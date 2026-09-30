@@ -1433,6 +1433,26 @@ class TheRemake(unittest.TestCase):
                         self.assertIn(refusal[1], said)
                         self.assertEqual(markers, [f"{prefix} work {waited} {place_of(launcher)} publish:ICS4U/2 terminal"])
 
+    def test_a_publish_set_for_later_is_never_ended(self):
+        """MF-4 (#378): launchd's runner is still running, so its publish is
+        waited for the whole ten minutes and refused — never stopped — even
+        in the instant after its deploy.sh has exited."""
+        runner = ("/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy "
+                  "/Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.sh "
+                  "--scheduled-section /Users/t/Work ICS4U 2")
+
+        def scheduled(pretend: AWorkspaceInUse) -> None:
+            pretend.launchers([[6101, 1, runner]])
+
+        for launcher in LAUNCHERS:
+            with self.subTest(launcher=launcher):
+                result, calls = self.remake(launcher, ["other work"], scheduled)
+                self.assertEqual(result.returncode, in_use_rules()["sentences"]["exitCode"], output_of(result))
+                self.assert_nothing_was_touched(calls, result)
+                self.assertIn(in_use_rules()["sentences"]["whenWorkDidNotFinish"][0]
+                              .replace("{origin}", origin_words("scheduled"))
+                              .replace("{doing}", doing_words("publish", "ICS4U/2")), self.said(result))
+
     def test_a_stopped_workspace_is_remade_without_asking_what_runs_in_it(self):
         for launcher in LAUNCHERS:
             with self.subTest(launcher=launcher):
@@ -1572,6 +1592,10 @@ class TheStopReachesOnlyThisFoldersWorkspace(unittest.TestCase):
                                     "teaching-quartz": "1e9ac7"})
                     pretend.looks([LOOKS["leftover"]])
                     pretend.launchers([])
+                    # All three are listed by the engine, running, so a stop
+                    # that went looking for "every workspace" would find them.
+                    everyone = [CONTAINER, "teaching-quartz-deadbeef", "teaching-quartz"]
+                    pretend.mac.workspaces({name: [] for name in everyone}, running=everyone)
                     result, calls = pretend.run(launcher, 'retire_legacy_container; remake_the_workspace; echo "CARRIED ON"')
                 self.assertEqual(result.returncode, 0, output_of(result))
                 self.assertEqual(engine_calls(calls, "stop"), ["docker stop " + OLD_ID], output_of(result))
