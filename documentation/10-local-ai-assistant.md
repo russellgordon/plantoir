@@ -6403,9 +6403,11 @@ finding's sentence, in the in-app assistant and over `--mcp-stdio`
 (`SiteHealthFinding.appending`), is `AssistWording.linksIntoHiddenPagesWillBeOffered`
 instead of ten pairs read aloud — only when the same build printed the
 checklist marker, the offer on disk is that build's, and the teacher has not
-already answered it (so it never promises a sheet that will not come), and
-`linksIntoHiddenPagesAreOfferedNow` when a window on that section is open and
-will show it at once; otherwise the finding's own words; and the assistant's
+already answered it (so it never promises a sheet that will not come) —
+otherwise the finding's own words. Its callers are the paths with no section
+window (`AssistSiteWork`); an "offered now" sentence for an open window was
+removed on review, because nothing on that path can honestly tell that a
+window on THAT folder's section is open; and the assistant's
 own publish no longer infers "never published" from "hidden now": its date
 moves skip a page the section's published-pages record lists
 (`datingPagesAClassBrings.publishedBeforeIsRecorded`, which replaced

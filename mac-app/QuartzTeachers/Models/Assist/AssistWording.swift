@@ -1614,14 +1614,6 @@ nonisolated enum AssistWording {
              + "pages, so you can change it in Obsidian any time. It’s never put on your website."
     }
 
-    /// The #333 finding said by an assistant — in the app or over
-    /// `--mcp-stdio` — when a window on that section is open and will show
-    /// the links checklist now (#379), rather than when it is next opened.
-    static func linksIntoHiddenPagesAreOfferedNow(course: String, section: String) -> String {
-        return "Some links on pages students can see lead to pages that are still hidden. "
-             + "The \(course) Section \(section) window is offering to publish them."
-    }
-
     /// The one sentence an assistant says for the #333 finding when the
     /// build has written a links checklist offer the teacher has not yet
     /// answered (#379): the section window will offer to publish the pages,
