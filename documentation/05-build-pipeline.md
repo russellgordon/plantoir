@@ -1259,7 +1259,10 @@ terminal or MCP publish leaves no console the app reads); an undo; offering
 the checklist after every build; `fixable: true`; changing the assistant's
 reach to two steps (`linksChecklist.knownDifference`); locked "comes with"
 rows under a ticked class (one summary line instead, a cut the director
-allowed; its own follow-up issue since #385); and, with
+allowed — reversed by [#398](https://github.com/russellgordon/plantoir/issues/398)
+in v1.4.2: the app now shows each row a ticked class brings as coming with
+it, from the planner's own plan; the offer the build writes is unchanged,
+`documentation/09-mac-app.md` → "Rows a ticked class brings (#398)"); and, with
 [#385](https://github.com/russellgordon/plantoir/issues/385) (v1.4.2), the
 rejections in the bullet "Rows that come under another row" above and in
 `linksChecklist.rejected`.
