@@ -475,6 +475,15 @@ public static class ScheduledPublishOutcome
     /// <summary>The same, against an arbitrary directory — what the tests use.</summary>
     public static void NoteFinishedRunsOnTrailIn(string directory)
     {
+        // One sweep at a time: since #218 the watcher runs it on every event,
+        // and two at once would each find no ".noted" mark and write the line twice.
+        lock (SweepGate) Sweep(directory);
+    }
+
+    private static readonly object SweepGate = new();
+
+    private static void Sweep(string directory)
+    {
         RefileOldNamedRecordsIn(directory);
         IEnumerable<string> files;
         try
