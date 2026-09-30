@@ -934,7 +934,9 @@ struct SectionDetailView: View {
         // But HELD, not dropped. Returning early discarded them — and the
         // failed-deploy path can arrive while the overnight findings are
         // already on screen, so this is reachable rather than theoretical.
-        if healthDialog != nil {
+        // Held behind the preview alert too (#397): the question about
+        // today's class can stay up while an assistant's build finishes.
+        if healthDialog != nil || previewAlertIsUp {
             // Appended, not assigned: three arrivals during one dialog used to
             // lose the middle batch.
             heldHealthFindings.append(
@@ -1035,7 +1037,7 @@ struct SectionDetailView: View {
         if forTheAlert.isEmpty {
             return
         }
-        if healthDialog != nil {
+        if healthDialog != nil || previewAlertIsUp {
             heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
             return
         }
@@ -1178,6 +1180,19 @@ struct SectionDetailView: View {
         previewAlertIsUp = true
     }
 
+    /// Two refusals in one alert, the earlier first. The title is the later
+    /// one's, since it is about the preview just asked for.
+    static func joining(_ earlier: PreviewAlert, then later: PreviewAlert) -> PreviewAlert {
+        guard case .refusal(_, let earlierSentence) = earlier,
+              case .refusal(let laterTitle, let laterSentence) = later else {
+            return later
+        }
+        if earlierSentence == laterSentence {
+            return later
+        }
+        return .refusal(title: laterTitle, sentence: earlierSentence + "\n\n" + laterSentence)
+    }
+
     /// Runs once the preview alert has gone: the preview the question's
     /// answer asked for, then whatever waited behind the alert.
     ///
@@ -1191,7 +1206,12 @@ struct SectionDetailView: View {
                 startPreview()
             }
         }
-        if !previewAlertIsUp, let held = heldPreviewRefusal {
+        if previewAlertIsUp, let held = heldPreviewRefusal {
+            // The button's own preview was refused too: both are said, the
+            // earlier first, rather than the held one dropped (implementation
+            // review, note 4).
+            previewAlert = SectionDetailView.joining(held, then: previewAlert)
+        } else if !previewAlertIsUp, let held = heldPreviewRefusal {
             previewAlert = held
             previewAlertIsUp = true
         } else if !previewAlertIsUp, let sentence = frontPageNotChanged {
@@ -1280,14 +1300,9 @@ struct SectionDetailView: View {
     func answerTodaysClass(_ offer: TodaysClassOnTheFrontPage.Offer, show: Bool) {
         startPreviewWhenTheQuestionHasGone = true
         if !show {
-            let notToday: TodaysClassOnTheFrontPage.NotToday = TodaysClassOnTheFrontPage.NotToday(
-                day: offer.day.text, classTitle: offer.classTitle
-            )
-            // A record that could not be written costs the question once
-            // more at the next press, nothing else.
-            try? notToday.write(courseDirectory: course.directoryURL, section: sectionNumber)
             ActivityTrail.note(
-                .frontPageLeftAsItWas, TodaysClassOnTheFrontPage.notTodayTrailLine(offer: offer),
+                .frontPageLeftAsItWas,
+                TodaysClassOnTheFrontPage.answerNotToday(offer, courseDirectory: course.directoryURL),
                 course: course.code, section: sectionNumber
             )
             return

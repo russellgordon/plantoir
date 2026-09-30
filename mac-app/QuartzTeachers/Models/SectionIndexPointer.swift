@@ -75,6 +75,10 @@ enum SectionIndexPointer {
         /// How many folders the teacher wrote before the name.
         let folderDepth: Int
 
+        /// Whether one of those folders is a `section<N>` folder — a path the
+        /// build turns into its display name (`rewrite_section_wikilinks`).
+        let namesASectionFolder: Bool
+
         /// The display name after `|`, as written, or nil.
         let displayName: String?
 
@@ -200,6 +204,12 @@ enum SectionIndexPointer {
                 continue
             }
 
+            var namesASectionFolder: Bool = false
+            for position in 0..<(pathParts.count - 1) {
+                if SectionIndexPointer.isASectionFolder(pathParts[position].trimmingCharacters(in: .whitespaces)) {
+                    namesASectionFolder = true
+                }
+            }
             var displayName: String?
             if let bar = inside.range(of: "|") {
                 displayName = String(inside[bar.upperBound...])
@@ -210,6 +220,7 @@ enum SectionIndexPointer {
                 lineIndex: bodyStart + offset,
                 name: name,
                 folderDepth: pathParts.count - 1,
+                namesASectionFolder: namesASectionFolder,
                 displayName: displayName,
                 hasMarkdownExtension: hasMarkdownExtension,
                 before: String(line[..<embedStart]),
@@ -220,33 +231,79 @@ enum SectionIndexPointer {
     }
 
     /// The embed that replaces `line`, naming `page` in the form the teacher
-    /// wrote (`sectionIndexPointer.writtenAs`, #397): a folder path keeps its
-    /// DEPTH and names where `page` actually is; a display name equal to the
-    /// old class's name follows the class; any other display name, and any
-    /// heading, is dropped; a typed `.md` stays.
-    static func embed(replacing line: ClassLine, with page: AssistSectionPage) -> String {
-        var written: String = page.title
+    /// wrote, as far as the SITE can still draw it
+    /// (`sectionIndexPointer.writtenAs`, #397):
+    ///
+    /// * a path holding a `section<N>` folder is written as the class's full
+    ///   place inside the course folder, and ALWAYS with `|<its name>` — the
+    ///   build turns a section path into its display name, and without one
+    ///   leaves a target the site does not have (implementation review,
+    ///   finding 1: MPM2DE's `…|Thread 1, Day 1` lost its name and the front
+    ///   page showed nothing);
+    /// * any other path is written as the class's place from the site's root
+    ///   (inside its section folder, or the course folder for a class outside
+    ///   one), because Quartz reads a path from there;
+    /// * a display name equal to the old class's name follows the class; any
+    ///   other, and a heading, is dropped; a typed `.md` stays.
+    ///
+    /// Places are read against `courseDirectory`, never from the disk path's
+    /// last few folders, which lost the `section1/` anchor one folder deeper
+    /// and could pick up the course folder's own name (finding 3). With no
+    /// course folder to read against, the bare name is written — what the
+    /// pointer always wrote before #397.
+    static func embed(replacing line: ClassLine, with page: AssistSectionPage, courseDirectory: URL?) -> String {
+        var name: String = page.title
         if line.hasMarkdownExtension {
-            written += ".md"
+            name += ".md"
         }
-        if line.folderDepth > 0 {
-            var folders: [String] = []
-            for component in page.fileURL.deletingLastPathComponent().pathComponents where component != "/" {
-                folders.append(component)
+        var written: String = name
+        if line.folderDepth > 0, let courseDirectory,
+           let place = SectionIndexPointer.foldersInsideTheCourse(of: page, courseDirectory: courseDirectory) {
+            var folders: [String] = place
+            if !line.namesASectionFolder, let first = folders.first, SectionIndexPointer.isASectionFolder(first) {
+                folders.removeFirst()
             }
-            if folders.count >= line.folderDepth {
-                var kept: [String] = []
-                for index in (folders.count - line.folderDepth)..<folders.count {
-                    kept.append(folders[index])
-                }
-                written = kept.joined(separator: "/") + "/" + written
+            if !folders.isEmpty {
+                written = folders.joined(separator: "/") + "/" + name
             }
         }
+        var keepsAName: Bool = line.namesASectionFolder
         if let displayName = line.displayName,
            displayName.trimmingCharacters(in: .whitespaces).lowercased() == line.name.lowercased() {
+            keepsAName = true
+        }
+        if keepsAName {
             written += "|" + page.title
         }
         return "![[" + written + "]]"
+    }
+
+    /// The folders between the course folder and `page`, or nil when the page
+    /// is not inside it.
+    static func foldersInsideTheCourse(of page: AssistSectionPage, courseDirectory: URL) -> [String]? {
+        let root: String = courseDirectory.standardizedFileURL.path + "/"
+        let full: String = page.fileURL.standardizedFileURL.path
+        guard full.hasPrefix(root) else {
+            return nil
+        }
+        var parts: [String] = String(full.dropFirst(root.count)).components(separatedBy: "/")
+        parts.removeLast()
+        var folders: [String] = []
+        for part in parts where !part.isEmpty {
+            folders.append(part)
+        }
+        return folders
+    }
+
+    /// `section1`, `section12`: a section's own folder in the course.
+    static func isASectionFolder(_ name: String) -> Bool {
+        guard name.hasPrefix("section"), name.count > "section".count else {
+            return false
+        }
+        for character in name.dropFirst("section".count) where !character.isASCII || !character.isNumber {
+            return false
+        }
+        return true
     }
 
     /// The index rewritten to point at `page`, or nil when nothing needs to
@@ -264,7 +321,8 @@ enum SectionIndexPointer {
         _ text: String,
         at page: AssistSectionPage,
         classTitles: Set<String>,
-        createdTail: String
+        createdTail: String,
+        courseDirectory: URL?
     ) -> Result? {
         var updated: String = text
         var replaced: String?
@@ -283,7 +341,7 @@ enum SectionIndexPointer {
             // `replacingOccurrences` rewrote it too until #397.
             var lines: [String] = text.components(separatedBy: "\n")
             lines[found.lineIndex] = found.before
-                + SectionIndexPointer.embed(replacing: found, with: page)
+                + SectionIndexPointer.embed(replacing: found, with: page, courseDirectory: courseDirectory)
                 + found.after
             updated = lines.joined(separator: "\n")
             replaced = found.name
@@ -341,7 +399,8 @@ enum SectionIndexPointer {
             forSection: sectionNumber
         )
         guard let result = SectionIndexPointer.repointing(
-            before, at: newest, classTitles: classTitles, createdTail: tail
+            before, at: newest, classTitles: classTitles, createdTail: tail,
+            courseDirectory: course.directoryURL
         ) else {
             return nil
         }
