@@ -109,7 +109,8 @@ enum SaveEnablement {
         return isHeldBack && !wasHeldBack && !alreadyNoted
     }
 
-    /// The trail line. Says which check, never the path or the ID.
+    /// The trail line. Says which check, never the path or the ID — and reads
+    /// as a HOLD, not a failure: no Save was pressed (#373 review, N2).
     static func heldBackTrailLine(courseCode: String, check: Check) -> String {
         var what: String = ""
         switch check {
@@ -120,6 +121,6 @@ enum SaveEnablement {
         case .additionalDestination:
             what = "an additional publishing destination needs attention"
         }
-        return "could not save the settings for " + courseCode + " yet (" + check.rawValue + ") — " + what
+        return "Save held back for " + courseCode + " (" + check.rawValue + ") — " + what
     }
 }

@@ -292,10 +292,18 @@ final class SaveEnablesTests: XCTestCase {
         await settle(seconds: 0.5)
         course.configuration.setEmoji("🔬", forSection: 1)
         await settle(seconds: 0.5)
+        // Leave the held-back state and come back into it, the way a teacher
+        // typing a path passes through usable and unusable folders: still
+        // ONE line for the visit (#373 review, N1 — without this step the
+        // per-visit flag could be deleted with every test green).
+        course.configuration.deployFolderPath = scratchURL.appendingPathComponent("existing folder").path
+        await settle(seconds: 0.8)
+        course.configuration.deployFolderPath = scratchURL.appendingPathComponent("no such folder").path
+        await settle(seconds: 0.8)
 
         let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
         XCTAssertEqual(
-            SaveEnablesTests.occurrences(of: "could not save the settings for EXC2O yet (deploy folder)", in: trail), 1,
+            SaveEnablesTests.occurrences(of: "Save held back for EXC2O (deploy folder)", in: trail), 1,
             "the held-back line should be on the trail exactly once: \(trail)"
         )
         XCTAssertFalse(trail.contains("no such folder"), "the trail must never carry the path")
