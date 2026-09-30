@@ -215,6 +215,7 @@ public static class ActivityTrail
         /// file.
         /// </summary>
         RememberedTimetableSetAside,
+        SectionAdded,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -264,6 +265,7 @@ public static class ActivityTrail
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
+        Event.SectionAdded => "section added",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

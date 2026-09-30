@@ -525,6 +525,10 @@ public static class PageFrontmatter
         return (Rebuild(lines, newline), new DraftEdit(key, before, draft, Changed: true));
     }
 
+    /// <summary>How many lines below the key at <paramref name="keyIndex"/> belong to its value (see <see cref="ContinuationLines"/>).</summary>
+    internal static int ContinuationLineCount(List<string> lines, int keyIndex, int closeIndex, bool keyValueWasEmpty) =>
+        ContinuationLines(lines, keyIndex, closeIndex, keyValueWasEmpty).Count;
+
     /// <summary>
     /// The lines BELOW a key that are part of its value, and so have to go
     /// wherever the key's line goes.
