@@ -6225,6 +6225,14 @@ def _is_draft(text: str) -> bool:
     A page wrongly left out of the coverage map is an expectation the map
     says nobody teaches.
     """
+    # Line endings first. The native Windows build writes its processed
+    # copies in text mode, so every page it reads back here ends its lines
+    # in CR LF, and a teacher's own page saved on Windows may too. Without
+    # this, `---\r\n` was not a fence and a page with `publish: false` read
+    # as VISIBLE (measured 2026-09-30, test_unreadable_page_settings on
+    # Windows 11). python-frontmatter, which the site's own reading goes
+    # through, accepts either ending.
+    text = text.replace("\r\n", "\n")
     if not text.startswith("---\n"):
         return False
     end = text.find("\n---", 4)
