@@ -112,6 +112,12 @@ version line. A list that survives its own release is worse than no list.
 
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-30 | Pressing Preview when today's class is published but the section's front page still shows an older one offers to put today's class there, with a Not Today button (#397). | macOS; shared toolchain | 629 |
+| 2026-09-30 | Scheduling a deploy names every place the course publishes to, and no longer lists the classes that are not published yet (#396). | macOS | 623 |
+| 2026-09-30 | In the links checklist, a page reached only through another offered page follows that page's row, and a page a ticked class brings is shown coming with it; pages are named the way Get Ready names them (#385, #398). | macOS; shared toolchain | 622, 628 |
+| 2026-09-30 | Asking the assistant (or Claude or Codex) which courses there are names every place each one publishes to (#403). | macOS | 627 |
+| 2026-09-30 | The default colour scheme is called "Standard Colours" (#383). | macOS; shared toolchain | 624 |
+| 2026-09-30 | A course set up at the command line follows the same course-code rule as the apps, with a note for an existing course whose code does not (#402). | macOS and Windows (shared toolchain) | 626 |
 
 ## Warnings the release notes MUST carry
 

@@ -6242,9 +6242,13 @@ folder path and before any `|` or `#` — and replaces that line. So a course's
 creation, by `setup_course.py`) and CODING's hand-made "## Most Recent Meeting"
 all repoint the same way, and an existing course keeps its heading. Nothing
 here changed in behaviour; what changed is that it is now CONTRACT data,
-`class-planning.json` → `sectionIndexPointer` (9 cases, run by
+`class-planning.json` → `sectionIndexPointer` (9 cases then; 27 since #397, run by
 `ClassPlanningContractTests.testTheFrontPageIsRepointedAsTheContractSays`;
-removing the class-title check turns it red).
+removing the class-title check turns it red). Since #397 (2026-09-30) the
+line is found OUTSIDE code and `%%` comments, only the line found is
+rewritten, and the new line keeps the form the teacher wrote as far as the
+site can draw it (`sectionIndexPointer.writtenAs`) —
+`documentation/09-mac-app.md` → "Today's class on the front page (#397)".
 
 **The date follows the embed, and a page with none keeps its own (#275,
 2026-09-25).** `repointing` used to write the front page's `created` AFTER its
