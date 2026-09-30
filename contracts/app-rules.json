@@ -4835,6 +4835,67 @@
             ],
             "waitingFor" : "publish MPM2D/2 terminal",
             "why" : "#388 plan review 8: a process is looked at for a launcher, a publish set for later and a docker exec independently, as before the two readers became one. This line names a launcher for another section, which cannot own MPM2D's publish; its docker exec aimed at this workspace can, and does. Stopping after the first kind found on a line would lose the exec and end a publish that is still being waited for."
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/deploy.sh A;B 1",
+              "/bin/bash /Users/t/Work/preview.sh ICS4U 1"
+            ],
+            "name" : "a course holding \";\" beside a live preview of another course: every piece is owned",
+            "preview" : "ICS4U/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=A;B --section=1 --port 8082 --build-only"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8081"
+              ]
+            ],
+            "waitingFor" : "preview ICS4U/1 -",
+            "why" : "#388 impl review S1: \";\" is the separator of the places the one reader is asked about, so a course holding it (no app can make one; the command-line setup can) would shift every later piece onto the wrong place, and this live preview of ICS4U would read as gone and be stopped. Such work text is answered the safe way: every piece owned, a wait rather than a guess. A \"\\\\\" is answered the same way (awk -v reads \"\\\\073\" as \";\")."
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              [
+                6101,
+                1,
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.sh --scheduled-section /Users/t/Work ICS4U 2"
+              ]
+            ],
+            "leftovers" : "build:ICS4U/3",
+            "name" : "a publish set for later owns only its own section's named work, and any unnameable work",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                510,
+                1,
+                "sh -c echo checking; read answer"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=3 --port 8082 --build-only"
+              ]
+            ],
+            "waitingFor" : "work - scheduled",
+            "why" : "#388 impl review N5: while launchd runs a publish of ICS4U section 2, work it cannot name (its own short check) is waited for, and a build of ANOTHER section whose launcher has gone is left over. `found = here` in place of `kind == \"other\" || here` would end the first; ignoring the place would keep the second."
           }
         ],
         "casesWhy" : "`launchers` rows are either a command line (given pid 7001, 7002… and parent 1) or [pid, parent, command line], so a case can say who started what. `leftovers` is the space-separated WORKSPACE_LEFTOVERS the look must set, `waitingFor` its WORKSPACE_WAITING_FOR; both default to empty. `psFails` makes the process table unreadable. Run through the REAL look by scripts/test_port_blocks.py in all three launchers. `psEmpty` makes `ps` answer 0 with no lines. A course with a space is carried with \"+\" for it (`preview`, `waitingFor`, `leftovers` and the markers), and decoded for every sentence.",

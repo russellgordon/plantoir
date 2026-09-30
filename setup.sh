@@ -2255,6 +2255,17 @@ WORKSPACE_LEFTOVERS=""
 # course AP, section CALC, and was stopped as left over).
 the_owners_of_the_work() {
   local places records status
+  # A course holding ";" (the PLACES separator) or "\" (which awk -v reads
+  # as the start of an escape, "\073" being ";") would shift every later
+  # place's number onto the wrong piece, and a live preview of ANOTHER
+  # course would read as gone. No app can make such a code, but the
+  # command-line setup can (knownLimits), so the answer is the safe one:
+  # every piece owned, a wait rather than a guess (#388 impl review S1).
+  case "$1" in
+    *";"*|*"\\"*)
+      printf '%s\n' "$1" | awk 'NF == 3 { print "owned - " $0 }'
+      return 0 ;;
+  esac
   # One place per piece of work, in the same order as the pieces, so a
   # record's place numbers are the pieces' numbers.
   places="$(printf '%s\n' "$1" | awk 'NF == 3 { printf "%s%s %s", (n++ ? ";" : ""), $2, $3 }')"
