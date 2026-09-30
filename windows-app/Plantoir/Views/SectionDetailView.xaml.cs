@@ -444,7 +444,9 @@ public sealed partial class SectionDetailView : UserControl
         if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
         try
         {
-            var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
+            var waiting = _window.Workspace.WorkspacePath is { } folder
+                ? ScheduledHealthFindings.Take(_course.Code, _sectionNumber, folder)
+                : Array.Empty<SiteHealthFinding>();
             if (waiting.Count > 0) NoteHealthFindings(waiting, cameFromPublishing: true);
         }
         catch (Exception ex)
@@ -480,7 +482,14 @@ public sealed partial class SectionDetailView : UserControl
     private void ShowHowTheScheduledPublishTurnedOut()
     {
         ScheduledPublishOutcome.Result? outcome;
-        try { outcome = ScheduledPublishOutcome.Read(_course.Code, _sectionNumber); }
+        try
+        {
+            // THIS working folder's record (#309): another folder's ICS3U
+            // section 1 is a different alarm with its own news.
+            outcome = _window.Workspace.WorkspacePath is { } folder
+                ? ScheduledPublishOutcome.Read(_course.Code, _sectionNumber, folder)
+                : null;
+        }
         catch (Exception ex)
         {
             App.LogDiagnostic($"ShowHowTheScheduledPublishTurnedOut exception: {ex}");
@@ -552,7 +561,8 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
-            ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber);
+            if (_window.Workspace.WorkspacePath is { } folder)
+                ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber, folder);
             SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
         }
         catch (Exception ex)

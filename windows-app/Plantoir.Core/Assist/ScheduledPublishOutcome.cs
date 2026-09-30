@@ -79,13 +79,43 @@ public static class ScheduledPublishOutcome
         BuildNeededAnAnswer,
 
         /// <summary>
-        /// Any other non-zero exit — a revoked token, a network that was down,
-        /// a build that failed for an ordinary reason.
+        /// Any other non-zero exit from a DESTINATION — a revoked token, a
+        /// network that was down. Until #297 this also covered a build that
+        /// failed, with every configured destination joined; that is
+        /// <see cref="BuildDidNotFinish"/> now.
         /// </summary>
         DidNotFinish,
 
         /// <summary>It worked, and went out to everywhere it was meant to.</summary>
         Succeeded,
+
+        /// <summary>
+        /// The BUILD exited with any code but 3 — never only 1 — before any
+        /// destination was reached (#297, mac #137). Names no destination and
+        /// sends the teacher to Preview.
+        /// </summary>
+        BuildDidNotFinish,
+
+        /// <summary>
+        /// The run came so long after its moment that it stood down (#239):
+        /// nothing deployed, the task cleared away. Windows' own tasks do not
+        /// run a missed start late (measured, documentation/07), so this is a
+        /// guard for a task somebody set to, not an everyday outcome.
+        /// </summary>
+        TooLateToRun,
+
+        /// <summary>
+        /// Another program was still building or publishing the course after
+        /// the run had waited ten minutes for it (#289), so it stood down.
+        /// </summary>
+        CourseWasBusy,
+
+        /// <summary>
+        /// The run read the course's settings when it fired (#347) and could
+        /// not deploy the way the course is set NOW; the record's second line
+        /// is the reason, and the sentence says it.
+        /// </summary>
+        CouldNotRunAsSetNow,
     }
 
     /// <summary>
@@ -124,8 +154,19 @@ public static class ScheduledPublishOutcome
     /// reach. A writer and a reader that disagree about a filename fail in the
     /// quietest way available — written faithfully every night, read never.
     /// </remarks>
-    public static string SentinelPath(string courseCode, int sectionNumber) =>
-        Path.Combine(Directory(), TaskScheduling.HealthRecordName(courseCode, sectionNumber));
+    public static string SentinelPath(string courseCode, int sectionNumber, string workingFolder) =>
+        Path.Combine(Directory(), TaskScheduling.HealthRecordName(courseCode, sectionNumber, workingFolder));
+
+    /// <summary>
+    /// The record's file in <paramref name="directory"/>: under the working
+    /// folder's name (#309), or — with no folder — the folder-less name every
+    /// record had before, which only the tests of the record's own format and
+    /// <see cref="RefileOldNamedRecordsIn"/> still ask for.
+    /// </summary>
+    internal static string RecordPath(string directory, string courseCode, int sectionNumber, string? workingFolder) =>
+        Path.Combine(directory, workingFolder is null
+            ? TaskScheduling.OldHealthRecordName(courseCode, sectionNumber)
+            : TaskScheduling.HealthRecordName(courseCode, sectionNumber, workingFolder));
 
     /// <summary>How a scheduled publish turned out, or null if nothing is waiting.</summary>
     /// <param name="Outcome">Which of the four it was.</param>
@@ -175,6 +216,10 @@ public static class ScheduledPublishOutcome
         Kind.BuildNeededAnAnswer => "build-needed-an-answer",
         Kind.DidNotFinish => "did-not-finish",
         Kind.Succeeded => "succeeded",
+        Kind.BuildDidNotFinish => "build-did-not-finish",
+        Kind.TooLateToRun => "too-late-to-run",
+        Kind.CourseWasBusy => "course-was-busy",
+        Kind.CouldNotRunAsSetNow => "could-not-run-as-set-now",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -184,6 +229,10 @@ public static class ScheduledPublishOutcome
         "build-needed-an-answer" => Kind.BuildNeededAnAnswer,
         "did-not-finish" => Kind.DidNotFinish,
         "succeeded" => Kind.Succeeded,
+        "build-did-not-finish" => Kind.BuildDidNotFinish,
+        "too-late-to-run" => Kind.TooLateToRun,
+        "course-was-busy" => Kind.CourseWasBusy,
+        "could-not-run-as-set-now" => Kind.CouldNotRunAsSetNow,
         _ => null,
     };
 
@@ -200,13 +249,27 @@ public static class ScheduledPublishOutcome
     /// section and the destination already.</para>
     /// </remarks>
     public static void Record(
-        string directory, string courseCode, int sectionNumber, Kind kind, string destination)
+        string directory, string courseCode, int sectionNumber, Kind kind, string destination,
+        string? workingFolder = null)
     {
         System.IO.Directory.CreateDirectory(directory);
-        File.WriteAllText(
-            Path.Combine(directory, TaskScheduling.HealthRecordName(courseCode, sectionNumber)),
+        string path = RecordPath(directory, courseCode, sectionNumber, workingFolder);
+        // Assembled OUTSIDE the directory and moved in (#218): a watch on the
+        // directory fires on the create, and a record written in two steps
+        // was empty at that instant on the mac, 0 of 40 times readable. One
+        // move is one event carrying a whole record.
+        string assembling = Path.Combine(Path.GetTempPath(), $"plantoir-record-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(assembling,
             string.Join(Environment.NewLine,
                 Word(kind), destination, courseCode, sectionNumber.ToString()) + Environment.NewLine);
+        try { File.Move(assembling, path, overwrite: true); }
+        catch
+        {
+            // A move refused: write it in place rather than lose it.
+            File.Copy(assembling, path, overwrite: true);
+            try { File.Delete(assembling); } catch { }
+        }
+        try { File.Delete(path + NotedSuffix); } catch { }
     }
 
     /// <summary>What the mark saying a record's trail line has been written is called.</summary>
@@ -233,13 +296,15 @@ public static class ScheduledPublishOutcome
     /// it, or the teacher dismisses it. Not showing it is then simply not
     /// showing it, and tomorrow morning still works.</para>
     /// </remarks>
-    public static Result? Read(string courseCode, int sectionNumber) =>
-        ReadFrom(Directory(), courseCode, sectionNumber);
+    public static Result? Read(string courseCode, int sectionNumber, string workingFolder) =>
+        ReadFrom(Directory(), courseCode, sectionNumber, workingFolder);
 
     /// <summary>The same, against an arbitrary directory — what the tests use.</summary>
-    public static Result? ReadFrom(string directory, string courseCode, int sectionNumber)
+    public static Result? ReadFrom(string directory, string courseCode, int sectionNumber, string? workingFolder = null) =>
+        ReadPath(RecordPath(directory, courseCode, sectionNumber, workingFolder), courseCode, sectionNumber);
+
+    private static Result? ReadPath(string path, string courseCode, int sectionNumber)
     {
-        string path = Path.Combine(directory, TaskScheduling.HealthRecordName(courseCode, sectionNumber));
         string text;
         DateTime writtenAt;
         try
@@ -320,7 +385,7 @@ public static class ScheduledPublishOutcome
         // A success names where it went; a build refusal has nowhere to name.
         // Only the two destination-shaped failures are unusable without one.
         if (destination.Length == 0
-            && kind is Kind.NeededAnAnswer or Kind.DidNotFinish) return null;
+            && kind is Kind.NeededAnAnswer or Kind.DidNotFinish or Kind.CouldNotRunAsSetNow) return null;
 
         string course = lines.Length > 2 ? lines[2].Trim() : "";
         if (course.Length == 0) course = fallbackCourse;
@@ -341,13 +406,22 @@ public static class ScheduledPublishOutcome
     /// hand — and the next scheduled run that would have cleared it could be a
     /// week away.
     /// </remarks>
-    public static void Dismiss(string courseCode, int sectionNumber) =>
-        Clear(Directory(), courseCode, sectionNumber);
+    public static void Dismiss(string courseCode, int sectionNumber, string workingFolder)
+    {
+        Clear(Directory(), courseCode, sectionNumber, workingFolder);
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Raised after this process dismisses a record, so the one app-wide
+    /// watcher (#218) moves the section's band and the sidebar's badge together.
+    /// </summary>
+    public static event Action? Changed;
 
     /// <summary>Throw away this section's record, and the mark saying it has been noted.</summary>
-    public static void Clear(string directory, string courseCode, int sectionNumber)
+    public static void Clear(string directory, string courseCode, int sectionNumber, string? workingFolder = null)
     {
-        string path = Path.Combine(directory, TaskScheduling.HealthRecordName(courseCode, sectionNumber));
+        string path = RecordPath(directory, courseCode, sectionNumber, workingFolder);
         try { File.Delete(path); } catch { }
         // The sidecar goes with it. Left behind, it would suppress the trail
         // line for the NEXT run whose record happened to be written within the
@@ -394,6 +468,7 @@ public static class ScheduledPublishOutcome
     /// <summary>The same, against an arbitrary directory — what the tests use.</summary>
     public static void NoteFinishedRunsOnTrailIn(string directory)
     {
+        RefileOldNamedRecordsIn(directory);
         IEnumerable<string> files;
         try
         {
@@ -430,7 +505,7 @@ public static class ScheduledPublishOutcome
                     SectionFromRecordName(Path.GetFileName(file)) ?? ("", 0);
                 if (fallbackSection == 0) continue;
 
-                if (ReadFrom(directory, fallbackCourse, fallbackSection) is not { } result) continue;
+                if (ReadPath(file, fallbackCourse, fallbackSection) is not { } result) continue;
 
                 ActivityTrail.Note(
                     EventFor(result.Outcome), TrailSentence(result),
@@ -461,6 +536,8 @@ public static class ScheduledPublishOutcome
     {
         const string marker = "-section";
         string stem = Path.GetFileNameWithoutExtension(fileName);
+        // Since #309 the working folder's id follows the section: "-section1.abcd1234".
+        stem = System.Text.RegularExpressions.Regex.Replace(stem, @"\.[0-9a-f]{8}$", "");
         int at = stem.LastIndexOf(marker, StringComparison.Ordinal);
         if (at <= 0) return null;
         if (!int.TryParse(stem[(at + marker.Length)..], out int section)) return null;
@@ -488,6 +565,14 @@ public static class ScheduledPublishOutcome
             $"the publish set to happen on its own did not finish — {result.Destination} stopped",
         Kind.Succeeded =>
             $"the publish set to happen on its own went out to {result.Destination}",
+        Kind.BuildDidNotFinish =>
+            "the publish set to happen on its own did not finish — the pages could not be built, so no destination was reached",
+        Kind.TooLateToRun =>
+            "turned off: the day it was set for had gone by, by more than the course allows, so it stood down",
+        Kind.CourseWasBusy =>
+            "turned off: another program on this computer was still building the course after ten minutes, so it stood down",
+        Kind.CouldNotRunAsSetNow =>
+            $"turned off: it could not deploy the way the course is set now — {result.Destination}",
         _ => throw new ArgumentOutOfRangeException(nameof(result)),
     };
 
@@ -526,6 +611,27 @@ public static class ScheduledPublishOutcome
                 $"{courseCode} Section {sectionNumber} published on its own to {result.Destination}. " +
                 "Your students have the new pages.",
 
+            Kind.BuildDidNotFinish =>
+                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped before it " +
+                "started — the pages could not be built, so nothing went up anywhere. Preview this section once " +
+                "yourself, and the reason will be in that section's window.",
+
+            Kind.TooLateToRun =>
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, but this computer wasn’t awake " +
+                "at that time and too long has passed since. Plantoir left the site as it was. Deploy it yourself " +
+                "when you’re ready, or schedule another from the section’s menu.",
+
+            Kind.CourseWasBusy =>
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, but the course was still being " +
+                "built somewhere else on this computer after ten minutes of waiting, so Plantoir left the site as it " +
+                "was rather than build it twice at once. Deploy it yourself when that has finished, or schedule " +
+                "another from the section’s menu.",
+
+            Kind.CouldNotRunAsSetNow =>
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, but it could not deploy the way " +
+                $"the course is set now — {result.Destination} — so Plantoir left the site as it was. Deploy it " +
+                "yourself from the section, or schedule another from the section’s menu.",
+
             _ => throw new ArgumentOutOfRangeException(nameof(result)),
         };
 
@@ -540,6 +646,25 @@ public static class ScheduledPublishOutcome
     /// </remarks>
     public static bool NeedsAttention(Kind kind) => kind != Kind.Succeeded;
 
+    /// <summary>
+    /// Every kind's contract key, through one exhaustive switch — what the
+    /// kinds test and the sentence test both walk (the mac's shape, recommended
+    /// on #239): a new kind cannot be added without a key, and both tests reach
+    /// it at once.
+    /// </summary>
+    public static string ContractKey(Kind kind) => kind switch
+    {
+        Kind.NeededAnAnswer => "neededAnAnswer",
+        Kind.BuildNeededAnAnswer => "buildNeededAnAnswer",
+        Kind.DidNotFinish => "didNotFinish",
+        Kind.Succeeded => "succeeded",
+        Kind.BuildDidNotFinish => "buildDidNotFinish",
+        Kind.TooLateToRun => "tooLateToRun",
+        Kind.CourseWasBusy => "courseWasBusy",
+        Kind.CouldNotRunAsSetNow => "couldNotRunAsSetNow",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
     /// <summary>The trail event this outcome leaves.</summary>
     /// <remarks>
     /// A build that stopped for a question is filed under "needed an answer"
@@ -551,10 +676,62 @@ public static class ScheduledPublishOutcome
     {
         Kind.NeededAnAnswer or Kind.BuildNeededAnAnswer =>
             ActivityTrail.Event.ScheduledPublishNeededAnAnswer,
-        Kind.DidNotFinish =>
+        Kind.DidNotFinish or Kind.BuildDidNotFinish =>
             ActivityTrail.Event.ScheduledPublishDidNotFinish,
         Kind.Succeeded =>
             ActivityTrail.Event.ScheduledPublishFinished,
+        // A run that stood down leaves the same event a removal does: the
+        // teacher's alarm is gone, and the reason is what differs (#239).
+        Kind.TooLateToRun or Kind.CourseWasBusy or Kind.CouldNotRunAsSetNow =>
+            ActivityTrail.Event.ScheduledDeployTurnedOff,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
+
+    /// <summary>
+    /// File every record a task set before #309 wrote under the folder-less
+    /// name under its working folder's name instead — the one moment its owner
+    /// can be known, from the wrapper that task still runs. A record whose
+    /// wrapper is gone is left where it is and shown nowhere: showing folder
+    /// A's failure in folder B is worse than the stated limit (mac #237).
+    /// </summary>
+    public static void RefileOldNamedRecordsIn(string directory)
+    {
+        IEnumerable<string> files;
+        try
+        {
+            files = System.IO.Directory.EnumerateFiles(directory, "*.txt")
+                .Where(path => path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !System.Text.RegularExpressions.Regex.IsMatch(
+                    Path.GetFileNameWithoutExtension(path), @"\.[0-9a-f]{8}$"))
+                .ToList();
+        }
+        catch { return; }
+
+        foreach (string file in files)
+        {
+            try
+            {
+                if (SectionFromRecordName(Path.GetFileName(file)) is not var (nameCourse, section)) continue;
+                string course = nameCourse;
+                try
+                {
+                    var lines = File.ReadAllLines(file);
+                    if (lines.Length > 2 && lines[2].Trim().Length > 0) course = lines[2].Trim();
+                }
+                catch { }
+                if (TaskScheduling.WorkingFolderOfTheOldTask(course, section) is not { } folder) continue;
+
+                string target = Path.Combine(directory, TaskScheduling.HealthRecordName(course, section, folder));
+                if (File.Exists(target) && File.GetLastWriteTimeUtc(target) >= File.GetLastWriteTimeUtc(file))
+                {
+                    File.Delete(file);
+                    try { File.Delete(file + NotedSuffix); } catch { }
+                    continue;
+                }
+                File.Move(file, target, overwrite: true);
+                if (File.Exists(file + NotedSuffix)) File.Move(file + NotedSuffix, target + NotedSuffix, overwrite: true);
+            }
+            catch { /* left for the next sweep */ }
+        }
+    }
 }

@@ -33,20 +33,43 @@ public sealed class ScheduledDeploy
         if (when <= now)
             return $"{when:dddd d MMMM, h:mm tt} has already passed. Pick a time still to come.";
 
-        // The PRIMARY destination — unchanged wording and order from before
-        // a course could have more than one, so every existing check
-        // against this function still passes byte for byte.
-        if (course.Configuration.DeployTarget == "local_folder")
-        {
-            if (Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath) is { } folderProblem)
-                return $"{course.Code} deploys to a folder, and that folder needs attention first: {folderProblem}";
-        }
+        return RefusalOf(course, sectionNumber, cloudflareAccountID) is { } refusal
+            ? SentenceFor(refusal, course, sectionNumber, cloudflareAccountID)
+            : null;
+    }
 
-        if (course.Configuration.DeploysToCloudflare)
-        {
-            if (Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
-                return $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
-        }
+    /// <summary>
+    /// One of <c>scheduledDeployRefusals</c>' keys, and the destination it is
+    /// about when it names one.
+    /// </summary>
+    public sealed record Refusal(string Key, string? Destination = null);
+
+    /// <summary>
+    /// Every refusal <c>scheduledDeployRefusals</c> makes EXCEPT a time already
+    /// passed, in its order, as a key. ONE decision for the schedule sheet (which
+    /// words it as a whole sentence, <see cref="Problem"/>) and for the run that
+    /// checks it all again when it fires (#347,
+    /// <c>scheduledDeployCancellation.theDestination</c>), so the two cannot
+    /// drift apart — a second copy of these checks is exactly the option (b)
+    /// #347 rejected.
+    /// </summary>
+    public static Refusal? RefusalOf(Models.Course course, int sectionNumber, string cloudflareAccountID)
+    {
+        // A course kept for reference is never deployed (#241's marker; this
+        // app keeps none for reference yet, but a folder can arrive with one).
+        if (course.Configuration.Values["kept_for_reference"] is Newtonsoft.Json.Linq.JValue { Type: Newtonsoft.Json.Linq.JTokenType.Boolean } kept
+            && kept.ToObject<bool>())
+            return new Refusal("keptForReference");
+
+        // The PRIMARY destination — unchanged order from before a course could
+        // have more than one.
+        if (course.Configuration.DeployTarget == "local_folder"
+            && Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath) is not null)
+            return new Refusal("deployFolderNeedsAttention");
+
+        if (course.Configuration.DeploysToCloudflare
+            && Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is not null)
+            return new Refusal("cloudflareAccountMissing");
 
         // Every ADDITIONAL destination gets the same two checks — a
         // redundancy target with no valid folder or credential would
@@ -54,22 +77,17 @@ public sealed class ScheduledDeploy
         // the surprise asking everything up front exists to prevent.
         foreach (var target in course.Configuration.AdditionalDeployTargets)
         {
-            if (target.Type == "local_folder")
-            {
-                if (Models.CourseConfiguration.DeployFolderProblem(target.Path) is { } folderProblem)
-                    return $"{course.Code} also deploys to a folder, and that folder needs attention first: {folderProblem}";
-            }
-            if (target.Type == "cloudflare_pages")
-            {
-                if (Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is { } accountProblem)
-                    return $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. {accountProblem} Add it in this course’s settings, under Deploying, then schedule this again.";
-            }
+            if (target.Type == "local_folder"
+                && Models.CourseConfiguration.DeployFolderProblem(target.Path) is not null)
+                return new Refusal("additionalDeployFolderNeedsAttention");
+            if (target.Type == "cloudflare_pages"
+                && Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID) is not null)
+                return new Refusal("additionalCloudflareAccountMissing");
         }
 
         if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course))
-            return $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
-                   "what to call the website. Nobody would be there to answer that at the scheduled time, " +
-                   "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.";
+            return new Refusal("neverDeployed", Models.DeployCommand.DestinationDescription(
+                course.Configuration.AllDeployDestinations[0]));
 
         // Same reasoning, for any additional destination that has never
         // gone out — a brand-new Netlify or Cloudflare destination also
@@ -78,25 +96,50 @@ public sealed class ScheduledDeploy
         foreach (var target in course.Configuration.AdditionalDeployTargets)
         {
             if (!Models.DeployCommand.HasDeployedBefore(sectionNumber, course, target.Type))
-            {
-                string destinationName = Models.DeployCommand.DestinationDescription(
-                    new Models.CourseConfiguration.DeployDestination(target.Type, target.Path));
-                return $"{course.Code} Section {sectionNumber} has never been deployed to {destinationName}, " +
-                       "so deploying it there asks what to call that site. Nobody would be there to answer " +
-                       "that at the scheduled time, and it would wait. Deploy it there once from Plantoir, " +
-                       "and after that it can be scheduled.";
-            }
+                return new Refusal("additionalDestinationNeverDeployed", Models.DeployCommand.DestinationDescription(
+                    new Models.CourseConfiguration.DeployDestination(target.Type, target.Path)));
         }
 
         return null;
     }
 
+    /// <summary>The schedule sheet's whole sentence for a refusal — unchanged wording.</summary>
+    private static string SentenceFor(Refusal refusal, Models.Course course, int sectionNumber, string cloudflareAccountID) =>
+        refusal.Key switch
+        {
+            "keptForReference" =>
+                $"{course.Code} is kept for reference, and a course kept for reference is never deployed.",
+            "deployFolderNeedsAttention" =>
+                $"{course.Code} deploys to a folder, and that folder needs attention first: " +
+                Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath),
+            "cloudflareAccountMissing" =>
+                $"{course.Code} deploys to Cloudflare Pages, which needs your Account ID. " +
+                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
+            "additionalDeployFolderNeedsAttention" =>
+                $"{course.Code} also deploys to a folder, and that folder needs attention first: " +
+                course.Configuration.AdditionalDeployTargets
+                    .Where(target => target.Type == "local_folder")
+                    .Select(target => Models.CourseConfiguration.DeployFolderProblem(target.Path))
+                    .First(problem => problem is not null),
+            "additionalCloudflareAccountMissing" =>
+                $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. " +
+                $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
+            "neverDeployed" =>
+                $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
+                "what to call the website. Nobody would be there to answer that at the scheduled time, " +
+                "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.",
+            "additionalDestinationNeverDeployed" =>
+                $"{course.Code} Section {sectionNumber} has never been deployed to {refusal.Destination}, " +
+                "so deploying it there asks what to call that site. Nobody would be there to answer " +
+                "that at the scheduled time, and it would wait. Deploy it there once from Plantoir, " +
+                "and after that it can be scheduled.",
+            _ => throw new ArgumentOutOfRangeException(nameof(refusal)),
+        };
+
     public required string CourseCode { get; init; }
     public required int SectionNumber { get; init; }
     public required DateTime When { get; init; }
 
-    /// <summary>The name the task carries, so it can be found and cancelled.</summary>
-    public string TaskName => $"Plantoir deploy {CourseCode} section {SectionNumber}";
 
     /// <summary>Classes that are not published yet, and so would not reach students.</summary>
     public required IReadOnlyList<string> UnpublishedClasses { get; init; }

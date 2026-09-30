@@ -134,6 +134,29 @@ public static class CourseArchiver
     /// </summary>
     public static string ArchiveAndRemoveCourse(Course course, string coursesDirectory)
     {
+        // CANCEL FIRST (#239): every deploy this working folder has set for
+        // the course, asked of the scheduler. A cancel that fails throws
+        // before anything is archived or removed.
+        var turnedOff = Plantoir.Core.Assist.ScheduledDeployRemoval.TurnOffFirst(
+            WorkingFolderOf(coursesDirectory), course.Code, section: null, "the course was removed");
+        try
+        {
+            return RemoveCourse(course, coursesDirectory);
+        }
+        catch (Exception error) when (turnedOff.Count > 0)
+        {
+            throw new InvalidOperationException(
+                Plantoir.Core.Assist.ScheduledDeployRemoval.RemovalFailedAfterTurningItOff(course.Code, turnedOff, error.Message), error);
+        }
+    }
+
+    /// <summary>The working folder a courses directory belongs to — its parent.</summary>
+    private static string WorkingFolderOf(string coursesDirectory) =>
+        Path.GetDirectoryName(coursesDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        ?? coursesDirectory;
+
+    private static string RemoveCourse(Course course, string coursesDirectory)
+    {
         string archivePath = ArchiveCourseWithoutRemoving(course, coursesDirectory);
         CourseRestorer.DeleteTree(course.DirectoryPath);
         // A build outlives the content it was made from. Archive this course
@@ -176,18 +199,28 @@ public static class CourseArchiver
     /// </summary>
     public static string ArchiveAndRemoveSection(Course course, int sectionNumber, string coursesDirectory)
     {
+        // CANCEL FIRST (#239), and only this working folder's deploy of this
+        // section. This used to cancel AFTER archiving and ignore a failure.
+        var turnedOff = Plantoir.Core.Assist.ScheduledDeployRemoval.TurnOffFirst(
+            WorkingFolderOf(coursesDirectory), course.Code, sectionNumber, "the section was removed");
+        try
+        {
+            return RemoveSection(course, sectionNumber, coursesDirectory);
+        }
+        catch (Exception error) when (turnedOff.Count > 0)
+        {
+            throw new InvalidOperationException(
+                Plantoir.Core.Assist.ScheduledDeployRemoval.RemovalFailedAfterTurningItOff(course.Code, turnedOff, error.Message), error);
+        }
+    }
+
+    private static string RemoveSection(Course course, int sectionNumber, string coursesDirectory)
+    {
         string sectionDir = course.SectionDirectory(sectionNumber);
         string archivePath = Archive(sectionDir, $"{course.Code}-section{sectionNumber}",
                                      coursesDirectory, course.Code);
         if (Directory.Exists(sectionDir)) CourseRestorer.DeleteTree(sectionDir);
         DiscardBuilds(coursesDirectory, course.Code, sectionNumber);
-        // A scheduled deploy for a section that no longer exists cannot do
-        // anything useful, and left alone it wakes up nightly to fail. Taking
-        // the section's number out of the configuration is what makes the
-        // launcher ask "Continue anyway?" about it, so this is also the other
-        // half of the reason the wrapper runs non-interactively.
-        Plantoir.Core.Assist.TaskScheduling.Cancel(
-            Plantoir.Core.Assist.TaskScheduling.NameFor(course.Code, sectionNumber));
         var remaining = course.Configuration.SectionNumbers.Where(n => n != sectionNumber).ToList();
         course.Configuration.SetSectionNumbers(remaining);
         course.Configuration.Write(course.ConfigFilePath);

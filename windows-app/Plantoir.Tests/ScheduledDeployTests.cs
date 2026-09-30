@@ -311,9 +311,12 @@ public sealed class ScheduledDeployTests : IDisposable
     }
 
     [Fact]
-    public void TheTaskNameIsPerSectionSoTwoSectionsDoNotCollide()
+    public void TheTaskNameIsPerSectionAndPerWorkingFolder()
     {
-        var one = Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow);
-        Assert.Equal("Plantoir deploy ICS3U section 1", one.TaskName);
+        // #309: section 1 and section 2 differ, and so do two working folders.
+        string one = TaskScheduling.NameFor("ICS3U", 1, _folder);
+        Assert.NotEqual(one, TaskScheduling.NameFor("ICS3U", 2, _folder));
+        Assert.NotEqual(one, TaskScheduling.NameFor("ICS3U", 1, Path.Combine(_folder, "last year")));
+        Assert.StartsWith("Plantoir deploy ICS3U section 1 ", one);
     }
 }
