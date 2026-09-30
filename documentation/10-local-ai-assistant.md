@@ -3352,7 +3352,7 @@ measurement, it is a claim that rots the moment those files are rewritten.**
 so the next launcher rewrite fails a test instead of silently stalling a
 teacher's progress bar again.
 
-**Do NOT copy the mac's seven launcher markers into your milestone lists.**
+**Do NOT copy the mac's launcher markers into your milestone lists.**
 Read your own `.ps1` files and match what they actually print. This fails
 silently in the worst way: the app does not crash, the progress bar simply
 stops advancing part-way and then jumps at the end, which reads as a slow
@@ -6387,7 +6387,9 @@ left.
 
 ### Afterwards: publishing a class needs its pages with it
 
-Only the assistant's publish is transitive. A teacher who publishes Day 2 by
+Only the assistant's publish — and, since #379, a class ticked in the section
+window's links checklist — is transitive; a class published by its own line in
+Obsidian is not. A teacher who publishes Day 2 by
 changing its page in Obsidian after this ran gets Day 2 live with links to the
 concepts that went into draft — before, those concepts were visible, so the one
 flag was enough. The plan and the sheet say so (`publishingFromNowOn`), and
