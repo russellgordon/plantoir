@@ -3440,7 +3440,7 @@
         "indexBody": "# Most Recent Meeting\n\n![[All Meetings/Week 3|This week]]\n",
         "expectBody": "# Most Recent Meeting\n\n![[All Meetings/Week 4]]\n",
         "frontPageHeading": "Most Recent Meeting",
-        "why": "The target is what comes before `|` or `#`, after the last `/`. Since #397 the folder path keeps its depth and names where the class is (`writtenAs`); the display name “This week” is not the old class's name, so it is dropped. It was the bare title until then.",
+        "why": "The target is what comes before `|` or `#`, after the last `/`. Since #397 a path without a section folder names the class's place from the site's root (`writtenAs`) — here `All Meetings/`, where the class is; the display name “This week” is not the old class's name, so it is dropped. It was the bare title until then.",
         "pointAtPath": "section1/All Meetings/Week 4.md"
       },
       {
@@ -3530,7 +3530,7 @@
         "pointAt": "Unit 1, Day 2",
         "indexBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 1|Unit 1, Day 1]]\n",
         "expectBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n",
-        "why": "`writtenAs`: the path keeps its depth, and a display name equal to the old class's name becomes the new one's. Russell's 2025 form."
+        "why": "`writtenAs`: a path holding a `section<N>` folder is written as the class's full place in the course folder, always with `|<the class's name>`, which the build turns into the name. Russell's 2025 form."
       },
       {
         "name": "a class one folder deeper, named with that folder, and the next class in the same folder",
@@ -4472,7 +4472,7 @@
           "body": "# Most Recent Class\n\n![[section1/All Classes/Unit 2, Day 5|Unit 2, Day 5]]\n",
           "createdDay": "2026-09-30"
         },
-        "why": "A display name equal to the old class's name becomes the new class's name, and the path keeps its depth. A bare name would be ambiguous in Obsidian in a course with two sections."
+        "why": "A section path is written as the class's full place in the course folder, always with `|<the class's name>` — which the build turns into the name, so the site can draw it. A bare name would be ambiguous in Obsidian in a course with two sections."
       },
       {
         "name": "a class filed one folder deeper, named with that folder",
@@ -4528,7 +4528,7 @@
           "body": "## Most Recent Class\n\n![[All Classes/Thread 5/Day 1]]\n",
           "createdDay": "2026-09-30"
         },
-        "why": "The path keeps its DEPTH, and its folders are the ones today's class is in. Copying “Thread 4/” as written would name a page that does not exist, and the front page would show nothing while the app reported it had moved."
+        "why": "The path names today's class's place from the site's root (`writtenAs`) — `All Classes/Thread 5/`, where it is filed. Copying “Thread 4/” as written would name a page that does not exist, and the front page would show nothing while the app reported it had moved."
       },
       {
         "name": "an embed of one heading of the class",
