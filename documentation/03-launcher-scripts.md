@@ -2047,6 +2047,17 @@ all XNU compares).
   deploy passes it — pressing Deploy runs this same launcher through a
   pseudo-terminal so a question can come back as a dialog.
 
+  **wrangler is kept out of all of this, deliberately.** Whether the launcher
+  has a terminal, and whether it was given `--non-interactive`, decides what
+  happens to the LAUNCHER's and `deploy.py`'s questions; wrangler, Cloudflare's
+  own deploy tool, is always run with `CI=1` and never asks anything on any
+  path, so the Cloudflare branch's `docker exec -it` or `-i` makes no
+  difference to it. `deploy.py` settles beforehand everything wrangler would
+  otherwise ask — including remaking a project deleted in Cloudflare's
+  dashboard, which is what turned every Cloudflare leg of `verify-deploy.sh`
+  red on 2026-09-30. [`07-deployment.md`](07-deployment.md) → "wrangler is
+  never left a question to ask".
+
   **It is a PREVIEW flag too, as of 2026-09-09 (issue #124).** A scheduled
   publish BUILDS before it publishes, and the build runs `preview.sh` /
   `preview.ps1` — which ask questions of their own, at half six, of nobody.

@@ -727,7 +727,15 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
     env = os.environ.copy()
     env["CLOUDFLARE_API_TOKEN"] = token
     env["CLOUDFLARE_ACCOUNT_ID"] = account_id
-    # The app runs this with no console to answer prompts on.
+    # wrangler must never ASK anything: CI is its documented switch for "no
+    # questions", and it is set whatever the caller is — a teacher's Deploy
+    # button (a pseudo-terminal), a scheduled deploy from launchd (none), the
+    # assistant's windowless deploy (--non-interactive) or verify-deploy.sh.
+    # With it set, a question wrangler would have asked becomes an error
+    # ("cannot be run in a non-interactive context"), so every situation that
+    # would make it ask has to be settled here first: the project must exist
+    # (remake_pages_project_if_gone), the branch and the dirty-tree answer are
+    # passed as flags. Pinned by scripts/test_deploy_cloudflare_project.py.
     env["CI"] = "1"
     env.setdefault("WRANGLER_SEND_METRICS", "false")
     cmd = [
@@ -754,6 +762,37 @@ def deploy_to_cloudflare(public_dir: Path, project_name: str, token: str, accoun
         sys.exit(130)
     if completed.returncode != 0:
         raise RuntimeError(f"Cloudflare's deploy tool exited with code {completed.returncode}")
+
+def remake_pages_project_if_gone(token: str, account_id: str, name: str) -> dict | None:
+    """
+    A section's saved project can outlive the project itself: a teacher (or
+    anybody tidying the account) deletes it in Cloudflare's dashboard, and the
+    marker in `.cloudflare_sites/` still names it. wrangler then finds no
+    project and wants to ASK whether to create one — which it cannot, because
+    it always runs with CI set (see deploy_to_cloudflare) — so every publish of
+    that section failed with "This command cannot be run in a non-interactive
+    context", which a teacher cannot act on. Found 2026-09-30 by
+    verify-deploy.sh, after its test project had been deleted by hand.
+
+    So the saved name is checked first, and when Cloudflare says it does not
+    exist (404) it is made again under the SAME name. The name was chosen
+    already, so nothing needs asking — which is why this is safe under
+    --non-interactive too, unlike Netlify, whose names are global and whose
+    deleted site needs a new name (a question). Returns the new project, or
+    None when the saved one exists or could not be checked: any other failure
+    is left to the upload, which reports it as before, rather than a flaky
+    check stopping a publish that would have worked.
+    """
+    try:
+        cloudflare_api("GET", f"/accounts/{account_id}/pages/projects/{name}", token)
+        return None
+    except RuntimeError as e:
+        if "error 404" not in str(e):
+            return None
+    return cloudflare_api(
+        "POST", f"/accounts/{account_id}/pages/projects", token,
+        {"name": name, "production_branch": "main"},
+    )
 
 def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
                           section: str, teacher_last_name: str | None):
@@ -789,6 +828,16 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
     if marker and marker.get("name"):
         project_name = marker["name"]
         print(f" Using this section's existing Cloudflare project: {project_name}")
+        remade = remake_pages_project_if_gone(token, account_id, project_name)
+        if remade is not None:
+            project_name = remade.get("name") or project_name
+            save_cloudflare_marker(course_dir, section, {
+                "name": project_name,
+                "id": remade.get("id"),
+                "subdomain": remade.get("subdomain"),
+                "account_id": account_id,
+            })
+            print(f"⚠️ That project was no longer on Cloudflare, so it has been made again: {project_name}")
     else:
         # Same rule as the Netlify path: the surname is asked for only when
         # a NEW project is being named, never on a repeat deploy.
