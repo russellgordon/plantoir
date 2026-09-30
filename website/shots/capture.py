@@ -76,7 +76,9 @@ APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 # from a Debug build and the notification banner shows the app icon, so every
 # build this script starts names the plain icon instead. The side effect is
 # that the Dock's Debug bundle is ribbonless after a capture run until the
-# next ordinary build.
+# next ordinary build. A notification-only run starts NO build (with
+# --skip-preflight), so the banner scene reads the bundle's own icon name
+# first — see bundle_icon_name() — rather than trusting which path built it.
 PLAIN_APP_ICON = "ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir"
 
 # ~/Desktop/Teaching, not ~/Teaching: the plain ~/Teaching folder on this
@@ -1287,6 +1289,51 @@ def image_path(name: str, suffix: str) -> Path:
     return IMAGE_DIR / f"{name}-{suffix}.png"
 
 
+def bundle_icon_name(app_binary: Path) -> str:
+    """The icon the built bundle names in its Info.plist, or "" if unreadable."""
+    import plistlib
+    info = app_binary.parent.parent / "Info.plist"
+    try:
+        with info.open("rb") as handle:
+            return str(plistlib.load(handle).get("CFBundleIconName", ""))
+    except (OSError, plistlib.InvalidFileException):
+        return ""
+
+
+def plain_icon_problem(app_binary: Path) -> str | None:
+    """Make sure the bundle the banner comes from wears the plain icon.
+
+    The notification banner shows the app icon, and the Debug build wears
+    the Beta ribbon (#372) unless it was built with PLAIN_APP_ICON. A UI-test
+    scene or the preflight builds it plain; a notification-only run with
+    --skip-preflight builds nothing, and would photograph whatever the last
+    ordinary Debug build left. So the BUNDLE is asked, and rebuilt plain when
+    it says otherwise. Returns a sentence naming the problem, or None.
+    """
+    if bundle_icon_name(app_binary) == "Plantoir":
+        return None
+    print("   The Debug build wears the Beta icon; rebuilding it with the plain one for the banner.")
+    result = run(
+        [
+            "xcodebuild",
+            "-project", str(MAC_APP / "Plantoir.xcodeproj"),
+            "-scheme", "Plantoir",
+            "-configuration", "Debug",
+            PLAIN_APP_ICON,
+            "build",
+        ],
+        cwd=MAC_APP,
+        capture_output=True,
+        text=True,
+    )
+    named = bundle_icon_name(app_binary)
+    if result.returncode != 0 or named != "Plantoir":
+        return (f"the Debug build wears the Beta icon ({named or 'no icon name'}) and rebuilding it with "
+                f"the plain one did not take, so the banner would show the ribbon; build with "
+                f"{PLAIN_APP_ICON} and re-take with --only notification-banner")
+    return None
+
+
 def run_scenes(folder: Path, chosen: list) -> int:
     """Photograph the chosen scenes in both appearances, then check them.
 
@@ -1312,6 +1359,13 @@ def run_scenes(folder: Path, chosen: list) -> int:
 
     failures: list[str] = []
     passed: list[str] = []          # "<name>-<suffix>", checked and promoted
+    icon_problem: str | None = None
+    for scene in chosen:
+        if scene.kind == "notification":
+            icon_problem = plain_icon_problem(app_binary)
+            if icon_problem is not None:
+                failures.append(f"{scene.name}: {icon_problem}")
+            break
     staging: Path = SCRATCH / "scenes-staged"
     if staging.exists():
         shutil.rmtree(staging)
@@ -1330,6 +1384,8 @@ def run_scenes(folder: Path, chosen: list) -> int:
                         print(f"   staged {len(saved)} image(s): {', '.join(saved)}")
                     for scene in chosen:
                         if scene.kind == "notification":
+                            if icon_problem is not None:
+                                continue
                             destination = staging / f"notification-banner-{suffix}.png"
                             staging.mkdir(parents=True, exist_ok=True)
                             for problem in scene_book.capture_notification(app_binary, folder, destination):
