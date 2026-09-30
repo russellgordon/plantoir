@@ -34,6 +34,59 @@ public static class SectionPublishState
 
         [JsonPropertyName("destinations")]
         public List<string> Destinations { get; set; } = new();
+
+        /// <summary>
+        /// The rule the fingerprint was taken under (#358 / mac #330;
+        /// <c>publishedFreshness.fingerprintRules.stampField</c>). Absent
+        /// means rule 1: every stamp written before rule 2 existed.
+        /// </summary>
+        [JsonPropertyName("fingerprintRule")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? FingerprintRule { get; set; }
+    }
+
+    // ---- Fingerprint rules (#358 / mac #330) ---------------------------
+    //
+    // app-rules.json -> publishedFreshness.fingerprintRules. Rule 1 is every
+    // counted file; rule 2 is rule 1 less the teacher's How I Teach page at a
+    // reserved place (the top of the course, or the top of section<N>/),
+    // which the build keeps off the site - so editing it must not mark a
+    // section "— Edited". VERSIONED rather than changed in place, because the
+    // fingerprint is a wire format three implementations hold byte for byte:
+    // the stamp names its rule, and a reader computes under THAT rule. This
+    // app, the scheduled wrapper (section_fingerprint.py --rule 2) and the
+    // stamp move to rule 2 together; any one alone is a false "— Edited".
+
+    /// <summary>The rule every new fingerprint is recorded under.</summary>
+    public const int CurrentRule = 2;
+
+    /// <summary>What a stamp without <c>fingerprintRule</c> means.</summary>
+    public const int RuleWhenAbsent = 1;
+
+    public static readonly IReadOnlyCollection<int> KnownRules = new[] { 1, 2 };
+
+    /// <summary>
+    /// <c>shared-rules.json → howITeachPage.matching</c>: the whole file name,
+    /// after Unicode NFC, with ONLY A-Z folded — the same fold as
+    /// <c>scripts/how_i_teach.py</c>, so the two cannot disagree about a name
+    /// (a dotted capital I is a look-alike and counts).
+    /// </summary>
+    public static bool IsTheHowITeachPage(string fileName) =>
+        string.Equals(AsciiFolded(fileName.Normalize(NormalizationForm.FormC)), "how i teach.md", StringComparison.Ordinal);
+
+    private static string AsciiFolded(string name) =>
+        new string(name.Select(c => c is >= 'A' and <= 'Z' ? (char)(c + 32) : c).ToArray());
+
+    /// <summary>The top of the course, or the top of a <c>section&lt;N&gt;</c> folder (ASCII digits).</summary>
+    public static bool IsReservedHowITeachPlace(string relativePath)
+    {
+        var parts = relativePath.Replace('\\', '/').Split('/');
+        if (parts.Length == 1) return IsTheHowITeachPage(parts[0]);
+        if (parts.Length != 2) return false;
+        string folder = parts[0];
+        string digits = folder.StartsWith("section", StringComparison.Ordinal) ? folder["section".Length..] : "";
+        bool isASection = digits.Length > 0 && digits.All(c => c is >= '0' and <= '9');
+        return isASection && IsTheHowITeachPage(parts[1]);
     }
 
     private static readonly HashSet<string> IgnoredFileNames = new(StringComparer.Ordinal)
@@ -63,8 +116,9 @@ public static class SectionPublishState
     /// Whether a REGULAR FILE at this course-relative path (forward-slash
     /// separated) is a genuine input to the section's built site.
     /// </summary>
-    public static bool CountsTowardFingerprint(string relativePath, int sectionNumber)
+    public static bool CountsTowardFingerprint(string relativePath, int sectionNumber, int rule = RuleWhenAbsent)
     {
+        if (rule >= 2 && IsReservedHowITeachPlace(relativePath)) return false;
         var parts = relativePath.Split('/');
         if (parts.Any(part => part.StartsWith('.'))) return false;
         string fileName = parts[^1];
@@ -158,11 +212,12 @@ public static class SectionPublishState
     /// culture-aware) sorting.
     /// </summary>
     public static string Fingerprint(
-        string courseDirectory, int sectionNumber, IReadOnlyList<string>? excludingRelativePaths = null)
+        string courseDirectory, int sectionNumber, IReadOnlyList<string>? excludingRelativePaths = null,
+        int rule = CurrentRule)
     {
         var excluded = excludingRelativePaths ?? Array.Empty<string>();
         var lines = new List<string>();
-        Walk(courseDirectory, courseDirectory, sectionNumber, excluded, lines, hopsRemaining: 1);
+        Walk(courseDirectory, courseDirectory, sectionNumber, excluded, lines, hopsRemaining: 1, rule);
         lines.Sort(StringComparer.Ordinal);
         string joined = string.Join("\n", lines);
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(joined));
@@ -171,7 +226,7 @@ public static class SectionPublishState
 
     private static void Walk(
         string courseDirectory, string directory, int sectionNumber,
-        IReadOnlyList<string> excluded, List<string> lines, int hopsRemaining)
+        IReadOnlyList<string> excluded, List<string> lines, int hopsRemaining, int rule)
     {
         IEnumerable<string> entries;
         try { entries = Directory.EnumerateFileSystemEntries(directory); }
@@ -190,18 +245,18 @@ public static class SectionPublishState
             if (isSymlink)
             {
                 if (hopsRemaining <= 0) continue; // one hop only
-                AppendSymlink(courseDirectory, entryPath, relative, sectionNumber, excluded, lines);
+                AppendSymlink(courseDirectory, entryPath, relative, sectionNumber, excluded, lines, rule);
                 continue;
             }
 
             if (Directory.Exists(entryPath))
             {
                 if (!FolderCountsTowardFingerprint(relative, sectionNumber)) continue;
-                Walk(courseDirectory, entryPath, sectionNumber, excluded, lines, hopsRemaining);
+                Walk(courseDirectory, entryPath, sectionNumber, excluded, lines, hopsRemaining, rule);
             }
             else if (File.Exists(entryPath))
             {
-                if (!CountsTowardFingerprint(relative, sectionNumber)) continue;
+                if (!CountsTowardFingerprint(relative, sectionNumber, rule)) continue;
                 AppendFileLine(lines, relative, entryPath);
             }
         }
@@ -215,7 +270,7 @@ public static class SectionPublishState
     /// </summary>
     private static void AppendSymlink(
         string courseDirectory, string linkPath, string linkRelative, int sectionNumber,
-        IReadOnlyList<string> excluded, List<string> lines)
+        IReadOnlyList<string> excluded, List<string> lines, int rule)
     {
         string? target = null;
         try { target = File.ResolveLinkTarget(linkPath, returnFinalTarget: true)?.FullName; }
@@ -231,19 +286,19 @@ public static class SectionPublishState
 
         if (File.Exists(target))
         {
-            if (!CountsTowardFingerprint(linkRelative, sectionNumber)) return;
+            if (!CountsTowardFingerprint(linkRelative, sectionNumber, rule)) return;
             AppendFileLine(lines, linkRelative, target);
             return;
         }
 
         // A link to a folder: walk it under the LINK's own path prefix, not
         // following any further symlink inside (hopsRemaining: 0).
-        WalkUnderPrefix(target, target, linkRelative, sectionNumber, excluded, lines);
+        WalkUnderPrefix(target, target, linkRelative, sectionNumber, excluded, lines, rule);
     }
 
     private static void WalkUnderPrefix(
         string physicalRoot, string directory, string relativePrefix, int sectionNumber,
-        IReadOnlyList<string> excluded, List<string> lines)
+        IReadOnlyList<string> excluded, List<string> lines, int rule)
     {
         IEnumerable<string> entries;
         try { entries = Directory.EnumerateFileSystemEntries(directory); }
@@ -263,11 +318,11 @@ public static class SectionPublishState
             if (Directory.Exists(entryPath))
             {
                 if (!FolderCountsTowardFingerprint(relative, sectionNumber)) continue;
-                WalkUnderPrefix(physicalRoot, entryPath, relativePrefix, sectionNumber, excluded, lines);
+                WalkUnderPrefix(physicalRoot, entryPath, relativePrefix, sectionNumber, excluded, lines, rule);
             }
             else if (File.Exists(entryPath))
             {
-                if (!CountsTowardFingerprint(relative, sectionNumber)) continue;
+                if (!CountsTowardFingerprint(relative, sectionNumber, rule)) continue;
                 AppendFileLine(lines, relative, entryPath);
             }
         }
@@ -327,7 +382,7 @@ public static class SectionPublishState
     /// </summary>
     public static bool RecordPublish(
         string courseDirectory, int sectionNumber, string fingerprint,
-        IReadOnlyList<string> destinations, DateTime? at = null)
+        IReadOnlyList<string> destinations, DateTime? at = null, int rule = CurrentRule)
     {
         try
         {
@@ -338,6 +393,7 @@ public static class SectionPublishState
                 Fingerprint = fingerprint,
                 PublishedAt = (at ?? DateTime.UtcNow),
                 Destinations = destinations.ToList(),
+                FingerprintRule = rule,
             };
             string json = JsonSerializer.Serialize(stamp, WriteOptions);
             string finalPath = StampPath(courseDirectory, sectionNumber);
@@ -360,7 +416,12 @@ public static class SectionPublishState
     {
         var stamp = ReadStamp(courseDirectory, sectionNumber);
         if (stamp is null) return false;
-        string current = Fingerprint(courseDirectory, sectionNumber, excludingRelativePaths);
+        // Computed under the rule the STAMP names (absent = 1); a rule this
+        // copy does not know counts as edited — nothing that cannot be read
+        // may claim a section is up to date.
+        int rule = stamp.FingerprintRule ?? RuleWhenAbsent;
+        if (!KnownRules.Contains(rule)) return true;
+        string current = Fingerprint(courseDirectory, sectionNumber, excludingRelativePaths, rule);
         return !string.Equals(stamp.Fingerprint, current, StringComparison.Ordinal);
     }
 

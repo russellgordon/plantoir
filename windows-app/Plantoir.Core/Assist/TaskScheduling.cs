@@ -264,7 +264,11 @@ public static class TaskScheduling
                 $"    $scriptsDir = if (Test-Path $toolchainScripts) {{ $toolchainScripts }} else {{ Join-Path {PsQuote(workingFolder)} 'scripts' }}",
                 "    $fpScript = Join-Path $scriptsDir 'section_fingerprint.py'",
                 "    if ((Test-Path $pythonExe) -and (Test-Path $fpScript)) {",
-                $"      $fpArgs = @({PsQuote(courseDirectory)}, {section}{(excludedArray.Length > 0 ? ", " + excludedArray : "")})",
+                // --rule BEFORE the positional arguments (the only place the
+                // script reads it), and the rule goes into the sentinel so the
+                // app records the stamp under the rule the value was taken
+                // under (#358 / mac #330).
+                $"      $fpArgs = @('--rule', '{SectionPublishState.CurrentRule}', {PsQuote(courseDirectory)}, {section}{(excludedArray.Length > 0 ? ", " + excludedArray : "")})",
                 "      $fpOutput = & $pythonExe $fpScript @fpArgs 2>$null",
                 "      if ($LASTEXITCODE -eq 0 -and $fpOutput) { $fingerprint = ([string]$fpOutput).Trim() }",
                 "    }",
@@ -505,6 +509,7 @@ public static class TaskScheduling
                 $"    sectionNumber = {section}",
                 $"    courseDirectory = {PsQuote(courseDirectory)}",
                 "    fingerprint = $fingerprint",
+                $"    fingerprintRule = {SectionPublishState.CurrentRule}",
                 $"    destinationTypes = @({destinationTypesArray})",
                 "    destinationNames = $destinationNames",
                 "    completedAtUtc = (Get-Date).ToUniversalTime().ToString('o')",
