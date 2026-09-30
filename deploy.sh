@@ -2579,7 +2579,7 @@ create_the_workspace_on_free_ports() {
     if it_was_a_name_conflict "$output"; then
       if [ "$named_already" = true ]; then
         printf '%s\n' "$output"
-        echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+        echo "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again."
         exit 1
       fi
       named_already=true
@@ -2646,7 +2646,7 @@ start_the_existing_workspace() {
       return 0
     fi
     # There was no start, so there are no engine's words to show.
-    echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+    echo "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again."
     exit 1
   fi
   if output="$(docker start "$CONTAINER_NAME" 2>&1)"; then
@@ -2654,7 +2654,7 @@ start_the_existing_workspace() {
   fi
   if ! it_was_a_port_clash "$output"; then
     printf '%s\n' "$output"
-    echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+    echo "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again."
     exit 1
   fi
   say_this_folder_is_set_up_again_on_free_addresses
@@ -2667,7 +2667,7 @@ start_the_existing_workspace() {
     return 0
   fi
   printf '%s\n' "$output"
-  echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+  echo "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again."
   exit 1
 }
 
@@ -2722,7 +2722,7 @@ clear_away_this_folders_other_spelling() {
     *$'\n'"$old_name"$'\n'*)
       case $'\n'"$running"$'\n' in
         *$'\n'"$old_name"$'\n'*)
-          echo "ℹ️  A second copy of this folder's workspace, made under another spelling of the folder's name, is still running (${old_name})."
+          echo "ℹ️  A second copy of this folder's website builder, made under another spelling of the folder's name, is still running (${old_name})."
           echo "   Plantoir is leaving it as it is, and will clear it away once it has stopped."
           return 0 ;;
       esac
@@ -2762,9 +2762,9 @@ clear_away_this_folders_other_spelling() {
   fi
   # The sentence names only what was removed.
   if [ "$workspace_gone" = true ] && [ "$builds_gone" = true ]; then
-    what="a second copy of this working folder's workspace and built websites"
+    what="a second copy of this working folder's website builder and built websites"
   elif [ "$workspace_gone" = true ]; then
-    what="a second copy of this working folder's workspace"
+    what="a second copy of this working folder's website builder"
   elif [ "$builds_gone" = true ]; then
     what="a second copy of this working folder's built websites"
   else
@@ -3023,7 +3023,7 @@ remake_the_workspace() {
       sleep 2
       if ! docker rm "$id" >/dev/null 2>&1 \
         && docker inspect -f '{{.Id}}' "$id" >/dev/null 2>&1; then
-        echo "❌ Plantoir could not start this folder's workspace. Try again, or restart this Mac if it happens again."
+        echo "❌ Plantoir could not start the website builder for this folder. Try again, or restart this Mac if it happens again."
         exit 1
       fi
     fi
@@ -3045,7 +3045,7 @@ retire_legacy_container() {
   if [ "$WORKSPACE_IS_RUNNING" != "nothing" ]; then
     return 0
   fi
-  echo "♻️  Retiring the old shared workspace container…"
+  echo "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…"
   docker stop "$id" >/dev/null 2>&1 || true
   docker rm "$id" >/dev/null 2>&1 || true
 }
