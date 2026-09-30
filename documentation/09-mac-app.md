@@ -2612,7 +2612,12 @@ against `shared-rules.json` → `userFacingLabelWords.forbidden`, whole-word and
 case-insensitive, comments skipped ("description" is not "script"). It found
 exactly two hits: that row and the colour picker's "Quartz default (none
 chosen)", now `colourSchemeNoneChosen`. It cannot see DATA: the catalog
-scheme "Quartz Standard Colours" (`support/colour_schemes.json`) is issue #383.
+scheme then named "Quartz Standard Colours" (`support/colour_schemes.json`)
+was issue #383. In v1.4.2 it became "Standard Colours" — the display name only;
+its id `quartz-standard`, which every course stores and both wizards default
+to, did not change — and `scripts/test_colour_scheme_names.py` now holds every
+scheme name against the same `forbidden` list, whole-word. It is pure Python,
+so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 

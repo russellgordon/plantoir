@@ -391,6 +391,20 @@ else
   cat /tmp/verify_preview_while_deploying_test.log
 fi
 
+if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
+  pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
+else
+  fail "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
+  cat /tmp/verify_colour_scheme_names_test.log
+fi
+
+if (cd scripts && python3 test_folder_spelling.py) >/tmp/verify_folder_spelling_test.log 2>&1; then
+  pass "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
+else
+  fail "one working folder, one spelling: every spelling of a folder names one website builder and one builds folder (scripts/test_folder_spelling.py, #189)"
+  cat /tmp/verify_folder_spelling_test.log
+fi
+
 if (cd scripts && python3 test_launcher_words.py) >/tmp/verify_launcher_words_test.log 2>&1; then
   pass "Launchers: no line a teacher reads says container, Docker or image, and every bar can reach the step it watches a launcher for (scripts/test_launcher_words.py, #382)"
 else

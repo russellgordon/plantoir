@@ -1273,9 +1273,13 @@ and two belts, for everything but a preview: **a publish set for later** —
 launchd runs `Plantoir --run-scheduled-deploy <…/scheduled/<label>.sh> …`
 for the whole run, including the up-to-ten-minute wait before its script
 starts and the instant between `deploy.sh` exiting and its Python being
-reaped, and the label holds the course as `ScheduledDeploy` writes it (upper
-case, anything not a letter or digit as `-`) and `section<N>` followed by a
-dot, so section 1 never matches section 12; and **a live `docker exec` aimed
+reaped, and the label, `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder
+id>].sh`, holds the course as `ScheduledDeploy` writes it (upper case,
+anything not A-Z or 0-9 as `-`) and a section bounded so section 1 never
+matches section 12 — and must END `.sh`, so a `tail -f` of the scheduled
+deploy's `.log` owns nothing (#388; before it, the owner check matched any
+`.deploy.<CODE>.section<N>.` and a log left open in Terminal kept a gone
+publish "running" for the full ten-minute wait); and **a live `docker exec` aimed
 at this workspace** by name or id (#378 plan review S7): work started by a
 live program that is not a launcher — an assistant's own command, an older
 launcher, `verify.sh` — is waited for, and since closing a program ends its
@@ -1298,21 +1302,84 @@ MCP server with claude or codex above it, then the Plantoir app ("another
 Plantoir window"), then claude or codex running the launcher directly, and
 otherwise "a command in Terminal".
 
-**Two readers of the process table in preview.sh, for now.** #381's guard
-(a preview refused while its section is being deployed) has its own reader,
-outside the PREVIEW PORT BLOCK, that recognises `deploy.sh C S` and a
-scheduled run of C/S; this one lives inside the block, because setup.sh and
-deploy.sh need it too. They were written the same night on separate branches
-and were not merged into one helper then; the scheduled-label rule (course
-sanitized, `section<N>` followed by a dot) is the part that must stay the
-same in both. They now read a course code with a space the same way — whole,
-as the text the arguments of `deploy.sh` begin with — since #382 folded that
-one part of #388 into the guard; folding the two readers into one helper is
-still [#388](https://github.com/russellgordon/plantoir/issues/388) (v1.4.2).
+**One reader of the process table, since #388 (v1.4.2).** #381's guard (a
+preview refused while its section is being deployed) and this owner check
+were written the same night on separate branches, each with its own reader of
+`ps`, and by the time [#388](https://github.com/russellgordon/plantoir/issues/388)
+was picked up they already disagreed beyond the spaced course #382 had fixed.
+Measured on 2026-09-30 by cutting `the_owners_of_the_work` out of setup.sh
+and running it against a pretend `ps` for pieces `publish ICS4U 2` / `build
+ICS4U 2`, three rows made BOTH pieces "owned" that the guard's own cases say
+are not a deploy:
+
+- (a) `tail -f …/ca.russellgordon.Plantoir.deploy.ICS4U.section2.3975d2cd.log`
+  — the owner check's label pattern had no `.sh` and no prefix;
+- (b) `node …/claude -p run ./deploy.sh ICS4U 2 now` — the owner check counts
+  any word, the guard only the program;
+- (c) `/bin/bash ./deploy.sh ICS4U 2 --reset-token` — the guard does not count
+  a deploy that only clears a token; the owner check counts `deploy.sh C S`
+  with any flags, for a publish and a build as much as for other work.
+
+Now both ask ONE function, `the_launchers_running`, in a new **PROCESS TABLE
+BLOCK** that is byte-identical in `setup.sh`, `preview.sh` and `deploy.sh`
+(`scripts/test_port_blocks.py` → `TheOneReaderOfTheProcessTable`). It reads
+`ps -Ao pid=,ppid=,args=` once — the only `ps -Ao` line in each launcher —
+leaves out this run's family, and prints one record per candidate: `<pid>
+<origin> <what> <program> <flags> <folder> <places>` (a launcher, a publish
+set for later and a `docker exec` are looked for independently, so one line
+can print more than one — #388 plan review 8, pinned by "one line can be a
+launcher and a docker exec at once"). What the two callers SHARE is how the
+table is read: which word is a launcher and which place its arguments begin
+with (runs of blanks in the place asked about collapsed, as the launcher's
+words are), its flags read from its OWN words (the owner check used to read
+`--stop`/`--build-only`/`--builder-tag` anywhere on the line), the one label
+rule, the label code (`label_code`, pinned by `labelCodeCases`), and when the
+table is unreadable — `ps` fails, OR its answer does not list this run (#378
+review N6; the guard used to believe such a table). What each keeps is its
+POLICY, below.
+
+Of the three divergences, **(a) is settled** by the one label rule; **(b)
+and (c) are kept on purpose**: this check keeps counting a launcher that a
+line merely names, and `deploy.sh C S` with any flags, because counting too
+many costs a wait while counting too few ends a publish — `bash -x ./deploy.sh
+ICS4U 2` is a real, running publish whose program word is a flag away, and the
+guard's "program" rule cannot see it. The reader reports `program`; only the
+guard uses it.
+
+**Why its own block, and why there.** The issue asked for the helper inside
+the PREVIEW PORT BLOCK. Measured: that block starts at `preview.sh:1742` (dev
+21fcec70), and the guard runs at `:794`, before anything is changed
+(`test_the_guard_asks_before_anything_is_changed` pins it before the PREVIEW
+PORT BLOCK marker). Bash defines a function only when it reaches it, so a
+helper there would not exist when the guard called it: "command not found",
+exit 127, which the guard reads as an unreadable table — every preview let
+through without a word, while every behaviour test (which pastes the block in
+itself) stayed green. So the PROCESS TABLE BLOCK sits straight after each
+launcher's CONTAINER MOUNT BLOCK, like the other shared blocks that open each
+launcher, and two things stop it drifting later: a text pin on the order, and
+`TheRealPreviewUpToItsGuard` (Mac only: its pretend `ps` walks the real table
+with `/bin/ps -o`, which Git Bash's `ps` lacks), which runs the REAL `preview.sh` from its first
+line to just after the guard's call, against a pretend `ps` and `lsof`, a
+scratch HOME and a PATH with no `docker` or `colima` — moving the block into
+the PREVIEW PORT BLOCK makes it print `REACHED` with a deploy of the section
+running. **Rejected:** moving the guard after the port block (it would run
+after `link_course_build_output` and `ensure_container_runtime`, which #381's
+`rejected` already refused); moving the ~1,190-line PREVIEW PORT BLOCK up
+(unreviewable, and it means loosening the test that keeps the guard early);
+putting the reader in the CONTAINER MOUNT or BUILD OUTPUT block (the wrong
+subject — nobody looks for a process reader under mounts); making the owner
+check adopt the guard's "program" rule (ends a `bash -x` publish, above);
+and folding the app's own `ps -Ao args=` reader (`FolderContainers.swift`, the
+quit path) — a third reader, but Swift, asking another question ("is ANY
+launcher running?"), and outside #388.
 
 **Two fail-safes, and they point different ways.** A process table that cannot
 be read counts as every owner RUNNING (a wait and a refusal are recoverable;
-an ended publish is not). The launcher guard of #381 (a preview refused while
+an ended publish is not) — and so does ANY other failure of the reader, not
+only its "unreadable" answer: a reader missing from the launcher answers 127,
+and an owner check that waited only on 2 would read that as every owner gone
+(#388 plan review 2; pinned by `test_a_reader_that_is_missing_waits_rather_than_ending_a_publish`,
+which runs the look with the PROCESS TABLE BLOCK left out). The launcher guard of #381 (a preview refused while
 its section is being deployed) fails the other way — it lets the preview
 through when `ps` cannot be read — because refusing every preview for as long
 as `ps` fails is #378's blocked-until-restart again.
@@ -1750,7 +1817,10 @@ legs — pulling it out from under the deploy, which is the harm the rule is
 for.
 
 **What counts as a deploy of C/S**, read from the LIVE process table (`ps
--Ao pid=,ppid=,args=`), never from a remembered process id or a lease file:
+-Ao pid=,ppid=,args=`), never from a remembered process id or a lease file.
+Since #388 the table is read by `the_launchers_running` in the PROCESS TABLE
+BLOCK, the one reader the owner check before a remake asks too (above, "One
+reader of the process table"); what counts is decided here:
 
 - `deploy.sh C S …` as the PROGRAM (the first word, or the script a shell was
   handed — a process whose text merely mentions it, such as a `claude -p`
@@ -1763,16 +1833,22 @@ for.
   still counts: a deploy of this very section is proved, only its folder is
   not. The course and section are matched as the text the arguments of
   `deploy.sh` BEGIN with, one space between words and a space after the
-  section ("AP CALC 2 "), the way `the_owners_of_the_work` reads them: a
+  section ("AP CALC 2 "), by the one reader both checks share: a
   course code may hold a space, which `ps` shows as two words, and until #382
   the guard compared one word for the course, so no deploy of such a course
   refused its preview (the known gap #388 named). The trailing space is what
   keeps section 1 from matching `AP CALC 12`, and "begins with" is what keeps
-  CALC from matching AP CALC; three `launcherCases` pin them.
+  CALC from matching AP CALC; three `launcherCases` pin them. Runs of blanks
+  in the course asked about count as one space, as `deploy.sh`'s own words
+  are rejoined ("a course typed with two spaces…", #388 plan review 9). **A
+  known gap, kept:** `bash -x ./deploy.sh C S` — a shell given a flag before
+  the script — is not the program by this rule, so its preview is let through
+  (fails open); `knownLimits` names it.
 - a deploy set for later of C/S: any process whose arguments name its script,
   `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
   (`<CODE>` as `ScheduledDeploy.sanitizedCode` writes it, the section bounded
-  so `section1` is not `section12`, a `.log` being read not counted). launchd
+  so `section1` is not `section12`, a `.log` being read not counted — now by
+  both checks, since they share the one label rule). launchd
   runs `Plantoir --run-scheduled-deploy <that script> …` for the whole run,
   so its build leg counts too. A label naming ANOTHER folder's id is that
   folder's deploy; a label from before #237 names no folder and counts for
@@ -1789,15 +1865,50 @@ leg from its publish record. **The gap that leaves**, named in the contract's
 build leg of its deploy. A `--for-deploy` flag on the build leg would close
 it; that is a `launcherFlags` change and was not made.
 
+**N5: the label's course code, settled by pinning (#388).** Swift's
+`ScheduledDeploy.sanitizedCode` keeps any letter or digit (`isLetter ||
+isNumber`); the launchers keep `A-Z` and `0-9`. They agree on every code
+either app can make, because `CourseCodeRule` refuses every non-ASCII
+character (course-management.json's "CAFÉ" case, run by both apps), and that
+agreement is now pinned twice: `previewWhileItsSectionDeploys.labelCodeCases`
+(8 cases, run through the real awk `label_code` and through
+`sanitizedCode`), and a mac test that walks the Basic Multilingual Plane and
+fails if `CourseCodeRule` ever accepts a character the two rules label
+differently — so allowing an accented letter for a French course name fails
+the suite instead of quietly hiding that course's scheduled deploys from the
+launcher. **Rejected:** changing Swift to ASCII (it would create a mac/Windows
+difference — Windows' `TaskScheduling.cs` sanitizer is `IsLetterOrDigit`,
+like Swift — and re-match old agents' labels for no teacher who can reach
+it), and teaching the launchers Unicode letters (bash 3.2's BSD awk and a
+per-user locale; fragile for nothing reachable). **Still reachable:** the
+command-line wizard (`setup.sh` → `setup_course.py`) checks a typed code only
+for a leading dot, so it can make "CAFÉ", "C++" or "A;B". For THIS guard
+such a course fails open: a deploy set for later of it is not recognised by
+the label look, and `deploy.sh`'s own row is still recognised by its words.
+**For the owner check before a remake it fails the DAMAGING way** (#388
+implementation review S3, measured with a pretend `ps` on the branch and on
+dev alike): the label rule cannot match `É`, so a scheduled publish of
+"CAFÉ" in the moment only its runner is left reads as gone and can be ended;
+and `+` is read back as a space, so even a live `deploy.sh C++ 1` reads as
+gone. Work holding `;` or `\` — either of which would shift the places'
+numbers onto OTHER courses' work, measured: a live preview of another course
+declared gone — is answered every piece owned instead (a
+`whatCountsAsRunning` case for each, and their must-fails). Recorded in both
+contracts' `knownLimits`, not fixed here: the fix is for the command-line
+setup to apply `CourseCodeRule`, drafted as a follow-up issue.
+
 **An unreadable process table lets the preview THROUGH** — the opposite of
 the look before a workspace is remade (above), on purpose. There, failing open
 costs somebody's publish, so an unreadable table counts as "owner running".
 Here, failing closed would refuse every preview for as long as `ps` fails,
 which is the "blocked until a restart" #378 was about; the window's check and
-the leases still stand when this one cannot see.
+the leases still stand when this one cannot see. "Unreadable" has ONE meaning
+for both checks since #388: `ps` fails, or it answers with a table that does
+not list this very run — the guard used to believe such a table; now it lets
+the preview through ("a process table that does not list this run…").
 
-This run's own ancestors and descendants never count, the same rule
-the owner check before a remake uses (`the_owners_of_the_work`, #378): a shell that ran `./deploy.sh C S
+This run's own ancestors and descendants never count — the one reader's
+rule, so the same for the owner check before a remake (#378): a shell that ran `./deploy.sh C S
 && ./preview.sh C S` carries both commands' words after its deploy has ended.
 
 **What it says, and writes.** `sentences.launcher` (the course and section,
@@ -1821,6 +1932,18 @@ another course" red (CALC 2 inside `deploy.sh AP CALC 2`). Checked once against
 the real process table too: a `deploy.sh ICS4U 2` sleeping in a scratch
 folder refused `preview.sh ICS4U 2` there with no engine call made, while the
 same deploy in ANOTHER folder, and a `--build-only` run, went on.
+
+Since #388 the harness pastes the PROCESS TABLE BLOCK in before the guard,
+and the must-fails were re-run against the ONE reader on 2026-09-30, each
+applied to all three launchers' copies: one word for the course, no space
+after the section, matching anywhere, a label rule without `.sh`, a label
+code that keeps `.`, and no check that the table lists this run each turn a
+case red in BOTH contracts (`launcherCases` and `whatCountsAsRunning`);
+dropping the ancestor walk turns the guard's family case red and dropping the
+descendant walk the owner check's; dropping the whitespace collapse turns "a
+course typed with two spaces…" red; and moving the block into the PREVIEW
+PORT BLOCK turns `TheRealPreviewUpToItsGuard` red (the real `preview.sh`
+printed `REACHED` with the deploy running).
 
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 

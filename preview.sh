@@ -608,6 +608,238 @@ say_this_folder_cannot_be_reached() {
   echo "   shared location, then try again."
 }
 # <<< CONTAINER MOUNT BLOCK <<<
+# >>> PROCESS TABLE BLOCK >>> — identical in setup.sh, preview.sh and
+# deploy.sh; scripts/test_port_blocks.py checks that the three copies match,
+# and that nothing else in a launcher reads the process table. Keep the
+# markers, and keep the three copies the same.
+# ---- Who is running what: the ONE reader of the process table (#388) ----
+# Two questions are asked of the live process table, and until #388 each had
+# its own reader, which had already come to disagree:
+#   - preview.sh's guard (#381): is this section being deployed right now?
+#     (a_deploy_is_running_for, in the PREVIEW WHILE DEPLOYING GUARD);
+#   - the look before a website builder is set up again (#378): has the
+#     program that started this work gone? (the_owners_of_the_work, in the
+#     PREVIEW PORT BLOCK).
+# Both now ask the_launchers_running, below, and each keeps its own POLICY —
+# what counts, and which way to fail — because the two fail-safes point
+# opposite ways on purpose (see each caller). What they share is how the
+# table is READ: how a launcher, its course and section and its flags are
+# recognised, how a publish set for later is recognised by its script name,
+# which processes are this run's own family, and when the table counts as
+# unreadable.
+#
+# This is its own block, straight after the CONTAINER MOUNT BLOCK, rather
+# than inside the PREVIEW PORT BLOCK where the second reader lived: bash
+# defines a function only when it reaches it, the PREVIEW PORT BLOCK comes
+# late in each launcher, and preview.sh asks its guard long before that —
+# before anything is changed (#381). A guard calling a function not defined
+# yet would get "command not found", read it as an unreadable table, and let
+# every preview through without a word.
+#
+# the_launchers_running PLACES [NAME] [ID]
+#   PLACES  the places asked about, ";"-joined (an awk -v value cannot hold a
+#           newline), each "<course> <section>" with "+" for a space in the
+#           course (CourseCodeRule refuses a "+"; the command-line setup
+#           does not, and a course like "C++" is then misread — see
+#           whatCountsAsRunning.knownLimits). The course may be empty. The
+#           caller answers work holding ";" or "\" itself: either would
+#           shift the places' numbers (the_owners_of_the_work).
+#   NAME/ID a website builder by its name and its id: a `docker exec` aimed
+#           at it is reported too. Left out, none is.
+# Prints one record per line, every field one word:
+#   <pid> <origin> <what> <program> <flags> <folder> <places>
+#   what     preview.sh, deploy.sh or setup.sh (the FIRST launcher named on
+#            the line), scheduled, or exec. One process can print up to
+#            three records — a launcher, a publish set for later and an exec
+#            are looked for independently, as they always were.
+#   origin   who started it: scheduled, claude, codex, assistant, window or
+#            terminal (the_owners_of_the_work says how it is read).
+#   program  1 when the launcher is the PROGRAM — the first word, or the
+#            script a shell was handed before any word starting with "-" —
+#            and 0 when the line merely names it (a `claude -p` prompt, a
+#            `bash -c` wrapper whose own child is the launcher).
+#   flags    the launcher's OWN words among --stop, --build-only,
+#            --builder-tag, --reset-token, --logout and --help (-h), without
+#            their dashes, ","-joined; "-" when none.
+#   folder   for a publish set for later, the folder id in its label, or "-"
+#            when the label carries none; "-" for everything else.
+#   places   the 1-based numbers of the PLACES this record is for,
+#            ","-joined, or "-". A launcher is for a place when its own
+#            words, upper-cased and one space between them, BEGIN with
+#            "<COURSE> <SECTION> " — so section 1 is not section 12, and AP
+#            CALC 1 is not CALC 1. A publish set for later is for a place
+#            when its label, `ca.russellgordon.Plantoir.deploy.<CODE>.
+#            section<N>[.<folder id>].sh` (ScheduledDeploy.agentLabel), holds
+#            that place: <CODE> as ScheduledDeploy.sanitizedCode writes it —
+#            upper case, anything not A-Z or 0-9 as "-", and COURSE for an
+#            empty code. The name must end ".sh": a `tail -f` of the
+#            scheduled deploy's .log is somebody READING about it, not it.
+# Returns 0 when it read the table, and 2 — printing nothing — when it could
+# not: `ps` failed, or answered with a table that does not list this very
+# run (#378 review N6: a `ps` answering 0 with nothing in it would otherwise
+# make every program look gone). What 2 MEANS is each caller's to decide.
+#
+# This run, its ancestors and its descendants never count: a login shell
+# wrapping this run, or a shell running `./deploy.sh C S; ./preview.sh C S`,
+# carries the same words.
+the_launchers_running() {
+  local table
+  table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" || return 2
+  printf '%s\n' "$table" | awk -v self="$$" '$1 == self { found = 1 } END { exit !found }' || return 2
+  printf '%s\n' "$table" | awk -v self="$$" -v places="${1:-}" -v name="${2:-}" -v id="${3:-}" '
+    function base(word,    parts, n) { n = split(word, parts, "/"); return tolower(parts[n]) }
+    # A course code as ScheduledDeploy.sanitizedCode writes it into a label
+    # (contracts/shared-rules.json -> previewWhileItsSectionDeploys.labelCodeCases).
+    function label_code(course,    s) {
+      s = toupper(course)
+      gsub(/[^A-Z0-9]/, "-", s)
+      if (s == "") s = "COURSE"
+      return s
+    }
+    # Who started process p: the first answer found walking up from it — a
+    # publish set for later first (the scheduled runner has no --mcp-stdio,
+    # so it must not be read as a window), then an assistant serving another
+    # app (claude or codex above it, if either is), then the Plantoir app
+    # itself, then claude or codex running the launcher directly, and
+    # otherwise a command typed in Terminal.
+    function origin_of(p,    q, steps, sched, mcp, app, claude, codex, w, n, word) {
+      q = p; steps = 0; sched = 0; mcp = 0; app = 0; claude = 0; codex = 0
+      while ((q in args) && steps < 64) {
+        if (args[q] ~ /\/Plantoir\/scheduled\// || args[q] ~ /--run-scheduled-deploy/) sched = 1
+        if (args[q] ~ /--mcp-stdio/) mcp = 1
+        else if (args[q] ~ /\/Contents\/MacOS\/Plantoir([ \t]|$)/) app = 1
+        n = split(args[q], word, /[ \t]+/)
+        for (w = 1; w <= n && w <= 2; w++) {
+          if (base(word[w]) == "claude") claude = 1
+          if (base(word[w]) == "codex") codex = 1
+        }
+        if (parent[q] == q || parent[q] < 1) break
+        q = parent[q]; steps++
+      }
+      if (sched) return "scheduled"
+      if (mcp) return claude ? "claude" : (codex ? "codex" : "assistant")
+      if (app) return "window"
+      if (claude) return "claude"
+      if (codex) return "codex"
+      return "terminal"
+    }
+    function joined(list, item) { return (list == "" ? item : list "," item) }
+    function or_dash(list) { return (list == "" ? "-" : list) }
+    {
+      pid = $1; parent[pid] = $2
+      line = $0
+      sub(/^[ \t]*[0-9]+[ \t]+[0-9]+[ \t]+/, "", line)
+      args[pid] = line
+      order[++count] = pid
+    }
+    END {
+      # The places asked about. The section is the last word; the course is
+      # everything before it, "+" read back as a space. It is compared two
+      # ways: as the words a launcher is given, runs of blanks as one space
+      # (a course typed "AP  CALC" is the course AP CALC to the launcher);
+      # and as its label code, written from the course exactly as given, as
+      # ScheduledDeploy writes it.
+      asked = (places == "") ? 0 : split(places, place, ";")
+      for (j = 1; j <= asked; j++) {
+        usable[j] = 0
+        if (!match(place[j], / [^ ]*$/)) continue
+        course = substr(place[j], 1, RSTART - 1)
+        wanted_section[j] = substr(place[j], RSTART + 1)
+        if (wanted_section[j] == "") continue
+        gsub(/\+/, " ", course)
+        wanted_code[j] = label_code(course)
+        spaced = toupper(course)
+        gsub(/[ \t]+/, " ", spaced)
+        sub(/^ /, "", spaced)
+        sub(/ $/, "", spaced)
+        wanted_words[j] = spaced " " wanted_section[j] " "
+        usable[j] = 1
+      }
+      # This run and its ancestors.
+      mine[self] = 1
+      p = self
+      while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
+        p = parent[p]; mine[p] = 1
+      }
+      for (i = 1; i <= count; i++) {
+        pid = order[i]
+        if (pid in mine) continue
+        # ... and its descendants.
+        q = pid; ours = 0; steps = 0
+        while ((q in parent) && steps < 64) {
+          if (parent[q] == self) { ours = 1; break }
+          q = parent[q]; steps++
+        }
+        if (ours) continue
+        n = split(args[pid], word, /[ \t]+/)
+        # A launcher: the first one named on the line.
+        for (w = 1; w <= n; w++) {
+          if (word[w] !~ /(^|\/)(preview|deploy|setup)\.sh$/) continue
+          # The program: the first word, or the script a shell was handed (a
+          # path with spaces splits into several words, none of them a flag).
+          program = (w == 1)
+          if (w > 1 && word[1] ~ /(^|\/)(ba|z|da|k)?sh$/) {
+            program = 1
+            for (v = 2; v < w; v++) {
+              if (word[v] ~ /^-/) program = 0
+            }
+          }
+          # Everything after the launcher name, one space between words, and
+          # the flags among its own words.
+          after = ""; flags = ""
+          for (a = w + 1; a <= n; a++) {
+            after = after " " word[a]
+            if (word[a] ~ /^--(stop|build-only|builder-tag|reset-token|logout|help)$/) {
+              flag = substr(word[a], 3)
+              if (index("," flags ",", "," flag ",") == 0) flags = joined(flags, flag)
+            } else if (word[a] == "-h" && index("," flags ",", ",help,") == 0) {
+              flags = joined(flags, "help")
+            }
+          }
+          after = toupper(substr(after, 2)) " "
+          for_places = ""
+          for (j = 1; j <= asked; j++) {
+            if (usable[j] && index(after, wanted_words[j]) == 1) for_places = joined(for_places, j)
+          }
+          print pid, origin_of(pid), base(word[w]), program, or_dash(flags), "-", or_dash(for_places)
+          break
+        }
+        # A publish set for later, by the name of the script launchd runs.
+        if (match(args[pid], /ca\.russellgordon\.Plantoir\.deploy\.[A-Za-z0-9-]+\.section[0-9]+(\.[0-9a-f]+)?\.sh([ \t]|$)/)) {
+          label = substr(args[pid], RSTART + 33, RLENGTH - 33)
+          sub(/[ \t]$/, "", label)
+          sub(/\.sh$/, "", label)
+          k = index(label, ".section")
+          code = substr(label, 1, k - 1)
+          rest = substr(label, k + 8)
+          dot = index(rest, ".")
+          if (dot > 0) {
+            label_section = substr(rest, 1, dot - 1); folder = substr(rest, dot + 1)
+          } else {
+            label_section = rest; folder = "-"
+          }
+          for_places = ""
+          for (j = 1; j <= asked; j++) {
+            if (usable[j] && wanted_code[j] == code && wanted_section[j] == label_section) for_places = joined(for_places, j)
+          }
+          print pid, origin_of(pid), "scheduled", 0, "-", folder, or_dash(for_places)
+        }
+        # A docker exec aimed at this website builder, by its name or its id.
+        if (name != "" || id != "") {
+          client = 0; asked_exec = 0
+          for (w = 1; w <= n; w++) {
+            if (base(word[w]) == "docker") client = 1
+            else if (client && word[w] == "exec") asked_exec = 1
+            else if (asked_exec && ((name != "" && word[w] == name) || (id != "" && (word[w] == id || word[w] == substr(id, 1, 12))))) {
+              print pid, origin_of(pid), "exec", 0, "-", "-", "-"
+              break
+            }
+          }
+        }
+      }
+    }'
+}
+# <<< PROCESS TABLE BLOCK <<<
 PREVIEW_PORT_RANGE="8081-8084"
 # Each preview also uses a live-reload websocket on port + 1000.
 PREVIEW_WS_RANGE="9081-9084"
@@ -679,99 +911,43 @@ export PATH="$TOOLS_DIR/bin:$PATH"
 # sentence that is false. The window refuses its own build leg from its
 # publish record; a preview typed in Terminal during ANOTHER program's build
 # leg is the one gap left, and the contract names it.
-# This run's own ancestors and descendants never count (a shell wrapping
-# `./deploy.sh C S; ./preview.sh C S` carries the words). A process table
-# that cannot be read lets the preview THROUGH — the opposite of the look
-# before a workspace is remade, on purpose: there, failing open costs a
-# publish; here, failing closed would refuse every preview for as long as
-# `ps` fails, which is "blocked until a restart" again. The window's check
-# and the leases still stand when this one cannot see.
+# How the table is read — which processes are launchers, for which course
+# and section, with which flags; which name is a publish set for later; which
+# processes are this run's own family — is the_launchers_running's, in the
+# PROCESS TABLE BLOCK, shared with the look before a website builder is set
+# up again (#388). What COUNTS as a deploy is decided here. A process table
+# that cannot be read — `ps` fails, or its answer does not list this run —
+# lets the preview THROUGH: the opposite of the look before a workspace is
+# remade, on purpose: there, failing open costs a publish; here, failing
+# closed would refuse every preview for as long as `ps` fails, which is
+# "blocked until a restart" again. The window's check and the leases still
+# stand when this one cannot see.
 a_deploy_is_running_for() {
-  local course="$1" section="$2" label_code folder_id here table found kind pid cwd
-  label_code="$(printf '%s' "$course" | tr '[:lower:]' '[:upper:]' | LC_ALL=C sed 's/[^A-Z0-9]/-/g')"
-  [[ -n "$label_code" ]] || label_code="COURSE"
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd
   here="$(/bin/pwd -P)"
   folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
-  table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" || return 1
-  [[ -n "$table" ]] || return 1
-  found="$(printf '%s\n' "$table" | awk -v self="$$" -v course="$course" -v section="$section" \
-      -v code="$label_code" -v folder="$folder_id" '
-    {
-      pid = $1; parent[pid] = $2
-      line = $0
-      sub(/^[ \t]*[0-9]+[ \t]+[0-9]+[ \t]+/, "", line)
-      args[pid] = line
-      order[++count] = pid
-    }
-    END {
-      mine[self] = 1
-      p = self
-      while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
-        p = parent[p]; mine[p] = 1
-      }
-      # What the arguments of deploy.sh begin with for THIS course and section.
-      spaced = toupper(course)
-      gsub(/[ \t]+/, " ", spaced)
-      sub(/^ /, "", spaced)
-      sub(/ $/, "", spaced)
-      wanted = spaced " " section " "
-      prefix = "ca.russellgordon.Plantoir.deploy." code ".section" section
-      pattern = "ca\\.russellgordon\\.Plantoir\\.deploy\\." code "\\.section" section "(\\.[0-9a-f]+)?\\.sh([ \t]|$)"
-      for (i = 1; i <= count; i++) {
-        pid = order[i]
-        if (pid in mine) continue
-        q = pid; ours = 0; steps = 0
-        while ((q in parent) && steps < 64) {
-          if (parent[q] == self) { ours = 1; break }
-          q = parent[q]; steps++
-        }
-        if (ours) continue
-        if (match(args[pid], pattern)) {
-          rest = substr(args[pid], RSTART + length(prefix), RLENGTH - length(prefix))
-          sub(/[ \t]$/, "", rest)
-          if (rest == ".sh" || rest == "." folder ".sh") { print "scheduled " pid; continue }
-        }
-        # deploy.sh must be the PROGRAM: the first word, or the script a
-        # shell was handed (a path with spaces splits into several words,
-        # none of them a flag). A process whose text merely MENTIONS it — a
-        # `claude -p` prompt, a `bash -c` wrapper, whose own child is the
-        # deploy and is counted — does not count. Only the arguments of
-        # deploy.sh itself are read for the flags that deploy nothing.
-        # (No apostrophes in here: this program sits in single quotes.)
-        # The course and section are read as the text the arguments of
-        # deploy.sh BEGIN with, one space between words, as
-        # the_owners_of_the_work reads them: a course code may hold a space
-        # ("AP CALC", which CourseCodeRule allows), and reading one word for
-        # it missed every deploy of that course (#388).
-        n = split(args[pid], word, /[ \t]+/)
-        for (w = 1; w + 2 <= n; w++) {
-          if (w > 1 && (word[1] !~ /(^|\/)(ba|z|da|k)?sh$/ || word[w] ~ /^-/)) break
-          if (word[w] !~ /(^|\/)deploy\.sh$/) continue
-          after = ""
-          for (a = w + 1; a <= n; a++) after = after " " word[a]
-          after = toupper(substr(after, 2)) " "
-          if (index(after, wanted) == 1) {
-            deploys = 1
-            for (f = w + 1; f <= n; f++) {
-              if (word[f] ~ /^(--reset-token|--logout|--help|-h)$/) deploys = 0
-            }
-            if (deploys) print "deploy " pid
-            break
-          }
-        }
-      }
-    }')"
-  while read -r kind pid; do
-    case "$kind" in
+  # One place is asked about, so a record for it says "1".
+  records="$(the_launchers_running "${course// /+} ${section}")" || return 1
+  while read -r pid origin what program flags folder places; do
+    [ "$places" = "1" ] || continue
+    case "$what" in
       scheduled)
-        return 0 ;;
-      deploy)
+        # A label carrying ANOTHER folder's id is that folder's deploy.
+        if [ "$folder" = "-" ] || [ "$folder" = "$folder_id" ]; then
+          return 0
+        fi ;;
+      deploy.sh)
+        # deploy.sh must be the PROGRAM, not merely named on a line.
+        [ "$program" = "1" ] || continue
+        case ",$flags," in
+          *,reset-token,*|*,logout,*|*,help,*) continue ;;
+        esac
         cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
         if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
           return 0
         fi ;;
     esac
-  done <<< "$found"
+  done <<< "$records"
   return 1
 }
 
@@ -2310,8 +2486,10 @@ WORKSPACE_LEFTOVERS=""
 # <course> <section>", origin one of claude, codex, assistant, window,
 # scheduled, terminal or "-".
 #
-# The proof is the LIVE process table, read once, and nothing else: an owner
-# counts only when a running process's OWN command line names it. There is no
+# The proof is the LIVE process table, read once by the_launchers_running
+# (the PROCESS TABLE BLOCK, shared with preview.sh's #381 guard since #388),
+# and nothing else: an owner counts only when a running process's OWN
+# command line names it. There is no
 # remembered process number anywhere in it — no lease file, no pid file, no
 # `kill -0` — so a number the system has since handed to another program
 # (Mail, or a launcher for another section) can never keep a dead owner
@@ -2321,15 +2499,20 @@ WORKSPACE_LEFTOVERS=""
 #   - a build for publishing: preview.sh for that course and section with
 #     --build-only, or deploy.sh for it (it runs that build itself).
 #   - a publish: deploy.sh for that course and section, whatever its flags.
+# A launcher counts here when its line merely NAMES it, not only when it is
+# the program (the guard's stricter rule): `bash -x ./deploy.sh C S` is a
+# real, running publish whose program word is a flag away, and missing it
+# would end that publish. Counting too many costs a wait; counting too few
+# ends a publish (#388).
 #   - a course being set up: setup.sh.
 #   - anything else (a launcher's short check, a stop, something typed by
 #     hand): any launcher at all, preview.sh, deploy.sh or setup.sh.
 # And two belts behind those, for everything but a preview:
 #   - a publish set for later: while launchd runs it, the app's scheduled
-#     runner and the script it runs both carry the script's path, whose name
-#     holds the course (as ScheduledDeploy writes it: upper case, anything
-#     not a letter or digit as "-") and "section<N>" followed by a dot — so
-#     section 1 is never read as section 12. That path is on the table from
+#     runner and the script it runs both carry the script's path,
+#     ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh,
+#     read by the one label rule the_launchers_running holds (the name must
+#     end ".sh", so a `tail -f` of its .log owns nothing — #388). That path is on the table from
 #     launchd's first instant to its last, including between the build and
 #     the upload, so a publish launchd is still running is never ended.
 #   - a `docker exec` still aimed at THIS workspace, by its name or its id:
@@ -2353,145 +2536,85 @@ WORKSPACE_LEFTOVERS=""
 # the cost of that is one wait and a refusal, the cost of the other is
 # somebody's publish ended. A table that does not list THIS run counts as
 # unread too (#378 review N6): `ps` answering 0 with nothing in it would
-# otherwise make every piece of work look abandoned.
+# otherwise make every piece of work look abandoned. So does ANY other
+# failure of the reader — a missing function answers 127, and a caller that
+# waited only on 2 would read that as "every owner gone" (#388).
 #
 # A course code may carry one space ("AP CALC", CourseCodeRule), so the
-# course in "$1" is written with "+" for the space (a code cannot hold a
-# "+"), and a launcher's arguments are compared as the text that follows the
-# launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
+# course in "$1" is written with "+" for the space (CourseCodeRule refuses
+# a "+"; the command-line setup does not — knownLimits), and the_launchers_running compares a launcher's arguments as the text
+# that follows the launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
 # word (#378 review S1: word by word, a live preview of AP CALC read as
 # course AP, section CALC, and was stopped as left over).
 the_owners_of_the_work() {
-  local table
-  if ! table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" \
-    || ! printf '%s\n' "$table" | awk -v self="$$" '$1 == self { found = 1 } END { exit !found }'; then
+  local places records status
+  # A course holding ";" (the PLACES separator) or "\" (which awk -v reads
+  # as the start of an escape, "\073" being ";") would shift every later
+  # place's number onto the wrong piece, and a live preview of ANOTHER
+  # course would read as gone. No app can make such a code, but the
+  # command-line setup can (knownLimits), so the answer is the safe one:
+  # every piece owned, a wait rather than a guess (#388 impl review S1).
+  case "$1" in
+    *";"*|*"\\"*)
+      printf '%s\n' "$1" | awk 'NF == 3 { print "owned - " $0 }'
+      return 0 ;;
+  esac
+  # One place per piece of work, in the same order as the pieces, so a
+  # record's place numbers are the pieces' numbers.
+  places="$(printf '%s\n' "$1" | awk 'NF == 3 { printf "%s%s %s", (n++ ? ";" : ""), $2, $3 }')"
+  status=0
+  records="$(the_launchers_running "$places" "${CONTAINER_NAME:-}" "${2:-}")" || status=$?
+  # ANY failure — the table unreadable (2), or the reader itself missing or
+  # broken — counts as every owner still running: waiting is the safe way
+  # to be wrong here, and the other way ends somebody's publish.
+  if [ "$status" -ne 0 ]; then
     printf '%s\n' "$1" | awk 'NF == 3 { print "owned - " $0 }'
     return 0
   fi
-  # One piece per ";" — an awk -v value cannot hold a newline.
-  printf '%s\n' "$table" | awk -v self="$$" -v work="$(printf '%s' "$1" | tr '\n' ';')" \
-    -v name="${CONTAINER_NAME:-}" -v id="${2:-}" '
-    function base(word,    parts, n) { n = split(word, parts, "/"); return tolower(parts[n]) }
-    function sanitized(code,    s) { s = toupper(code); gsub(/[^A-Z0-9]/, "-", s); return s }
-    # Who started process p: the first answer found walking up from it.
-    function origin_of(p,    q, steps, sched, mcp, app, claude, codex, w, n, word) {
-      q = p; steps = 0; sched = 0; mcp = 0; app = 0; claude = 0; codex = 0
-      while ((q in args) && steps < 64) {
-        if (args[q] ~ /\/Plantoir\/scheduled\// || args[q] ~ /--run-scheduled-deploy/) sched = 1
-        if (args[q] ~ /--mcp-stdio/) mcp = 1
-        else if (args[q] ~ /\/Contents\/MacOS\/Plantoir([ \t]|$)/) app = 1
-        n = split(args[q], word, /[ \t]+/)
-        for (w = 1; w <= n && w <= 2; w++) {
-          if (base(word[w]) == "claude") claude = 1
-          if (base(word[w]) == "codex") codex = 1
-        }
-        if (parent[q] == q || parent[q] < 1) break
-        q = parent[q]; steps++
-      }
-      if (sched) return "scheduled"
-      if (mcp) return claude ? "claude" : (codex ? "codex" : "assistant")
-      if (app) return "window"
-      if (claude) return "claude"
-      if (codex) return "codex"
-      return "terminal"
-    }
-    {
-      pid = $1; parent[pid] = $2
-      line = $0
-      sub(/^[ \t]*[0-9]+[ \t]+[0-9]+[ \t]+/, "", line)
-      args[pid] = line
-      order[++count] = pid
-    }
-    END {
-      mine[self] = 1
-      p = self
-      while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
-        p = parent[p]; mine[p] = 1
-      }
-      # Every candidate owner, by what it is: L_kind/L_course/L_section/L_flags
-      # for a launcher, S_code/S_section for a publish set for later, X for a
-      # docker exec aimed at this workspace.
+  printf '%s\n' "$1" | awk -v records="$(printf '%s' "$records" | tr '\n' ';')" '
+    function has(list, item) { return index("," list ",", "," item ",") > 0 }
+    BEGIN {
       owners = 0
-      for (i = 1; i <= count; i++) {
-        pid = order[i]
-        if (pid in mine) continue
-        q = pid; ours = 0; steps = 0
-        while ((q in parent) && steps < 64) {
-          if (parent[q] == self) { ours = 1; break }
-          q = parent[q]; steps++
+      lines = split(records, record, ";")
+      for (r = 1; r <= lines; r++) {
+        if (split(record[r], field, " ") != 7) continue
+        owners++
+        O_origin[owners] = field[2]
+        O_kind[owners] = field[3]
+        O_flags[owners] = field[5]
+        O_places[owners] = field[7]
+      }
+    }
+    NF == 3 {
+      j++
+      kind = $1; section = $3
+      found = 0
+      for (o = 1; o <= owners && !found; o++) {
+        k = O_kind[o]
+        here = has(O_places[o], j)
+        if (kind == "preview") {
+          found = (k == "preview.sh" && here && !has(O_flags[o], "stop") && !has(O_flags[o], "build-only"))
+          continue
         }
-        if (ours) continue
-        n = split(args[pid], word, /[ \t]+/)
-        for (w = 1; w <= n; w++) {
-          if (word[w] ~ /(^|\/)(preview|deploy|setup)\.sh$/) {
-            owners++
-            O_pid[owners] = pid
-            O_kind[owners] = base(word[w])
-            # Everything after the launcher name, one space between words.
-            after = ""
-            for (a = w + 1; a <= n; a++) after = after " " word[a]
-            O_after[owners] = toupper(substr(after, 2)) " "
-            O_stop[owners] = (args[pid] ~ /[ \t]--stop([ \t]|$)/)
-            O_buildonly[owners] = (args[pid] ~ /[ \t]--build-only([ \t]|$)/)
-            O_tag[owners] = (args[pid] ~ /[ \t]--builder-tag([ \t]|$)/)
-            break
-          }
+        if (k == "exec") { found = 1; continue }
+        if (k == "scheduled") {
+          found = (kind == "other" || here)
+          continue
         }
-        if (match(args[pid], /\.deploy\.[A-Za-z0-9-]+\.section[0-9]+\./)) {
-          label = substr(args[pid], RSTART + 8, RLENGTH - 9)
-          k = index(label, ".section")
-          owners++
-          O_pid[owners] = pid
-          O_kind[owners] = "scheduled"
-          O_course[owners] = substr(label, 1, k - 1)
-          O_section[owners] = substr(label, k + 8)
-        }
-        client = 0; asked_exec = 0
-        for (w = 1; w <= n; w++) {
-          if (base(word[w]) == "docker") client = 1
-          else if (client && word[w] == "exec") asked_exec = 1
-          else if (asked_exec && ((name != "" && word[w] == name) || (id != "" && (word[w] == id || word[w] == substr(id, 1, 12))))) {
-            owners++
-            O_pid[owners] = pid
-            O_kind[owners] = "exec"
-            break
-          }
+        if (kind == "build") {
+          found = (here && ((k == "preview.sh" && has(O_flags[o], "build-only")) || k == "deploy.sh"))
+        } else if (kind == "publish") {
+          found = (k == "deploy.sh" && here)
+        } else if (kind == "setup") {
+          found = (k == "setup.sh" && !has(O_flags[o], "builder-tag"))
+        } else {
+          found = (k == "preview.sh" || k == "deploy.sh" || (k == "setup.sh" && !has(O_flags[o], "builder-tag")))
         }
       }
-      pieces = split(work, piece, ";")
-      for (j = 1; j <= pieces; j++) {
-        if (split(piece[j], it, " ") != 3) continue
-        kind = it[1]; course = toupper(it[2]); section = it[3]
-        gsub(/\+/, " ", course)
-        # "AP CALC 1 " must be how the launcher arguments begin.
-        wants = course " " section " "
-        found = 0
-        for (o = 1; o <= owners && !found; o++) {
-          k = O_kind[o]
-          if (kind == "preview") {
-            found = (k == "preview.sh" && index(O_after[o], wants) == 1 && !O_stop[o] && !O_buildonly[o])
-            continue
-          }
-          if (k == "exec") { found = 1; continue }
-          if (k == "scheduled") {
-            found = (kind == "other" || (O_course[o] == sanitized(course) && O_section[o] == section))
-            continue
-          }
-          if (kind == "build") {
-            found = (index(O_after[o], wants) == 1 && ((k == "preview.sh" && O_buildonly[o]) || k == "deploy.sh"))
-          } else if (kind == "publish") {
-            found = (k == "deploy.sh" && index(O_after[o], wants) == 1)
-          } else if (kind == "setup") {
-            found = (k == "setup.sh" && !O_tag[o])
-          } else {
-            found = (k == "preview.sh" || k == "deploy.sh" || (k == "setup.sh" && !O_tag[o]))
-          }
-        }
-        if (found) {
-          print "owned " origin_of(O_pid[o - 1]) " " kind " " it[2] " " section
-        } else {
-          print "gone - " kind " " it[2] " " section
-        }
+      if (found) {
+        print "owned " O_origin[o - 1] " " kind " " $2 " " section
+      } else {
+        print "gone - " kind " " $2 " " section
       }
     }'
 }
