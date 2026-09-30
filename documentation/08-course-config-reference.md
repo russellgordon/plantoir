@@ -400,9 +400,9 @@ right:
 * **Anything REPORTING to a teacher collapses it to VISIBLE.** The section
   graph (`AssistSectionGraph`; `AssistWorkspace.Plan` on Windows), Windows'
   scheduled deploy's "classes students cannot see yet"
-  (`ScheduledDeploy.UnpublishedClassesIn` — so a page whose flag cannot be
-  read is NOT listed there as one students cannot see; the mac has had no
-  such list since #396, and Windows' #396 issue removes theirs), the index pointer, the dangling-link check,
+  (`ScheduledDeploy.UnpublishedClassesIn`, until it went with #400 on
+  2026-09-30 — neither app has such a list since #396; what is left is the
+  classes a caller NAMES, each said as published or not), the index pointer, the dangling-link check,
   the "N linked pages stay visible" sweep (`AssistWorkspace.cs:692`), and the
   re-date planner. (No VIEW reads a page's flag — a sentence here said "the
   sidebar" until 2026-09-18 and there is no such reader; the sidebar lists
