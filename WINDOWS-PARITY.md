@@ -351,6 +351,7 @@ issue whose code it touches, so work this file's order and meet them there:
 | [#393](https://github.com/russellgordon/plantoir/issues/393) | The mac launchers' console says "website builder"; one new launcher marker; check your bars for a dead step (mac #382) | with #386 and #391 (the launchers' console and markers) |
 | [#384](https://github.com/russellgordon/plantoir/issues/384) | Copy a Page's checklist and result scroll as ONE region (mac #365) | with Copy a Page |
 | [#392](https://github.com/russellgordon/plantoir/issues/392) | Links into hidden pages: the checklist, and the published-pages record (mac #379) | after #359 |
+| #WIN_TBD | Links checklist: a page reached only through another offered page follows it; pages named like #362 (mac #385) | with #392 |
 | [#380](https://github.com/russellgordon/plantoir/issues/380) | Marketing pictures keep the window's own corners on Windows too (mac #375) | with #370 |
 
 ---
