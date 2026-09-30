@@ -185,6 +185,25 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 4: preview and publish mechanics (2026-09-30)
+
+Branch `issue/bundle4-preview-publish`. Done: #278 (address read by whole
+lines), #233 (the quiet after the server line bounded, three outcomes, trail
+line), #286 (forty port blocks, the sentence, the launcher trail line),
+#386 (no preview of a section being deployed: window, assistant, preview.ps1),
+#391 (windowless deploy/rebuild `--non-interactive`, exit 3 named), #395
+(Cloudflare remade, from the app's and plantoir-mcp's own runs), #304 (partial
+publish folder refused; deploy.ps1 resolves once), #358 (fingerprint rule 2),
+#319 and #307 (measured; the re-probe now binds loopback too). Checked, nothing
+to change: #393, #401. Partly: #272 (freshness, preview detection and the
+two-window Save merge done; Preview Again, four sentences and two events
+owed), #357 (re-date counts done; the saved settings at the deploy act owed),
+#395 (the scheduled wrapper captures only the build leg's output, so an
+overnight remake leaves no line yet). Measurements and reasons:
+`documentation/12-windows-app.md` → "Preview and publish mechanics that match
+the mac (bundle 4)" and `documentation/03-launcher-scripts.md` →
+"preview.ps1's own port walk…".
+
 ## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
 
 Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's
