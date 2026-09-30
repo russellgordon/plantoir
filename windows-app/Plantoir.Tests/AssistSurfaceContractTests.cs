@@ -148,13 +148,23 @@ public class AssistSurfaceContractTests
     {
         var tools = onThisSurface.ToHashSet(StringComparer.Ordinal);
 
-        // The arguments this server takes that the contract does not describe.
+        // The arguments this server takes that the contract does not describe,
+        // in TWO halves (#178), because they are two different things.
         //
-        // `preview` is the SECOND of the two departures AssistToolSurface.swift
-        // names: on the mac every change rebuilds, which is what the assistant's
-        // system prompt promises a teacher, so there is no flag; here a batch of
-        // edits can be made with the preview suppressed and rebuilt once at the
-        // end. The rest are arguments the mac's surface simply does not offer.
+        // (1) The departures the CONTRACT states: `toolSchemas.departures
+        // .absentHere` names each parameter this surface takes and the mac's
+        // does not, with its why and what was rejected — today one, `preview`.
+        // They are READ from the file, so the next one the mac records arrives
+        // here as a failure rather than as silence, and the why lives once, in
+        // the contract, not in a drifting copy here. Every tool on this surface
+        // that takes a named parameter is that departure; the file must name
+        // one this server really takes, or it is asserting a departure that is
+        // gone.
+        //
+        // (2) The rest, which the contract deliberately leaves to this side
+        // (`notEnumeratedHere`: the mac does not declare these arguments, so it
+        // can neither test them nor notice when they change). Kept here, by
+        // hand, with their reasons below.
         //
         // Held to an exact set for the same reason as the type departures: a
         // NEW one is a routing difference nobody chose, and a resolved one that
@@ -162,11 +172,26 @@ public class AssistSurfaceContractTests
         // plan_ twins take no `preview` — they change nothing, so there is
         // nothing to rebuild — which this list said they did until the check
         // itself said otherwise.
-        var agreedExtras = new[]
+        var absentHere = ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["departures"]!["absentHere"]!
+            .AsArray()
+            .Select(entry => entry!["parameter"]!.ToString())
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.NotEmpty(absentHere);
+        var statedByTheContract = onlyHere
+            .Where(e => absentHere.Contains(e[(e.IndexOf('.') + 1)..]))
+            .ToList();
+        foreach (string parameter in absentHere)
         {
-            "publish_class_on.preview",
-            "publish_pages.preview", "publish_pages.includeLinked",
-            "unpublish_pages.preview", "unpublish_pages.includeLinked",
+            Assert.True(statedByTheContract.Any(e => e.EndsWith("." + parameter, StringComparison.Ordinal)),
+                $"assist-cases.json → toolSchemas.departures.absentHere says this surface takes `{parameter}` and " +
+                "the mac's does not, and no tool here takes it any more. The departure is gone: say so on a " +
+                "`mac` issue so the entry is removed from the contract.");
+        }
+
+        var notEnumeratedHere = new[]
+        {
+            "publish_pages.includeLinked",
+            "unpublish_pages.includeLinked",
             "plan_publish_pages.includeLinked",
             "plan_unpublish_pages.includeLinked",
             "add_next_class.unit", "add_next_class.days",
@@ -228,6 +253,10 @@ public class AssistSurfaceContractTests
             // measurement script strips it too.
             "add_next_class.duplicate", "plan_add_next_class.duplicate",
         }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
+
+        // Exact set in both directions over the two halves together (#122's
+        // lesson: losing that property once cost a real bug).
+        var agreedExtras = statedByTheContract.Concat(notEnumeratedHere).ToList();
 
         var unagreedExtras = onlyHere.Except(agreedExtras).OrderBy(e => e, StringComparer.Ordinal).ToList();
         Assert.True(unagreedExtras.Count == 0,
@@ -1079,6 +1108,13 @@ public class AssistSurfaceContractTests
             LocalModel.BuildArguments("model.gguf", 8080, threads: 4, useGpu: true));
         Answer("The model runs on the HOST, with hardware acceleration");
 
+        // Every request carries the contract's cap, read from the file.
+        int cap = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == "Every request caps how much the model may write")!["cap"]!
+            .GetValue<int>();
+        Assert.Equal(cap, LocalModel.Request(new JsonArray(), new JsonArray())["max_tokens"]!.GetValue<int>());
+        Answer("Every request caps how much the model may write");
+
         // The one that genuinely cannot be executed, named rather than dropped.
         // A polarity veto is a rule about how a MODEL is chosen: it governs the
         // routing suite in research/ai-assist/, which is measured by hand and
@@ -1087,6 +1123,14 @@ public class AssistSurfaceContractTests
         Assert.True(unanswered.Remove("A model that inverts polarity is VETOED, whatever it scores"),
             "The polarity veto is recorded here as the one requirement no test can execute, and " +
             "the contract no longer states it in those words.");
+
+        // A requirement this app owes and has not built is held open by name
+        // (NamedGapLedger, the parity burn-down list) rather than left red;
+        // the ledger fails the day a test here answers it.
+        var allRules = doc["modelTiers"]!["requirements"]!.AsArray().Select(r => r!["rule"]!.ToString()).ToList();
+        var deferred = NamedGapLedger.GapsIn(
+            NamedGapLedger.ModelTierRequirements, allRules, allRules.Where(r => !unanswered.Contains(r)));
+        unanswered.ExceptWith(deferred);
 
         Assert.True(unanswered.Count == 0,
             "contracts/app-rules.json requires things of the local assistant that no test here " +

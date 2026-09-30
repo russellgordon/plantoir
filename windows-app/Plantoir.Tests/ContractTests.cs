@@ -10,21 +10,31 @@ namespace Plantoir.Tests;
 
 public class ContractTests
 {
+    /// <summary>
+    /// <c>assist-wording.json</c> → <c>wording</c> is THE list (#157): every key
+    /// is walked by reflection, in both directions, rather than named here one
+    /// line at a time. A key the mac adds with no member here goes red naming
+    /// itself; a member here with no key goes red too, unless it is one of the
+    /// sentences this app says and the mac says differently
+    /// (<see cref="WindowsOnlyWording"/>). A key this app does not carry yet is
+    /// held open BY NAME in <see cref="NamedGapLedger"/> against the issue that
+    /// owns it, and the ledger fails the day it starts existing.
+    ///
+    /// <para>What is compared. A key is resolved to a public static member of
+    /// the same name (first letter upper-cased) on <c>AssistWording</c>, then on
+    /// <c>ClassChangeWording</c>, where the duplicate-and-copy sentences live. A
+    /// constant is compared with the file WHOLE. A method cannot be compared
+    /// generically — its example values live in the file, not in its
+    /// signature — so the methods keep their hand-written calls below, with the
+    /// placeholder convention of the generator ("{course}", "{section}", 2).</para>
+    /// </summary>
     [Fact]
     public void AssistWording_MatchesContract()
     {
         var doc = ContractLoader.LoadJson("assist-wording.json");
         var wording = doc["wording"]!.AsObject();
 
-        Assert.Equal(wording["deployApproval"]!.ToString(), AssistWording.DeployApproval);
-        Assert.Equal(wording["deployQuestion"]!.ToString(), AssistWording.DeployQuestion);
-        Assert.Equal(wording["planQuestion"]!.ToString(), AssistWording.PlanQuestion);
-        Assert.Equal(wording["deployAccepted"]!.ToString(), AssistWording.DeployAccepted);
-        Assert.Equal(wording["planAccepted"]!.ToString(), AssistWording.PlanAccepted);
-        Assert.Equal(wording["cancelled"]!.ToString(), AssistWording.Cancelled);
-        Assert.Equal(wording["deployWasCancelled"]!.ToString(), AssistWording.DeployWasCancelled);
-        Assert.Equal(wording["planWasCancelled"]!.ToString(), AssistWording.PlanWasCancelled);
-
+        // ---- The methods, by hand: their example values come from the file.
         Assert.Equal(wording["deployed"]!.ToString(), AssistWording.Deployed("{course}", "{section}"));
         Assert.Equal(wording["couldNotBuildBeforeDeploying"]!.ToString(), AssistWording.CouldNotBuildBeforeDeploying("{course}", "{section}"));
         Assert.Equal(wording["deployDidNotFinish"]!.ToString(), AssistWording.DeployDidNotFinish("{course}", "{section}"));
@@ -40,50 +50,102 @@ public class ContractTests
         Assert.Equal(wording["undidPartly"]!.ToString(), AssistWording.UndidPartly("{change}", 2));
         Assert.Equal(wording["couldNotUndo"]!.ToString(), AssistWording.CouldNotUndo("{change}", 2));
 
-        Assert.Equal(wording["undoIsStillAvailable"]!.ToString(), AssistWording.UndoIsStillAvailable);
-        Assert.Equal(wording["nothingToUndo"]!.ToString(), AssistWording.NothingToUndo);
-        Assert.Equal(wording["aCreatedPageCanBeTakenBack"]!.ToString(), AssistWording.ACreatedPageCanBeTakenBack);
-        Assert.Equal(wording["undoDoesNotReachTheLiveSite"]!.ToString(), AssistWording.UndoDoesNotReachTheLiveSite);
-        Assert.Equal(wording["whereTheOutputIs"]!.ToString(), AssistWording.WhereTheOutputIs);
-        Assert.Equal(wording["nothingToDo"]!.ToString(), AssistWording.NothingToDo);
-
-        // Rolling a section over to a new year. Pinned here rather than merely
-        // present in AssistWording, because the two sentences a teacher is
-        // OFFERED are the two AssistCardCommand must accept verbatim — a
-        // reply that invites a phrasing the matcher does not take is worse
-        // than one that offers nothing.
         // Both said straight to a teacher now that "back up this course" and
         // "what does publishing mean?" are fixed phrasings, matched in code.
         Assert.Equal(wording["backedUpCourse"]!.ToString(),
                      AssistWording.BackedUpCourse("{course}", "{course}_backup_2026-09-08_190000.zip"));
-
-        // Said when a teacher asks what publishing means twice in one
-        // conversation. Pinned here rather than merely present, because a
-        // fixed phrasing lets a TEACHER reach it — the sentence it replaced
-        // was addressed to a model, and the mac made and corrected that same
-        // mistake, so the two apps saying one thing is the point.
         Assert.Equal(wording["publishingAlreadyExplained"]!.ToString(),
                      AssistWording.PublishingAlreadyExplained("{course}", "{section}"));
 
-        Assert.Equal(wording["rolloverWebsiteQuestion"]!.ToString(), AssistWording.RolloverWebsiteQuestion);
-        Assert.Equal(wording["rolloverSayToStartANewWebsite"]!.ToString(), AssistWording.RolloverSayToStartANewWebsite);
-        Assert.Equal(wording["rolloverSayToKeepTheSameWebsite"]!.ToString(), AssistWording.RolloverSayToKeepTheSameWebsite);
-        Assert.Equal(wording["rolloverIsOnANewWebsite"]!.ToString(), AssistWording.RolloverIsOnANewWebsite);
-        Assert.Equal(wording["rolloverHadNoWebsiteYet"]!.ToString(), AssistWording.RolloverHadNoWebsiteYet);
-        Assert.Equal(wording["rolloverKeptTheSameWebsite"]!.ToString(), AssistWording.RolloverKeptTheSameWebsite);
-        Assert.Equal(wording["rolloverWebsiteNotDecided"]!.ToString(), AssistWording.RolloverWebsiteNotDecided);
-        Assert.Equal(wording["rolloverTurnedOffTheScheduledPublish"]!.ToString(),
-                     AssistWording.RolloverTurnedOffTheScheduledPublish);
-        Assert.Equal(wording["rolloverCouldNotTurnOffTheScheduledPublish"]!.ToString(),
-                     AssistWording.RolloverCouldNotTurnOffTheScheduledPublish);
-
-        // The two with a value in them carry the generator's own example, the
-        // same way `deployed` above carries "{course}" and "{section}".
+        // The two with a value in them carry the generator's own example.
         Assert.Equal(wording["rolloverStartedANewWebsite"]!.ToString(),
                      AssistWording.RolloverStartedANewWebsite(
                          ".netlify_sites/section1.previous-2026-09-08_071500.json"));
         Assert.Equal(wording["rolloverCouldNotStartANewWebsite"]!.ToString(),
                      AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"));
+
+        // The class-planning sentences hoisted on 2026-09-30, with the
+        // generator's own examples.
+        Assert.Equal(wording["madeRoom"]!.ToString(), AssistWording.MadeRoom(1, "Unit", 3, 4));
+        Assert.Equal(wording["movedToLaterDays"]!.ToString(), AssistWording.MovedToLaterDays(3));
+        Assert.Equal(wording["movesAndBecomesADraft"]!.ToString(), AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"));
+        Assert.Equal(wording["publishedTheClassOn"]!.ToString(), AssistWording.PublishedTheClassOn("2026-09-14"));
+        Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
+        Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
+
+        // ---- The walk: the file is the list.
+        var keys = wording.Select(pair => pair.Key).ToList();
+        var here = keys.Where(key => WordingMember(key) is not null).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.AssistWordingKeys, keys, here);
+
+        var unresolved = keys
+            .Where(key => WordingMember(key) is null && !deferred.Contains(key))
+            .ToList();
+        Assert.True(unresolved.Count == 0,
+            "assist-wording.json names sentences with no member of the same name on AssistWording or " +
+            "ClassChangeWording, and no NamedGapLedger entry holding them open: " +
+            string.Join(", ", unresolved) + ". Add the member (the mac owns the words; copy them), or " +
+            "ledger the key by name against the open issue that owns it.");
+
+        // ---- The other direction: a member of AssistWording with no key.
+        var keySet = keys.ToHashSet(StringComparer.Ordinal);
+        var members = typeof(AssistWording)
+            .GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(member => member is FieldInfo or MethodInfo { IsSpecialName: false })
+            .Select(member => member.Name)
+            .Distinct()
+            .ToList();
+        foreach (var (name, why) in WindowsOnlyWording)
+        {
+            Assert.True(members.Contains(name),
+                $"WindowsOnlyWording names {name}, which AssistWording no longer has: delete the entry ({why}).");
+            Assert.False(keySet.Contains(char.ToLowerInvariant(name[0]) + name[1..]),
+                $"WindowsOnlyWording names {name}, and assist-wording.json now carries it as a key: delete " +
+                "the entry so the walk compares it.");
+        }
+        var keyless = members
+            .Where(name => !keySet.Contains(char.ToLowerInvariant(name[0]) + name[1..]))
+            .Where(name => !WindowsOnlyWording.ContainsKey(name))
+            .ToList();
+        Assert.True(keyless.Count == 0,
+            "AssistWording carries sentences assist-wording.json does not name: " + string.Join(", ", keyless) +
+            ". The mac owns the sentence (CLAUDE.md rule 2): propose the key on a `mac` issue, or say here " +
+            "why the two apps word it differently.");
+
+        // ---- Values last, so a sentence that differs cannot hide a missing key.
+        var differs = here
+            .Select(key => (key, member: WordingMember(key)))
+            .Where(entry => entry.member is FieldInfo { FieldType: var type } && type == typeof(string))
+            .Where(entry => (string?)((FieldInfo)entry.member!).GetValue(null) != wording[entry.key]!.ToString())
+            .Select(entry => $"{entry.key}: contract \"{wording[entry.key]}\", here \"{((FieldInfo)entry.member!).GetValue(null)}\"")
+            .ToList();
+        Assert.True(differs.Count == 0,
+            "These sentences differ from assist-wording.json:\n" + string.Join("\n", differs));
+    }
+
+    /// <summary>
+    /// Sentences AssistWording carries that the contract deliberately does not,
+    /// each with its reason. Mend-checked both ways by the test above.
+    /// </summary>
+    private static readonly Dictionary<string, string> WindowsOnlyWording = new(StringComparer.Ordinal)
+    {
+        ["DeployedToMultipleDestinations"] =
+            "this app's own sentence for a deploy to more than one destination; the mac says " +
+            "wording.deployed and adds wording.deployWentOutTo, owed on #400",
+        ["DeployPartiallySucceeded"] =
+            "this app's own sentence for a deploy that reached some destinations; the mac's shape is " +
+            "wording.deployWentOutTo, owed on #400",
+        ["DeployToMultipleDestinationsDidNotFinish"] =
+            "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
+    };
+
+    /// <summary>The public static member a wording key names, or null.</summary>
+    private static MemberInfo? WordingMember(string key)
+    {
+        string name = char.ToUpperInvariant(key[0]) + key[1..];
+        return new[] { typeof(AssistWording), typeof(ClassChangeWording) }
+            .Select(home => home.GetMember(name, BindingFlags.Public | BindingFlags.Static).FirstOrDefault())
+            .FirstOrDefault(member => member is not null);
     }
 
     [Fact]
@@ -738,14 +800,18 @@ public class ContractTests
         var doc = ContractLoader.LoadJson("app-rules.json");
         var cases = doc["failureExplanations"]!["cases"]!.AsArray();
 
-        foreach (var c in cases)
-        {
-            if (c is null) continue;
-            string output = c["output"]!.ToString();
-            string? expect = c["expect"]?.ToString();
-            string? actual = FailureExplainer.Explanation(output);
-            Assert.Equal(expect, actual);
-        }
+        // Every case is played and every mismatch reported, rather than
+        // stopping at the first: this list grows from the mac, and a red that
+        // names only its first case hides which issues own the rest.
+        var mismatches = cases
+            .Where(c => c is not null)
+            .Select((c, index) => (index, expect: c!["expect"]?.ToString(), actual: FailureExplainer.Explanation(c["output"]!.ToString())))
+            .Where(result => result.expect != result.actual)
+            .Select(result => $"case {result.index}: expected \"{result.expect ?? "null"}\", got \"{result.actual ?? "null"}\"")
+            .ToList();
+        Assert.True(mismatches.Count == 0,
+            "app-rules.json → failureExplanations: " + mismatches.Count + " of " + cases.Count +
+            " cases explained differently here:\n" + string.Join("\n", mismatches));
     }
 
     [Fact]
@@ -968,10 +1034,16 @@ public class ContractTests
         string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         string source = File.ReadAllText(Path.Combine(repoRoot, "windows-app", "Plantoir.Core", "Models", "CourseConfiguration.cs"));
 
-        foreach (string key in keys)
-        {
-            Assert.Contains($"\"{key}\"", source);
-        }
+        // A key this app does not carry yet is held open by name against the
+        // issue that owns it (NamedGapLedger, the parity burn-down list), and
+        // the ledger fails the day the key appears in CourseConfiguration.cs.
+        var here = keys.Where(key => source.Contains($"\"{key}\"")).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CourseConfigKeys, keys, here);
+
+        var missing = keys.Where(key => !here.Contains(key) && !deferred.Contains(key)).ToList();
+        Assert.True(missing.Count == 0,
+            "file-formats.json → courseConfigKeys names keys CourseConfiguration.cs does not: " +
+            string.Join(", ", missing));
     }
 
     private sealed class ScriptedModel : IChatModel

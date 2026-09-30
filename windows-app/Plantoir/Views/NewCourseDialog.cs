@@ -1346,25 +1346,33 @@ public sealed class NewCourseDialog : ContentDialog
             ["class_folder"] = ClassFolderRule.Name(null, _perSectionFolders),
         };
 
-        // The marks pool is written ONLY when the teacher chose it — which
-        // means only when the structure did not come from example content.
+        // The marks pool is written for EVERY new course, before setup runs,
+        // because setup keeps a saved answer and reads a saved file WITHOUT
+        // the key as a course that was never asked — it derives the pool from
+        // the manifest only when there is no saved file at all, which only a
+        // command-line run has (#317, the mac's #292; contract
+        // shared-rules.json -> gradedFolders.newCourse). The comment that
+        // stood here said setup would take a payload's pool from its
+        // manifest; it did not, so every payload course made here had none.
         //
-        // A payload declares its own `graded_folders` in its manifest, and
-        // `setup_course.py:graded_folders_for` prefers a pool already present in
-        // the saved config over the manifest's. So writing one here for a
-        // pre-populated course would silently OVERRIDE a manifest that had
-        // declared the right answer — and the value written would be an
-        // inference from the wizard's DEFAULT folders, because the structure
-        // editors are collapsed for such a course and never showed the teacher
-        // the payload's real ones. If the payload calls its assessed folder
-        // anything but exactly "Tasks", reconciliation would then leave `[]`:
-        // the explicit "asked, and nothing counts" state, from a teacher who was
-        // never asked. Mirrors the mac's own guard.
+        // Two sources, never mixed. A course the teacher shaped gets the
+        // pool the teacher chose, reconciled exactly against its folders. A
+        // course taking ready-made pages gets the MANIFEST's pool, read the
+        // way the command line reads it — never the wizard's own list, which
+        // for such a course was built from the wizard's DEFAULT folders in
+        // editors the teacher never saw, and never the subject skeleton's.
+        // An unreadable manifest leaves the key absent, as before. (This app
+        // has no clubs yet; when #274 brings them, a club must be kept on the
+        // first branch — it takes no ready-made pages.)
         if (!StructureComesFromExampleContent)
         {
             result["graded_folders"] = new JArray(
                 GradedFolderRule.Reconciled(CurrentGradedFolders(),
                     _sharedFolders.Concat(_perSectionFolders)));
+        }
+        else if (ExampleContentCatalog.MarksPool(ExampleContentRoot, NormalizedCode) is { } manifestPool)
+        {
+            result["graded_folders"] = new JArray(manifestPool);
         }
 
         // Pruned once more, defensively, at the point this actually gets

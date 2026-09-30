@@ -161,6 +161,26 @@ class CourseFolder:
         return content, date_pass(content, section, write_back=write_back)
 
 
+def _link_or_skip(test: unittest.TestCase, link: Path, target: Path, target_is_directory: bool = False) -> None:
+    """Makes a symbolic link, or skips the test where this account may not.
+
+    Windows lets an ordinary account make a symbolic link only with Developer
+    Mode on or SeCreateSymbolicLinkPrivilege; without either, `symlink_to`
+    raises OSError [WinError 1314] "A required privilege is not held by the
+    client" (measured 2026-09-30, Windows 11 Pro 26200). That is the test
+    machine's setting, not the build's behaviour, so the case skips and says
+    why rather than failing `dotnet test`. The mac and the container always
+    make the link, so the case still runs there.
+    """
+    try:
+        link.symlink_to(target, target_is_directory=target_is_directory)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            test.skipTest("this Windows account may not make symbolic links (WinError 1314, "
+                          "Developer Mode off); the case runs on the mac and in the container")
+        raise
+
+
 class DatesFollowTheClassTests(unittest.TestCase):
 
     # MARK: - Set up and tear down
@@ -326,7 +346,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
         page = folder.files_by_title["Kept Elsewhere"]
         elsewhere = self.temporary / "elsewhere.md"
         shutil.move(page, elsewhere)
-        page.symlink_to(elsewhere)
+        _link_or_skip(self, page, elsewhere)
         original = elsewhere.read_bytes()
 
         content, result = folder.build(1)
@@ -351,7 +371,7 @@ class DatesFollowTheClassTests(unittest.TestCase):
         elsewhere.mkdir(parents=True)
         (elsewhere / "Notes.md").write_text("---\ntitle: Notes\n---\nBody\n", encoding="utf-8")
         course.mkdir(parents=True)
-        (course / "Exercises").symlink_to(elsewhere, target_is_directory=True)
+        _link_or_skip(self, course / "Exercises", elsewhere, target_is_directory=True)
         (course / "Plain.md").write_text("---\ntitle: Plain\n---\nBody\n", encoding="utf-8")
         build_site.forget_vault_sources(course)
         self.assertTrue(build_site._reaches_the_page_through_a_link(course / "Exercises" / "Notes.md"))
