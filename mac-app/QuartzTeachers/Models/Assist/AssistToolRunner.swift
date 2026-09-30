@@ -4519,14 +4519,22 @@ final class AssistToolRunner {
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
-                // `AssistToolRunner.destination(of:)`, NOT
-                // `DeployCommand.destinationDescription`: that one returns the raw
-                // PATH for a folder destination, which is machinery a teacher is not
-                // the audience for, disagrees with what the deploy card says two
-                // functions away, disagrees with Windows' "a folder on this computer",
-                // and prints BLANK for a course set to a folder that has not been
-                // chosen yet — a state the product models on purpose.
-                + "  publishes to: \(AssistToolRunner.destination(of: course))"
+                // EVERY place the course publishes to (#403), primary first then
+                // each additional destination in the order saved — the same list
+                // a deploy walks (`allDeployDestinations`) — named by TYPE and
+                // joined "A, B and C", in the scheduled deploy card's words
+                // (`planOpening.cardNaming`, #396). This used to name the primary
+                // alone, so a course publishing to Netlify AND Cloudflare Pages
+                // read "Netlify", and one set to a folder not chosen yet read
+                // "Netlify" too. The app's own assistant window shows this line
+                // when a teacher asks what courses they have, so it is a teacher
+                // surface. Rejected: `deployPlan(...).descriptions` and
+                // `DeployCommand.destinationDescription`, which name a folder by
+                // its PATH — machinery on that surface, and BLANK for a folder
+                // that has not been chosen yet, a state the product models on
+                // purpose. Pinned by shared-rules.json →
+                // scheduledDeployRefusals.planOpening.listCoursesLine.
+                + "  publishes to: \(AssistToolRunner.everyDestination(of: course))"
                 + howITeachLine(for: course)
             )
         }
@@ -5278,17 +5286,6 @@ final class AssistToolRunner {
             names.append(destinationName(of: destination))
         }
         return MultiDestinationDeployRunner.joinedWithAnd(names)
-    }
-
-    /// Where a course's site goes, named rather than described.
-    static func destination(of course: Course) -> String {
-        if course.configuration.deploysToLocalFolder {
-            return "a folder on this computer"
-        }
-        if course.configuration.deploysToCloudflare {
-            return "Cloudflare Pages"
-        }
-        return "Netlify"
     }
 
     // MARK: - Reading the model's arguments
