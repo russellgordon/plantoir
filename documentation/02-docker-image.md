@@ -299,8 +299,9 @@ a new tag and orphans the previous one. Nothing in the repository had ever
 removed one: 139 images and 50 GB on this dev machine, ~115 of them
 `teaching-quartz` tags. Containers were never the problem — each launcher
 already removes its own container before recreating it (since #94 by its id,
-and only once nothing is running in it — 03 → "Before a workspace is
-remade"), and the name is a hash of the working folder, so it is one container
+and only once nothing whose owner is still running is at work in it — work
+left behind by a program that has closed is ended with it since #378; 03 →
+"Before a workspace is remade"), and the name is a hash of the working folder, so it is one container
 per folder replaced in place.
 
 The mac fix is `prune_superseded_images()` in `setup.sh`, `preview.sh` and
