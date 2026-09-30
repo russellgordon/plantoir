@@ -361,7 +361,7 @@ issues whose code it touches:
 
 | Issue | What it is | Do it |
 |---|---|---|
-| the `windows` issue from mac [#396](https://github.com/russellgordon/plantoir/issues/396) | Schedule Deploy: drop the not-published-yet note, and name every destination (sidebar dialog, `Describe()`, the card, `PlantoirTools.cs`' `schedule_deploy` result). **Turns a GREEN test RED on pull, by design**: `SharedRuleContractTests.AScheduledDeployNamesTheClassesStudentsCannotSeeYet` asserts the old `scheduledDeployRefusals.alsoSaid.rule` — map that red to this issue on the red list | with [#357](https://github.com/russellgordon/plantoir/issues/357) (#335, which adds `actsUseTheSavedSettings`' case 8 here) and [#347](https://github.com/russellgordon/plantoir/issues/347) (#323, whose "one function for the set and the run" is the list the sentence must name) |
+| [#400](https://github.com/russellgordon/plantoir/issues/400) (from mac [#396](https://github.com/russellgordon/plantoir/issues/396)) | Schedule Deploy: drop the not-published-yet note, and name every destination (sidebar dialog, `Describe()`, the card, `PlantoirTools.cs`' `schedule_deploy` result). **Turns a GREEN test RED on pull, by design**: `SharedRuleContractTests.AScheduledDeployNamesTheClassesStudentsCannotSeeYet` asserts the old `scheduledDeployRefusals.alsoSaid.rule` — map that red to this issue on the red list | with [#357](https://github.com/russellgordon/plantoir/issues/357) (#335, which adds `actsUseTheSavedSettings`' case 8 here) and [#347](https://github.com/russellgordon/plantoir/issues/347) (#323, whose "one function for the set and the run" is the list the sentence must name) |
 
 ---
 
