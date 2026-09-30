@@ -42,8 +42,29 @@ final class LinksChecklistSheetModel: Identifiable {
     let naming: LinksChecklistNaming
 
     /// The places whose OWN tick is on right now. What is shown ticked, and
-    /// published, is `going` (#385).
-    var ticked: Set<String>
+    /// published, is `going` (#385) and, since #398, `comingWith`.
+    var ticked: Set<String> {
+        didSet {
+            workOutWhatIsShown()
+        }
+    }
+
+    /// The rows that go on their own account: written by Publish
+    /// (`linksChecklist.followingARow`). Worked out once per change of
+    /// `ticked`, never per row per redraw: the view asks for it several times
+    /// for every row, and each answer is a pass over every row — ~11.8 s for
+    /// one redraw of a 461-row sheet in Debug when it was worked out on every
+    /// access (#398 implementation review, finding 1).
+    private(set) var going: Set<String> = []
+
+    /// The rows a ticked class brings, each with that class's place — shown
+    /// ticked and disabled, "comes with …" (#398,
+    /// `linksChecklist.comingWithAClass`). Worked out with `going`.
+    private(set) var comingWith: [String: String] = [:]
+
+    /// The rows shown ticked: those that go and those a ticked class brings.
+    /// Worked out with `going`.
+    private(set) var shownTicked: Set<String> = []
 
     private(set) var stage: Stage = .choosing
 
@@ -67,24 +88,6 @@ final class LinksChecklistSheetModel: Identifiable {
 
     var classRows: [LinksChecklistOffer.Row] {
         return rowsIn(.aClass)
-    }
-
-    /// The rows that go on their own account: written by Publish
-    /// (`linksChecklist.followingARow`).
-    var going: Set<String> {
-        return LinksChecklistGate.going(rows, ticked: ticked)
-    }
-
-    /// The rows a ticked class brings, each with that class's place — shown
-    /// ticked and disabled, "comes with …" (#398,
-    /// `linksChecklist.comingWithAClass`).
-    var comingWith: [String: String] {
-        return LinksChecklistGate.comingWith(rows, going: going, brings: broughtRowsByClass)
-    }
-
-    /// The rows shown ticked: those that go and those a ticked class brings.
-    var shownTicked: Set<String> {
-        return LinksChecklistGate.shownTicked(going: going, comingWith: comingWith)
     }
 
     var publishButtonTitle: String {
@@ -135,6 +138,8 @@ final class LinksChecklistSheetModel: Identifiable {
         self.broughtByClass = brings.counts
         self.broughtRowsByClass = brings.rows
         self.ticked = startingTicks
+        // An initializer's assignment runs no `didSet`.
+        workOutWhatIsShown()
         if let problem {
             stage = .problem(problem)
         } else if stillOffered.isEmpty {
@@ -143,6 +148,18 @@ final class LinksChecklistSheetModel: Identifiable {
     }
 
     // MARK: - Functions
+
+    /// Works out what goes, what comes with a ticked class, and what is
+    /// shown ticked — once, for the whole sheet.
+    private func workOutWhatIsShown() {
+        let nowGoing: Set<String> = LinksChecklistGate.going(rows, ticked: ticked)
+        let nowComingWith: [String: String] = LinksChecklistGate.comingWith(
+            rows, going: nowGoing, brings: broughtRowsByClass
+        )
+        going = nowGoing
+        comingWith = nowComingWith
+        shownTicked = LinksChecklistGate.shownTicked(going: nowGoing, comingWith: nowComingWith)
+    }
 
     func rowsIn(_ group: LinksChecklistOffer.Group) -> [LinksChecklistOffer.Row] {
         var found: [LinksChecklistOffer.Row] = []

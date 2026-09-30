@@ -6984,31 +6984,40 @@ links checklist (#379)"); this is the app's half.
   classes behind one visible overview (461 rows) opens — graph read and the
   one planner call — in **0.158 s**
   (`LinksChecklistComingWithTests.testTwentyClassesAreWorkedOutInOnePlan`).
-  Nothing is re-planned per tick. **At Publish**, `plan(…, shownComingWith:)`
+  Nothing is re-planned per tick, and what goes, what comes with a class and
+  what is shown ticked are worked out ONCE per change of `ticked` (the
+  model's `didSet`), not per row per redraw: the view asks for them several
+  times for every row, and each answer is a pass over every row. Worked out on
+  every access, as first written, one redraw of that 461-row sheet took
+  **11.8 s** in Debug on the same Mac (about 8× dev's own per-row `going`);
+  cached, **0.031 s**. The test asserts a 0.5 s ceiling on one full redraw
+  (implementation review, finding 1). **At Publish**, `plan(…, shownComingWith:)`
   receives the rows the sheet showed coming with a class: one not written
   after all (its class or page changed while the sheet was open) is named in
-  the "changed since it was checked" lines and is neither remembered as
-  unticked nor counted as left hidden (publish case iv-l). The published trail
+  the "changed since it was checked" lines (iv-l: its class was published
+  elsewhere; iv-n: the row itself was). What it leaves behind follows its OWN
+  tick like any other row's — a teacher's own untick of a brought row is
+  remembered like any other untick, as Not Now remembers it (implementation
+  review note 6; the first cut forgot it, "because the teacher saw it
+  ticked", and so forgot a deliberate untick). The published trail
   line gains "({N} of them on the list)": rows written ONLY because a ticked
   class brought them (own tick off, or on but nothing they come under went) —
   `Outcome.cameWithAClass`; a row that went on its own tick is not counted.
-  **Measured** (the planner's emulation of Get Ready over the 39 payloads):
-  the one class row each payload offers (the exam-day class) brings 1,900 of
-  2,463 rows — 1,886 of which were shown unticked, 41 locked and 14 with a
-  date they would not get, all published anyway; 1,896 of the 1,900 are
-  reached through other pages, not `firstUsedIn` that class. So on a fresh
-  course, ticking that one class ticks about three quarters of the sheet — out
-  of view, since the class group is last (the button's count and the class
-  row's "brings N more" are the in-view cues). **Measured once, and judged —
-  do not re-measure it:** across the 39 payloads after an (emulated) Get
-  Ready, the single exam-day class row each payload offers reaches about
-  1,900 of the 2,463 rows, because that class links "Final Examination",
-  which links most of the course, and the reach (the assistant's rule,
-  `followingLinks`) walks through visible pages too. Russell judged on
-  2026-09-30 (ruling R20 of the v1.4.2 run) that a class linking forward to
-  future classes' material the way the example courses do is "highly
-  unlikely to actually occur in real practice", so this is not a problem to
-  fix and no `decision` issue was opened for it; the reach stays as it is.
+  **Measured once, and judged — do not re-measure it.** Over the 39 payloads
+  after an emulated Get Ready (the planner's emulation, not Get Ready itself),
+  the one class row each payload offers — the exam-day class, which a visible
+  page links and which links "Final Examination", which links most of the
+  course — brings 1,900 of 2,463 rows (1,886 of them were shown unticked, 41
+  locked and 14 with a date they would not get, all published anyway; 1,896
+  are reached through other pages, not `firstUsedIn` that class), because the
+  reach (the assistant's rule, `followingLinks`) walks through visible pages
+  too. So on such a course, ticking that one class ticks about three quarters
+  of the sheet — out of view, since the class group is last (the button's
+  count and the class row's "brings N more" are the in-view cues). Russell,
+  2026-09-30 (ruling R20 of the v1.4.2 run): "highly unlikely to actually
+  occur in real practice. A teacher will almost never link from a current
+  class page to a future class page in that way." So it is not a problem to
+  fix, no `decision` issue was opened, and the reach stays as it is.
   **Rejected:** letting a brought row be unticked while its class goes (a
   change to what is published, and a published class linking a hidden page);
   working the set out from `firstUsedIn`; a second walk (the old count's
@@ -7094,7 +7103,7 @@ links checklist (#379)"); this is the app's half.
   eleven mutations run red — recorded in the piece's ready file.
   `LinksChecklistFollowingTests` (#385): every `followingARow` case through
   `LinksChecklistGate`, the checkbox through the model's binding, publish
-  cases iv-e to iv-i — and #398's iv-j to iv-l — THROUGH THE SHEET (with the
+  cases iv-e to iv-i — and #398's iv-j to iv-n — THROUGH THE SHEET (with the
   trail captured), the naming
   case (with a row removed, to prove "shared" is across the section), an
   older builder's offer, the three trail lines filled from the contract's

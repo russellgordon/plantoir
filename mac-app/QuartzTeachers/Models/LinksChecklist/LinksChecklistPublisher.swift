@@ -255,8 +255,10 @@ enum LinksChecklistPublisher {
     /// `shownComingWith` is the rows the sheet showed coming with a ticked
     /// class (#398): the button counted them, so one that is not written after
     /// all — its class or its page changed while the sheet was open — is NAMED
-    /// as changed since, like a row that went, and is not remembered as
-    /// unticked, because the teacher saw it ticked (plan review, S7).
+    /// as changed since, like a row that went (plan review, S7). What it
+    /// leaves behind follows its OWN tick like any other row's: a teacher's
+    /// own untick of a brought row is remembered like any other untick, as
+    /// Not Now remembers it (implementation review, note 6).
     static func plan(
         offer: LinksChecklistOffer,
         ticked: Set<String>,
@@ -412,7 +414,7 @@ enum LinksChecklistPublisher {
         for unticked in untickedPages {
             if changedPaths.contains(unticked.path) {
                 outcome.cameWithAClass += 1
-            } else if !shownComingWith.contains(unticked.place) {
+            } else {
                 outcome.leftUntickedPlaces.append(unticked.place)
             }
         }
@@ -420,7 +422,7 @@ enum LinksChecklistPublisher {
         for following in followingPages {
             if changedPaths.contains(following.path) {
                 outcome.cameWithAClass += 1
-            } else if !shownComingWith.contains(following.place) {
+            } else {
                 outcome.leftWithTheirPagePlaces.append(following.place)
             }
         }

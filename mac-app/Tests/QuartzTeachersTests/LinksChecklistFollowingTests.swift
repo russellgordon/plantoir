@@ -350,6 +350,14 @@ final class LinksChecklistFollowingTests: XCTestCase {
         _ = try runAComingWithCase("iv-l.")
     }
 
+    func testARowUnderAnUntickedPageTickedOnItsOwnCameWithTheClass() throws {
+        _ = try runAComingWithCase("iv-m.")
+    }
+
+    func testABroughtRowMadeVisibleWhileOpenIsNamed() throws {
+        _ = try runAComingWithCase("iv-n.")
+    }
+
     // MARK: - An offer from an older builder
 
     func testAnOfferFromAnOlderBuilderReadsAsBefore() throws {
