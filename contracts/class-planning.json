@@ -3004,8 +3004,12 @@
     }
   },
   "sectionIndexPointer": {
-    "note": "Which line of a section's front page (`sectionN/index.md`) is repointed when a newer class page becomes visible (#267). The front page opens by transcluding ONE class page — the newest one students can see — under a heading the course chose when it was created: “# Most Recent Class” for a course, “# Most Recent Meeting” for a club (`course_config.json` → `front_page_heading`), and whatever the teacher typed in a course made by hand (CODING's is “## Most Recent Meeting”, an h2). The embed is FOUND BY WHICH PAGE IT NAMES — the first line that transcludes one of the section's class pages — never by the heading. The heading is written once, at creation, and is never read or rewritten by repointing: that is why a hand-worded front page keeps working, and why an existing course keeps its heading. `indexBody` is the page BELOW its frontmatter; these `cases` carry no dates; the frontmatter's `created:`, which follows the class the embed names, is `dateCases` (#275). `expectBody: null` means the page is left exactly as it is. Which page is newest (date, then the course's own numbering) is also out of scope: `pointAt` names it.",
+    "note": "Which line of a section's front page (`sectionN/index.md`) is repointed when a newer class page becomes visible (#267). The front page opens by transcluding ONE class page — the newest one students can see — under a heading the course chose when it was created: “# Most Recent Class” for a course, “# Most Recent Meeting” for a club (`course_config.json` → `front_page_heading`), and whatever the teacher typed in a course made by hand (CODING's is “## Most Recent Meeting”, an h2). The embed is FOUND BY WHICH PAGE IT NAMES — the first line that transcludes one of the section's class pages — never by the heading. The heading is written once, at creation, and is never read or rewritten by repointing: that is why a hand-worded front page keeps working, and why an existing course keeps its heading. `indexBody` is the page BELOW its frontmatter; these `cases` carry no dates; the frontmatter's `created:`, which follows the class the embed names, is `dateCases` (#275). `expectBody: null` means the page is left exactly as it is. Which page is newest (date, then the course's own numbering) is also out of scope: `pointAt` names it. A case may give `pointAtPath`, where the class it points at lives inside the course folder (default `section1/All Classes/<pointAt>.md`), for the cases where the line names a folder (`writtenAs`).",
     "found": "The first line, anywhere in the page BELOW its frontmatter and OUTSIDE code and `%%` comments (`shared-rules.json` → `readingALink.whatIsCode`, `whatIsAComment` — the one mask every link reader uses), whose text, trimmed of spaces, tabs and a Windows carriage return, is `![[…]]` and whose target — before any `|` display name or `#` heading, after any folder path, and without a `.md` the teacher typed — is one of the section's class-page titles (case-insensitive). THAT line, by its position, is rewritten as `writtenAs` says; every other byte is left alone, including another copy of the same line inside a comment (#397: until then the mac replaced every copy of the line's text, and a class line parked in a comment or a fence was read as the page's embed).",
+    "writtenAs": {
+      "rule": "The new line keeps the FORM the teacher wrote (#397, director's ruling on the plan review, 2026-09-30). A folder path before the page name keeps its DEPTH, and its folders are the last ones of the path to where the class it now names actually is (so `section1/All Classes/X` stays `section1/All Classes/Y`, and `Thread 4/Day 15` becomes `Thread 5/Day 1` when that class is filed in Thread 5); a path deeper than the class's own location is dropped. A display name equal to the old class's name (case-insensitive) becomes the new class's name; any other display name, and any `#heading` or `#^block`, is dropped. A `.md` the teacher typed is kept. The spaces around the embed on its line, and a carriage return at its end, are kept.",
+      "why": "A bare name in a course with two sections is ambiguous in Obsidian, and Russell's own front pages were written with the section's path; rewriting them bare every morning undid how he writes them. A path copied as written would name a page that does not exist when the next class is filed in another folder — the front page would show nothing while the app reported it had moved. A heading or an alias of the teacher's own may not fit the next class (it may have no heading of that name, and an embed of a missing heading shows nothing), so it is dropped rather than guessed at."
+    },
     "neverFoundBy": "The heading text. A front page headed anything, at any level, or with no heading at all, is repointed the same way; a transclusion of a page that is NOT a class page (Help Sessions, Key Links) is never replaced, whatever heading it sits under.",
     "whenNoClassIsTransclusion": {
       "mac": "Left as it is. The mac never inserts an embed: it cannot know where on a teacher's page one belongs, and a club's front page is created WITH its first embed (`setup_course.py` → the club start), so a page with none is one the teacher emptied on purpose.",
@@ -3079,9 +3083,10 @@
         ],
         "pointAt": "Week 4",
         "indexBody": "# Most Recent Meeting\n\n![[All Meetings/Week 3|This week]]\n",
-        "expectBody": "# Most Recent Meeting\n\n![[Week 4]]\n",
+        "expectBody": "# Most Recent Meeting\n\n![[All Meetings/Week 4]]\n",
         "frontPageHeading": "Most Recent Meeting",
-        "why": "The target is what comes before `|` or `#`, after the last `/`. The replacement is the bare title: the display name and path are not carried over."
+        "why": "The target is what comes before `|` or `#`, after the last `/`. Since #397 the folder path keeps its depth and names where the class is (`writtenAs`); the display name “This week” is not the old class's name, so it is dropped. It was the bare title until then.",
+        "pointAtPath": "section1/All Meetings/Week 4.md"
       },
       {
         "name": "already pointing at the newest",
@@ -3115,6 +3120,128 @@
         "indexBody": "# Most Recent Class Recordings\n\nSee the links below.\n",
         "expectBody": null,
         "why": "Neither app inserts here: the mac never inserts, and the heading Windows inserts under must equal the course's heading, not begin with it."
+      },
+      {
+        "name": "a class embed inside a %% comment is not the embed",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2",
+          "Unit 1, Day 3"
+        ],
+        "pointAt": "Unit 1, Day 3",
+        "indexBody": "# Most Recent Class\n\n%%\n![[Unit 1, Day 1]]\n%%\n\n![[Unit 1, Day 2]]\n",
+        "expectBody": "# Most Recent Class\n\n%%\n![[Unit 1, Day 1]]\n%%\n\n![[Unit 1, Day 3]]\n",
+        "why": "A comment is never a link (readingALink.whatIsAComment). #397: without the mask the commented line is repointed, the page students see is unchanged, and the app reports that it moved."
+      },
+      {
+        "name": "the same embed inside a comment and outside it: only the outside one is replaced",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "%%\n![[Unit 1, Day 1]]\n%%\n![[Unit 1, Day 1]]\n",
+        "expectBody": "%%\n![[Unit 1, Day 1]]\n%%\n![[Unit 1, Day 2]]\n",
+        "why": "The line FOUND is replaced, not every line with its text (the mac replaced every occurrence until #397)."
+      },
+      {
+        "name": "a class embed only inside a fenced code block: the page has no class embed",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "```\n![[Unit 1, Day 1]]\n```\n",
+        "expectBody": null,
+        "why": "Code is never a link (readingALink.whatIsCode). No heading, so Windows does not insert either."
+      },
+      {
+        "name": "a long line of emoji above a comment does not move where the embed is",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "Welcome! 🎉🎉🎉🎉🎉🎉\n%%\nnote\n%%\n![[Unit 1, Day 1]]\n",
+        "expectBody": "Welcome! 🎉🎉🎉🎉🎉🎉\n%%\nnote\n%%\n![[Unit 1, Day 2]]\n",
+        "why": "Where a line starts is counted in the same units the comment mask is (UTF-16 on the mac, code points in the build). Counted in characters, six emoji put the embed inside the comment above it and the page was never repointed."
+      },
+      {
+        "name": "the section's folder path and the class's own name as its display name",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 1|Unit 1, Day 1]]\n",
+        "expectBody": "# Most Recent Class\n\n![[section1/All Classes/Unit 1, Day 2|Unit 1, Day 2]]\n",
+        "why": "`writtenAs`: the path keeps its depth, and a display name equal to the old class's name becomes the new one's. Russell's 2025 form."
+      },
+      {
+        "name": "a class one folder deeper, named with that folder, and the next class in the same folder",
+        "classTitles": [
+          "Day 15",
+          "Day 16"
+        ],
+        "pointAt": "Day 16",
+        "pointAtPath": "section1/All Classes/Thread 4/Day 16.md",
+        "indexBody": "## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
+        "expectBody": "## Most Recent Class\n\n![[Thread 4/Day 16]]\n",
+        "why": "Russell's ICS3U 2023 shape."
+      },
+      {
+        "name": "the next class is in another folder: the path names where it is",
+        "classTitles": [
+          "Day 15",
+          "Day 1"
+        ],
+        "pointAt": "Day 1",
+        "pointAtPath": "section1/All Classes/Thread 5/Day 1.md",
+        "indexBody": "## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
+        "expectBody": "## Most Recent Class\n\n![[Thread 5/Day 1]]\n",
+        "why": "The path's DEPTH is kept and its folders are read from where the class is; copying “Thread 4/” would name a page that does not exist."
+      },
+      {
+        "name": "one heading of a class: the heading is dropped",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "![[Unit 1, Day 1#Agenda|Unit 1, Day 1]]\n",
+        "expectBody": "![[Unit 1, Day 2|Unit 1, Day 2]]\n",
+        "why": "The next class may have no heading of that name, and an embed of a missing heading shows nothing. The display name is the old class's name, so it follows."
+      },
+      {
+        "name": "a class line written with .md keeps it",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n![[Unit 1, Day 1.md]]\n",
+        "expectBody": "# Most Recent Class\n\n![[Unit 1, Day 2.md]]\n"
+      },
+      {
+        "name": "Windows line endings: found, and written back with them",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\r\n\r\n![[Unit 1, Day 1]]\r\n\r\n![[Help Sessions]]\r\n",
+        "expectBody": "# Most Recent Class\r\n\r\n![[Unit 1, Day 2]]\r\n\r\n![[Help Sessions]]\r\n"
+      },
+      {
+        "name": "an indented class line keeps its indent",
+        "classTitles": [
+          "Unit 1, Day 1",
+          "Unit 1, Day 2"
+        ],
+        "pointAt": "Unit 1, Day 2",
+        "indexBody": "# Most Recent Class\n\n  ![[Unit 1, Day 1]]  \n",
+        "expectBody": "# Most Recent Class\n\n  ![[Unit 1, Day 2]]  \n",
+        "why": "Only the embed itself is rewritten; the spaces around it on its line are the teacher's."
       }
     ],
     "dateCases": {
@@ -3396,6 +3523,1329 @@
         }
       ]
     }
+  },
+  "todaysClassOnTheFrontPage": {
+    "note": "#397 (Russell, 2026-09-30: “A convenience feature – I often forget to update that transclude each day”). When the teacher presses Preview in a section window and today's class is published but the section's front page (`section<N>/index.md`) still shows an older one, the app asks whether to show today's class there instead. It asks; it never moves the line on its own. The question never names the machinery (R14): it says “the front page”.",
+    "rule": "ASKED when all of these hold. (1) TODAY'S CLASS: among the section's class pages (`classFolder`), those CERTAINLY visible for this section (a `publish:` the app cannot read is not offered — the build hides it, #246) whose date for this section — `created`, or `createdSection<N>` where that is the page's key — is today on the teacher's clock. The date is the first ten characters as WRITTEN, never converted (`sectionIndexPointer.dateCases.why`). Several: the pointer's tie-break, the higher of the course's own numbering. None: not asked. (2) THE LINE: the front page's class line, found exactly as `sectionIndexPointer.found` says. None: not asked. (3) NOT ALREADY RIGHT: the found line names a class that is certainly visible and dated today or LATER → not asked (the teacher chose between today's classes, or put a later one up early on purpose); a line naming an older, undated or hidden class → asked. (4) NOT DECLINED: `frontPageNotToday` on disk does not hold today's day AND this class.",
+    "askedFrom": "The section window's Preview button, and nothing else.",
+    "neverAskedFrom": "The assistant (in the app or outside it), the MCP server, Start of the Year, Course Settings, a repair's rebuild, Deploy, a scheduled deploy, a launcher (interactive or `--non-interactive`); a course kept for reference; a section being deployed, or whose course another program is building; a front page that is a symbolic link, a Finder alias, or locked. The question never blocks anything nobody is at the window to answer, and a preview that is going to be refused is refused as it is today, with no question first.",
+    "yes": "The front page is READ AGAIN and the rule decided again for the day the question was asked — never a fresh “today” — with the section's busy checks again. When it still offers the SAME class, the pointer writes it (`sectionIndexPointer.writtenAs`: one line, and the page's `created` follows the class, #275), and the preview starts. When the page now shows today's class: nothing is written. When it would offer another class, or none, or the section is now busy: nothing is written and the teacher is told (`wording.noLongerOffered`). A save that fails is said (`wording.couldNotSave`). The preview starts in every case, AFTER the question has gone.",
+    "notToday": "Recorded in `file-formats.json` → `frontPageNotToday` for that section, the day the question was asked, and the class offered; then the preview starts. Escape is Not Today.",
+    "whenNoClassIsTransclusion": "Not asked, on either platform — the question does not follow Windows' inserting pointer. There is no line to change, and where a class belongs on a page the teacher made without one is theirs to decide.",
+    "howTheCasesRun": "`today` fixes the teacher's clock. `classes` are section `section` (default 1) class pages in `section<N>/<folder>/` (`folder` default `All Classes`), each written `---\\ntitle: <title>\\npublish: <publish>\\ncreated: <created>\\n---\\n` — `publish: \"unreadable\"` writes the unclosed quote `publish: \"true`, and `created: null` writes no created line. `unitWord`, `classPageScheme`, `frontPageHeading` and `noun` are the course's, as in `sectionIndexPointer`. `indexText` is the whole front page. `declined` is the `frontPageNotToday` record on disk. `expectAsk` is `{show, shows}` — the class offered and the class the line names, as file names — or null for no question. `expectAfterYes` is what Yes leaves: `body` is the page below its frontmatter, byte for byte, and `createdDay` the day its `created` begins with. Each case runs through the platform's REAL readers on real files.",
+    "wording": {
+      "question": "Show {class} on the front page?",
+      "because": "Today’s {noun} is published, but the front page still shows {shown}.",
+      "show": "Show on Front Page",
+      "notToday": "Not Today",
+      "notChangedTitle": "The Front Page Was Not Changed",
+      "noLongerOffered": "The front page or today’s {noun} changed while you were deciding, so it was left as it is.",
+      "couldNotSave": "The front page could not be saved, so it still shows {shown}."
+    },
+    "fill": "`{class}` and `{shown}` are class pages' file names; `{noun}` is the course's word for a class, singular (“class”, or “meeting” for a club).",
+    "plainWordsCheck": "No sentence says “transclude”, “transclusion”, “embed” (R14, Russell 2026-09-30), “index”, “file”, “frontmatter” or “link” — the page every student lands on is “the front page”.",
+    "rejected": [
+      "The build detects it and reports a marker (the #379 shape): the answer would come after the preview was built, so Yes needs a second build; the container's clock is not the teacher's; and every scheduled and assistant build would have to be taught to ignore it.",
+      "Asking inside every preview: the assistant, Start of the Year and Course Settings would block on a question nobody may be watching.",
+      "Following the pointer's own target (the newest visible class): it offers tomorrow's class when it was published early — the opposite of the request.",
+      "Inserting a class line into a front page that has none: where it goes is the teacher's.",
+      "Asking again at every preview after Not Today, or remembering Not Today for the whole section: the first is the nagging the issue anticipates, the second never offers a class published later the same day.",
+      "Remembering Not Today in the app's preferences: per machine, and not where the section's other answers live.",
+      "The assistant mentioning a stale front page: its own publishes already repoint, and a new conditional sentence is wording the local model's routing was never measured with."
+    ],
+    "cases": [
+      {
+        "name": "the ordinary morning: today's class is published and the front page shows yesterday's",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Russell's case (#397). Yes changes the one line and the page's date, exactly as the pointer does when the assistant publishes."
+      },
+      {
+        "name": "today's class is still hidden",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": false
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "Only a class students can see is offered: a front page showing a hidden class shows nothing."
+      },
+      {
+        "name": "no class is dated today",
+        "today": "2026-10-03",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "A day with no class (a weekend, a PA day) asks nothing."
+      },
+      {
+        "name": "the front page already shows today's class",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null
+      },
+      {
+        "name": "two classes today, both published: the later one is offered",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-09-30T13:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 6",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 6]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "The pointer's own tie-break (`SectionIndexPointer.mostRecentVisibleClass`): same date, the higher Unit x, Day y wins."
+      },
+      {
+        "name": "two classes today, and the front page already shows one of them",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-09-30T13:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "Either of today's classes is today's class; the teacher's choice between them is not second-guessed."
+      },
+      {
+        "name": "two classes today, only the earlier one published",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-09-30T13:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "a front page with no class on it is not asked about",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "There is no line to change, and neither app's question adds one: where a class belongs on a page the teacher emptied is theirs to decide (`sectionIndexPointer.whenNoClassIsTransclusion`). Both platforms, no `expectAskOnWindows`."
+      },
+      {
+        "name": "a hand-made front page with no class and no heading",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\nWelcome to our class. Everything is in the sidebar.\n",
+        "expectAsk": null
+      },
+      {
+        "name": "a class inside a %% comment is not on the front page",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n%%\n![[Unit 2, Day 4]]\n%%\n\n![[Help Sessions]]\n",
+        "expectAsk": null,
+        "why": "A comment is never a link (shared-rules.json -> readingALink.whatIsAComment): the page shows no class, so there is no line to change."
+      },
+      {
+        "name": "today's class written inside a comment does not count as shown, and is not the line changed",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          },
+          {
+            "title": "Unit 1, Day 9",
+            "created": "2026-09-18T07:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n%%\nLast week: ![[Unit 1, Day 9]]\n![[Unit 2, Day 5]]\n%%\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n%%\nLast week: ![[Unit 1, Day 9]]\n![[Unit 2, Day 5]]\n%%\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Read without the comment mask, the commented line is taken as the embed, the page is 'already showing' today's class, and the question is never asked while students see yesterday's."
+      },
+      {
+        "name": "the same line inside a comment and outside it: only the one outside changes",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n%%\n![[Unit 2, Day 4]]\n%%\n\n![[Unit 2, Day 4]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n%%\n![[Unit 2, Day 4]]\n%%\n\n![[Unit 2, Day 5]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "The replacement is made at the line that was found, never by replacing every copy of its text."
+      },
+      {
+        "name": "a class inside a fenced code block is not on the front page",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n```\n![[Unit 2, Day 4]]\n```\n",
+        "expectAsk": null,
+        "why": "Code is never a link (readingALink.whatIsCode)."
+      },
+      {
+        "name": "an embed with a folder path and a display name of the teacher's own",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[All Classes/Unit 2, Day 4|Today]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[All Classes/Unit 2, Day 5]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Yes keeps the form the teacher wrote (sectionIndexPointer.writtenAs): the folder path stays, taken from where today's class actually is; a display name that is not the old class's name (“Today”) is dropped, because the pointer cannot know whether it still fits."
+      },
+      {
+        "name": "Russell's 2025 form: the section's folder path and the class's own name as its display name",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[section1/All Classes/Unit 2, Day 4|Unit 2, Day 4]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[section1/All Classes/Unit 2, Day 5|Unit 2, Day 5]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "A display name equal to the old class's name becomes the new class's name, and the path keeps its depth. A bare name would be ambiguous in Obsidian in a course with two sections."
+      },
+      {
+        "name": "a class filed one folder deeper, named with that folder",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Day 15",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true,
+            "folder": "All Classes/Thread 4"
+          },
+          {
+            "title": "Day 16",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true,
+            "folder": "All Classes/Thread 4"
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
+        "expectAsk": {
+          "show": "Day 16",
+          "shows": "Day 15"
+        },
+        "expectAfterYes": {
+          "body": "## Most Recent Class\n\n![[Thread 4/Day 16]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Russell's ICS3U 2023 shape. The folder path stays."
+      },
+      {
+        "name": "today's class is in the next folder: the path names where it actually is",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Day 15",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true,
+            "folder": "All Classes/Thread 4"
+          },
+          {
+            "title": "Day 1",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true,
+            "folder": "All Classes/Thread 5"
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n## Most Recent Class\n\n![[Thread 4/Day 15]]\n",
+        "expectAsk": {
+          "show": "Day 1",
+          "shows": "Day 15"
+        },
+        "expectAfterYes": {
+          "body": "## Most Recent Class\n\n![[Thread 5/Day 1]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "The path keeps its DEPTH, and its folders are the ones today's class is in. Copying “Thread 4/” as written would name a page that does not exist, and the front page would show nothing while the app reported it had moved."
+      },
+      {
+        "name": "an embed of one heading of the class",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4#Warm-up]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "The heading is dropped: today's class may not have one of that name, and an embed of a missing heading shows nothing."
+      },
+      {
+        "name": "a class line written with .md",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4.md]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5.md]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Obsidian accepts the file's extension in a link; the line is found without it and written back with it."
+      },
+      {
+        "name": "a front page saved with Windows line endings",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\r\ntitle: Section 1\r\npublish: true\r\ncreated: 2026-09-29T07:00:00.000-0400\r\nenableToc: false\r\nexcludeBacklinks: true\r\n---\r\n# Most Recent Class\r\n\r\n![[Unit 2, Day 4]]\r\n\r\n![[Help Sessions]]\r\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\r\n\r\n![[Unit 2, Day 5]]\r\n\r\n![[Help Sessions]]\r\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "The line is found with its carriage return trimmed and written back with it, so the page keeps one kind of line ending. The build reads it the same way (sectionIndexPointer.dateCases)."
+      },
+      {
+        "name": "a class line in a list item is not the front page's embed",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n- ![[Unit 2, Day 4]]\n",
+        "expectAsk": null,
+        "why": "`found` reads a line whose whole text is the embed. A list item or a callout is the teacher's own layout; neither app changes it (documentation/09-mac-app.md)."
+      },
+      {
+        "name": "a class line in a callout is not the front page's embed",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n> ![[Unit 2, Day 4]]\n",
+        "expectAsk": null
+      },
+      {
+        "name": "the front page already shows a later class",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 6]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "A teacher who put tomorrow's class up early did it on purpose; asking to move it BACK would undo their choice every morning."
+      },
+      {
+        "name": "the front page shows a class with no date",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": null,
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "the front page shows an older class that is now hidden",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": false
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "Not Today was pressed for this class earlier today",
+        "today": "2026-09-30",
+        "declined": {
+          "day": "2026-09-30",
+          "class": "Unit 2, Day 5"
+        },
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "Asked once a day per class and section, not at every preview."
+      },
+      {
+        "name": "Not Today was pressed yesterday",
+        "today": "2026-09-30",
+        "declined": {
+          "day": "2026-09-29",
+          "class": "Unit 2, Day 4"
+        },
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "Not Today was pressed for the other class today",
+        "today": "2026-09-30",
+        "declined": {
+          "day": "2026-09-30",
+          "class": "Unit 2, Day 5"
+        },
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-09-30T13:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 6",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 6]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "A class published later the same day is a new question."
+      },
+      {
+        "name": "the front page shows today's other class, which is still hidden",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": false
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-09-30T13:00:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 6",
+          "shows": "Unit 2, Day 5"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 6]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "Showing a class students cannot open is showing nothing; only a VISIBLE class dated today or later stops the question."
+      },
+      {
+        "name": "a club: numbered pages under its own heading",
+        "today": "2026-09-30",
+        "unitWord": "Week",
+        "classPageScheme": "numbered",
+        "frontPageHeading": "Most Recent Meeting",
+        "noun": "meeting",
+        "classes": [
+          {
+            "title": "Week 3",
+            "created": "2026-09-23T15:30:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Week 4",
+            "created": "2026-09-30T15:30:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Meeting\n\n![[Week 3]]\n",
+        "expectAsk": {
+          "show": "Week 4",
+          "shows": "Week 3"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Meeting\n\n![[Week 4]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "CODING's hand-made front page: an h2 in the teacher's words, no blank line, no final newline",
+        "today": "2026-09-30",
+        "unitWord": "Week",
+        "classPageScheme": "numbered",
+        "noun": "meeting",
+        "classes": [
+          {
+            "title": "Week 9",
+            "created": "2026-09-23T15:30:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Week 10",
+            "created": "2026-09-30T15:30:00.000-0400",
+            "publish": true
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n## Most Recent Meeting\n![[Week 9]]",
+        "expectAsk": {
+          "show": "Week 10",
+          "shows": "Week 9"
+        },
+        "expectAfterYes": {
+          "body": "## Most Recent Meeting\n![[Week 10]]",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "section 2 meets on its own days",
+        "today": "2026-09-30",
+        "section": 2,
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 2\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "The classes are section 2's own pages, read with section 2's keys; a class dated today in section 1 is not section 2's class."
+      },
+      {
+        "name": "a date with no time is today",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "a quoted date is today",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "\"2026-09-30T07:00:00.000-0400\"",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        }
+      },
+      {
+        "name": "the day is read as written, never converted",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T23:30:00.000+0000",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": {
+          "show": "Unit 2, Day 5",
+          "shows": "Unit 2, Day 4"
+        },
+        "expectAfterYes": {
+          "body": "# Most Recent Class\n\n![[Unit 2, Day 5]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+          "createdDay": "2026-09-30"
+        },
+        "why": "23:30 UTC is 19:30 in Toronto, and the calendar day a page carries is the one written in it (sectionIndexPointer.dateCases.why). Converting to another zone moves days near midnight."
+      },
+      {
+        "name": "a date written another way is not read as today",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "30/09/2026",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "The one form the file format promises (CalendarDay: strict). An unread date is not a class dated today."
+      },
+      {
+        "name": "today's class whose publish line cannot be read is not offered",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": "unreadable"
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![[Unit 2, Day 4]]\n\n![[Help Sessions]]\n![[Key Links]]\n",
+        "expectAsk": null,
+        "why": "`publish: \"true` (an unclosed quote): the app answers 'cannot tell' and the build HIDES the page (#246). Only a class certainly visible is offered — putting a hidden class on the page every student lands on is the failure that reports success."
+      },
+      {
+        "name": "a plain link to a class is not a class on the front page",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n[[Unit 2, Day 4]]\n",
+        "expectAsk": null,
+        "why": "`found` reads a whole-line `![[…]]` only; a link shows nothing of the class on the front page."
+      },
+      {
+        "name": "a Markdown-style picture of a class is not an embed",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\n![Yesterday](Unit%202,%20Day%204.md)\n",
+        "expectAsk": null
+      },
+      {
+        "name": "an embed that shares its line with words is not the front page's embed",
+        "today": "2026-09-30",
+        "classes": [
+          {
+            "title": "Unit 2, Day 3",
+            "created": "2026-09-28T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 4",
+            "created": "2026-09-29T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 5",
+            "created": "2026-09-30T07:00:00.000-0400",
+            "publish": true
+          },
+          {
+            "title": "Unit 2, Day 6",
+            "created": "2026-10-01T07:00:00.000-0400",
+            "publish": false
+          }
+        ],
+        "indexText": "---\ntitle: Section 1\npublish: true\ncreated: 2026-09-29T07:00:00.000-0400\nenableToc: false\nexcludeBacklinks: true\n---\n# Most Recent Class\n\nToday: ![[Unit 2, Day 4]]\n",
+        "expectAsk": null,
+        "why": "The pointer's `found` rule reads whole lines; changing it is outside this piece (0 of the 89 front pages in support/ are written this way)."
+      }
+    ]
   },
   "reDatingASection": {
     "note": "Re-dating a whole section onto a new timetable (re_date_classes), and what the reply says it did.",

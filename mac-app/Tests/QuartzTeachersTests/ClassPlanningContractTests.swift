@@ -1228,7 +1228,9 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNotNil(noEmbed["windows"] as? String)
 
         let cases: [[String: Any]] = try ClassPlanningContractTests.cases(in: "sectionIndexPointer")
-        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        XCTAssertGreaterThanOrEqual(cases.count, 20)
+        let writtenAs: [String: Any] = try XCTUnwrap(section["writtenAs"] as? [String: Any])
+        XCTAssertNotNil(writtenAs["rule"] as? String)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let body: String = try XCTUnwrap(testCase["indexBody"] as? String, name)
@@ -1238,11 +1240,14 @@ final class ClassPlanningContractTests: XCTestCase {
             for title in titles {
                 classTitles.insert(title.lowercased())
             }
+            // Where the class lives decides the folder path a line keeps
+            // (`writtenAs`, #397).
+            let pointAtPath: String = (testCase["pointAtPath"] as? String) ?? "section1/All Classes/\(pointAt).md"
             let page: AssistSectionPage = AssistSectionPage(
                 title: pointAt,
                 displayTitle: pointAt,
-                fileURL: URL(fileURLWithPath: "/courses/CLUB/section1/All Classes/\(pointAt).md"),
-                relativePath: "courses/CLUB/section1/All Classes/\(pointAt).md",
+                fileURL: URL(fileURLWithPath: "/courses/CLUB/\(pointAtPath)"),
+                relativePath: "courses/CLUB/\(pointAtPath)",
                 isSectionLocal: true,
                 isVisibleToStudents: true,
                 visibilityIsCertain: true,
@@ -1273,7 +1278,7 @@ final class ClassPlanningContractTests: XCTestCase {
         let pointer: [String: Any] = try ClassPlanningContractTests.section("sectionIndexPointer")
         let dateCases: [String: Any] = try XCTUnwrap(pointer["dateCases"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(dateCases["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 9)
+        XCTAssertGreaterThanOrEqual(cases.count, 13)
 
         var ranThroughThePointer: Int = 0
         for testCase in cases {
@@ -1320,7 +1325,7 @@ final class ClassPlanningContractTests: XCTestCase {
             }
             ranThroughThePointer += 1
         }
-        XCTAssertGreaterThanOrEqual(ranThroughThePointer, 7, "the contract lost the pointer's date cases")
+        XCTAssertGreaterThanOrEqual(ranThroughThePointer, 9, "the contract lost the pointer's date cases")
     }
 
     private static func section(_ name: String) throws -> [String: Any] {

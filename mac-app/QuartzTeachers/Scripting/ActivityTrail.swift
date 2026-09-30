@@ -1081,6 +1081,13 @@ nonisolated enum ActivityTrail {
         /// The first launch of a version different from the last (#204), by
         /// its own updater or by hand.
         case appUpdated = "app updated"
+        /// The teacher pressed Show on Front Page at Preview (#397): the
+        /// section's front page now shows today's class — from and to, as
+        /// file names.
+        case putTodaysClassOnTheFrontPage = "put today's class on the front page"
+        /// The front page was offered today's class and not changed (#397):
+        /// Not Today, already right, changed while asked, or not saved.
+        case frontPageLeftAsItWas = "left the front page as it was"
     }
 
     // MARK: - Stored properties
