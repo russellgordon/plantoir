@@ -89,7 +89,8 @@ and drew its corners; that code is gone, and `schedule` was retaken from a
 native capture of Notification Center's window. The
 page's own CSS no longer draws a rounded box-shadow round a shot either. `website/shots/test_native_corners.py`
 reads every picture the pages show and fails on a square corner or one
-drawn tighter than a real window's, and `capture.py` runs the same check. A
+drawn tighter than a real window's, and `capture.py` and `build.py --deploy`
+run the same check (the deploy refuses on a failing picture). A
 mask drawn at the REAL radius passes it, so the test is a guard, not a proof. **Open
 the corners of every image you are about to commit and look** — a native
 corner fades over many pixels; a drawn one is tight.
