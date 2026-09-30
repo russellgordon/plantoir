@@ -3234,16 +3234,21 @@ sentences), `UnitWordRenameSheet` (the sheet). The rules and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `specialNames.renameUnitWord`; the trail line is `word for a unit renamed`.
 
-**Only the mac runs any of it today**, and this line said "the cases both
-suites run" until 2026-09-18, which was never true: Windows has no renamer, so
-its suite has no counterpart of `ClassPlanningContractTests.testRenamingTheUnitWordCases`
-and the seven `cases` and three `linkCases` are UNRUN there rather than
-failing. The two pieces that did turn the Windows suite red — the trail event
-and `renameUnitWord.explanation` — are held there as named gaps
-(`windows-app/Plantoir.Tests/NamedGapLedger.cs`) against
-[issue #158](https://github.com/russellgordon/plantoir/issues/158), milestoned
-v1.3.0, which is what owes the whole feature. `contracts/README.md` →
-"Named gaps: the handover whose fix belongs to a LATER release" says when that is allowed.
+**Both apps run it since 2026-09-30.** Windows' renamer landed with #158
+(bundle 2): `Plantoir.Core/Models/UnitWordRenamer.cs` and
+`UnitWordRenameWording.cs`, and a Rename… button beside the word under
+Settings — Overall in `CourseSettingsView`. `UnitWordRenameContractTests`
+runs the seven `cases` (each on a course built on disk) and the six
+`linkCases`, pins every sheet sentence, and drives one rename through the
+contract's order; the two named gaps are deleted. Three Windows-side choices
+worth knowing: `unit_word` is written with `CourseConfiguration.RecordOnDisk`
+(only that key, so unsaved edits in Course Settings stay unsaved — the folder
+rename's rule); "is it the same file?" is asked of the directory listing's
+real spelling (NTFS has no inode number to ask), so a case-only rename on a
+case-insensitive volume is a move onto itself, which `File.Move` performs; and
+a whole-course restore clears the record of a stopped rename. The sheet was
+compiled and NOT driven (no UI test covers it yet). This line said "the cases
+both suites run" until 2026-09-18, which was not true then; it is now.
 
 What it does, in the order it does it — and the order is part of the
 contract, because "disk first, configuration last" is the kind of reasoning a
