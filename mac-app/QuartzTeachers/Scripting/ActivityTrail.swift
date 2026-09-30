@@ -1025,7 +1025,9 @@ nonisolated enum ActivityTrail {
         case startOfTheYearChangeUndone = "start of the year change undone"
         /// The links checklist was put in front of the teacher (#379).
         /// Carries how many pages in each group (used by a class, linked from
-        /// other pages, classes) and the occasion: after a preview, after
+        /// other pages, classes), how many are listed under another page and
+        /// how many would be published as offered — rows that GO, not rows
+        /// whose own tick is on (#385) — and the occasion: after a preview, after
         /// publishing, on opening after a publish Plantoir did not watch
         /// (scheduled, the assistant, outside), or from the menu. #333's alert
         /// was shown and nobody could tell afterwards whether it had been seen;
@@ -1034,14 +1036,16 @@ nonisolated enum ActivityTrail {
         /// Pages published from the links checklist (#379). Carries how many
         /// were published, dated from a class, dated as the first class, kept
         /// their date, classes published, pages those classes brought, left
-        /// unticked; and the PLACES of the published pages, at most ten then
+        /// unticked, left with the page they come under (#385); and the PLACES of the published pages, at most ten then
         /// "and N more" — names, never anything written on them. It changes
         /// what students will see and rewrites dates in the teacher's files,
         /// and "why is this page visible / why did its date change" is asked
         /// weeks later.
         case pagesPublishedFromLinksChecklist = "published pages that links led to"
         /// The teacher left pages hidden that links lead to (#379): Not Now,
-        /// or Publish with some unticked. Carries the counts. When a student
+        /// or Publish with some unticked. Carries every page left hidden and,
+        /// of those, how many only because the page they come under was
+        /// (#385). When a student
         /// reports a dead link, the trail shows the teacher was offered it
         /// and chose.
         case linksChecklistSetAside = "left pages hidden that links lead to"
