@@ -5187,6 +5187,51 @@ and LOOKED at without a window, which is how it was first seen at all — and ho
 a `ScrollView` that reserved its cap and drew a 320 pt hole with the rows
 nowhere in it was found and taken out.
 
+### The checklist and the result screen fit on the screen (#365)
+
+**Everything that grows with the number of pages scrolls in ONE capped area;
+the sheet is at most 620 pt tall, whatever it lists.** Only the rows used to be
+capped. The sentences under them — one per page that will be skipped, the links
+that will lead nowhere, the pictures lines — sat outside the scroll area, and a
+well-linked lesson (The Unplugged Algorithm, last year's ICS3U into ICS4U) has
+about seventy of them: every curriculum embed outside the course's folders and
+every shared page ICS4U already has. The sheet grew past the bottom of the
+screen and Cancel and Copy went with it; Escape was the only way out. Now:
+
+- the checklist's heading (`CopyPageWording.willCopy`) and "Copies start
+  hidden…" stay fixed; the rows AND every per-page sentence scroll inside one
+  `CappedScrollArea` (`Views/Helpers/CappedScrollArea.swift`) of at most 380 pt
+  (`CopyPageChecklist.tallestList`);
+- the result screen (`CopyPageResultView`, split out of the sheet so it can be
+  measured) does the same with its per-page sentences, at 320 pt
+  (`CopyPageResultView.tallestSentenceList`), keeping the first sentence, the
+  backup line and Show in Finder outside it — at 380 it measured 612 pt, too
+  close to the rule to leave room for the orange problem line.
+
+**Why 620.** The smallest screen worth fitting is a 13-inch MacBook Air at its
+older default of 1280 × 800 points: less a 24 pt menu bar, a ~52 pt title bar
+and a ~70 pt Dock, about 654 pt is left for a sheet. Measured with 11 rows and
+70 sentences: the checklist sheet is 556 pt, the result sheet 552 pt; with one
+row and nothing under it, 214 pt (no reserved hole). Rejected: a cap worked out
+from `NSScreen` — a sheet that changes size with the display is one no test can
+pin. Rejected for now: grouping the skip sentences ("8 pages are already in
+ICS4U"), which #365 floated — it is new contract wording Windows would owe, and
+the scroll alone fixes the fault.
+
+**`CappedScrollArea` is a `Layout`, not a measured `@State` height**, and that
+is the part that would pass review wrongly. The obvious version measures the
+content with `.onGeometryChange` into a `@State` and frames the scroll view at
+`min(measured, cap)`; that state starts at zero and learns the real height a
+pass later, so a size test reading the sheet once measures an EMPTY area and
+"at most 620 pt" passes with every row invisible. The `Layout` asks the scroll
+view for its natural height at the offered width in the same pass (a scroll
+view's ideal height along its axis is its content's) and returns the smaller of
+that and the cap. `CopyPageChecklistSizeTests` pins BOTH directions — at most
+620 pt, and at least cap + the fixed lines, so a collapsed area fails — and four
+mutations were run red: sentences moved back outside the area (checklist 3,356
+pt), the result's sentences outside (3,024 pt), the cap always reserved (a
+one-row checklist 556 pt), the area collapsed to zero (checklist 176 pt).
+
 ### What was REJECTED, and why
 
 | Not built | Why |

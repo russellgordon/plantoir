@@ -343,79 +343,17 @@ struct CopyPageSheet: View {
 
     // MARK: - What happened
 
+    /// The result, as its own view so its height can be measured without a
+    /// sheet, a workspace or a copy having been made (#365).
     @ViewBuilder
     func result(_ outcome: CoursePageCopyOutcome) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if outcome.createdNothing {
-                Text(CopyPageWording.nothingWasCopied)
-            } else {
-                Text(CopyPageWording.copiedInto(
-                    pages: outcome.pagesCreated.count,
-                    course: destinationCourse?.displayCode ?? "",
-                    folder: destinationFolderName
-                ))
-                Text(CopyPageWording.copiesStartHidden)
-                    .foregroundStyle(.secondary)
-            }
-
-            if outcome.mediaCreated > 0 {
-                Text(CopyPageWording.willBringPicturesAndFiles(
-                    count: outcome.mediaCreated,
-                    size: ReferenceImportWording.size(outcome.bytesCopied)
-                ))
-                .foregroundStyle(.secondary)
-            }
-            if outcome.mediaReused > 0 {
-                Text(CopyPageWording.picturesAlreadyThere(count: outcome.mediaReused))
-                    .foregroundStyle(.secondary)
-            }
-            if !outcome.renamed.isEmpty {
-                Text(CopyPageWording.picturesBroughtInUnderANewName(count: outcome.renamed.count))
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(outcome.skipped.indices, id: \.self) { index in
-                Text(CopyPageSheet.sentence(
-                    for: outcome.skipped[index], couldNotBeRemoved: outcome.couldNotBeRemoved
-                ))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if !outcome.sourceSettingsUnreadable.isEmpty {
-                Text(CopyPageWording.theSourcesSettingsCouldNotBeRead(
-                    names: outcome.sourceSettingsUnreadable
-                ))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if !outcome.linksLeadingNowhere.isEmpty {
-                Text(CopyPageWording.theseLinksWillNotLeadAnywhereYet(
-                    names: outcome.linksLeadingNowhere
-                ))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if let backupFileName {
-                Text(CopyPageWording.theBackupTaken(
-                    course: destinationCourse?.displayCode ?? "", named: backupFileName
-                ))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let folderURL = destinationFacts?.directoryURL
-                .appendingPathComponent(destinationFolderName) {
-                Button("Show in Finder", systemImage: "finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([folderURL])
-                }
-                .accessibilityIdentifier("copyPageShowInFinder")
-            }
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        // A container element with its own identifier (#353): without `.contain`
-        // SwiftUI applies an identifier on a stack to every element inside it,
-        // and the inner identifiers (copyPageShowInFinder) never reach the tree.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("copyPageResult")
+        CopyPageResultView(
+            outcome: outcome,
+            courseCode: destinationCourse?.displayCode ?? "",
+            folderName: destinationFolderName,
+            backupFileName: backupFileName,
+            folderURL: destinationFacts?.directoryURL.appendingPathComponent(destinationFolderName)
+        )
     }
 
     // MARK: - The buttons
