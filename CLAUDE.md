@@ -309,7 +309,7 @@ Neither app contains toolchain logic of its own: they write the same
    before you read a log and think the rule was broken: when the Docker daemon
    has already failed to answer, they force-cycle it (`colima stop --force`
    then `colima start`, in each launcher's `ensure_container_runtime` —
-   `setup.sh:1234`, `preview.sh:1457`, `deploy.sh:2099` on 2026-09-27; grep the
+   `setup.sh:1421`, `preview.sh:1743`, `deploy.sh:2320` on 2026-09-30; grep the
    function name, since the line numbers drift),
    ungated, because at that point no Colima-based tool is working anyway.
    **The app's quit path is the other one, and as of
@@ -962,8 +962,8 @@ it rather than restating it:
 | What must HAPPEN, and in what order? | [`contracts/assist-cases.json`](contracts/assist-cases.json) — run by both test suites. |
 | What is the launcher asked to do, what is a teacher told about what they typed, which progress markers are shared? | [`contracts/app-rules.json`](contracts/app-rules.json). |
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
-| Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
-| What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
+| Which page titles carry numbers, what is the next class called, what happens when room is made for one, and does Preview offer today's class for the front page (#397)? | [`contracts/class-planning.json`](contracts/class-planning.json). |
+| What are the backup and archive files called, what section number is offered next, and what may a course code be, at the app and at the command line (#402)? | [`contracts/course-management.json`](contracts/course-management.json). |
 | What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, **when quitting asks the teacher first (and when it must never ask)**, **when the app may install a new version of itself, and what a quit does to one that is ready (#204)**, and **when the links checklist is offered, what it says, and what Publish writes from it (#379)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
