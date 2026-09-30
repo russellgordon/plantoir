@@ -982,6 +982,31 @@ What replaces the old container concepts:
   what is using it before replacing it, and tell a live user from an orphan by
   whether the program that started it is still running — an orphan counted as
   live refuses for ever.
+
+  **A preview cannot start while its own section is being deployed — what
+  Windows OWES (GitHub #381, 2026-09-29).** Russell's decision 4 on #378: a
+  preview of a section cannot start AT ALL while that same section is being
+  deployed, whoever started the deploy. Unlike the remake above this is NOT
+  mac-only: `contracts/shared-rules.json` → `previewWhileItsSectionDeploys`
+  is `appliesOn: ["mac", "windows"]`, with one case per deployer. The mac
+  found two gaps by reading its code, and Windows should check for the same
+  two before assuming it has neither: (1) the window's preview asked other
+  PROGRAMS' work leases only, never this program's own publishes, so another
+  window of the app — or the in-app assistant's windowless deploy — deploying
+  the same section did not refuse; (2) `preview.sh` started by hand checked
+  nothing, and a bare `deploy.sh` writes no lease. The mac's fixes, to match
+  in rule and not in mechanism: a check at the top of the one function every
+  window preview goes through, reading the in-process publish record; and a
+  check in the launcher, on serving runs only and before anything is changed,
+  that reads the LIVE process table for `deploy C S` working in the same
+  folder or a deploy set for later of C/S. Three details that are easy to get
+  wrong: a `--build-only` run is NOT a deploy (it is also the assistant's
+  "rebuild the preview", and counting it refuses every preview with a false
+  sentence); a process table that cannot be read lets the preview THROUGH
+  (the opposite of the remake's rule, and why is in
+  [03](03-launcher-scripts.md) → "A section being deployed cannot be
+  previewed (#381)"); and never a remembered process id. Until it is done the
+  cases are a named gap against the `windows` issue opened with #381.
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
