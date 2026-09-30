@@ -340,8 +340,10 @@ class TheRealPreviewUpToItsGuard(unittest.TestCase):
             }
             result = subprocess.run([BASH, "./preview.sh", "ICS4U", "2", "--image", "x"], cwd=mac.here,
                                     env=environment, capture_output=True, text=True, timeout=60)
-            self.assertIn("ps -Ao pid=,ppid=,args=", (mac.fake / "calls").read_text(encoding="utf-8"),
-                          "the real preview.sh never read the process table")
+            calls_file = mac.fake / "calls"
+            calls = calls_file.read_text(encoding="utf-8") if calls_file.exists() else ""
+            self.assertIn("ps -Ao pid=,ppid=,args=", calls,
+                          "the real preview.sh never read the process table: " + result.stdout + result.stderr)
             return result
 
     def test_a_deploy_of_this_section_stops_the_real_preview_sh(self):
