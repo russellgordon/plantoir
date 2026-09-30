@@ -30,6 +30,7 @@ final class ContainerIdentifierTripwireTests: XCTestCase {
         "cloudSyncNotice",
         "settingsSaveNotice",
         "copyPageResult",
+        "copyPageChecklist",
     ]
 
     // MARK: - Functions
