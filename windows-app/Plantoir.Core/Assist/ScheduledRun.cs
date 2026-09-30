@@ -81,9 +81,9 @@ public static class ScheduledRun
             string? course = o["course"]?.GetValue<string>();
             int section = o["section"]?.GetValue<int>() ?? 0;
             if (name is null || folder is null || course is null || section <= 0) return null;
-            DateTimeOffset? scheduledFor = DateTimeOffset.TryParse(o["scheduledFor"]?.GetValue<string>(),
-                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind,
-                out var when) ? when : null;
+            // Written by this app in the round-trip "O" form, read back the same way.
+            string? stored = o["scheduledFor"]?.GetValue<string>();
+            DateTimeOffset? scheduledFor = DateTimeOffset.TryParse(stored, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var when) ? when : null;
             var promised = (o["promised"] as JsonArray)?.Select(p => p?.GetValue<string>() ?? "")
                                .Where(p => p.Length > 0).ToList() ?? new List<string>();
             return new Job(name, folder, course, section, scheduledFor, promised);
