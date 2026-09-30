@@ -30,7 +30,8 @@
         "ICS3U",
         "ICS4U",
         "Reference Courses",
-        "2025"
+        "2025",
+        "Language and region"
       ]
     },
     {
@@ -332,7 +333,9 @@
       "caption": "Clubs start the way clubs do.",
       "expectText": [
         "CODING",
-        "This is a club"
+        "This is a club",
+        "Club name",
+        "Create Club"
       ]
     }
   ]
