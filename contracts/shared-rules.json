@@ -388,7 +388,7 @@
         "why": "Scheduling a section that already has a scheduled deploy removes the old one - deliberately, since a section has one per working folder (one per Mac until #237) - and until issue #195 (2026-09-23) nothing said so, before or after. The old job leaves nothing behind once it is replaced, so a teacher who set Friday and then Saturday and asks why it went on Saturday has no answer anywhere unless this line exists. The approval card and the schedule sheet now say it BEFORE anything is written (wording.scheduleReplaces); this is the record AFTERWARDS. Written where the replacement happens, in the one function every way of scheduling reaches, so it cannot be missing from one of them. Not written when the old deploy was set for the same minute, or had already gone by: neither is a promise being broken. Since #237 the old deploy is always THIS working folder's - another folder's deploy of the same section is a different alarm, left standing and not named - and that includes one this folder set before #237 under the old name, which scheduling again retires."
       },
       {
-        "carries": "the course code, the section number, the moment asked for, and - when the section already had a scheduled deploy - whether that one still stands; or, since #322, for a deploy refused BEFORE anything was written, the destination it was refused for by kind (Netlify, Cloudflare Pages or a folder - never a folder's path) and the refusal's first sentence",
+        "carries": "the course code, the section number, the moment asked for, and - when the section already had a scheduled deploy - whether that one still stands; or, since #322, for a deploy refused BEFORE anything was written, the destination it was refused for by kind (Netlify, Cloudflare Pages or a folder - never a folder's path) and the refusal's first sentence. Since #396 that destination is the one that CAUSED the refusal - for a course that also deploys to Cloudflare Pages, refused over the Account ID, 'deploying to Cloudflare Pages', where it used to name the primary whatever the cause; a refusal that is not about a destination (a time already passed, a course kept for reference) names every destination by kind, joined 'A and B'",
         "event": "scheduled deploy could not be set",
         "why": "Added 2026-09-24 with issue #195's fix review. 'I set it for Friday and it never went' is otherwise answered only by the refusal that was on screen at the time, which nobody quotes a week later. The two ways it fails leave DIFFERENT things behind, and the line has to say which: when the new deploy's files could not be WRITTEN, the old deploy's plist is still on disk (the failed write is atomic and everything before it writes elsewhere), so it is handed back to macOS and the line says it still stands - saying 'turned off' there would be false, because the old job would still fire; when macOS REFUSED the new one after its plist was written, the old one's plist has been overwritten, so it is gone, and 'scheduled deploy turned off' says so beside this line - including when the old one was set for the same minute, which the card rightly leaves unsaid but whose loss is still a loss. Widened by #322 (2026-09-26) to a refusal at the ACT - the schedule sheet's button, or schedule_deploy from either assistant - because #322 took a code read to diagnose: the assistant refused a course the teacher had just saved as deploying to a folder, as 'never deployed', from a copy of the settings that still said Netlify, and nothing on the trail named the destination. With this line the contradiction would have sat two lines under 'saved the settings'. NOT written by the approval card or plan_scheduled_deploy, which are advisory and repeat; the destination is named by kind, so no path reaches the trail."
       },
@@ -3821,8 +3821,14 @@
   },
   "scheduledDeployRefusals": {
     "alsoSaid": {
-      "note": "Not a refusal - a teacher may be deploying deliberately without them - but the plan NAMES the section's unpublished class pages before the teacher agrees. A deploy that runs perfectly at half six and puts up a site missing tomorrow's class is the failure worth catching while somebody is awake.",
-      "rule": "list the class pages students cannot see yet, by name"
+      "note": "Russell's decision, 2026-09-30 (#396): the section-wide list of unpublished classes is REMOVED from scheduling - \"completely unnecessary\". Classes later in the year are unpublished on purpose all year, so the list fired on every schedule (his MPM2D: 50 classes, eight named and '...and 42 more'), named pages the teacher had no intention of publishing, and its last sentence - 'Deploying now would put the site up without them. Publish first, look the preview over, then schedule this.' - said 'deploying now' on a sheet that deploys later. It replaces the rule 'list the class pages students cannot see yet, by name' (the mac's Schedule a deploy sheet and plan_scheduled_deploy since they existed; Windows' Schedule Deploy dialog since GUI-IMPROVEMENTS row 432). What STAYS: plan_scheduled_deploy's `classes` argument - a caller that NAMES classes is told, for each, whether it is published (its parameter description promises it, and the tool list is pinned). An immediate deploy never listed unpublished classes on either platform, and still does not. The KEY is kept, with a new rule, so a reader that still asserts the old one fails with a string difference naming #396 rather than a missing key.",
+      "rejected": [
+        "Keep the list but only for classes dated on or before the scheduled day: Russell decided removal, and a class dated tomorrow that is still unpublished is usually one the teacher is still writing - the preview is where that is seen.",
+        "Hide the list behind a disclosure, or drop only its last sentence: the same decision; a list nobody asked for, shown on every schedule, is noise however it is folded.",
+        "Keep the field and the function on the mac and only stop rendering it: the sheet re-plans on every redraw (#335), so it would keep reading every class page for nothing, and a field the plan carries invites the list back.",
+        "Also remove plan_scheduled_deploy's named-class check: it answers a caller who asked, its description promises it, and changing it is a routing change the tool-surface digest forbids."
+      ],
+      "rule": "nothing about the section's unpublished classes - only classes a caller NAMES (plan_scheduled_deploy's classes argument) are checked, each as published or not"
     },
     "cases": [
       {
@@ -3911,6 +3917,59 @@
       }
     ],
     "note": "Everything a deploy running at 06:30 would ASK is asked NOW instead, while somebody is awake to answer. A scheduled deploy that stops at a prompt in the dark is the worst outcome available: it reports nothing, changes nothing, and is discovered by a class looking at yesterday's site. Checked in this ORDER - the first match is what the teacher is told, so a time in the past is answered before a missing account.",
+    "planOpening": {
+      "appliesOn": [
+        "mac",
+        "windows"
+      ],
+      "cardNaming": "The assistant's approval card for schedule_deploy names the same destinations in the same order with the card's own words: 'Netlify', 'Cloudflare Pages', and 'a folder on this computer' for a folder - by TYPE, never the path (a path is machinery on a card, and a folder not chosen yet would be blank; #322's case 'the approval card names the destination saved now' pins 'a folder').",
+      "cases": [
+        {
+          "card": "Netlify",
+          "name": "one destination",
+          "saved": {
+            "deploy_target": "netlify"
+          },
+          "sheet": "Netlify",
+          "why": "Byte-identical to the sentence before #396."
+        },
+        {
+          "card": "Netlify and Cloudflare Pages",
+          "name": "two destinations",
+          "saved": {
+            "additional_deploy_targets": [
+              {
+                "type": "cloudflare_pages"
+              }
+            ],
+            "deploy_target": "netlify"
+          },
+          "sheet": "Netlify and Cloudflare Pages",
+          "why": "Russell's report (#396), as it happened: MPM2D deploys to Netlify AND Cloudflare Pages, and the sheet said 'to Netlify'."
+        },
+        {
+          "card": "Cloudflare Pages, Netlify and a folder on this computer",
+          "name": "saved order, three destinations, no comma before 'and'",
+          "saved": {
+            "additional_deploy_targets": [
+              {
+                "type": "netlify"
+              },
+              {
+                "path": "{folder}",
+                "type": "local_folder"
+              }
+            ],
+            "deploy_target": "cloudflare_pages"
+          },
+          "sheet": "Cloudflare Pages, Netlify and {folder}",
+          "why": "Proves the order is the SAVED order - primary first, then each additional as listed, never sorted by name or type - and the join: commas, then ' and ' before the last, with no comma before it."
+        }
+      ],
+      "message": "Deploy {course} Section {section} to {destinations} at {moment}.",
+      "note": "How a case is run. saved is the course_config.json keys on disk; {folder} is an existing folder the harness makes. The harness writes the first-deploy marker for every non-folder type and passes a Cloudflare Account ID that works, so the plan is SCHEDULABLE and what is compared is the plan, not a refusal (assert that first: a refusal also names destinations). Section 1 of course ICS3U. Which surface compares what: the mac's Schedule a deploy sheet, the first line of plan_scheduled_deploy's result, and Windows' ScheduledDeploy.Describe() compare their FIRST LINE WHOLE with message rendered with the case's sheet as {destinations} and the moment as that surface writes it. Windows' sidebar Schedule Deploy dialog names no moment in its first sentence (the time is picked below it): there, the first sentence must CONTAIN 'to ' + sheet (+ ' ' or '.' after it), rather than adopt message. The assistant's schedule_deploy card must CONTAIN 'to ' + card + ' at '. The schedule_deploy RESULT ('Scheduled: ... deploys to {destinations} at ...') must contain 'deploys to ' + sheet + ' at '. And the destinations a plan names equal, in order, the destinations the scheduled job is written to deploy to (the mac records them as PLANTOIR_SCHEDULED_TO).",
+      "why": "#396, Russell's decision (R10, 2026-09-30): the sheet's first sentence names EVERY destination the deploy goes to, not only the primary. {destinations} is every destination, primary first then each additional in the order saved, in the words the schedule sheet has always used for one ('Netlify', 'Cloudflare Pages', a folder's path), joined 'A', 'A and B', 'A, B and C' - no comma before 'and', the same joining an immediate multi-destination deploy's result uses (deployWentOutTo). It is the list the scheduled run deploys to, read from the SAVED settings (actsUseTheSavedSettings, #335); if the settings are saved differently afterwards, the run goes where they say then (#323) and the Save says so (specialNames.settingsSaveScheduledDeployGoesWhereTheCourseDeploysNow). Each entry the file lists is named once, as the run deploys to each: the app never writes the same type twice, but a hand-edited file can, and the sentence then names both, because the run deploys to both."
+    },
     "wording": {
       "note": "Since #322 the two never-deployed refusals are pinned WHOLE, rendered from these templates with {course}, {section} and {destination} filled in, and compared as a whole sentence rather than by a substring: both contain 'has never been deployed to', so a Contains check cannot tell the primary's refusal from an additional destination's. {destination} is 'Netlify' or 'Cloudflare Pages' - a folder keeps no first-deploy marker and never reaches either. The runner that reads these may still classify the OTHER refusals by a phrase.",
       "neverDeployed": "{course} Section {section} has never been deployed to {destination}, so deploying it there asks what to call the website. Nobody would be there to answer that at the scheduled time, and it would wait. Deploy it to {destination} once from Plantoir, and after that it can be scheduled.",
@@ -17595,6 +17654,34 @@
           "notice": null
         },
         "why": "The window's copy is valid and names a folder; it must not be used in the file's place, because a destination has no safe default (#323)."
+      },
+      {
+        "act": "scheduleSheet",
+        "expect": {
+          "destinations": [
+            "netlify",
+            "local_folder"
+          ],
+          "notice": "schedulingUsesSavedSettings",
+          "schedulable": true
+        },
+        "name": "the schedule sheet names every SAVED destination, not an unsaved removal",
+        "saved": {
+          "additional_deploy_targets": [
+            {
+              "path": "{folder}",
+              "type": "local_folder"
+            }
+          ],
+          "deploy_target": "netlify"
+        },
+        "savedDeployedBefore": [
+          "netlify"
+        ],
+        "unsavedInWindow": {
+          "additional_deploy_targets": []
+        },
+        "why": "#396 with #335: the sheet names what the run will use. A destination removed in Course Settings but not saved is still deployed to, so the sheet still names it - naming only the window's list would promise the run less than it does."
       }
     ],
     "appliesOn": [

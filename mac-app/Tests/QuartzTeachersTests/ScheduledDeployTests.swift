@@ -966,10 +966,27 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertFalse(plan.description.contains("Netlify"))
     }
 
-    func testClassesStudentsCannotSeeYetAreNamed() throws {
+    /// Scheduling says nothing about the section's unpublished classes (#396,
+    /// Russell: "completely unnecessary"). Later classes are unpublished on
+    /// purpose all year, so the old "One thing first — N classes are not
+    /// published yet" list fired on every schedule, and its last sentence
+    /// said "deploying now" on a sheet that deploys later. Ten unpublished
+    /// classes here, so the old "…and N more." branch would have fired too.
+    /// The contract's `alsoSaid.rule` is read so a Windows-side change to it
+    /// is seen here as well.
+    func testTheSchedulePlanSaysNothingAboutUnpublishedClasses() throws {
+        let refusals: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let alsoSaid: [String: Any] = try XCTUnwrap(refusals["alsoSaid"] as? [String: Any])
+        let rule: String = try XCTUnwrap(alsoSaid["rule"] as? String)
+        XCTAssertTrue(rule.hasPrefix("nothing about the section's unpublished classes"), rule)
+
         try prepare()
+        var unpublished: [String] = []
+        for day in 3...12 {
+            unpublished.append("Unit 2, Day \(day)")
+        }
         let course: Course = try makeCourse(
-            unpublishedClassTitles: ["Unit 2, Day 3"],
+            unpublishedClassTitles: unpublished,
             publishedClassTitles: ["Unit 2, Day 2"]
         )
         let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
@@ -978,56 +995,15 @@ final class ScheduledDeployTests: XCTestCase {
             cloudflareAccountID: "", inWorkingFolder: workspaceURL
         )
 
-        XCTAssertEqual(plan.unpublishedClasses, ["Unit 2, Day 3"])
+        XCTAssertTrue(plan.isSchedulable, plan.description)
         let text: String = plan.description
-        XCTAssertTrue(text.contains("not published yet"))
-        XCTAssertTrue(text.contains("Unit 2, Day 3"))
-        XCTAssertFalse(text.contains("Unit 2, Day 2"))
-        XCTAssertTrue(text.contains("Publish first"))
-    }
-
-    /// A teacher who annotates the flag with a reason has still published the
-    /// page: the build strips the comment before Quartz sees it. Warning them
-    /// that this class is "not published yet", at half six the night before a
-    /// deploy, is a warning about something that is not true — and the page
-    /// students are already reading is the one it names.
-    func testAClassWhoseFlagCarriesAReasonIsNotReportedHeldBack() throws {
-        try prepare()
-        let course: Course = try makeCourse()
-        let page: String = """
-        ---
-        title: Unit 2, Day 4
-        publish: true # covered on Tuesday
-        created: 2026-09-08T07:00:00.000-0400
-        ---
-
-        Body.
-        """
-        try page.write(
-            to: course.directoryURL
-                .appendingPathComponent("section1/All Classes")
-                .appendingPathComponent("Unit 2, Day 4.md"),
-            atomically: true,
-            encoding: .utf8
-        )
-
-        XCTAssertEqual(
-            ScheduledDeploy.unpublishedClasses(course: course, sectionNumber: 1),
-            [],
-            "The build publishes this page, so nothing should say it is held back"
-        )
-    }
-
-    func testAFullyPublishedSectionSaysNothingAboutHeldBackClasses() throws {
-        try prepare()
-        let course: Course = try makeCourse(publishedClassTitles: ["Unit 2, Day 2"])
-        let plan: ScheduledDeployPlan = ScheduledDeploy.plan(
-            course: course, sectionNumber: 1,
-            when: sixThirtyTomorrow(), now: Date(),
-            cloudflareAccountID: "", inWorkingFolder: workspaceURL
-        )
-        XCTAssertTrue(plan.unpublishedClasses.isEmpty)
-        XCTAssertFalse(plan.description.contains("not published yet"))
+        for title in unpublished {
+            XCTAssertFalse(text.contains(title), text)
+        }
+        XCTAssertFalse(text.contains("Unit 2, Day 2"), text)
+        for phrase in ["not published yet", "One thing first", "Publish first", "and 2 more", "Deploying now"] {
+            XCTAssertFalse(text.contains(phrase), "\(phrase) in: \(text)")
+        }
     }
 
     func testPlanningChangesNothing() throws {
