@@ -325,11 +325,11 @@ public static class CourseRestorer
         for (int index = block.Open + 1; index < block.Close; index++)
         {
             string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
-            if (SectionAdder.PerSectionKeyNumber(bare) is not { } number) continue;
-            if (sectionNumber is { } wanted && number != wanted) continue;
+            if (SectionAdder.PerSectionKey(bare) is not { } named) continue;
+            if (sectionNumber is { } wanted && named.Number != wanted) continue;
             found.Add(index);
             // Asked of the key's own line as it stands: nothing here is rewritten.
-            string key = bare[..bare.IndexOf(':')];
+            string key = named.Key;
             bool wasEmpty = PageVisibilityReader.ValuePart(key, bare) is { } value
                 && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
             found.AddRange(PageVisibilityReader.LinesOwnedByKey(lines, index, block.Close, wasEmpty));

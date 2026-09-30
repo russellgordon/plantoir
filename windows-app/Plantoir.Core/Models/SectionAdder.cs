@@ -281,8 +281,7 @@ public static class SectionAdder
 
         int lastKeyPosition = fences.Open + 1 + numbered[^1].Index;
         string lineEnding = allLines[lastKeyPosition].EndsWith('\r') ? "\r" : "";
-        string lastKey = lines[numbered[^1].Index];
-        lastKey = lastKey[..lastKey.IndexOf(':')];
+        string lastKey = PerSectionKey(lines[numbered[^1].Index])!.Value.Key;
         bool wasEmpty = PageVisibilityReader.ValuePart(lastKey, lines[numbered[^1].Index]) is { } value
             && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
         int valueLines = PageFrontmatter.ContinuationLineCount(allLines, lastKeyPosition, fences.Close, wasEmpty);
@@ -294,8 +293,7 @@ public static class SectionAdder
 
     private static bool AlreadyHasKeys(int sectionNumber, List<string> lines)
     {
-        string[] prefixes = [$"createdSection{sectionNumber}:", $"publishForSection{sectionNumber}:", $"draftSection{sectionNumber}:"];
-        return lines.Any(l => prefixes.Any(p => l.StartsWith(p, StringComparison.Ordinal)));
+        return lines.Any(line => PerSectionKey(line) is { } key && key.Number == sectionNumber);
     }
 
     /// <inheritdoc cref="PublishReading"/>
@@ -397,18 +395,37 @@ public static class SectionAdder
         return (null, true);
     }
 
-    internal static int? PerSectionKeyNumber(string line)
+    internal static int? PerSectionKeyNumber(string line) => PerSectionKey(line)?.Number;
+
+    /// <summary>
+    /// The per-section key a column-0 line names — <c>createdSection&lt;N&gt;</c>,
+    /// <c>publishForSection&lt;N&gt;</c> or <c>draftSection&lt;N&gt;</c> — and its
+    /// section, or null. ONE leading quote is dropped and the key confirmed
+    /// with the reader's own <see cref="PageVisibilityReader.ValuePart"/>, so
+    /// <c>"publishForSection1": false</c>, <c>publishForSection1 : false</c> and
+    /// the plain spelling are all the same key, as they are to YAML and to the
+    /// reader. The mac's <c>AssistPageVisibility.perSectionKey(namedIn:)</c>.
+    /// </summary>
+    /// <remarks>
+    /// Bundle 2 review, finding 1: a bare prefix test missed the quoted
+    /// spelling, so the duplicate kept a quoted <c>publishForSection1: false</c>
+    /// on its copy — which then beat every later plain publish (#200 B for one
+    /// spelling) — and adding a section skipped a page whose keys were all
+    /// quoted, SHOWING a page hidden in section 1 (finding 3; the mac's
+    /// <c>perSectionKeyNumber(in:)</c> shares it).
+    /// </remarks>
+    internal static (string Key, int Number)? PerSectionKey(string line)
     {
-        string[] prefixes = ["createdSection", "publishForSection", "draftSection"];
-        foreach (string prefix in prefixes)
+        string unquoted = line.Length > 0 && (line[0] == '"' || line[0] == '\'') ? line[1..] : line;
+        foreach (string prefix in new[] { "createdSection", "publishForSection", "draftSection" })
         {
-            if (line.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                string rest = line[prefix.Length..];
-                int colon = rest.IndexOf(':');
-                if (colon > 0 && int.TryParse(rest[..colon], out int num))
-                    return num;
-            }
+            if (!unquoted.StartsWith(prefix, StringComparison.Ordinal)) continue;
+            int end = prefix.Length;
+            while (end < unquoted.Length && char.IsAsciiDigit(unquoted[end])) end++;
+            if (end == prefix.Length) continue;
+            string key = unquoted[..end];
+            if (PageVisibilityReader.ValuePart(key, line) is null) continue;
+            return (key, int.Parse(unquoted[prefix.Length..end], System.Globalization.CultureInfo.InvariantCulture));
         }
         return null;
     }

@@ -210,6 +210,26 @@ public sealed class DuplicateClassTests : IDisposable
     }
 
     [Fact]
+    public void AQuotedPerSectionKeyIsStrippedToo()
+    {
+        // Bundle 2 review, finding 1: `"publishForSection1": false` is the
+        // same key to YAML and to the reader, and left on the copy it beats
+        // every later plain publish — #200 B again, for one spelling.
+        FourClasses();
+        Write("Unit 2, Day 2",
+              "---\ntitle: Unit 2, Day 2\n\"publishForSection1\": false\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\nShared.\n");
+        var workspace = Open();
+
+        workspace.ApplyDuplicateClass(workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 2"));
+
+        string copy = File.ReadAllText(ClassPath("Unit 2, Day 3"));
+        Assert.DoesNotContain("publishForSection1", copy);
+        Assert.True(PageFrontmatter.IsDraft(copy, 1));
+        string published = PageFrontmatter.SetDraft(copy, "publish", draft: false, 1).Text;
+        Assert.False(PageFrontmatter.IsDraft(published, 1));
+    }
+
+    [Fact]
     public void AnInheritedPerSectionDateGoesTooSoTheSiteShowsTheCopysOwnDay()
     {
         FourClasses();
