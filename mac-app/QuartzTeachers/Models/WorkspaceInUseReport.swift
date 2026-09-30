@@ -115,9 +115,12 @@ struct WorkspaceInUseReport: Equatable {
         case .workDidNotFinish:
             sentence = WorkspaceInUseReport.lineWhenWorkDidNotFinish
         }
-        sentence = sentence.replacingOccurrences(of: "{place}", with: place)
+        // "+" stands for the one space a course code may carry (#378 review S1).
+        sentence = sentence.replacingOccurrences(of: "{place}", with: place.replacingOccurrences(of: "+", with: " "))
         sentence = sentence.replacingOccurrences(of: "{seconds}", with: String(seconds))
-        sentence = sentence.replacingOccurrences(of: "{preview}", with: openPreview)
+        sentence = sentence.replacingOccurrences(
+            of: "{preview}", with: openPreview.replacingOccurrences(of: "+", with: " ")
+        )
         sentence = sentence.replacingOccurrences(of: "{what}", with: what)
         return sentence
     }

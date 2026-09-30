@@ -3570,11 +3570,13 @@ docker exec $_EXEC_TTY \
     # never forwarded it would leave a green test suite and an unchanged hang.
     [ "$NON_INTERACTIVE" = "true" ] && opts="$opts --non-interactive";
     [ -n "$TEAM_SLUG" ] && opts="$opts --team $TEAM_SLUG";
+    # The course in double quotes: a code may carry one space ("AP CALC"),
+    # and unquoted it reached deploy.py as two words (#378 review N1).
     if [ "$TARGET" = "cloudflare" ]; then
       CLOUDFLARE_API_TOKEN="$tok" CLOUDFLARE_ACCOUNT_ID="$CF_ACCOUNT" \
-        python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course '"$COURSE_CODE"' --section '"$SECTION_NUM"' $opts
+        python3 /opt/scripts/deploy.py --host-os mac --target cloudflare --course "'"$COURSE_CODE"'" --section '"$SECTION_NUM"' $opts
     else
       NETLIFY_AUTH_TOKEN="$tok" \
-        python3 /opt/scripts/deploy.py --host-os mac --course '"$COURSE_CODE"' --section '"$SECTION_NUM"' $opts
+        python3 /opt/scripts/deploy.py --host-os mac --course "'"$COURSE_CODE"'" --section '"$SECTION_NUM"' $opts
     fi
   '

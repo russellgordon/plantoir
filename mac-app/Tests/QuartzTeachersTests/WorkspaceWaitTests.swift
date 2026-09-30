@@ -216,6 +216,28 @@ final class WorkspaceWaitTests: XCTestCase {
         XCTAssertNil(runner.waitingSince)
     }
 
+    /// #378 review S1: a course code may carry a space; the launchers write it
+    /// with "+", and every sentence and trail line says it with the space.
+    func testACourseWhoseCodeHasASpaceIsSaidWithTheSpace() {
+        let waits: [WorkspaceWait] = WorkspaceWait.waits(in: ["PLANTOIR_WAITING_FOR: preview AP+CALC/1 -"])
+        XCTAssertEqual(waits.first?.statusSentence, "Waiting for the preview of AP CALC section 1 to close…")
+        let reports: [LeftoverWorkReport] = LeftoverWorkReport.reports(in: "PLANTOIR_LEFTOVER_STOPPED: AP+CALC/2 preview:AP+CALC/1")
+        XCTAssertEqual(reports.count, 1, "a spaced course must not drop the line")
+        XCTAssertEqual(
+            reports.first?.trailSentence,
+            "AP CALC/2 · stopped a preview of AP CALC section 1, left running in this folder after the program "
+                + "that started it had closed, before setting the folder up again"
+        )
+        let waited: [WorkspaceInUseReport] = WorkspaceInUseReport.reports(
+            in: "PLANTOIR_WORKSPACE_IN_USE: waited 4 AP+CALC/2 build:AP+CALC/1 window"
+        )
+        XCTAssertEqual(
+            waited.first?.trailSentence,
+            "AP CALC/2 · waited 4 s for a build of AP CALC section 1 started by another Plantoir window to finish "
+                + "before setting this folder up again, then went ahead"
+        )
+    }
+
     func testMalformedWaitLinesSayNothing() {
         XCTAssertTrue(WorkspaceWait.waits(in: ["PLANTOIR_WAITING_FOR: dancing MPM2D/2 claude"]).isEmpty)
         XCTAssertTrue(WorkspaceWait.waits(in: ["PLANTOIR_WAITING_FOR: publish MPM2D/2"]).isEmpty)

@@ -57,6 +57,7 @@ Pure stdlib. Run with:
     python3 scripts/test_deploy_sh_questions.py
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -461,6 +462,50 @@ class ATeacherAlreadyBittenGetsOutOfIt(unittest.TestCase):
 # Deliberately NOT gated on bash: this one reads JSON and deploy.sh as text.
 # A live check on whether the contract and this file have come apart should not
 # quietly disappear on a machine that merely lacks a usable shell.
+@unittest.skipUnless(HAS_BASH, "no bash here that can run a program")
+class ACourseCodeWithASpaceReachesDeployPyWhole(unittest.TestCase):
+    """#378 review N1: a course code may carry one space ("AP CALC",
+    CourseCodeRule). deploy.sh writes the code into the `sh -lc` script it
+    hands the container; unquoted there, deploy.py was given `--course AP
+    CALC` and refused CALC as an argument it does not know. The REAL
+    `docker exec … sh -lc '…'` command is cut out of deploy.sh and run with
+    `docker` standing in, so the script runs here, and `python3` writes down
+    the arguments it was given, one per line."""
+
+    def arguments_for(self, target: str) -> list:
+        text = (REPOSITORY_ROOT / "deploy.sh").read_text(encoding="utf-8")
+        start = text.index("docker exec $_EXEC_TTY \\\n  -e HOST_TZ_OFFSET")
+        finish = text.index("\n  '", start) + len("\n  '")
+        command = text[start:finish]
+        with tempfile.TemporaryDirectory() as scratch:
+            command = command.replace("/tmp/deploy_pat", scratch + "/deploy_pat")
+            bin_folder = Path(scratch) / "bin"
+            bin_folder.mkdir()
+            (bin_folder / "python3").write_text(
+                '#!/bin/bash\nfor a in "$@"; do echo "$a"; done > "' + scratch + '/words"\n', encoding="utf-8")
+            (bin_folder / "python3").chmod(0o755)
+            program = "\n".join([
+                'docker() { while [ "$1" != "-lc" ]; do shift; done; shift; sh -c "$1"; }',
+                '_EXEC_TTY="-i"; CONTAINER_NAME="teaching-quartz-0000abcd"',
+                'COURSE_CODE="AP CALC"; SECTION_NUM="1"; TARGET="' + target + '"',
+                'NON_INTERACTIVE="false"; DIAGNOSE=""; TEAM_SLUG=""; CF_ACCOUNT=""; HOST_TZ_OFFSET=""',
+                command,
+            ])
+            environment = dict(os.environ)
+            environment["PATH"] = str(bin_folder) + ":/usr/bin:/bin"
+            result = subprocess.run(["bash", "-c", program], capture_output=True, env=environment, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", "replace"))
+            return (Path(scratch) / "words").read_text(encoding="utf-8").splitlines()
+
+    def test_netlify_and_cloudflare_both_get_the_course_whole(self):
+        for target in ["netlify", "cloudflare"]:
+            with self.subTest(target=target):
+                words = self.arguments_for(target)
+                self.assertIn("--course", words, words)
+                self.assertEqual(words[words.index("--course") + 1], "AP CALC", words)
+                self.assertEqual(words[words.index("--section") + 1], "1", words)
+
+
 class EveryQuestionTheContractNamesIsDrivenHere(unittest.TestCase):
     """The four above are the four the contract names — asserted, not assumed.
 
