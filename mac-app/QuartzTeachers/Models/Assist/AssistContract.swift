@@ -312,6 +312,10 @@ enum AssistContract {
             "howITeachCarriesNoSettings": AssistWording.howITeachCarriesNoSettings,
             "howITeachSaved": AssistWording.howITeachSaved(course: course),
             "howITeachIsNeverPublished": AssistWording.howITeachIsNeverPublished(course: course),
+            // The links checklist (#379): the finding's sentence for an assistant.
+            "linksIntoHiddenPagesWillBeOffered": AssistWording.linksIntoHiddenPagesWillBeOffered(
+                course: course, section: section
+            ),
             "howITeachBriefing": AssistWording.howITeachBriefing(courses: [course]),
             "howITeachListedAsWritten": AssistWording.howITeachListedAsWritten,
             "howITeachListedAsNotWritten": AssistWording.howITeachListedAsNotWritten,

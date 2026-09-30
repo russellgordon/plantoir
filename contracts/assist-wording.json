@@ -93,6 +93,7 @@
     "linkedClassWasLeftAloneForAMeeting" : "“Week 4” is a meeting of its own, so it stays as it is — publish it when you get to that meeting.",
     "linkedPageIsADraft" : "a draft, so students can’t open it yet",
     "linkedPageIsMissing" : "no page is called this, so the link leads nowhere",
+    "linksIntoHiddenPagesWillBeOffered" : "Some links on pages students can see lead to pages that are still hidden. Plantoir will offer to publish them when you next open {course} Section {section}.",
     "lookTheSectionOverBeforePublishing" : "Look the section over in Plantoir before you publish.",
     "madeRoom" : "Made room for 1 class at Unit 3, Day 4.",
     "madeRoomForAMeeting" : "Made room for 1 meeting at Week 5.",

@@ -483,7 +483,10 @@ enum AssistPublishPlanner {
         // on. Same teacher, same class, two different results depending on
         // which sentence they used.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return plan(
             publishes: true, titles: titles,
@@ -541,7 +544,10 @@ enum AssistPublishPlanner {
         // second rule here with a different condition, which is how the two
         // routes to the same act came to disagree.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return .success(plan(
             publishes: true, titles: titles,
@@ -1191,16 +1197,16 @@ enum AssistPublishPlanner {
     /// pre-populated course and a hand-published one date their pages the same
     /// way.
     ///
-    /// "Never published" is inferred from the page being hidden now, because
-    /// nothing on disk records a page's history. A page published once and
-    /// later hidden therefore counts as never published, and would take a new
-    /// date. Recording the truth would mean a new frontmatter key on every
-    /// page, agreed with the Python and the Windows app; the inference costs
-    /// nothing and is right in every case anybody has met.
+    /// "Published before" is READ from the section's published-pages record
+    /// since #379 (`publishedBeforeIsRecorded`, replacing the inference that
+    /// every hidden page was never published): a page a deploy put on a site
+    /// and that was hidden since keeps its date. A date on the page is not
+    /// the sign — 7,114 of 7,118 payload pages carry one.
     static func dateMovesFollowingClasses(
         titles: [String],
         graph: AssistSectionGraph,
-        classPages: [ClassPageSummary]
+        classPages: [ClassPageSummary],
+        publishedBefore: Set<String> = []
     ) -> [AssistPublishDateMove] {
         // Only the NAMED pages that are really classes with a date. Publishing
         // an ordinary page moves nothing: there is no class day to inherit.
@@ -1263,6 +1269,11 @@ enum AssistPublishPlanner {
                 }
                 claimed.insert(page.lowercasedTitle)
                 if page.date == entry.day {
+                    continue
+                }
+                // Published before and hidden again: it keeps its date
+                // (#379, Russell's decision 4; `publishedBeforeIsRecorded`).
+                if PublishedPagesRecord.lists(page.fileURL, in: publishedBefore) {
                     continue
                 }
                 moves.append(AssistPublishDateMove(
