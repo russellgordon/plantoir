@@ -1881,10 +1881,20 @@ like Swift — and re-match old agents' labels for no teacher who can reach
 it), and teaching the launchers Unicode letters (bash 3.2's BSD awk and a
 per-user locale; fragile for nothing reachable). **Still reachable:** the
 command-line wizard (`setup.sh` → `setup_course.py`) checks a typed code only
-for a leading dot, so it can make "CAFÉ"; a deploy set for later of such a
-course is not recognised by the launcher's label look (it fails open;
-`deploy.sh`'s own row is still recognised by its words). Recorded in
-`knownLimits`, not fixed here.
+for a leading dot, so it can make "CAFÉ", "C++" or "A;B". For THIS guard
+such a course fails open: a deploy set for later of it is not recognised by
+the label look, and `deploy.sh`'s own row is still recognised by its words.
+**For the owner check before a remake it fails the DAMAGING way** (#388
+implementation review S3, measured with a pretend `ps` on the branch and on
+dev alike): the label rule cannot match `É`, so a scheduled publish of
+"CAFÉ" in the moment only its runner is left reads as gone and can be ended;
+and `+` is read back as a space, so even a live `deploy.sh C++ 1` reads as
+gone. Work holding `;` or `\` — either of which would shift the places'
+numbers onto OTHER courses' work, measured: a live preview of another course
+declared gone — is answered every piece owned instead (the
+`whatCountsAsRunning` case with `;`, and its must-fail). Recorded in both
+contracts' `knownLimits`, not fixed here: the fix is for the command-line
+setup to apply `CourseCodeRule`, drafted as a follow-up issue.
 
 **An unreadable process table lets the preview THROUGH** — the opposite of
 the look before a workspace is remade (above), on purpose. There, failing open

@@ -309,7 +309,14 @@ exit 0
 """
 
 
-@unittest.skipUnless(HAS_BASH, "needs a bash that can run a program")
+# Mac only, as test_port_blocks.py's TheRealListings is: the pretend `ps`
+# walks the REAL process table with `/bin/ps -o ppid= -p`, which MSYS's ps
+# (Git Bash on Windows) does not have — the walk would stop at once, the
+# table would not list this run, and the guard would rightly let the preview
+# through, reading as a failure there (#388 impl review S4). The guard it
+# proves is preview.sh's, which only a Mac runs; Windows' is preview.ps1's (#386).
+@unittest.skipUnless(HAS_BASH and sys.platform == "darwin" and Path("/bin/ps").exists(),
+                     "needs a Mac: the pretend ps walks the real table with /bin/ps -o")
 class TheRealPreviewUpToItsGuard(unittest.TestCase):
     """The behaviour tests above paste the PROCESS TABLE BLOCK in before the
     guard themselves, so they would stay green if the real preview.sh called
