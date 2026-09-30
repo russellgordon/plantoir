@@ -228,6 +228,28 @@ enum CourseActivity {
         return false
     }
 
+    /// True while THIS section is being deployed by this copy of the app —
+    /// from any window, or by the assistant with no window (GitHub #381).
+    ///
+    /// Asked by the one function every preview a window starts goes through
+    /// (`SectionDetailView.startPreview`), because a preview of a section
+    /// must not start while that same section deploys. The section, not the
+    /// course: previewing section 1 while section 2 deploys from the same
+    /// app works, and Russell's rule names the same section. Other programs
+    /// are refused through their work leases, and a deploy typed at a
+    /// command line by `preview.sh` itself —
+    /// `shared-rules.json` → `previewWhileItsSectionDeploys`.
+    static func sectionPublishIsRunning(folderPath: String, courseCode: String, sectionNumber: Int) -> Bool {
+        for publish in activePublishes {
+            if publish.courseCode == courseCode
+                && publish.sectionNumber == sectionNumber
+                && FolderIdentity.isSameFolder(publish.folderPath, folderPath) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// True while any section of the course is previewing or publishing, or
     /// a copy of the course is being zipped (#351).
     static func courseIsBusy(folderPath: String, courseCode: String) -> Bool {
