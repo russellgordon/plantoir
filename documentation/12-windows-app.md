@@ -1524,18 +1524,20 @@ fenced with `----` got a second block PREPENDED and the teacher's real
 frontmatter became body text on the student's site.
 
 One fence finder and one key matcher now serve the reader and every
-VISIBILITY writer — and that qualifier is load-bearing, because two other
-finders are still hand-rolled and were deliberately left alone:
-`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
-#140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
-Russell decided on 2026-09-19: adopt the shared finder; it is owed together
-with #182's carry-the-value-lines restore, see the `windows` issue from #182)
-and `SectionAdder.FrontmatterLines` (strict here; it was strict
-on the mac too until #175, 2026-09-25, when that strictness was measured to
-PUBLISH a page hidden in section 1 into a newly added section — the mac now
-uses the shared finder and splices by line, and this one owes the same, see
-`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
+writer. Until 2026-09-30 two finders were hand-rolled and strict here:
+`CourseRestorer.FrontmatterBounds`, which a restore used — lenient on the mac
+since #140, so a restore reached different pages on the two platforms
+([issue #177](https://github.com/russellgordon/plantoir/issues/177), decided
+2026-09-19: adopt the shared finder) — and `SectionAdder.FrontmatterLines`,
+whose strictness was measured on the mac (#175) to PUBLISH a page hidden in
+section 1 into a newly added section. Parity bundle 2 removed
+`FrontmatterBounds` and pointed both at `PageVisibilityReader.FenceIndices`
+(#177/#308 with #182's carry-the-value-lines restore; #282 with the splice by
+line), and since the fix round a per-section key is named by ONE helper,
+`SectionAdder.PerSectionKey`, which accepts the quoted spelling too — see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK".
+`AssistWorkspace.BodyAfterFrontmatter` is still hand-rolled (it trims and
+accepts `...`); the #188 rule is what it should agree with if it is touched.
 Four finders, two unified here, three on the mac. Check which one you
 are looking at before "tidying" any of them.
 

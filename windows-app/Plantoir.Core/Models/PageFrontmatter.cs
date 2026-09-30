@@ -550,8 +550,8 @@ public static class PageFrontmatter
         {
             string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
             if (bare.StartsWith(' ') || bare.StartsWith('\t')) continue;
-            if (SectionAdder.PerSectionKeyNumber(bare) is null) continue;
-            string key = bare[..bare.IndexOf(':')];
+            if (SectionAdder.PerSectionKey(bare) is not { } named) continue;
+            string key = named.Key;
             removals.Add(index);
             removals.UnionWith(ContinuationLines(lines, index, fences.Close, ValueIsEmpty(lines[index], key)));
         }

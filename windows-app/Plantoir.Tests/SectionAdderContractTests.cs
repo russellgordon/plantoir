@@ -49,6 +49,23 @@ public class SectionAdderContractTests
         Assert.Equal(SectionAdder.PageOutcome.GivenKeys, plain);
     }
 
+    /// <summary>
+    /// A QUOTED per-section key is the same key to YAML (bundle 2 review,
+    /// finding 3): a page carrying only quoted keys used to be skipped, so the
+    /// new section had no key and the page — hidden in section 1 — was SHOWN.
+    /// </summary>
+    [Fact]
+    public void AQuotedPerSectionKeyIsGivenItsPairToo()
+    {
+        var (written, outcome) = SectionAdder.ExtendFrontmatter(
+            "---\ntitle: Loops\n\"createdSection1\": 2026-09-08T07:00:00.000-0400\n\"publishForSection1\": false\n---\nBody.\n",
+            2, "2026-09-25T07:00:00.000-0400");
+        Assert.Equal(SectionAdder.PageOutcome.GivenKeys, outcome);
+        Assert.Equal(
+            "---\ntitle: Loops\n\"createdSection1\": 2026-09-08T07:00:00.000-0400\n\"publishForSection1\": false\n" +
+            "createdSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody.\n", written);
+    }
+
     [Fact]
     public void TheTrailLineIsTheMacsWordForWord()
     {
