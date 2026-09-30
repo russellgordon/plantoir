@@ -101,6 +101,30 @@ class DeployRecordsTests(unittest.TestCase):
                            "Cloudflare's pages are recorded before they are uploaded")
 
 
+def _a_bash_that_can_reach_a_scratch_folder() -> bool:
+    """Is there a bash here that can run in the folders these tests build?
+
+    `shutil.which("bash")` is not enough on Windows: a machine with WSL
+    enabled has `C:\\Windows\\System32\\bash.exe` on PATH, and on the machine
+    this was measured on (2026-09-30) that launcher printed "Windows Subsystem
+    for Linux must be updated" and exited 1, so all four tests here FAILED
+    inside `dotnet test` rather than skipping. The same probe as
+    `test_deploy_sh_questions.HAS_BASH`: hand a real temporary folder to a real
+    bash and see whether it can `cd` there.
+    """
+    if shutil.which("bash") is None:
+        return False
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = subprocess.run(
+                ["bash", "-c", 'cd "$1" && printf reachable', "_", str(tmp)],
+                capture_output=True, timeout=60,
+            )
+            return probe.stdout.decode("utf-8", "replace").strip() == "reachable"
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 class FolderPublishRecordsTests(unittest.TestCase):
     """deploy.sh's folder branch never enters deploy.py, so it records itself."""
 
@@ -112,8 +136,8 @@ class FolderPublishRecordsTests(unittest.TestCase):
         cls.launcher = text
 
     def setUp(self):
-        if shutil.which("bash") is None:
-            self.skipTest("no bash on this machine")
+        if not _a_bash_that_can_reach_a_scratch_folder():
+            self.skipTest("no bash here that can reach a scratch folder")
         self.temporary = Path(tempfile.mkdtemp())
         self.course = self.temporary / "courses" / "TEST"
         self.section_dir = self.temporary / "courses" / "TEST" / ".merged_output" / "section1"

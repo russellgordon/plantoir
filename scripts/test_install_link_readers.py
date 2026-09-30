@@ -58,6 +58,14 @@ def page_name(name: str) -> str:
 REFERENCE = datetime(2026, 9, 1)
 
 
+def _write_exactly(path: Path, text: str) -> None:
+    """Writes `text` byte for byte. `write_text` translates every newline to
+    os.linesep, so on Windows the contract's CR LF case landed on disk as
+    CR CR LF, which a reader sees as a BLANK LINE inside the code span. The
+    fixture, not the reader, was what failed there (measured 2026-09-30)."""
+    path.write_bytes(text.encode("utf-8"))
+
+
 class FirstUseDatesTests(unittest.TestCase):
     """A payload page takes the date of the first class that links to it."""
 
@@ -65,8 +73,8 @@ class FirstUseDatesTests(unittest.TestCase):
         payload = root / "payload"
         classes = payload / "per_section" / "All Classes"
         classes.mkdir(parents=True)
-        (classes / f"Unit 1, Day {ordinal}.md").write_text(
-            f"---\ncreated: __CREATED_CLASS_{ordinal}__\n---\n\n{body}", encoding="utf-8")
+        _write_exactly(classes / f"Unit 1, Day {ordinal}.md",
+                       f"---\ncreated: __CREATED_CLASS_{ordinal}__\n---\n\n{body}")
         return payload
 
     def test_a_table_link_with_an_escaped_pipe_takes_its_class_date(self):
@@ -236,7 +244,7 @@ class PagesTheCourseTeachesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "All Classes").mkdir()
-            (root / "All Classes" / "Unit 1, Day 1.md").write_text(class_body, encoding="utf-8")
+            _write_exactly(root / "All Classes" / "Unit 1, Day 1.md", class_body)
             (root / "Worksheet.md").write_text("# Worksheet\n", encoding="utf-8")
             return build_site._pages_the_course_teaches(root, ["All Classes"])
 
