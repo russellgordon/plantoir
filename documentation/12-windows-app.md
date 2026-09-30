@@ -1524,20 +1524,22 @@ fenced with `----` got a second block PREPENDED and the teacher's real
 frontmatter became body text on the student's site.
 
 One fence finder and one key matcher now serve the reader and every
-VISIBILITY writer — and that qualifier is load-bearing, because two other
-finders are still hand-rolled and were deliberately left alone:
-`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
-#140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
-Russell decided on 2026-09-19: adopt the shared finder; it is owed together
-with #182's carry-the-value-lines restore, see the `windows` issue from #182)
-and `SectionAdder.FrontmatterLines` (strict here; it was strict
-on the mac too until #175, 2026-09-25, when that strictness was measured to
-PUBLISH a page hidden in section 1 into a newly added section — the mac now
-uses the shared finder and splices by line, and this one owes the same, see
-`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
-Four finders, two unified here, three on the mac. Check which one you
-are looking at before "tidying" any of them.
+writer. Until 2026-09-30 two finders were hand-rolled and strict here:
+`CourseRestorer.FrontmatterBounds`, which a restore used — lenient on the mac
+since #140, so a restore reached different pages on the two platforms
+([issue #177](https://github.com/russellgordon/plantoir/issues/177), decided
+2026-09-19: adopt the shared finder) — and `SectionAdder.FrontmatterLines`,
+whose strictness was measured on the mac (#175) to PUBLISH a page hidden in
+section 1 into a newly added section. Parity bundle 2 removed
+`FrontmatterBounds` and pointed both at `PageVisibilityReader.FenceIndices`
+(#177/#308 with #182's carry-the-value-lines restore; #282 with the splice by
+line), and since the fix round a per-section key is named by ONE helper,
+`SectionAdder.PerSectionKey`, which accepts the quoted spelling too — see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK".
+`AssistWorkspace.BodyAfterFrontmatter` is still hand-rolled (it trims and
+accepts `...`); the #188 rule is what it should agree with if it is touched.
+Only `BodyAfterFrontmatter` is still its own finder here (the mac keeps
+several). Check which one you are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
 2026-09-19; the mac followed the same day.**
@@ -2226,6 +2228,177 @@ stayed green because its example says "two classes". A form one side supports
 and does not DECLARE is invisible to the other. If a family here accepts
 something the contract's `shape` does not spell out, that is a case to propose,
 not a detail to leave in the code.
+
+## Dates are written in the Gregorian calendar, by one helper (#144)
+
+Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
+from a cloud session on Linux (see "Working from a cloud session" in
+`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+The mac needs nothing from this and owes nothing back; it is written up here
+because the REASON is what a future reader of the C# needs, and the reason
+cannot be read off the code.
+
+**The fault.** `date.ToString("yyyy-MM-dd")` and `$"{date:yyyy-MM-dd}"` render
+the year in the current culture's DEFAULT CALENDAR. The `-` is a literal and
+is safe; the `yyyy` is not. On a Windows 11 PC whose regional format is Thai
+(default calendar Buddhist), 2026-09-09 renders as `2569-09-09`, measured in
+the issue; under `ar-SA` (Umm al-Qura) the same day is `1448-03-27`. Sixty-six
+sites in this app's product code formatted a date that way and none passed a
+culture. Most only DISPLAY a sentence — wrong once, and not corrupting. The
+ones that mattered WROTE:
+
+| Writer | What it wrote on a Thai PC | What read it back |
+|---|---|---|
+| `TimetableMemory.Write` | `"dates": ["2569-09-08", …]`, `"recorded": "2569-09-09"` | `TimetableMemory.Read`, which was ALREADY invariant — so every remembered class landed 543 years out, "when are my next classes?" answered from a list matching nothing, and `add_next_class` continued from a date no teacher gave it. Symmetric-looking, broken in one file, nothing reported |
+| `PageFrontmatter.SetCreated` and `AssistWorkspace.ClassSkeleton` | `created: 2569-09-09T07:00:00.000-0400` into every re-dated and every new class page | The build, which sorts and dates the site by it |
+| `ProblemReportStore.SaveRunTranscript` | the transcript's FILE NAME, `2569-09-19 120000 setup.ps1.txt`, and its "Started" line | `RunFilePaths` and `PruneRuns`, which sorted by name ordinally and deleted past twenty |
+| `ActivityTrail.Note`, `ProblemReportBuilder.Stamp` / `About`, `AssistWorkspace.ReleaseSite` | every trail timestamp, the report's folder name and "Made on" line, the released-marker stamp | A person reading a problem report |
+
+**A second column had the same fault.** The `:` in a custom format is the
+culture's TIME SEPARATOR, so a bare `HH:mm:ss` renders `14.15.30` on a
+Finnish or Danish machine. Every trail line and every transcript carried it.
+Found by the plan review, not by the issue.
+
+**The shape of the fix: one helper, `Plantoir.Core/Models/DateText.cs`**, and
+every product site goes through it — `Iso(DateOnly)` for the ISO day,
+`Stamp(DateTime)` for the trail's `yyyy-MM-dd HH:mm:ss`, `Invariant(…, format)`
+for the four other shapes that exist (`yyyy-MM-dd_HHmmss`, `yyyy-MM-dd HHmmss`,
+`yyyy-MM-dd 'at' HH.mm.ss`, `yyyy-MM-dd HH:mm:ss zzz`), and `TryReadDay` for
+the reader half. The issue proposed the name `Dates`; three classes
+(`TimetableMemory`, `ReDatePlan`, `ScheduleReading`) already have a `Dates`
+property, which shadowed the type inside exactly the files that needed it
+most, so it is `DateText`. The mac is immune by construction (`CalendarDay.text`
+is three integers through `String(format:)`) and this is how the C# reaches the
+same place. Two decisions inside the helper, both from the plan review:
+
+- **No `Iso(DateTime)`.** It would drop the time silently, and the next site
+  written as `DateText.Iso(DateTime.Now)` would be exactly the kind of call
+  that looks right and is not. A caller with a moment says which shape it
+  wants.
+- **`TryReadDay` is EXACT, not lenient.** A lenient invariant parse reads
+  `09/08/2026` as September the 8th — US order — while the cultural parse it
+  replaced read it as the 9th of August on a Canadian or British machine.
+  Switching the two `remember_timetable` readers to lenient-invariant would
+  have silently swapped day and month for those teachers. The tools ask for
+  `YYYY-MM-DD` by name and refuse anything else by name, so exact is what
+  they meant. (Under `ar-SA` the old bare parse did not misread the app's own
+  spelling; it FAILED outright, so every date was refused on such a machine.)
+
+**Two things the fix itself would have broken, and what was done about them.**
+A fixed writer beside an unchanged reader can be worse than the old state,
+and this piece had two of those:
+
+- **The runs folder becomes MIXED on every affected machine** — twenty old
+  transcripts named `2569-…` beside the new `2026-…` ones — and ordinally the
+  old names win, so `PruneRuns` would have kept the old twenty for ever and
+  deleted each new transcript on arrival, with the problem report showing the
+  twenty oldest runs and never the one being reported. The second comment on
+  the issue had judged this reachable only after a locale change; the fix
+  reaches it on day one. Both readers now order by the file's write time
+  (`File.GetLastWriteTimeUtc`, name descending as the tie-break), which has
+  no calendar. **This reverses a mac decision on purpose**: the mac's
+  `runFileURLs` (`ProblemReport.swift`) sorts by NAME so that "nothing a copy
+  or a restore from a backup could disturb" is involved. That reason does not
+  hold here, because this folder never travels — `ProblemReportStore.LogsDirectory`
+  is `%LOCALAPPDATA%\Plantoir\Logs`, not the working folder — while the
+  mixed-calendar folder is real on the day the fix lands. Two consequences
+  worth knowing: the order is by when a task FINISHED (the file is written
+  once, at the end), so a long preview started earlier lists above a short
+  task that ended after it; and a file deleted between the listing and the
+  sort reads as 1601-01-01 and drops to the bottom, harmless. Rejected:
+  skipping implausible names the way `ArchiveStamp` does — a name is only a
+  label here, and the write time is what "the last twenty tasks" means anyway.
+- **A timetable already remembered in the other calendar** is still on that
+  teacher's disk, and the invariant reader takes `2569-09-08` as the year
+  2569. `TimetableMemory.Read` now returns null — "not remembered" — when any
+  date is before `EarliestBelievable` (2000-01-01) or more than
+  `YearsAheadBelievable` (3) years past today, the same shape as
+  `ArchiveStamp`: a date that cannot be true does not get to decide anything.
+  The assistant asks for the timetable again, and the next `Write` replaces
+  the file with one it can read. **`Write` refuses the same list**
+  (`TimetableMemory.Unbelievable` is the one rule both consult), because the
+  implementation review found what a reader-only guard does: `remember_timetable`
+  saved the file, read it back for its reply, and dereferenced the null —
+  a crash after the write, where before there had been a working tool. The
+  two MCP tools and the section-schedule dialog now refuse first, naming the
+  date. The window is contract data since this piece —
+  `contracts/file-formats.json` → `sectionTimetable.believable` (the two
+  bounds and eight cases, run here by `DateTextTests`) — because a working
+  folder travels, so a file written by a pre-#144 Windows on a Thai PC can be
+  restored on a mac, whose `SectionTimetable` reads it just as invariantly;
+  the `mac` issue opened with this piece says so. The floor is 2000, not
+  `ArchiveStamp`'s 2025, because a teacher may keep last year's timetable;
+  it is still centuries clear of every wrong reading (2569, 1483, 1448). The
+  ceiling is three years, not two days, because future class dates are the
+  point of the file. **It leaves a trail line** — `remembered timetable set
+  aside`, `appliesOn: ["windows"]` in `shared-rules.json` → `activityTrail.mustRecord`,
+  carrying the date it refused — written by the reader, once per read of
+  such a file until the teacher answers and the file is replaced. Windows
+  only because only this app ever wrote such a file; the mac's guard, when
+  it adopts one, meets a file that arrived rather than one it wrote, and
+  can decide its own line then.
+
+**What is deliberately left in the machine's culture**, so nobody "fixes"
+it: `TaskScheduling.Schedule` formats the date for `schtasks.exe` and walks
+`DateFormats` until it takes one, and `TaskScheduling.NextRun` parses the
+`Next Run Time:` row that Windows wrote in its own culture — that program
+accepts nothing else. `BackupItem.Subtitle` and `ArchivedItem.Subtitle` show
+a month by name to the teacher and say `CurrentCulture` out loud. Sentences
+of the shape `dddd d MMMM, h:mm tt` (no year) are read by a person in their
+language and carry nothing a calendar can shift. Worth knowing, not fixed:
+`/ST when.ToString("HH:mm")` in `TaskScheduling.Schedule` renders `14.15` on
+a Finnish machine, and whether `schtasks` takes that is unmeasured.
+
+**Five sites were left to `origin/issue/159-settle-the-day-once`**, the
+unmerged Windows branch from 2026-09-19 that `WINDOWS-PARITY.md` Phase 5
+step 1 says to take up as it stands: the model's dateline (`AssistAgent`
+:610), the "deploy tomorrow at" card's moment (:704), that card's reader
+(:815), and the two `DateTime.TryParse(when)` readers in `PlantoirTools`
+(`plan_scheduled_deploy`, `schedule_deploy`), which #159 routes through one
+reader, `ScheduledDeploy.ReadTheMoment`. Changing them here would have put
+the same lines in conflict for no gain. **The order matters**: once this
+piece is on `dev`, tool output the model reads is Gregorian while the
+dateline and the `when` readers are still cultural, so on a Thai PC a model
+echoing `2026-09-20 06:30` into `schedule_deploy` is refused as "already
+passed" (the cultural reader takes it as 1483). #159 merges first, or the two
+merge together; on a Gregorian machine neither order changes anything.
+**Whichever lands second needs one follow-up commit**: if #159 is already on
+`dev`, this branch's five `DeliberatelyCultural` entries excuse lines that
+no longer exist, and #159's `ReadTheMoment` carries a cultural FALLBACK that
+the source scan will flag — one entry to add, five to remove. (And #159's
+middle step, an invariant LENIENT parse, is the very `09/08/2026` month/day
+swap `TryReadDay` rejects; a comment on #159 says so.)
+
+**What keeps it fixed** is `DateTextTests`, and the two tests that matter are
+not the ones about the helper:
+
+- `NoProductSourceRendersOrReadsAYearInTheMachinesCalendar` walks every `.cs`
+  under `Plantoir.Core`, `Plantoir.Mcp` and `Plantoir` (never `bin/` or
+  `obj/`, never a `//` line) and fails on any line that renders a year
+  (`ToString("…yyyy`, `{x:yyyy…}`, `.ToString(format)`) or parses a date
+  (`DateTime`/`DateOnly`/`DateTimeOffset` `.Parse`/`.TryParse`/`…Exact(`)
+  without `InvariantCulture` or an explicit `CurrentCulture` on the same line,
+  or `string.Create(CultureInfo.InvariantCulture, …)` on the line before
+  (#159's shape). `DeliberatelyCultural` excuses one line per entry, by file
+  name and a substring of the line, with the reason; the five #159 lines are
+  in it until that branch lands, when its `ReadTheMoment` will want an entry
+  of its own for its cultural FALLBACK. Its blind spot is a format passed
+  through a variable, which is why `TaskScheduling`'s `when.ToString(format)`
+  is matched by name. Three more, none with a site today: a second bare
+  `yyyy` on a line that also says `InvariantCulture` gets through; the line
+  after a `string.Create(CultureInfo.InvariantCulture, …)` is skipped
+  whatever it holds; and `{x:MMMM d, yyyy}` is missed because the pattern
+  wants `yyyy` right after the colon. A bare `{date}`, `ToString("d")` or
+  `ToShortDateString()` is not scanned at all, and the greps found none.
+- `EveryExcuseStillExcusesALineThatExists` fails the moment an entry matches
+  nothing, so a dead excuse cannot one day excuse a new site by accident. The
+  #159 entries are exempt from it, for the reason above.
+- Every culture test FIRST asserts that the bare rendering really does shift
+  under the swapped culture on this machine (`2569` under `th-TH`, `14.15.30`
+  under `fi-FI`). A machine running with invariant globalization would
+  otherwise pass every assertion while proving nothing. Measured on Linux
+  with ICU 74 and on Windows 11 alike: `new CultureInfo("th-TH")` has the
+  Buddhist calendar as its default on both.
 
 ## What a window lets go of when its working folder changes
 

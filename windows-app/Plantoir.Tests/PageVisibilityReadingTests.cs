@@ -111,7 +111,7 @@ public class PageVisibilityReadingTests
     {
         // Measured: a page whose whole frontmatter is `publish:false` reaches
         // Quartz with NO keys and is published; one with another key beside it
-        // stops the build. Either way this is not the page's flag, and reading
+        // cannot be parsed (it stopped the build until #246; the build now hides and names it). Either way this is not the page's flag, and reading
         // it as one called a live page hidden.
         Assert.Equal(PageVisibility.SaysNothing, Answer("publish:false"));
         Assert.Equal(PageVisibility.SaysNothing, Answer("publish:true"));

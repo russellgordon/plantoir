@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Scripting;
 
@@ -233,6 +234,19 @@ public static class ActivityTrail
         /// told, or stood down over them. Written only when something differs.
         /// </summary>
         ScheduledPublishReadTheCoursesSettings,
+        /// <summary>
+        /// A remembered timetable named a date that cannot be a class date —
+        /// the file was written by this app before #144, on a PC whose
+        /// regional format uses another calendar — and was set aside, so the
+        /// assistant asks for the timetable again and rewrites it. Windows
+        /// only (`appliesOn: ["windows"]`): only this app ever wrote such a
+        /// file.
+        /// </summary>
+        RememberedTimetableSetAside,
+        SectionAdded,
+        PageSettingsLeftAsTheyWere,
+        ClassCopyNotMade,
+        WordForAUnitRenamed,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -285,6 +299,11 @@ public static class ActivityTrail
         Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
+        Event.RememberedTimetableSetAside => "remembered timetable set aside",
+        Event.SectionAdded => "section added",
+        Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
+        Event.ClassCopyNotMade => "class copy not made",
+        Event.WordForAUnitRenamed => "word for a unit renamed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -312,7 +331,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
         Append(entry);
     }
 
@@ -320,7 +339,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
         Append(entry);
     }
 
@@ -328,9 +347,13 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
         Append(entry);
     }
+
+    /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
+    public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
+        $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
 
     public static void NoteLaunch()
     {

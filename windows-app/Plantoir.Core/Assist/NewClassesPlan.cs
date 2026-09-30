@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -52,7 +54,7 @@ public sealed class NewClassesPlan
                   $"{CourseCode} Section {SectionNumber}, on the {(Classes.Count == 1 ? "day" : "days")} this class actually meets:");
         lines.Add("");
         foreach (var created in Classes)
-            lines.Add($"  {created.Title}  ({created.Date:yyyy-MM-dd} {created.Date.DayOfWeek})");
+            lines.Add($"  {created.Title}  ({DateText.Iso(created.Date)} {created.Date.DayOfWeek})");
 
         if (AlreadyThere.Count > 0)
         {

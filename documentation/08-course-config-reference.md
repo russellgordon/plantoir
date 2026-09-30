@@ -76,7 +76,7 @@ A representative example:
 | `curriculum_folders` | string[] or absent | setup (the manifest's one folder, for a course with nothing recorded), either app's "Curriculum folders" checkboxes, and a rename in Course Settings | build, both apps | The course's curriculum folders in its own order (#128). Each one holding an expectation page gets a coverage map; the FIRST is the primary, whose map keeps the title `Curriculum Coverage`, and every other is `<Folder> Coverage`. Read unioned with the legacy `curriculum_folder` (the list first). ABSENT means none declared: the build maps the one folder the old scan finds (alphabetically first top-level folder mentioning `curriculum` that holds a page) — not additive. A setup re-run keeps a saved list exactly. Contract: `file-formats.json` → `courseConfigKeys`, `shared-rules.json` → `specialNames.curriculumFoldersResolution`; the deep dive is `05-build-pipeline.md` → "The curriculum coverage maps". |
 | `curriculum_folder` | string or null | LEGACY in meaning, still WRITTEN: whenever `curriculum_folders` is written (setup, either app's checkboxes, a rename) it names the list's FIRST (primary) folder | build, both apps | One curriculum folder's name. Still read forever, unioned after `curriculum_folders`, so a folder an older Plantoir wrote down still counts. Written beside the list for the other direction (Russell's ruling on the #128 review): an older Plantoir on a second Mac reads only this key, and without it a primary folder renamed to a name without "curriculum" would leave that Mac publishing no map. A course with only this key keeps it as it is; setup no longer writes it from the manifest over a name a rename had recorded. |
 | `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. **A club (#267) writes the name the teacher chose — `All Meetings` by default — and `setup_course.py` keeps a RECORDED name on a re-run** rather than rebuilding it from the guess, which reads `["Resources", "All Meetings"]` as `Resources` (measured). |
-| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. **Under `class_page_scheme: "numbered"` it is the whole word of a ONE-number name** — a club writes `Week`, so its pages are `Week 3` — reused rather than joined by a second word key, so the key's name under-describes it. A numbered course's word is not renamed afterwards: Course Settings disables Rename… for it. |
+| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — both apps; Windows since 2026-09-30, [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. **Under `class_page_scheme: "numbered"` it is the whole word of a ONE-number name** — a club writes `Week`, so its pages are `Week 3` — reused rather than joined by a second word key, so the key's name under-describes it. A numbered course's word is not renamed afterwards: Course Settings disables Rename… for it. |
 | `class_page_scheme` | string (`unit_day` or `numbered`) | setup (a club only, #267) | build, both apps | The SHAPE of a class page's name: `unit_day` is `<unit_word> 2, Day 3`; `numbered` is `<unit_word> 3`, one number counting meetings. **Absent, empty and unknown all mean `unit_day`**, so a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages — degraded, never corrupting) and nothing is rewritten. Written by the wizard for a club only; every other course's file is byte-identical to before. **Not switchable after creation**, and an existing course — Russell's `CODING` included — can never become numbered from the app. In a numbered course there are NO units: "publish Week 1" acts on one page, "start a new unit" and "add days to a unit" are refused, and make-room keeps the section's date gaps ([10](10-local-ai-assistant.md) → "A numbered course has no units"). |
 | `front_page_heading` | string | setup (a club only, #267) | setup only | The heading a new numbered course's section front pages are created with, above the embed of the newest page: a club writes `Most Recent Meeting`. **Absent means nothing is recorded**: the course's front pages keep whatever heading they have (`Most Recent Class` for a course set up before #267, or whatever it was edited to — CODING's reads `Most Recent Meeting`), and Course Settings shows no row for it (#376) rather than naming a default. Read only when a course is created; the assistant's repointing finds the embed by the class page it names, never by the heading, so it never reads or writes this. Not switchable afterwards; Course Settings shows it locked, when recorded (#376). |
 | `class_noun` | string (`class` or `meeting`) | setup (a club only, #267) | both apps | What the assistant calls one page when it talks to the teacher: a club writes `meeting`. **Absent and unknown mean `class`.** A closed pair, not free text, because the sentences carry articles and plurals. The build never reads it, and it moves no byte of what the assistant's model is shown. Not switchable afterwards; Course Settings shows it locked, when recorded (#376). |
@@ -548,19 +548,27 @@ separately from the reader:
   count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
   on the new date and made a Windows-line-ending page lose its frontmatter
   entirely. The cases are `contracts/course-management.json` →
-  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
-  strict and owes the same change (the `windows` issue from #175).
-  `CourseRestorer`'s
-  is strict on Windows and, since the mac's `PageFrontmatter.block` was
-  loosened for the reason above, lenient on the mac — so a restore reaches
+  `sectionNumbers.addingKeysToAPage`; Windows' `SectionAdder.FrontmatterLines`
+  and `ExtendFrontmatter` made the same change on 2026-09-30 (#282, bundle 2:
+  shared finder, splice by line index, each new line taking the ending of the
+  line it follows, inserted after the last key's whole value), and
+  `SectionAdderContractTests` runs the eight cases as bytes. `CourseRestorer`'s
+  finder was strict on Windows and, since the mac's `PageFrontmatter.block` was
+  loosened for the reason above, lenient on the mac — so a restore reached
   different pages on the two platforms, which is
   [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
-  decided it on 2026-09-19: the restore uses the SHARED finder, on both
-  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
-  and drops each key WITH the lines it owns (below), and Windows owes both in
-  one change (the `windows` issue from #182). The trap to avoid is reading
-  "one fence finder" and making the MAC strict, which puts the second-block bug
-  straight back.
+  decided it on 2026-09-19 (and again 2026-09-25): the restore uses the SHARED
+  finder, on both platforms. The mac's has since #140; since #182 (2026-09-25)
+  it also carries and drops each key WITH the lines it owns (below). Windows
+  took both on 2026-09-30 (#177/#308, bundle 2): `CourseRestorer
+  .FrontmatterBounds` is gone, `SettingPerSectionKeys` walks
+  `PageVisibilityReader.LinesOwnedByKey`, and `SectionRestoreTests` runs
+  `backups.restoringOneSectionsKeys`. One small difference, Windows' on
+  purpose: blank lines before the opening fence are KEPT by Windows' restore,
+  where the mac's `settingPerSectionKeys` starts its rebuilt page at the fence
+  and drops them (harmless to the build; told to the mac). The trap to avoid
+  is reading "one fence finder" and making the MAC strict, which puts the
+  second-block bug straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -699,8 +707,9 @@ separately from the reader:
   measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except the indented-dashes
-  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this on 2026-09-19 — and the indented-dashes shape
+  on 2026-09-30 (#308, bundle 2: `IsFence` for the close, `IsOpeningFence`
+  for the open)** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
@@ -864,9 +873,13 @@ separately from the reader:
     `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three were pre-existing and all three are shared with Windows (which
-  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
-  issue). The first two are not reached by the fixed reader or writer at all
+  All three were pre-existing and all three were shared with Windows, which
+  took #182, #186 and #188 together on 2026-09-30 (#308, bundle 2):
+  `PageVisibilityReader.PlaceForANewTopLevelKey` / `NamesATopLevelKey`, and
+  `SetDraft` / `SetCreated` answer `FrontmatterWriteOutcome.NoRoomForAKey`.
+  **Windows' callers do not yet NAME the declined pages** (the four
+  `pagesWhose…` wording keys stay ledgered on #308): a declined page is left
+  exactly as it was, which is the safe half; the sentence is what is owed. The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
@@ -920,9 +933,12 @@ separately from the reader:
   date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
-  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
-  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
-  #199).
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows
+  matched it on 2026-09-30 (#284, bundle 2): one `PageFrontmatter.ReplaceKeyLine`
+  for `SetTitle`, `SetCreated` and `SectionAdder`'s copy and scaffold, with
+  `LinesUntilOpenValueCloses` (a port of the mac's `OpenValueScanner`) and
+  `ScalarText`; `FileFormatContractTests.TheDateAndTitleWritingCasesAreFollowed`
+  runs all 16 cases as bytes.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a
