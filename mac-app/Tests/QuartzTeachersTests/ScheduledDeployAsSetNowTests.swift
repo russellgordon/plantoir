@@ -354,10 +354,8 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         )
         let problem: String = try XCTUnwrap(refusedOverTheAccount.problem)
         XCTAssertEqual(refusedOverTheAccount.refusedOver, "Cloudflare Pages")
-        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-            course: try course(), sectionNumber: 1, when: refusedOverTheAccount.when,
-            refusal: problem, refusedOver: refusedOverTheAccount.refusedOver
-        )
+        XCTAssertFalse(problem.isEmpty)
+        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: refusedOverTheAccount, course: try course())
         var trail: String = ActivityTrail.store.activityText(includingPrompts: true)
         XCTAssertTrue(trail.contains("refused before anything was written, deploying to Cloudflare Pages: "), trail)
         XCTAssertFalse(trail.contains("deploying to Netlify"), trail)
@@ -367,10 +365,8 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
             cloudflareAccountID: "", inWorkingFolder: workspace
         )
         XCTAssertNil(alreadyPassed.refusedOver, "a time already passed is not about a destination")
-        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(
-            course: try course(), sectionNumber: 1, when: alreadyPassed.when,
-            refusal: try XCTUnwrap(alreadyPassed.problem), refusedOver: alreadyPassed.refusedOver
-        )
+        XCTAssertNotNil(alreadyPassed.problem)
+        ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: alreadyPassed, course: try course())
         trail = ActivityTrail.store.activityText(includingPrompts: true)
         XCTAssertTrue(
             trail.contains("refused before anything was written, deploying to Netlify and Cloudflare Pages: "), trail

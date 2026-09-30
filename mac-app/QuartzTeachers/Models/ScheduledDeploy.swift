@@ -1562,25 +1562,29 @@ enum ScheduledDeploy {
     /// sentence about Cloudflare. A refusal that is not about a destination
     /// (a time already passed, a course kept for reference) names every
     /// destination by kind, which for a course with one is what it always said.
-    static func noteRefusedBeforeAnythingWasWritten(
-        course: Course,
-        sectionNumber: Int,
-        when: Date,
-        refusal: String,
-        refusedOver: String?
-    ) {
+    ///
+    /// Takes the PLAN rather than its parts, so a caller cannot hand over
+    /// the refusal without the destination that caused it (the #396
+    /// implementation review's S1): the refusal, the moment, the section and
+    /// the cause are all read from the one value. A plan with no refusal
+    /// writes nothing. `course` is the copy the plan was made from — the one
+    /// read at the act.
+    static func noteRefusedBeforeAnythingWasWritten(plan: ScheduledDeployPlan, course: Course) {
+        guard let refusal = plan.problem else {
+            return
+        }
         var destination: String = MultiDestinationDeployRunner.joinedWithAnd(
             SettingsSaveNotice.destinationKinds(of: course.configuration)
         )
-        if let refusedOver {
+        if let refusedOver = plan.refusedOver {
             destination = refusedOver
         }
         ActivityTrail.note(
             .scheduledDeployCouldNotBeSet,
-            "could not set a scheduled deploy for \(dayAndTimeText(when)): refused before anything was written, "
+            "could not set a scheduled deploy for \(dayAndTimeText(plan.when)): refused before anything was written, "
                 + "deploying to \(destination): \(firstSentence(of: refusal))",
             course: course.code,
-            section: sectionNumber
+            section: plan.sectionNumber
         )
     }
 
@@ -3274,7 +3278,7 @@ struct ScheduledDeployPlan {
         when: Date,
         destinations: [String],
         problem: String?,
-        refusedOver: String? = nil,
+        refusedOver: String?,
         replacing: Date? = nil,
         locale: Locale = Locale.current
     ) {

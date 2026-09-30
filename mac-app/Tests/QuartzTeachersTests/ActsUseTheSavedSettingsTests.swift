@@ -236,6 +236,25 @@ final class ActsUseTheSavedSettingsTests: XCTestCase {
         XCTAssertEqual(allowed.plan?.destinations, [allowing.folder.path])
     }
 
+    /// #396, the implementation review's S1, through the sheet's own call
+    /// site: a Netlify + Cloudflare Pages course with no Account ID is refused
+    /// at the press, and the trail names Cloudflare Pages — the destination
+    /// that caused it — not the primary and not every destination.
+    func testARefusalAtThePressNamesTheDestinationThatCausedIt() throws {
+        let world: World = try makeWorld(
+            saved: ["deploy_target": "netlify", "additional_deploy_targets": [["type": "cloudflare_pages"]]],
+            deployedBefore: ["netlify", "cloudflare_pages"]
+        )
+        let refusal: String? = ScheduleDeploySheet.scheduleFromTheSavedSettings(
+            windowCourse: world.window, sectionNumber: 1, when: later, workspaceURL: world.root,
+            cloudflareAccountID: "", anyCopyUnsaved: false, runner: FakeLaunchControl()
+        )
+        XCTAssertNotNil(refusal)
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: false)
+        XCTAssertTrue(trail.contains("refused before anything was written, deploying to Cloudflare Pages: "), trail)
+        XCTAssertFalse(trail.contains("deploying to Netlify"), trail)
+    }
+
     /// A Save can land between drawing the sheet and pressing Schedule: what
     /// is written is what the file says at the PRESS.
     func testSchedulingAtThePressReadsTheFileAgain() throws {
@@ -465,26 +484,11 @@ final class ActsUseTheSavedSettingsTests: XCTestCase {
     /// `{folder}` replaced wherever it appears — at the top level, or inside
     /// `additional_deploy_targets`' entries (#396's case), where a literal
     /// "{folder}" would be refused as a folder that does not exist and the
-    /// case would silently test a refusal.
+    /// case would silently test a refusal. One walk for both harnesses:
+    /// `SharedRulesContractTests.withFolder`, which also replaces it inside a
+    /// longer string.
     private func substituting(_ value: Any, folder: URL) -> Any {
-        if let text = value as? String, text == "{folder}" {
-            return folder.path
-        }
-        if let list = value as? [Any] {
-            var substituted: [Any] = []
-            for item in list {
-                substituted.append(substituting(item, folder: folder))
-            }
-            return substituted
-        }
-        if let entry = value as? [String: Any] {
-            var substituted: [String: Any] = [:]
-            for (key, item) in entry {
-                substituted[key] = substituting(item, folder: folder)
-            }
-            return substituted
-        }
-        return value
+        return SharedRulesContractTests.withFolder(value, folder.path)
     }
 
     /// Destination types as the schedule sheet names them: "Netlify",
