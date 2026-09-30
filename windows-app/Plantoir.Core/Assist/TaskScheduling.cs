@@ -367,7 +367,7 @@ public static class TaskScheduling
                 "    # ANSI and mangle any non-ASCII inside a sentence.",
                 "    # PLANTOIR_DATED: too (#279): the pages this build rewrote with their",
                 "    # class's date, which the app names on the trail when it reads this.",
-                "    $markers = @(Select-String -LiteralPath $scanned -SimpleMatch -Pattern 'PLANTOIR_HEALTH:','PLANTOIR_DATED:' -Encoding UTF8 | ForEach-Object { $_.Line })",
+                "    $markers = @(Select-String -LiteralPath $scanned -SimpleMatch 'PLANTOIR_HEALTH:','PLANTOIR_DATED:' -Encoding UTF8 | ForEach-Object { $_.Line })",
                 "    if ($markers.Count -gt 0) {",
                 "      Set-Content -LiteralPath $healthFile -Value $markers -Encoding utf8",
                 "    } else {",
