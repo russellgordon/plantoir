@@ -33,7 +33,12 @@ public static class Program
         int run = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.RunArgument);
         if (run >= 0 && run + 1 < args.Length)
         {
-            var ending = Plantoir.Core.Assist.ScheduledRun.Execute(args[run + 1]);
+            // The task's own name; its job is found from it. A path is taken as is.
+            string named = args[run + 1];
+            string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase)
+                ? named
+                : Plantoir.Core.Assist.TaskScheduling.JobPath(named);
+            var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job);
             Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
             return;
         }

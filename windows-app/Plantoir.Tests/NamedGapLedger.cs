@@ -279,8 +279,6 @@ internal static class NamedGapLedger
             "sectionIsBeingDeployed"),
         Owed(AssistWordingKeys, 391, "a windowless deploy or rebuild does not refuse at a question yet (mac #378)",
             "deployNeedsAnAnswer", "deployNeedsAnAnswerAt", "previewBuildNeedsAnAnswer"),
-        Owed(AssistWordingKeys, 400, "this app says a partial deploy in its own multi-destination words (DeployPartiallySucceeded); the sentence comes from mac #396, whose Windows twin is #400",
-            "deployWentOutTo"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
             "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
             "pagesWhoseSettingsCannotBeAddedToNamingSeveral"),

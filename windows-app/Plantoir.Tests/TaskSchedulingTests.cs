@@ -23,15 +23,15 @@ public class TaskSchedulingTests
     {
         string command = TaskScheduling.TaskRunCommand(
             @"C:\Users\lenov\AppData\Local\Programs\Plantoir\Plantoir.exe",
-            @"C:\Users\lenov\AppData\Local\Plantoir\scheduled\test.job.json");
+            "Plantoir deploy ICS3U section 1 abcd1234");
 
         // The literal two-character sequence backslash-then-quote must never
-        // appear — that is exactly the bug. Real quote characters round each
-        // path instead.
+        // appear — that is exactly the bug. Real quote characters round the
+        // program and the task's name instead.
         Assert.DoesNotContain("\\\"", command);
         Assert.Equal(
             "\"C:\\Users\\lenov\\AppData\\Local\\Programs\\Plantoir\\Plantoir.exe\" --run-scheduled-deploy " +
-            "\"C:\\Users\\lenov\\AppData\\Local\\Plantoir\\scheduled\\test.job.json\"",
+            "\"Plantoir deploy ICS3U section 1 abcd1234\"",
             command);
     }
 
@@ -40,11 +40,13 @@ public class TaskSchedulingTests
     {
         // The case that actually broke — a path with spaces in it.
         string command = TaskScheduling.TaskRunCommand(
-            @"C:\Program Files\Plantoir\Plantoir.exe", @"C:\Users\a teacher\scheduled\x.job.json");
+            @"C:\Program Files\Plantoir\Plantoir.exe", "Plantoir deploy MCV4U section 2 0123abcd");
 
         Assert.DoesNotContain("\\\"", command);
         Assert.StartsWith("\"C:\\Program Files\\Plantoir\\Plantoir.exe\" --run-scheduled-deploy \"", command);
-        Assert.EndsWith("x.job.json\"", command);
+        Assert.EndsWith("section 2 0123abcd\"", command);
+        // schtasks refuses a /TR over 261 characters; the job's path is not carried.
+        Assert.True(command.Length < 120, $"{command.Length} characters");
     }
 
     [Fact]
