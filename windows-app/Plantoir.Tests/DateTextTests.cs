@@ -343,8 +343,8 @@ public class DateTextTests
     [
         ("TaskScheduling.cs", "when.ToString(format)",
             "schtasks.exe accepts a date only in the machine's own short format; DateFormats is walked until it takes one."),
-        ("TaskScheduling.cs", "DateTime.TryParse(value, out var when)",
-            "parses schtasks' Next Run Time row, which Windows wrote in the machine's culture."),
+        ("TaskScheduling.cs", "DateTime.TryParse(fields[1], out var when)",
+            "parses schtasks' Next Run Time column (/Query /FO CSV), which Windows wrote in the machine's culture."),
         // The three below are fixed on origin/issue/159-settle-the-day-once
         // (ScheduledDeploy.ReadTheMoment, one reader). They are excused here so
         // that this test does not change lines that branch also changes; the
