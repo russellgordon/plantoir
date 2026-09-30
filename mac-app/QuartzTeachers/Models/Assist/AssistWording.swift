@@ -290,6 +290,20 @@ nonisolated enum AssistWording {
              + "well would spoil both. Try again once that has finished."
     }
 
+    /// Said when a preview of a section was asked for while THIS copy of
+    /// Plantoir is deploying that same section — from any of its windows, or
+    /// by the assistant with no window open (GitHub #381, Russell's decision
+    /// 4 on #378). Shown under "Cannot Preview Yet".
+    ///
+    /// Names the SECTION, unlike `courseIsBeingBuiltElsewhere`, because the
+    /// in-app publish record it comes from knows the section, and the rule
+    /// is about the section. "Deployed" is the word on the button that
+    /// started it. `shared-rules.json` → `previewWhileItsSectionDeploys`.
+    static func sectionIsBeingDeployed(course: String, section: String) -> String {
+        return "\(course) Section \(section) is being deployed right now. "
+             + "Preview it once the deploy has finished."
+    }
+
     // MARK: - Previewing
 
     /// A section window is open, so its own Preview is what runs.
