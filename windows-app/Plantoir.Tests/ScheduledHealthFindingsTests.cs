@@ -41,7 +41,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         $"\"detail\": \"Some detail.\", \"fixable\": true, \"course\": \"{course}\", \"section\": {section}}}";
 
     private void WriteRecord(string course, int section, params string[] lines) =>
-        File.WriteAllLines(Path.Combine(_dir, TaskScheduling.HealthRecordName(course, section)), lines);
+        File.WriteAllLines(Path.Combine(_dir, TaskScheduling.OldHealthRecordName(course, section)), lines);
 
     // ---- Reading it back -------------------------------------------------
 
@@ -87,7 +87,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         WriteRecord("ICS3U", 1, "this is not a finding at all");
 
         Assert.Empty(ScheduledHealthFindings.TakeFrom(_dir, "ICS3U", 1));
-        Assert.False(File.Exists(Path.Combine(_dir, TaskScheduling.HealthRecordName("ICS3U", 1))));
+        Assert.False(File.Exists(Path.Combine(_dir, TaskScheduling.OldHealthRecordName("ICS3U", 1))));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         // A trail that dated an overnight problem to whenever somebody opened
         // the app would file it under the wrong night — and this line is the
         // ONLY record of it, since the run happened with the app closed.
-        string path = Path.Combine(_dir, TaskScheduling.HealthRecordName("ICS3U", 1));
+        string path = Path.Combine(_dir, TaskScheduling.OldHealthRecordName("ICS3U", 1));
         File.WriteAllLines(path, new[] { MarkerLine("mediaFolderMissing") });
         var lastNight = DateTime.Now.AddHours(-9);
         File.SetLastWriteTime(path, lastNight);
@@ -114,8 +114,8 @@ public class ScheduledHealthFindingsTests : IDisposable
         // The generated wrapper and this reader both call HealthRecordName.
         // A mismatch would fail in the quietest way available: written
         // faithfully every night, read never.
-        Assert.EndsWith(TaskScheduling.HealthRecordName("ICS3U", 3),
-                        ScheduledHealthFindings.SentinelPath("ICS3U", 3));
+        Assert.EndsWith(TaskScheduling.HealthRecordName("ICS3U", 3, _dir),
+                        ScheduledHealthFindings.SentinelPath("ICS3U", 3, _dir));
     }
 
     // ---- The wrapper's own ordering --------------------------------------
@@ -300,7 +300,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         try
         {
             string log = Path.Combine(folder, "build.log");
-            string record = Path.Combine(folder, TaskScheduling.HealthRecordName("ICS4U", 1));
+            string record = Path.Combine(folder, TaskScheduling.OldHealthRecordName("ICS4U", 1));
             File.WriteAllLines(log, new[]
             {
                 "Building step 3 of 7",
