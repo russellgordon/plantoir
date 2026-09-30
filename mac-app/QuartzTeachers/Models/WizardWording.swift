@@ -164,7 +164,8 @@ enum WizardWording {
         nameLabel: "Course name",
         sectionMarkerCaption: "e.g. “S1” appears beside the course code",
         gradeCaption: "e.g. “Grade 12” before the course name",
-        structureCaption: "Defaults are fine for most courses"
+        structureCaption: "Defaults are fine for most courses",
+        defaultSiteName: "Course Website"
     )
 
     /// The same words for a club (#368) — `wizard.clubToggle`.
@@ -177,7 +178,8 @@ enum WizardWording {
         nameLabel: "Club name",
         sectionMarkerCaption: "e.g. “S1” appears beside the club code",
         gradeCaption: "e.g. “Grade 12” before the club name",
-        structureCaption: "Defaults are fine for most clubs"
+        structureCaption: "Defaults are fine for most clubs",
+        defaultSiteName: "Club Website"
     )
 
     // MARK: - Functions
@@ -267,4 +269,7 @@ nonisolated struct WizardPanelWords: Equatable {
     let sectionMarkerCaption: String
     let gradeCaption: String
     let structureCaption: String
+
+    /// The site's name when the name field is left blank.
+    let defaultSiteName: String
 }
