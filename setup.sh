@@ -68,10 +68,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h) print_help; exit 0 ;;
     --image)
-      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value" >&2; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "❌ --image requires a value" >&2; exit 1; fi  # never shown to a teacher: reached only with --image or --context, which the app never passes
       OVERRIDE_IMAGE="$2"; shift 2 ;;
     --context)
-      if [[ $# -lt 2 ]]; then echo "❌ --context requires a value (e.g., desktop-linux, default, colima)" >&2; exit 1; fi
+      if [[ $# -lt 2 ]]; then echo "❌ --context requires a value (e.g., desktop-linux, default, colima)" >&2; exit 1; fi  # never shown to a teacher: reached only with --image or --context, which the app never passes
       DOCKER_CONTEXT_OVERRIDE="$2"; shift 2 ;;
     --prepare-builder) PREPARE_BUILDER=1; shift ;;
     --builder-tag) BUILDER_TAG_ONLY=1; shift ;;
@@ -396,7 +396,7 @@ resolve_build_context() {
   if [[ -f "./Dockerfile" ]]; then
     echo "."
   elif [[ -f "./.toolchain/Dockerfile" ]]; then
-    echo "./.toolchain"
+    echo "./.toolchain"  # never shown to a teacher: the answer $(resolve_build_context) captures
   else
     return 1
   fi
@@ -431,7 +431,7 @@ if [[ -n "$OVERRIDE_IMAGE" ]]; then
   IMAGE="$OVERRIDE_IMAGE"
 else
   BUILD_CONTEXT=$(resolve_build_context) || {
-    echo "❌ This folder is missing the toolchain's build recipe."
+    echo "❌ This folder is missing the recipe for its website builder."
     echo "   Open the folder in the app once to refresh it, or run from a"
     echo "   copy of the repository."
     exit 1
@@ -736,7 +736,7 @@ _helper_pins() {
 
 # The same versions as one word, for the line the app reads.
 _helper_pins_word() {
-  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"
+  printf 'colima=%s,lima=%s,docker=%s,buildx=%s\n' "$COLIMA_VERSION" "$LIMA_VERSION" "$DOCKER_CLI_VERSION" "$BUILDX_VERSION"  # never shown to a teacher: a field of a PLANTOIR_ line the app reads
 }
 
 _helper_arch() {
@@ -1256,12 +1256,11 @@ ensure_container_runtime
 # ====================================================================
 
 
-CURRENT_CONTEXT=$(docker context show 2>/dev/null || echo "unknown")
-HOST_ARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo "unknown")
-HOST_OS=$(docker info --format '{{.OSType}}' 2>/dev/null || echo "unknown")
-echo "🔌 Docker context: ${CURRENT_CONTEXT}"
-echo "🧭 Host detected by Docker: ${HOST_OS}/${HOST_ARCH}"
-echo "🖼️  Using image: ${IMAGE}"
+# Which website builder this run uses, by the part of its name that changes
+# with the recipe — worth having in a problem report. Until #382 this also
+# printed the engine's context and the platform it reported, naming the
+# machinery to a teacher (rule 1) at the cost of two more engine calls.
+echo "🧰 Website builder version: ${IMAGE##*:}"
 
 # -------------------- Folders & permissions --------------------
 # Not in --prepare-builder mode, which makes no courses folder (bundle B).
@@ -1352,8 +1351,8 @@ build_image_if_missing() {
     return 0
   fi
   if [[ -z "$BUILD_CONTEXT" ]]; then
-    echo "❌ Image '$IMAGE' is not on this machine."
-    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."
+    echo "❌ Image '$IMAGE' is not on this machine."  # never shown to a teacher: reached only with --image, which the app never passes
+    echo "   Build it first, e.g.: docker buildx build --load -t $IMAGE ."  # never shown to a teacher: reached only with --image, which the app never passes
     exit 1
   fi
   # The size is said only when there is no earlier website builder on this
@@ -2587,7 +2586,7 @@ retire_legacy_container() {
 
 run_container_with_mount() {
   retire_legacy_container
-  echo "🔗 Binding host courses to container: $HOST_COURSES ➜ /teaching/courses"
+  echo "🔗 Letting the website builder read and save your courses: $HOST_COURSES"
   # The builds folder is mounted at its OWN absolute path, unconditionally,
   # so that courses/<CODE>/.merged_output — a symlink to a path under
   # $HOME — resolves to the same place inside the container as it does
@@ -2638,6 +2637,9 @@ DESIRED_IMAGE_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null 
 RUNNING_IMAGE_ID=$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
 
 # -------------------- Create/start container (mount-aware, with refresh-on-new-courses) --------------------
+# The same line, and so the same progress marker, as preview.sh and
+# deploy.sh print here (TaskMilestones: the example course watches for it).
+echo "🚀 Getting this folder's website builder ready…"
 clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists. Check its current /teaching/courses mount.
@@ -2678,11 +2680,11 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
           echo "🛑 The website builder could not save into 'courses/', so Plantoir is setting this folder up again…"
           remake_the_workspace
         else
-          echo "✅ Container $CONTAINER_NAME is already running with correct, writable mount."
+          echo "✅ This folder's website builder is already running, and can save into 'courses/'."
         fi
       fi
     else
-      echo "▶️  Starting existing container $CONTAINER_NAME..."
+      echo "▶️  Starting this folder's website builder…"
       start_the_existing_workspace
       # After start, probe writability just in case
       if ! probe_container_write; then
@@ -2692,7 +2694,7 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
     fi
   fi
 else
-  echo "🆕 Creating a new container named $CONTAINER_NAME (image: $IMAGE)…"
+  echo "🆕 Setting up a website builder for this folder…"
   run_container_with_mount
 fi
 
@@ -2713,7 +2715,7 @@ if ((${#PASSTHRU_ARGS[@]})) && printf '%s\n' "${PASSTHRU_ARGS[@]}" | grep -q -- 
 fi
 
 # -------------------- Run setup inside container --------------------
-echo "📚 Running setup_course.py inside the Docker container..."
+echo "📚 Opening course setup…"
 # Ensure the container knows the host OS (mac). Users never need to pass this.
 # If someone did pass --host-os already, strip it and override to mac.
 if ((${#PASSTHRU_ARGS[@]})); then

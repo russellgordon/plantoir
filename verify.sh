@@ -384,6 +384,13 @@ else
   cat /tmp/verify_preview_while_deploying_test.log
 fi
 
+if (cd scripts && python3 test_launcher_words.py) >/tmp/verify_launcher_words_test.log 2>&1; then
+  pass "Launchers: no line a teacher reads says container, Docker or image, and every bar can reach the step it watches a launcher for (scripts/test_launcher_words.py, #382)"
+else
+  fail "Launchers: no line a teacher reads says container, Docker or image, and every bar can reach the step it watches a launcher for (scripts/test_launcher_words.py, #382)"
+  cat /tmp/verify_launcher_words_test.log
+fi
+
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else

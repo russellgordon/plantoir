@@ -68,12 +68,12 @@ final class PreviewStopperTests: XCTestCase {
 
     /// The two silences are different facts and must stay different.
     ///
-    /// "Nothing to stop — no container is running for this folder" means the
+    /// "Nothing to stop — this folder's website builder isn't running" means the
     /// sweep never ran; "Stopped 0" means it ran and found nothing. A line
     /// claiming zero for the first would be a line that is not true.
     func testNothingIsRecordedWhenTheLauncherDidNotSweep() {
         XCTAssertNil(PreviewStopper.countReclaimed(
-            in: "✅ Nothing to stop — no container is running for this folder.\n"))
+            in: "✅ Nothing to stop — this folder's website builder isn't running.\n"))
         XCTAssertNil(PreviewStopper.countReclaimed(in: ""))
         XCTAssertNil(PreviewStopper.countReclaimed(
             in: "⚠️ Cannot stop preview processes: the build recipe is incomplete.\n"))
@@ -97,7 +97,7 @@ final class PreviewStopperTests: XCTestCase {
             "✅ Stopped 1 process(es).\n", courseCode: "ICS3U", sectionNumber: 2
         )
         PreviewStopper.noteWhatWasReclaimed(
-            "✅ Nothing to stop — no container is running for this folder.\n",
+            "✅ Nothing to stop — this folder's website builder isn't running.\n",
             courseCode: "ICS3U", sectionNumber: 2
         )
 

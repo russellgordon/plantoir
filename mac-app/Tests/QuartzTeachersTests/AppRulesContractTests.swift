@@ -260,8 +260,9 @@ final class AppRulesContractTests: XCTestCase {
     /// the three copies are still the SAME text — a fix made in one copy only
     /// is how the first-run lines drift apart.
     ///
-    /// The rest of each launcher still names the machinery in places; that is
-    /// a separate, larger piece, and the whole-file scan belongs to it.
+    /// The rest of each launcher is scanned by `scripts/test_launcher_words.py`
+    /// (#382), which both platforms' suites run; this test stays for the
+    /// block's three copies being the same text, which that one does not ask.
     func testTheFirstRunLinesNameNoMachinery() throws {
         let repository: URL = AppRulesContractTests.repositoryRoot()
         let forbiddenWords: [String] = [
