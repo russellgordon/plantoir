@@ -513,6 +513,9 @@ public sealed partial class AssistWindow : Window
             // answer is read off a detail pane, and another folder's pane
             // answers about another folder's section.
             SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_course.Code, _section) == true,
+            // Same process as every window's Deploy, so the in-memory publish
+            // record is the truth about this section being deployed (#386).
+            SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(_folder, _course.Code, _section),
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>

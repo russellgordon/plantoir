@@ -1368,6 +1368,36 @@ public class AssistWorkspaceTests : IDisposable
         Assert.Equal(new[] { "preview", "preview", "deploy" }, _launcher.Runs.Select(r => r.Launcher));
     }
 
+    /// <summary>
+    /// #391 (mac #378): nobody is at a window to answer a question, so every
+    /// launcher this headless path runs is --non-interactive, and a question
+    /// (exit 3) is named rather than reported as a failed deploy.
+    /// </summary>
+    [Fact]
+    public async Task AWindowlessDeployAndRebuildRefuseAtAQuestion()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        await workspace.Deploy("ICS3U", 1);
+        Assert.All(_launcher.Runs, run => Assert.Contains("--non-interactive", run.Arguments));
+
+        _launcher.Runs.Clear();
+        _launcher.QuestionOn = "deploy";
+        var destinationAsked = await workspace.Deploy("ICS3U", 1);
+        Assert.False(destinationAsked.Succeeded);
+        Assert.Equal(AssistWording.DeployNeedsAnAnswer("ICS3U", "1"), destinationAsked.Message);
+
+        _launcher.QuestionOn = "preview";
+        var buildAsked = await workspace.Deploy("ICS3U", 1);
+        Assert.Equal(AssistWording.DeployNeedsAnAnswer("ICS3U", "1"), buildAsked.Message);
+        Assert.DoesNotContain(_launcher.Runs.Skip(2), run => run.Launcher == "deploy");   // the build leg asked: nothing went out
+
+        var rebuildAsked = await workspace.RebuildPreview("ICS3U", 1);
+        Assert.False(rebuildAsked.Succeeded);
+        Assert.Equal(AssistWording.PreviewBuildNeedsAnAnswer("ICS3U", "1"), rebuildAsked.Message);
+    }
+
     [Fact]
     public async Task AFirstEverDeployIsSentBackToPlantoirForTheSiteName()
     {
@@ -1403,7 +1433,7 @@ public class AssistWorkspaceTests : IDisposable
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
 
         Assert.Equal(new[] { "preview" }, _launcher.Runs.Select(r => r.Launcher));
-        Assert.Equal(new[] { "ICS3U", "1", "--build-only" }, _launcher.Runs[0].Arguments);
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" }, _launcher.Runs[0].Arguments);   // #391: nobody can answer a question here
     }
 
     [Fact]
@@ -1845,11 +1875,19 @@ internal sealed class FakeLauncher : ILauncherRunner
     /// <summary>Which launcher, if any, should report failure.</summary>
     public string? FailOn { get; set; }
 
+    /// <summary>
+    /// Which launcher, if any, stops at a question nobody can answer — exit 3
+    /// under --non-interactive (#391).
+    /// </summary>
+    public string? QuestionOn { get; set; }
+
     Task<LaunchOutcome> ILauncherRunner.Run(string launcher, IReadOnlyList<string> arguments,
                                             string workingFolder, IProgress<string>? progress,
                                             CancellationToken cancellation)
     {
         Runs.Add(new Run(launcher, arguments.ToArray()));
+        if (launcher == QuestionOn)
+            return Task.FromResult(new LaunchOutcome(false, "It asked a question.", null, LaunchOutcome.NeedsAnAnswerExitCode));
         return Task.FromResult(launcher == FailOn
             ? new LaunchOutcome(false, "It went wrong.")
             : new LaunchOutcome(true, "Done."));

@@ -466,8 +466,19 @@ if (-not $builtFound) {
 # Each section lands in its own subfolder so sections never overwrite
 # one another. Netlify is not involved.
 if ($TO_FOLDER) {
-  $targetDir = Join-Path -Path ($TO_FOLDER.TrimEnd('\','/')) -ChildPath ("section{0}" -f $SECTION_NUM)
-  New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  # Resolved ONCE, against THIS working folder, before anything uses it
+  # (#304 / mac #227). The app refuses a partial path outright; a command
+  # line can still hand one over, and one-argument GetFullPath (like robocopy,
+  # a native program) resolves against the PROCESS directory, which
+  # Set-Location does not change - so a relative path could be created in one
+  # folder and copied into another. The two-argument GetFullPath does not
+  # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
+  $folderAsked = $TO_FOLDER.Trim()
+  if (-not [IO.Path]::IsPathRooted($folderAsked)) { $folderAsked = Join-Path -Path $ScriptDir -ChildPath $folderAsked }
+  $folderAsked = [IO.Path]::GetFullPath($folderAsked)
+  $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
+  # Not New-Item -Path, which reads [ and ] in a folder name as wildcards.
+  $null = [IO.Directory]::CreateDirectory($targetDir)
   # A PREVIEW build must never reach a published site. Serve mode bakes a
   # live-reload client into every page, and on a published site that script
   # makes a student's browser ask permission to access other apps and
@@ -549,7 +560,12 @@ if ($TO_FOLDER) {
   # below 8 all mean success.
   robocopy $PUBLIC_DIR_HOST $targetDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
   if ($LASTEXITCODE -ge 8) {
-    Write-Host ("Publishing to the folder failed (robocopy exit {0})." -f $LASTEXITCODE)
+    # deploy.sh's own words for the same failure (#304), so the app's one
+    # explanation lifts both; the copy's number stays for whoever reads on.
+    $copyExit = $LASTEXITCODE
+    Write-Host ("{0} Not every page could be copied into the publishing folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
+    Write-Host ("   Folder: {0}" -f $targetDir)
+    Write-Host ("   (copy error {0})" -f $copyExit)
     exit 1
   }
   $global:LASTEXITCODE = 0

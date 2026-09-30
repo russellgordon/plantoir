@@ -92,6 +92,12 @@ foreach ($case in @($ports.hostBlockCases)) {
     $want = $case.expect
     Report 'hostBlockCases' $case.name (("$got") -eq ("$want")) "expected '$want', got '$got'"
 }
+# The sentence, word for word, as preview.ps1 prints it (the proposed
+# Windows line, whenNoBlockIsFree.sentenceOnWindows).
+$previewSource = Get-Content -LiteralPath (Join-Path $repo 'preview.ps1') -Raw -Encoding UTF8
+foreach ($line in @($ports.whenNoBlockIsFree.sentenceOnWindows)) {
+    Report 'whenNoBlockIsFree' $line ($previewSource.Contains('Write-Host "' + $line + '"')) 'preview.ps1 does not print this line word for word'
+}
 # The websocket half of a block spoils it too.
 $ws = New-Object 'System.Collections.Generic.HashSet[int]'; $null = $ws.Add(9081)
 Report 'hostBlockCases' 'a websocket port alone spoils its block (Windows)' ((Find-FreePreviewPort -From 8081 -Listening $ws) -eq 8091) 'expected 8091'

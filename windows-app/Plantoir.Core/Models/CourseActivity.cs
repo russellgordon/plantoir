@@ -49,6 +49,21 @@ public static class CourseActivity
     }
 
     /// <summary>
+    /// Whether THIS copy of the app is deploying exactly this section — the
+    /// window's own Deploy or another window's (#386 / mac #381,
+    /// <c>shared-rules.json → previewWhileItsSectionDeploys</c>, layer
+    /// <c>window</c>). The SECTION, not the course: section 1 may still be
+    /// previewed while section 2 deploys from the same app. Another program's
+    /// deploy is the work leases' to refuse, course-wide.
+    /// </summary>
+    public static bool IsPublishingSection(string folderPath, string courseCode, int sectionNumber)
+    {
+        lock (_gate)
+            return _publishes.Any(p => p.FolderPath == folderPath && p.CourseCode == courseCode &&
+                                       p.SectionNumber == sectionNumber);
+    }
+
+    /// <summary>
     /// True when an assistant is working on this course in another process.
     /// Unlike previews and publishes this is read from disk, because the MCP
     /// server has its own memory and neither side can see the other's.

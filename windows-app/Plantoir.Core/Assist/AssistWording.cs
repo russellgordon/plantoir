@@ -38,6 +38,36 @@ public static class AssistWording
     public static string Deployed(string course, string section) =>
         $"{course} Section {section} is deployed. Students can reach it now.";
 
+    // ---- A windowless deploy or rebuild that met a question (#391 / mac #378)
+    // The launchers run --non-interactive with nobody at a window, so a
+    // question (a site name, the surname, a token) is refused with exit 3
+    // rather than waiting for ever on a terminal nobody reads.
+
+    public static string DeployNeedsAnAnswer(string course, string section) =>
+        $"{course} Section {section} needs one answer before it can be deployed from here, so nothing was sent to " +
+        "students. Deploy it once from its window in Plantoir, where the question can be answered; after that it can " +
+        "be deployed from here.";
+
+    public static string DeployNeedsAnAnswerAt(string course, string section, string destinations) =>
+        $"{course} Section {section} was not deployed to {destinations}: it needs one answer there that can only be " +
+        "given from its window in Plantoir. Deploy it once from there; after that it can be deployed from here.";
+
+    /// <summary>
+    /// wording.deployWentOutTo, word for word. INTERNAL on purpose: the public
+    /// member of that name is #400's to add (it replaces this app's own
+    /// multi-destination sentences), and NamedGapLedger holds the key open
+    /// against #400 until then.
+    /// </summary>
+    internal static string WentOutTo(string destinations) => $"It did go out to {destinations}.";
+
+    public static string PreviewBuildNeedsAnAnswer(string course, string section) =>
+        $"The preview for {course} Section {section} needs one answer before it can be built from here. Build it " +
+        "once from its window in Plantoir, where the question can be answered.";
+
+    /// <summary>#386 / mac #381: a preview of a section this app is deploying.</summary>
+    public static string SectionIsBeingDeployed(string course, string section) =>
+        $"{course} Section {section} is being deployed right now. Preview it once the deploy has finished.";
+
     public static string CouldNotBuildBeforeDeploying(string course, string section) =>
         $"{course} Section {section} could not be built, so nothing was sent to students. {WhereTheOutputIs}";
 

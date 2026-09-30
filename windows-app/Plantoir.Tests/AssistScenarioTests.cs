@@ -130,6 +130,8 @@ public class AssistScenarioTests : IDisposable
         bool sectionWindowOpen = given?["sectionWindowOpen"]?.GetValue<bool>() ?? false;
         bool sectionBusy = given?["sectionBusy"]?.GetValue<bool>() ?? false;
         string? pending = given?["pending"]?.ToString();
+        // #391: the launcher refuses a question with exit 3 under --non-interactive.
+        if (given?["theDeployMeetsAQuestion"]?.GetValue<bool>() == true) _launcher.QuestionOn = "deploy";
 
         SetUpWhatThisCaseNeeds(when, pending);
 

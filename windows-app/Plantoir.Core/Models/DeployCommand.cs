@@ -68,7 +68,9 @@ public static class DeployCommand
         if (destination.Type == "local_folder")
         {
             args.Add("--to-folder");
-            args.Add(destination.Path);
+            // TRIMMED, the way DeployFolderProblem checked it (#304): a
+            // trailing space names another folder.
+            args.Add(destination.Path.Trim());
             return args;
         }
 

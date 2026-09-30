@@ -1233,8 +1233,14 @@ public sealed class AssistWorkspace
 
         progress?.Report($"Building Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
+        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
+        if (build.NeededAnAnswer)
+            // The build leg's question is the deploy's, not a destination's:
+            // no destination was reached (the #132 lesson - keep the legs apart).
+            return new AssistResult(false,
+                Models.SiteHealthFinding.Appending(
+                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
         if (!build.Succeeded)
             return new AssistResult(false,
                 // What the build said about the folders belongs HERE most of
@@ -1265,12 +1271,38 @@ public sealed class AssistWorkspace
         // in this environment. If this drifts from RunAsync's own rules
         // again, that is the trade being made.
         var outcomeLegs = new List<(Models.CourseConfiguration.DeployDestination Destination, bool Succeeded)>();
+        var askedAt = new List<Models.CourseConfiguration.DeployDestination>();
         foreach (var destination in destinations)
         {
-            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination);
+            // unattended: --non-interactive, so a question refuses with exit 3
+            // instead of waiting for ever on a terminal nobody reads (#391).
+            var arguments = Models.DeployCommand.Arguments(course.Code, section, destination, unattended: true);
             progress?.Report($"Deploying to {Models.DeployCommand.DestinationDescription(destination)}…");
             var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
             outcomeLegs.Add((destination, deployed.Succeeded));
+            if (deployed.NeededAnAnswer) askedAt.Add(destination);
+        }
+
+        // A destination that stopped at a question is named, and so is where
+        // it DID go out (#391: wording.deployNeedsAnAnswer for one destination,
+        // deployNeedsAnAnswerAt + deployWentOutTo for several).
+        if (askedAt.Count > 0)
+        {
+            string answerMessage;
+            if (destinations.Count == 1)
+            {
+                answerMessage = AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString());
+            }
+            else
+            {
+                string Names(IEnumerable<Models.CourseConfiguration.DeployDestination> legs) =>
+                    string.Join(" and ", legs.Select(Models.DeployCommand.DestinationDescription));
+                answerMessage = AssistWording.DeployNeedsAnAnswerAt(course.Code, section.ToString(), Names(askedAt));
+                var wentOut = outcomeLegs.Where(leg => leg.Succeeded).Select(leg => leg.Destination).ToList();
+                if (wentOut.Count > 0) answerMessage += " " + AssistWording.WentOutTo(Names(wentOut));
+            }
+            return new AssistResult(outcomeLegs.Any(leg => leg.Succeeded),
+                Models.SiteHealthFinding.Appending(answerMessage, build.Findings), null);
         }
 
         bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
@@ -1296,8 +1328,12 @@ public sealed class AssistWorkspace
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
+        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
+        if (build.NeededAnAnswer)
+            return new AssistResult(false,
+                Models.SiteHealthFinding.Appending(
+                    AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
         return build.Succeeded
             ? new AssistResult(true,
                 Models.SiteHealthFinding.Appending(
@@ -1432,7 +1468,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
+        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
@@ -1637,7 +1673,7 @@ public sealed class AssistWorkspace
         RefuseIfPlantoirIsBuilding(course);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         using var claim = ClaimTheBuild(course);
-        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
+        var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         return build.Succeeded
             ? new AssistResult(true, summary, backup)
@@ -3490,7 +3526,18 @@ public interface ILauncherRunner
 public readonly record struct LaunchOutcome(
     bool Succeeded,
     string Message,
-    IReadOnlyList<Models.SiteHealthFinding>? Findings = null);
+    IReadOnlyList<Models.SiteHealthFinding>? Findings = null,
+    int? ExitCode = null)
+{
+    /// <summary>
+    /// deploy.py's NEEDS_AN_ANSWER, which preview.ps1 and deploy.ps1 pass
+    /// through under --non-interactive: a question nobody was there to answer
+    /// (#391 / mac #378). Means that alone.
+    /// </summary>
+    public bool NeededAnAnswer => ExitCode == NeedsAnAnswerExitCode;
+
+    public const int NeedsAnAnswerExitCode = 3;
+}
 
 /// <summary>The result of planning a whole unit publish/unpublish.</summary>
 public sealed record WholeUnitPlanResult(
