@@ -38,7 +38,7 @@ final class StartOfYearTests: XCTestCase {
     func testStartOfYearAsTheContractSays() async throws {
         let rules: [String: Any] = try StartOfYearTests.rules("startOfYear")
         let cases: [[String: Any]] = try XCTUnwrap(rules["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 14)
+        XCTAssertGreaterThanOrEqual(cases.count, 15)
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let made = try AssistFixture.makeRunner(surface: .mcp)
@@ -65,6 +65,27 @@ final class StartOfYearTests: XCTestCase {
             let code: String = try XCTUnwrap(
                 StartOfYearPlanner.planCode(in: planned.detail), "\(name): the plan carries no code"
             )
+            if let expectedNames = testCase["expectPlanNames"] as? [[String: String]] {
+                let lines: [String] = planned.detail.components(separatedBy: "\n")
+                for expected in expectedNames {
+                    let page: String = try XCTUnwrap(expected["page"])
+                    let expectedName: String
+                    if let folder = expected["folder"] {
+                        expectedName = StartOfYearWording.pageNameInFolder(page: page, folder: folder)
+                    } else {
+                        expectedName = StartOfYearWording.pageName(page: page)
+                    }
+                    var found: Bool = false
+                    for line in lines where line.hasPrefix("• " + expectedName + " — ") {
+                        found = true
+                    }
+                    XCTAssertTrue(found, "\(name): no line names the page as \(expectedName):\n\(planned.detail)")
+                }
+                for line in lines {
+                    XCTAssertFalse(line.contains(".md"), "\(name): a path in the plan: \(line)")
+                    XCTAssertFalse(line.contains("courses/"), "\(name): a path in the plan: \(line)")
+                }
+            }
             if let fragment = testCase["expectIntroContains"] as? String {
                 XCTAssertTrue(planned.detail.contains(fragment), "\(name): \(planned.detail)")
             }
@@ -240,7 +261,10 @@ final class StartOfYearTests: XCTestCase {
             "staysKeyLinks": StartOfYearWording.staysKeyLinks(pages: "{pages}"),
             "staysEverythingElse": StartOfYearWording.staysEverythingElse,
             "linksLeftHeading": StartOfYearWording.linksLeftHeading,
-            "linksLeftLine": StartOfYearWording.linksLeftLine(page: "{page}", links: "{links}"),
+            "linksLeftLine": StartOfYearWording.linksLeftLine(name: "{name}", links: "{links}"),
+            "pageName": StartOfYearWording.pageName(page: "{page}"),
+            "pageNameInFolder": StartOfYearWording.pageNameInFolder(page: "{page}", folder: "{folder}"),
+            "draftLine": StartOfYearWording.draftLine(name: "{name}", reason: "{reason}"),
             "publishingFromNowOn": StartOfYearWording.publishingFromNowOn(noun: "{noun}"),
             "alreadyTaught": StartOfYearWording.alreadyTaught(classes: "{classes}"),
             "scheduledDeploy": StartOfYearWording.scheduledDeploy(moment: "{moment}"),
@@ -433,7 +457,9 @@ final class StartOfYearTests: XCTestCase {
         XCTAssertEqual(plan.danglingSources.count, 1)
         XCTAssertEqual(plan.danglingSources.first?.page.title, "Marks")
         XCTAssertEqual(plan.danglingSources.first?.hiddenTargets.count, 2)
-        XCTAssertTrue(plan.describe().contains(StartOfYearWording.linksLeftLine(page: "Marks", links: "2 links")))
+        XCTAssertTrue(plan.describe().contains(StartOfYearWording.linksLeftLine(
+            name: StartOfYearWording.pageName(page: "Marks"), links: "2 links"
+        )))
     }
 
     /// The front page's class embed is repointed by the write itself, so it
@@ -802,7 +828,11 @@ final class StartOfYearTests: XCTestCase {
             }
             let flag: String = visible ? "true" : "false"
             let url: URL
-            var frontmatter: [String] = ["title: \(title)"]
+            // `shownAs` is the title a teacher sees, while the file keeps
+            // `title` as its name; `folder` puts a course-level page there
+            // instead of Concepts (#362).
+            let shownAs: String = page["shownAs"] as? String ?? title
+            var frontmatter: [String] = ["title: \(shownAs)"]
             switch kind {
             case "class":
                 url = ClassPages.folderURL(forSection: 1, in: course).appendingPathComponent(title + ".md")
@@ -826,7 +856,8 @@ final class StartOfYearTests: XCTestCase {
                 url = course.directoryURL.appendingPathComponent("Curriculum").appendingPathComponent(title + ".md")
                 frontmatter.append("publishForSection1: \(flag)")
             default:
-                url = course.directoryURL.appendingPathComponent("Concepts").appendingPathComponent(title + ".md")
+                let folder: String = page["folder"] as? String ?? "Concepts"
+                url = course.directoryURL.appendingPathComponent(folder).appendingPathComponent(title + ".md")
                 frontmatter.append("publishForSection1: \(flag)")
                 if !undated {
                     frontmatter.append("createdSection1: \(date)T07:00:00.000-0400")

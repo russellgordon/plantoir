@@ -103,8 +103,27 @@ nonisolated enum StartOfYearWording {
     static let linksLeftHeading: String =
         "After this, links on these pages will lead to pages students cannot see yet:"
 
-    static func linksLeftLine(page: String, links: String) -> String {
-        return "“\(page)”: \(links)"
+    /// `{name}` is a page as `pageName` or `pageNameInFolder` says it (#362).
+    static func linksLeftLine(name: String, links: String) -> String {
+        return "\(name): \(links)"
+    }
+
+    // MARK: - Naming a page (#362)
+
+    /// A page by its title — never a path to its file.
+    static func pageName(page: String) -> String {
+        return "“\(page)”"
+    }
+
+    /// A page whose title another page in the section also has, with the
+    /// folder it is in within the course.
+    static func pageNameInFolder(page: String, folder: String) -> String {
+        return "“\(page)” (in \(folder))"
+    }
+
+    /// One line of a list of pages going into draft.
+    static func draftLine(name: String, reason: String) -> String {
+        return "\(name) — \(reason)"
     }
 
     /// The consequence the plan review's H3 found, said before Go and in the
