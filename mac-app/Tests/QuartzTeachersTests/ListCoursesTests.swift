@@ -88,6 +88,56 @@ final class ListCoursesTests: XCTestCase {
         )
     }
 
+    /// Every place each course publishes to, not only the first (#403).
+    ///
+    /// Runs every `planOpening` case and every `listCoursesLine` case from
+    /// shared-rules.json through list_courses on BOTH surfaces — `.local` is
+    /// the one a teacher sees, when the app's own assistant window is asked
+    /// "what courses do I have?" — and compares the course's line WHOLE with
+    /// "  publishes to: " + the case's `card`. The folder-not-chosen case is
+    /// the one the old primary-only name got wrong ("Netlify"); the two- and
+    /// three-destination cases are the ones it cut short, and "Netlify and
+    /// Cloudflare Pages" is the one a sort by name would turn round.
+    @MainActor
+    func testItNamesEveryPlaceEachCoursePublishesTo() async throws {
+        let refusals: [String: Any] = try SharedRulesContractTests.section("scheduledDeployRefusals")
+        let opening: [String: Any] = try XCTUnwrap(refusals["planOpening"] as? [String: Any])
+        let planCases: [[String: Any]] = try XCTUnwrap(opening["cases"] as? [[String: Any]])
+        let lineRules: [String: Any] = try XCTUnwrap(opening["listCoursesLine"] as? [String: Any])
+        let lineCases: [[String: Any]] = try XCTUnwrap(lineRules["cases"] as? [[String: Any]])
+        var cases: [[String: Any]] = planCases
+        cases.append(contentsOf: lineCases)
+        XCTAssertEqual(cases.count, 4)
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let card: String = try XCTUnwrap(testCase["card"] as? String)
+            let saved: [String: Any] = try XCTUnwrap(testCase["saved"] as? [String: Any])
+            for surface in [AssistToolRunner.Surface.local, AssistToolRunner.Surface.mcp] {
+                let made = try AssistFixture.makeRunner(surface: surface)
+                let root: URL = made.root
+                defer { try? FileManager.default.removeItem(at: root) }
+                let folder: URL = root.appendingPathComponent("published-here")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                var changes: [String: Any] = [:]
+                for (key, value) in saved {
+                    changes[key] = SharedRulesContractTests.withFolder(value, folder.path)
+                }
+                let configURL: URL = root.appendingPathComponent("courses/ICS3U/course_config.json")
+                try SharedRulesContractTests.change(configURL, changes)
+
+                let said: String = await run(made.runner)
+                var publishesLines: [String] = []
+                for line in said.components(separatedBy: "\n") {
+                    if line.hasPrefix("  publishes to: ") {
+                        publishesLines.append(line)
+                    }
+                }
+                XCTAssertEqual(publishesLines, ["  publishes to: \(card)"], "\(name), \(surface): \(said)")
+            }
+        }
+    }
+
     /// A folder with nothing in it says so, and says what to do next.
     ///
     /// Named rather than typed, so the sentence has one home and Windows can
