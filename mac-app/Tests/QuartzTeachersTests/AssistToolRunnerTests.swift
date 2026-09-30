@@ -3489,6 +3489,65 @@ final class AssistToolRunnerTests: XCTestCase {
         }
     }
 
+    /// `class-planning.json` → `datingPagesAClassBrings.publishedBeforeIsRecorded`
+    /// (#379, the plan's Q5): a page the section's published-pages record
+    /// lists keeps its date when its class is published; a page that only
+    /// carries a date moves. Run through `publish_pages`.
+    @MainActor
+    func testAPagePublishedBeforeKeepsItsDateAsTheContractSays() async throws {
+        for testCase in try AssistToolRunnerTests.cases(
+            in: "contracts/class-planning.json", section: "datingPagesAClassBrings",
+            key: "publishedBeforeIsRecorded"
+        ) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let made = try makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+
+            var dateWas: [String: String] = [:]
+            for entry in try XCTUnwrap(testCase["classes"] as? [[String: Any]]) {
+                let title: String = try XCTUnwrap(entry["title"] as? String)
+                try writeContractPage(
+                    title: title, isClassPage: true, visible: false,
+                    links: entry["links"] as? [String] ?? [], dated: try XCTUnwrap(entry["date"] as? String),
+                    in: made.course
+                )
+            }
+            for entry in try XCTUnwrap(testCase["pages"] as? [[String: Any]]) {
+                let title: String = try XCTUnwrap(entry["title"] as? String)
+                let day: String = try XCTUnwrap(entry["date"] as? String)
+                dateWas[title] = day
+                try writeContractPage(
+                    title: title, isClassPage: false, visible: entry["visible"] as? Bool ?? false,
+                    links: entry["links"] as? [String] ?? [], dated: day, in: made.course
+                )
+            }
+            var places: [String] = []
+            for title in testCase["publishedBefore"] as? [String] ?? [] {
+                places.append("Concepts/" + title)
+            }
+            let folder: URL = PublishedPagesRecord.folderURL(courseDirectory: made.course.directoryURL, section: 1)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try JSONSerialization.data(withJSONObject: ["version": 1, "places": places])
+                .write(to: folder.appendingPathComponent("20260601T120000Z-netlify.json"))
+
+            let asked: [String] = try XCTUnwrap(testCase["publish"] as? [String])
+            _ = await made.runner.run(call: call(
+                "publish_pages",
+                arguments: ["course": "ICS3U", "section": 1, "pages": asked.joined(separator: "; ")]
+            ))
+            for title in testCase["expectNoMove"] as? [String] ?? [] {
+                let after: String = contractPageText(title: title, isClassPage: false, in: made.course)
+                XCTAssertTrue(after.contains("createdSection1: \(try XCTUnwrap(dateWas[title]))"),
+                              "\(name): “\(title)” was published before and was re-dated: \(after)")
+            }
+            for (title, expected) in testCase["expectMoves"] as? [String: String] ?? [:] {
+                let after: String = contractPageText(title: title, isClassPage: false, in: made.course)
+                XCTAssertTrue(after.contains("createdSection1: \(expected)"),
+                              "\(name): “\(title)” should have taken \(expected): \(after)")
+            }
+        }
+    }
+
     /// What a re-date SAYS it did (#343): the classes and the pages they use
     /// whose dates were written, each counted from its own list, never one
     /// subtracted from the other. The old reply read "Re-dated 14 classes and

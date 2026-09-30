@@ -755,6 +755,38 @@ site_carries_preview_client() {
 # sync — only changed files move, and files deleted from the site are
 # deleted from the folder. Each section lands in its own subfolder so
 # sections can never overwrite one another. Netlify is not involved.
+# ---- #379: the published-pages record, for a folder publish --------------
+# A folder publish never enters deploy.py, so it records here what deploy.py
+# records after an upload: a copy of the build's own list of the pages the
+# site shows, as a new fragment of the section's record
+# (contracts/file-formats.json -> publishedPagesRecord). Only when the list
+# belongs to the build the site folder holds (its buildId is .build-id's):
+# a list from an earlier build is never taken for this site's. Plain cp and
+# grep, no JSON handling in bash; any failure records nothing and publishes
+# anyway, because the pages are already out.
+# BEGIN record_published_pages
+record_published_pages() {
+  local built="$1" course="$2" section="$3" destination="$4"
+  local listing="${built}/.visible-pages.json" id_file="${built}/.build-id"
+  [[ -f "$listing" && -f "$id_file" ]] || return 0
+  local current listed
+  # `|| return 0` on both: under `set -euo pipefail` a list with no buildId
+  # (grep finds nothing) or an unreadable .build-id would otherwise END the
+  # launcher here — after the copy succeeded, before "Published" is said.
+  current="$(tr -d '[:space:]' < "$id_file" 2>/dev/null)" || return 0
+  listed="$(grep -o '"buildId": *"[^"]*"' "$listing" 2>/dev/null | head -n 1 | sed -e 's/^"buildId": *"//' -e 's/"$//')" || return 0
+  [[ -n "$current" && "$current" == "$listed" ]] || return 0
+  local folder="courses/${course}/.publish_state/section${section}.published-pages"
+  mkdir -p "$folder" 2>/dev/null || return 0
+  local name
+  name="$(date -u +%Y%m%dT%H%M%SZ)-${destination}.json"
+  if cp "$listing" "${folder}/.${name}.$$.tmp" 2>/dev/null; then
+    mv -f "${folder}/.${name}.$$.tmp" "${folder}/${name}" 2>/dev/null || rm -f "${folder}/.${name}.$$.tmp"
+  fi
+  return 0
+}
+# END record_published_pages
+
 if [[ -n "$TO_FOLDER" ]]; then
   # A relative folder is taken from THIS working folder (line 5 already
   # cd'd here), and made a full path before anything reads it. Three
@@ -911,6 +943,8 @@ if [[ -n "$TO_FOLDER" ]]; then
     exit 1
   fi
   CHANGED_COUNT="$(printf '%s\n' "$_rsync_said" | grep -c '^[<>ch.]f' || true)"
+  # After the copy succeeded, never before (#379).
+  record_published_pages "$SECTION_DIR_HOST" "$COURSE_CODE" "$SECTION_NUM" "folder"
   echo "✅ Published: ${CHANGED_COUNT} file(s) updated."
   echo "   Folder: ${TARGET_DIR}"
   echo "   Upload that folder to your web host however you prefer (e.g. SFTP)."

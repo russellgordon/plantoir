@@ -51,12 +51,13 @@ struct CopyPageChecklist: View {
     /// **The rule it serves: the sheet is at most 620 pt tall, whatever it
     /// lists** (`tallestSheet`, pinned by `CopyPageChecklistSizeTests`). The
     /// arithmetic, so the number is not taken on trust: the smallest screen
-    /// a teacher is likely to have is a 13-inch MacBook Air at 1280 × 800
-    /// points; less a 24 pt menu bar, a ~52 pt window title bar and a ~70 pt
+    /// a teacher is likely to meet is a 13-inch MacBook Air set to "Larger
+    /// Text", 1280 × 800 points; less a 24 pt menu bar, a ~52 pt window title bar and a ~70 pt
     /// Dock, that leaves ≈ 654 pt for a sheet. The checklist state is ≈ 40
     /// padding + 17 title + 16 + (≈ 34 heading + 8 + 380 + 8 + ≈ 34 "Copies
-    /// start hidden") + 16 + ≈ 22 buttons ≈ 575 pt. Newer Airs default to
-    /// 1470 × 956 and have more room; the older screen is the one to fit.
+    /// start hidden") + 16 + ≈ 22 buttons ≈ 575 pt. A current Air's
+    /// default is 1470 × 956 and has more room; "Larger Text" is the one to
+    /// fit.
     /// Rejected: a cap worked out from `NSScreen` — a sheet that changes size
     /// with the display is one no test can pin.
     static var tallestList: CGFloat {
