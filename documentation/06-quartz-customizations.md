@@ -662,7 +662,10 @@ not what triggers it.
 - **Angle-bracket destinations, `[q](<Tasks/Quiz 1.md>)`**, were left out of
   that piece as pre-existing on both sides. They are handled on the mac since
   #97 (2026-09-26) — see "Inside angle brackets: the third spelling (#97)"
-  below — and are owed on Windows.
+  below — and Windows matched them on 2026-09-30 (#338, parity bundle 2:
+  `FolderPathRewriter`'s `(?!<)` plain pattern, its own `AngleLink` pass with
+  a lookahead `>`, the name spelled plain inside the brackets; the live
+  web-address defect — `[h](<https://…/Tasks/…>)` repointed — went with it).
 
 ### Inside angle brackets: the third spelling (#97)
 
@@ -671,8 +674,8 @@ CommonMark lets a Markdown destination sit inside angle brackets,
 Obsidian's own links never use this form, so it appears only where a teacher
 typed it — but where it does, a folder rename missed it. The plain pattern
 `(\]\()([^)\s]+)` reads up to the first space, so (measured with
-`NSRegularExpression` against the pre-fix pattern; Windows has the identical
-one in `FolderPathRewriter.cs`):
+`NSRegularExpression` against the pre-fix pattern; Windows had the identical
+one in `FolderPathRewriter.cs` until 2026-09-30):
 
 | Link | Target read before #97 | What a rename of `Tasks` did |
 |---|---|---|

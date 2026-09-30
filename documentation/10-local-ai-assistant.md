@@ -2324,6 +2324,16 @@ rewriter half moves nothing that ships; it matters for what teachers write.
 | build `_extract_wikilink_targets` | 0 | 7 (TEJ2O only) |
 | the rule | **0** | 7 before the TEJ2O fix, **0** after |
 
+**Windows since 2026-09-30** (#339, parity bundle 2): `Plantoir.Core/Models/MarkdownCode.cs`
+is a rule-for-rule port of `scripts/markdown_code.py`, and `WikiLinks.Parse`, the
+insertion's relink and count (`WikiLinks.Rewriting` / `CountLinksTo`), the
+unit-word rename and `FolderPathRewriter` all mask with its `NotALinkRanges`,
+restarting the search at the end of a range a match started in. Measured the way
+the mac was: `NotALinkRanges` against `markdown_code.not_a_link_ranges` on all
+**12,490** pages in `support/`, UTF-16 offsets, **0 disagreements** (Windows 11 Pro
+26200, .NET 9, CPython 3.14; the harness was a one-off and is not committed). The
+50,000 fuzzed texts were NOT re-run on Windows. `WithoutCode` is gone.
+
 **The shipped page this exposed.** TEJ2O's `shared/Labs/Control Something with
 Code.md` opened `   ```python` at three spaces inside step 4 of a numbered
 list and wrote the program at column 0. CommonMark cannot continue a fence
@@ -4394,17 +4404,30 @@ renaming `makingRoomCannotBeUndone` to something generic (a rename changes the
 generated file for no gain, and Windows owes the key under its current name in
 #274).
 
-**What Windows owes** is in the `windows` issue opened for #185:
-`DuplicateClassPlan.Describe()` adds `MakingRoomCannotBeUndone` when
-`MovesOtherClasses`, and `Duplication_MatchesContract` reads
-`undoRule.planWarns`. Nothing goes red there when this is pulled —
-`Duplication_MatchesContract` reads fields by name — so it is unrun there,
-not failing. The trap: `OtherClassesMoved` is the past tense and must not go
+**Windows did it on 2026-09-30** (#346, parity bundle 2):
+`DuplicateClassPlan.Describe()` adds `AssistWording.MakingRoomCannotBeUndone`
+when `MovesOtherClasses`, asserted both ways in `DuplicateClassTests`
+(`APlanThatMovesOtherClassesWarnsTheUndoWillNotHelp`, and its absence on the
+last-class plan). `Duplication_MatchesContract` does NOT read
+`undoRule.planWarns` yet: that runner stops at its first case ("Week 1", a
+club's numbered page, #274), so an assertion added there could not be seen to
+pass; it goes in with #274. The trap: `OtherClassesMoved` is the past tense and must not go
 on a plan.
 
 #### Three things the duplicate did that nothing was watching
 
 All three were found from the Windows side and closed on the mac in #163.
+**Windows took them back on 2026-09-30** ([#200](https://github.com/russellgordon/plantoir/issues/200),
+parity bundle 2), and its shipped code had had B — the rejected fix below —
+since #149: `AssistWorkspace.ApplyDuplicateClass` now strips the copy's
+inherited per-section keys (`PageFrontmatter.WithoutPerSectionKeys`), abandons a
+copy it cannot read back as hidden (`ClassChangeWording.TheCopyCouldNotBeMadeHidden`,
+trail `class copy not made`), and asks the insertion what it CREATED rather than
+comparing the destination's text (a private overload of `ApplyInsertClasses`
+hands back the paths of the blanks it wrote). Windows' test for A cannot use
+the mac's invalid-UTF-8 page — .NET reads one without complaint — so it turns
+`Unit 1, Day 5.md` into a FOLDER of that name after the plan, which skips the
+rename the same way (`DuplicateClassTests.ALinkRewrittenInsideTheLessonCannotFoolTheGuard`).
 
 **1. A copy could arrive already visible to students.** The copy is given a
 plain `publish: false`, but the build consults `publishForSection<N>` FIRST,
