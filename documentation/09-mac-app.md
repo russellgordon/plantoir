@@ -6999,8 +6999,16 @@ links checklist (#379)"); this is the app's half.
   reached through other pages, not `firstUsedIn` that class. So on a fresh
   course, ticking that one class ticks about three quarters of the sheet — out
   of view, since the class group is last (the button's count and the class
-  row's "brings N more" are the in-view cues). That reach is the assistant's
-  rule, not this piece's; whether it is right is a separate `decision` issue.
+  row's "brings N more" are the in-view cues). **Measured once, and judged —
+  do not re-measure it:** across the 39 payloads after an (emulated) Get
+  Ready, the single exam-day class row each payload offers reaches about
+  1,900 of the 2,463 rows, because that class links "Final Examination",
+  which links most of the course, and the reach (the assistant's rule,
+  `followingLinks`) walks through visible pages too. Russell judged on
+  2026-09-30 (ruling R20 of the v1.4.2 run) that a class linking forward to
+  future classes' material the way the example courses do is "highly
+  unlikely to actually occur in real practice", so this is not a problem to
+  fix and no `decision` issue was opened for it; the reach stays as it is.
   **Rejected:** letting a brought row be unticked while its class goes (a
   change to what is published, and a published class linking a hidden page);
   working the set out from `firstUsedIn`; a second walk (the old count's
