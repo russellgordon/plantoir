@@ -35,6 +35,20 @@ enum ScheduledDeployWording {
             + "Nobody would be there to answer that at the scheduled time, and it would wait. "
             + "Deploy it there once from Plantoir, and after that it can be scheduled."
     }
+
+    /// The first line of a schedulable plan — the Schedule a deploy sheet's
+    /// opening sentence, and the first line of `plan_scheduled_deploy`'s
+    /// result. Pinned WHOLE by `contracts/shared-rules.json` →
+    /// `scheduledDeployRefusals.planOpening`.
+    ///
+    /// `destinations` is EVERY place the deploy goes, already joined — "A",
+    /// "A and B", "A, B and C" (#396). Until then it named the primary only,
+    /// and Russell's MPM2D, which deploys to Netlify and Cloudflare Pages,
+    /// read "Deploy MPM2D Section 1 to Netlify at …". Byte-identical to the
+    /// old sentence for a course with one destination.
+    static func planOpening(course: String, section: Int, destinations: String, moment: String) -> String {
+        return "Deploy \(course) Section \(section) to \(destinations) at \(moment)."
+    }
 }
 
 /// Why a scheduled deploy cannot go ahead the way a course is set: one case
@@ -112,6 +126,26 @@ nonisolated enum ScheduledDeployRefusal: Equatable, Sendable {
             return "it has never been deployed to \(destination), and the first deploy there asks what to call the website"
         case .additionalDestinationNeverDeployed(let destination):
             return "it has never been deployed to \(destination), and the first deploy there asks what to call that site"
+        }
+    }
+
+    /// The destination this refusal was reached for, BY KIND — "Netlify",
+    /// "Cloudflare Pages" or "a folder", never a path — or nil when it is
+    /// not about a destination. For the trail line a refusal at the act
+    /// leaves (`scheduled deploy could not be set`, #322 and #396).
+    ///
+    /// A never-deployed refusal carries its destination's name already, and
+    /// is never a folder (`hasDeployedBefore` calls a folder always ready).
+    var destinationKind: String? {
+        switch self {
+        case .keptForReference:
+            return nil
+        case .deployFolderNeedsAttention, .additionalDeployFolderNeedsAttention:
+            return "a folder"
+        case .cloudflareAccountMissing, .additionalCloudflareAccountMissing:
+            return "Cloudflare Pages"
+        case .neverDeployed(let destination), .additionalDestinationNeverDeployed(let destination):
+            return destination
         }
     }
 

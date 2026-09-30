@@ -48,11 +48,27 @@ nonisolated struct LinksChecklistOffer: Sendable, Equatable {
         let why: Why
         let firstUsedIn: String?
         let linkedFrom: [String]
+        /// The offered rows this page is reached through when no page
+        /// students can see links it — nearest first; the first is the row it
+        /// is listed under (#385). Empty for most rows, always for a class,
+        /// and for every row of an offer an older builder wrote.
+        let dependsOn: [String]
 
         // MARK: - Computed properties
 
         var id: String {
             return place
+        }
+
+        // MARK: - Functions
+
+        /// The same row, reached through these rows instead (#385's re-read).
+        func withDependsOn(_ places: [String]) -> Row {
+            return Row(
+                place: place, title: title, group: group, ticked: ticked, step: step,
+                claimedBy: claimedBy, date: date, why: why, firstUsedIn: firstUsedIn,
+                linkedFrom: linkedFrom, dependsOn: places
+            )
         }
     }
 
@@ -122,6 +138,12 @@ nonisolated struct LinksChecklistOffer: Sendable, Equatable {
                     linkedFrom.append(text)
                 }
             }
+            var dependsOn: [String] = []
+            for entry in (page["dependsOn"] as? [Any]) ?? [] {
+                if let text = entry as? String {
+                    dependsOn.append(text)
+                }
+            }
             rows.append(Row(
                 place: place,
                 title: (page["title"] as? String) ?? name(ofPlace: place),
@@ -132,7 +154,8 @@ nonisolated struct LinksChecklistOffer: Sendable, Equatable {
                 date: day,
                 why: why,
                 firstUsedIn: page["firstUsedIn"] as? String,
-                linkedFrom: linkedFrom
+                linkedFrom: linkedFrom,
+                dependsOn: dependsOn
             ))
         }
         var firstClassPlace: String? = nil
@@ -310,6 +333,128 @@ nonisolated enum LinksChecklistGate {
             return false
         }
         return row.ticked
+    }
+
+    // MARK: - Rows that come under another row (#385)
+
+    /// The rows that GO — shown ticked, and published by Publish
+    /// (`shared-rules.json` → `linksChecklist.followingARow`). A row goes when
+    /// its OWN tick is on and it has no `dependsOn`, or at least one row in its
+    /// `dependsOn` goes.
+    ///
+    /// Worked out from nothing upwards (the least fixed point): two hidden
+    /// pages that link only each other never go through each other, only
+    /// through a row that goes. NOT "a row it comes under is ticked" — that
+    /// publishes such a pair with nothing students can see linking either.
+    static func going(_ rows: [LinksChecklistOffer.Row], ticked: Set<String>) -> Set<String> {
+        var going: Set<String> = []
+        var somethingWasAdded: Bool = true
+        while somethingWasAdded {
+            somethingWasAdded = false
+            for row in rows where !going.contains(row.place) && ticked.contains(row.place) {
+                var canGo: Bool = row.dependsOn.isEmpty
+                for parent in row.dependsOn where going.contains(parent) {
+                    canGo = true
+                }
+                if canGo {
+                    going.insert(row.place)
+                    somethingWasAdded = true
+                }
+            }
+        }
+        return going
+    }
+
+    /// True when a row comes under other rows and none of them is going: it
+    /// is shown unticked and cannot be ticked, whatever its own tick.
+    static func isLocked(_ row: LinksChecklistOffer.Row, going: Set<String>) -> Bool {
+        if row.dependsOn.isEmpty {
+            return false
+        }
+        for parent in row.dependsOn where going.contains(parent) {
+            return false
+        }
+        return true
+    }
+
+    /// What the checkbox does: it changes the row's OWN tick and nothing
+    /// else. The rows under it keep theirs — copying the tick down would tick
+    /// ten pages of later units under SNC1W's Final Examination
+    /// (`followingARow.whyItsOwnTickIsKept`).
+    static func toggled(_ ticked: Set<String>, place: String, isOn: Bool) -> Set<String> {
+        var changed: Set<String> = ticked
+        if isOn {
+            changed.insert(place)
+        } else {
+            changed.remove(place)
+        }
+        return changed
+    }
+
+    /// One row as the sheet lists it: under which heading, and how far in.
+    struct ShownRow: Equatable {
+
+        // MARK: - Stored properties
+
+        let row: LinksChecklistOffer.Row
+        let depth: Int
+        /// The heading it is listed under — its parent's group when it comes
+        /// under a row of the other group.
+        let group: LinksChecklistOffer.Group
+    }
+
+    /// The order the sheet lists rows in: each group in turn, a row followed
+    /// by the rows listed under it (those whose FIRST `dependsOn` is it), in
+    /// the offer's order, depth first. `dependsOn[0]` is strictly nearer to a
+    /// page students can see, so this cannot loop on a file the build wrote;
+    /// a row it never reaches (a hand-edited file) is listed at the end of its
+    /// own group rather than lost.
+    static func shownOrder(_ rows: [LinksChecklistOffer.Row]) -> [ShownRow] {
+        var rowPlaces: Set<String> = []
+        for row in rows {
+            rowPlaces.insert(row.place)
+        }
+        var childrenOf: [String: [LinksChecklistOffer.Row]] = [:]
+        var topRows: [LinksChecklistOffer.Row] = []
+        for row in rows {
+            if let first = row.dependsOn.first, first != row.place, rowPlaces.contains(first) {
+                childrenOf[first, default: []].append(row)
+            } else {
+                topRows.append(row)
+            }
+        }
+        var shown: [ShownRow] = []
+        var visited: Set<String> = []
+        let groups: [LinksChecklistOffer.Group] = [.fromAClass, .notReachedByAClass, .aClass]
+        for group in groups {
+            for top in topRows where top.group == group {
+                appendShown(top, depth: 0, group: group, childrenOf: childrenOf, visited: &visited, into: &shown)
+            }
+        }
+        for group in groups {
+            for row in rows where row.group == group && !visited.contains(row.place) {
+                appendShown(row, depth: 0, group: group, childrenOf: childrenOf, visited: &visited, into: &shown)
+            }
+        }
+        return shown
+    }
+
+    private static func appendShown(
+        _ row: LinksChecklistOffer.Row,
+        depth: Int,
+        group: LinksChecklistOffer.Group,
+        childrenOf: [String: [LinksChecklistOffer.Row]],
+        visited: inout Set<String>,
+        into shown: inout [ShownRow]
+    ) {
+        if visited.contains(row.place) {
+            return
+        }
+        visited.insert(row.place)
+        shown.append(ShownRow(row: row, depth: depth, group: group))
+        for child in childrenOf[row.place] ?? [] {
+            appendShown(child, depth: depth + 1, group: group, childrenOf: childrenOf, visited: &visited, into: &shown)
+        }
     }
 }
 
