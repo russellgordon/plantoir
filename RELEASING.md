@@ -110,8 +110,34 @@ whether a teacher will notice, and whether both platforms have it.
 **Clear this list when the tag goes up**, in the same commit that moves the
 version line. A list that survives its own release is worse than no list.
 
+Filled 2026-09-30 for v1.4.1 from `GUI-IMPROVEMENTS.md` rows 607–620 and the closed v1.4.1
+milestone — one line per piece. Rows 607 and 608 are not teacher-visible and sit under the hood.
+
+**What a teacher notices** (macOS; the Windows installer is not part of v1.4.1 — its half of
+each is on the milestone "Windows: parity with mac v1.4.0"). "Shared toolchain" marks a change
+in the shared scripts, which a Windows teacher gets with the next Windows release.
+
 | Landed | What a teacher sees | Platforms | Log |
 |---|---|---|---|
+| 2026-09-30 | Links from visible pages into hidden ones become a checklist in the section window: tick the pages to publish, each dated like the class that uses it; a hidden class is offered unticked and brings its own pages (#379). | macOS; shared toolchain | 619 |
+| 2026-09-29 | A preview that has to wait says what it is waiting for; work left behind by a closed Revise with Claude or Codex session no longer blocks previews until the Mac restarts; a deploy asked of Claude or Codex stops at a question and says to deploy once from Plantoir, instead of waiting for ever (#378). | macOS | 618 |
+| 2026-09-29 | A section cannot be previewed while that same section is being deployed — from another window, the assistant or Terminal (#381). | macOS | 610 |
+| 2026-09-29 | Course Settings' Save looks disabled when it is, is no longer held back silently by a destination problem the edit does not touch, and says why when it is held back; an emoji or grade-in-title setting no longer changes on its own (#364; the likely cause of #373, left open for confirmation). | macOS | 611 |
+| 2026-09-29 | Course Settings shows the Class Pages rows only for a course that recorded them (a club), and says "Language and region" where it said "Language / region (Quartz locale)" (#376, #369). | macOS | 612, 614 |
+| 2026-09-30 | With "This is a club" ticked, the New Course panel says Meetings, Club code, Club name and Create Club (#368). | macOS | 617 |
+| 2026-09-30 | Get Ready for the Start of the Year names pages by their titles, adding a folder only when two pages share a title (#362). | macOS | 616 |
+| 2026-09-29 | Copy a Page's checklist and the screen after Copy fit on the screen however many pages are skipped (#365). | macOS | 609 |
+| 2026-09-30 | The details under a preview, a publish or a new course say "website builder", never container or Docker, and the example course's progress bar reaches every step (#382). | macOS | 620 |
+
+**Under the hood** (nothing a teacher sees; listed so the notes can leave them out on purpose):
+
+| Landed | What changed | Platforms | Log |
+|---|---|---|---|
+| 2026-09-29 | Every text field wears one bordered style, pinned by a source scan (#374). | macOS | 613 |
+| 2026-09-30 | The start-of-year sheet's and the stopped-publish band's buttons keep their own accessibility identifiers (#366). | macOS | 615 |
+| 2026-09-30 | Test runs no longer move the teacher's real window frames (#361). | macOS | — |
+| 2026-09-29 | The Debug build's Dock icon wears a BETA ribbon; a Release build is unchanged (#372). | macOS (Debug only) | 607 |
+| 2026-09-29 | plantoir.app's pictures keep their windows' own corners and `build.py --deploy` refuses any that do not; a chemistry picture joins the calculus one (#375); the ICS4U marketing course publishes to a folder (#371). | website | 608 |
 
 ## Warnings the release notes MUST carry
 
@@ -125,6 +151,16 @@ commit that moves the version line.
 
 | Added | The warning | Why it cannot be left out |
 |---|---|---|
+
+**No warnings for v1.4.1 — do NOT pass `--required-warning`.** Rows 609–620 were checked
+against this section's definition (something a teacher must DO, usually before updating), and
+none asks for anything. #379 changes how a finding is shown: a checklist the teacher can
+dismiss with Not Now, which publishes nothing on its own, while scheduled, assistant and
+command-line publishes publish as they did. #378 ends only work whose owner has provably gone,
+never a publish launchd is running, and it asks nothing of the teacher. Both are what a teacher
+gains, and they belong in the notes' body. Marking the release important would take Skip and
+Remind Me Later away from the first update window most teachers will ever see, for nothing
+they must do.
 
 ## The short version
 
