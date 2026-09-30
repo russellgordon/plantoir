@@ -323,9 +323,10 @@ struct LeftoverWorkReport: Equatable {
             return false
         }
         for character in text.unicodeScalars {
-            // "+" stands for the one space a course code may carry.
+            // A course code may carry one space; the marker writes it "+", and
+            // `courseAndSection` has already turned it back (#378 review S1).
             let allowed: Bool = CharacterSet.alphanumerics.contains(character) || character == "-"
-                || character == "_" || character == "." || character == "+"
+                || character == "_" || character == "." || character == " "
             if !allowed {
                 return false
             }
