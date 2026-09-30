@@ -639,6 +639,135 @@ _wait_for_docker() {
 TOOLS_DIR="$HOME/Library/Application Support/Plantoir/tools"
 export PATH="$TOOLS_DIR/bin:$PATH"
 
+# >>> PREVIEW WHILE DEPLOYING GUARD >>> — preview.sh only. Cut out between
+# these two markers and run against a pretend process table by
+# scripts/test_preview_while_deploying.py; keep the markers.
+# ---- A section being deployed cannot be previewed (GitHub #381) --------
+# Russell's decision 4 on #378: "a preview of a section cannot start AT ALL
+# while that same section is being deployed", whoever started the deploy.
+# The app refuses in the window (SectionDetailView.startPreview) and other
+# programs are refused by their work leases (#156); this is the layer that
+# sees the rest — a deploy.sh typed in Terminal, one a Revise with Claude
+# session's own command line runs, and a preview started from a command
+# line while any deploy runs. The rule and its cases are
+# contracts/shared-rules.json -> previewWhileItsSectionDeploys.
+#
+# Asked on a SERVING run only, and here: after the arguments are checked,
+# before anything is changed — no builds link, no website builder, no
+# workspace looked at or set up again. A serving preview that remade the
+# folder's workspace in a deploy's host-side stretch (a token being read,
+# the moment between its two legs) would pull it out from under the deploy,
+# which is the harm this exists for.
+#
+# What counts as a deploy of C/S, read from the LIVE process table — never
+# a remembered process id, never a lease file:
+#   - `deploy.sh C S …`, unless it only clears a saved token (--reset-token,
+#     --logout) or prints its help; --diagnose DOES deploy. Only one working
+#     in THIS folder counts: its working directory is asked of lsof, and one
+#     that cannot be asked counts (a deploy of this very section is proved;
+#     only its folder is not).
+#   - a scheduled deploy of C/S: any process whose arguments name its script,
+#     `ca.russellgordon.Plantoir.deploy.<CODE>.section<N>[.<folder id>].sh`
+#     (ScheduledDeploy.agentLabel; <CODE> as ScheduledDeploy.sanitizedCode
+#     writes it). launchd's `Plantoir --run-scheduled-deploy <script> …`
+#     lives for the whole run, both legs, so the build leg counts too. A
+#     label carrying ANOTHER folder's id is that folder's deploy.
+# NOT a deploy: `preview.sh C S --build-only`. It is a publish's build leg,
+# but it is also exactly what the assistant's "rebuild the preview" runs, and
+# nothing on the command line tells the two apart — counting it would refuse
+# every preview of a section while the assistant refreshed it, with a
+# sentence that is false. The window refuses its own build leg from its
+# publish record; a preview typed in Terminal during ANOTHER program's build
+# leg is the one gap left, and the contract names it.
+# This run's own ancestors and descendants never count (a shell wrapping
+# `./deploy.sh C S; ./preview.sh C S` carries the words). A process table
+# that cannot be read lets the preview THROUGH — the opposite of the look
+# before a workspace is remade, on purpose: there, failing open costs a
+# publish; here, failing closed would refuse every preview for as long as
+# `ps` fails, which is "blocked until a restart" again. The window's check
+# and the leases still stand when this one cannot see.
+a_deploy_is_running_for() {
+  local course="$1" section="$2" label_code folder_id here table found kind pid cwd
+  label_code="$(printf '%s' "$course" | tr '[:lower:]' '[:upper:]' | LC_ALL=C sed 's/[^A-Z0-9]/-/g')"
+  [[ -n "$label_code" ]] || label_code="COURSE"
+  here="$(/bin/pwd -P)"
+  folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
+  table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" || return 1
+  [[ -n "$table" ]] || return 1
+  found="$(printf '%s\n' "$table" | awk -v self="$$" -v course="$course" -v section="$section" \
+      -v code="$label_code" -v folder="$folder_id" '
+    {
+      pid = $1; parent[pid] = $2
+      line = $0
+      sub(/^[ \t]*[0-9]+[ \t]+[0-9]+[ \t]+/, "", line)
+      args[pid] = line
+      order[++count] = pid
+    }
+    END {
+      mine[self] = 1
+      p = self
+      while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
+        p = parent[p]; mine[p] = 1
+      }
+      prefix = "ca.russellgordon.Plantoir.deploy." code ".section" section
+      pattern = "ca\\.russellgordon\\.Plantoir\\.deploy\\." code "\\.section" section "(\\.[0-9a-f]+)?\\.sh([ \t]|$)"
+      for (i = 1; i <= count; i++) {
+        pid = order[i]
+        if (pid in mine) continue
+        q = pid; ours = 0; steps = 0
+        while ((q in parent) && steps < 64) {
+          if (parent[q] == self) { ours = 1; break }
+          q = parent[q]; steps++
+        }
+        if (ours) continue
+        if (match(args[pid], pattern)) {
+          rest = substr(args[pid], RSTART + length(prefix), RLENGTH - length(prefix))
+          sub(/[ \t]$/, "", rest)
+          if (rest == ".sh" || rest == "." folder ".sh") { print "scheduled " pid; continue }
+        }
+        if (args[pid] ~ /[ \t](--reset-token|--logout|--help|-h)([ \t]|$)/) continue
+        n = split(args[pid], word, /[ \t]+/)
+        for (w = 1; w + 2 <= n; w++) {
+          if (word[w] ~ /(^|\/)deploy\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
+            print "deploy " pid
+            break
+          }
+        }
+      }
+    }')"
+  while read -r kind pid; do
+    case "$kind" in
+      scheduled)
+        return 0 ;;
+      deploy)
+        cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
+          return 0
+        fi ;;
+    esac
+  done <<< "$found"
+  return 1
+}
+
+# The sentence is contracts/shared-rules.json ->
+# previewWhileItsSectionDeploys.sentences.launcher, and the trail line that
+# entry's launcherLine — both checked by scripts/test_preview_while_deploying.py.
+refuse_a_preview_while_its_section_deploys() {
+  if a_deploy_is_running_for "$COURSE" "$SECTION"; then
+    echo ""
+    echo "❌ ${COURSE} section ${SECTION} is being deployed right now, so it cannot be previewed until that has finished."
+    echo "   Nothing was changed."
+    echo ""
+    note_on_the_trail "${COURSE}/${SECTION} · the preview stopped before building — this section was being deployed"
+    exit 1
+  fi
+}
+# <<< PREVIEW WHILE DEPLOYING GUARD <<<
+
+if [[ -z "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then
+  refuse_a_preview_while_its_section_deploys
+fi
+
 # -------------------- Stop mode ----------------------------------------
 # ./preview.sh CODE N --stop : kill this section's preview processes
 # INSIDE the container. Ending the host-side script (closing the app's
