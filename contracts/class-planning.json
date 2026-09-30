@@ -55,9 +55,740 @@
       "value": true,
       "why": "Naming the class ('publish Unit 2, Day 3') and naming its day ('publish tomorrow's class') are two ways of saying one thing and must date pages identically. They did not: the by-day route worked the dates out and the by-name route passed an empty list, so the same teacher got two different results depending on which sentence they used."
     },
-    "neverPublishedIsInferred": {
-      "from": "the page being hidden at the moment the publish is planned",
-      "why": "Nothing on disk records a page's history. A page published once and later hidden therefore counts as never published and would take a new date. Recording the truth would mean a new frontmatter key on every page, agreed between both apps and the Python; the inference costs nothing and is right in every case anybody has met."
+    "publishedBeforeIsRecorded": {
+      "from": "the section's published-pages record: courses/<CODE>/.publish_state/section<N>.published-pages/, one fragment per destination a deploy reached (file-formats.json -> publishedPagesRecord). A page listed there has been on a site students could reach; a page hidden now and listed there KEEPS its date when it is published again - from the links checklist and from the assistant's publish alike (Russell's decision 4 on #379, 2026-09-29; the plan's Q5).",
+      "replaces": "neverPublishedIsInferred (#173 era): 'a page published once and later hidden counts as never published and takes a new date'. Russell chose the opposite on 2026-09-29.",
+      "whyARecordAndNotAKeyOnThePage": "The obvious sign - a date already on the page (created, or createdSection<N> on a course-level page) - means nothing: measured over the 39 payloads, 7,114 of the 7,118 pages that carry a publish flag also carry created, because setup_course.py writes it on every page it makes and a template copied in Obsidian carries its install-day stamp. Reading 'has a date' as 'was published' would switch the dating off everywhere, and every test built from bare fixtures would still pass. A new page key stamped by deploys (firstPublishedSection<N>) was rejected too: a line on every published page, a rewrite of teacher files on nearly every deploy (each day's class brings new pages), each one after a build has started triggering #265's extra build, and a key both apps and the Python must agree on forever.",
+      "honestLimit": "Pages published and hidden again BEFORE the record existed (v1.4.1), or renamed since they were published, are not in it and count as never published - the old inference, once. Accepted by the director (Q3), 2026-09-29: rare. The first deploy after v1.4.1 records the pages visible AT THAT DEPLOY; a page already hidden then stays unrecorded, and takes its class's date once when it is next published.",
+      "releasedAtRollover": "The record's fragments are moved aside on EVERY rollover of the section, whichever website answer the teacher gave, and the rollover's undo restores it (file-formats.json -> publishedPagesRecord.releasedWhenASectionRollsOver): a new year's site has published nothing yet, so the pages Get Ready hid take this year's class dates.",
+      "firstClassException": "datingPagesAClassBrings.fromTheLinksChecklist.firstClassException: a page a visible class links DIRECTLY is dated by the build on every build, record or not.",
+      "cases": [
+        {
+          "name": "a page published before and hidden again keeps its date when its class is published",
+          "classes": [
+            {
+              "title": "Unit 2, Day 3",
+              "date": "2026-10-06",
+              "links": [
+                "Worksheet"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "Worksheet",
+              "visible": false,
+              "date": "2026-02-01"
+            }
+          ],
+          "publishedBefore": [
+            "Worksheet"
+          ],
+          "publish": [
+            "Unit 2, Day 3"
+          ],
+          "expectNoMove": [
+            "Worksheet"
+          ]
+        },
+        {
+          "name": "a page that only carries a date, and was never published, moves",
+          "classes": [
+            {
+              "title": "Unit 2, Day 3",
+              "date": "2026-10-06",
+              "links": [
+                "Worksheet"
+              ]
+            }
+          ],
+          "pages": [
+            {
+              "title": "Worksheet",
+              "visible": false,
+              "date": "2026-02-01"
+            }
+          ],
+          "publishedBefore": [],
+          "publish": [
+            "Unit 2, Day 3"
+          ],
+          "expectMoves": {
+            "Worksheet": "2026-10-06"
+          }
+        }
+      ],
+      "howTheCasesRun": "The shape reachStopsAtAClassPage.cases uses, plus `publishedBefore`: the titles of pages the section's published-pages record lists. Run by the mac harness through the assistant's publish (AssistToolRunnerTests); owed by Windows."
+    },
+    "fromTheLinksChecklist": {
+      "rule": "When a teacher publishes pages from the links checklist (shared-rules.json -> linksChecklist), each page takes a date worked out by the BUILD and written into the offer (file-formats.json -> linksChecklistOffer). From every VISIBLE, DATED class page of the section, links are followed up to TWO steps - by the #333 finding's reader, path first then name, a name several pages share landing on a hidden one only when EVERY one is hidden. A link that lands on a class page is not entered (followingLinks.stopsAtAClassPage), a hidden class is not walked from (visibleClassesOnly), and the walk does not go THROUGH a folder's index or Key Links. (1) A hidden page reached at step 1 or 2 is 'used by a class' (group fromAClass), claimed by the earliest visible class that reaches it (date, then title - whenSeveralClassesShareAPage). (2) EXCEPT a page a visible, dated class links DIRECTLY in the way the build's own date pass reads links: the build has already given it the earliest direct linker's date (atBuildTime) and would rewrite any other on the next build, so the checklist writes no date for it (why datedByTheBuild). (3) Every other hidden page that a visible page, or an offered page, links to - closed transitively, stopping at class pages - is 'linked from other pages' (group notReachedByAClass) and takes the date of the first class of the year (datingNonClassPages.dateInherited). (4) A hidden class such a link lands on is offered as a class (group class): never walked through, never dated. (5) A page in the section's published-pages record keeps the date it has (publishedBeforeIsRecorded); a folder's index or Key Links is never given a date.",
+      "reach": "two steps",
+      "appliesWhen": "a page is published from the links checklist",
+      "datesAreDays": "The offer carries a calendar day (YYYY-MM-DD, the day the class's own value names as written, never converted to another time zone), because that is what the apps write - the same CalendarDay the assistant's date moves carry. A page's date is therefore KEPT as that day, not copied character for character (director's ruling N9).",
+      "whyNotAtBuildTime": "Two steps is a rule for HIDDEN pages at the moment the teacher publishes them, never a build-time rule. At build time it would rewrite VISIBLE pages on every build through hubs: measured 2026-09-25, Day 1 claimed 98 of the 105 pages EXC2O's first build rewrote, and ICS4U 133 of 136 through Learning Goals (atBuildTime.reach). And dating a hidden step-2 page at build time would write Unit 1, Day 1's date into SNC1W's Final Examination while it is still hidden; published later by its own flag it would go out dated Day 1.",
+      "ticking": "Every row in the two page groups starts TICKED, except a page that a HIDDEN class links directly while NO visible class does: that page is a later class's material, starts UNTICKED, and says which hidden class uses it first (firstUsedIn - the earliest by date, then title). Class rows always start unticked. Russell's decision 1 (2026-09-29) and the director's ruling on the plan's Q1 as narrowed by plan-review finding 5: measured over the 39 payloads, a default-ticked sheet straight after Get Ready (#96) would offer a median of 56 pages (16-82), e.g. SNC1W's Final Examination dated Unit 1, Day 1 through How Marks Work - one press would undo Get Ready and misdate the year. A page a VISIBLE class links directly stays ticked even when a hidden class links it too: it is material of a class students can already open.",
+      "tickedAnyway": "A row that started unticked and is ticked by the teacher takes the date its group gives it (step 2: the claiming visible class's; the other group: the first class of the year) - the row shows that date, so the teacher sees what ticking it means.",
+      "firstClassException": "Recorded so nobody 'fixes' it (plan-review N8): a page a visible class links DIRECTLY takes that class's date from the BUILD on every build, hidden or not, even when the page was published before and hidden again - so for those pages the build's rule (atBuildTime) wins over publishedBeforeIsRecorded. Decision 4 governs step-2 and other-group pages.",
+      "howTheCasesRun": "Each case lays out pages by their place in the course folder, the way test_links_into_hidden_pages.py does (a page in section1/ lands at the top of the merged content; every page is remembered against its source). A page is a class when its name is a class page's (section1/All Classes/Unit x, Day y). `visible` false writes `publish: false`; `created` is written as the page's date; `links` are [[...]] lines; `published` true puts the page in the section's published-pages record. `expect` maps a page's place to the row the offer must carry for it - only the keys given are compared (null means null); `expectAbsent` lists places that must not be offered at all; `expectNoOffer` true means the offer is empty and no file is written. Run by the build (scripts/test_links_checklist.py) in the image under verify.sh and on Windows by PythonToolchainTests.",
+      "cases": [
+        {
+          "name": "a. two steps away takes the class's date",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "visible": true,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": [
+                "How Loops Work"
+              ]
+            },
+            {
+              "path": "Concepts/How Loops Work",
+              "visible": true,
+              "links": [
+                "Loop Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Loop Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Loop Worksheet": {
+              "group": "fromAClass",
+              "ticked": true,
+              "step": 2,
+              "claimedBy": "section1/All Classes/Unit 1, Day 2",
+              "date": "2026-09-10",
+              "why": "dated"
+            }
+          }
+        },
+        {
+          "name": "b. three steps away is the other group, dated as the first class",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "visible": true,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Middle"
+              ]
+            },
+            {
+              "path": "Concepts/Middle",
+              "visible": true,
+              "links": [
+                "Deep"
+              ]
+            },
+            {
+              "path": "Exercises/Deep",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Deep": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "step": null,
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
+        },
+        {
+          "name": "c. the walk stops at a class page",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Unit 2, Day 5"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 2, Day 5",
+              "visible": false,
+              "created": "2026-10-20T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "section1/All Classes/Unit 2, Day 5": {
+              "group": "class",
+              "ticked": false
+            }
+          },
+          "expectAbsent": [
+            "Exercises/Worksheet"
+          ]
+        },
+        {
+          "name": "d. a class page never inherits a date",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Unit 1, Day 3"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 3",
+              "visible": false,
+              "created": "2026-09-12T07:00:00.000+0000",
+              "links": []
+            }
+          ],
+          "expect": {
+            "section1/All Classes/Unit 1, Day 3": {
+              "group": "class",
+              "ticked": false,
+              "step": null,
+              "claimedBy": null,
+              "date": null,
+              "why": "classNeverDated"
+            }
+          }
+        },
+        {
+          "name": "e. a page a class links directly is dated by the build, not the checklist",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 4",
+              "visible": true,
+              "created": "2026-09-15T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Worksheet": {
+              "group": "fromAClass",
+              "ticked": true,
+              "step": 1,
+              "claimedBy": "section1/All Classes/Unit 1, Day 4",
+              "date": null,
+              "why": "datedByTheBuild"
+            }
+          }
+        },
+        {
+          "name": "f. a page published before keeps its date; a page that only carries a date moves",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "visible": true,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": [
+                "Published Once",
+                "Only Dated"
+              ]
+            },
+            {
+              "path": "Exercises/Published Once",
+              "visible": false,
+              "links": [],
+              "created": "2026-02-01T07:00:00.000+0000",
+              "published": true
+            },
+            {
+              "path": "Exercises/Only Dated",
+              "visible": false,
+              "links": [],
+              "created": "2026-02-01T07:00:00.000+0000"
+            }
+          ],
+          "expect": {
+            "Exercises/Published Once": {
+              "group": "fromAClass",
+              "ticked": true,
+              "date": null,
+              "why": "keepsItsDate"
+            },
+            "Exercises/Only Dated": {
+              "group": "fromAClass",
+              "ticked": true,
+              "date": "2026-09-10",
+              "why": "dated"
+            }
+          }
+        },
+        {
+          "name": "g. a hidden class dates nothing",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 3",
+              "visible": false,
+              "created": "2026-09-12T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Worksheet": {
+              "group": "notReachedByAClass",
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
+        },
+        {
+          "name": "h. the earliest class claims, ties by title",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 10",
+              "visible": true,
+              "created": "2026-09-22T07:00:00.000+0000",
+              "links": [
+                "Hub A"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 9",
+              "visible": true,
+              "created": "2026-09-19T07:00:00.000+0000",
+              "links": [
+                "Hub B"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 2, Day 2",
+              "visible": true,
+              "created": "2026-09-24T07:00:00.000+0000",
+              "links": [
+                "Hub C"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 2, Day 1",
+              "visible": true,
+              "created": "2026-09-24T07:00:00.000+0000",
+              "links": [
+                "Hub D"
+              ]
+            },
+            {
+              "path": "Concepts/Hub A",
+              "visible": true,
+              "links": [
+                "Shared Worksheet"
+              ]
+            },
+            {
+              "path": "Concepts/Hub B",
+              "visible": true,
+              "links": [
+                "Shared Worksheet"
+              ]
+            },
+            {
+              "path": "Concepts/Hub C",
+              "visible": true,
+              "links": [
+                "Tied Worksheet"
+              ]
+            },
+            {
+              "path": "Concepts/Hub D",
+              "visible": true,
+              "links": [
+                "Tied Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Shared Worksheet",
+              "visible": false,
+              "links": []
+            },
+            {
+              "path": "Exercises/Tied Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Shared Worksheet": {
+              "claimedBy": "section1/All Classes/Unit 1, Day 9",
+              "date": "2026-09-19"
+            },
+            "Exercises/Tied Worksheet": {
+              "claimedBy": "section1/All Classes/Unit 2, Day 1",
+              "date": "2026-09-24"
+            }
+          }
+        },
+        {
+          "name": "j. a page only a later hidden class links directly starts unticked, and says which class uses it first",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "How Marks Work"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 5, Day 20",
+              "visible": false,
+              "created": "2026-12-18T08:00:00.000+0000",
+              "links": [
+                "Final Examination"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 5, Day 22",
+              "visible": false,
+              "created": "2026-12-22T08:00:00.000+0000",
+              "links": [
+                "Final Examination"
+              ]
+            },
+            {
+              "path": "Setup/How Marks Work",
+              "visible": true,
+              "links": [
+                "Final Examination"
+              ]
+            },
+            {
+              "path": "Assessments/Final Examination",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Assessments/Final Examination": {
+              "group": "fromAClass",
+              "step": 2,
+              "ticked": false,
+              "firstUsedIn": "section1/All Classes/Unit 5, Day 20",
+              "date": "2026-09-08",
+              "why": "dated"
+            }
+          },
+          "expectAbsent": [
+            "Setup/How Marks Work"
+          ]
+        },
+        {
+          "name": "k. a page a visible class links directly stays ticked, even when a hidden class links it too",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 5",
+              "visible": true,
+              "created": "2026-09-17T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 12",
+              "visible": false,
+              "created": "2026-09-30T07:00:00.000+0000",
+              "links": [
+                "Worksheet"
+              ]
+            },
+            {
+              "path": "Exercises/Worksheet",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Exercises/Worksheet": {
+              "group": "fromAClass",
+              "step": 1,
+              "ticked": true,
+              "firstUsedIn": null
+            }
+          }
+        },
+        {
+          "name": "a folder's index or Key Links may be offered, and is never dated",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Concepts/index"
+              ]
+            },
+            {
+              "path": "Concepts/index",
+              "visible": false,
+              "links": []
+            },
+            {
+              "path": "Concepts/Loops",
+              "visible": true,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Concepts/index": {
+              "group": "fromAClass",
+              "ticked": true,
+              "date": null,
+              "why": "structuralNeverDated"
+            }
+          }
+        },
+        {
+          "name": "the other group stops at a class page too",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hidden Hub"
+              ]
+            },
+            {
+              "path": "Resources/Hidden Hub",
+              "visible": false,
+              "links": [
+                "Unit 3, Day 1"
+              ]
+            },
+            {
+              "path": "section1/All Classes/Unit 3, Day 1",
+              "visible": false,
+              "created": "2026-10-30T07:00:00.000+0000",
+              "links": [
+                "Deep"
+              ]
+            },
+            {
+              "path": "Exercises/Deep",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Resources/Hidden Hub": {
+              "group": "notReachedByAClass",
+              "ticked": true
+            },
+            "section1/All Classes/Unit 3, Day 1": {
+              "group": "class",
+              "ticked": false
+            }
+          },
+          "expectAbsent": [
+            "Exercises/Deep"
+          ]
+        },
+        {
+          "name": "the walk does not go through Key Links or a folder's index: what they link to is the other group, dated as the first class",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "section1/All Classes/Unit 1, Day 2",
+              "visible": true,
+              "created": "2026-09-10T07:00:00.000+0000",
+              "links": [
+                "Key Links"
+              ]
+            },
+            {
+              "path": "section1/Key Links",
+              "visible": true,
+              "links": [
+                "Behind Key Links"
+              ]
+            },
+            {
+              "path": "Concepts/Behind Key Links",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Concepts/Behind Key Links": {
+              "group": "notReachedByAClass",
+              "step": null,
+              "claimedBy": null,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
+        },
+        {
+          "name": "the other group follows links out of its own pages: a hidden page behind a hidden page no class reaches is offered too",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": []
+            },
+            {
+              "path": "Resources/Useful Links",
+              "visible": true,
+              "links": [
+                "Hidden A"
+              ]
+            },
+            {
+              "path": "Resources/Hidden A",
+              "visible": false,
+              "links": [
+                "Hidden B"
+              ]
+            },
+            {
+              "path": "Resources/Hidden B",
+              "visible": false,
+              "links": []
+            }
+          ],
+          "expect": {
+            "Resources/Hidden A": {
+              "group": "notReachedByAClass",
+              "ticked": true
+            },
+            "Resources/Hidden B": {
+              "group": "notReachedByAClass",
+              "ticked": true,
+              "date": "2026-09-08",
+              "why": "datedAsTheFirstClass"
+            }
+          }
+        },
+        {
+          "name": "nothing to offer when every link leads somewhere students can see",
+          "pages": [
+            {
+              "path": "section1/All Classes/Unit 1, Day 1",
+              "visible": true,
+              "created": "2026-09-08T07:00:00.000+0000",
+              "links": [
+                "Hub"
+              ]
+            },
+            {
+              "path": "Concepts/Hub",
+              "visible": true,
+              "links": []
+            }
+          ],
+          "expectNoOffer": true
+        }
+      ]
     },
     "atBuildTime": {
       "rule": "On every build of section N, a page a VISIBLE, dated class of section N links to DIRECTLY takes the date of the EARLIEST such class — even over a date of its own, typed or not — and the build REWRITES it into the teacher's own file, as well as into the site's copy. A page no visible class of section N links to directly keeps its own date and is not written — including a page reached only THROUGH another shared page, and an undated one stays undated. A file is written only when the date the build would read for section N differs from the class's, so a second build changes no file at all.",
@@ -765,7 +1496,7 @@
     }
   },
   "datingNonClassPages": {
-    "note": "Pages that are not linked from a Unit x, Day y page, directly or through other pages (a page a class links DIRECTLY takes that class's date instead: `datingPagesAClassBrings.atBuildTime`; a page reached only through another shared page keeps its own date, or none), and are not themselves a Unit x, Day y page (such as sidebar pages, Curriculum pages, and Key Links pages not referenced in any class lesson), inherit the same date as the first class of the year (Unit 1, Day 1) when a site is previewed or deployed, and upon course setup.",
+    "note": "Pages that are not linked from a Unit x, Day y page, directly or through other pages (a page a class links DIRECTLY takes that class's date instead: `datingPagesAClassBrings.atBuildTime`; a page reached only through another shared page keeps its own date, or none), and are not themselves a Unit x, Day y page (such as sidebar pages, Curriculum pages, and Key Links pages not referenced in any class lesson), inherit the same date as the first class of the year (Unit 1, Day 1) when a site is previewed or deployed, and upon course setup. The same date is what the links checklist writes into a hidden page it offers in its second group, \"linked from other pages\" (datingPagesAClassBrings.fromTheLinksChecklist, #379).",
     "appliesTo": [
       "sidebar pages (e.g., folder index.md files — but NOT the section's own front page, which carries the date of the class its embed names: `sectionIndexPointer.dateCases`)",
       "Key Links pages that are not linked from any Unit x, Day y class page",

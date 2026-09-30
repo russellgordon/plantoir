@@ -923,6 +923,70 @@ log and the process inherits it, and an unread pipe is what wedged the
 assistant server once. Where a task runner already captures output, use that;
 the log-scrape is a workaround for a constraint not every platform shares.
 
+### Links into hidden pages: published as they are, offered afterwards (#379)
+
+The same rule covers the one finding that now has a checklist behind it. A
+scheduled deploy whose build finds links into hidden pages publishes AS IS —
+nothing the teacher did not choose goes up (Russell's decision 3) — and the
+links checklist is offered the next time the section window appears or
+becomes key, from the offer file the build left
+(`shared-rules.json` → `linksChecklist.offeredWhen.afterAnUnwatchedPublish`).
+The folder-problem record the window reads on appearing keeps the finding; the
+window takes it out of the alert only when the checklist will really be shown
+(an offer on disk, fresh, holding a page not yet answered). Mechanics:
+[05 → The links checklist (#379)](05-build-pipeline.md#the-links-checklist-379).
+
+## The published-pages record (#379)
+
+"A page published before, then hidden again, keeps its date" (Russell's
+decision 4 on #379) needs to know what has been on a site students could
+reach. Nothing did: a date on the page is on 7,114 of the 7,118 payload pages
+that carry a publish flag. So a deploy now RECORDS it
+(`file-formats.json` → `publishedPagesRecord`, `visiblePagesList`).
+
+- **The build writes the list.** A build for publishing writes
+  `.visible-pages.json` into the section's built output, BESIDE `public/`
+  (never inside it, so no destination uploads it) — every page it shows, by
+  its place in the course folder, read with the build's own hide rule after
+  the How I Teach sweep and the #246 hiding. It is written only after Quartz
+  built the site and it was mirrored; a build that fails half way leaves the
+  previous list in place, but it has already written a new `.build-id`, so
+  nothing is recorded from that list until a build for publishing succeeds. Every build, preview
+  or not, first writes `.build-id` beside it; the list carries the id of the
+  build that wrote it.
+- **Each destination records itself, after its upload succeeded.** `deploy.py`
+  adds a fragment `.publish_state/section<N>.published-pages/<UTC stamp>-<netlify|cloudflare>.json`
+  after the Netlify delta deploy completed, or after `publish_to_cloudflare`
+  returned; `deploy.sh`'s folder branch — which never enters `deploy.py` —
+  copies the list itself after rsync succeeded (`record_published_pages`, a
+  plain `cp` with a `grep` for the id: no JSON in bash). Each records ONLY
+  when the list's id is `.build-id`'s, so a list from an earlier build than the
+  site in the folder (a preview has run since) is never recorded.
+- **Why fragments, not one file.** `deploy.py` publishes ONE destination per
+  run and never sees a folder publish, so "after every destination succeeded"
+  cannot be known anywhere (plan review, finding 10). A Netlify success with a
+  failed Cloudflare secondary DID put the pages in front of students — recording
+  it is the truth — and fragments cannot lose each other when two publishes
+  run at once. Readers take the union.
+- **Released on every rollover** of the section, whichever website answer the
+  teacher gave — its fragments moved into `section<N>.published-pages.previous-<stamp>/`
+  — and restored by the rollover's undo — a new year's site has
+  published nothing yet (`publishedPagesRecord.releasedWhenASectionRollsOver`).
+- **Never fails a publish.** The pages are already out; a record that could
+  not be written costs, at worst, one page taking its class's date once.
+
+Tested by `scripts/test_published_pages_record.py` (11: the fragment, an
+earlier build's list not recorded, the call after each upload in `main()`, the
+folder branch cut out of `deploy.sh` and run under bash, the list beside
+`public/` and written only after the site was built, the union read), with
+eight mutations run red. `verify-deploy.sh` is owed for this change (the
+publishing path moved) and does not yet read the record back.
+
+**Windows owes** `deploy.ps1`'s folder half (it copies with PowerShell and
+never enters `deploy.py` either) and the rollover release in its own rollover
+(`AssistWorkspace.ReleaseSite` is the wrong hook on both platforms: it runs
+only for a NEW website, finding 12).
+
 ## Deploys with several destinations
 
 Take the findings from the FIRST leg only. Every destination publishes the same

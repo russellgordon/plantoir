@@ -2304,6 +2304,15 @@ deployed"; three things belong here, beside the launchers themselves:
   teacher installs nothing. The check is a `grep` for the key and a second one
   for `course_code`, so the sentence names the code a teacher reads rather than
   the folder.
+- **The folder branch records what it published (#379).** Because it never
+  enters `deploy.py`, it also does `deploy.py`'s new bookkeeping itself: after
+  rsync succeeded, `record_published_pages` copies the build's
+  `.visible-pages.json` into `courses/<CODE>/.publish_state/section<N>.published-pages/`
+  when its build id is `.build-id`'s — plain `cp` and `grep`, no host
+  interpreter, and any failure records nothing and publishes anyway
+  ([`07-deployment.md`](07-deployment.md) → "The published-pages record
+  (#379)"; `scripts/test_published_pages_record.py` cuts the function out of
+  the launcher and runs it). `deploy.ps1`'s folder branch owes the same.
 - **It fails CLOSED.** A settings file that exists and cannot be read refuses.
   A settings file that is absent is left to the course-folder check further
   down, which already says that in its own words.
