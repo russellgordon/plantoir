@@ -298,13 +298,13 @@ struct StartOfYearSheet: View {
             DisclosureGroup(StartOfYearWording.classesHeading(
                 classes: StartOfYearWording.counted(classChanges.count, noun: plan.noun)
             )) {
-                draftList(classChanges, first: first, showingPath: false)
+                draftList(classChanges, plan: plan, first: first)
             }
         }
         let pageChanges: [StartOfYearDraft] = plan.draftsThatChange(plan.pageDrafts)
         if !pageChanges.isEmpty {
             DisclosureGroup(StartOfYearWording.pagesHeading(pages: StartOfYearWording.pages(pageChanges.count))) {
-                draftList(pageChanges, first: first, showingPath: true)
+                draftList(pageChanges, plan: plan, first: first)
             }
         }
         if plan.classesAlreadyInDraft > 0 {
@@ -338,7 +338,7 @@ struct StartOfYearSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(plan.danglingSources, id: \.page.relativePath) { source in
                         Text("• " + StartOfYearWording.linksLeftLine(
-                            page: source.page.displayTitle,
+                            name: plan.name(of: source.page),
                             links: source.hiddenTargets.count == 1
                                 ? "1 link" : "\(source.hiddenTargets.count) links"
                         ))
@@ -353,23 +353,28 @@ struct StartOfYearSheet: View {
             .foregroundStyle(.secondary)
     }
 
-    func draftList(_ drafts: [StartOfYearDraft], first: String, showingPath: Bool) -> some View {
+    /// Each page by its title, and its folder only when another page in the
+    /// section shares the title (#362) — built by the plan, the same line
+    /// `describe()` gives an outside assistant. (The `id:` is the page's path
+    /// on purpose: an identity, never shown.)
+    func draftList(_ drafts: [StartOfYearDraft], plan: StartOfYearPlan, first: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(drafts, id: \.page.relativePath) { draft in
-                let name: String = showingPath
-                    ? "“\(draft.page.displayTitle)” (\(draft.page.relativePath))"
-                    : "“\(draft.page.displayTitle)”"
-                Text("• \(name) — \(draft.reason.sentence(first: first))")
+                Text("• " + plan.line(for: draft, first: first))
                     .textSelection(.enabled)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// The undo's lists: each file by its title, never its path (#362).
     func fileList(_ urls: [URL]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(urls, id: \.path) { url in
-                Text("• " + AssistSectionGraph.relativePath(of: url, workspaceURL: model.workspaceURL))
+        let names: [String] = StartOfYearPageNaming.names(
+            ofFilesAt: urls, courseDirectoryURL: model.course.directoryURL, courseCode: model.course.code
+        )
+        return VStack(alignment: .leading, spacing: 4) {
+            ForEach(names.indices, id: \.self) { index in
+                Text("• " + names[index])
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
