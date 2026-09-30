@@ -329,7 +329,14 @@ public static class ScheduledPublishOutcome
         // An unusable record IS deleted, because nothing else ever will: no
         // sentence can be shown for it, so no Dismiss can be pressed, and it
         // would otherwise be re-read every time the app opened, for ever.
-        if (result is null)
+        //
+        // But not one written in the last minute (#218): the watcher reads a
+        // record the moment it appears, and a wrapper written by an older build
+        // still writes in place, so its record can be read before its content
+        // lands. Deleting it then would destroy the news the watch exists to
+        // deliver. A minute is not a latency guess — the band shows on the next
+        // event either way; it is only how long an EMPTY file is left alone.
+        if (result is null && DateTime.Now - writtenAt > TimeSpan.FromMinutes(1))
         {
             try { File.Delete(path); } catch { }
             try { File.Delete(path + NotedSuffix); } catch { }

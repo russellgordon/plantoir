@@ -260,9 +260,25 @@ public class ScheduledPublishOutcomeTests : IDisposable
     {
         string path = RecordPath(_dir, "ICS3U", 1);
         File.WriteAllText(path, "   \r\n");
+        File.SetLastWriteTime(path, DateTime.Now.AddMinutes(-2));
 
         Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
         Assert.False(File.Exists(path), "An unusable record must not be re-read every morning.");
+    }
+
+    /// <summary>
+    /// ...but one written in the last minute is left alone (#218): the watcher
+    /// reads a record the moment it appears, and a wrapper from an older build
+    /// writes in place, so the empty file may be a record still being written.
+    /// </summary>
+    [Fact]
+    public void AnEmptyRecordWrittenJustNowIsLeftForItsContent()
+    {
+        string path = RecordPath(_dir, "ICS3U", 1);
+        File.WriteAllText(path, "");
+
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
+        Assert.True(File.Exists(path), "a record still being written was thrown away");
     }
 
     /// <summary>
@@ -274,6 +290,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
     {
         string path = RecordPath(_dir, "ICS3U", 1);
         File.WriteAllText(path, "needed-an-answer\r\n\r\n");
+        File.SetLastWriteTime(path, DateTime.Now.AddMinutes(-2));
 
         Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
         Assert.False(File.Exists(path));
