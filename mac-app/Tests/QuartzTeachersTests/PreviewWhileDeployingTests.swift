@@ -208,32 +208,39 @@ final class PreviewWhileDeployingTests: XCTestCase {
 
     /// Swift keeps any letter or digit in a label; the launchers keep only
     /// A-Z and 0-9. They agree on every code a teacher can make only because
-    /// `CourseCodeRule` refuses every character they disagree on. This walks
-    /// the whole Basic Multilingual Plane and holds that true — so the day
-    /// the rule starts accepting an accented letter (French course names
-    /// are common in Ontario), this fails instead of a scheduled deploy of
-    /// that course quietly going unseen by the launchers.
+    /// `CourseCodeRule` accepts nothing they would write differently. This
+    /// walks the whole Basic Multilingual Plane, types each character into a
+    /// code, and for every code the rule accepts compares the two labels of
+    /// the code as STORED (`normalized`: upper-cased, so "ß" arrives as
+    /// "SS" and is ASCII by then). The day the rule starts accepting an
+    /// accented letter (French course names are common in Ontario), this
+    /// fails instead of a scheduled deploy of that course quietly going
+    /// unseen by the launchers.
     func testEveryCharacterACourseCodeMayHoldIsLabelledAsTheLaunchersLabelIt() {
-        var disagreementsChecked: Int = 0
-        var accepted: [String] = []
+        var codesAccepted: Int = 0
+        var labelledDifferently: [String] = []
         for value in 0x20...0xFFFF {
             guard let scalar = Unicode.Scalar(value) else {
                 continue
             }
-            let character: Character = Character(scalar)
-            let swiftWrites: String = ScheduledDeploy.sanitizedCode(String(character))
-            let launchersWrite: String = launcherLabelCode(of: character)
-            if swiftWrites == launchersWrite {
+            let typed: String = "A" + String(Character(scalar)) + "1"
+            if CourseCodeRule.trouble(typed, existingCodes: []) != nil {
                 continue
             }
-            disagreementsChecked += 1
-            let typed: String = "A" + String(character) + "1"
-            if CourseCodeRule.trouble(typed, existingCodes: []) == nil {
-                accepted.append(String(format: "U+%04X", value))
+            codesAccepted += 1
+            let stored: String = CourseCodeRule.normalized(typed)
+            var launchersWrite: String = ""
+            for character in stored {
+                launchersWrite += launcherLabelCode(of: character)
+            }
+            if ScheduledDeploy.sanitizedCode(stored) != launchersWrite {
+                labelledDifferently.append(String(format: "U+%04X", value))
             }
         }
-        XCTAssertGreaterThan(disagreementsChecked, 1000, "the walk found almost nothing to check")
-        XCTAssertEqual(accepted, [], "a code holding these is accepted, and Swift and the launchers label it differently")
+        // Letters, digits, a space and a dash — and a few that upper-case
+        // into ASCII letters — so the walk plainly found codes to compare.
+        XCTAssertGreaterThan(codesAccepted, 60, "the walk found almost nothing to compare")
+        XCTAssertEqual(labelledDifferently, [], "a code holding these is accepted, and Swift and the launchers label it differently")
     }
 
     // MARK: - Functions
