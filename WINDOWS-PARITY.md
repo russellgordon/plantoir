@@ -356,13 +356,14 @@ issue whose code it touches, so work this file's order and meet them there:
 
 ### Added by the mac's v1.4.2 (2026-09-30)
 
-On this milestone (the director's ruling R8). Placed beside the scheduling
+On this milestone (the director's ruling R8). Each is placed beside the
 issues whose code it touches:
 
 | Issue | What it is | Do it |
 |---|---|---|
 | [#400](https://github.com/russellgordon/plantoir/issues/400) (from mac [#396](https://github.com/russellgordon/plantoir/issues/396)) | Schedule Deploy: drop the not-published-yet note, and name every destination (sidebar dialog, `Describe()`, the card, `PlantoirTools.cs`' `schedule_deploy` result). **Turns a GREEN test RED on pull, by design**: `SharedRuleContractTests.AScheduledDeployNamesTheClassesStudentsCannotSeeYet` asserts the old `scheduledDeployRefusals.alsoSaid.rule` — map that red to this issue on the red list | with [#357](https://github.com/russellgordon/plantoir/issues/357) (#335, which adds `actsUseTheSavedSettings`' case 8 here) and [#347](https://github.com/russellgordon/plantoir/issues/347) (#323, whose "one function for the set and the run" is the list the sentence must name) |
 | [#404](https://github.com/russellgordon/plantoir/issues/404) (from mac #403 and #402) | `list_courses` names every destination (`PlantoirTools.cs` `ListCourses`' primary-only ternary; `planOpening.listCoursesLine`). #402 (the command-line course-code rule) is inherited through the shared Python — nothing to build, one thing to KEEP: `NewCourseCreator.cs` writes `course_config.json` before `setup.ps1` asks for the code | with #400 — the same `everyDestination` words and join |
+| #NEW (from mac [#398](https://github.com/russellgordon/plantoir/issues/398)) | Links checklist: a row a ticked class brings is shown ticked and disabled, "comes with …", until the class is unticked; the button counts rows shown ticked; the published trail line counts rows that came only with a class. Nothing reddens on pull (no Windows test reads `linksChecklist`) | with #392 and #399 — after them, since it changes their sheet |
 
 ---
 

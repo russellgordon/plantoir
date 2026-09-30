@@ -6922,7 +6922,10 @@ links checklist (#379)"); this is the app's half.
   without a window): three groups under headings, each row a checkbox with a
   second line — the date it will have, or "first used in …" for a page that
   starts unticked, or "a class of its own — tick it to publish it now" plus
-  "brings N more pages with it" once ticked — and where it is linked from.
+  "brings N more pages with it" once ticked (a count of PAGES, rows or not —
+  key `comesWith`, not to be confused with #398's `comesWithAClass`), or,
+  since #398, "comes with “Unit 3, Day 1” — it goes when that class goes" for
+  a row a ticked class brings (below) — and where it is linked from.
   Rows are checked again against the pages as they are now; one that became
   visible or went away is dropped. It scrolls in a `CappedScrollArea` of 380 pt
   (#365's), width 560; 100 rows measure within 620 pt. Not Now and Publish both
@@ -6952,8 +6955,10 @@ links checklist (#379)"); this is the app's half.
   "ONLY linked from": the implementation review (S1) found that every one of
   the 44 measured rows is also "first used in" a hidden class, whose link
   `dependsOn` leaves out by design, so "only" was false in the common case
-  (naming case 2 pins it). The Publish button counts rows that go and is disabled when
-  none does. **The re-read** frees the rows under a page made visible before
+  (naming case 2 pins it). The Publish button counts rows SHOWN ticked — rows
+  that go and, since #398, rows a ticked class brings — and is disabled when
+  none is. A row a ticked class brings is never locked: it is shown coming
+  with the class instead (next bullet). **The re-read** frees the rows under a page made visible before
   the sheet OPENED (their `dependsOn` becomes empty — a visible page links
   them now), drops a gone page from other rows' `dependsOn`, and drops a row
   left with nothing it could go with, repeated to a fixed point. Nothing is
@@ -6964,6 +6969,78 @@ links checklist (#379)"); this is the app's half.
   hub has gone since is named in the "changed since it was checked" lines.
   **Answered file:** only rows whose OWN tick was off are remembered as
   unticked, so a row left with its hub comes back with it next time.
+- **Rows a ticked class brings (#398).** Ticking a class in "Classes not yet
+  published" has always published every page that class's publish reaches
+  (`whatAClassBrings`, the assistant's rule), whatever those pages' own rows
+  showed. Now each such ROW is shown ticked and `.disabled`, its second line
+  `comesWithAClass` ("comes with “Unit 3, Day 1” — it goes when that class
+  goes") and then only the plain `linkedFrom` part — never the date line (the
+  class's date wins, ruling F2), never `firstUsedIn` (it is going now), never
+  `linkedFromRow` (the class has overruled "goes when that page goes").
+  Precedence per row: coming with a ticked class, then #385's going/locked,
+  then its own tick. The row's OWN tick is kept and the checkbox ignores a
+  step on it while it comes with a class (`LinksChecklistGate.toggled(…,
+  comingWith:)`, which the binding and the contract's pure cases both call),
+  so unticking the class returns the row exactly as it was. Two ticked
+  classes bringing one row: the first in the sheet's order is named.
+  **What a class brings** is worked out ONCE, when the sheet opens
+  (`LinksChecklistPublisher.whatEachClassBrings`): every class row's title
+  goes through `AssistPublishPlanner.planPublishing(titles:)` together — the
+  planner Publish uses — and the pages it would change because they are
+  linked are shared out by each class's own `reachFollowingLinks`. That is
+  exact (reach from several classes is the union of each one's; whether a
+  reached page changes is decided page by page), so a page already visible or
+  one the writer would decline (#186) is not shown as coming, here or at
+  Publish; the class row's "brings N more" count comes from the same call and
+  now equals the trail's "bringing N more". Rows are matched to the plan in
+  composed Unicode form (Swift's own `String` equality is canonical already,
+  so this matters for a port whose string compare is ordinal). Measured on an
+  Apple M4 Pro, 2026-09-30: a synthetic section of 463 pages with 20 hidden
+  classes behind one visible overview (461 rows) opens — graph read and the
+  one planner call — in **0.158 s**
+  (`LinksChecklistComingWithTests.testTwentyClassesAreWorkedOutInOnePlan`).
+  Nothing is re-planned per tick, and what goes, what comes with a class and
+  what is shown ticked are worked out ONCE per change of `ticked` (the
+  model's `didSet`), not per row per redraw: the view asks for them several
+  times for every row, and each answer is a pass over every row. Worked out on
+  every access, as first written, one redraw of that 461-row sheet took
+  **11.8 s** in Debug on the same Mac (about 8× dev's own per-row `going`);
+  cached, **0.031 s**. The test asserts a 0.5 s ceiling on one full redraw
+  (implementation review, finding 1). **At Publish**, `plan(…, shownComingWith:)`
+  receives the rows the sheet showed coming with a class: one not written
+  after all (its class or page changed while the sheet was open) is named in
+  the "changed since it was checked" lines (iv-l: its class was published
+  elsewhere; iv-n: the row itself was). What it leaves behind follows its OWN
+  tick like any other row's — a teacher's own untick of a brought row is
+  remembered like any other untick, as Not Now remembers it (implementation
+  review note 6; the first cut forgot it, "because the teacher saw it
+  ticked", and so forgot a deliberate untick). The published trail
+  line gains "({N} of them on the list)": rows written ONLY because a ticked
+  class brought them (own tick off, or on but nothing they come under went) —
+  `Outcome.cameWithAClass`; a row that went on its own tick is not counted.
+  **Measured once, and judged — do not re-measure it.** Over the 39 payloads
+  after an emulated Get Ready (the planner's emulation, not Get Ready itself),
+  the one class row each payload offers — the exam-day class, which a visible
+  page links and which links "Final Examination", which links most of the
+  course — brings 1,900 of 2,463 rows (1,886 of them were shown unticked, 41
+  locked and 14 with a date they would not get, all published anyway; 1,896
+  are reached through other pages, not `firstUsedIn` that class), because the
+  reach (the assistant's rule, `followingLinks`) walks through visible pages
+  too. So on such a course, ticking that one class ticks about three quarters
+  of the sheet — out of view, since the class group is last (the button's
+  count and the class row's "brings N more" are the in-view cues). Russell,
+  2026-09-30 (ruling R20 of the v1.4.2 run): "highly unlikely to actually
+  occur in real practice. A teacher will almost never link from a current
+  class page to a future class page in that way." So it is not a problem to
+  fix, no `decision` issue was opened, and the reach stays as it is.
+  **Rejected:** letting a brought row be unticked while its class goes (a
+  change to what is published, and a published class linking a hidden page);
+  working the set out from `firstUsedIn`; a second walk (the old count's
+  `reachFollowingLinks` loop, which counted pages the writer declines); one
+  planner call per class row (S6: a mid-year section can offer twenty); copying
+  the class's tick into the rows; dropping the class row's count (it also
+  counts pages that are not rows); listing the brought rows under the class
+  row (the class group is last — up to 81 rows would move on one tick).
 - **Names (#385's notes).** Rows and second lines name pages the way #362's
   plan does, with the same builder: `LinksChecklistNaming` computes
   `sharedTitles` over every page of the section's graph (not only the rows —
@@ -6997,24 +7074,26 @@ links checklist (#379)"); this is the app's half.
 - **Trail:** "offered to publish pages that links lead to" (occasion and
   counts — since #385 also how many are listed under another page, and
   "ticked" counts rows that GO, computed by `offeredLine(model:)` rather than
-  at the call sites), "published pages that links led to" (counts, "left
-  unticked" and "left with the page they come under" separately, and at most
-  ten places), "left pages hidden that links lead to" (Not Now or some
+  at the call sites; since #398 rows SHOWN ticked, identical at opening),
+  "published pages that links led to" (counts, "left unticked" and "left with
+  the page they come under" separately, since #398 how many of the pages the
+  classes brought were rows of the list, and at most ten places), "left pages hidden that links lead to" (Not Now or some
   unticked; EVERY page left hidden, with how many only because the page they
   come under was, in brackets — written when that total is above 0).
 - **Known limits, recorded from the implementation review (2026-09-30):**
   the front page not moving (F1) holds for THIS press only — the next
   assistant publish or hide repoints it by `mostRecentVisibleClass`, which may
   then pick a future class ticked here (N10); a row a ticked class also brings
-  but that shows no "first used in" line (case k, or a group-2 row the class
-  reaches) is published with the class even if unticked, and the class's line
-  gives only a count (N2, the allowed cut). #385 did NOT close it and widened
-  it: a row under an unticked row is now shown LOCKED and unticked even when a
-  ticked class reaches it and will publish it (the counts stay honest — it is
-  not "left hidden" — the checkbox does not). Both variants are
-  [#398](https://github.com/russellgordon/plantoir/issues/398) "Links
-  checklist: show the rows a ticked class brings as coming with it (N2)"
-  (`linksChecklist.followingARow.knownLimit`); a row that goes only through a
+  used to show its own tick (unticked, or since #385 locked) while Publish sent
+  it anyway (N2) — CLOSED by
+  [#398](https://github.com/russellgordon/plantoir/issues/398) (v1.4.2), which
+  leaves two limits of its own (`linksChecklist.comingWithAClass.knownLimit`):
+  what a class brings is worked out when the sheet opens, so a link ADDED to a
+  ticked class while it is open brings a row shown with its own tick (a
+  removed link, or a page made visible, is named instead), and a row under a
+  brought row that is not itself brought (the writer declines it, or the two
+  link readers disagree) stays locked under a row shown ticked, its "goes when
+  that page goes" then false on screen; a row that goes only through a
   page the writer then DECLINES (no room for a key, #186) is still published
   with nothing students can see linking it — `going` is worked out before the
   writer runs, and the teacher is told only that the page above it was
@@ -7039,11 +7118,17 @@ links checklist (#379)"); this is the app's half.
   eleven mutations run red — recorded in the piece's ready file.
   `LinksChecklistFollowingTests` (#385): every `followingARow` case through
   `LinksChecklistGate`, the checkbox through the model's binding, publish
-  cases iv-e to iv-i THROUGH THE SHEET (with the trail captured), the naming
+  cases iv-e to iv-i — and #398's iv-j to iv-n — THROUGH THE SHEET (with the
+  trail captured), the naming
   case (with a row removed, to prove "shared" is across the section), an
   older builder's offer, the three trail lines filled from the contract's
   templates, and a hundred-deep chain within 620 pt; a missing publish case
-  now FAILS rather than skips.
+  now FAILS rather than skips. `LinksChecklistComingWithTests` (#398): every
+  `comingWithAClass` pure case through the gate, the brought row's inert
+  checkbox through the binding, the sheet's brought rows against what the
+  press's own plan writes (with a page the writer declines and a row spelled
+  decomposed), and the twenty-class timing; sixteen mutations run red —
+  recorded in the piece's ready file.
 
 ## Testing: the real-home tripwire (#264)
 
