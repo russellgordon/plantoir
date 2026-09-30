@@ -73,6 +73,9 @@ public sealed class DuplicateClassPlan
         {
             lines.Add("");
             lines.Add(ClassChangeWording.OtherClassesWouldMove(OtherClassesMoving, Insertion.Renames.Count));
+            // #346 (the mac's #185): the card says the undo will not help on
+            // EXACTLY the condition that withholds it, before Go.
+            lines.Add(AssistWording.MakingRoomCannotBeUndone);
         }
 
         return string.Join("\n", lines);

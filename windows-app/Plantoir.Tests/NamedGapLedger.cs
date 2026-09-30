@@ -133,8 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 158, "this app cannot rename a course's word for a unit yet, so there is no moment to record",
-            "word for a unit renamed"),
         Owed(ActivityTrailEvents, 320, "reopening the last working folder does not record either outcome yet (mac #311)",
             "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
@@ -155,12 +153,6 @@ internal static class NamedGapLedger
             "assistant was asked about another course"),
         Owed(ActivityTrailEvents, 352, "a page list naming no page is not refused in code here yet (mac #197)",
             "assistant named no page it could find"),
-        Owed(ActivityTrailEvents, 200, "duplicating a class does not record a copy it declined to make yet",
-            "class copy not made"),
-        Owed(ActivityTrailEvents, 308, "the writers do not yet say when they left a page's settings alone (mac #182/#186/#188)",
-            "page settings left as they were"),
-        Owed(ActivityTrailEvents, 282, "adding a section does not record itself yet (mac #175)",
-            "section added"),
         Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
             "exclusions reverted"),
         Owed(ActivityTrailEvents, 233, "a preview that never appears is not told apart and recorded yet (mac #225/#234/#235/#280)",
@@ -207,8 +199,6 @@ internal static class NamedGapLedger
             "left pages hidden that links lead to"),
 
         // ---- specialNames.platformWording.keys
-        Owed(PlatformWordedKeys, 158, "the sentence belongs to a sheet this app does not have yet, so there is nothing here to word",
-            "renameUnitWord.explanation"),
 
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
         Owed(CourseConfigKeys, 345, "one coverage map per declared curriculum folder is not built here yet (mac #128)",
@@ -286,9 +276,6 @@ internal static class NamedGapLedger
             "scheduleReplaces"),
         Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "askedAboutAReferenceCourse", "deployRefusedForAReferenceCourse"),
-        Owed(AssistWordingKeys, 200, "duplicating a class does not decline a copy it cannot keep hidden yet",
-            "theCopyCouldNotBeMadeHidden", "theCopyCouldNotBeMadeHiddenNamingTheBackup",
-            "thePlaceForTheCopyIsStillTakenNamingTheBackup"),
         Owed(AssistWordingKeys, 352, "a page list naming no page is not refused in code here yet (mac #197)",
             "noPageCalled", "noPagesCalled", "morePagesThanOneAreCalled", "everyPageIsNotAPageToHide",
             "everyPageIsNotAPageToPublish"),
@@ -304,13 +291,9 @@ internal static class NamedGapLedger
             "deployNeedsAnAnswer", "deployNeedsAnAnswerAt", "previewBuildNeedsAnAnswer"),
         Owed(AssistWordingKeys, 400, "this app says a partial deploy in its own multi-destination words (DeployPartiallySucceeded); the sentence comes from mac #396, whose Windows twin is #400",
             "deployWentOutTo"),
-        Owed(AssistWordingKeys, 346, "the hide and publish answers for a page already in that state are not the contract's sentences here yet; #346 names all six",
-            "alreadyHiddenOne", "alreadyHiddenSeveral", "alreadyPublishedOne", "alreadyPublishedSeveral",
-            "unitAlreadyHidden", "unitAlreadyPublished"),
-        Owed(AssistWordingKeys, 308, "the date writers do not yet say which pages they could not add a date to (mac #186)",
+        Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
             "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
-            "pagesWhoseSettingsCannotBeAddedToNamingSeveral", "sharedPageWhoseSettingCouldNotBePutBack",
-            "sharedPagesWhoseSettingsCouldNotBePutBack"),
+            "pagesWhoseSettingsCannotBeAddedToNamingSeveral"),
         // The class-worded sentences below were ledgered to #157 on the first
         // pass as "said inline today"; a review (2026-09-30) found that false
         // for most. Re-done key by key: seven WERE said word for word and are
@@ -325,11 +308,6 @@ internal static class NamedGapLedger
             "theSemesterBegins", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
         Owed(AssistWordingKeys, 262, "not said on Windows; #262 specifies it for a call naming no course",
             "noCourseNamed"),
-        Owed(AssistWordingKeys, 346,
-            "Windows says its own words here (\"…before you deploy it.\"), or nothing; #346 names these sentences",
-            "lookTheSectionOverBeforePublishing", "makingRoomCannotBeUndone"),
-        Owed(AssistWordingKeys, 200, "not said on Windows; #200 names these duplicate/make-room plan sentences",
-            "otherClassesWouldMoveAndLinksFollow", "otherClassesWouldMoveKeepingTheirNames"),
         Owed(AssistWordingKeys, 357,
             "Windows says \"Every page is already on the day it should be.\" without the section, and nothing for the counts; #357 owns re-dating's reported counts",
             "everyPageIsAlreadyOnItsDay", "reDated", "reDatedOnlyPagesTheyUse"),

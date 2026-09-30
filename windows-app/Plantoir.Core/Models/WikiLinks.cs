@@ -22,75 +22,82 @@ public static class WikiLinks
     /// <summary>
     /// <c>[[target]]</c>, <c>[[target|alias]]</c>, <c>[[target#heading]]</c>
     /// and the <c>![[embed]]</c> form. The target stops at the first
-    /// <c>#</c> or <c>|</c>; anything else up to <c>]]</c> is the target.
+    /// <c>]</c>, <c>#</c> or <c>|</c>, and a backslash immediately before that
+    /// character is not part of it (#318, the mac's #294): Obsidian escapes the
+    /// alias pipe in a table cell, <c>[[Ohm's Law\|Ohm]]</c>, and reading the
+    /// target as <c>Ohm's Law\</c> made the link dead. The heading is LAZY for
+    /// the same reason — greedy gave <c>Part A\</c> for <c>[[X#Part A\|a]]</c>.
     /// </summary>
     private static readonly Regex LinkPattern = new(
-        @"(?<embed>!)?\[\[(?<target>[^\]\|#]+)(?:#(?<heading>[^\]\|]*))?(?:\|(?<alias>[^\]]*))?\]\]",
+        @"(?<embed>!)?\[\[(?<target>[^\]\|#]+?)(?=\\?[\]\|#])(?:#(?<heading>[^\]\|]*?))?(?:\\?\|(?<alias>[^\]]*))?\]\]",
         RegexOptions.Compiled);
+
+    /// <summary>
+    /// The one pattern every REWRITER matches: group 1 is the opening
+    /// brackets, group 2 the name, and the lookahead leaves an escaping
+    /// backslash OUTSIDE the match, so replacing only the name keeps it — a
+    /// rewrite that wrote back a normalised target would give
+    /// <c>[[Module 2, Day 3|Tuesday]]</c> and split the table cell in two
+    /// (the trap #318 names). The mac's <c>WikiLinkRewriter.pattern</c>.
+    /// </summary>
+    public static readonly Regex TargetPattern = new(@"(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])", RegexOptions.Compiled);
 
     /// <summary>
     /// Every wikilink on the page, in document order, with duplicates kept —
     /// the caller decides whether repetition matters.
     ///
-    /// Fenced code blocks and inline code spans are skipped: a page that
-    /// documents the link syntax should not cause the pages it mentions to be
-    /// published.
+    /// A link whose <c>[[</c> starts inside code or a <c>%%</c> comment is not
+    /// a link (#339, <see cref="MarkdownCode"/>): Quartz never draws one, so a
+    /// page that documents the link syntax must not publish what it mentions.
     /// </summary>
     public static List<WikiLink> Parse(string markdown)
     {
         var links = new List<WikiLink>();
-        foreach (string line in WithoutCode(markdown))
-            foreach (Match match in LinkPattern.Matches(line))
-            {
-                string target = match.Groups["target"].Value.Trim();
-                if (target.Length == 0) continue;
-                links.Add(new WikiLink(
-                    Target: target,
-                    Heading: match.Groups["heading"].Success ? match.Groups["heading"].Value.Trim() : null,
-                    Alias: match.Groups["alias"].Success ? match.Groups["alias"].Value.Trim() : null,
-                    IsEmbed: match.Groups["embed"].Success));
-            }
+        foreach (Match match in MarkdownCode.MatchesOutside(LinkPattern, markdown))
+        {
+            string target = match.Groups["target"].Value.Trim();
+            if (target.Length == 0) continue;
+            links.Add(new WikiLink(
+                Target: target,
+                Heading: match.Groups["heading"].Success ? match.Groups["heading"].Value.Trim() : null,
+                Alias: match.Groups["alias"].Success ? match.Groups["alias"].Value.Trim() : null,
+                IsEmbed: match.Groups["embed"].Success));
+        }
         return links;
     }
 
     /// <summary>
-    /// The page's lines with fenced blocks dropped and inline code blanked.
-    /// Blanking rather than removing keeps it simple: we only care about what
-    /// links survive, not about the text.
+    /// <paramref name="text"/> with every link whose name is a key of
+    /// <paramref name="renamed"/> (case-insensitively, trimmed) pointed at the
+    /// new name. Only the name between the brackets changes — an alias, a
+    /// heading, an escaping backslash and a link inside code or a comment are
+    /// left exactly as written. The mac's <c>WikiLinkRewriter.rewriting</c>.
     /// </summary>
-    private static IEnumerable<string> WithoutCode(string markdown)
+    public static string Rewriting(string text, IReadOnlyDictionary<string, string> renamed)
     {
-        bool inFence = false;
-        string fenceMarker = "";
-        foreach (string raw in markdown.Split('\n'))
+        if (renamed.Count == 0) return text;
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (from, to) in renamed) byName[from.Trim()] = to;
+        var builder = new System.Text.StringBuilder();
+        int carried = 0;
+        foreach (Match match in MarkdownCode.MatchesOutside(TargetPattern, text))
         {
-            string line = raw.TrimEnd('\r');
-            string trimmed = line.TrimStart();
-
-            if (trimmed.StartsWith("```", StringComparison.Ordinal) ||
-                trimmed.StartsWith("~~~", StringComparison.Ordinal))
-            {
-                string marker = trimmed[..3];
-                if (!inFence) { inFence = true; fenceMarker = marker; }
-                else if (marker == fenceMarker) { inFence = false; fenceMarker = ""; }
-                continue;
-            }
-            if (inFence) continue;
-            yield return StripInlineCode(line);
+            if (!byName.TryGetValue(match.Groups[2].Value.Trim(), out string? to)) continue;
+            builder.Append(text, carried, match.Index - carried);
+            builder.Append(match.Groups[1].Value).Append(to);
+            carried = match.Index + match.Length;
         }
+        if (carried == 0) return text;
+        builder.Append(text, carried, text.Length - carried);
+        return builder.ToString();
     }
 
-    private static string StripInlineCode(string line)
+    /// <summary>How many links on the page name one of <paramref name="names"/> — counted the way <see cref="Rewriting"/> would rewrite them.</summary>
+    public static int CountLinksTo(IEnumerable<string> names, string text)
     {
-        if (!line.Contains('`')) return line;
-        var builder = new System.Text.StringBuilder(line.Length);
-        bool inCode = false;
-        foreach (char character in line)
-        {
-            if (character == '`') { inCode = !inCode; builder.Append(' '); continue; }
-            builder.Append(inCode ? ' ' : character);
-        }
-        return builder.ToString();
+        var wanted = new HashSet<string>(names.Select(name => name.Trim()), StringComparer.OrdinalIgnoreCase);
+        if (wanted.Count == 0) return 0;
+        return MarkdownCode.MatchesOutside(TargetPattern, text).Count(match => wanted.Contains(match.Groups[2].Value.Trim()));
     }
 
     /// <summary>
