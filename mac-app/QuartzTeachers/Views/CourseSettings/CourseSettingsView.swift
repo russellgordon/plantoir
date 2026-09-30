@@ -38,6 +38,12 @@ struct CourseSettingsView: View {
     /// Whether this window is key, read only to notice it BECOMING key.
     @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
 
+    /// Whether `settings save held back` has been written on this visit to
+    /// the course, so a teacher typing in a held-back form leaves one line,
+    /// not one per keystroke. Starts afresh when the form is rebuilt for a
+    /// course (`.id(code)` in MainWindowView).
+    @State var heldBackWasNoted: Bool = false
+
     // MARK: - Body
 
     var body: some View {
@@ -54,20 +60,25 @@ struct CourseSettingsView: View {
             Form {
                 Section {
                     TextField("Course name", text: $configuration.courseName)
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("courseNameField")
 
                     if configuration.isClub {
                         TextField("Short label beside emoji (clubs, ≤ 12 characters)", text: $configuration.customShortName)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("customShortNameField")
                     }
 
-                    Picker("Language / region (Quartz locale)", selection: $configuration.locale) {
-                        ForEach(LocaleCatalog.codes, id: \.self) { code in
-                            Text(LocaleCatalog.displayName(forCode: code))
-                                .tag(code)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker(CourseSettingsWording.localeLabel, selection: $configuration.locale) {
+                            ForEach(LocaleCatalog.codes, id: \.self) { code in
+                                Text(LocaleCatalog.displayName(forCode: code))
+                                    .tag(code)
+                            }
                         }
+                        .accessibilityIdentifier("localePicker")
+                        ExampleCaption(CourseSettingsWording.localeCaption)
+                            .accessibilityIdentifier("localeCaption")
                     }
 
                     Toggle("Show page read-time estimates to students", isOn: $configuration.showReadingTime)
@@ -130,28 +141,25 @@ struct CourseSettingsView: View {
                 // The words the course was made with (#267): shown, and
                 // LOCKED — a club's are chosen in the wizard and are not
                 // switchable afterwards, and an existing course (CODING
-                // included) can never become one from here.
-                Section {
-                    LabeledContent(WizardWording.settingsPageNamingLabel) {
-                        Text(WizardWording.settingsPageNamingValue(configuration.classPageNaming))
-                            .accessibilityIdentifier("pageNamingValue")
+                // included) can never become one from here. Only what the
+                // course RECORDED is shown, and the group goes when that is
+                // nothing — every course but a club made since #267 (#376).
+                let lockedRows: [ClassPagesLockedRows.Row] = ClassPagesLockedRows.rows(for: configuration)
+                if !lockedRows.isEmpty {
+                    Section {
+                        ForEach(lockedRows, id: \.key) { row in
+                            LabeledContent(row.label) {
+                                Text(row.value)
+                                    .accessibilityIdentifier(row.identifier)
+                            }
+                        }
+                        Text(WizardWording.settingsLockedCaption)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } header: {
+                        FormSectionHeader("Class Pages")
                     }
-                    LabeledContent(WizardWording.settingsFrontPageHeadingLabel) {
-                        Text(WizardWording.settingsFrontPageHeadingValue(
-                            configuration.recordedFrontPageHeading
-                        ))
-                        .accessibilityIdentifier("frontPageHeadingValue")
-                    }
-                    LabeledContent(WizardWording.settingsNounLabel) {
-                        Text(configuration.classNoun.rawValue)
-                            .accessibilityIdentifier("classNounValue")
-                    }
-                    Text(WizardWording.settingsLockedCaption)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } header: {
-                    FormSectionHeader("Class Pages")
                 }
 
                 Section {
@@ -380,15 +388,26 @@ struct CourseSettingsView: View {
                 Button("Revert") {
                     revertToFile()
                 }
-                .disabled(!course.configuration.hasUnsavedChanges)
+                .disabled(!SaveEnablement.revertIsEnabled(hasUnsavedChanges: course.configuration.hasUnsavedChanges))
                 .accessibilityIdentifier("revertButton")
 
                 Spacer()
 
+                // The press-time problem wins when both exist; otherwise,
+                // when there is something to save and a destination problem
+                // holds it back, the reason is said HERE, beside the button
+                // it explains (#373). It used to be said only under
+                // Deploying, screens away from a section's settings.
                 if let saveProblem {
                     Text(saveProblem)
                         .foregroundStyle(.red)
                         .font(.callout)
+                } else if saveIsHeldBack, let holdingProblem {
+                    Text(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("saveHeldBackReason")
                 }
                 if didJustSave {
                     Text("Saved ✓")
@@ -397,13 +416,7 @@ struct CourseSettingsView: View {
                         .accessibilityIdentifier("savedConfirmation")
                 }
 
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.borderedProminent)
-                .disabled(!course.configuration.hasUnsavedChanges || savingProblem != nil)
-                .accessibilityIdentifier("saveButton")
+                saveButton
             }
             .padding(12)
         }
@@ -437,6 +450,9 @@ struct CourseSettingsView: View {
             if newState == .key {
                 marksWalkGeneration += 1
             }
+        }
+        .onChange(of: saveIsHeldBack) { wasHeldBack, isHeldBack in
+            noteHeldBackIfNew(wasHeldBack: wasHeldBack, isHeldBack: isHeldBack)
         }
     }
 
@@ -473,36 +489,67 @@ struct CourseSettingsView: View {
         }
     }
 
-    /// Why saving is blocked right now, or nil when it isn't. A deploy
-    /// destination that cannot be reached must not reach disk: the deploy
-    /// would quietly have nowhere to go, and would only say so much later.
-    var savingProblem: String? {
-        if course.configuration.deployTarget == "local_folder" {
-            if let problem = CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath) {
-                return problem
+    /// Save, wearing the accent colour ONLY when it can be pressed (#364).
+    /// v1.4.0's dark marketing picture showed a disabled accent Save —
+    /// (17,70,126) against Revert's disabled (38,38,38) — and it read as
+    /// enabled to everyone who looked. Otherwise it is a plain bordered
+    /// button: Revert's own look, the system's disabled button in both
+    /// appearances. ONE predicate decides both the look and the state, so
+    /// they cannot disagree.
+    @ViewBuilder
+    var saveButton: some View {
+        if SaveEnablement.saveWearsTheAccent(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        ) {
+            Button("Save") {
+                save()
             }
+            .keyboardShortcut("s", modifiers: .command)
+            .buttonStyle(.borderedProminent)
+            .disabled(!saveIsEnabled)
+            .accessibilityIdentifier("saveButton")
+        } else {
+            Button("Save") {
+                save()
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .buttonStyle(.bordered)
+            .disabled(!saveIsEnabled)
+            .accessibilityIdentifier("saveButton")
         }
-        if course.configuration.deploysToCloudflare {
-            if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
-                return problem
-            }
-        }
-        // Every ADDITIONAL destination gets the same check — a redundancy
-        // target with no valid folder or credential would otherwise only
-        // fail the first time a deploy actually reached it.
-        for target in course.configuration.additionalDeployTargets {
-            if target.type == "local_folder" {
-                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
-                    return problem
-                }
-            }
-            if target.type == "cloudflare_pages" {
-                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
-                    return problem
-                }
-            }
-        }
-        return nil
+    }
+
+    /// The first problem with where this course publishes, as this window
+    /// has it set now — shown under Deploying whatever else is happening.
+    var destinationProblem: SaveEnablement.DestinationProblem? {
+        return SaveEnablement.destinationProblem(
+            for: course.configuration, cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+        )
+    }
+
+    /// The problem that holds Save back, or nil. A destination that cannot
+    /// be reached must not reach disk — but only an edit that CHANGES where
+    /// the course publishes can put it there. A destination already broken
+    /// on disk (a folder from another Mac, a Cloudflare course on a Mac
+    /// with no account ID) no longer blocks saving a section's colour
+    /// scheme: that block was the likeliest real cause of #373.
+    var holdingProblem: SaveEnablement.DestinationProblem? {
+        return SaveEnablement.holdingProblem(
+            destinationProblem: destinationProblem,
+            destinationsChanged: course.configuration.deployDestinationsDifferFromSaved
+        )
+    }
+
+    var saveIsEnabled: Bool {
+        return SaveEnablement.saveIsEnabled(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        )
+    }
+
+    var saveIsHeldBack: Bool {
+        return SaveEnablement.saveIsHeldBack(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        )
     }
 
     /// Every folder that could hold work counting for marks.
@@ -643,10 +690,30 @@ struct CourseSettingsView: View {
         return RemovalTrail.inCourseSettings(courseCode: course.code, list: list)
     }
 
+    /// Writes `settings save held back` on the change into the held-back
+    /// state, once per visit (#373): the one state in which the form
+    /// changes and no act follows, so without it a "Save would not light
+    /// up" report finds nothing on the trail.
+    func noteHeldBackIfNew(wasHeldBack: Bool, isHeldBack: Bool) {
+        guard SaveEnablement.shouldNoteHeldBack(
+            wasHeldBack: wasHeldBack, isHeldBack: isHeldBack, alreadyNoted: heldBackWasNoted
+        ) else {
+            return
+        }
+        guard let holdingProblem else {
+            return
+        }
+        heldBackWasNoted = true
+        ActivityTrail.note(
+            .settingsSaveHeldBack,
+            SaveEnablement.heldBackTrailLine(courseCode: course.code, check: holdingProblem.check)
+        )
+    }
+
     func save() {
         saveProblem = nil
-        if let savingProblem {
-            saveProblem = savingProblem
+        if let holdingProblem {
+            saveProblem = holdingProblem.sentence
             return
         }
         do {

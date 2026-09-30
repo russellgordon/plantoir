@@ -2477,6 +2477,141 @@ publish still says them; nothing is refused or undone. The trail's `settings
 saved` line carries the same facts from `SettingsSaveNotice.scheduledDeploys`.
 Contract: `savingSettings.scheduledDeploys`; the whole story is docs 07, "Where
 it deploys is read when it runs (#323)".
+
+### What enables Save, and why the dark picture looked enabled (#364, #373)
+
+**The rule** (`contracts/shared-rules.json` → `savingSettings.whatEnablesSave`,
+decided in `SaveEnablement`): Save is enabled exactly when this window's copy
+differs from what it last read or wrote — `CourseConfiguration.hasUnsavedChanges`
+compares the WHOLE `values` dictionary, course-wide and per-section keys alike —
+and nothing holds it back. Revert is enabled exactly when the copy differs.
+
+**Measured, not assumed.** #364 (Save apparently enabled on a freshly opened
+course, dark picture only) and #373 (Russell, 2026-09-27: a change made only on
+a section's page did not enable Save) were filed as one comparison wrong in both
+directions. On dev 2e11471d, with the course in #364's picture, in the real
+window, light and dark, Debug and Release, pressing the real per-section
+toggle through accessibility: the comparison is right both ways. #364's own
+frame proves it — Revert is disabled there, (38,38,38), and Save cannot be
+enabled while Revert is not. Save was a DISABLED `.borderedProminent`: its
+fill (17,70,126) in dark and (146,198,255) in light is the accent at about 40%,
+its label dimmed to (155,177,201). On a dark window that reads as enabled.
+#373 did not reproduce on any path; it stays open for Russell to try the new
+build.
+
+**What changed.**
+- **Save wears the accent only when it can be pressed.** `saveButton` draws
+  `.borderedProminent` when `SaveEnablement.saveWearsTheAccent` and
+  `.bordered` otherwise — Revert's own disabled look in both appearances. ONE
+  predicate decides the look and the state. `SaveEnablesTests` scans the view
+  for any other `.borderedProminent`. This is mac-visual, so it is not in the
+  contract; the Windows issue asks them to check a disabled accent button in
+  their dark theme.
+- **A destination problem holds Save back only when the edit moves the
+  destination** (director's ruling on the plan review, folded in). The one
+  path that kept Save grey after a per-section change was `savingProblem`: a
+  `local_folder` course whose folder is missing on THIS Mac (a folder from
+  another Mac or account), or a Cloudflare course with no Account ID on this
+  Mac, blocked every Save, and nothing near the button said why. A destination
+  already on disk is not made worse by saving a colour scheme, so the block now
+  needs `CourseConfiguration.deployDestinationsDifferFromSaved` (the primary
+  destination, its folder or any additional destination, against what this
+  copy last read or wrote). The problem is still said under Deploying, as
+  before. This is the likeliest real #373.
+- **When Save IS held back, the reason is said beside it**:
+  `CourseSettingsWording.saveHeldBack(reason:)` with the destination's own
+  sentence, identifier `saveHeldBackReason`; the press-time `saveProblem` wins
+  when both exist. And the trail says `settings save held back` once per visit
+  to the course (`heldBackWasNoted`, reset by `.id(code)`), with WHICH check
+  (deploy folder, cloudflare account id, additional destination) and never the
+  path or the ID — the held-back state is the one place where the form changes
+  and no act follows, so a "Save would not light up" report found nothing.
+- **Two ways a form could change on its own, closed.** A stored emoji holding
+  two ("📚🔬", a hand edit) reached the emoji field, which always settles on
+  one and wrote it back the moment the form appeared, so a course nobody had
+  touched read as changed: `emoji(forSection:)` now reads it as one emoji
+  (`CourseConfiguration.oneEmoji`), and the file keeps what it has. And the
+  legacy course-wide `show_grade_in_title` Bool was replaced by an EMPTY
+  per-section map the first time a section was toggled, so on a course that
+  stored `false`, toggling section 2 turned section 1's grade back on: the map
+  is now seeded with the legacy value for every section first.
+- `color_schemes` is in `file-formats.json` → `courseConfigKeys` at last; the
+  key count could not see it because it was read by subscript, not `forKey:`.
+
+**Pinned.** `SaveEnablesTests` runs the contract: eight fresh-open shapes
+(the #364 course with its destination moved to Netlify so no case depends on a
+folder on one Mac, plus the legacy and absent-key shapes) opened in the real
+window and left to settle, then Save and Revert read through accessibility; one
+edit per per-section key made through the section's own binding, then saved and
+read back; the held-back cases; the toggle pressed through accessibility; and
+the held-back sentence and trail line. Every real-window test has a model half
+that never skips. Must-fails are in the #373 comment and `GUI-IMPROVEMENTS.md`.
+
+**REJECTED.** Rewriting the comparison per key, or normalising on load (it is
+not wrong, and normalising on load would itself dirty a fresh form or write
+changes nobody asked for); `.tint(.gray)` on a disabled accent Save (how a
+tinted disabled prominent button renders was not measured, and Revert's own
+look needs no measuring); `.keyboardShortcut(.defaultAction)` for Save (Return
+in any field would save); reading #364 as an ordering bug between two launches
+(the same frame shows Revert disabled).
+## Every text field is bordered, and says nothing about the machinery (#374, #369)
+
+**One modifier.** Russell, 2026-09-27 (#374): every text field wears the
+bordered, rounded style Course name has, never the borderless "clean" look.
+The audit found every editable field ALREADY bordered — the two rows in his
+picture, "Class pages are named" and "Front page heading", are read-only
+`LabeledContent { Text }` values, not fields, and after #376 only a club shows
+them at all. So the change is structural: `.borderedTextField()`
+(`Views/Helpers/BorderedTextField.swift`) is the ONE place `.roundedBorder` is
+written, and the 21 fields that wrote it themselves now call it.
+`TextFieldStyleScanTests` walks every `TextField(`/`SecureField(` in
+`QuartzTeachers/Views` (comments and string contents masked, parentheses
+matched, the chain stopping where the next field begins) and fails on a field
+whose chain has neither `.borderedTextField()` nor a bordered chrome, and on
+any field that chooses a style of its own — even alongside
+`.borderedTextField()`, because the style nearest the view wins and a `.plain`
+there draws it borderless. A second test allows `.textFieldStyle(` only in the
+modifier, inside the two chromes' definitions, and in the listed exceptions.
+
+**Per row, for the closing comment.** *Class pages are named / Front page
+heading / The assistant calls a page a*: read-only locked values (not fields),
+kept as plain secondary text under their caption; shown only when recorded
+(#376). *What do you call a unit? — Unit [Rename…]*: a read-only value with an
+action; the button says where it is changed, and `renameLockedNumbered` says
+why when it is disabled. Neither needs a border, because neither can be typed
+in.
+
+**Allowed, with the reason, because each draws its own border:**
+`WizardFieldChrome` (the wizard's 24pt fields beside the course-code picker;
+`.roundedBorder` is 26pt — Russell, 2026-08-23; 12, "Metrics"),
+`SearchablePickerChrome` (24pt for the same reason), the sidebar's
+`renameField` (`.plain` inside its own card, because the row sits on the
+selection colour, #293), the assistant's `assistComposerField` (`.plain`
+inside the composer's own rounded stroke), and `taskAnswerField` (inside an
+`.alert`, where AppKit draws the field). An exception whose field has gone
+fails the test until it leaves the list. `TextEditor`s are not text fields;
+the footer's already strokes its own border.
+
+REJECTED: converting the wizard's chrome fields to `.roundedBorder` (2pt out
+of line with the picker, measured); a scan for `.plain` alone (an unstyled
+field in a grouped `Form` is the borderless look and carries no `.plain`); a
+lock glyph on the read-only rows (cut by the director — Russell did not ask
+for it, and after #376 only clubs see them).
+
+**The machinery in a label (#369).** Course Settings' first settings row read
+"Language / region (Quartz locale)" from v1.1.0 to v1.4.0. It is now
+`CourseSettingsWording.localeLabel` ("Language and region") with
+`localeCaption` under it, and the wizard's picker uses the same key. Rule 1 had
+been enforced only by word lists inside individual features' tests, so
+`UserFacingLabelWordsTests` now scans every string literal passed to a
+label-bearing call in the views (`Text`, `Picker`, `Toggle`, `Button`,
+`LabeledContent`, `TextField`, `Label`, `Section`, `.help`, `.alert`, …)
+against `shared-rules.json` → `userFacingLabelWords.forbidden`, whole-word and
+case-insensitive, comments skipped ("description" is not "script"). It found
+exactly two hits: that row and the colour picker's "Quartz default (none
+chosen)", now `colourSchemeNoneChosen`. It cannot see DATA: the catalog
+scheme "Quartz Standard Colours" (`support/colour_schemes.json`) is issue #383.
+
 ## Two programs, one course: the build, preview and publish leases (#156)
 
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
@@ -2978,7 +3113,8 @@ The trail's `course created` line says "created CODING as a club, with pages
 named “Week 1” in “All Meetings”" (read from the file just written).
 
 **Course Settings shows the three settings LOCKED** — a Class Pages section with
-three label/value rows and one caption, for every course — and disables the
+up to three label/value rows and one caption, for a course that RECORDED them
+(#376, below) — and disables the
 unit word's Rename… button for a numbered course, with
 `renameLockedNumbered` under it. Russell, 2026-09-24: a club's words are not
 switchable after the wizard. Consequence: an existing course, CODING included,
@@ -2987,15 +3123,33 @@ renames pages between shapes (not asked for, and converting 80 "Unit 2, Day 3"
 pages to week numbers is its own piece); a front-page heading rename across
 every section (dropped with the same answer).
 
-**The heading row shows what the course RECORDED**
-(`CourseConfiguration.recordedFrontPageHeading`), and for a course with no
-`front_page_heading` — every course made before #267, CODING included — the
-named sentence `WizardWording.settingsFrontPageHeadingNotSet`. The first version
-filled in "Most Recent Class", so CODING's locked row contradicted its own
-front page ("## Most Recent Meeting"). Nothing rewrites a heading after
-creation, so the row does not guess one. REJECTED: reading the heading off
-section 1's `index.md` (a row about the course would then report one section's
-page, and a teacher may have edited it on purpose).
+**A locked row is drawn only when the course RECORDED its key (#376).**
+`ClassPagesLockedRows.rows(for:)` gives the rows to draw: page naming when
+`class_page_scheme` is present and non-blank, the heading when
+`front_page_heading` is (`CourseConfiguration.recordedFrontPageHeading`, shown
+verbatim), the noun when `class_noun` is. When none is, the whole Class Pages
+group — header and caption — is not drawn. Only the wizard writes the three
+keys, together, and only for a club, so that is every other course, CODING and
+the ICS3U/ICS4U copies included. Russell, 2026-09-27: "if there's no point in
+showing the setting (i.e. for a course made before the setting existed) then
+yes, it should be hidden." Measured on plantoir.app's own `courses-light.png`:
+for an ordinary course the page-naming row said "“Unit 1, Day 1”", repeating
+word for word the caption under "What do you call a unit?" three rows above it
+(y≈606 and y≈756), and the noun row said "class" — the same for every course.
+A present value this app does not know (a scheme written by a newer app) is
+drawn as this app reads it, because that is what governs its behaviour here.
+
+History, so nobody rebuilds it: from #267 until #376 the heading row was drawn
+for every course, and a course with no `front_page_heading` read
+`WizardWording.settingsFrontPageHeadingNotSet` ("Not recorded — the front page
+keeps the heading it already has"). That replaced a first version that filled
+in "Most Recent Class", which contradicted CODING's front page ("## Most Recent
+Meeting"). The sentence is retired from the code and the contract, and
+`ClubFillTests` fails if the contract key comes back. REJECTED: showing derived
+defaults for the scheme and the noun (the repetition above); reading the heading
+off section 1's `index.md` (a row about the course would then report one
+section's page, and a teacher may have edited it on purpose). Contract:
+`wizard.clubToggle.settingsRows.shownWhen` and its eight `shownWhenCases`.
 
 Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
 `shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).

@@ -1184,7 +1184,7 @@ struct NewCourseWizardView: View {
                                 renameClassFolder(to: newValue)
                             }
                         ))
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("clubClassFolderField")
                     }
                     if let problem = NewCourseWizardView.clubClassFolderProblem(
@@ -1197,12 +1197,12 @@ struct NewCourseWizardView: View {
                     }
                     LabeledContent(WizardWording.clubFrontPageHeadingLabel) {
                         TextField("", text: $frontPageHeading)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("clubFrontPageHeadingField")
                     }
                     LabeledContent(WizardWording.clubPageWordLabel) {
                         TextField("", text: $unitWord)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("unitWordField")
                     }
                     if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1225,7 +1225,7 @@ struct NewCourseWizardView: View {
                 // `prompt:`; the club branch above has always been this shape.
                 LabeledContent(UnitWordRenameWording.fieldLabel) {
                     TextField("", text: $unitWord, prompt: Text(ClassPageTerm.standard))
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("unitWordField")
                 }
                 if let problem = ClassPageTerm.problem(with: unitWord) {
@@ -1370,7 +1370,7 @@ struct NewCourseWizardView: View {
             // with the ones almost everyone sets.
             Section {
                 DisclosureGroup("Advanced") {
-                    Picker("Language / region", selection: $locale) {
+                    Picker(CourseSettingsWording.localeLabel, selection: $locale) {
                         ForEach(LocaleCatalog.codes, id: \.self) { code in
                             Text(LocaleCatalog.displayName(forCode: code)).tag(code)
                         }

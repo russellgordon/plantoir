@@ -70,6 +70,15 @@ final class LabeledFieldTripwireTests: XCTestCase {
             for fieldKind in ["TextField(", "SecureField("] {
                 var searchStart: String.Index = body.startIndex
                 while let fieldRange = body.range(of: fieldKind, range: searchStart..<body.endIndex) {
+                    // A whole name only: `.borderedTextField()` (#374) ends
+                    // in "TextField(" and is a modifier, not a field.
+                    if fieldRange.lowerBound > body.startIndex {
+                        let before: Character = body[body.index(before: fieldRange.lowerBound)]
+                        if before.isLetter || before.isNumber || before == "_" {
+                            searchStart = fieldRange.upperBound
+                            continue
+                        }
+                    }
                     let rest: Substring = body[fieldRange.upperBound...]
                     let title: String
                     if let comma = rest.firstIndex(of: ",") {
@@ -144,6 +153,7 @@ final class LabeledFieldTripwireTests: XCTestCase {
         }
         LabeledContent("Name") {
             TextField("", text: $name)
+                .borderedTextField()
         }
         """
         XCTAssertEqual(
