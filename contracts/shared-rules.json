@@ -466,6 +466,18 @@
         "why": "From 2026-09-25 every preview and every publish can REWRITE the teacher's own pages: the front page takes the date of the class it shows, and a page a class links to directly takes the date of the earliest visible class that links to it (class-planning.json -> sectionIndexPointer.dateCases and datingPagesAClassBrings.atBuildTime). A change to a teacher's files that nobody asked for in so many words is exactly what a trail exists to answer - 'why did the date on this page change?' - and the build's console, where it is also said, is gone by the time anyone asks. Recorded from the build's own PLANTOIR_DATED: line (pagesDatedByTheBuild), which says nothing when nothing was rewritten, so a build whose dates were already right leaves no line. A SCHEDULED publish records it too, from that run's own part of its log once the run is done: it is often the first build after a class goes visible, so the one likeliest to rewrite files, and nobody is watching a console then."
       },
       {
+        "event": "put today's class on the front page",
+        "carries": "the course and section; the class the front page now shows and the class it replaced - FILE NAMES, names in the course folder, never the page's title or anything written on a page (the 'published pages that links led to' precedent).",
+        "line": "{course}/{section} · put today's class on the front page — {class} in place of {shown}",
+        "why": "Added with #397. Pressing Preview can offer to change the one class line on the section's front page; Show on Front Page REWRITES the teacher's own page. 'Why does my front page say Day 5?' is asked later, and the answer is that the teacher said yes."
+      },
+      {
+        "event": "left the front page as it was",
+        "carries": "the course and section; WHICH answer - Not Today, already showed today's class, it changed while the teacher was asked, or could not be saved; the class offered and the class the page showed - file names only.",
+        "line": "{course}/{section} · left the front page as it was — {Not Today|already showed today's class|it changed while the teacher was asked|could not be saved}: {class} offered, it showed {shown}",
+        "why": "Added with #397. When students see yesterday's class, the trail shows the teacher was asked and chose, or that the answer could not be carried out. A question never answered changed nothing, and a question not asked (Not Today already said for that class today) is not an action: neither writes a line."
+      },
+      {
         "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from, and how many could not be deleted",
         "event": "backups deleted",
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
@@ -14721,7 +14733,13 @@
       "llamas",
       "wranglers",
       "pythons",
-      "workspaces"
+      "workspaces",
+      "transclude",
+      "transcludes",
+      "transcluded",
+      "transcluding",
+      "transclusion",
+      "transclusions"
     ],
     "matching": "Whole word and case-insensitive: “description” does not contain “script”. A plural is a different word to a whole-word match, so the plurals are LISTED (“scripts”, “containers”, …) rather than inferred — data both platforms read, not a matcher rule each must reimplement (#369 implementation review, N5; measured 2026-09-30 over all of the mac app: zero hits for any of them). Comments are not labels and are skipped, and so is code interpolated into a label (Swift's `\\(…)`): the sidebar's “No course or club matches “\\(workspace.filterText)”.” names a variable, not the machinery (found when “workspace” joined the list, 2026-09-30).",
     "scope": "On the mac: every string literal passed straight to a call that puts words on screen, in QuartzTeachers/Views — Text, Picker, Toggle, Button, LabeledContent, TextField, SecureField, Label, DisclosureGroup, ExampleCaption, FormSectionHeader, Section, .help, .navigationTitle, .alert, .confirmationDialog. Wording held in a named key is pinned by that key's own contract instead.",
@@ -14731,7 +14749,7 @@
         "why": "It credits Jacky Zhao's Quartz and asks the reader to sponsor him: naming it is the point. On the mac it is a LocalizedStringKey constant rather than a label literal, so the scan never reaches it; a platform whose scan does reach it exempts it by this entry."
       }
     ],
-    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses. “workspace” was added 2026-09-30 (v1.4.1 release sweep): Russell said the word meant nothing to him, and the launchers say “website builder” since #378 and #382; zero label hits when it was added."
+    "why": "CLAUDE.md rule 1: the GUI never mentions the machinery. Until #369 that rule was enforced only by word lists inside individual features' tests, and no test scanned the labels in the views, which is how “Quartz locale” shipped from v1.1.0 to v1.4.0. Measured on 2026-09-29 with this list and this scope: exactly two hits, both fixed in #369. “terminal” is deliberately NOT on the list — “New Terminal at Folder” is a real macOS action a teacher uses. “workspace” was added 2026-09-30 (v1.4.1 release sweep): Russell said the word meant nothing to him, and the launchers say “website builder” since #378 and #382; zero label hits when it was added. The transclude family was added 2026-09-30 with #397 (R14, Russell): not machinery but a technical term, which rule 1's plain-words reason covers as well — the page every student lands on is “the front page”; zero label hits when added. “embed” is deliberately NOT on the list: “Most teachers embed video from YouTube” (PublishingChoiceView) is a real label."
   },
   "savingSettings": {
     "rule": "A Save writes only the settings THIS window changed since it last read or wrote the course's settings file. Every other setting keeps the value the file has now. Compared per TOP-LEVEL key of course_config.json, never inside a list. After a Save, every other window's copy of that course that has nothing unsaved reads the file again; a copy with unsaved changes is left alone, and its own Save follows the same rule.",

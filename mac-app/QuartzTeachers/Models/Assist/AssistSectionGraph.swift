@@ -207,30 +207,73 @@ nonisolated struct AssistSectionGraph {
             guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
                 continue
             }
-            let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
-                pageAt: pageURL, forSection: sectionNumber, in: course
-            )
-            let dateKey: String = PageFrontmatter.createdKey(
-                forSection: sectionNumber, isSectionLocal: isSectionLocal
-            )
-            let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
-                in: text, forSection: sectionNumber
-            )
-            pages.append(AssistSectionPage(
-                title: pageURL.deletingPathExtension().lastPathComponent,
-                displayTitle: displayName(forPageAt: pageURL, in: text),
-                fileURL: pageURL,
-                relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
-                isSectionLocal: isSectionLocal,
-                isVisibleToStudents: visibility != .hidden,
-                visibilityIsCertain: visibility != .cannotTell,
-                date: PageFrontmatter.createdDay(in: text, key: dateKey),
-                linkedTitles: linkTargets(in: text),
-                classFolderNames: ClassFolder.names(for: course),
-                pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+            pages.append(AssistSectionGraph.page(
+                at: pageURL, text: text, forSection: sectionNumber, in: course,
+                workspaceURL: workspaceURL, readingLinks: true
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)
+    }
+
+    /// The section's CLASS pages alone, read exactly as `read` reads them but
+    /// without their links (`linkedTitles` is empty) — for the question about
+    /// today's class at Preview (#397), which is asked on every press of the
+    /// button and needs each class's date, visibility and file name, nothing
+    /// more. Membership is `isClassPage`, decided from the path BEFORE the file
+    /// is opened, so the other pages of a large course are never read;
+    /// `TodaysClassOnTheFrontPageTests` pins that it names the same pages as
+    /// `read`'s class pages.
+    @MainActor
+    static func classPages(forSection sectionNumber: Int, in course: Course) -> [AssistSectionPage] {
+        var pages: [AssistSectionPage] = []
+        let classFolders: [String] = ClassFolder.names(for: course)
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
+            if pageURL.lastPathComponent.lowercased() == "index.md" {
+                continue
+            }
+            let within: String = pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+            if !ClassFolder.isClassPage(relativePath: within, classFolders: classFolders) {
+                continue
+            }
+            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+                continue
+            }
+            pages.append(AssistSectionGraph.page(
+                at: pageURL, text: text, forSection: sectionNumber, in: course,
+                workspaceURL: nil, readingLinks: false
+            ))
+        }
+        return pages
+    }
+
+    /// One page, read — the single place both readers above build a page.
+    @MainActor
+    private static func page(
+        at pageURL: URL, text: String, forSection sectionNumber: Int, in course: Course,
+        workspaceURL: URL?, readingLinks: Bool
+    ) -> AssistSectionPage {
+        let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
+            pageAt: pageURL, forSection: sectionNumber, in: course
+        )
+        let dateKey: String = PageFrontmatter.createdKey(
+            forSection: sectionNumber, isSectionLocal: isSectionLocal
+        )
+        let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
+            in: text, forSection: sectionNumber
+        )
+        return AssistSectionPage(
+            title: pageURL.deletingPathExtension().lastPathComponent,
+            displayTitle: displayName(forPageAt: pageURL, in: text),
+            fileURL: pageURL,
+            relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
+            isSectionLocal: isSectionLocal,
+            isVisibleToStudents: visibility != .hidden,
+            visibilityIsCertain: visibility != .cannotTell,
+            date: PageFrontmatter.createdDay(in: text, key: dateKey),
+            linkedTitles: readingLinks ? linkTargets(in: text) : [],
+            classFolderNames: ClassFolder.names(for: course),
+            pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+        )
     }
 
     /// What a teacher calls this page, which is not always what the file is
