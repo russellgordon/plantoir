@@ -187,6 +187,31 @@ class TheCommandLineAsks(unittest.TestCase):
         self.assertEqual(said, ["❌ A course code can only use letters, numbers, spaces and dashes."])
 
 
+class TheBareFolderName(unittest.TestCase):
+    """What may reach the existing-course step at all (#402 review S2, N3).
+
+    Pure, so both platforms pin it: on Windows `courses / "C:X"` is
+    drive-RELATIVE and `Path("C:X").is_absolute()` is False, so the colon is
+    the only guard; and Windows drops a trailing dot or space when it reads a
+    path, so "ICS4U." would find ICS4U's settings and rewrite its code. None
+    of these can be made as a contract case, because Windows cannot create
+    such folders.
+    """
+
+    NOT_BARE = ("C:X", "C:", "X/", "X\\", ".", "..", "/tmp/X", "", "ICS4U.", "ICS4U ", "C++.")
+    BARE = ("ICS4U", "C++", "AP CALC", "MTEL-12", "-ICS3U-")
+
+    def test_what_is_not_a_bare_folder_name(self):
+        for name in self.NOT_BARE:
+            with self.subTest(name=name):
+                self.assertFalse(setup_course._is_a_bare_folder_name(name))
+
+    def test_what_is_a_bare_folder_name(self):
+        for name in self.BARE:
+            with self.subTest(name=name):
+                self.assertTrue(setup_course._is_a_bare_folder_name(name))
+
+
 class TheNote(unittest.TestCase):
 
     def every_note(self):

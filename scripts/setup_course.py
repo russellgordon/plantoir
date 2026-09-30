@@ -489,10 +489,18 @@ def _is_a_bare_folder_name(code):
     Asked before the existing-course exemption, because pathlib JOINS rather
     than appends: `courses / "ICS4U/"` is `courses/ICS4U`, and
     `courses / "/tmp/x"` is `/tmp/x` (on Windows `C:\\x` replaces the base the
-    same way). Writing outside courses/ is the damaging direction, so anything
-    that is not plainly one name is refused by the rule instead.
+    same way; a driveless "C:X" is drive-RELATIVE there, and the colon is the
+    only thing that stops it). Writing outside courses/ is the damaging
+    direction, so anything that is not plainly one name is refused by the rule
+    instead.
     """
     if code in ("", ".", ".."):
+        return False
+    # A trailing dot or space is dropped by Windows when it reads a path, so
+    # "ICS4U." would find ICS4U's course_config.json and then write
+    # "ICS4U." into it — the folder and its settings disagreeing (#402
+    # implementation review N3). Such a name is never a bare folder name.
+    if code != code.rstrip(". "):
         return False
     if "/" in code or "\\" in code or ":" in code:
         return False
