@@ -1880,10 +1880,13 @@ launcher. **Rejected:** changing Swift to ASCII (it would create a mac/Windows
 difference — Windows' `TaskScheduling.cs` sanitizer is `IsLetterOrDigit`,
 like Swift — and re-match old agents' labels for no teacher who can reach
 it), and teaching the launchers Unicode letters (bash 3.2's BSD awk and a
-per-user locale; fragile for nothing reachable). **Still reachable:** the
-command-line wizard (`setup.sh` → `setup_course.py`) checks a typed code only
-for a leading dot, so it can make "CAFÉ", "C++" or "A;B". For THIS guard
-such a course fails open: a deploy set for later of it is not recognised by
+per-user locale; fragile for nothing reachable). **Still reachable, since
+#402 only by an OLD course:** until #402 the command-line wizard (`setup.sh` →
+`setup_course.py`) checked a typed code only for a leading dot, so it could
+make "CAFÉ", "C++" or "A;B". It now asks `CourseCodeRule` whole
+(`course-management.json → courseCode.commandLine`, below), so what is left is
+a course made at the command line before #402, or a folder given a
+`course_config.json` by hand. For THIS guard such a course fails open: a deploy set for later of it is not recognised by
 the label look, and `deploy.sh`'s own row is still recognised by its words.
 **For the owner check before a remake it fails the DAMAGING way** (#388
 implementation review S3, measured with a pretend `ps` on the branch and on
@@ -1894,8 +1897,13 @@ gone. Work holding `;` or `\` — either of which would shift the places'
 numbers onto OTHER courses' work, measured: a live preview of another course
 declared gone — is answered every piece owned instead (a
 `whatCountsAsRunning` case for each, and their must-fails). Recorded in both
-contracts' `knownLimits`, not fixed here: the fix is for the command-line
-setup to apply `CourseCodeRule`, drafted as a follow-up issue.
+contracts' `knownLimits`, narrowed rather than removed: #402 made the
+command-line setup apply `CourseCodeRule`, and the guards stay, because a
+course that already carries such a code keeps working (it is renamed in the
+app). #402 rejected the launchers refusing the codes as well: an existing
+course would stop previewing and publishing, and its scheduled publishes would
+start failing — a certain failure to close a narrow race — for a second copy of
+the rule in bash 3.2 and PowerShell.
 
 **An unreadable process table lets the preview THROUGH** — the opposite of
 the look before a workspace is remade (above), on purpose. There, failing open

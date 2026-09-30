@@ -2955,16 +2955,30 @@ on a Mac before 2026-09-25) can still have its own code re-typed while being
 renamed — it cannot be given the name, and renaming it away is how it leaves.
 The sentence says the name is kept, never what for: rule 1.
 
-**The command line still accepts "work", deliberately.** `setup_course.py`'s
-code prompt has never carried the app's rule — it refuses only a leading dot,
-and does not hold the twelve-character limit or the character rule either — so
-adding one name to it would be a third, partial copy of a rule that has one
-home. The app's rule is the gate a teacher meets: both wizards validate before
-they ever start `setup.sh`/`setup.ps1`. A teacher typing codes into the launcher
-by hand is off the supported path already, and on Windows the damaging half of
-the collision is guarded separately — `BuildOutputLocation.WouldCollideWithEveryCourse`
-refuses to delete by that path. If the command line ever gets the shared rule,
-it gets all of it, WORK included.
+**The command line has the whole rule since #402, WORK included.** Until
+then `setup_course.py`'s code prompt refused only a leading dot, and this page
+said adding WORK alone would be a third, partial copy of a rule with one home —
+"if the command line ever gets the shared rule, it gets all of it". #402 did
+that: `ask_for_course_code` asks `course_code_trouble`, a port of
+`CourseCodeRule.trouble` gated by every `course-management.json →
+courseCode.problems` and `.normalized` case (`scripts/test_course_code_rule.py`),
+and a refused code hears the wizard's full sentence. Three things differ from
+the app's wizard, all on purpose, and `courseCode.commandLine` holds them as
+cases. It passes NO existing codes: re-running the wizard over a course is how
+the command line changes its settings. A leading dot is still refused FIRST,
+whatever is on disk, because a reference import's hidden staging folder has a
+`course_config.json`. And a course that is already here — one bare folder name
+whose `course_config.json` exists — is let through, with a note naming the
+rule and the app's rename when its code is outside it. Both apps write that
+file BEFORE they answer the prompt, so an app's New Course run never meets the
+refusal, and a difference between the two apps' rules (Windows has no WORK
+yet) cannot leave an app answering the same code forever; refusing a
+command-line teacher's own course would only lock them out of it. The
+bare-name condition is there because a path joins rather than appends
+(`courses/` + `ICS4U/` is `courses/ICS4U`; + an absolute path is that path).
+On Windows the damaging half of the WORK collision is still guarded
+separately — `BuildOutputLocation.WouldCollideWithEveryCourse` refuses to
+delete by that path.
 
 ## Renaming a course folder
 
@@ -4107,7 +4121,8 @@ volume resolved the uppercased name, and the run went straight past the
 reference gate — because during the copy there is no marker yet for that gate
 to find. So the refusal is now real rather than assumed: `deploy.sh`,
 `preview.sh` and both `.ps1` twins refuse a course argument beginning with a
-dot before anything else, `setup_course.py` refuses one at its own prompt,
+dot before anything else, `setup_course.py` refuses one at its own prompt
+before anything else too (before its existing-course step, #402),
 `verify.sh` greps all four structurally, and
 `scripts/test_reference_course.py` drives the real `deploy.sh` at it. A
 refusal is the safe direction: no real course code begins with a dot.
