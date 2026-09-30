@@ -38,4 +38,20 @@ public class DuplicationWordingTests
         Assert.Equal(Key("theCopyCouldNotBeMadeHiddenNamingTheBackup"),
             ClassChangeWording.TheCopyCouldNotBeMadeHiddenNamingTheBackup("{page}", "{copy}", Backup));
     }
+    /// <summary>#346: the seven sentences the mac's #174/#185 made keys, rendered as the contract renders them.</summary>
+    [Fact]
+    public void TheAlreadyAndMakingRoomSentencesAreTheContracts()
+    {
+        Assert.Equal(Key("alreadyPublishedOne"), AssistWording.AlreadyPublishedOne);
+        Assert.Equal(Key("alreadyHiddenOne"), AssistWording.AlreadyHiddenOne);
+        Assert.Equal(Key("alreadyPublishedSeveral"), AssistWording.AlreadyPublishedSeveral);
+        Assert.Equal(Key("alreadyHiddenSeveral"), AssistWording.AlreadyHiddenSeveral);
+        Assert.Equal(Key("unitAlreadyPublished"), AssistWording.UnitAlreadyPublished("Unit", 4));
+        Assert.Equal(Key("unitAlreadyHidden"), AssistWording.UnitAlreadyHidden("Unit", 4));
+        Assert.Equal(Key("lookTheSectionOverBeforePublishing"), AssistWording.LookTheSectionOverBeforePublishing);
+        Assert.Equal(Key("makingRoomCannotBeUndone"), AssistWording.MakingRoomCannotBeUndone);
+        // The plan's key is the one class-planning.json -> duplication.undoRule.planWarns names.
+        Assert.Equal("wording.makingRoomCannotBeUndone",
+            ContractLoader.LoadJson("class-planning.json")["duplication"]!["undoRule"]!["planWarns"]!.ToString());
+    }
 }

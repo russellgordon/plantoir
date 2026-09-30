@@ -147,6 +147,29 @@ public static class AssistWording
         ? $"One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is."
         : $"{count} shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.";
 
+    // ---- Already in that state (#346, the mac's #174) ----------------------
+
+    public const string AlreadyPublishedOne = "It's already been published.";
+    public const string AlreadyHiddenOne = "It's already hidden.";
+    public const string AlreadyPublishedSeveral = "They have already been published.";
+    public const string AlreadyHiddenSeveral = "They have already been hidden.";
+    public static string UnitAlreadyPublished(string unitWord, int unit) => $"{unitWord} {unit} has already been published.";
+    public static string UnitAlreadyHidden(string unitWord, int unit) => $"{unitWord} {unit} is already hidden.";
+
+    // ---- Making room (#346, the mac's #185) -------------------------------
+
+    /// <summary>
+    /// Said on the PLAN card when other classes will move — make-room's, and
+    /// the duplicate's since #185 — so a teacher can still say no. Future
+    /// tense: <see cref="ClassChangeWording.OtherClassesMoved"/> is the reply's
+    /// past-tense twin and would be false before anything has moved.
+    /// </summary>
+    public const string MakingRoomCannotBeUndone =
+        "Because other classes move, “Undo that” will not take this back afterwards — the copy made before any of it is in Plantoir's Backups list.";
+
+    /// <summary>The make-room reply's last line. Windows said "…before you deploy it." until #346; it says the mac's now.</summary>
+    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you publish.";
+
     public static string UndidPartly(string whatHappened, int leftAlone)
     {
         string pages = leftAlone == 1 ? "one page" : $"{leftAlone} pages";

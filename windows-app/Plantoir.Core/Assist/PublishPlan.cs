@@ -96,10 +96,9 @@ public sealed class PublishPlan
                     return null;
             }
 
-            string done = Publishes ? "published" : "hidden";
             if (named.Count == 1)
-                return Publishes ? "It's already been published." : "It's already hidden.";
-            return $"They have already been {done}.";
+                return Publishes ? AssistWording.AlreadyPublishedOne : AssistWording.AlreadyHiddenOne;
+            return Publishes ? AssistWording.AlreadyPublishedSeveral : AssistWording.AlreadyHiddenSeveral;
         }
     }
 

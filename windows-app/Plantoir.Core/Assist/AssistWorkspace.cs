@@ -1490,8 +1490,8 @@ public sealed class AssistWorkspace
         if (moving.Count == 0)
         {
             string already = publishing
-                ? $"{course.Configuration.UnitWord} {unit} has already been published."
-                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
+                ? AssistWording.UnitAlreadyPublished(course.Configuration.UnitWord, unit)
+                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit);
             return new WholeUnitPlanResult(
                 HasPages: true,
                 MovingCount: 0,
@@ -1624,8 +1624,8 @@ public sealed class AssistWorkspace
         if (!changedAnything)
         {
             string already = publishing
-                ? $"{course.Configuration.UnitWord} {unit} has already been published."
-                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
+                ? AssistWording.UnitAlreadyPublished(course.Configuration.UnitWord, unit)
+                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit);
             return new AssistResult(true, already, backup);
         }
 
@@ -2899,7 +2899,7 @@ public sealed class AssistWorkspace
             $" Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
-            "Look the section over in Plantoir before you deploy it.";
+            AssistWording.LookTheSectionOverBeforePublishing;
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
