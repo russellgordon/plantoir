@@ -3024,7 +3024,7 @@ else
 fi
 
 # Preflight: nudge if quartz.layout.ts in the container wasn't initialized by setup.sh
-echo "🔎 Preflight: checking Quartz sidebar anchor..."
+echo "🔎 Checking where the sidebar leaves hidden pages out…"
 if ! docker exec -i "$CONTAINER_NAME" bash -lc 'test -f /opt/quartz/quartz.layout.ts && grep -q "const omit = new Set" /opt/quartz/quartz.layout.ts'; then
   echo "⚠️  The website builder could not find where it leaves hidden pages out of the sidebar."
   echo "   (Continuing anyway; the build will attempt a safe fallback.)"
@@ -3205,8 +3205,8 @@ the_preview_s_host_port() {
 # remake is never tried — rebuilding in a loop against a listener that
 # moves with us would cost two minutes a turn and fix nothing.
 #
-# The remade workspace skips the "Preflight: checking Quartz sidebar
-# anchor" look above: it only warns, and it was made from the same image
+# The remade workspace skips the "Checking where the sidebar leaves
+# hidden pages out" look above: it only warns, and it was made from the same image
 # the look was just run against. Do not "fix" that by looking again.
 announce_the_preview_address() {
   if [[ -n "$BUILD_ONLY" ]]; then
