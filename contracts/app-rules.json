@@ -4598,9 +4598,144 @@
               ]
             ],
             "why" : "Decision 1: an open session is not an owner; it owns work only through a launcher it is running."
+          },
+          {
+            "expect" : "a preview",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh AP CALC 1"
+            ],
+            "name" : "a preview of a course whose code has a space, its launcher running",
+            "preview" : "AP+CALC/1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ],
+            "waitingFor" : "preview AP+CALC/1 -",
+            "why" : "#378 review S1: a course code may carry one space (CourseCodeRule, \"AP CALC\"). Read word by word, this live preview was course AP, section CALC, and was stopped and reported as left over. The course runs to the next \" --\", is carried with \"+\" for the space, and a launcher's arguments are matched as the text they begin with."
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+
+            ],
+            "leftovers" : "preview:AP+CALC/1",
+            "name" : "a preview of a course whose code has a space, its launcher gone",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash ./preview.sh AP CALC 1 --build-only"
+            ],
+            "name" : "a build of a course whose code has a space, its launcher running and no docker exec to vouch for it",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8082 --build-only"
+              ]
+            ],
+            "waitingFor" : "build AP+CALC/1 terminal"
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/deploy.sh AP CALC 1"
+            ],
+            "name" : "a deploy of a course whose code has a space, the course quoted in the wrapper",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                410,
+                1,
+                "sh -lc  tok=$(cat /tmp/deploy_pat); rm -f /tmp/deploy_pat; opts=\"\"; NETLIFY_AUTH_TOKEN=\"$tok\" \\ python3 /opt/scripts/deploy.py --host-os mac --course \"AP CALC\" --section 1 $opts "
+              ],
+              [
+                420,
+                410,
+                "python3 /opt/scripts/deploy.py --host-os mac --course AP CALC --section 1"
+              ]
+            ],
+            "waitingFor" : "publish AP+CALC/1 terminal"
+          },
+          {
+            "expect" : "nothing",
+            "launchers" : [
+              "/bin/bash /Users/t/Work/preview.sh AP 1"
+            ],
+            "leftovers" : "preview:AP+CALC/1",
+            "name" : "a launcher for AP 1 does not own a preview of AP CALC 1",
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                210,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=AP CALC --section=1 --port 8081"
+              ]
+            ]
+          },
+          {
+            "expect" : "other work",
+            "launchers" : [
+
+            ],
+            "name" : "the process table is read but lists nothing, not even this run",
+            "psEmpty" : true,
+            "running" : true,
+            "top" : [
+              [
+                100,
+                1,
+                "tail -f /dev/null"
+              ],
+              [
+                310,
+                1,
+                "python3 -u /opt/scripts/build_site.py --host-os mac --course=ICS4U --section=1 --port 8082 --build-only"
+              ]
+            ],
+            "waitingFor" : "build ICS4U/1 -",
+            "why" : "#378 review N6: a table that does not list this run is not believed; it counts as unread, and so as every owner running."
           }
         ],
-        "casesWhy" : "`launchers` rows are either a command line (given pid 7001, 7002… and parent 1) or [pid, parent, command line], so a case can say who started what. `leftovers` is the space-separated WORKSPACE_LEFTOVERS the look must set, `waitingFor` its WORKSPACE_WAITING_FOR; both default to empty. `psFails` makes the process table unreadable. Run through the REAL look by scripts/test_port_blocks.py in all three launchers.",
+        "casesWhy" : "`launchers` rows are either a command line (given pid 7001, 7002… and parent 1) or [pid, parent, command line], so a case can say who started what. `leftovers` is the space-separated WORKSPACE_LEFTOVERS the look must set, `waitingFor` its WORKSPACE_WAITING_FOR; both default to empty. `psFails` makes the process table unreadable. Run through the REAL look by scripts/test_port_blocks.py in all three launchers. `psEmpty` makes `ps` answer 0 with no lines. A course with a space is carried with \"+\" for it (`preview`, `waitingFor`, `leftovers` and the markers), and decoded for every sentence.",
         "knownLimits" : "The owner test is folder-blind: another working folder's launcher for the SAME course and section makes this folder's leftover count as owned (a needless wait, and the status line names that other folder's work, for up to ten minutes — the safe direction; matching by working directory was rejected as a second system query for a failure that only waits). Between the last look and the stop — tens of milliseconds — another launcher can start something in the workspace, which is then ended, and not named: narrowed, not closed. And a workspace remade during a deploy's host-side stretch (the token handed in, before the upload starts) has nothing inside to see. Closing those needs a lock every launcher and the app honour, which is what #156's work leases are for, and they are the app's.",
         "originsWhy" : "Who started the owner, read from its ancestors: 'scheduled' first (the app's --run-scheduled-deploy runner is the Plantoir binary with no --mcp-stdio, so it must not be read as a window — plan review N2), then 'claude' / 'codex' / 'assistant' for a Plantoir --mcp-stdio with claude, codex or neither above it, then 'window' for the Plantoir app, then 'claude' / 'codex' for one of them running the launcher directly, and otherwise 'terminal'. '-' when the table could not be read.",
         "rule" : "One look answers one of three: 'nothing' (not running, gone, only its own first process, or only work whose OWNER has gone), 'a preview' (build_site.py WITHOUT --build-only, with everything it started, AND a preview.sh for that course and section running on this Mac other than this run), or 'other work' (a build, a publish, a course being set up or anything else whose owner is running, and a running workspace that `docker top` did not answer). Every process belongs to the OUTERMOST piece of work above it inside the workspace: deploy.py (the `sh -lc` wrapper and the Python both name it) is a publish of its --course and --section, and the build_site.py --build-only a deploy runs as its own child is part of that publish (#378 plan review S2). The owners, proved from the LIVE process table only: a preview — preview.sh C S without --stop or --build-only; a build — preview.sh C S --build-only, or deploy.sh C S; a publish — deploy.sh C S; a course being set up — setup.sh; anything else — any launcher. Belts, for everything but a preview: a publish set for later, by the scheduled script's path (course sanitized as ScheduledDeploy writes it, 'section<N>' followed by a dot) and, for anything else, any such path; and a live `docker exec` aimed at this workspace by name or id. An open preview wins over other work, because waiting cannot end it. A website builder serving with no build_site.py above it is always left over.",

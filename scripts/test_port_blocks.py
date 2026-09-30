@@ -200,18 +200,20 @@ exit 99
 FAKE_PS = r"""#!/bin/bash
 echo "ps $*" >> "$FAKE/calls"
 if [ -f "$FAKE/ps_fails" ]; then exit 1; fi
-if [ -f "$FAKE/ps_self" ]; then
-  # The program that asked, with the words it was run with, and every shell
-  # between it and the run (a question asked from inside $( … ) is asked by
-  # a subshell of a subshell), as a real process table would list them.
-  p="$PPID"; words="$(cat "$FAKE/ps_self")"
-  while [ -n "$p" ] && [ "$p" -gt 1 ]; do
-    pp="$(/bin/ps -o ppid= -p "$p" | tr -d ' ')"
-    echo "$p $pp $words"
-    words="/bin/bash (a shell between)"
-    p="$pp"
-  done
-fi
+# Read, and answered, but with nothing in it (#378 review N6).
+if [ -f "$FAKE/ps_empty" ]; then exit 0; fi
+# The program that asked, with the words it was run with (ps_self, or a
+# plain shell), and every shell between it and the run (a question asked
+# from inside $( … ) is asked by a subshell of a subshell), as a real process
+# table would list them — the run itself included, which the block checks
+# for before it believes the table.
+p="$PPID"; words="$(cat "$FAKE/ps_self" 2>/dev/null || echo "/bin/bash (this run)")"
+while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+  pp="$(/bin/ps -o ppid= -p "$p" | tr -d ' ')"
+  echo "$p $pp $words"
+  words="/bin/bash (a shell between)"
+  p="$pp"
+done
 cat "$FAKE/ps" 2>/dev/null
 exit 0
 """
@@ -1140,7 +1142,7 @@ class TheLookBeforeARemakeIsWritten(unittest.TestCase):
     def test_the_other_two_markers_are_the_contracts(self):
         block = self.block()
         self.assertIn('echo "PLANTOIR_WAITING_FOR: $1"', block)
-        self.assertIn(f'echo "{leftover_trail_entry()["marker"]["prefix"]} ${{WORKSPACE_TRAIL_PLACE:-setup}} $1"', block)
+        self.assertIn(f'echo "{leftover_trail_entry()["marker"]["prefix"]} ${{place// /+}} $1"', block)
 
     def test_the_sentences_name_no_machinery(self):
         """Rule 1 — and, since #378, not "workspace" either."""
@@ -1288,6 +1290,8 @@ class WhatCountsAsRunning(unittest.TestCase):
             pretend.launchers(case.get("launchers", []))
             if case.get("psFails"):
                 pretend.flag("ps_fails")
+            if case.get("psEmpty"):
+                pretend.flag("ps_empty")
             if case.get("leaseFile"):
                 # A lease on disk naming a process number something else has
                 # since been given (MF-2): the proof must not consult it.

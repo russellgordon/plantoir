@@ -2841,10 +2841,20 @@ WORKSPACE_LEFTOVERS=""
 #
 # A table that cannot be read counts as every owner RUNNING, with no origin:
 # the cost of that is one wait and a refusal, the cost of the other is
-# somebody's publish ended.
+# somebody's publish ended. A table that does not list THIS run counts as
+# unread too (#378 review N6): `ps` answering 0 with nothing in it would
+# otherwise make every piece of work look abandoned.
+#
+# A course code may carry one space ("AP CALC", CourseCodeRule), so the
+# course in "$1" is written with "+" for the space (a code cannot hold a
+# "+"), and a launcher's arguments are compared as the text that follows the
+# launcher's name — "AP CALC 1 …" begins with "AP CALC 1 " — never word by
+# word (#378 review S1: word by word, a live preview of AP CALC read as
+# course AP, section CALC, and was stopped as left over).
 the_owners_of_the_work() {
   local table
-  if ! table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)"; then
+  if ! table="$(ps -Ao pid=,ppid=,args= 2>/dev/null)" \
+    || ! printf '%s\n' "$table" | awk -v self="$$" '$1 == self { found = 1 } END { exit !found }'; then
     printf '%s\n' "$1" | awk 'NF == 3 { print "owned - " $0 }'
     return 0
   fi
@@ -2907,8 +2917,10 @@ the_owners_of_the_work() {
             owners++
             O_pid[owners] = pid
             O_kind[owners] = base(word[w])
-            O_course[owners] = (w + 1 <= n) ? toupper(word[w + 1]) : ""
-            O_section[owners] = (w + 2 <= n) ? word[w + 2] : ""
+            # Everything after the launcher name, one space between words.
+            after = ""
+            for (a = w + 1; a <= n; a++) after = after " " word[a]
+            O_after[owners] = toupper(substr(after, 2)) " "
             O_stop[owners] = (args[pid] ~ /[ \t]--stop([ \t]|$)/)
             O_buildonly[owners] = (args[pid] ~ /[ \t]--build-only([ \t]|$)/)
             O_tag[owners] = (args[pid] ~ /[ \t]--builder-tag([ \t]|$)/)
@@ -2940,11 +2952,14 @@ the_owners_of_the_work() {
       for (j = 1; j <= pieces; j++) {
         if (split(piece[j], it, " ") != 3) continue
         kind = it[1]; course = toupper(it[2]); section = it[3]
+        gsub(/\+/, " ", course)
+        # "AP CALC 1 " must be how the launcher arguments begin.
+        wants = course " " section " "
         found = 0
         for (o = 1; o <= owners && !found; o++) {
           k = O_kind[o]
           if (kind == "preview") {
-            found = (k == "preview.sh" && O_course[o] == course && O_section[o] == section && !O_stop[o] && !O_buildonly[o])
+            found = (k == "preview.sh" && index(O_after[o], wants) == 1 && !O_stop[o] && !O_buildonly[o])
             continue
           }
           if (k == "exec") { found = 1; continue }
@@ -2953,9 +2968,9 @@ the_owners_of_the_work() {
             continue
           }
           if (kind == "build") {
-            found = (O_course[o] == course && O_section[o] == section && ((k == "preview.sh" && O_buildonly[o]) || k == "deploy.sh"))
+            found = (index(O_after[o], wants) == 1 && ((k == "preview.sh" && O_buildonly[o]) || k == "deploy.sh"))
           } else if (kind == "publish") {
-            found = (k == "deploy.sh" && O_course[o] == course && O_section[o] == section)
+            found = (k == "deploy.sh" && index(O_after[o], wants) == 1)
           } else if (kind == "setup") {
             found = (k == "setup.sh" && !O_tag[o])
           } else {
@@ -3028,6 +3043,20 @@ look_inside_the_workspace() {
       }
       return "-"
     }
+    # The course runs to the next " --", not to the first blank: a code may
+    # carry one space (#378 review S1). Quotes a shell kept are dropped,
+    # and the space is written "+" so the pieces below stay one word each.
+    function course_of(cmd,    rest, cut) {
+      if (!match(cmd, /--course[= ]/)) return "-"
+      rest = substr(cmd, RSTART + RLENGTH)
+      cut = index(rest, " --")
+      if (cut > 0) rest = substr(rest, 1, cut - 1)
+      gsub(/["\047]/, "", rest)
+      sub(/[ \t]+$/, "", rest)
+      if (rest == "") return "-"
+      gsub(/ /, "+", rest)
+      return toupper(rest)
+    }
     NR == 1 { next }
     NF >= 8 {
       pid = $2; parent[pid] = $3
@@ -3041,17 +3070,19 @@ look_inside_the_workspace() {
         pid = order[i]
         cmd = command[pid]
         if (cmd ~ /\/opt\/scripts\/deploy\.py/) {
-          root[pid] = "publish " toupper(named(cmd, "--course")) " " named(cmd, "--section")
+          root[pid] = "publish " course_of(cmd) " " named(cmd, "--section")
         } else if (cmd ~ /\/opt\/scripts\/build_site\.py/) {
-          root[pid] = (cmd ~ /--build-only/ ? "build " : "preview ") toupper(named(cmd, "--course")) " " named(cmd, "--section")
+          root[pid] = (cmd ~ /--build-only/ ? "build " : "preview ") course_of(cmd) " " named(cmd, "--section")
         } else if (cmd ~ /\/opt\/scripts\/setup_course\.py/) {
           root[pid] = "setup - -"
         } else if (cmd ~ /[ \t]--serve([ \t]|$)/) {
           serving[pid] = 1
-          if (match(cmd, /quartz-builds\/[^\/ \t]+\/section[0-9]+/)) {
+          if (match(cmd, /quartz-builds\/[^\/]+\/section[0-9]+/)) {
             where = substr(cmd, RSTART + 14, RLENGTH - 14)
             k = index(where, "/section")
-            served_as[pid] = toupper(substr(where, 1, k - 1)) " " substr(where, k + 8)
+            place = toupper(substr(where, 1, k - 1))
+            gsub(/ /, "+", place)
+            served_as[pid] = place " " substr(where, k + 8)
           }
         }
       }
@@ -3105,7 +3136,7 @@ LOOKED
           preview)
             if [ "$WORKSPACE_IS_RUNNING" != "a preview" ]; then
               WORKSPACE_IS_RUNNING="a preview"
-              WORKSPACE_OPEN_PREVIEW="$course section $section"
+              WORKSPACE_OPEN_PREVIEW="${course//+/ } section $section"
               WORKSPACE_OPEN_PREVIEW_PLACE="$course/$section"
             fi ;;
           other)
@@ -3163,6 +3194,7 @@ workspace_origin_in_words() {
 # contracts/app-rules.json -> ….sentences.doing.
 workspace_doing_in_words() {
   local course="${2%/*}" section="${2#*/}"
+  course="${course//+/ }"
   case "$1" in
     build) echo "building $course section $section" ;;
     publish) echo "deploying $course section $section" ;;
@@ -3176,6 +3208,7 @@ workspace_doing_in_words() {
 workspace_leftover_in_words() {
   local place="${1#*:}"
   local course="${place%/*}" section="${place#*/}"
+  course="${course//+/ }"
   case "$1" in
     build:*) echo "a build of $course section $section" ;;
     publish:*) echo "a deploy of $course section $section" ;;
@@ -3196,7 +3229,8 @@ tell_the_app_what_is_waited_for() {
 }
 
 tell_the_app_what_was_stopped() {
-  echo "PLANTOIR_LEFTOVER_STOPPED: ${WORKSPACE_TRAIL_PLACE:-setup} $1"
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_LEFTOVER_STOPPED: ${place// /+} $1"
 }
 
 # The console sentence for what is waited for, said once each time it
@@ -3209,7 +3243,8 @@ say_what_is_waited_for() {
   local place="${rest%% *}" origin="${rest#* }"
   case "$kind" in
     preview)
-      echo "⏳ Waiting for the preview of ${place%/*} section ${place#*/} to close before Plantoir sets this folder up again…" ;;
+      course="${place%/*}"
+      echo "⏳ Waiting for the preview of ${course//+/ } section ${place#*/} to close before Plantoir sets this folder up again…" ;;
     work)
       echo "⏳ Waiting for something else Plantoir is doing in this folder to finish before it sets the folder up again…" ;;
     *)
@@ -3277,7 +3312,8 @@ say_what_was_left_over_and_is_stopped() {
 # is the open preview ("<course>/<section>") for a preview, and for a wait or
 # a refusal on other work the item waited for and who started it.
 tell_the_app_the_workspace_was_in_use() {
-  echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${WORKSPACE_TRAIL_PLACE:-setup}${3:+ $3}"
+  local place="${WORKSPACE_TRAIL_PLACE:-setup}"
+  echo "PLANTOIR_WORKSPACE_IN_USE: $1 $2 ${place// /+}${3:+ $3}"
 }
 
 # Removes this folder's workspace and makes it again, once nothing whose
