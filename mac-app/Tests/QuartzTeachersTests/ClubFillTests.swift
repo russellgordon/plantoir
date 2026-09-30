@@ -58,6 +58,7 @@ final class ClubFillTests: XCTestCase {
             ("sectionMarkerCaption", clubWords.sectionMarkerCaption, courseWords.sectionMarkerCaption),
             ("gradeCaption", clubWords.gradeCaption, courseWords.gradeCaption),
             ("structureCaption", clubWords.structureCaption, courseWords.structureCaption),
+            ("defaultSiteName", clubWords.defaultSiteName, courseWords.defaultSiteName),
         ]
         for pair in pairs {
             XCTAssertEqual(pair.club, club[pair.key] as? String, "club " + pair.key)
@@ -67,6 +68,14 @@ final class ClubFillTests: XCTestCase {
         XCTAssertEqual(clubWords.createButton, club["createButton"] as? String)
         XCTAssertEqual(courseWords.createButton, wizard["createCourseButton"] as? String)
         XCTAssertEqual(courseWords.createButton, WizardWording.createCourseButton)
+        // The marks list's caption: a course's is the gradedFolders one Course
+        // Settings shows; a club's names no coverage map (review N3).
+        let graded: [String: Any] = try XCTUnwrap(all["gradedFolders"] as? [String: Any])
+        let gradedWording: [String: Any] = try XCTUnwrap(graded["wording"] as? [String: Any])
+        XCTAssertEqual(GradedFolderWording.captionFor(isClub: false), gradedWording["caption"] as? String)
+        XCTAssertEqual(GradedFolderWording.captionFor(isClub: true), club["gradedFolderCaption"] as? String)
+        XCTAssertFalse(GradedFolderWording.captionFor(isClub: true).contains("Most courses"))
+        XCTAssertFalse(GradedFolderWording.captionFor(isClub: true).contains("shows an expectation"))
         // The club caption beside the tick box says club, not course: it
         // contradicted the club's naming caption a few rows below.
         XCTAssertTrue(WizardWording.clubToggleCaption.hasSuffix("not once the club is made."))
@@ -90,12 +99,14 @@ final class ClubFillTests: XCTestCase {
             "\"" + courseWords.gradeCaption + "\"",
             "\"" + courseWords.structureCaption + "\"",
             "WizardWording.createCourseButton",
+            "\"Course Website\"",
+            "Text(GradedFolderWording.caption)",
         ]
         for literal in literals {
             XCTAssertFalse(text.contains(literal), "NewCourseWizardView still says \(literal) whatever is being made (#368)")
         }
         // Positive control: the panel does ask.
-        XCTAssertGreaterThanOrEqual(text.components(separatedBy: "WizardWording.panelWords(isClub: isClubCourse)").count - 1, 8)
+        XCTAssertGreaterThanOrEqual(text.components(separatedBy: "WizardWording.panelWords(isClub: isClubCourse)").count - 1, 10)
     }
 
     func testTheFillMatchesTheContract() throws {

@@ -3159,9 +3159,14 @@ made…"), the button (Create Club; its identifier stays `createCourseButton`, w
 tests and the marketing scene find it by), the progress title (Creating your club,
 set when Create is pressed; the example course's "Adding the example course" is
 untouched), the code and name labels (Club code / Club name), the two site-title
-captions ("…beside the club code", "…before the club name") and the Structure
-caption ("Defaults are fine for most clubs"); the toggle caption now ends "…once
-the club is made". Keys: the course's under `wizard` (`namingHeading`,
+captions ("…beside the club code", "…before the club name"), the Structure
+caption ("Defaults are fine for most clubs") and — folded in from the
+implementation review — the caption under the marks tick list (a course keeps
+`gradedFolders.wording.caption`, which names the coverage map and says most
+courses keep Tasks; a club's, `clubToggle.gradedFolderCaption`, says a club
+starts without a coverage map) and the name a blank name field gives the site
+("Club Website", not "Course Website": `defaultSiteName`); the toggle caption
+now ends "…once the club is made". Keys: the course's under `wizard` (`namingHeading`,
 `namingCaption`, `creatingTitle`, `codeLabel`, `nameLabel`, `sectionMarkerCaption`,
 `gradeCaption`, `structureCaption`, and the existing `createCourseButton`), the
 club's under `wizard.clubToggle` with the same names plus `createButton`;
@@ -7242,8 +7247,12 @@ posted it twice and the guard made one repair —
 `AppKitBookkeepingGuardTests.testResizingTheHostsMainWindowLeavesTheRealFrameAsItWas`,
 gated, which asserts both that the guard ACTED (`repairsMade` grew) and that
 the saved value is the one from before. So the window-notification fallback
-the plan held in reserve was not needed, and every prefix is covered while the
-app runs, not only at quit. `StateDirectoryUITests` therefore tolerates
+the plan held in reserve was not needed. That was MEASURED for the window frame
+only; the split-view, table, toolbar and open-panel keys are covered by the same
+path because this app is not sandboxed (no `app-sandbox` entitlement), so AppKit
+and the open/save panels write them through the same in-process
+`UserDefaults.standard` — an out-of-process write would post no notification
+and be put back only at quit. `StateDirectoryUITests` therefore tolerates
 NOTHING: it resizes the main window (asserting the size changed — a positive
 control), samples the real `NSWindow Frame main-AppWindow-1` for the whole ten
 seconds while the app still runs (never "until it matches": `cfprefsd` flushes
@@ -7261,7 +7270,10 @@ application state is a second path for frames.
 **Its honest limit.** The domain is shared by every copy of Plantoir running
 as the same user. A frame, split-view or open-panel change the teacher's own
 `/Applications` copy saves WHILE a test app runs is put back too, at the test
-app's next write — only AppKit's keys, only during that overlap. And copies
+app's next write or when the test app quits (the `willTerminate` pass) — only
+AppKit's keys, only during that overlap. That includes the UNIT GATE: its host is
+armed, so a window move the teacher makes in their own open copy while a gate
+runs is undone when the gate's host next writes or quits. And copies
 built before #361 (another worktree's unit gate) still write the key
 unguarded until they carry it.
 

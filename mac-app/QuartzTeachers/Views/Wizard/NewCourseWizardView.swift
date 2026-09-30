@@ -1346,7 +1346,7 @@ struct NewCourseWizardView: View {
                             members: gradedFoldersBinding,
                             protection: wizardGradedFolderProtection
                         )
-                        Text(GradedFolderWording.caption)
+                        Text(GradedFolderWording.captionFor(isClub: isClubCourse))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -1746,7 +1746,7 @@ struct NewCourseWizardView: View {
 
         var name: String = courseName.trimmingCharacters(in: .whitespaces)
         if name.isEmpty {
-            name = "Course Website"
+            name = WizardWording.panelWords(isClub: isClubCourse).defaultSiteName
         }
 
         // What is being made, said while it is made (#368).
