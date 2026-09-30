@@ -28,6 +28,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent))  # build.py, for the deploy's own check
 
 from PIL import Image, ImageDraw  # noqa: E402
 
@@ -123,6 +124,41 @@ class TheCheckItself(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
+
+
+class TheDeployRefuses(unittest.TestCase):
+    """`build.py --deploy` asks the same question before publishing (#375),
+    because the failure this rule exists for was a deploy."""
+
+    def test_the_committed_pictures_let_the_deploy_through(self):
+        import build
+        self.assertIsNone(build.native_corners_refusal())
+
+    def test_a_square_picture_on_a_page_stops_the_deploy(self):
+        import json
+        import shutil
+        import tempfile
+        import build
+        with tempfile.TemporaryDirectory() as scratch:
+            website = Path(scratch) / "website"
+            image_dir = Path(scratch) / "img"
+            (website / "pages").mkdir(parents=True)
+            image_dir.mkdir()
+            manifest = {"shots": [{"id": "courses", "alt": "a"}]}
+            (website / "shots.json").write_text(json.dumps(manifest), encoding="utf-8")
+            (website / "pages" / "index.html").write_text("{{shot:courses}}", encoding="utf-8")
+            real = REPO / "site" / "img" / "courses-light.png"
+            if not real.exists():
+                self.skipTest("no courses-light.png to build the test from")
+            shutil.copy(real, image_dir / "courses-light.png")
+            shutil.copy(real, image_dir / "courses-dark.png")
+            self.assertIsNone(build.native_corners_refusal(website, image_dir))
+            with Image.open(real) as opened:
+                Image.new("RGBA", opened.size, (240, 240, 240, 255)).save(image_dir / "courses-dark.png")
+            refusal = build.native_corners_refusal(website, image_dir)
+            self.assertIsNotNone(refusal)
+            self.assertIn("courses-dark.png", refusal)
+            self.assertNotIn("courses-light.png", refusal)
 
 
 if __name__ == "__main__":
