@@ -137,6 +137,7 @@ final class LinksChecklistTests: XCTestCase {
             "linkedFromSeveralRows": LinksChecklistWording.linkedFromSeveralRows(
                 name: "{name}", count: "{count}", pages: "{pages}"
             ),
+            "comesWithAClass": LinksChecklistWording.comesWithAClass(name: "{name}"),
             "rowInFolder": LinksChecklistWording.rowInFolder(page: "{page}", folder: "{folder}"),
             "frontPageStaysPut": LinksChecklistWording.frontPageStaysPut,
             "nothingChangesUntilYouDeploy": LinksChecklistWording.nothingChangesUntilYouDeploy,
@@ -249,7 +250,8 @@ final class LinksChecklistTests: XCTestCase {
             ticked.insert(place)
         }
         let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
-            offer: offer, ticked: ticked, course: made.course, sectionNumber: 1, workspaceURL: made.root
+            offer: offer, ticked: ticked, course: made.course, sectionNumber: 1, workspaceURL: made.root,
+            shownComingWith: []
         )
         guard case .published = result else {
             XCTFail("Publish did not publish: \(result)")
@@ -295,7 +297,8 @@ final class LinksChecklistTests: XCTestCase {
             ticked.insert(place)
         }
         let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
-            offer: offer, ticked: ticked, course: made.course, sectionNumber: 1, workspaceURL: made.root
+            offer: offer, ticked: ticked, course: made.course, sectionNumber: 1, workspaceURL: made.root,
+            shownComingWith: []
         )
         guard case .published(let outcome) = result else {
             return XCTFail("Publish did not publish: \(result)")

@@ -64,15 +64,15 @@ final class LinksChecklistFollowingTests: XCTestCase {
             }
             for step in testCase["steps"] as? [[String: String]] ?? [] {
                 if let place = step["tick"] {
-                    ticked = LinksChecklistGate.toggled(ticked, place: place, isOn: true)
+                    ticked = LinksChecklistGate.toggled(ticked, place: place, isOn: true, comingWith: [:])
                 }
                 if let place = step["untick"] {
-                    ticked = LinksChecklistGate.toggled(ticked, place: place, isOn: false)
+                    ticked = LinksChecklistGate.toggled(ticked, place: place, isOn: false, comingWith: [:])
                 }
             }
             let going: Set<String> = LinksChecklistGate.going(rows, ticked: ticked)
             var locked: [String] = []
-            for row in rows where LinksChecklistGate.isLocked(row, going: going) {
+            for row in rows where LinksChecklistGate.isLocked(row, going: going, comingWith: [:]) {
                 locked.append(row.place)
             }
             XCTAssertEqual(going.sorted(), LinksChecklistFollowingTests.places(testCase["expectGoing"]), "\(name): going")
@@ -156,7 +156,11 @@ final class LinksChecklistFollowingTests: XCTestCase {
         for row in offer.rows where !row.dependsOn.isEmpty {
             anyDependsOn = true
         }
-        XCTAssertTrue(anyDependsOn, "A #385 case whose rows carry no dependsOn tests nothing (plan risk 4)")
+        // A #385 case whose rows carry no dependsOn tests nothing (plan risk
+        // 4) — unless it is a #398 case, which tests the rows a class brings.
+        let isAComingWithCase: Bool = testCase["expectComesWith"] != nil
+        XCTAssertTrue(anyDependsOn || isAComingWithCase,
+                      "A #385 case whose rows carry no dependsOn tests nothing (plan risk 4)")
         for title in testCase["deletedSince"] as? [String] ?? [] {
             try FileManager.default.removeItem(at: try XCTUnwrap(urls[title]))
         }
@@ -180,6 +184,14 @@ final class LinksChecklistFollowingTests: XCTestCase {
             locked.append(row.place)
         }
         XCTAssertEqual(locked.sorted(), LinksChecklistFollowingTests.places(testCase["expectLocked"]), "\(start) locked")
+        if let expectComesWith = testCase["expectComesWith"] as? [String: String] {
+            XCTAssertEqual(model.comingWith, expectComesWith, "\(start) comes with")
+            for row in model.rows where expectComesWith[row.place] != nil {
+                XCTAssertTrue(model.isDisabled(row), "\(start): \(row.place) comes with a class and can be changed")
+                XCTAssertTrue(model.binding(for: row).wrappedValue, "\(start): \(row.place) comes with a class and shows unticked")
+            }
+        }
+        try LinksChecklistFollowingTests.checkSecondLines(model, testCase, start: start)
         if let count = testCase["expectPublishCount"] as? Int {
             let wanted: String = count == 0
                 ? LinksChecklistWording.publishNothingTicked
@@ -208,8 +220,55 @@ final class LinksChecklistFollowingTests: XCTestCase {
         return SheetRun(testCase: testCase, urls: urls, made: made, model: model, outcome: outcome, trail: trail)
     }
 
+    /// `expectSecondLines` / `expectSecondLinesLack` (#398): parts a row's
+    /// second line must, or must not, contain.
+    static func checkSecondLines(_ model: LinksChecklistSheetModel, _ testCase: [String: Any], start: String) throws {
+        let keys: [(key: String, mustContain: Bool)] = [("expectSecondLines", true), ("expectSecondLinesLack", false)]
+        for entry in keys {
+            for (place, parts) in testCase[entry.key] as? [String: [[String: String]]] ?? [:] {
+                var found: LinksChecklistOffer.Row?
+                for row in model.rows where row.place == place {
+                    found = row
+                }
+                let line: String = model.secondLine(for: try XCTUnwrap(found, "\(start): \(place) is not offered"))
+                for part in parts {
+                    let name: String = StartOfYearWording.pageName(page: try XCTUnwrap(part["name"]))
+                    let wanted: String
+                    switch part["wording"] {
+                    case "comesWithAClass":
+                        wanted = LinksChecklistWording.comesWithAClass(name: name)
+                    case "firstUsedIn":
+                        wanted = LinksChecklistWording.firstUsedIn(name: name)
+                    case "linkedFromRow":
+                        wanted = LinksChecklistWording.linkedFromRow(name: name)
+                    case "datedLike":
+                        wanted = LinksChecklistWording.datedLike(name: name)
+                    default:
+                        XCTFail("The harness does not know \(part["wording"] ?? "nil")")
+                        wanted = "?"
+                    }
+                    if entry.mustContain {
+                        XCTAssertTrue(line.contains(wanted), "\(start) \(place): “\(line)” lacks “\(wanted)”")
+                    } else {
+                        XCTAssertFalse(line.contains(wanted), "\(start) \(place): “\(line)” says “\(wanted)”")
+                    }
+                }
+            }
+        }
+    }
+
     func checkTheSheetRun(_ run: SheetRun) throws {
         let name: String = run.testCase["name"] as? String ?? "?"
+        if let changed = run.testCase["expectChangedSince"] as? [String] {
+            var wanted: [String] = []
+            for title in changed {
+                wanted.append(StartOfYearWording.pageName(page: title))
+            }
+            XCTAssertEqual(run.outcome.changedSince.sorted(), wanted.sorted(), "\(name): changed since")
+        }
+        if let count = run.testCase["expectCameWithAClass"] as? Int {
+            XCTAssertEqual(run.outcome.cameWithAClass, count, "\(name): rows that came with a class")
+        }
         for (title, wanted) in try XCTUnwrap(run.testCase["expect"] as? [String: [String: Any]]) {
             let url: URL = try XCTUnwrap(run.urls[title], title)
             let isClass: Bool = url.path.contains("/All Classes/")
@@ -265,6 +324,30 @@ final class LinksChecklistFollowingTests: XCTestCase {
 
     func testARowShownLockedIsNotPublishedWhenItsPageIsMadeVisibleWhileTheSheetIsOpen() throws {
         try checkTheSheetRun(try runThroughTheSheet("iv-i."))
+    }
+
+    // MARK: - publishCases from iv-j: rows a ticked class brings (#398)
+
+    func runAComingWithCase(_ start: String) throws -> SheetRun {
+        let testCase: [String: Any] = try LinksChecklistTests.publishCase(start)
+        let comesWith: [String: String] = try XCTUnwrap(testCase["expectComesWith"] as? [String: String], start)
+        XCTAssertFalse(comesWith.isEmpty, "\(start): a #398 case that shows nothing coming with a class tests nothing")
+        XCTAssertNotNil(testCase["expectCameWithAClass"], "\(start) does not pin the trail's count")
+        let run: SheetRun = try runThroughTheSheet(start)
+        try checkTheSheetRun(run)
+        return run
+    }
+
+    func testARowUnderAnUntickedPageThatAClassBringsIsShownComingWithIt() throws {
+        _ = try runAComingWithCase("iv-j.")
+    }
+
+    func testARowAClassBringsThroughAnotherPageTakesTheClasssDate() throws {
+        _ = try runAComingWithCase("iv-k.")
+    }
+
+    func testARowShownComingWithAClassMadeVisibleWhileOpenIsNamedNotRemembered() throws {
+        _ = try runAComingWithCase("iv-l.")
     }
 
     // MARK: - An offer from an older builder
@@ -509,7 +592,7 @@ final class LinksChecklistFollowingTests: XCTestCase {
         let published: String = LinksChecklistFollowingTests.fill(
             try LinksChecklistFollowingTests.template(.pagesPublishedFromLinksChecklist),
             [("{N pages}", "1 page"), ("{N}", "1"), ("{N}", "0"), ("{N}", "0"), ("{N classes}", "0 classes"),
-             ("{N}", "0"), ("{N}", "1"), ("{N}", "1"), ("{places}", "Concepts/Glossary")]
+             ("{N}", "0"), ("{N}", "0"), ("{N}", "1"), ("{N}", "1"), ("{places}", "Concepts/Glossary")]
         )
         XCTAssertEqual(LinksChecklistPublisher.publishedLine(run.outcome), published)
         XCTAssertTrue(run.trail.contains(published), run.trail)
@@ -518,6 +601,17 @@ final class LinksChecklistFollowingTests: XCTestCase {
             [("{Not Now|some unticked}", "some unticked"), ("{N pages}", "2 pages"), ("{N}", "1")]
         )
         XCTAssertTrue(run.trail.contains(setAside), "“\(setAside)” is not on the trail:\n\(run.trail)")
+
+        // #398: iv-j's press, whose class brought one row of the list.
+        let brought: SheetRun = try runThroughTheSheet("iv-j.")
+        let broughtLine: String = LinksChecklistFollowingTests.fill(
+            try LinksChecklistFollowingTests.template(.pagesPublishedFromLinksChecklist),
+            [("{N pages}", "2 pages"), ("{N}", "0"), ("{N}", "0"), ("{N}", "0"), ("{N classes}", "1 class"),
+             ("{N}", "1"), ("{N}", "1"), ("{N}", "1"), ("{N}", "0"),
+             ("{places}", "Concepts/Worksheet, section1/All Classes/Unit 3, Day 1")]
+        )
+        XCTAssertEqual(LinksChecklistPublisher.publishedLine(brought.outcome), broughtLine)
+        XCTAssertTrue(brought.trail.contains(broughtLine), brought.trail)
         XCTAssertEqual(LinksChecklistPublisher.setAsideLine(notNow: true, count: 3, withTheirPage: 0),
                        LinksChecklistFollowingTests.fill(
                         try LinksChecklistFollowingTests.template(.linksChecklistSetAside),

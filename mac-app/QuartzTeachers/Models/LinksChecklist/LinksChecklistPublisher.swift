@@ -57,6 +57,25 @@ enum LinksChecklistPublisher {
         /// each NAMED the way a sentence names a page (`LinksChecklistNaming`,
         /// quotes included) — `wording.pageChangedSince`.
         var changedSince: [String] = []
+        /// Rows written ONLY because a ticked class brought them: their own
+        /// tick was off, or on but nothing they come under went (#398). A row
+        /// that went on its own tick is not counted, even when a class also
+        /// brings it — so "I unticked it and it was published" can be read
+        /// off the trail (plan review, S1).
+        var cameWithAClass: Int = 0
+    }
+
+    /// What each class row of the sheet would bring if it were ticked (#398).
+    struct ClassBrings: Equatable {
+
+        // MARK: - Stored properties
+
+        /// The ROWS each class would bring, by the class row's place, in the
+        /// sheet's order — each row's own `place`, as the offer spells it.
+        var rows: [String: [String]] = [:]
+        /// How many pages each class would bring, rows or not — the class
+        /// row's "brings N more" line.
+        var counts: [String: Int] = [:]
     }
 
     enum Result: Equatable {
@@ -159,14 +178,93 @@ enum LinksChecklistPublisher {
         return kept
     }
 
+    /// What each class row would bring, worked out ONCE when the sheet opens
+    /// (#398, `linksChecklist.comingWithAClass`).
+    ///
+    /// **The same planner Publish uses, called once for every class.** Every
+    /// class row's title goes through `planPublishing(titles:)` together — the
+    /// call `plan` makes for the ticked ones — and the pages it would change
+    /// because they are linked are shared out among the classes by each
+    /// class's own reach. That is exact: the reach of several classes is the
+    /// union of each one's (the walk stops at every class and every starting
+    /// page is seeded as seen), and whether a reached page would change is
+    /// decided page by page (`appendChanges`), so a page is in the whole
+    /// plan's share of one class exactly when that class's own plan would
+    /// change it. One planner call rather than one per class, because each
+    /// call reads every page in the reach and runs the writer over it
+    /// (plan review, S6). Not a second walk deciding the same set: pages the
+    /// writer would decline, and pages already visible, are left out here
+    /// because they are left out there.
+    ///
+    /// Rows are matched in COMPOSED form, because a file name is bytes and
+    /// the build may have read it in the other Unicode form (plan review, S2).
+    static func whatEachClassBrings(
+        rows: [LinksChecklistOffer.Row],
+        graph: AssistSectionGraph,
+        pages: [String: AssistSectionPage],
+        classPages: [ClassPageSummary],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> ClassBrings {
+        var classes: [(place: String, title: String)] = []
+        var titles: [String] = []
+        for row in rows where row.group == .aClass {
+            guard let page = pages[row.place.precomposedStringWithCanonicalMapping] else {
+                continue
+            }
+            classes.append((place: row.place, title: page.title))
+            titles.append(page.title)
+        }
+        var brings: ClassBrings = ClassBrings()
+        if classes.isEmpty {
+            return brings
+        }
+        let whole: AssistPublishPlan = AssistPublishPlanner.planPublishing(
+            titles: titles, onOrAfter: nil, before: nil, graph: graph,
+            classPages: classPages, forSection: sectionNumber, in: course
+        )
+        var broughtPaths: Set<String> = []
+        for change in whole.changes where change.becauseLinked {
+            broughtPaths.insert(change.page.fileURL.path)
+        }
+        for entry in classes {
+            // By title, exactly as the planner finds a class (N9).
+            guard let start = graph.page(titled: entry.title) else {
+                continue
+            }
+            var count: Int = 0
+            var broughtPlaces: Set<String> = []
+            for page in graph.reachFollowingLinks(from: [start]).pages where broughtPaths.contains(page.fileURL.path) {
+                count += 1
+                broughtPlaces.insert(place(of: page.fileURL, in: course))
+            }
+            var broughtRows: [String] = []
+            for row in rows where row.group != .aClass {
+                if broughtPlaces.contains(row.place.precomposedStringWithCanonicalMapping) {
+                    broughtRows.append(row.place)
+                }
+            }
+            brings.counts[entry.place] = count
+            brings.rows[entry.place] = broughtRows
+        }
+        return brings
+    }
+
     /// The one merged plan for a press, and the counts it will report.
+    ///
+    /// `shownComingWith` is the rows the sheet showed coming with a ticked
+    /// class (#398): the button counted them, so one that is not written after
+    /// all — its class or its page changed while the sheet was open — is NAMED
+    /// as changed since, like a row that went, and is not remembered as
+    /// unticked, because the teacher saw it ticked (plan review, S7).
     static func plan(
         offer: LinksChecklistOffer,
         ticked: Set<String>,
         graph: AssistSectionGraph,
         classPages: [ClassPageSummary],
         forSection sectionNumber: Int,
-        in course: Course
+        in course: Course,
+        shownComingWith: Set<String>
     ) -> (plan: AssistPublishPlan, outcome: Outcome) {
         let pages: [String: AssistSectionPage] = pagesByPlace(graph, in: course)
         let naming: LinksChecklistNaming = LinksChecklistNaming(
@@ -181,6 +279,10 @@ enum LinksChecklistPublisher {
         // reckoning (it goes as it went), but nothing is FREED here: a row the
         // sheet showed locked is never written (plan-review finding 2).
         let goingAsShown: Set<String> = LinksChecklistGate.going(offer.rows, ticked: ticked)
+        var promisedAsShown: Set<String> = goingAsShown
+        for place in shownComingWith {
+            promisedAsShown.insert(place)
+        }
         var rowsStillThere: [LinksChecklistOffer.Row] = []
         for row in offer.rows where pages[row.place.precomposedStringWithCanonicalMapping] != nil {
             rowsStillThere.append(row)
@@ -190,21 +292,25 @@ enum LinksChecklistPublisher {
         var rowPages: [AssistSectionPage] = []
         var untickedPages: [(place: String, path: String)] = []
         var followingPages: [(place: String, path: String)] = []
+        var comingWithPages: [(place: String, path: String)] = []
         var rowMoves: [String: AssistPublishDateMove] = [:]
         var classTitles: [String] = []
         for row in offer.rows {
             let key: String = row.place.precomposedStringWithCanonicalMapping
             guard let page = pages[key] else {
-                if goingAsShown.contains(row.place) {
+                if promisedAsShown.contains(row.place) {
                     outcome.changedSince.append(naming.name(ofPlace: row.place))
                 }
                 continue
             }
             if page.isVisibleToStudents && page.visibilityIsCertain {
-                if goingAsShown.contains(row.place) {
+                if promisedAsShown.contains(row.place) {
                     outcome.changedSince.append(naming.name(ofPlace: row.place))
                 }
                 continue
+            }
+            if shownComingWith.contains(row.place) {
+                comingWithPages.append((place: row.place, path: page.fileURL.path))
             }
             if !ticked.contains(row.place) {
                 // Counted only after the merge below: a ticked class may
@@ -215,7 +321,7 @@ enum LinksChecklistPublisher {
             if !going.contains(row.place) {
                 // Its own tick is on, but nothing it comes under goes.
                 followingPages.append((place: row.place, path: page.fileURL.path))
-                if goingAsShown.contains(row.place) {
+                if goingAsShown.contains(row.place) && !shownComingWith.contains(row.place) {
                     outcome.changedSince.append(naming.name(ofPlace: row.place))
                 }
                 continue
@@ -299,12 +405,30 @@ enum LinksChecklistPublisher {
         for change in changes {
             outcome.publishedPlaces.append(place(of: change.page.fileURL, in: course))
         }
-        for unticked in untickedPages where !changedPaths.contains(unticked.path) {
-            outcome.leftUntickedPlaces.append(unticked.place)
+        var declinedPaths: Set<String> = []
+        for page in noRoom {
+            declinedPaths.insert(page.fileURL.path)
+        }
+        for unticked in untickedPages {
+            if changedPaths.contains(unticked.path) {
+                outcome.cameWithAClass += 1
+            } else if !shownComingWith.contains(unticked.place) {
+                outcome.leftUntickedPlaces.append(unticked.place)
+            }
         }
         outcome.leftUnticked = outcome.leftUntickedPlaces.count
-        for following in followingPages where !changedPaths.contains(following.path) {
-            outcome.leftWithTheirPagePlaces.append(following.place)
+        for following in followingPages {
+            if changedPaths.contains(following.path) {
+                outcome.cameWithAClass += 1
+            } else if !shownComingWith.contains(following.place) {
+                outcome.leftWithTheirPagePlaces.append(following.place)
+            }
+        }
+        // Shown coming with a class, and not written after all: said, not
+        // left to look like a choice (S7). A page the writer declined is
+        // named by that sentence instead.
+        for shown in comingWithPages where !changedPaths.contains(shown.path) && !declinedPaths.contains(shown.path) {
+            outcome.changedSince.append(naming.name(ofPlace: shown.place))
         }
         outcome.leftWithTheirPage = outcome.leftWithTheirPagePlaces.count
         outcome.publishedPlaces.sort()
@@ -334,7 +458,8 @@ enum LinksChecklistPublisher {
         ticked: Set<String>,
         course: Course,
         sectionNumber: Int,
-        workspaceURL: URL
+        workspaceURL: URL,
+        shownComingWith: Set<String>
     ) -> Result {
         if CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: course.code) {
             return .refused(LinksChecklistWording.deployUnderWay(course: course.displayCode))
@@ -345,7 +470,7 @@ enum LinksChecklistPublisher {
         let planned: (plan: AssistPublishPlan, outcome: Outcome) = plan(
             offer: offer, ticked: ticked, graph: graph,
             classPages: ClassPages.list(forSection: sectionNumber, in: course),
-            forSection: sectionNumber, in: course
+            forSection: sectionNumber, in: course, shownComingWith: shownComingWith
         )
         var outcome: Outcome = planned.outcome
         if planned.plan.changes.isEmpty && planned.plan.dateMoves.isEmpty && outcome.declined.isEmpty {
@@ -446,19 +571,22 @@ enum LinksChecklistPublisher {
         }
         return "published pages that links led to — \(pages) (\(outcome.datedFromAClass) dated from a class, "
              + "\(outcome.datedAsTheFirstClass) dated as the first class, \(outcome.keptTheirDate) kept their date), "
-             + "\(classes) bringing \(outcome.broughtByClasses) more, \(outcome.leftUnticked) left unticked, "
+             + "\(classes) bringing \(outcome.broughtByClasses) more (\(outcome.cameWithAClass) of them on the list), "
+             + "\(outcome.leftUnticked) left unticked, "
              + "\(outcome.leftWithTheirPage) left with the page they come under: \(names)"
     }
 
     /// The trail line for putting the checklist in front of the teacher, from
-    /// the sheet as it opens: `ticked` counts the rows that GO — what Publish
-    /// would write as offered — not the rows whose own tick is on (#385).
+    /// the sheet as it opens: `ticked` counts the rows SHOWN ticked — what
+    /// Publish would write as offered — not the rows whose own tick is on
+    /// (#385): the rows that go and, since #398, the rows a ticked class
+    /// brings (none when the sheet opens, since no class starts ticked).
     static func offeredLine(model: LinksChecklistSheetModel) -> String {
         var listedUnder: Int = 0
         for shown in LinksChecklistGate.shownOrder(model.rows) where shown.depth > 0 {
             listedUnder += 1
         }
-        return offeredLine(model.rows, going: model.going.count, listedUnder: listedUnder, occasion: model.occasion)
+        return offeredLine(model.rows, going: model.shownTicked.count, listedUnder: listedUnder, occasion: model.occasion)
     }
 
     static func offeredLine(

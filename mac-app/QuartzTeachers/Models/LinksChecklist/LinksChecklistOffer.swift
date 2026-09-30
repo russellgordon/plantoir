@@ -366,8 +366,15 @@ nonisolated enum LinksChecklistGate {
     }
 
     /// True when a row comes under other rows and none of them is going: it
-    /// is shown unticked and cannot be ticked, whatever its own tick.
-    static func isLocked(_ row: LinksChecklistOffer.Row, going: Set<String>) -> Bool {
+    /// is shown unticked and cannot be ticked, whatever its own tick. A row a
+    /// ticked class brings is never locked — it is shown coming with that
+    /// class instead (#398, `linksChecklist.comingWithAClass`).
+    static func isLocked(
+        _ row: LinksChecklistOffer.Row, going: Set<String>, comingWith: [String: String]
+    ) -> Bool {
+        if comingWith[row.place] != nil {
+            return false
+        }
         if row.dependsOn.isEmpty {
             return false
         }
@@ -381,7 +388,16 @@ nonisolated enum LinksChecklistGate {
     /// else. The rows under it keep theirs — copying the tick down would tick
     /// ten pages of later units under SNC1W's Final Examination
     /// (`followingARow.whyItsOwnTickIsKept`).
-    static func toggled(_ ticked: Set<String>, place: String, isOn: Bool) -> Set<String> {
+    ///
+    /// A row shown coming with a ticked class ignores it (#398): its checkbox
+    /// is disabled, and its own tick is kept exactly as it was, so unticking
+    /// the class brings the row back as it was.
+    static func toggled(
+        _ ticked: Set<String>, place: String, isOn: Bool, comingWith: [String: String]
+    ) -> Set<String> {
+        if comingWith[place] != nil {
+            return ticked
+        }
         var changed: Set<String> = ticked
         if isOn {
             changed.insert(place)
@@ -389,6 +405,43 @@ nonisolated enum LinksChecklistGate {
             changed.remove(place)
         }
         return changed
+    }
+
+    // MARK: - Rows a ticked class brings (#398)
+
+    /// The rows shown coming with a ticked class, each with the class that
+    /// brings it (`shared-rules.json` → `linksChecklist.comingWithAClass`).
+    ///
+    /// `brings` is, for each class row, the rows publishing that class would
+    /// publish because it links them — the class publish's own plan
+    /// (`LinksChecklistPublisher.whatEachClassBrings`), never `firstUsedIn`.
+    /// Only classes that GO bring anything. Where two ticked classes bring the
+    /// same row, the FIRST class in the sheet's order is named. A class row is
+    /// never brought.
+    static func comingWith(
+        _ rows: [LinksChecklistOffer.Row], going: Set<String>, brings: [String: [String]]
+    ) -> [String: String] {
+        var pagePlaces: Set<String> = []
+        for row in rows where row.group != .aClass {
+            pagePlaces.insert(row.place)
+        }
+        var found: [String: String] = [:]
+        for row in rows where row.group == .aClass && going.contains(row.place) {
+            for place in brings[row.place] ?? [] where pagePlaces.contains(place) && found[place] == nil {
+                found[place] = row.place
+            }
+        }
+        return found
+    }
+
+    /// The rows shown ticked: those that go, and those a ticked class brings.
+    /// What the Publish button counts.
+    static func shownTicked(going: Set<String>, comingWith: [String: String]) -> Set<String> {
+        var shown: Set<String> = going
+        for place in comingWith.keys {
+            shown.insert(place)
+        }
+        return shown
     }
 
     /// One row as the sheet lists it: under which heading, and how far in.
