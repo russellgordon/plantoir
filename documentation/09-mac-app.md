@@ -534,8 +534,10 @@ happily — a preview that can start and that no stop is aimed at.
 
 **One note serves both a preview and a deploy deliberately.** They never run at
 once for a section: a deploy stops a running preview and waits for it before
-noting anything of its own, and the Preview button is disabled while a deploy
-runs. A third folder would be a second name for the same one.
+noting anything of its own, and a preview of a section cannot start while that
+section deploys — the button is disabled, and since #381 `startPreview()`
+itself refuses (below, "A preview of the section this app is deploying"). A
+third folder would be a second name for the same one.
 
 It is guarded by a source scan rather than by a behavioural test, and that is
 the honest limit: no real `SectionDetailView` ever mounts in a unit test —
@@ -2536,6 +2538,39 @@ another live program holds `build`, `publish` or `preview` on the course:
 Every decline writes `build declined, course busy elsewhere` on the trail, with
 what was asked for and the other program's process id — from whichever process
 declined, so an outside assistant's refusal is on the trail too.
+
+**A preview of the section this app is deploying (#381).** The table above
+is about OTHER programs, and on purpose `whatBlocksABuild` never counts this
+program's own leases (a window must not decline its own build). So until
+2026-09-29 a preview of a section was refused while the SAME copy of the app
+deployed it only by the Preview button's `.disabled` — not when another window
+of the app deployed it, not when the in-app assistant deployed it with no
+window, and not on the assistant's or the restart path's way into
+`startPreview()`, which do not pass the button. Russell's decision 4 on #378
+made it a rule: `contracts/shared-rules.json` → `previewWhileItsSectionDeploys`.
+
+`startPreview()` now asks `SectionDetailView.refusalWhileThisSectionDeploys`
+FIRST — after the copy check and before the reference lock, the build lease,
+the preview lease or the look at other programs' leases — which reads
+`CourseActivity.sectionPublishIsRunning`: the record the window's Deploy
+(`WorkLeaseRegistry.claimAPublish`) and `AssistSiteWork.deploy` both write.
+It refuses with `wording.sectionIsBeingDeployed` under "Cannot Preview Yet"
+and writes `WorkLeaseRegistry.lineWhenItsSectionIsBeingDeployed` under `build
+declined, course busy elsewhere`. The SECTION, not the course: previewing
+section 1 while section 2 deploys from the same app works, and the decision
+names the same section, so widening it was rejected. A deploy typed at a
+command line is refused by `preview.sh` itself when the window's preview
+reaches it ([03](03-launcher-scripts.md) → "A section being deployed cannot
+be previewed (#381)"), and the panel shows the launcher's own sentence
+(`FailureExplainer.sectionIsBeingDeployedExplanation`). The button's
+`.disabled` is unchanged: a convenience, not the rule.
+The in-app assistant's own preview (`AssistToolRunner.bringThePreviewUpToDate`) asks the same record first,
+before it opens a window, stops a preview or runs a no-window `--build-only`
+rebuild, and answers `wording.sectionIsBeingDeployed` — otherwise the window
+would refuse while the conversation said the preview was on its way (#381's
+review, S1; `WorkLeaseDecliningTests`).
+`PreviewWhileDeployingTests` pins the rule, the order in `startPreview` and the
+sentences.
 
 **A build, preview or publish lease with no name line is treated as gone**
 (added in the fix round after #245's `ProcessLiveness.nameToCompare`, which
@@ -5037,6 +5072,51 @@ tick re-plans.
 and LOOKED at without a window, which is how it was first seen at all — and how
 a `ScrollView` that reserved its cap and drew a 320 pt hole with the rows
 nowhere in it was found and taken out.
+
+### The checklist and the result screen fit on the screen (#365)
+
+**Everything that grows with the number of pages scrolls in ONE capped area;
+the sheet is at most 620 pt tall, whatever it lists.** Only the rows used to be
+capped. The sentences under them — one per page that will be skipped, the links
+that will lead nowhere, the pictures lines — sat outside the scroll area, and a
+well-linked lesson (The Unplugged Algorithm, last year's ICS3U into ICS4U) has
+about seventy of them: every curriculum embed outside the course's folders and
+every shared page ICS4U already has. The sheet grew past the bottom of the
+screen and Cancel and Copy went with it; Escape was the only way out. Now:
+
+- the checklist's heading (`CopyPageWording.willCopy`) and "Copies start
+  hidden…" stay fixed; the rows AND every per-page sentence scroll inside one
+  `CappedScrollArea` (`Views/Helpers/CappedScrollArea.swift`) of at most 380 pt
+  (`CopyPageChecklist.tallestList`);
+- the result screen (`CopyPageResultView`, split out of the sheet so it can be
+  measured) does the same with its per-page sentences, at 320 pt
+  (`CopyPageResultView.tallestSentenceList`), keeping the first sentence, the
+  backup line and Show in Finder outside it — at 380 it measured 612 pt, too
+  close to the rule to leave room for the orange problem line.
+
+**Why 620.** The smallest screen worth fitting is a 13-inch MacBook Air at its
+older default of 1280 × 800 points: less a 24 pt menu bar, a ~52 pt title bar
+and a ~70 pt Dock, about 654 pt is left for a sheet. Measured with 11 rows and
+70 sentences: the checklist sheet is 556 pt, the result sheet 552 pt; with one
+row and nothing under it, 214 pt (no reserved hole). Rejected: a cap worked out
+from `NSScreen` — a sheet that changes size with the display is one no test can
+pin. Rejected for now: grouping the skip sentences ("8 pages are already in
+ICS4U"), which #365 floated — it is new contract wording Windows would owe, and
+the scroll alone fixes the fault.
+
+**`CappedScrollArea` is a `Layout`, not a measured `@State` height**, and that
+is the part that would pass review wrongly. The obvious version measures the
+content with `.onGeometryChange` into a `@State` and frames the scroll view at
+`min(measured, cap)`; that state starts at zero and learns the real height a
+pass later, so a size test reading the sheet once measures an EMPTY area and
+"at most 620 pt" passes with every row invisible. The `Layout` asks the scroll
+view for its natural height at the offered width in the same pass (a scroll
+view's ideal height along its axis is its content's) and returns the smaller of
+that and the cap. `CopyPageChecklistSizeTests` pins BOTH directions — at most
+620 pt, and at least cap + the fixed lines, so a collapsed area fails — and four
+mutations were run red: sentences moved back outside the area (checklist 3,356
+pt), the result's sentences outside (3,024 pt), the cap always reserved (a
+one-row checklist 556 pt), the area collapsed to zero (checklist 176 pt).
 
 ### What was REJECTED, and why
 

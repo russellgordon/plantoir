@@ -238,6 +238,7 @@ enum AssistContract {
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
+            "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
             "builtWithNoWindowOpen": AssistWording.builtWithNoWindowOpen(course: course, section: section),
             "rebuiltForACallerWithNoWindow": AssistWording.rebuiltForACallerWithNoWindow(

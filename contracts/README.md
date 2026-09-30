@@ -966,6 +966,7 @@ Re-taken at the merge into `dev`: **255** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **257** lists on the merged tree, `activityTrail.mustRecord` **105**.
 Re-taken at the merge into `dev`: **263** lists on the merged tree, `activityTrail.mustRecord` **109**.
 Re-taken at the merge into `dev`: **265** lists on the merged tree, `activityTrail.mustRecord` **111**.
+Re-taken at the merge into `dev`: **268** lists on the merged tree, `activityTrail.mustRecord` **111**.
 
 **Re-taken 2026-09-26 with [#301](https://github.com/russellgordon/plantoir/issues/301)**
 (the trail read back leniently), counted ON THIS BRANCH (on `dev` cf80225a): **212**
@@ -1309,9 +1310,20 @@ branch: **263** lists on the merged tree (257 on dev plus these six),
 `activityTrail.mustRecord` **109** (105 on dev plus four), **forty-three** rule
 sets (dev's count; bundle B adds none).
 
+**Re-taken 2026-09-29 with [#381](https://github.com/russellgordon/plantoir/issues/381)**
+(a preview cannot start while its section is being deployed), counted ON
+THIS BRANCH off `dev` 23bde395, which read **265**: the walker reads **268** —
+three new lists, all in `shared-rules.json` → `previewWhileItsSectionDeploys`:
+`cases` (10 after the fix round; 9 first), `launcherCases` (24; 21 first) and `failureExplanationCases` (1), in the
+table below. `activityTrail.mustRecord` is unchanged at **111** (the two new
+lines are fields of the existing `build declined, course busy elsewhere`),
+and `shared-rules.json` holds **forty-four** rule sets (dev's forty-three plus
+this one).
+
 **Re-taken 2026-09-29 with [#378](https://github.com/russellgordon/plantoir/issues/378)**
 (piece A: work left behind is stopped, the wait is named), counted on this
-branch off `origin/dev` 23bde395: **265** lists, unchanged — no new list.
+branch after merging `origin/dev` 373b94d5 (#381), which read **268**: **268**
+lists, unchanged — no new list.
 Lists that grew (rows, not lists): `app-rules.json` →
 `previewPorts.whenTheWorkspaceIsInUse.whatCountsAsRunning.cases` 14 → 34 and
 `.sequences.cases` 6 → 9 (both exempt, permanently — the table below);
@@ -1321,7 +1333,7 @@ window open, which meets a question" — **red on Windows until
 `wording.deployNeedsAnAnswer`**, a proposed case, the `windows` issue from
 #378); `shared-rules.json` → `transcriptStripping.machineLines.cases` 7 → 9
 (the two new markers; the one rule already hides them).
-`activityTrail.mustRecord` grew from 111 to **112** (`left-over work
+`activityTrail.mustRecord` grew from 111 to **112** on the merged tree (`left-over work
 stopped`, `appliesOn: ["mac"]`, permanently). `assist-wording.json` gained
 four generated keys (`deployNeedsAnAnswer`, `deployNeedsAnAnswerAt`,
 `deployWentOutTo`, `previewBuildNeedsAnAnswer`).
@@ -1359,6 +1371,7 @@ entries above rather than in this table. Re-derive it; do not subtract.
 
 | List | Cases | Where it stands |
 |---|---|---|
+| `shared-rules.json` → `previewWhileItsSectionDeploys.cases`, `.launcherCases`, `.failureExplanationCases` | 10 + 24 + 1 | **Owed**, the `windows` issue opened with [#381](https://github.com/russellgordon/plantoir/issues/381). AUTHORED, arrived 2026-09-29. On the mac: `PreviewWhileDeployingTests` and `WorkLeaseDecliningTests` (the in-app assistant's preview) (the window layer's `cases`, the failure explanation, the trail line, the source order in `startPreview`) and `scripts/test_preview_while_deploying.py` (every `launcherCases` row against the real guard in `preview.sh`, pretend `ps` and `lsof`). **Unrun rather than red** on Windows: nothing there enumerates `shared-rules.json`'s top-level keys, and `launcherCases` are `preview.sh`'s process table — the script SKIPS where there is no bash that can run a program, so `PythonToolchainTests` stays green. What Windows owes is the RULE for its window and `preview.ps1` (its own process table, never a remembered pid): `cases` are the acceptance list, and a named gap in `NamedGapLedger.cs` until then. The two new trail lines are fields of an event Windows already records, so `SharedRules_ActivityTrailEvents_Exist` does not go red. |
 | `shared-rules.json` → `specialNames.curriculumFoldersResolution.cases`, `.curriculumFolderProtection.cases`, `.curriculumFoldersOffer.cases`, `.renameFolder.materialisesOnRename.curriculumFoldersCases`, `curriculumRules.coveragePageTitles.cases`, `transcriptStripping.machineLines.cases` | 16 + 11 + 10 + 5 + 7 + 9 | **Owed**, the `windows` issue from [#128](https://github.com/russellgordon/plantoir/issues/128) (v1.4.0). `curriculumFoldersResolution` REPLACES a key Windows reads, so their `SpecialNamesContractTests` goes RED on the missing `curriculumFolderResolution`; `isExpectationCode` gains 20 cases their `ContractTests.SharedRules_CurriculumRules_MatchesContract` already walks (red until the regex widens); `curriculum_folders` reddens `FileFormats_CourseConfigKeys_MatchesContract`. The build half (resolution, titles, order) runs there already through `PythonToolchainTests` discovering `scripts/test_coverage_maps.py`. `machineLines` is the one to do first: until it lands, every Windows build shows the new `PLANTOIR_MAPS:` line raw (#279's shape). |
 | `class-planning.json` → `renamingTheUnitWord.cases`, `.linkCases.cases` | 7 + 6 | **Owed**, [#158](https://github.com/russellgordon/plantoir/issues/158) (v1.3.0) — Windows cannot rename a course's word for a unit at all yet. Unrun rather than failing; the paragraph above says why that is the quiet kind of gap. |
 | `shared-rules.json` → `wizard.skeletonToggle.cases` | 17 | **Owed**, [#169](https://github.com/russellgordon/plantoir/issues/169) (v1.2.0). Windows shipped the RESTORE behaviour first; what it owed was the test and a seam to run it against, the restore being private to `NewCourseDialog`. Since 2026-09-21 it also owes the BEHAVIOUR: four of the seventeen cases describe a code whose ready-made pages were declined, which their `SkeletonCatalog.HasSkeleton` refuses to offer a skeleton for ([#248](https://github.com/russellgordon/plantoir/issues/248)). Their own `HasSkeletonReturnsFalseWhenExampleContentExists` asserts the old rule against itself and stays green. |
