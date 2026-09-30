@@ -391,7 +391,7 @@ struct StringListEditorView: View {
     var addPopover: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField(addLabel, text: $newItemName, prompt: Text(promptText))
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .focused($addFieldIsFocused)
                 .onSubmit {
                     if canAdd {
@@ -440,7 +440,7 @@ struct StringListEditorView: View {
             Text(SpecialNames.renameFolderTitle(for: item))
                 .font(.headline)
             TextField("New name", text: $proposedName)
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .accessibilityIdentifier("renameField")
                 .onSubmit {
                     Task { await performRename(of: item, finishing: finishing) }

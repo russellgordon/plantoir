@@ -39,26 +39,18 @@ enum WizardWording {
 
     /// Course Settings' three LOCKED rows (#267): the words a course was
     /// made with, shown and not changeable (Russell, 2026-09-24: not
-    /// switchable after the wizard).
+    /// switchable after the wizard) — and only when the course RECORDED
+    /// them (#376, `ClassPagesLockedRows`).
     nonisolated static let settingsPageNamingLabel: String = "Class pages are named"
     nonisolated static let settingsFrontPageHeadingLabel: String = "Front page heading"
     nonisolated static let settingsNounLabel: String = "The assistant calls a page a"
     nonisolated static let settingsLockedCaption: String =
         "Chosen when the course was made. An existing course keeps these; they cannot be changed here."
 
-    /// The heading row when the course recorded none (every course made
-    /// before #267): its front page keeps whatever heading it has, and this
-    /// row does not guess which.
-    nonisolated static let settingsFrontPageHeadingNotSet: String =
-        "Not recorded — the front page keeps the heading it already has"
-
-    /// The heading row's value: the recorded heading, or the sentence above.
-    nonisolated static func settingsFrontPageHeadingValue(_ recorded: String?) -> String {
-        guard let recorded else {
-            return settingsFrontPageHeadingNotSet
-        }
-        return recorded
-    }
+    // The heading row used to say "Not recorded — the front page keeps the
+    // heading it already has" for a course without `front_page_heading`.
+    // Retired in #376: the row is now drawn only when the heading was
+    // recorded, and shows it verbatim (`ClassPagesLockedRows`).
 
     /// How a scheme is shown in its locked row: the course's own first page.
     nonisolated static func settingsPageNamingValue(_ naming: ClassPageNaming) -> String {

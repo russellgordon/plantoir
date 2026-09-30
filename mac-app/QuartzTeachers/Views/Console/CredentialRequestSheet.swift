@@ -78,7 +78,7 @@ struct CredentialRequestSheet: View {
                 // the label back.
                 if request.isSecret {
                     SecureField(request.fieldPlaceholder, text: $answer)
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .labelsHidden()
                         .accessibilityIdentifier("credentialField")
                         .onSubmit {
@@ -86,7 +86,7 @@ struct CredentialRequestSheet: View {
                         }
                 } else {
                     TextField(request.fieldPlaceholder, text: $answer)
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .labelsHidden()
                         .accessibilityIdentifier("credentialField")
                         .onSubmit {

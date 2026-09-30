@@ -299,7 +299,8 @@ class CourseConfiguration {
 
     /// What is wrong with a folder chosen for local-folder publishing, or
     /// nil when the folder is usable. Both the settings form and the
-    /// wizard check this live — and block saving — so a deploy never
+    /// wizard check this live — and block saving when the edit sets or
+    /// changes the destination (`SaveEnablement`, #373) — so a deploy never
     /// discovers the problem after the fact.
     static func deployFolderProblem(forPath rawPath: String) -> String? {
         let path: String = rawPath.trimmingCharacters(in: .whitespaces)
@@ -509,6 +510,26 @@ class CourseConfiguration {
     /// answer for a course without the key is that none was recorded.
     var recordedFrontPageHeading: String? {
         let stored: String = stringValue(forKey: "front_page_heading").trimmingCharacters(in: .whitespaces)
+        if stored.isEmpty {
+            return nil
+        }
+        return stored
+    }
+
+    /// The `class_page_scheme` this course RECORDED, trimmed, or nil when the
+    /// key is absent or blank (#376). Only the wizard writes it, and only
+    /// for a club made since #267, so nil is every other course.
+    var recordedClassPageScheme: String? {
+        let stored: String = stringValue(forKey: "class_page_scheme").trimmingCharacters(in: .whitespaces)
+        if stored.isEmpty {
+            return nil
+        }
+        return stored
+    }
+
+    /// The `class_noun` this course RECORDED, trimmed, or nil (#376).
+    var recordedClassNoun: String? {
+        let stored: String = stringValue(forKey: "class_noun").trimmingCharacters(in: .whitespaces)
         if stored.isEmpty {
             return nil
         }
@@ -800,9 +821,17 @@ class CourseConfiguration {
 
     func setShowsGradeInTitle(_ shows: Bool, forSection sectionNumber: Int) {
         // A legacy course-wide Bool would shadow the per-section map, so
-        // it is replaced by the map the first time a section is set.
-        if values["show_grade_in_title"] is Bool {
-            values["show_grade_in_title"] = [String: Any]()
+        // it is replaced by the map the first time a section is set — and
+        // the map is SEEDED with the Bool for every section first. It used
+        // to be replaced by an empty map, so on a course that stored `false`
+        // toggling section 2 silently turned section 1's grade back on (the
+        // default), a change nobody made (#373's plan review, finding 10).
+        if let legacy = values["show_grade_in_title"] as? Bool {
+            var seeded: [String: Any] = [:]
+            for number in sectionNumbers {
+                seeded["section\(number)"] = legacy
+            }
+            values["show_grade_in_title"] = ["sections": seeded]
         }
         setNestedValue(shows, forKey: "show_grade_in_title", childKey: "sections", entryKey: "section\(sectionNumber)")
     }
@@ -948,10 +977,27 @@ class CourseConfiguration {
         let sectionsMap: [String: Any] = nestedDictionary(forKey: "emojis", childKey: "sections")
         if let stored = sectionsMap["section\(sectionNumber)"] as? String {
             if !stored.isEmpty {
-                return stored
+                return CourseConfiguration.oneEmoji(from: stored)
             }
         }
         return "📚"
+    }
+
+    /// A stored emoji as the field shows it: exactly one emoji.
+    ///
+    /// Normalised on READ, never written: a value holding two ("📚🔬", from
+    /// a hand edit or another app) used to reach the emoji field as it was,
+    /// and the field — which always settles on one — wrote the one it kept
+    /// back into the settings the moment Course Settings appeared, so a
+    /// course nobody had touched reported unsaved changes (#364/#373 plan
+    /// review, finding 11). Reading it as the field would settle it means
+    /// the field has nothing to write. A value with no emoji at all ("CS")
+    /// is returned as it is; the field leaves that alone too.
+    static func oneEmoji(from stored: String) -> String {
+        if let first = EmojiChoiceField.newestEmoji(in: stored, previous: "") {
+            return first
+        }
+        return stored
     }
 
     func setEmoji(_ emoji: String, forSection sectionNumber: Int) {
@@ -1129,10 +1175,9 @@ class CourseConfiguration {
 
     /// The colour scheme id chosen for a given section, or "" when unset.
     func colourSchemeID(forSection sectionNumber: Int) -> String {
-        if let map = values["color_schemes"] as? [String: Any] {
-            if let stored = map["section\(sectionNumber)"] as? String {
-                return stored
-            }
+        let map: [String: Any] = flatDictionary(forKey: "color_schemes")
+        if let stored = map["section\(sectionNumber)"] as? String {
+            return stored
         }
         return ""
     }
@@ -1463,7 +1508,36 @@ class CourseConfiguration {
         values = dictionary
     }
 
+    /// Where the course publishes as this copy last read or wrote the file,
+    /// or nil when there is no such file content (a copy made in memory).
+    var savedDeployDestinations: [DeployDestination]? {
+        guard let saved = CourseConfiguration.decodedDictionary(lastSavedData) else {
+            return nil
+        }
+        let savedCopy: CourseConfiguration = CourseConfiguration(values: saved, lastSavedData: lastSavedData)
+        return savedCopy.allDeployDestinations
+    }
+
+    /// Whether this copy's unsaved changes move where the course publishes:
+    /// the primary destination, its folder, or any additional destination.
+    /// A copy with no saved content counts as changed. This is what decides
+    /// whether a destination problem may hold Save back (#373): a problem
+    /// with a destination already on disk is not made worse by saving a
+    /// colour scheme, so it only blocks an edit that changes the destination.
+    var deployDestinationsDifferFromSaved: Bool {
+        guard let saved = savedDeployDestinations else {
+            return true
+        }
+        return saved != allDeployDestinations
+    }
+
     /// True when the in-memory values differ from what was last saved.
+    ///
+    /// Compared over EVERY top-level key, course-wide and per-section alike
+    /// (`contracts/shared-rules.json` → `savingSettings.whatEnablesSave`).
+    /// #373 reported a per-section change that did not enable Save; this
+    /// comparison was measured right in both directions (#364, #373), and
+    /// the cases pin it.
     var hasUnsavedChanges: Bool {
         guard let savedDecoded = try? JSONSerialization.jsonObject(with: lastSavedData) else {
             return true
@@ -1556,6 +1630,16 @@ class CourseConfiguration {
             return stored
         }
         return []
+    }
+
+    /// A top-level map, or an empty one when the key is absent or is not a
+    /// map. Read through `forKey:` so the file-formats contract's key count
+    /// sees the key (`color_schemes` was invisible to it until #373's plan).
+    private func flatDictionary(forKey key: String) -> [String: Any] {
+        if let stored = values[key] as? [String: Any] {
+            return stored
+        }
+        return [:]
     }
 
     private func nestedDictionary(forKey key: String, childKey: String) -> [String: Any] {

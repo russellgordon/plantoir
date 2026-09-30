@@ -102,7 +102,7 @@ struct KeepACopyForReferenceSheet: View {
             // (#354): a titled field in a labelled row draws its title twice.
             LabeledContent("Folder name") {
                 TextField("", text: $folderName, prompt: Text("Folder name"))
-                    .textFieldStyle(.roundedBorder)
+                    .borderedTextField()
                     .accessibilityIdentifier("keepACopyFolderName")
             }
 
