@@ -64,6 +64,10 @@ struct SidebarView: View {
     /// chosen on, while its sheet is up (#96).
     @State var startOfYearRequest: StartOfYearRequest?
 
+    /// The links checklist opened from the section's menu (#379), so Not Now
+    /// is not a one-way door.
+    @State var linksChecklistFromTheMenu: LinksChecklistSheetModel?
+
     /// The scheduled deploy the teacher is being asked about cancelling.
     @State var cancelScheduleRequest: ScheduledDeployRequest?
 
@@ -604,6 +608,9 @@ struct SidebarView: View {
                 workspace.selection = SidebarSelection.section(course.code, sectionNumber)
             }
         }
+        .sheet(item: $linksChecklistFromTheMenu) { model in
+            LinksChecklistSheet(model: model)
+        }
         .sheet(item: $startOfYearRequest) { request in
             if let workspaceURL = workspace.workspaceURL {
                 StartOfYearSheet(model: StartOfYearSheetModel(
@@ -1135,6 +1142,45 @@ struct SidebarView: View {
         .accessibilityIdentifier("copyAPage-\(course.code)")
     }
 
+    /// Opens the links checklist from the menu. An offer older than the
+    /// course's newest change may be wrong, so the sheet says a preview is
+    /// needed first rather than showing it (plan review, finding 15).
+    func openTheLinksChecklist(course: Course, sectionNumber: Int) {
+        guard let workspaceURL = workspace.workspaceURL,
+              let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) else {
+            return
+        }
+        let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+            courseDirectory: course.directoryURL, section: sectionNumber
+        )
+        var problem: String? = nil
+        if CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: course.code) {
+            problem = LinksChecklistWording.deployUnderWay(course: course.displayCode)
+        } else if !LinksChecklistGate.isFresh(
+            writtenAt: read.writtenAt, newestContentChange: BuildFreshness.newestContentDate(course: course)
+        ) {
+            problem = LinksChecklistWording.needsAPreviewFirst(
+                course: course.displayCode, section: String(sectionNumber)
+            )
+        }
+        let model: LinksChecklistSheetModel = LinksChecklistSheetModel(
+            course: course, sectionNumber: sectionNumber, workspaceURL: workspaceURL,
+            offer: read.offer, answered: answered, occasion: .fromTheMenu, problem: problem
+        )
+        if problem == nil && !model.rows.isEmpty {
+            var ticked: Int = 0
+            for row in model.rows where model.ticked.contains(row.place) {
+                ticked += 1
+            }
+            ActivityTrail.note(
+                .linksChecklistOffered,
+                LinksChecklistPublisher.offeredLine(model.rows, ticked: ticked, occasion: .fromTheMenu),
+                course: course.code, section: sectionNumber
+            )
+        }
+        linksChecklistFromTheMenu = model
+    }
+
     /// "Get Ready for the Start of the Year…", and its undo while one is
     /// held (#96).
     @ViewBuilder
@@ -1154,6 +1200,15 @@ struct SidebarView: View {
             }
             .disabled(deploying)
             .accessibilityIdentifier("startOfYearUndo-\(course.code)-section\(sectionNumber)")
+        }
+        // The links checklist, on demand (#379): whenever the last build left
+        // an offer. A course kept for reference never has one.
+        if LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) != nil {
+            Button(LinksChecklistWording.menuItem, systemImage: "link") {
+                openTheLinksChecklist(course: course, sectionNumber: sectionNumber)
+            }
+            .disabled(deploying)
+            .accessibilityIdentifier("linksChecklist-\(course.code)-section\(sectionNumber)")
         }
         if deploying {
             Text(CourseActivity.availableOnceDeployCompleted)
