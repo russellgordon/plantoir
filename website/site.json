@@ -5,7 +5,7 @@
   "base_url": "https://plantoir.app",
   "repo_url": "https://github.com/russellgordon/plantoir",
   "support_email": "support@plantoir.app",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "released": "September 2026",
   "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
   "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows is pinned to 1.1.0 because v1.2.0 onward carried the macOS DMG only: unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
