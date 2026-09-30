@@ -289,6 +289,10 @@ git push origin main
 python3 website/build.py --deploy
 ```
 
+Before publishing, `--deploy` refuses if any picture a Mac visitor is shown
+lacks its window's own corners (#375); that is a stop — retake the picture
+(`marketing-screenshots` skill), never mask or crop it to pass.
+
 `--deploy` fetches `https://plantoir.app` afterward on its own and confirms
 the live version-note line matches `site.json` — watch its output for the
 ✅/⚠️/❌ line rather than assuming the push alone means teachers can see the

@@ -19,6 +19,8 @@
   --green-deep: #2D6620;
 
   --shadow: 0 1px 2px rgba(43, 42, 36, .06), 0 8px 24px rgba(43, 42, 36, .08);
+  --shot-shadow-near: rgba(43, 42, 36, .10);
+  --shot-shadow-far: rgba(43, 42, 36, .12);
 }
 
 /* Dark mode. Warm near-black rather than blue-black, so the page still reads
@@ -36,6 +38,8 @@
     --green-deep: #86CC66;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+    --shot-shadow-near: rgba(0, 0, 0, .35);
+    --shot-shadow-far: rgba(0, 0, 0, .40);
   }
 }
 
@@ -296,11 +300,16 @@ ol.steps li::before {
   text-align: center;
 }
 
+/* No corner and no shadow SHAPE is drawn round a picture: every capture
+   arrives with its window's own rounded corners, transparent outside the
+   curve. The shadow is a drop-shadow FILTER, which follows the picture's
+   alpha — so it has the window's real curve, and falls round each window of
+   a pair rather than round the rectangle holding both. (Until 2026-09-27 a
+   10px border-radius and a box-shadow drew a rectangle round every shot.) */
 .shot img {
   max-width: 100%;
   height: auto;
-  border-radius: 10px;
-  box-shadow: var(--shadow);
+  filter: drop-shadow(0 1px 2px var(--shot-shadow-near)) drop-shadow(0 8px 16px var(--shot-shadow-far));
 }
 
 /* A phone-shaped capture should not be blown up to the width of a window. */
@@ -311,14 +320,13 @@ ol.steps li::before {
    its own: a rounded rectangle drawn around a phone's rounded corners reads
    as a mistake. */
 .shot-device { width: 100%; margin-left: 0; transform: none; }
-.shot-device img { max-width: 290px; border-radius: 0; box-shadow: none; }
+.shot-device img { max-width: 290px; filter: none; }
 
-/* An assembled or composite figure brings its own rounded corners and its own
-   shadows — the cards and windows inside it are drawn that way — so the frame
-   the other shots get would sit around the outside of the arrangement and
-   spoil it. */
+/* The hero and the fanned colour figure carry shadows made from each
+   window's own alpha when they are assembled; a second one here would
+   double them. The light-and-dark pair is static and stays flat. */
 .shot-composite img,
-.shot-static img { border-radius: 0; box-shadow: none; }
+.shot-static img { filter: none; }
 
 .shot figcaption {
   margin-top: 12px;
