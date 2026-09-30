@@ -3147,6 +3147,47 @@ section's page, and a teacher may have edited it on purpose). Contract:
 Every sentence is in `WizardWording` / `UnitWordRenameWording` and pinned in
 `shared-rules.json` (`wizard.clubToggle`, `specialNames.renameUnitWord`).
 
+**The panel says club when it is making a club (#368, v1.4.1).** Until v1.4.1,
+with the box ticked, a club's own fields ("Folder for meeting pages", "Pages are
+named Week") sat under a "Units" heading captioned "Chosen once, when the course
+is made…", beside "Course code" and "Course name", above "Create Course" — and
+the tick box's own caption ended "…but not once the course is made", a few rows
+above the club's. Nine places now follow the TICK BOX through
+`WizardWording.panelWords(isClub:)` (a `WizardPanelWords` for each side): the
+naming section's heading and caption (Meetings / "Chosen once, when the club is
+made…"), the button (Create Club; its identifier stays `createCourseButton`, which
+tests and the marketing scene find it by), the progress title (Creating your club,
+set when Create is pressed; the example course's "Adding the example course" is
+untouched), the code and name labels (Club code / Club name), the two site-title
+captions ("…beside the club code", "…before the club name"), the Structure
+caption ("Defaults are fine for most clubs") and — folded in from the
+implementation review — the caption under the marks tick list (a course keeps
+`gradedFolders.wording.caption`, which names the coverage map and says most
+courses keep Tasks; a club's, `clubToggle.gradedFolderCaption`, says a club
+starts without a coverage map) and the name a blank name field gives the site
+("Club Website", not "Course Website": `defaultSiteName`); the toggle caption
+now ends "…once the club is made". Keys: the course's under `wizard` (`namingHeading`,
+`namingCaption`, `creatingTitle`, `codeLabel`, `nameLabel`, `sectionMarkerCaption`,
+`gradeCaption`, `structureCaption`, and the existing `createCourseButton`), the
+club's under `wizard.clubToggle` with the same names plus `createButton`;
+`clubToggle.panelWordsFollow` states the rule. **Why the tick box and not
+`ClubCodeRule`:** a teacher can untick it for a club-shaped code, and the words
+must describe what will be made. **Why the heading ignores the noun picker:** it
+would change under the teacher's hand as they choose the row beneath it, and a
+club whose noun is "class" is still a club. The code field's label does change
+when typing CODING ticks the box — that is the box doing what it says. Gated:
+`ClubFillTests.testThePanelsWordsFollowTheToggle` (every key both ways, and each
+pair must differ) and `testThePanelHasNoCourseOnlyWordsOfItsOwn` (no course-only
+literal left in `NewCourseWizardView`, with a positive count of the calls). The
+opt-in `UnitWordRowUITests.testAClubsPanelSaysMeetingsAndCreateClub` types
+CODING, scrolls the lazy form until the naming rows exist, asserts PRESENCE
+(Meetings, the button's label) before absence, then unticks and checks the
+course's words come back; run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1 xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersUITests/UnitWordRowUITests/testAClubsPanelSaysMeetingsAndCreateClub`
+(plain `PLANTOIR_UI_TESTS=1` does not reach the runner and the test skips).
+Not changed, on purpose: "Enter a course code." (a refusal before anything is
+known) and the grade-in-title warning's own words.
+
 ## Renaming a course's word for a unit
 
 Beside the word under Settings — Overall ("What do you call a unit?  Unit
@@ -6737,12 +6778,50 @@ ready for the start of the year"; the contract is `shared-rules.json` →
 anything is written: the intro; the warnings (classes dated before today that
 are going into draft; this folder's scheduled deploy for the section, which
 would put the change in front of students; a first class that is itself in
-draft); every class and every other page going into draft, each with its
-reason, in disclosure groups; what stays; the links left on pages students will
+draft); every class and every other page going into draft, each by its
+title with its reason, in disclosure groups; what stays; the links left on pages students will
 see that will lead to hidden pages, grouped by page with a count; the sentence
 that publishing a class by hand after this leaves it with dead links (issue
 #333); and that the undo ends when Plantoir quits. Go is disabled when there is
 nothing to do.
+
+**Pages are named by title, never by path (#362, v1.4.1).** Until v1.4.1 the
+pages list printed `“Predict the Output” (courses/ICS3U/Warm-Ups/Predict the
+Output.md)`, and the undo sheet printed the bare path with no title at all —
+the working folder's layout and the `.md` the product otherwise hides. Now a
+page is `“{title}”` (`startOfYear.wording.pageName`), and ONLY when another page
+in the section has the same title does it become `“Notes” (in Zeta)`
+(`pageNameInFolder`: the folder within the course, "/"-joined, or the course
+code for a page at the top of the course folder). The title is the app's one
+naming rule — `AssistSectionPage.displayTitle`: front matter title, else the
+file name as written, else the folder for an `index.md` — which the assistant,
+the publish plan and the re-date planner already use; the "(in …)" suffix is
+this sheet's alone, so do not copy it into the assistant's replies without
+deciding to. One builder, `StartOfYearPlan.line(for:first:)` (`draftLine`),
+serves both disclosure lists AND the MCP plan text (`describe()`), and the
+links-left list takes the same name. "Shares a title" is decided across EVERY
+page the section's graph read, not within the list shown — a "Notes" going into
+draft whose twin STAYS is exactly the case a teacher could not otherwise tell
+apart (the contract case "a page is named by its title, and by its folder only
+when another page shares the title" keeps its twin for that reason). Titles
+are compared trimmed, precomposed and case-folded, and NOT with the graph's
+`normalized`, which is for link targets and would make "Input/Output" and
+"Output" one title. The folder comes from the URLs' components compared in one
+Unicode form, not from string-dropping `courses/<CODE>/` off `relativePath`
+(file names are bytes: an NFD working folder would defeat the prefix). The
+undo holds files rather than the graph, so its lists name each file from what
+it says now and decide "shared" within the list (`StartOfYearPageNaming.names`).
+Measured over the 39 payloads: the only title more than one page shares is
+`_DUPLICATE ME`, always `publish: false`, so it never reaches a plan — the
+suffix costs nothing on a fresh course. **The plan code is unchanged**: it
+hashes each change's path, not the words. REJECTED: dropping only `.md` (still
+the folder layout); the folder always (noise on every line of a 90-page list);
+deciding "shared" within the list shown (misleads when the twin stays); a
+separate rule for the MCP text; a humanised file name (would disagree with the
+reasons' own names, which use `displayTitle`). Pinned by
+`StartOfYearNamingTests` (the undo names, the Unicode and "Input/Output"
+comparisons, and a source scan that neither the sheet nor the planner
+interpolates a `relativePath` into a line).
 
 **Go** (`StartOfYearPreparation.carryOut`), in order: re-plan from disk and,
 if the plan differs from the one on screen, write nothing and show the new one
@@ -7035,7 +7114,8 @@ in `NewSiteDialogUITests`). The one exception is the marketing captures
 (`MarketingScreenshotTests`, `AssistantTreeDump`), which drive the REAL
 toolchain — a real preview, real helper programs on the PATH — and so do not
 take a state folder at all: they still write the real trail, run by
-`website/shots/capture.py`, by hand, rarely. Windows documents the same edge
+`website/shots/capture.py`, by hand, rarely — but not his window frames, since
+#361 (below). Windows documents the same edge
 for its own `--state-dir` (doc 12).
 
 ### What was wrong
@@ -7131,16 +7211,88 @@ Then the negative half: every real item unchanged, polled the same 10 s. It
 skips when another Plantoir is running — that copy's writes could not be told
 apart from a leak — and never quits the teacher's copy to make room.
 
-**The residual it tolerates, by name:** AppKit and SwiftUI write their own
-bookkeeping — `NSWindow Frame …`, `NSSplitView Subview Frames …`, open/save
-panel keys — straight to `UserDefaults.standard`, whatever the app does. So a
-UI test can still move where the teacher's main window next opens. The allowed
-prefixes are `StateDirectoryUITests.realPreferenceKeysAppKitOwns`; any other
-real key that changes is red. `-ApplePersistenceIgnoreState YES` (passed by
-`IsolatedLaunch`) keeps the app from restoring the teacher's windows.
-The real domain's key NAMES were read around each UI run on 2026-09-26 (75
-before and after, none added or removed); values of AppKit's keys may still
-change, which is why they are allowed by prefix rather than listed.
+**AppKit's own bookkeeping is put back (#361, v1.4.1).** AppKit and SwiftUI
+write their window frames, split-view positions and open/save panel folders
+straight to `UserDefaults.standard` — the app's REAL domain, the one the
+teacher's copy reads — whatever store the app picks, and no public API points
+those writes elsewhere. Until v1.4.1 the test tolerated them by prefix, and
+they cost something: the unit gate's `InAppUserInterfaceTests` `setFrame`
+left the teacher's main window at 1100×720 on every run (the host IS
+`ca.russellgordon.Plantoir`), a UI run on 2026-09-27 moved it again and the
+rollover test met a window that covered the assistant.
+
+Now **a run a test drives puts each of those keys back the moment it
+changes.** `AppKitBookkeepingGuard` (in `PlantoirDefaults.swift`, the
+preferences seam) copies the keys matching `PlantoirDefaults.appKitOwnedKeyPrefixes`
+from the PERSISTENT domain at `applicationWillFinishLaunching` — before any
+window exists, so before AppKit's first write; never from
+`dictionaryRepresentation`, which would take `IsolatedLaunch`'s argument-domain
+frame for the saved one — and on every `UserDefaults.didChangeNotification`
+compares again and writes back what changed (a key added since is removed); a
+last pass runs at `willTerminate`. Only those prefixes: the teacher's own
+settings are never touched. **Armed** by `PlantoirDefaults.guardsAppKitBookkeeping`,
+a pure function, when XCTest is loaded (the unit host), under a UI test
+(`UITEST_WORKSPACE`, which the marketing captures set too) or with
+`--state-dir` — and never otherwise, which `AppKitBookkeepingGuardTests` pins
+(no flags must be false; armed for a teacher, every window move would be undone
+the moment it was saved, silently). **Armed ONLY from
+`applicationWillFinishLaunching`, never `QuartzTeachersApp.init`:**
+`RealHome.isInsideTestBundle` is a `static let`, and a first read at `init`,
+before XCTest is loaded in the unit host, could freeze it false for the whole
+process and point the unit suite at the real home.
+
+**Step 0, measured (2026-09-30, hosted unit suite):** AppKit's frame save
+posts `didChangeNotification` in-process — `setFrame` on the host's main window
+posted it twice and the guard made one repair —
+`AppKitBookkeepingGuardTests.testResizingTheHostsMainWindowLeavesTheRealFrameAsItWas`,
+gated, which asserts both that the guard ACTED (`repairsMade` grew) and that
+the saved value is the one from before. So the window-notification fallback
+the plan held in reserve was not needed. That was MEASURED for the window frame
+only; the split-view, table, toolbar and open-panel keys are covered by the same
+path because this app is not sandboxed (no `app-sandbox` entitlement), so AppKit
+and the open/save panels write them through the same in-process
+`UserDefaults.standard` — an out-of-process write would post no notification
+and be put back only at quit. `StateDirectoryUITests` therefore tolerates
+NOTHING: it resizes the main window (asserting the size changed — a positive
+control), samples the real `NSWindow Frame main-AppWindow-1` for the whole ten
+seconds while the app still runs (never "until it matches": `cfprefsd` flushes
+the file lazily, so an early read matches trivially), then quits and compares
+every real key. With the guard unarmed it is red at the mid-run check (14
+samples of `1592 35 1022 662 …`); armed, green. `IsolatedLaunch` also passes
+`-NSWindow Frame main-AppWindow-1 "40 60 1100 720 …"` in the argument domain,
+so every isolated launch opens at the same size whatever the teacher left
+(`IsolatedLaunch.mainWindowFrameKey`, the one constant the marketing captures
+read too — theirs had been the dead
+`NSWindow Frame SwiftUI.ModifiedContent<…>-1-AppWindow-1` name from before the
+window group had an id). `-ApplePersistenceIgnoreState YES` stays: saved
+application state is a second path for frames.
+
+**Its honest limit.** The domain is shared by every copy of Plantoir running
+as the same user. A frame, split-view or open-panel change the teacher's own
+`/Applications` copy saves WHILE a test app runs is put back too, at the test
+app's next write or when the test app quits (the `willTerminate` pass) — only
+AppKit's keys, only during that overlap. That includes the UNIT GATE: its host is
+armed, so a window move the teacher makes in their own open copy while a gate
+runs is undone when the gate's host next writes or quits. And copies
+built before #361 (another worktree's unit gate) still write the key
+unguarded until they carry it.
+
+**REJECTED:** a distinct suite or an "application domain" launch argument (none
+exists, and no public API retargets `standardUserDefaults`, which is what
+AppKit writes through — `PlantoirDefaults` already moves OUR writes);
+`setFrameAutosaveName` per state folder or "" (SwiftUI names the window itself
+and replaced a name set from `WindowAccessor`, measured `bf157cc4`; and it
+covers frames only); a volatile or argument-domain frame alone (read layers,
+never where writes go — the argument frame is kept for determinism only);
+restoring the key from the test runner (sandboxed, read-only on `/`, and a
+tearDown never runs after a crash); a separate bundle identifier for test
+launches (removes the whole class, but changes TCC grants, notification
+permission and Sparkle's defaults, and needs a second app target — too big for
+a point release); swizzling `NSWindow.saveFrame(usingName:)` (private call
+path, Objective-C runtime tricks in code a student should be able to read);
+and tolerating it (it moved his window, and the unit gate moved it every run).
+Windows has no analogue — WinUI has no frame autosave, and its placements live
+in `AppSettings`, which `--state-dir` moves (doc 12).
 
 ### The assistant's weights under a state folder
 
@@ -7298,7 +7450,9 @@ teacher's app) restoring a full-screen window. Checked 2026-09-25 after the
 full-screen probe: there is no `Saved Application State` folder for
 `ca.russellgordon.Plantoir`, the saved main-window frame
 (`NSWindow Frame main-AppWindow-1`) is 1100×720 — the size
-`InAppUserInterfaceTests` sets — and no full-screen key is stored.
+`InAppUserInterfaceTests` sets — and no full-screen key is stored. (Since #361,
+v1.4.1, the unit gate no longer leaves that size behind: the host puts AppKit's
+keys back — "AppKit's own bookkeeping is put back", above.)
 
 **Rejected, with the numbers:**
 
@@ -7911,6 +8065,26 @@ With an identifier on the header too, that text read "backupsGroup-backupsGroup"
 and `backupsTotal` was dead; the header's own identifier (`backupsGroup`, read by
 nothing) was dropped in the review round, and the text carries `backupsTotal`. No unit test: in process the tree does not
 reach hosted SwiftUI.
+
+**Two more, found after the sweep (#366, v1.4.1):** the start-of-year sheet
+(`startOfYearSheet` — its Go, Undo and "Undo This" buttons all read back as the
+sheet, so the marketing scene had to find Go as "the button that is not
+Cancel") and the stopped-publish band (`stoppedPublishNotice` swallowed
+`dismissStoppedPublish`). #353's sweep missed the sheet because its buttons
+come from a computed property (`buttons`), so a scan for "an identifier on a
+stack whose body holds an identified control" never sees them in the same
+place. Hence a NAMED list rather than a discovered one:
+`ContainerIdentifierTripwireTests` (gated) holds the seven containers known to
+hold identified controls (`copyPageChecklist`, given `.contain` by #365, among them) and fails any whose `.accessibilityIdentifier(…)` is
+not IMMEDIATELY preceded by `.accessibilityElement(children: .contain)` —
+order-aware, because `.contain` placed after the identifier compiles and does
+nothing — and fails a name no product file uses any more. Add a container to
+it when you give one an identifier. The opt-in
+`ContainerIdentifiersUITests.testTheStartOfYearSheetKeepsItsButtonsIdentifiers`
+finds `startOfYearGo` off the real tree (run it with
+`TEST_RUNNER_PLANTOIR_UI_TESTS=1` — xcodebuild passes only `TEST_RUNNER_`
+variables to the runner, and without it the test skips). VoiceOver was never
+affected: it speaks labels, not identifiers.
 
 ## A field in a labelled row has no title of its own (#354)
 

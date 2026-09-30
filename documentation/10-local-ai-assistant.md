@@ -6259,7 +6259,9 @@ tool or fixed phrasing in this piece (a routing change), and a persistent undo.
 ### The plan code, and its honest limit
 
 `plan_prepare_for_start_of_year` returns the whole plan — every page with its
-reason, not truncated — and a line `Plan code: <8 hex>`
+reason, not truncated, each named by its title and by its folder within the
+course only when another page in the section shares the title (#362; never a
+path to the file — doc 09 → "Pages are named by title, never by path") — and a line `Plan code: <8 hex>`
 (`startOfYear.planCode.line`), always in that shape, so a client or a harness
 finds it in one place. `prepare_for_start_of_year` re-plans from disk and
 writes only when the code given is the current plan's; with no code
@@ -6268,7 +6270,9 @@ writes only when the code given is the current plan's; with no code
 and code. `planCode` is deliberately NOT required in the schema, or the
 no-code call would be unreachable through a real client. The code is a SHA-256
 over the course, section, first class and every change's path and new
-visibility; each platform issues and checks its own. **It proves a plan was
+visibility; each platform issues and checks its own. The code hashes PATHS
+while the text names TITLES, so #362's change of words left every code as it
+was. **It proves a plan was
 MADE, not that a person READ it** — Claude Code can call both in one breath;
 the description asks it to show the teacher and wait.
 
