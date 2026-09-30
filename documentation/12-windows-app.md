@@ -588,7 +588,7 @@ holds one entry per key, carrying the key, the issue, the milestone and the
 reason. Everything else is asserted exactly as before, and the ledger fails
 both ways — if a ledgered thing starts existing here (saying to delete the
 entry) and if it stops being in the contract. **So a green totals line on this
-suite can mean "green, with two written debts"**, and the ledger file is the
+suite can mean "green, with the debts the ledger names"**, and the ledger file is the
 one place that says which. `contracts/README.md` → "Named gaps" carries the
 boundary: a named gap is allowed only while an open issue milestoned LATER
 than the release being cut owns the work, and never for a difference a teacher
@@ -596,6 +596,43 @@ can see at the current milestone. Softening the contract instead — an
 `appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
 — was rejected there and the reasoning is worth reading before proposing it
 again.
+
+**Since 2026-09-30 the ledger is the parity milestone's BURN-DOWN LIST**
+(Russell: no Windows release before parity, so an entry may name an open issue
+on "Windows: parity with mac v1.4.0" itself; `contracts/README.md` → "Named
+gaps"). Bundle 1 of the parity run widened it from two entries to every debt
+the suite could name, so that a red run means something again:
+
+| Area | What is held open | Wired into |
+|---|---|---|
+| `activityTrail.mustRecord` | 58 events this app does not declare yet, each against the issue carrying its mac piece | `ContractTests.SharedRules_ActivityTrailEvents_Exist` |
+| `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
+| `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
+| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` does not name (#345, #274, #239, #241) | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
+| `modelTiers.requirements` | 3 requirements no test here answers (#196, #262) | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
+| `sectionIndexPointer.dateCases` | the club front-page case (#274) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
+| `gradedFolders.newCourse.cases` | the declined-skeleton case (#250), the club case (#274) | `GradedFoldersNewCourseContractTests` |
+
+The event-to-issue mapping was made from each event's own `#` references in
+the contract, matched to the open `windows` issue that names that mac piece;
+where two issues could own one, the choice is the entry's to change. An entry
+goes when its issue lands, and the mend-check says so.
+
+**`AssistWording_MatchesContract` walks the file now (#157).** Every key of
+`assist-wording.json` → `wording` is resolved by reflection to a public static
+member of the same name (first letter upper-cased) on `AssistWording`, then on
+`ClassChangeWording`; a constant is compared WHOLE, and the methods keep their
+hand-written calls because their example values live in the file, not in a
+signature. In the other direction every member of `AssistWording` must have a
+key, except the three multi-destination sentences this app words differently
+(`WindowsOnlyWording` in the test, mend-checked both ways; owed on #165).
+REJECTED: resolving only against `AssistWording` (seven duplicate-and-copy
+sentences live in `ClassChangeWording` and would have been ledgered as absent
+while being said); a reverse check over `ClassChangeWording` too (it carries
+three helpers with no key by design, and the issue asked for the file to be
+the list, not for a second allow-list); searching the whole codebase for each
+sentence's text (a sentence built inline from pieces cannot be found by its
+text, and a text search would call a stale copy present).
 
 ## Driving the real interface
 
@@ -1578,6 +1615,19 @@ should mirror it:
   assembly the way the mac test uses `#filePath`). Include a guard that the
   scan actually found a plausible number of source files, so a moved folder
   fails loudly instead of passing vacuously.
+  **Mirrored on Windows 2026-09-30** as
+  `Plantoir.Tests/ActivityTrailWiringTests.cs`: every `ActivityTrail.Event`
+  member must be referenced as `Event.X` on a non-comment line of product
+  source (`windows-app/` minus the test projects and build output) other than
+  its `KeyFor` arm, with a floor of 100 files so a moved folder fails. One
+  event is written through a helper rather than `Note(Event.X, …)` —
+  `assistant asked`, by `ActivityTrail.NotePrompt` — and is listed with its
+  helper, which must itself be called. An event the contract names that this
+  app has not DECLARED is the other test's business
+  (`SharedRules_ActivityTrailEvents_Exist`, or a ledger entry), so together
+  they say: every event the contract asks of Windows is declared and
+  referenced, or ledgered by name. On the day it was written every declared
+  event was referenced.
 - **Its honest limit, so nobody oversells it**: the scan proves a call site
   EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
   and `noteHelpers(_:)` (split since #222, because the helpers line waits for
