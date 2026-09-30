@@ -10,7 +10,9 @@ import Foundation
 ///
 /// **The parameters are Strings** so the pin can call each one with its
 /// `{placeholder}` and get the contract's template back. `{pages}` is the
-/// word "page" or "pages" that agrees with `{count}`.
+/// word "page" or "pages" that agrees with `{count}`. `{name}` is a page named
+/// by `LinksChecklistNaming` — #362's `pageName`, quotes included, so these
+/// sentences add none of their own (#385).
 nonisolated enum LinksChecklistWording {
 
     // MARK: - Functions
@@ -41,24 +43,24 @@ nonisolated enum LinksChecklistWording {
 
     // MARK: - A row's second line
 
-    static func datedLike(class className: String) -> String {
-        return "will have the same date as “\(className)”"
+    static func datedLike(name: String) -> String {
+        return "will have the same date as \(name)"
     }
 
-    static func alreadyDatedLike(class className: String) -> String {
-        return "has the same date as “\(className)”"
+    static func alreadyDatedLike(name: String) -> String {
+        return "has the same date as \(name)"
     }
 
     static let keepsItsDate: String = "was published before, so it keeps its date"
 
     static let keepsTheDateItHas: String = "keeps the date it has"
 
-    static func datedAsTheFirstClass(first: String) -> String {
-        return "will have the date of “\(first)”, the first class of the year"
+    static func datedAsTheFirstClass(name: String) -> String {
+        return "will have the date of \(name), the first class of the year"
     }
 
-    static func firstUsedIn(class className: String) -> String {
-        return "first used in “\(className)” — it will come with that class"
+    static func firstUsedIn(name: String) -> String {
+        return "first used in \(name) — it will come with that class"
     }
 
     static let classRow: String = "a class of its own — tick it to publish it now"
@@ -67,12 +69,29 @@ nonisolated enum LinksChecklistWording {
         return "brings \(count) more \(pages) with it"
     }
 
-    static func linkedFrom(page: String) -> String {
-        return "linked from “\(page)”"
+    static func linkedFrom(name: String) -> String {
+        return "linked from \(name)"
     }
 
-    static func linkedFromSeveral(page: String, count: String) -> String {
-        return "linked from “\(page)” and \(count) more"
+    static func linkedFromSeveral(name: String, count: String) -> String {
+        return "linked from \(name) and \(count) more"
+    }
+
+    /// A row reached only through other offered rows (#385), named by the
+    /// one it is listed under.
+    static func onlyLinkedFrom(name: String) -> String {
+        return "only linked from \(name) — it goes when that page goes"
+    }
+
+    static func onlyLinkedFromSeveral(name: String, count: String, pages: String) -> String {
+        return "only linked from \(name) and \(count) more hidden \(pages) — it goes when one of them goes"
+    }
+
+    // MARK: - A row's title
+
+    /// A row whose title another page in the section also has (#385).
+    static func rowInFolder(page: String, folder: String) -> String {
+        return "\(page) (in \(folder))"
     }
 
     // MARK: - Under the list
@@ -106,8 +125,8 @@ nonisolated enum LinksChecklistWording {
     static let nothingLeftToPublish: String =
         "Those pages have all been published or removed since the website was made."
 
-    static func pageChangedSince(page: String) -> String {
-        return "“\(page)” changed since it was checked, so it was left as it is."
+    static func pageChangedSince(name: String) -> String {
+        return "\(name) changed since it was checked, so it was left as it is."
     }
 
     static func published(count: String, pages: String) -> String {

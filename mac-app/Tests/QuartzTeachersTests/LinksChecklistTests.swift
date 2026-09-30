@@ -12,6 +12,12 @@ import XCTest
 @MainActor
 final class LinksChecklistTests: XCTestCase {
 
+    // MARK: - Types
+
+    struct MissingCase: Error {
+        let start: String
+    }
+
     // MARK: - Functions
 
     static func contract() throws -> [String: Any] {
@@ -30,7 +36,10 @@ final class LinksChecklistTests: XCTestCase {
                 return candidate
             }
         }
-        throw XCTSkip("No publish case starts “\(start)”")
+        // A FAILURE, not a skip: a renamed case must not pass silently as one
+        // more skipped test (plan-review note 8).
+        XCTFail("No publish case starts “\(start)”")
+        throw LinksChecklistTests.MissingCase(start: start)
     }
 
     /// Lays out a case's pages in section 1 of a fresh course, with a front
@@ -77,7 +86,7 @@ final class LinksChecklistTests: XCTestCase {
                 filled[key] = value
             }
             filled["title"] = LinksChecklistOffer.name(ofPlace: row["place"] as? String ?? "")
-            filled["linkedFrom"] = ["Concepts/How Marks Work"]
+            filled["linkedFrom"] = row["linkedFrom"] ?? ["Concepts/How Marks Work"]
             pages.append(filled)
         }
         let object: [String: Any] = [
@@ -111,16 +120,21 @@ final class LinksChecklistTests: XCTestCase {
             "fromAClassHeading": LinksChecklistWording.fromAClassHeading,
             "notReachedHeading": LinksChecklistWording.notReachedHeading,
             "classesHeading": LinksChecklistWording.classesHeading,
-            "datedLike": LinksChecklistWording.datedLike(class: "{class}"),
-            "alreadyDatedLike": LinksChecklistWording.alreadyDatedLike(class: "{class}"),
+            "datedLike": LinksChecklistWording.datedLike(name: "{name}"),
+            "alreadyDatedLike": LinksChecklistWording.alreadyDatedLike(name: "{name}"),
             "keepsItsDate": LinksChecklistWording.keepsItsDate,
             "keepsTheDateItHas": LinksChecklistWording.keepsTheDateItHas,
-            "datedAsTheFirstClass": LinksChecklistWording.datedAsTheFirstClass(first: "{first}"),
-            "firstUsedIn": LinksChecklistWording.firstUsedIn(class: "{class}"),
+            "datedAsTheFirstClass": LinksChecklistWording.datedAsTheFirstClass(name: "{name}"),
+            "firstUsedIn": LinksChecklistWording.firstUsedIn(name: "{name}"),
             "classRow": LinksChecklistWording.classRow,
             "comesWith": LinksChecklistWording.comesWith(count: "{count}", pages: "{pages}"),
-            "linkedFrom": LinksChecklistWording.linkedFrom(page: "{page}"),
-            "linkedFromSeveral": LinksChecklistWording.linkedFromSeveral(page: "{page}", count: "{count}"),
+            "linkedFrom": LinksChecklistWording.linkedFrom(name: "{name}"),
+            "linkedFromSeveral": LinksChecklistWording.linkedFromSeveral(name: "{name}", count: "{count}"),
+            "onlyLinkedFrom": LinksChecklistWording.onlyLinkedFrom(name: "{name}"),
+            "onlyLinkedFromSeveral": LinksChecklistWording.onlyLinkedFromSeveral(
+                name: "{name}", count: "{count}", pages: "{pages}"
+            ),
+            "rowInFolder": LinksChecklistWording.rowInFolder(page: "{page}", folder: "{folder}"),
             "frontPageStaysPut": LinksChecklistWording.frontPageStaysPut,
             "nothingChangesUntilYouDeploy": LinksChecklistWording.nothingChangesUntilYouDeploy,
             "publishButton": LinksChecklistWording.publishButton(count: "{count}", pages: "{pages}"),
@@ -129,7 +143,7 @@ final class LinksChecklistTests: XCTestCase {
             "deployUnderWay": LinksChecklistWording.deployUnderWay(course: "{course}"),
             "needsAPreviewFirst": LinksChecklistWording.needsAPreviewFirst(course: "{course}", section: "{section}"),
             "nothingLeftToPublish": LinksChecklistWording.nothingLeftToPublish,
-            "pageChangedSince": LinksChecklistWording.pageChangedSince(page: "{page}"),
+            "pageChangedSince": LinksChecklistWording.pageChangedSince(name: "{name}"),
             "published": LinksChecklistWording.published(count: "{count}", pages: "{pages}")
         ]
         for (key, sentence) in ours {
@@ -335,9 +349,13 @@ final class LinksChecklistTests: XCTestCase {
         )
         XCTAssertEqual(model.ticked, ["Concepts/Published Once"])
         let worksheet: LinksChecklistOffer.Row = try XCTUnwrap(model.fromAClassRows.first)
-        XCTAssertTrue(model.secondLine(for: worksheet).hasPrefix(LinksChecklistWording.firstUsedIn(class: "Unit 2, Day 5")))
+        XCTAssertTrue(model.secondLine(for: worksheet).hasPrefix(
+            LinksChecklistWording.firstUsedIn(name: StartOfYearWording.pageName(page: "Unit 2, Day 5"))
+        ))
         model.ticked.insert(worksheet.place)
-        XCTAssertTrue(model.secondLine(for: worksheet).hasPrefix(LinksChecklistWording.datedLike(class: "Unit 1, Day 1")),
+        XCTAssertTrue(model.secondLine(for: worksheet).hasPrefix(
+            LinksChecklistWording.datedLike(name: StartOfYearWording.pageName(page: "Unit 1, Day 1"))
+        ),
                       "Ticked anyway, the row says the date it will take")
         let classRow: LinksChecklistOffer.Row = try XCTUnwrap(model.classRows.first)
         model.ticked.insert(classRow.place)

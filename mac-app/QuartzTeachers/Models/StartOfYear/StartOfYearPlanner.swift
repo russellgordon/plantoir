@@ -92,6 +92,10 @@ nonisolated struct StartOfYearDanglingSource {
 /// stays cannot otherwise tell which one goes. Before #362 every page line
 /// carried `(courses/ICS3U/Warm-Ups/Predict the Output.md)`: the working
 /// folder's layout and the `.md` the product otherwise keeps out of sight.
+///
+/// The links checklist names its pages through this too (#385,
+/// `LinksChecklistNaming`): a second user, not a second rule — which is why
+/// the name was left as it is rather than made neutral.
 nonisolated enum StartOfYearPageNaming {
 
     // MARK: - Functions

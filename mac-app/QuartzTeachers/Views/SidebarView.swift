@@ -1168,13 +1168,9 @@ struct SidebarView: View {
             offer: read.offer, answered: answered, occasion: .fromTheMenu, problem: problem
         )
         if problem == nil && !model.rows.isEmpty {
-            var ticked: Int = 0
-            for row in model.rows where model.ticked.contains(row.place) {
-                ticked += 1
-            }
             ActivityTrail.note(
                 .linksChecklistOffered,
-                LinksChecklistPublisher.offeredLine(model.rows, ticked: ticked, occasion: .fromTheMenu),
+                LinksChecklistPublisher.offeredLine(model: model),
                 course: course.code, section: sectionNumber
             )
         }
