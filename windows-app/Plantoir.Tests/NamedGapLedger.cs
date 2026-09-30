@@ -233,9 +233,6 @@ internal static class NamedGapLedger
             "a club typed with a payload code is not given the payload's pool"),
 
         // ---- app-rules.json → modelTiers.requirements
-        Owed(ModelTierRequirements, 196,
-            "LocalModel.Ask sends max_tokens 512, but no test reads the contract's cap yet — answered with #196's finish_reason work",
-            "Every request caps how much the model may write"),
         Owed(ModelTierRequirements, 196, "a cut-off model reply is not detected here yet (mac #198)",
             "A reply the engine stopped part way runs no tool and says so"),
         Owed(ModelTierRequirements, 262, "a finished reply that wrote nothing is not checked against the window here yet",
@@ -305,25 +302,40 @@ internal static class NamedGapLedger
             "sectionIsBeingDeployed"),
         Owed(AssistWordingKeys, 391, "a windowless deploy or rebuild does not refuse at a question yet (mac #378)",
             "deployNeedsAnAnswer", "deployNeedsAnAnswerAt", "previewBuildNeedsAnAnswer"),
-        Owed(AssistWordingKeys, 165, "this app says a partial publish in its own multi-destination words (DeployPartiallySucceeded), not the mac's",
+        Owed(AssistWordingKeys, 400, "this app says a partial deploy in its own multi-destination words (DeployPartiallySucceeded); the sentence comes from mac #396, whose Windows twin is #400",
             "deployWentOutTo"),
-        Owed(AssistWordingKeys, 342, "the hide and publish answers for a page already in that state are not the contract's sentences here yet (mac #201)",
+        Owed(AssistWordingKeys, 346, "the hide and publish answers for a page already in that state are not the contract's sentences here yet; #346 names all six",
             "alreadyHiddenOne", "alreadyHiddenSeveral", "alreadyPublishedOne", "alreadyPublishedSeveral",
             "unitAlreadyHidden", "unitAlreadyPublished"),
         Owed(AssistWordingKeys, 308, "the date writers do not yet say which pages they could not add a date to (mac #186)",
             "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
             "pagesWhoseSettingsCannotBeAddedToNamingSeveral", "sharedPageWhoseSettingCouldNotBePutBack",
             "sharedPagesWhoseSettingsCouldNotBePutBack"),
-        Owed(AssistWordingKeys, 157,
-            "said by this app today (or close to it) in words built inline, with no AssistWording member under this key; hoisting it is #157's remaining half",
+        // The class-worded sentences below were ledgered to #157 on the first
+        // pass as "said inline today"; a review (2026-09-30) found that false
+        // for most. Re-done key by key: seven WERE said word for word and are
+        // hoisted into AssistWording (so no entry); the rest go to the issue
+        // whose body names the key, and the two no issue names stay on #157
+        // with that said plainly (listed for Russell).
+        Owed(AssistWordingKeys, 274,
+            "not said on Windows; #274 carries the class/meeting pair of sentences this key belongs to",
             "addedTheNextPage", "allScheduledDatesHaveConcluded", "datesForTheNextPage", "datesToDuplicate",
-            "datesToFindADaysPage", "datesToReDate", "datesToReplace", "everyDateIsSpokenFor", "everyPageIsAlreadyOnItsDay",
-            "lookTheSectionOverBeforePublishing", "madeRoom", "makingRoomCannotBeUndone", "movedToLaterDays",
-            "movesAndBecomesADraft", "movesToTheFirstDay", "noCourseNamed", "noCoursesYet",
-            "otherClassesWouldMoveAndLinksFollow", "otherClassesWouldMoveKeepingTheirNames", "pagesAcrossTheDates",
-            "pagesRunFrom", "pagesWithNoDayOfTheirOwn", "publishedTheClassOn", "reDated", "reDatedOnlyPagesTheyUse",
-            "reDatingOntoTheDatesOnFile", "sharingTheLastDay", "spareDatesAfterThese", "theNextWouldFallOn",
-            "theSemesterBegins", "whatPublishingMeans", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
+            "datesToFindADaysPage", "datesToReDate", "datesToReplace", "movesToTheFirstDay", "pagesAcrossTheDates",
+            "pagesRunFrom", "pagesWithNoDayOfTheirOwn", "sharingTheLastDay", "spareDatesAfterThese",
+            "theSemesterBegins", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
+        Owed(AssistWordingKeys, 262, "not said on Windows; #262 specifies it for a call naming no course",
+            "noCourseNamed"),
+        Owed(AssistWordingKeys, 346,
+            "Windows says its own words here (\"…before you deploy it.\"), or nothing; #346 names these sentences",
+            "lookTheSectionOverBeforePublishing", "makingRoomCannotBeUndone"),
+        Owed(AssistWordingKeys, 200, "not said on Windows; #200 names these duplicate/make-room plan sentences",
+            "otherClassesWouldMoveAndLinksFollow", "otherClassesWouldMoveKeepingTheirNames"),
+        Owed(AssistWordingKeys, 357,
+            "Windows says \"Every page is already on the day it should be.\" without the section, and nothing for the counts; #357 owns re-dating's reported counts",
+            "everyPageIsAlreadyOnItsDay", "reDated", "reDatedOnlyPagesTheyUse"),
+        Owed(AssistWordingKeys, 157,
+            "not said on Windows; no open issue names it (listed in QUESTIONS-FOR-RUSSELL.md)",
+            "noCoursesYet", "whatPublishingMeans"),
     }.SelectMany(group => group).ToArray();
 
     /// <summary>
