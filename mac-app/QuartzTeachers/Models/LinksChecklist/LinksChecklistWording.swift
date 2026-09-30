@@ -85,6 +85,13 @@ nonisolated enum LinksChecklistWording {
         return "linked from \(name) — it goes when that page goes"
     }
 
+    /// A row a ticked class brings (#398): shown ticked and disabled until
+    /// the class is unticked. Says nothing about dates, because a page
+    /// published before keeps its own.
+    static func comesWithAClass(name: String) -> String {
+        return "comes with \(name) — it goes when that class goes"
+    }
+
     static func linkedFromSeveralRows(name: String, count: String, pages: String) -> String {
         return "linked from \(name) and \(count) more hidden \(pages) — it goes when one of them goes"
     }
