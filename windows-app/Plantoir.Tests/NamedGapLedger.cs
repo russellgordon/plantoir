@@ -133,8 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 158, "this app cannot rename a course's word for a unit yet, so there is no moment to record",
-            "word for a unit renamed"),
         Owed(ActivityTrailEvents, 320, "reopening the last working folder does not record either outcome yet (mac #311)",
             "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
@@ -201,8 +199,6 @@ internal static class NamedGapLedger
             "left pages hidden that links lead to"),
 
         // ---- specialNames.platformWording.keys
-        Owed(PlatformWordedKeys, 158, "the sentence belongs to a sheet this app does not have yet, so there is nothing here to word",
-            "renameUnitWord.explanation"),
 
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
         Owed(CourseConfigKeys, 345, "one coverage map per declared curriculum folder is not built here yet (mac #128)",

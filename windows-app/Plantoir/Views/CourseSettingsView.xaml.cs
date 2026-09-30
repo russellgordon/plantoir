@@ -209,6 +209,128 @@ public sealed partial class CourseSettingsView : UserControl
     private void NoticeAfterRemoval(string name) =>
         ShowFolderNotice(SpecialNames.RemoveLeavesTheFolderOnDisk.Replace("{name}", name));
 
+    // ---- Renaming the word for a unit (#158) -----------------------------------
+
+    /// <summary>
+    /// The sheet: the wizard's own question, the explanation, the "prose is
+    /// left alone" line, the plan (pages, sections, links — surveyed once,
+    /// OFF the UI thread, when the sheet opens), and a live refusal. Rename
+    /// runs the whole rename off the UI thread and the sheet cannot be
+    /// dismissed while it runs. The mac's UnitWordRenameSheet.
+    /// </summary>
+    private async Task OpenRenameUnitWordDialog()
+    {
+        string oldWord = Config.UnitWord;
+        var facts = UnitWordRenamer.Facts(_course);
+        string? interruptedTarget = null;
+        UnitWordSurvey? survey = null;
+        await Task.Run(() =>
+        {
+            interruptedTarget = UnitWordRenamer.InterruptedRenameTarget(facts);
+            survey = UnitWordRenamer.Survey(facts);
+        });
+
+        var field = new TextBox { Text = interruptedTarget ?? oldWord, Header = UnitWordRenameWording.FieldLabel };
+        AutomationProperties.SetAutomationId(field, "renameUnitWordField");
+        var planText = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+        var problem = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+        };
+        AutomationProperties.SetAutomationId(problem, "renameUnitWordProblem");
+
+        var body = new StackPanel { Spacing = 10 };
+        if (interruptedTarget is not null)
+            body.Children.Add(new TextBlock { Text = UnitWordRenameWording.InterruptedRename(oldWord, interruptedTarget), TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(field);
+        body.Children.Add(new TextBlock { Text = UnitWordRenameWording.Explanation, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(new TextBlock { Text = UnitWordRenameWording.ProseIsLeftAlone, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(planText);
+        body.Children.Add(problem);
+
+        var dialog = new ContentDialog
+        {
+            Title = UnitWordRenameWording.SheetTitle(oldWord),
+            Content = body,
+            PrimaryButtonText = "Rename",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "renameUnitWordDialog");
+
+        bool running = false;
+        dialog.Closing += (_, args) => { if (running) args.Cancel = true; };
+
+        void Recheck()
+        {
+            string typed = field.Text.Trim();
+            planText.Text = survey is null ? UnitWordRenameWording.LookingOver
+                : UnitWordRenameWording.Pages(survey.Pages, survey.Sections, _course.Code, oldWord, typed.Length == 0 ? oldWord : typed)
+                  + " " + UnitWordRenameWording.Links(survey.Links);
+            string? why = UnitWordRenamer.Problem(oldWord, field.Text, interruptedTarget);
+            problem.Text = why ?? "";
+            problem.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
+            dialog.IsPrimaryButtonEnabled = why is null;
+        }
+        field.TextChanged += (_, _) => Recheck();
+        Recheck();
+
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            var deferral = args.GetDeferral();
+            string newWord = field.Text.Trim();
+            string workingFolder = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(_course.DirectoryPath)!)!;
+            string coursesDirectory = System.IO.Path.GetDirectoryName(_course.DirectoryPath)!;
+            try
+            {
+                if (CourseActivity.IsPreviewing(workingFolder, _course.Code) || CourseActivity.IsPublishing(workingFolder, _course.Code))
+                {
+                    problem.Text = UnitWordRenameWording.ProblemBusy(_course.Code);
+                    problem.Visibility = Visibility.Visible;
+                    args.Cancel = true;
+                    return;
+                }
+                running = true;
+                dialog.IsPrimaryButtonEnabled = false;
+                problem.Text = UnitWordRenameWording.LookingOver;
+                problem.Visibility = Visibility.Visible;
+                var outcome = await Task.Run(() =>
+                {
+                    // The plan is redone at Rename: the destination check
+                    // depends on the word typed and on the disk now.
+                    var plan = UnitWordRenamer.Plan(oldWord, newWord, UnitWordRenamer.Facts(_course));
+                    return UnitWordRenamer.Rename(plan, _course, coursesDirectory);
+                });
+                ShowFolderNotice(UnitWordRenameWording.Done(oldWord, newWord, outcome));
+                BuildForm();
+            }
+            catch (UnitWordRenameProblem failure)
+            {
+                problem.Text = failure.Message;
+                problem.Visibility = Visibility.Visible;
+                args.Cancel = true;
+            }
+            catch (Exception error)
+            {
+                problem.Text = error.Message;
+                problem.Visibility = Visibility.Visible;
+                args.Cancel = true;
+            }
+            finally
+            {
+                running = false;
+                dialog.IsPrimaryButtonEnabled = true;
+                deferral.Complete();
+            }
+        };
+
+        try { await dialog.ShowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"rename unit word dialog: {ex.Message}"); }
+    }
+
     // ---- Renaming a folder ---------------------------------------------------
 
     private IReadOnlyList<string> NamesInScope(FolderScope scope) =>
@@ -447,6 +569,18 @@ public sealed partial class CourseSettingsView : UserControl
         var nameBox = new TextBox { Text = Config.CourseName };
         nameBox.TextChanged += (_, _) => { Config.CourseName = nameBox.Text; MarkChanged(); RebuildGradeWarnings(); };
         Form.Children.Add(FormBuilders.LabeledRow("Course name", nameBox));
+
+        // The word for a unit, with Rename… beside it (#158). It commits to
+        // DISK at once, like a folder rename, so it is a sheet and not a field.
+        var unitWord = new TextBlock { Text = Config.UnitWord, VerticalAlignment = VerticalAlignment.Center };
+        var renameUnitWord = new Button { Content = UnitWordRenameWording.RenameButton, Margin = new Thickness(12, 0, 0, 0) };
+        AutomationProperties.SetAutomationId(renameUnitWord, "renameUnitWordButton");
+        renameUnitWord.Click += (_, _) => _ = OpenRenameUnitWordDialog();
+        var unitWordRow = new StackPanel { Orientation = Orientation.Horizontal };
+        unitWordRow.Children.Add(unitWord);
+        unitWordRow.Children.Add(renameUnitWord);
+        Form.Children.Add(FormBuilders.LabeledRow(UnitWordRenameWording.FieldLabel, unitWordRow));
+        Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaption(Config.UnitWord)));
 
         if (Config.IsClub(CourseNameCatalogs.Shared))
         {

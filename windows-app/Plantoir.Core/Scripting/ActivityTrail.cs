@@ -218,6 +218,7 @@ public static class ActivityTrail
         SectionAdded,
         PageSettingsLeftAsTheyWere,
         ClassCopyNotMade,
+        WordForAUnitRenamed,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -270,6 +271,7 @@ public static class ActivityTrail
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
         Event.ClassCopyNotMade => "class copy not made",
+        Event.WordForAUnitRenamed => "word for a unit renamed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

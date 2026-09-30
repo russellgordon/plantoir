@@ -88,6 +88,9 @@ public static class CourseRestorer
             // ones just replaced, so a build left standing would read as newer
             // and publish what the course used to say.
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            // A restored course no longer holds what a stopped rename of its
+            // word for a unit was part way through (#158, as the mac does).
+            UnitWordRenamer.ClearRenameRecord(destination);
             try { Directory.Delete(staging, recursive: true); } catch { }
         }
     }
