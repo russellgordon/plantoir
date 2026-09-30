@@ -16438,7 +16438,7 @@
       },
       {
         "name": "this run's own shell naming a deploy is not a deploy",
-        "parentArgs": "bash -c ./deploy.sh ICS4U 2; ./preview.sh ICS4U 2",
+        "parentArgs": "bash -c ./deploy.sh ICS4U 2 && ./preview.sh ICS4U 2",
         "processes": [],
         "expect": "allowed",
         "why": "A shell that ran the deploy and then this preview carries both commands' words; the deploy itself has finished."
