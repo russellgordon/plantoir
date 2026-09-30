@@ -538,6 +538,21 @@
         "appliesOnWhy": "PERMANENT, the same case as 'workspace was in use': Windows builds natively and has no workspace in which work could be left behind."
       },
       {
+        "carries": "the course and section, the Cloudflare project's name and the address the website answers at now. Never the account ID, never the token.",
+        "event": "cloudflare project made again",
+        "marker": {
+          "prefix": "PLANTOIR_CLOUDFLARE_REMADE:",
+          "shape": "PLANTOIR_CLOUDFLARE_REMADE: <course>/<section> <project name> <address>, the course's one permitted space written +",
+          "examples": [
+            "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+            "PLANTOIR_CLOUDFLARE_REMADE: AP+CALC/2 ap-calc-s2-2026-gordon ap-calc-s2-2026-gordon-7x2.pages.dev"
+          ],
+          "why": "Printed by the shared scripts/deploy.py (remake_pages_project_if_gone's caller), which runs inside the website builder on the mac and natively on Windows, so neither can write the host's trail itself. Read by the app the same way as PLANTOIR_LEFTOVER_STOPPED and in the same two places on the mac: ScriptRunner from a run it started (the Deploy button, the assistant's deploy), ScheduledDeploy from a publish launchd ran. Machinery, so the console leaves it out (transcriptStripping.machineLines); the console says it in words on the line before. A marker that is not this shape — a path, anything with a space where a name should be — records nothing."
+        },
+        "line": "{place} · the Cloudflare project {project} was not in this Cloudflare account, so it was made again; the website is now at {address}",
+        "why": "Found 2026-09-30, when verify-deploy.sh went red on every Cloudflare leg: a section's saved project had been deleted in Cloudflare's dashboard, wrangler (always run with CI set) wanted to ask whether to create it, could not, and every publish of that section failed. deploy.py now makes the project again under the same name (documentation/07-deployment.md -> 'wrangler is never left a question to ask'), and that is a changed thing a teacher can see weeks later without knowing why: the address can change (a remade project may be given a different .pages.dev address), a custom domain the teacher had attached went with the deleted project and is not re-attached, and the project's past deployments are gone. 'My class site's address changed', 'my own domain stopped working' and 'my old versions vanished' are the reports, and the console that said so is long gone by then. The address is carried because it is the fact that changed; the account is not, because 'not in this account' is also what a teacher who switched the section to a different Cloudflare account sees, and the account ID is not a thing to put in a report. Both platforms run the same deploy.py, so this carries no appliesOn."
+      },
+      {
         "carries": "where the preview was for (course and section), the preview address in question (a number on this Mac, never a path or a name), and which of four happened: a STOPPED workspace's address was being used by something else, so the workspace was set up again on free addresses BEFORE it started; the address a running workspace was about to announce was held by another account on this Mac or by macOS itself, so the workspace was set up again once; the address was STILL held after that, so the preview stopped before building; or the check was NOT made, because the run was pointed at an engine other than the one Plantoir sets up",
         "event": "preview address held by another account",
         "marker": {
@@ -5589,6 +5604,11 @@
           "line": "PLANTOIR_LEFTOVER_STOPPED: ICS4U/1 publish:MPM2D/2",
           "hidden": true,
           "why": "#378: work ended because its owner had gone, for the trail's 'left-over work stopped'."
+        },
+        {
+          "line": "PLANTOIR_CLOUDFLARE_REMADE: ICS4U/1 ics4u-s1-2026-gordon ics4u-s1-2026-gordon.pages.dev",
+          "hidden": true,
+          "why": "2026-09-30: a section's Cloudflare project made again, for the trail's 'cloudflare project made again'. Printed by the shared deploy.py, so on both platforms."
         },
         {
           "line": "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
