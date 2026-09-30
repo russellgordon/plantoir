@@ -364,8 +364,18 @@ the release side.
   404s whenever a platform lags.
 - **Signed with the `plantoir-macos` key**, the feed AND each download. The key
   lives in this Mac's Keychain (backed up in Russell's Passwords app); Sparkle's
-  `generate_appcast` and `sign_update` read it — the Keychain asks, once for each
-  tool (so twice a cut) — answer **Allow**, not "Always Allow" — and nothing prints it. The public half is `SUPublicEDKey` in
+  `generate_appcast` and `sign_update` read it, and nothing prints it. **Since
+  2026-09-29 the copies of those two tools in the main checkout
+  (`mac-app/Vendor/Sparkle/bin/`) are on the key's access list — "Always
+  Allow", granted by Russell so a cut can run unattended overnight.** The
+  trade-off he accepted: those two programs can now use the key without
+  asking, whoever runs them. So run the feed step from the main checkout. From
+  another checkout or worktree the Keychain may still ask, once each time a
+  tool signs (up to three times with deltas); answer **Allow** there and do not
+  add a second copy to the list. A re-fetched Sparkle (`fetch-sparkle.sh`
+  replacing the tools) asks again, in the main checkout too. To withdraw the
+  grant, remove the two entries under the key's item in Keychain Access →
+  Access Control. The public half is `SUPublicEDKey` in
   `mac-app/project.yml`. A re-serialised feed breaks its signature, and the app
   then refuses it: silently on the daily check.
 - **Built only at a cut, from the EXACT DMG uploaded, and only AFTER the
@@ -406,8 +416,8 @@ the release side.
   - `generate_appcast` rewrites the item of every archive it is given —
     measured: the earlier item's download moved to the NEW release and lost
     its notes, even with `--versions` — so `update_feed.py` puts every earlier
-    item back exactly as it was, signs the feed again with the same key (the
-    Keychain asks once more), and refuses the cut if any earlier item is
+    item back exactly as it was, signs the feed again with the same key (silently
+    from the main checkout; elsewhere the Keychain asks once more), and refuses the cut if any earlier item is
     missing or still differs. `--maximum-versions 0` keeps every release in
     the feed: generate_appcast's default keeps three and dropped the oldest
     from the fourth cut on (measured by the implementation review).
@@ -498,7 +508,7 @@ Spotlight's list.
 | R0 | LOCAL | Record Russell's app: `defaults read /Applications/Plantoir.app/Contents/Info.plist CFBundleShortVersionString` and `CFBundleVersion`, and `codesign -dvvv /Applications/Plantoir.app 2>&1 \| grep CDHash=` — written down, for C3. Also written down: `defaults read ca.russellgordon.Plantoir 2>/dev/null \| grep -c '"\?SU'` (0 on 1.3.1, which has no updater), `mdfind "kMDItemCFBundleIdentifier == 'ca.russellgordon.Plantoir'"` (his copies today), and `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock docker ps --format '{{.Names}} {{.Ports}}'` (the ports his containers hold). Russell creates a standard account of his choosing and writes its short name down here as `<account>` (this run: `plantoir`); C2 and C3 use that name. |
 | R1 | IDENTITY | In Russell's account, on the issue branch: `./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml` → build **A** (version `<v>-rehearsal.<build>`, `dist/Plantoir-macOS-REHEARSAL.dmg`; keep a copy as A). Record build, size, SHA-256, the notarization id. **The positive team check, and must-fail (b):** the run passing `check-signatures.sh` is the first. Then, BEFORE R2 (whose `publish.sh` run `rm -rf`s `mac-app/build/`): `ditto mac-app/build/Plantoir.app /tmp/r1b/Plantoir.app`, and with `ID` the identity publish.sh printed: `codesign --force --sign - --options runtime /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate`; `codesign --force --timestamp --options runtime --sign "$ID" /tmp/r1b/Plantoir.app/Contents/Frameworks/Sparkle.framework`; `codesign --force --timestamp --options runtime --entitlements mac-app/QuartzTeachers/QuartzTeachers.entitlements --sign "$ID" /tmp/r1b/Plantoir.app`; then `mac-app/release/check-signatures.sh /tmp/r1b/Plantoir.app` must exit 1 naming `Autoupdate` twice (WRONG TEAM and NO SECURE TIMESTAMP) and nothing else. Delete `/tmp/r1b` after. |
 | R2 | IDENTITY | One commit later, build **B** the same way. Then `rm -rf mac-app/build` so no Release build is left registered with Launch Services in his account. |
-| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. The Keychain asks twice each run — **Allow**, not "Always Allow". Never committed (`.gitignore`). |
+| R3 | IDENTITY | Twice, A first then B: `python3 website/update_feed.py macos --version <A's or B's own version, the "-rehearsal.<build>" string> --dmg <that DMG> --notes <a short notes file> --rehearsal website/updates/rehearsal-204/macos.xml --download-prefix https://github.com/russellgordon/plantoir/releases/download/v<v>-rehearsal-204/` — B's run with `--required-warning` and a fake warning in its notes, so the feed holds both items and both sections of notes. `--version` must be the rehearsal string or the DMG is refused as "built before the version was raised" (which here only means the wrong string was typed). Both items name the same download address, and only B is uploaded: harmless, since A is the version installed and never offered. From the main checkout the Keychain does not ask (Always Allow since 2026-09-29, above); from a worktree it asks twice each run — answer **Allow**. Never committed (`.gitignore`). |
 | R4 | OUTWARD | `gh release create v<v>-rehearsal-204 --prerelease --target <the issue branch's commit> -R russellgordon/plantoir` with B's DMG (`Plantoir-macOS-REHEARSAL.dmg`). `--target` keeps the tag off `main`. Then V9. |
 | R5 | OUTWARD | From a worktree at `origin/main`: `python3 website/build.py`, drop the rehearsal feed into `site/updates/rehearsal-204/macos.xml` (not committed), `python3 website/netlify_deploy.py`; `curl` it back, SHA-256 equal. |
 | R6 | LOCAL | Russell, in his account: `sudo mkdir "/Applications/Plantoir Rehearsal"` and `sudo ditto <A>/Plantoir.app "/Applications/Plantoir Rehearsal/Plantoir.app"`. From now until C2, Russell opens Plantoir in his own account only from his Dock — never Spotlight, Launchpad or a notification. Then, logged in as the rehearsal account: open it from THAT path (never by name), let the first run finish (above), and make a scratch working folder `~/rehearsal-work` with the example course (the wizard's EXC2O). |
