@@ -99,6 +99,11 @@ struct CopyPageChecklist: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .fixedSize(horizontal: false, vertical: true)
+        // A container element with its own identifier (#353, #366): without
+        // `.contain` SwiftUI applies an identifier on a stack to every element
+        // inside it, so the rows' own identifiers (copyPageLinked-…) never
+        // reach the accessibility tree and a UI test cannot find them.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("copyPageChecklist")
     }
 
