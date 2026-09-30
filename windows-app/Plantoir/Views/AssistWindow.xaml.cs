@@ -215,9 +215,10 @@ public sealed partial class AssistWindow : Window
         catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
         if (choice != ContentDialogResult.Primary) return;
 
+        int notPutBack;
         try
         {
-            AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
+            notPutBack = AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
                                          Workspace.CoursesDirectory(_folder));
         }
         catch (Exception error)
@@ -228,7 +229,7 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.SectionRestored,
             "put the section back to how it was when this conversation started, from " +
             Path.GetFileName(_conversationBackupPath!), _course.Code, _section);
-        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section));
+        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section, notPutBack));
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)

@@ -193,7 +193,8 @@ public class SiteHealthContractTests
     private static readonly string[] MachineryWords =
     {
         "toolchain", "script", "docker", "container", "wsl",
-        "python", "stdout", "quartz", "repository", "config",
+        "python", "json", "stdout", "quartz", "repository", "config",
+        "yaml", "frontmatter", "symlink", "vault",
     };
 
     /// <summary>
@@ -206,12 +207,20 @@ public class SiteHealthContractTests
     [Fact]
     public void NoCheckNamesTheMachinery()
     {
+        // Every string a check carries reaches a teacher, assembled into the
+        // sentence or the detail, except these three (#300, the mac's
+        // testNoCheckNamesTheMachinery): pageSettingsUnreadable brought
+        // sentenceForSeveral, pageWithLine, pageWithoutLine, andMore, frontPage.
+        var notShown = new HashSet<string> { "name", "why", "fill" };
         foreach (var check in SiteHealth["checks"]!.AsArray())
         {
-            string said = (check!["sentence"]!.ToString() + " " + check["detail"]!.ToString())
-                .ToLowerInvariant();
-            foreach (string word in MachineryWords)
-                Assert.False(said.Contains(word), $"{check["name"]} says \"{word}\" to a teacher");
+            foreach (var (key, value) in check!.AsObject())
+            {
+                if (notShown.Contains(key) || value is not System.Text.Json.Nodes.JsonValue text
+                    || !text.TryGetValue<string>(out var shown)) continue;
+                foreach (string word in MachineryWords)
+                    Assert.False(shown.ToLowerInvariant().Contains(word), $"{check["name"]}.{key} says \"{word}\" to a teacher");
+            }
         }
     }
 

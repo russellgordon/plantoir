@@ -1196,6 +1196,83 @@
     ],
     "note": "`courses/<CODE>/.internal/timetable/section<N>.json` — the dates a section actually meets, written down once by whichever app the teacher used and read by both. It lives INSIDE the course folder so it travels with a backup, an archive and a restore; a teacher who restores a course gets its timetable back with it.",
     "path": "courses/<CODE>/.internal/timetable/section<N>.json",
+    "believable": {
+      "why": "A date in this file that cannot be a class date is not believed, and a list holding one is not written. Until 2026-09-27 (#144) the Windows app rendered the year in the PC's default calendar, so a Thai-locale PC wrote 2569-09-08 for 2026-09-08 into this file; the invariant reader on every platform takes that as the Gregorian year 2569, and a working folder travels between machines through backups, restores and shared folders. A memory holding any date before `earliest`, or more than `yearsAhead` years past today, is read as NOTHING remembered - the assistant asks for the timetable again and the next write replaces the file - and a write is refused rather than saved, so what one side accepts the other believes (a tool that saved and then read back would otherwise find nothing where it had just written). The floor is generous (last year's dates are fine) and still centuries clear of every wrong reading a calendar can produce: 2569 Buddhist read as Gregorian, 1483 Gregorian read as Buddhist, 1448 Umm al-Qura. Three years ahead because future class dates are the point of the file; the nearest wrong reading is 543 years out, so any figure between works. The same shape as `course-management.json` -> `zipNames.couldHaveBeenStamped`: a date that cannot be true does not get to decide anything.",
+      "earliest": "2000-01-01",
+      "yearsAhead": 3,
+      "cases": [
+        {
+          "dates": [
+            "2569-09-08",
+            "2569-09-10"
+          ],
+          "today": "2026-09-09",
+          "believed": false,
+          "why": "the year a Thai-locale PC wrote before #144; read as nothing, so the assistant asks again"
+        },
+        {
+          "dates": [
+            "1483-09-08"
+          ],
+          "today": "2026-09-09",
+          "believed": false,
+          "why": "a Gregorian 2026 read back as a Buddhist year by a bare cultural parse"
+        },
+        {
+          "dates": [
+            "1448-03-27"
+          ],
+          "today": "2026-09-09",
+          "believed": false,
+          "why": "an Umm al-Qura year"
+        },
+        {
+          "dates": [
+            "1999-12-31",
+            "2026-09-10"
+          ],
+          "today": "2026-09-09",
+          "believed": false,
+          "why": "one date below the floor spoils the list: half a timetable is worse than none"
+        },
+        {
+          "dates": [
+            "2000-01-01",
+            "2026-09-10"
+          ],
+          "today": "2026-09-09",
+          "believed": true,
+          "why": "the floor is inclusive"
+        },
+        {
+          "dates": [
+            "2026-09-08",
+            "2029-09-09"
+          ],
+          "today": "2026-09-09",
+          "believed": true,
+          "why": "three years ahead to the day is still believed"
+        },
+        {
+          "dates": [
+            "2026-09-08",
+            "2029-09-10"
+          ],
+          "today": "2026-09-09",
+          "believed": false,
+          "why": "a day past the ceiling is not"
+        },
+        {
+          "dates": [
+            "2025-09-02",
+            "2026-06-25"
+          ],
+          "today": "2026-09-09",
+          "believed": true,
+          "why": "last year's timetable, kept for reference"
+        }
+      ]
+    },
     "verified": "Both apps use this exact path — mac `SectionTimetable`, Windows `TimetableMemory.cs`."
   },
   "sidebarHiding": {

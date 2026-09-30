@@ -14,6 +14,7 @@ public static class FailureExplainer
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
+        ?? UnreadableFrontPageExplanation(output)
         ?? MissingFrontPageExplanation(output)
         ?? MissingBuildExplanation(output)
         ?? WorkspaceNotCreatedExplanation(output);
@@ -150,4 +151,34 @@ public static class FailureExplainer
         output.Contains("no front page, so no website was produced")
             ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
             : null;
+
+    /// <summary>
+    /// A section whose FRONT PAGE's settings cannot be read (#300, the mac's
+    /// #246): the build hides such a page, so there is no website to publish.
+    /// Asked before the missing-front-page and missing-build cards — the
+    /// build's line deliberately never says "no front page", and it is
+    /// followed by "Built site not found" — and the line number is read only
+    /// from the same line as the sign. The mac's
+    /// <c>FailureExplainer.unreadableFrontPageExplanation</c>, word for word.
+    /// </summary>
+    private static string? UnreadableFrontPageExplanation(string output)
+    {
+        const string sign = "the settings at the top of its front page could not be read";
+        int at = output.IndexOf(sign, StringComparison.Ordinal);
+        if (at < 0) return null;
+        const string headline = "The settings at the top of this section's front page could not be read, "
+            + "so there is no website to publish. ";
+        return LineNumberAfter("(near line ", output[(at + sign.Length)..]) is { } line
+            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then publish again."
+            : headline + "Open the front page in Obsidian, fix its settings, then publish again.";
+    }
+
+    /// <summary>The number after <paramref name="marker"/>, only when the marker is on the same line.</summary>
+    private static int? LineNumberAfter(string marker, string text)
+    {
+        int at = text.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0 || text[..at].Contains('\n')) return null;
+        string digits = new(text[(at + marker.Length)..].TakeWhile(char.IsAsciiDigit).ToArray());
+        return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int line) ? line : null;
+    }
 }

@@ -185,6 +185,40 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
+
+Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's
+frontmatter now finds the block the way the build does and takes a key's whole
+value with it; every link reader and rewriter shares one definition of code.
+
+- **Dates are Gregorian whatever the PC's region** (#144): `DateText`, taken
+  from the cloud branch `claude/nifty-mendel-q8ixto` (cherry-picked, not
+  re-derived).
+- **One fence rule, asymmetric** (#308/#188): the closing fence is column-0
+  dashes only; the opening may be indented. **One `ReplaceKeyLine`** (#284) for
+  `SetTitle`, `SetCreated` and the section copy and scaffold. **No key goes
+  where the block has no column-0 place for it** (#186): `SetDraft` and
+  `SetCreated` answer `NoRoomForAKey`. *Not yet*: the plan, re-date and
+  make-room callers naming the declined pages (four wording keys still ledgered
+  on #308).
+- **Adding a section** (#282) finds `----`, a blank line before the fence and a
+  trailing space, splices by line, keeps CR LF, and records `section added`.
+- **Restoring a section** (#177/#182) uses the shared finder, carries each key
+  WITH its lines, and counts and says the pages it had no room on.
+- **Duplicating a class** (#200): a forced-hidden copy can be published again
+  (B), the guard asks what the insertion created (A), the refusal admits other
+  classes may have moved (C); the plan card warns the undo will not help (#346).
+- **Renaming the word for a unit** (#158): Course Settings → Rename…, the whole
+  feature, off the UI thread. The sheet is compiled, not driven.
+- **Links** (#339/#318/#338): `MarkdownCode` (0 disagreements with
+  `markdown_code.py` over 12,490 pages), escaped pipes, angle-bracket links in a
+  folder rename.
+- **The unreadable front page gets its own card** (#300).
+
+Contract lists run here for the first time: `datesAndTitles.writingCases` (16),
+`sectionNumbers.addingKeysToAPage` (8), `backups.restoringOneSectionsKeys` (6),
+`readingALink.cases` (52), `renamingTheUnitWord.cases` + `.linkCases` (7 + 6).
+
 ## Parity run, bundle 1: red means something again (2026-09-30)
 
 The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
@@ -322,6 +356,28 @@ days after the log passed 250.
 this app's source from the mac, read rather than run — `dotnet` is not
 installed there — so treat it as a starting point, and report anything it gets
 wrong in a `mac` issue.
+
+## Work done from a cloud (Linux) session — 2026-09-27
+
+The first piece of this port built off the Windows PC: [#144](https://github.com/russellgordon/plantoir/issues/144),
+in a Claude Code cloud session (Ubuntu 24.04, no Windows App SDK). What that
+kind of session can do, measured on the day and written for the next one in
+[`WINDOWS-DIRECTOR-PROMPT.md`](../WINDOWS-DIRECTOR-PROMPT.md) → "Working from a
+cloud session":
+
+- `Plantoir.Core`, `Plantoir.Mcp`, `PtyDriver` and `Plantoir.Tests` build and
+  run on Linux with the .NET 10 SDK (Microsoft's apt repository no longer
+  carries 9.0) plus the .NET 9 runtime from `dotnet-install.sh`. `Plantoir/`
+  (WinUI 3) and `Plantoir.UiTests` do not build there at all.
+- `dotnet test` on Linux: **1538 tests, 111 red before the change** — every
+  red one either a Windows path (`C:\Users\…` expected, `CreateFileW` in
+  `FolderContainers`) or a handover the parity plan already lists. The gate
+  for a cloud session is therefore **"no NEW red"**, judged by diffing the
+  failing-test list before and after, not by the totals line alone.
+- The WinUI project's edits (#144: one line in `App.xaml.cs`, one line plus a
+  refusal block in `SectionScheduleDialog.cs`) were NOT compiled. The first
+  `dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64` on the PC
+  is the check, and "PT - Dev" is stale until then.
 
 ## Known rough edges for the next session
 

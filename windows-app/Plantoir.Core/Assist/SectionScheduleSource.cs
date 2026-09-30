@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -31,7 +32,7 @@ public sealed record ScheduleReading(
     string SuggestedSource,
     ColumnOrdering? ChosenOrdering = null)
 {
-    public IReadOnlyList<string> DatesText => Dates.Select(d => d.ToString("yyyy-MM-dd")).ToList();
+    public IReadOnlyList<string> DatesText => Dates.Select(d => DateText.Iso(d)).ToList();
 }
 
 public sealed class OrderingQuestion

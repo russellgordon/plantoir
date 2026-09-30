@@ -297,6 +297,16 @@ public sealed class SectionScheduleDialog : ContentDialog
             string source = string.IsNullOrWhiteSpace(_sourceBox.Text) ? "the teacher" : _sourceBox.Text.Trim();
             var today = DateOnly.FromDateTime(DateTime.Now);
 
+            // What TimetableMemory.Read would not believe, Write refuses; say
+            // which date rather than "could not save" (#144).
+            if (TimetableMemory.Unbelievable(_parsedDates, today) is { } impossible)
+            {
+                _statusBlock.Text = $"{DateText.Iso(impossible)} can't be a class date. Check the year and read the dates again.";
+                _statusBlock.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
+                args.Cancel = true;
+                return;
+            }
+
             bool wrote = TimetableMemory.Write(_workspacePath, _course.Code, _sectionNumber, _parsedDates, source, today);
             if (wrote)
             {
@@ -385,7 +395,7 @@ public sealed class SectionScheduleDialog : ContentDialog
                     return false;
                 }
 
-                _statusBlock.Text = $"Found {_parsedDates.Count} class {(_parsedDates.Count == 1 ? "date" : "dates")} ({_parsedDates[0]:yyyy-MM-dd} to {_parsedDates[^1]:yyyy-MM-dd}).";
+                _statusBlock.Text = $"Found {_parsedDates.Count} class {(_parsedDates.Count == 1 ? "date" : "dates")} ({DateText.Iso(_parsedDates[0])} to {DateText.Iso(_parsedDates[^1])}).";
                 _statusBlock.Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
                 return true;
             }
