@@ -379,6 +379,31 @@ public class ScheduledRunTests : IDisposable
     }
 
     [Fact]
+    public void ADeploySetAgainWhileTheRunWorksIsNotClearedByIt()
+    {
+        // One task per section per folder: setting the section again while a
+        // long deploy runs replaces the task under the SAME name. The run
+        // clearing "its" task by name afterwards would delete the new one.
+        string folder = Folder();
+        var clock = new Clock();
+        string name = _scheduler.AddNew(folder, "ICS3U", 1, clock.Now, "Netlify");
+        var world = new ScheduledRun.World
+        {
+            Now = () => clock.Now, Sleep = _ => { }, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = _ =>
+            {
+                _scheduler.AddNew(folder, "ICS3U", 1, clock.Now.AddDays(1), "Netlify");   // set again, same name
+                return 0;
+            },
+        };
+
+        Assert.Equal(ScheduledRun.Ending.Deployed, ScheduledRun.Execute(TaskScheduling.JobPath(name), world));
+        Assert.Contains(name, _scheduler.Tasks.Keys);
+        Assert.Empty(_scheduler.Deleted);
+    }
+
+    [Fact]
     public void ARunWhoseTaskWasCancelledMeanwhileDeploysNothing()
     {
         string folder = Folder();

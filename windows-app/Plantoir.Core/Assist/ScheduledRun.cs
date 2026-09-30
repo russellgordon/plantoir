@@ -323,8 +323,21 @@ public static class ScheduledRun
 
         // One-shot: the task has done its job; clear it away so it cannot be
         // mistaken for one still to come. The wrapper's record stays.
-        TaskScheduling.Cancel(new TaskScheduling.ScheduledTask(job.TaskName, job.WorkingFolder, job.CourseCode, job.Section, null));
+        ClearIfStillMine(job, TaskScheduling.JobPath(job.TaskName));
         return Ending.Deployed;
+    }
+
+    /// <summary>
+    /// Clear this run's task away — but only while its job still names THIS
+    /// run's moment. A teacher who sets the section again while a long deploy
+    /// runs, or while the run waits for the course, gets a new task under the
+    /// SAME name (one per section per folder); deleting by name then would
+    /// delete the deploy they have just set.
+    /// </summary>
+    private static void ClearIfStillMine(Job job, string jobPath)
+    {
+        if (ReadJob(jobPath) is { } now && now.ScheduledFor != job.ScheduledFor) return;
+        TaskScheduling.Cancel(new TaskScheduling.ScheduledTask(job.TaskName, job.WorkingFolder, job.CourseCode, job.Section, null));
     }
 
     /// <summary>
@@ -363,7 +376,7 @@ public static class ScheduledRun
             ScheduledPublishOutcome.Record(world.OutcomeDirectory, job.CourseCode, job.Section, kind, reason, job.WorkingFolder);
         }
         catch { /* the task still goes: a record that cannot be written must not leave it to recur */ }
-        TaskScheduling.Cancel(new TaskScheduling.ScheduledTask(job.TaskName, job.WorkingFolder, job.CourseCode, job.Section, null));
+        ClearIfStillMine(job, TaskScheduling.JobPath(job.TaskName));
     }
 
     /// <summary>
