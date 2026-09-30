@@ -15,7 +15,8 @@ public static class FailureExplainer
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
         ?? MissingFrontPageExplanation(output)
-        ?? MissingBuildExplanation(output);
+        ?? MissingBuildExplanation(output)
+        ?? WorkspaceNotCreatedExplanation(output);
 
     /// <summary>
     /// The one-time Windows setup (the launchers' Install-WindowsSubsystem)
@@ -124,6 +125,27 @@ public static class FailureExplainer
     /// built yet" is the wrong thing to say to somebody who just watched it
     /// build. The build's own reason is the specific one, so it wins.
     /// </summary>
+    /// <summary>
+    /// The mac's builder could not be handed the working folder at all
+    /// (#221, #230): the daemon refused the bind mount with
+    /// "bind source path does not exist". This app builds natively and has no
+    /// mount, so the output cannot appear here today; the case is implemented
+    /// anyway so the two explainers stay ONE list of troubles, exactly as the
+    /// mac implements the Windows-only "untrusted mount point" case.
+    ///
+    /// <para>Matched NARROWLY and asked LAST, both copied from the mac rather
+    /// than re-derived: "Error response from daemon" was the tempting
+    /// substring and would tell a teacher whose disk was full to check where
+    /// their folder is kept, and a matcher placed earlier could shadow the
+    /// specific troubles above it. The sentence is the contract's, and it
+    /// reads mac-shaped (the home-folder advice is the mac VM's limit); said
+    /// so on #230 rather than forked.</para>
+    /// </summary>
+    private static string? WorkspaceNotCreatedExplanation(string output) =>
+        output.Contains("bind source path does not exist")
+            ? "Plantoir could not get this folder ready for building. Check that it is inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then try again."
+            : null;
+
     private static string? MissingFrontPageExplanation(string output) =>
         output.Contains("no front page, so no website was produced")
             ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
