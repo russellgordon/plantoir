@@ -451,7 +451,10 @@ if ($TO_FOLDER) {
   # state the wait below exists for.
   $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
   if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
-    Write-Host "This site was built by a preview, which bakes in a live-reload script"
+    # Plain words (#296, rule 1): this used to say "bakes in a live-reload
+    # script". The mac's deploy.sh carries the old sentence at its own
+    # line and is asked to take this wording (bundle 1 mac issue).
+    Write-Host "This site was built by a preview, which adds live updating"
     Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
     # publish can meet a question nobody is there to answer: preview.ps1 asks
@@ -496,7 +499,7 @@ if ($TO_FOLDER) {
       Start-Sleep -Milliseconds 200
     }
     if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
-      Write-Host "The rebuilt site still carries the preview's live-reload script."
+      Write-Host "The rebuilt site still carries the preview's live updating."
       Write-Host "  Nothing was published, rather than publishing pages students'"
       Write-Host "  browsers would ask about."
       exit 1
