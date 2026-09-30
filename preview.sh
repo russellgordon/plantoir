@@ -2732,7 +2732,7 @@ retire_legacy_container() {
   if [ "$WORKSPACE_IS_RUNNING" != "nothing" ] || [ -n "$WORKSPACE_LEFTOVERS" ]; then
     return 0
   fi
-  echo "♻️  Setting aside what an older Plantoir used for every folder…"
+  echo "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…"
   docker stop "$id" >/dev/null 2>&1 || true
   docker rm "$id" >/dev/null 2>&1 || true
 }
@@ -2797,13 +2797,13 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   # Container exists — check its current /teaching/courses mount
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
-    echo "🧩 Existing container has no /teaching/courses mount; recreating with correct mount…"
+    echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
     remake_the_workspace
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
-    echo "🔄 Detected different working directory:"
-    echo "   • Existing mount: $CURRENT_MOUNT_SRC"
-    echo "   • Desired mount:  $HOST_COURSES"
-    echo "♻️  Recreating container '$CONTAINER_NAME' to point at the new folder…"
+    echo "🔀 This folder's website builder was set up for a folder somewhere else:"
+    echo "   • Set up for:  $CURRENT_MOUNT_SRC"
+    echo "   • This folder: $HOST_COURSES"
+    echo "♻️  Setting it up again for this folder…"
     remake_the_workspace
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
@@ -3072,9 +3072,14 @@ announce_the_preview_address || exit 1
 
 # A terminal is what makes the container's prompts and live progress work, so
 # ask for one when there IS one. But `docker exec -t` refuses to start at all
-# when stdin is not a terminal — from a script, from CI, or from Plantoir's
-# MCP server — and it fails here, minutes into the build, saying only "the
-# input device is not a TTY". Without a terminal, run python unbuffered so
+# when stdin is not a terminal — from a script or from CI — and it fails here,
+# minutes into the build, saying only "the input device is not a TTY".
+# (Everything Plantoir itself starts — a window's buttons, its assistant, and
+# the MCP server an assistant in another app talks to — runs on a
+# pseudo-terminal, ScriptRunner, so it takes the -it branch. That is why a
+# question asked inside the container waits for an answer, and why Plantoir's
+# windowless callers pass --non-interactive: a question with nobody to answer
+# it, left behind when its program closed, is GitHub #378.) Without a terminal, run python unbuffered so
 # progress still arrives line by line. (verify.sh refuses up front for the
 # same reason; this makes refusing unnecessary.)
 if [[ -t 0 ]]; then

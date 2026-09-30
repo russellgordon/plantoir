@@ -3376,7 +3376,7 @@ retire_legacy_container() {
   if [ "$WORKSPACE_IS_RUNNING" != "nothing" ] || [ -n "$WORKSPACE_LEFTOVERS" ]; then
     return 0
   fi
-  echo "♻️  Setting aside what an older Plantoir used for every folder…"
+  echo "♻️  Clearing away the website builder that older versions of Plantoir shared between folders…"
   docker stop "$id" >/dev/null 2>&1 || true
   docker rm "$id" >/dev/null 2>&1 || true
 }
@@ -3457,13 +3457,13 @@ clear_away_this_folders_other_spelling
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   CURRENT_MOUNT_SRC=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/teaching/courses"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME" 2>/dev/null || echo "")
   if [[ -z "$CURRENT_MOUNT_SRC" ]]; then
-    echo " Existing container has no /teaching/courses mount; recreating with correct mount…"
+    echo "♻️  Plantoir cannot find your courses from this folder's website builder, so it is setting the folder up again…"
     remake_the_workspace
   elif [[ "$CURRENT_MOUNT_SRC" != "$HOST_COURSES" ]]; then
-    echo " Detected different working directory:"
-    echo " • Existing mount: $CURRENT_MOUNT_SRC"
-    echo " • Desired mount: $HOST_COURSES"
-    echo "♻️ Recreating container '$CONTAINER_NAME' to point at the new folder…"
+    echo "🔀 This folder's website builder was set up for a folder somewhere else:"
+    echo "   • Set up for:  $CURRENT_MOUNT_SRC"
+    echo "   • This folder: $HOST_COURSES"
+    echo "♻️  Setting it up again for this folder…"
     remake_the_workspace
   elif ! container_has_builds_mount; then
     # Built websites moved out of the working folder, which needs a second
@@ -3474,10 +3474,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
   else
     if docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       if ! probe_container_write; then
-        echo " 🛑 Mounted 'courses/' is not writable from the container — recreating it…"
+        echo "🛑 The website builder could not save into 'courses/', so Plantoir is setting this folder up again…"
         remake_the_workspace
       elif ! probe_container_network; then
-        echo " 🔌 This container's connection has gone stale — recreating it…"
+        echo "🔌 Plantoir lost its connection to the website builder, so it is setting this folder up again…"
         remake_the_workspace
       else
         echo "✅ Container $CONTAINER_NAME is already running with correct, writable mount."
@@ -3486,10 +3486,10 @@ if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
       echo " Starting existing container $CONTAINER_NAME..."
       start_the_existing_workspace
       if ! probe_container_write; then
-        echo " 🛑 Mounted 'courses/' is not writable from the container after start — recreating it…"
+        echo "🛑 The website builder could not save into 'courses/' after it started, so Plantoir is setting this folder up again…"
         remake_the_workspace
       elif ! probe_container_network; then
-        echo " 🔌 This container's connection has gone stale after starting it — recreating it…"
+        echo "🔌 Plantoir lost its connection to the website builder after starting it, so it is setting this folder up again…"
         remake_the_workspace
       fi
     fi
@@ -3511,7 +3511,9 @@ fi
 
 # Ask for a terminal only when there is one: `docker exec -t` refuses to start
 # without a terminal on stdin, which is how this runs from a script or from
-# Plantoir's MCP server. See the same note in preview.sh.
+# CI. Everything Plantoir starts — its MCP server included — runs on a
+# pseudo-terminal and takes -it, which is why its windowless deploys pass
+# --non-interactive (GitHub #378). See the same note in preview.sh.
 if [[ -t 0 ]]; then _EXEC_TTY="-it"; else _EXEC_TTY="-i"; fi
 
 # Pass options via env to avoid fragile mixed quoting in sh -lc
