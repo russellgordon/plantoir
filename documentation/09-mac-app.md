@@ -7741,8 +7741,8 @@ across its lower third reading **BETA**; a Release build is unchanged.
 
 **What is generated, and from what.** `mac-app/Plantoir-Beta.icon` is a
 second Icon Composer bundle written by `mac-app/make-beta-icon.py`: a copy of
-`Plantoir.icon` — every drawing byte for byte, the same `icon.json` — plus one
-extra group in front holding `beta-ribbon.svg`, drawn by the script. The
+`Plantoir.icon` — every drawing byte for byte, the same `icon.json` content
+(re-serialised, so not byte-identical) — plus one extra group in front holding `beta-ribbon.svg`, drawn by the script. The
 letters are SVG PATHS, not `<text>`, because the icon compiler has no font to
 rely on, and they are chunky block letters so they survive the Dock's 64
 pixels (checked by rendering at 64 and 128 with Icon Composer's own `ictool`).
@@ -7767,8 +7767,15 @@ comparison anything can pass.
 **The screenshots on plantoir.app are the exception to watch.** They are taken
 from a Debug build, and the notification banner scene shows the app icon, so
 `website/shots/capture.py` passes `ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir`
-to every `xcodebuild` it starts. The side effect: after a capture run, the
-Dock's Debug bundle is ribbonless until the next ordinary Debug build.
+to every `xcodebuild` it starts. That alone does not make the banner safe: a
+notification-only run with `--skip-preflight` starts no build at all, and would
+photograph whatever the last ordinary Debug build left — the ribbon, since
+rule 10 ends every piece with one. So before the banner scene the script reads
+`CFBundleIconName` from the bundle's own Info.plist, rebuilds it plain if it is
+not `Plantoir`, and fails the scene by name if that does not take — asking the
+bundle rather than guessing which path built it. The side effect: after a
+capture run, the Dock's Debug bundle is ribbonless until the next ordinary
+Debug build.
 
 **Rejected:** adding "Beta" to the Debug bundle's display name
 (`CFBundleDisplayName`). The About panel reads that key, and so — through
@@ -7783,8 +7790,13 @@ Also rejected: badging the icon at run time with `NSApp.dockTile` — it shows
 only while the app runs, and the whole point is telling the two apart in the
 Dock before either is launched.
 
-No teacher ever sees a Debug build, so there is no `GUI-IMPROVEMENTS.md` row
-for this and nothing for Windows to mirror (its development copy is a separate
-problem on a separate machine); the note under "The Windows icon derives from
+No teacher ever sees a Debug build, so there is nothing for Windows to mirror
+(its development copy is a separate problem on a separate machine, and Windows
+has no Debug icon variant); the change still has a `GUI-IMPROVEMENTS.md` row,
+because that log is where somebody asks when the Debug icon changed. What
+keeps a Release build from ever wearing the ribbon is pinned by
+`BetaIconTests.testOnlyDebugNamesTheBetaIcon`, a scan of `project.yml`: the
+base setting names `Plantoir`, only Debug names `Plantoir-Beta`, and Release
+excludes the Beta bundle. And the note under "The Windows icon derives from
 `mac-app/Plantoir.icon`" in [11. Release strategy](11-release-strategy.md)
 says to re-run the script when the art changes.
