@@ -509,4 +509,26 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
             "a problem that has been put right must stop being reported"
         )
     }
+
+    // MARK: - The links checklist (#379)
+
+    /// The assistant says the checklist will be offered, instead of reading
+    /// ten pairs aloud — but only when the same build said it wrote an offer.
+    func testTheLinksFindingSaysTheChecklistWillBeOfferedWhenTheBuildWroteOne() {
+        let finding: String = "PLANTOIR_HEALTH: {\"name\": \"linksIntoHiddenPages\", \"sentence\": \"11 links lead to hidden pages.\", "
+            + "\"detail\": \"Publish the page each one leads to: pairs.\", \"fixable\": false, \"course\": \"ICS4U\", \"section\": 1}"
+        let marker: String = "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"b1\", \"pages\": 11, \"ticked\": 3}"
+
+        let withOffer: ScriptRunner = ScriptRunner()
+        withOffer.receiveOutput(finding + "\r\n" + marker + "\r\n")
+        let said: String = SiteHealthFinding.appending(to: "Done.", from: withOffer)
+        XCTAssertTrue(said.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")), said)
+        XCTAssertFalse(said.contains("pairs"), said)
+
+        let olderBuilder: ScriptRunner = ScriptRunner()
+        olderBuilder.receiveOutput(finding + "\r\n")
+        let saidBefore: String = SiteHealthFinding.appending(to: "Done.", from: olderBuilder)
+        XCTAssertTrue(saidBefore.contains("pairs"), "With no offer the finding's own words are the honest ones: \(saidBefore)")
+    }
+
 }

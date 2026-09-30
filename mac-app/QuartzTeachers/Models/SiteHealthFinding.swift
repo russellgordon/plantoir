@@ -115,9 +115,30 @@ struct SiteHealthFinding: Equatable, Identifiable {
         }
         var parts: [String] = [message]
         for finding in runner.healthFindings {
+            if let offered = sentenceWhenTheChecklistIsOffered(for: finding, from: runner) {
+                parts.append(offered)
+                continue
+            }
             parts.append(finding.sentence + " " + finding.detail)
         }
         return parts.joined(separator: "\n\n")
+    }
+
+    /// For the #333 finding when the same build wrote a links checklist offer
+    /// for its section (#379): the section window will offer the pages, so
+    /// the assistant says that instead of reading ten pairs aloud. Only when
+    /// the build SAID so — a builder older than the app writes no offer, and
+    /// then the finding's own words are the honest ones.
+    static func sentenceWhenTheChecklistIsOffered(for finding: SiteHealthFinding, from runner: ScriptRunner) -> String? {
+        guard finding.name == LinksChecklistRouting.findingName else {
+            return nil
+        }
+        for marker in runner.linksChecklistMarkers where marker.section == finding.section && marker.pages > 0 {
+            return AssistWording.linksIntoHiddenPagesWillBeOffered(
+                course: finding.course, section: String(finding.section)
+            )
+        }
+        return nil
     }
 
     /// Splits output into lines, on SCALARS rather than Characters.

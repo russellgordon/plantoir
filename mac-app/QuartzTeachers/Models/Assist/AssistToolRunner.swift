@@ -3789,6 +3789,23 @@ final class AssistToolRunner {
                 // last year's. An offer that looks like it worked is worse than
                 // no offer at all.
                 var said: String = already
+                // The record is set aside on a rollover that moved no page,
+                // too (#379): the year still turned over.
+                if isARollover(arguments) {
+                    let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                        courseDirectory: asked.located.course.directoryURL,
+                        section: asked.located.sectionNumber
+                    )
+                    if !released.isEmpty {
+                        history.record(AssistChange(
+                            whatHappened: "set aside the record of pages published last year",
+                            courseCode: asked.located.course.code,
+                            sectionNumber: asked.located.sectionNumber,
+                            rebuildsThePreview: false,
+                            files: released
+                        ))
+                    }
+                }
                 let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
                     arguments,
                     course: asked.located.course,
@@ -3812,7 +3829,7 @@ final class AssistToolRunner {
                 for: asked.located.course, sectionNumber: asked.located.sectionNumber
             )
 
-            let change: AssistChange
+            var change: AssistChange
             var leftAlone: [String] = []
             var classesReDated: Int = 0
             var pagesTheyUseReDated: Int = 0
@@ -3829,6 +3846,25 @@ final class AssistToolRunner {
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
+                )
+            }
+            // A rollover sets aside the section's published-pages record
+            // (#379, plan review finding 12): a new year's site has published
+            // nothing yet. Whichever website answer is given, and inside the
+            // rollover's own change, so taking the rollover back brings it back.
+            if isARollover(arguments) {
+                let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                    courseDirectory: asked.located.course.directoryURL,
+                    section: asked.located.sectionNumber
+                )
+                var files: [AssistSavedFile] = change.files
+                for file in released {
+                    files.append(file)
+                }
+                change = AssistChange(
+                    whatHappened: change.whatHappened, courseCode: change.courseCode,
+                    sectionNumber: change.sectionNumber, rebuildsThePreview: change.rebuildsThePreview,
+                    files: files, appliesToTheWholeCourse: change.appliesToTheWholeCourse, kind: change.kind
                 )
             }
             history.record(change)
