@@ -6520,6 +6520,52 @@ a report from the file had the same strict read and was left behind; since
 [#301](https://github.com/russellgordon/plantoir/issues/301) it follows the same
 rule through the same function — see the next section.
 
+#### On Windows: a sharing violation, not a rewrite (#303)
+
+Since 2026-09-30 ([#303](https://github.com/russellgordon/plantoir/issues/303)).
+Windows lost lines for a different reason with the same effect. It never
+trims, so it has no rewrite race; its writers are the app, `plantoir-mcp.exe`
+and (from bundle 3 on) the scheduled run, and no `.ps1` launcher writes the
+trail. `ActivityTrail.Append` was `lock` + `File.AppendAllText` + an empty
+`catch`: `lock` covers threads of one process, and `AppendAllText` opens with
+`FileShare.Read`, so a second PROCESS opening the file while the first held it
+threw a sharing violation, and the empty catch dropped the line.
+
+Measured on this Windows PC (Intel Core i5-8365U, 4 cores / 8 threads, 15.7 GB,
+NTFS, Windows 11 Pro 25H2 build 26200, 2026-09-30) with a harness that calls
+the app's own `ActivityTrail.Note`, each writer its own process, all started on
+the same clock tick:
+
+| Writer | 2 processes × 500 lines, 5 rounds | 3 processes × 3 lines, bursts (the mac's shape) |
+|---|---|---|
+| `File.AppendAllText` (what shipped) | **4,444 of 5,000 kept** | **682 of 900** (100 bursts) |
+| `FileStream(Append, Write, FileShare.ReadWrite)`, one `Write` per line, no lock — the issue's first candidate | 4,512 of 5,000 | 180 of 270 (30 bursts) |
+| a named mutex `Local\PlantoirActivityTrail` round open-append-close (what it does now) | **5,000 of 5,000** | **900 of 900** (100 bursts) |
+
+**Why the first candidate lost lines.** The reasoning behind it was that an
+append-mode write lands at end-of-file. It does in POSIX `O_APPEND`; .NET's
+`FileMode.Append` instead opens for ordinary write, seeks to the end ONCE and
+keeps its own position, so two writers that open at the same end both write at
+that offset and the second overwrites the first. Opening with the share flag
+only swapped the dropped line for an overwritten one.
+
+**What it does now.** Every writer takes the named mutex, opens with
+`FileShare.ReadWrite | FileShare.Delete` (so a problem report reading the file
+cannot make a writer fail), appends one line in one `Write`, and releases. The
+redaction (`LogRedactor.Redacting`) still happens before any of it. A mutex
+abandoned by a writer that died is taken over (`AbandonedMutexException`); a
+wait longer than five seconds writes the line anyway — a line that might
+interleave beats a line certainly lost, and one line's append is well under a
+millisecond. `Local\`, not `Global\`: the trail is per user and every writer
+runs in the teacher's session. Pinned by `ActivityTrailWritersTests` (another
+writer's open handle held across a `Note`: RED on the old append).
+
+**Rejected:** the share flag alone (measured above); a retry loop on the
+sharing violation, as the issue says — a guessed delay that still drops the
+line after its last retry. **To KNOW:** if Windows ever trims, the trim must
+run under this same mutex, because a trim is the one write that replaces the
+file, which is exactly how the mac lost lines.
+
 ### When the trail holds characters that cannot be read
 
 Since 2026-09-26 ([#301](https://github.com/russellgordon/plantoir/issues/301)).
