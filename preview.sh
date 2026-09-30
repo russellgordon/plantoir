@@ -709,6 +709,12 @@ a_deploy_is_running_for() {
       while ((p in parent) && parent[p] != p && !(parent[p] in mine) && parent[p] > 1) {
         p = parent[p]; mine[p] = 1
       }
+      # What the arguments of deploy.sh begin with for THIS course and section.
+      spaced = toupper(course)
+      gsub(/[ \t]+/, " ", spaced)
+      sub(/^ /, "", spaced)
+      sub(/ $/, "", spaced)
+      wanted = spaced " " section " "
       prefix = "ca.russellgordon.Plantoir.deploy." code ".section" section
       pattern = "ca\\.russellgordon\\.Plantoir\\.deploy\\." code "\\.section" section "(\\.[0-9a-f]+)?\\.sh([ \t]|$)"
       for (i = 1; i <= count; i++) {
@@ -732,12 +738,21 @@ a_deploy_is_running_for() {
         # deploy and is counted — does not count. Only the arguments of
         # deploy.sh itself are read for the flags that deploy nothing.
         # (No apostrophes in here: this program sits in single quotes.)
+        # The course and section are read as the text the arguments of
+        # deploy.sh BEGIN with, one space between words, as
+        # the_owners_of_the_work reads them: a course code may hold a space
+        # ("AP CALC", which CourseCodeRule allows), and reading one word for
+        # it missed every deploy of that course (#388).
         n = split(args[pid], word, /[ \t]+/)
         for (w = 1; w + 2 <= n; w++) {
           if (w > 1 && (word[1] !~ /(^|\/)(ba|z|da|k)?sh$/ || word[w] ~ /^-/)) break
-          if (word[w] ~ /(^|\/)deploy\.sh$/ && toupper(word[w + 1]) == toupper(course) && word[w + 2] == section) {
+          if (word[w] !~ /(^|\/)deploy\.sh$/) continue
+          after = ""
+          for (a = w + 1; a <= n; a++) after = after " " word[a]
+          after = toupper(substr(after, 2)) " "
+          if (index(after, wanted) == 1) {
             deploys = 1
-            for (f = w + 3; f <= n; f++) {
+            for (f = w + 1; f <= n; f++) {
               if (word[f] ~ /^(--reset-token|--logout|--help|-h)$/) deploys = 0
             }
             if (deploys) print "deploy " pid
