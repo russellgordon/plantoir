@@ -106,7 +106,13 @@ same day from a native capture of Notification Center's window, and
 which now leaves Playwright's square page screenshots square, and
 `hero_windows.py` still masks screen grabs with a drawn `rounded()`. Neither
 was edited from the mac; the gate does not judge `-windows-` pictures until
-Windows has an answer that keeps a window's own shape.
+Windows has an answer that keeps a window's own shape. Meanwhile (#375, the
+stopgap row 606 used for `courses` and `new-course`) `hero`, `colour-schemes`
+and `light-and-dark` are `windows: false` in `shots.json` and their drawn
+`-windows` files are deleted, so a Windows visitor is shown the Mac picture;
+a native retake sets `windows: true` again. `build.py --deploy` runs the same
+corner check as the test and refuses on any failing picture a Mac visitor is
+shown.
 
 ---
 
@@ -269,8 +275,8 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 | `site-phone` | Rendered class website on Mobile Viewport | `site-phone-light.png/.webp`<br>`site-phone-dark.png/.webp` | `site-phone-windows-light.png/.webp`<br>`site-phone-windows-dark.png/.webp` |
 | `coverage` | Curriculum expectation tag browser | `coverage-light.png/.webp`<br>`coverage-dark.png/.webp` | `coverage-windows-light.png/.webp`<br>`coverage-windows-dark.png/.webp` |
 | `search` | Quartz live search popover | `search-light.png/.webp`<br>`search-dark.png/.webp` | `search-windows-light.png/.webp`<br>`search-windows-dark.png/.webp` |
-| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` |
-| `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` |
+| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | none (`windows: false` until retaken with native corners, #375) |
+| `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | none (`windows: false` until retaken with native corners, #375) |
 
 Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
 `capture_windows.py` takes an id marked `windows: true`, and the section says
