@@ -159,6 +159,9 @@ public partial class App : Application
                 Settings.SkippedUpdateVersion,
                 skipped => { Settings.SkippedUpdateVersion = skipped; try { Settings.Save(); } catch { } },
                 _ => QuitConfirmation.WhatIsUnderWay(CourseActivity.UnderWay()));
+            Updater.RememberingDailyChecksIn(
+                () => Settings.LastUpdateCheckUtc,
+                when => { Settings.LastUpdateCheckUtc = when; try { Settings.Save(); } catch { } });
             Updater.Start();
         }
 
@@ -368,9 +371,8 @@ public partial class App : Application
         {
             if (!_installerStarted && Updater is { } updater)
             {
-                var underWay = CourseActivity.UnderWay();
-                bool working = underWay.Publishes > 0 || underWay.PreviewsBeingBuilt > 0;
-                if (updater.AtQuit(working, QuitConfirmation.WhatIsUnderWay(underWay)) is { } install)
+                // The same gate as the install (ruling 7), not only this app's own work.
+                if (updater.AtQuitGated() is { } install)
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(install.Path, install.Arguments) { UseShellExecute = false });
             }
         }

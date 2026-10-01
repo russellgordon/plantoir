@@ -119,8 +119,31 @@ public sealed class AppUpdater : IDisposable
     public void Start()
     {
         if (!IsActive) return;
-        _daily = new Timer(_ => _ = CheckAsync(teacherAsked: false), null,
-                           TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(AppUpdates.CheckEverySeconds));
+        // On the WALL CLOCK (ruling 10): look every hour whether a day has
+        // passed since the last daily check (kept in settings), so a laptop that
+        // sleeps at night and is never relaunched still checks once a day.
+        // A process-time timer of 86400 s drifted by every hour spent asleep.
+        _daily = new Timer(_ => { if (DailyCheckIsDue(DateTime.UtcNow)) _ = CheckAsync(teacherAsked: false); }, null,
+                           TimeSpan.FromMinutes(1), TimeSpan.FromHours(1));
+    }
+
+    private Func<DateTime?> _lastDailyCheck = () => null;
+    private Action<DateTime> _rememberDailyCheck = _ => { };
+
+    /// <summary>A day by the wall clock since the last daily check; records the new one when due.</summary>
+    internal bool DailyCheckIsDue(DateTime nowUtc)
+    {
+        if (_lastDailyCheck() is { } last && nowUtc - last < TimeSpan.FromSeconds(AppUpdates.CheckEverySeconds)) return false;
+        _rememberDailyCheck(nowUtc);
+        return true;
+    }
+
+    /// <summary>Where the last daily check is kept (the app passes its settings).</summary>
+    public AppUpdater RememberingDailyChecksIn(Func<DateTime?> read, Action<DateTime> write)
+    {
+        _lastDailyCheck = read;
+        _rememberDailyCheck = write;
+        return this;
     }
 
     private SparkleUpdater Sparkle()
@@ -273,6 +296,18 @@ public sealed class AppUpdater : IDisposable
             return (_installerPath, AppUpdates.InstallerArguments(relaunch: false));
         }
         return null;
+    }
+
+    /// <summary>
+    /// The quit, decided by the SAME gate as the install (ruling 7): anything in
+    /// mayNotInstallWhile — a scheduled publish, another program's build or
+    /// publish, any running plantoir-mcp — not only this app's own work. A held
+    /// update must never install on the way out over the work it was held for.
+    /// </summary>
+    public (string Path, string Arguments)? AtQuitGated()
+    {
+        var hold = AppUpdates.EvaluateForInstall(_snapshot(), _assistantServers());
+        return AtQuit(hold.Held, hold.Held ? UpdateWording.Work(hold, _theQuitQuestionsWords("")) : "");
     }
 
     private void NoteStopped(string? version, string category, string? detail, bool daily = false)

@@ -136,12 +136,14 @@ public class AppUpdatesContractTests
         Assert.DoesNotContain("RELAUNCH", AppUpdates.InstallerArguments(relaunch: false));
         Assert.Contains("/PLANTOIRUPDATE=1", AppUpdates.InstallerArguments(relaunch: false));
         Assert.Contains("/VERYSILENT", AppUpdates.InstallerArguments(relaunch: false));
+        Assert.Contains("/NOCLOSEAPPLICATIONS", AppUpdates.InstallerArguments(relaunch: false));   // ruling 8
 
         string iss = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "installer.iss"));
         Assert.Contains("{param:RELAUNCH|0}", iss);
         Assert.Contains("Check: WantsRelaunch", iss);
         Assert.Contains("{param:PLANTOIRUPDATE|0}", iss);
-        Assert.Contains("if not IsUpdate then", iss);   // the update path skips the taskkill (ruling 2)
+        Assert.Contains("if not IsUpdate then", iss);
+        Assert.Contains("function InitializeSetup", iss);                 // refuses an update while plantoir-mcp runs   // the update path skips the taskkill (ruling 2)
     }
 
     [Fact]

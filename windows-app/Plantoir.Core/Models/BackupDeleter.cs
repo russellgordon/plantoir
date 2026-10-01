@@ -79,20 +79,23 @@ public static class BackupDeleter
 /// leaves them alone (#283).
 ///
 /// <para><b>In this app</b>: each open assistant window holds the backup its
-/// conversation made before its first change, from the moment that backup
-/// exists until the window closes. Only that one — an OLDER assistant backup
-/// of the same section is an ordinary backup now (deleteCases[2]).</para>
+/// conversation made, from the moment it exists until the window closes.
+/// Holds are COUNTED (bundle-8 ruling 9): two holders of one zip, one closes,
+/// the zip is still held. Only that zip — an older assistant backup of the
+/// same section is an ordinary backup now (deleteCases[2]).</para>
 ///
-/// <para><b>In another program</b> (bundle-8 ruling 4): a Claude Code session
-/// through <c>plantoir-mcp</c> holds a live <c>assist</c> lease on its course.
-/// Which zip its conversation made is not written anywhere on disk, so while
-/// such a lease is alive the NEWEST assistant-made backup of that course is
-/// held — the one that session most plausibly made. That can hold one backup
-/// too many; it can never let the one it made go.</para>
+/// <para><b>In another program</b> (rulings 4 and 9): <c>plantoir-mcp</c>
+/// writes the zip its conversation made into a record beside its lease,
+/// <c>&lt;COURSE&gt;.held-backup.&lt;pid&gt;</c> in the activity folder
+/// (<see cref="RecordFor"/>), and removes it at exit. A record counts while that
+/// pid holds a live <c>assist</c> lease, so a killed session's leftover record
+/// holds nothing. The earlier "newest assistant backup of the course" guess is
+/// gone: it released the outside session's own zip whenever this app's
+/// assistant had made a later one.</para>
 /// </summary>
 public static class HeldBackups
 {
-    private static readonly HashSet<string> s_held = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, int> s_held = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object s_gate = new();
 
     private sealed class Hold : IDisposable
@@ -101,7 +104,13 @@ public static class HeldBackups
         public Hold(string path) => _path = path;
         public void Dispose()
         {
-            lock (s_gate) { if (_path is not null) s_held.Remove(_path); _path = null; }
+            lock (s_gate)
+            {
+                if (_path is null) return;
+                if (s_held.TryGetValue(_path, out int n) && n > 1) s_held[_path] = n - 1;
+                else s_held.Remove(_path);
+                _path = null;
+            }
         }
     }
 
@@ -109,36 +118,68 @@ public static class HeldBackups
     public static IDisposable HoldWhileOpen(string backupPath)
     {
         string full = Path.GetFullPath(backupPath);
-        lock (s_gate) s_held.Add(full);
+        lock (s_gate) s_held[full] = s_held.TryGetValue(full, out int n) ? n + 1 : 1;
         return new Hold(full);
     }
 
     /// <summary>The backups held by assistant windows in this app.</summary>
     public static IReadOnlySet<string> InThisApp()
     {
-        lock (s_gate) return new HashSet<string>(s_held, StringComparer.OrdinalIgnoreCase);
+        lock (s_gate) return new HashSet<string>(s_held.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>For tests: forget every hold.</summary>
     internal static void Reset() { lock (s_gate) s_held.Clear(); }
 
+    /// <summary>Where a program records the zip its conversation made, beside its lease.</summary>
+    public static string RecordFor(string workspacePath, string courseCode, int pid) =>
+        Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "activity", $"{courseCode}.held-backup.{pid}");
+
+    /// <summary>Write (or replace) this process's record. Best-effort: a record that cannot be written holds nothing.</summary>
+    public static void Record(string workspacePath, string courseCode, string backupPath)
+    {
+        try
+        {
+            string record = RecordFor(workspacePath, courseCode, Environment.ProcessId);
+            Directory.CreateDirectory(Path.GetDirectoryName(record)!);
+            File.WriteAllText(record, Path.GetFullPath(backupPath));
+        }
+        catch (Exception) { }
+    }
+
+    /// <summary>Remove this process's records (at exit).</summary>
+    public static void ForgetRecords(string workspacePath)
+    {
+        try
+        {
+            string dir = Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "activity");
+            foreach (string file in Directory.EnumerateFiles(dir, $"*.held-backup.{Environment.ProcessId}")) File.Delete(file);
+        }
+        catch (Exception) { }
+    }
+
     /// <summary>
     /// Everything a delete in <paramref name="workspacePath"/> must keep: this
-    /// app's open conversations, plus the newest assistant backup of each
-    /// course another live program is assisting with.
+    /// app's open conversations, plus each zip another program's live
+    /// assistant session has on record.
     /// </summary>
     public static IReadOnlySet<string> For(string workspacePath, IEnumerable<BackupItem> backups,
-                                           Func<string, IEnumerable<string>>? coursesAssistedElsewhere = null)
+                                           Func<string, IEnumerable<int>>? livingAssistantPids = null)
     {
         var held = new HashSet<string>(InThisApp(), StringComparer.OrdinalIgnoreCase);
-        var assisted = new HashSet<string>(
-            (coursesAssistedElsewhere ?? WorkLease.CoursesAssistedByAnotherProgram)(workspacePath),
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var newest in backups
-                     .Where(b => b.Maker is BackupMaker.Assistant && assisted.Contains(b.CourseCode))
-                     .GroupBy(b => b.CourseCode, StringComparer.OrdinalIgnoreCase)
-                     .Select(g => g.OrderByDescending(b => b.BackedUpAt).First()))
-            held.Add(Path.GetFullPath(newest.FilePath));
+        var living = (livingAssistantPids ?? AssistantPids)(workspacePath).ToHashSet();
+        string dir = Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "activity");
+        IEnumerable<string> records;
+        try { records = Directory.EnumerateFiles(dir, "*.held-backup.*").ToList(); }
+        catch (Exception) { return held; }
+        foreach (string record in records)
+        {
+            if (!int.TryParse(record[(record.LastIndexOf('.') + 1)..], out int pid) || !living.Contains(pid)) continue;
+            try { held.Add(Path.GetFullPath(File.ReadAllText(record).Trim())); } catch (Exception) { }
+        }
         return held;
     }
+
+    private static IEnumerable<int> AssistantPids(string workspacePath) =>
+        WorkLease.LiveLeasesOfOthers(workspacePath).Where(l => l.Kind == WorkLease.Assisting).Select(l => l.Pid);
 }

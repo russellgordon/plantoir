@@ -1240,7 +1240,10 @@ public sealed partial class SidebarPane : UserControl
         string when;
         try
         {
-            string zipPath = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory());
+            // Off the UI thread (ruling 10): zipping takes seconds, and a backup
+            // landing in the same second waits up to a second for the next (#187).
+            string courses = Workspace.CoursesDirectory();
+            string zipPath = await Task.Run(() => CourseArchiver.BackUpCourse(course, courses));
             when = BackupItem.From(zipPath, course.Code)?.WhenDescription ?? "just now";
         }
         catch (Exception error)
