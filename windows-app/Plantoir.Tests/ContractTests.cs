@@ -87,6 +87,22 @@ public class ContractTests
                      AssistWording.LinkedClassesWereLeftAlone(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
         Assert.Equal(wording["linkedClassStaysVisible"]!.ToString(), AssistWording.LinkedClassStaysVisible("Unit 2, Day 4"));
 
+        // #281/#288: rendered by running this app's own functions on the
+        // inputs the generator used, so the keys test the code path rather
+        // than a template.
+        Assert.Equal(wording["morningOrEvening"]!.ToString(),
+                     AssistWording.MorningOrEvening(AssistCardCommand.MorningOrEvening("deploy at 6:30")!));
+        Assert.Equal(wording["sayTheTimeAs"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6.30 pm")!));
+        Assert.Equal(wording["sayTheTimeAsWithoutTheComma"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6:30 pm,")!));
+
+        // #180: a call the model made for another course.
+        Assert.Equal(wording["askedAboutAnotherCourse"]!.ToString(),
+                     AssistWording.AskedAboutAnotherCourse("{course}", "{otherCourse}"));
+        Assert.Equal(wording["askedAboutACourseThatIsNotHere"]!.ToString(),
+                     AssistWording.AskedAboutACourseThatIsNotHere("{course}", "{otherCourse}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
@@ -1067,8 +1083,8 @@ public class ContractTests
 
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
-            Task.FromResult<JsonObject?>(null);
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<ModelReply?>(null);
     }
 
     private sealed class DummyTools : IToolServer

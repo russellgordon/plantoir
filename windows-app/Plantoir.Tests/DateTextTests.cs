@@ -343,19 +343,13 @@ public class DateTextTests
     [
         ("TaskScheduling.cs", "DateTime.TryParse(fields[1], out var when)",
             "parses schtasks' Next Run Time column (/Query /FO CSV), which Windows wrote in the machine's culture."),
-        // The three below are fixed on origin/issue/159-settle-the-day-once
-        // (ScheduledDeploy.ReadTheMoment, one reader). They are excused here so
-        // that this test does not change lines that branch also changes; the
-        // entries go when #159 lands, and ReadTheMoment's own cultural
-        // FALLBACK (a human-written shape) will want an entry of its own.
-        ("AssistAgent.cs", "_dateline = $\" (Today is {today:yyyy-MM-dd}",
-            "#159 rewrites this dateline invariantly from its one clock; left for that branch."),
-        ("AssistAgent.cs", "{DateTime.Now.AddDays(1):yyyy-MM-dd} {hour:00}:{minute:00}",
-            "#159 rewrites the card's moment invariantly from its one clock; left for that branch."),
-        ("AssistAgent.cs", "DateTime.TryParse(when, out var parsed)",
-            "#159 replaces this with ScheduledDeploy.ReadTheMoment; left for that branch."),
-        ("PlantoirTools.cs", "DateTime.TryParse(when, out var moment)",
-            "#159 replaces both of these (plan_scheduled_deploy, schedule_deploy) with ScheduledDeploy.ReadTheMoment; left for that branch."),
+        // ScheduledDeploy.ReadTheMoment (#159): the exact invariant form the
+        // app writes is tried first, then an invariant lenient read; only a
+        // shape a PERSON wrote by hand reaches this last step, and a person
+        // writes in their own culture's order. Without it a teacher on a
+        // day-first machine typing "20/09/2026 06:30" would be read US-order.
+        ("ScheduledDeploy.cs", "DateTime.TryParse(when, out var human)",
+            "the last-resort reader of a human-written moment, after the invariant forms (#159)."),
     ];
 
     private static readonly Regex RendersAYear = new(

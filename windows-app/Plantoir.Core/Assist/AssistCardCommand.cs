@@ -7,7 +7,7 @@ using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
-public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
+public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
 {
     private static readonly char[] TrimChars = new[] { ' ', '\t', '\r', '\n', '.', '!' };
 
@@ -111,9 +111,14 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             return new AssistCardCommand(found.Tool, found.Args);
         }
 
+        // Hide and unpublish first, by a frame of their own; a publish
+        // sentence falls through to the shipped publish reading untouched —
+        // see HideOrUnpublish for why the VERB is the gate.
+        if (HideOrUnpublish(tidied) is { } hidden) return hidden;
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
         if (MakeRoom(tidied) is { } room) return room;
+        if (DeployAtATime(tidied) is { } scheduled) return scheduled;
         return DuplicateClass(tidied, message);
     }
 
@@ -177,19 +182,77 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         });
     }
 
+    /// <summary>
+    /// <c>[please] hide|unpublish unit &lt;n&gt;[[,] day &lt;m&gt;] [please]</c> →
+    /// <c>unpublish_pages</c> (#217, the mac's #215).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why.</b> Measured on the mac (Qwen2.5-1.5B, Metal, M4 Pro):
+    /// "unpublish unit 4, day 21" reached <c>unpublish_pages</c> every time;
+    /// "hide unit 4, day 21" reached NO tool in five phrasings of five, and
+    /// the model echoed the teacher's sentence back — after which even
+    /// "Unpublish Unit 4, Day 20" echoed too. Read in code, it never reaches
+    /// the model at all.</para>
+    ///
+    /// <para><b>The whole VERB is gated.</b> Hide and unpublish take both
+    /// references AND the tolerance (please at either end, a trailing ?, odd
+    /// spacing around the comma). Publish takes NONE of it: it keeps its own
+    /// literal "publish unit &lt;n&gt;" below. Unpublishing errs safe — a
+    /// page nobody can see — while publishing puts a page in front of
+    /// students, and "publish unit 4?" is plausibly a teacher ASKING. The
+    /// mac's first cut let the tolerance reach publish and a fuzz found 141
+    /// new publish matches nobody asked for; each is a refused row in
+    /// <c>hideIsUnpublish</c>.</para>
+    ///
+    /// <para><b>Refusals first.</b> A card binds THIS window's course and
+    /// section unconditionally, so a frame that swallowed "hide unit 4, day 21
+    /// in ICS3U" would act on this course and report success. The frame reads
+    /// a fixed number of words and refuses everything else — a leading word
+    /// other than please, a second page, a section named, a spelled-out
+    /// number. Term-blind on purpose: only the literal word "unit".</para>
+    ///
+    /// <para>The number is accepted as the shipped unit family accepts it (an
+    /// integer, sign allowed, no positivity guard), and the teacher's own
+    /// digits travel: "hide unit 04" is "Unit 04".</para>
+    /// </remarks>
+    private static AssistCardCommand? HideOrUnpublish(string tidied)
+    {
+        // A question mark comes off HERE, not in the shared tidier: fixed
+        // shapes are matched by equality and some of them carry one.
+        string frame = tidied.TrimEnd('?');
+        var words = frame.Replace(',', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
+        if (words.Count > 0 && words[^1] == "please") words.RemoveAt(words.Count - 1);
+
+        if (words.Count < 3 || words[1] != "unit") return null;
+        if (words[0] != "hide" && words[0] != "unpublish") return null;
+
+        string unit = words[2];
+        if (!IsAnInteger(unit)) return null;
+        if (words.Count == 3)
+            return new AssistCardCommand("unpublish_pages", new Dictionary<string, string> { ["pages"] = $"Unit {unit}" });
+
+        if (words.Count != 5 || words[3] != "day" || !IsAnInteger(words[4])) return null;
+        return new AssistCardCommand("unpublish_pages",
+            new Dictionary<string, string> { ["pages"] = $"Unit {unit}, Day {words[4]}" });
+    }
+
+    /// <summary>What Swift's <c>Int(...)</c> accepts: ASCII digits with an optional sign.</summary>
+    private static bool IsAnInteger(string text) =>
+        int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _);
+
     private static AssistCardCommand? WholeUnit(string tidied)
     {
-        // The two openings after the first pair are #197's: measured, "Publish
+        // Publish only: "unpublish unit <n>" is read by HideOrUnpublish (#217).
+        // The two openings after "publish unit " are #197's: measured, "Publish
         // all the classes in Unit 2." went to publish_class_on with TODAY's
-        // date 3 times in 3 on the smaller assistant — on a teaching day that
-        // publishes today's class and reports success, about a request for a
-        // unit. Same frame, nothing else widened: a literal opening and a bare
-        // number, nothing before or after, so a course or section named, a
-        // courtesy word or a question mark falls through to the model
-        // (pagesNamingNoPage.everythingInAUnit).
+        // date 3 times in 3 on the smaller assistant. Same frame, nothing else
+        // widened: a literal opening and a bare number, nothing before or
+        // after, so a course or section named, a courtesy word or a question
+        // mark falls through to the model (pagesNamingNoPage.everythingInAUnit).
         var prefixes = new[]
         {
-            ("unpublish unit ", "unpublish_pages"), ("publish unit ", "publish_pages"),
+            ("publish unit ", "publish_pages"),
             ("publish all the classes in unit ", "publish_pages"), ("publish everything in unit ", "publish_pages"),
         };
         foreach (var (prefix, tool) in prefixes)

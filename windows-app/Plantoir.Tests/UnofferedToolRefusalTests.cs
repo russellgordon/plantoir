@@ -33,10 +33,10 @@ internal sealed class ScriptModel : IChatModel
         return this;
     }
 
-    public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+    public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
     {
         Asked.Add((JsonArray)messages.DeepClone());
-        return Task.FromResult(_replies.Count > 0 ? _replies.Dequeue() : null);
+        return Task.FromResult<ModelReply?>(_replies.Count > 0 ? _replies.Dequeue() : null);
     }
 }
 
