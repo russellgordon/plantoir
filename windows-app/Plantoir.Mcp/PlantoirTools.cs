@@ -342,7 +342,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string classes = "")
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
             return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
                 classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -357,13 +363,32 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "read it out — especially that the computer must be ON and AWAKE at that moment, plugged in " +
                  "if it is a laptop, with the lid open. Plantoir does not wake it. Replaces any deploy already " +
                  "scheduled for the same section. Use cancel_scheduled_deploy to call it off.")]
+    /// <summary>
+    /// A bare time of day — "06:30", "tomorrow 06:30" — settled into the whole
+    /// moment it means BEFORE it is read (#193). ReadTheMoment's lenient step
+    /// would otherwise read "06:30" as TODAY at 06:30, silently, usually a
+    /// moment already past. A whole moment comes back unchanged (the settler
+    /// is idempotent), so the app's own settled calls pass straight through.
+    /// </summary>
+    private string Settled(string when)
+    {
+        var now = DateTime.Now;
+        return ScheduledMoment.Settle(when, Today(), now) ?? when;
+    }
+
     public CallToolResult ScheduleDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when)
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             ScheduledDeploy plan;
@@ -376,6 +401,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // deploy RUNS now (#347), from the course's settings and the app's
             // own; what is written here is only what the teacher was told.
             var scheduledCourse = workspace.Course(plan.CourseCode);
+            DateTime? replaced = TaskScheduling.MomentItWouldReplace(
+                workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment, DateTime.Now);
             if (TaskScheduling.Schedule(workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment,
                                         scheduledCourse.Configuration.AllDeployDestinations) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
@@ -384,7 +411,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // teacher agreed to, before this ran. Repeating it afterwards is
             // the assistant explaining itself to somebody who just read it.
             string summary = $"Scheduled: {plan.CourseCode} Section {plan.SectionNumber} deploys to " +
-                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}.";
+                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}." +
+                             (replaced is { } was ? " " + AssistWording.ScheduleReplaces($"{was:dddd d MMMM, h:mm tt}") : "");
             return Answering(summary, summary + "\n\n" +
                              "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
                              "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");

@@ -755,8 +755,30 @@ public class AssistWorkspaceTests : IDisposable
 
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.Course("SNC1W"));
 
-        Assert.Equal("This session is working on ICS3U only, so SNC1W can’t be reached from here. " +
-                     "Start again from SNC1W in Plantoir to work on that course.", refusal.Message);
+        Assert.Equal(AssistWording.AskedAboutAnotherCourse("ICS3U", "SNC1W"), refusal.Message);
+    }
+
+    [Fact]
+    public void ALockedSessionNamesTheFoldersSpellingAndDoesNotSendATeacherToACourseThatIsNotHere()
+    {
+        AddCourse("SNC1W", "Science", 1);
+        var workspace = new AssistWorkspace(_folder, _launcher, lockedCourse: "ICS3U");
+
+        Assert.Equal(AssistWording.AskedAboutAnotherCourse("ICS3U", "SNC1W"),
+                     Assert.Throws<AssistRefusal>(() => workspace.Course("snc1w")).Message);
+        Assert.Equal(AssistWording.AskedAboutACourseThatIsNotHere("ICS3U", "ZZZ9Z"),
+                     Assert.Throws<AssistRefusal>(() => workspace.Course(" ZZZ9Z\n")).Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ACallNamingNoCourseSaysSoPlainly(string code)
+    {
+        var refusal = Assert.Throws<AssistRefusal>(() => Open().Course(code));
+        Assert.Equal(AssistWording.NoCourseNamed, refusal.Message);
+        var locked = new AssistWorkspace(_folder, _launcher, lockedCourse: "ICS3U");
+        Assert.Equal(AssistWording.NoCourseNamed, Assert.Throws<AssistRefusal>(() => locked.Course(code)).Message);
     }
 
     [Fact]

@@ -8,12 +8,23 @@ public static class AssistWording
 {
     // MARK: - Agreeing to something
 
-    /// <summary>The deploy approval card, said before "Shall I deploy?".</summary>
+    /// <summary>
+    /// The IMMEDIATE deploy's approval card, said before "Shall I deploy?".
+    /// It leads by saying it happens now (#193): the small assistant sent "Deploy
+    /// at 6:30 AM" to the immediate deploy 10 trials of 10, and a card naming no
+    /// time put nothing in front of the teacher to contradict them.
+    /// </summary>
     public const string DeployApproval =
-        "Students will see what is deployed. Be certain to review changes you have made.";
+        "This happens now. Students will see what is deployed. Be certain to review changes you have made.";
 
     /// <summary>The question under the deploy card.</summary>
     public const string DeployQuestion = "Shall I deploy?";
+
+    /// <summary>
+    /// The question under a SCHEDULED deploy's card (#260) — it names a moment
+    /// that is not now, and the immediate question reads as now.
+    /// </summary>
+    public const string ScheduleQuestion = "Shall I schedule the deploy?";
 
     /// <summary>The question under a plan card.</summary>
     public const string PlanQuestion = "Shall I go ahead?";
@@ -509,20 +520,91 @@ public static class AssistWording
 
     public const string HowITeachTooLong =
         "Nothing was saved: that is longer than a How I Teach page can be (8000 characters). Make it shorter and show the teacher again.";
+    // MARK: - A reply that cannot be acted on (#196)
+
+    /// <summary>
+    /// The engine stopped the reply part way, or its arguments could not be
+    /// read. Nothing ran. Names no limit (rule 1); the advice addresses the
+    /// cause.
+    /// </summary>
+    public const string AnswerWasCutOff =
+        "I didn't get to the end of that, so I haven't changed anything. " +
+        "Ask me again — a shorter sentence, or fewer pages at a time.";
+
+    /// <summary>
+    /// A finished reply named a tool and wrote NOTHING for it, and the tool
+    /// needs more than the window supplies (#262). Nothing ran.
+    /// </summary>
+    public const string AnswerLeftOutWhatItWasFor =
+        "I did not work out which pages, day or time you meant, so nothing was done. Please ask me again.";
+
+    /// <summary>
+    /// A call over MCP named no course — missing or blank (#262) — rather than
+    /// "There is no course called “”".
+    /// </summary>
+    public const string NoCourseNamed = "No course was named, so nothing was done.";
+
+    /// <summary>
+    /// The model answered with the teacher's own request (#217). Deliberately
+    /// GENERAL: the guard fires on any request answered in plain words, so
+    /// advice about pages or verbs would be false for a whole class of them.
+    /// </summary>
+    public const string DidNotFollowThat =
+        "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
+
+    /// <summary>
+    /// Said on the scheduled card, the schedule dialog and the tool's result
+    /// when the section already has a deploy set (#261). <paramref name="moment"/>
+    /// is written the way the card writes its own.
+    /// </summary>
+    public static string ScheduleReplaces(string moment) => $"This replaces the deploy already set for {moment}.";
+
+    // MARK: - A time asked about, or spelled for the teacher (#281, #288)
+
+    /// <summary>"deploy at 6:30": morning or evening? Nothing is set; the two sentences named are ones the family accepts.</summary>
+    public static string MorningOrEvening(AssistTimeQuestion question) =>
+        $"Is that {question.Clock} in the morning or in the evening? Nothing is set yet. " +
+        $"Say “{question.SayMorning}” or “{question.SayEvening}”.";
+
+    /// <summary>
+    /// A time the family can read but does not set, answered with the one
+    /// sentence to type — naming the teacher's own spelling, or, when only a
+    /// comma stands in the way, saying so.
+    /// </summary>
+    public static string SayTheTimeAs(AssistTimeRespelling respelling) =>
+        respelling.CommaIsTheOnlyDifference
+            ? SayTheTimeAsWithoutTheComma(respelling.Say)
+            : $"To set a deploy for “{respelling.Written}”, say it as “{respelling.Say}”. Nothing is set yet.";
+
+    /// <summary>The spelling reply when a comma is all that stands in the way.</summary>
+    public static string SayTheTimeAsWithoutTheComma(string say) =>
+        $"To set that deploy, say it as “{say}”, without the comma. Nothing is set yet.";
+
+    // MARK: - A call the model made for another course (#180)
+
+    /// <summary>
+    /// The model named a course that IS in this working folder but is not
+    /// this window's. Nothing ran. <paramref name="otherCourse"/> is spelled
+    /// the way the working folder spells it, never the way the model wrote
+    /// it — a teacher told to open "mcv4u" is sent looking for something
+    /// their sidebar does not show.
+    /// </summary>
+    public static string AskedAboutAnotherCourse(string course, string otherCourse) =>
+        $"This window is for {course}, so nothing was done for {otherCourse}. " +
+        $"Open {otherCourse}'s section in Plantoir and ask me there.";
+
+    /// <summary>
+    /// The model named a code that is no course in this working folder — a
+    /// typo, or one it invented. Deliberately gives no "open it" advice:
+    /// there is nothing to open.
+    /// </summary>
+    public static string AskedAboutACourseThatIsNotHere(string course, string otherCourse) =>
+        $"There is no course called {otherCourse} in this working folder, so nothing was done. " +
+        $"This window is for {course}.";
 
     // MARK: - Shared fragments
 
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";
 
     public const string NothingToDo = "I am not sure what to do with that.";
-
-    /// <summary>
-    /// A reply that was refused rather than acted on — here, a tool the model
-    /// named that it was never offered (#350 / mac #327). Reused on purpose
-    /// rather than a sentence of its own: any wording specific to the refusal
-    /// would have to describe a tool list, and rule 1 says the window never
-    /// talks about its machinery. (#217's echo guard says it too.)
-    /// </summary>
-    public const string DidNotFollowThat =
-        "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
 }

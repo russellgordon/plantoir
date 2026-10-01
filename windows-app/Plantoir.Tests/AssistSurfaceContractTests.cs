@@ -1115,6 +1115,49 @@ public class AssistSurfaceContractTests
         Assert.Equal(cap, LocalModel.Request(new JsonArray(), new JsonArray())["max_tokens"]!.GetValue<int>());
         Answer("Every request caps how much the model may write");
 
+        // A reply the engine stopped part way runs no tool and says so (#196):
+        // a stopped call whose arguments PARSE — the measured 28-token case —
+        // reaches no tool, and the teacher hears answerWasCutOff. The finish
+        // reason must survive LocalModel's reading of the body to get there.
+        Assert.True(LocalModel.ReadReply(
+            """{"choices":[{"finish_reason":"length","message":{"role":"assistant"}}]}""")!.WasCutOff);
+        var stoppedModel = new WindowBindingContractTests.ScriptedModel();
+        stoppedModel.Then(new JsonObject
+        {
+            ["tool_calls"] = new JsonArray(new JsonObject
+            {
+                ["id"] = "call-0",
+                ["function"] = new JsonObject { ["name"] = "deploy_section", ["arguments"] = """{"course":"ICS3U","section":1}""" },
+            }),
+        }, "length");
+        var stoppedTools = new WindowBindingContractTests.RecordingTools();
+        var stoppedAgent = new AssistAgent(stoppedModel, stoppedTools,
+            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+        var stoppedLines = stoppedAgent.Say("put that up for me the way we said", CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Assert.Empty(stoppedTools.Calls);
+        Assert.Equal(AssistWording.AnswerWasCutOff, Assert.Single(stoppedLines).Text);
+        Answer("A reply the engine stopped part way runs no tool and says so");
+
+        // #262: every case is the tool's own required, properties and
+        // readOnly, and whether what the model wrote runs.
+        const string wroteNothing =
+            "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs";
+        var nothingCases = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == wroteNothing)!["cases"]!.AsArray();
+        Assert.True(nothingCases.Count >= 14, "the #262 cases have gone missing");
+        foreach (var item in nothingCases)
+        {
+            var judged = AssistAgent.Judge(
+                item!["arguments"]!.ToString(),
+                item["required"]!.AsArray().Select(r => r!.ToString()),
+                item["properties"]!.AsArray().Select(r => r!.ToString()),
+                item["readOnly"]!.GetValue<bool>());
+            Assert.True((judged == AssistAgent.WhatTheModelWrote.Readable) == item["readable"]!.GetValue<bool>(),
+                $"{item["name"]}: {item["tool"]} with “{item["arguments"]}” was judged {judged}");
+        }
+        Answer(wroteNothing);
+
         // The one that genuinely cannot be executed, named rather than dropped.
         // A polarity veto is a rule about how a MODEL is chosen: it governs the
         // routing suite in research/ai-assist/, which is measured by hand and
