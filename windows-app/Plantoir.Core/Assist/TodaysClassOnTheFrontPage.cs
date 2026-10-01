@@ -65,8 +65,8 @@ public static class TodaysClassOnTheFrontPage
         if (raw is null) return null;
         string value = raw.Trim().Trim('"', '\'');
         var match = WrittenDay.Match(value);
-        return match.Success && DateOnly.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd",
-                   CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+        if (!match.Success) return null;
+        return DateOnly.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
             ? day : null;
     }
 
