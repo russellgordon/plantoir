@@ -191,10 +191,9 @@ public sealed class CourseConfiguration
     /// Writes ONE change to the file on disk from a fresh read, leaving every
     /// other unsaved edit in this object unsaved — the recorder a folder
     /// rename uses, because the folder has really moved and a Cancel that
-    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
-    /// as it is: making it read-compare-write would change what
-    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
-    /// and Cancel in Course Settings would stop doing what it says.
+    /// appeared to undo it would be a lie. <see cref="Write"/> writes this
+    /// object's WHOLE set of changes (merged per key since #272); this writes
+    /// one change and leaves the rest of this object's edits unsaved.
     ///
     /// <para>Read, change, and write only if nothing else wrote in between. A
     /// build's own <c>preflight_update_course_config</c> writes this same
