@@ -522,7 +522,12 @@ public sealed class LocalModel : IChatModel, IDisposable
         if (choice?["message"] is not JsonObject message) return null;
         string? finished = choice["finish_reason"] is JsonValue reason && reason.TryGetValue(out string? text)
             ? text : null;
-        return new ModelReply((JsonObject)message.DeepClone(), finished);
+        // The completion-token count rides along for the trail (#164): it is
+        // the honest check on thinking having been switched back on, since
+        // the engine parses the thinking OUT of the content.
+        int? tokens = JsonNode.Parse(body)?["usage"]?["completion_tokens"] is JsonValue used &&
+                      used.TryGetValue(out int count) ? count : null;
+        return new ModelReply((JsonObject)message.DeepClone(), finished, tokens);
     }
 
     /// <summary>

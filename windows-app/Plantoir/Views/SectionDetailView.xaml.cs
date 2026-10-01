@@ -229,18 +229,34 @@ public sealed partial class SectionDetailView : UserControl
             // is told again — "show it once" means once per BUILD, not once
             // for the life of this view.
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && _previewRunner.IsRunning)
+            {
                 _healthQueue.ForgetShown();
+                _linksChecklistDecided = null;
+                _heldLinksFinding = null;
+            }
             // As the build reports them. preview.ps1 does not exit while it is
             // serving, so waiting for this runner to FINISH would hold the
             // dialog until the teacher pressed Stop.
             if (args.PropertyName == nameof(_previewRunner.HealthFindings))
                 NoteHealthFindings(_previewRunner);
+            // The links checklist (#392): read when the build's marker
+            // ARRIVES, mid-build — a preview never ends.
+            if (args.PropertyName == nameof(_previewRunner.LinksChecklistMarker) &&
+                _previewRunner.LinksChecklistMarker is { } marker)
+                DecideTheLinksChecklist(marker);
         };
         _deployRunner.PropertyChanged += (_, args) =>
         {
             RefreshChrome();
             if (args.PropertyName == nameof(_deployRunner.IsRunning) && !_deployRunner.IsRunning)
+            {
                 _ = RefreshPublishedMarker();
+                // A publish this window ran: its build's marker, if it printed one.
+                if (_deployRunner.Legs.Select(leg => leg.Runner.LinksChecklistMarker).LastOrDefault(m => m is not null) is { } marker)
+                    DecideTheLinksChecklist(marker);
+                else
+                    ReleaseTheHeldLinksFinding();
+            }
         };
         Preview.NavigationCompleted += (_, _) => RefreshChrome();
         _window.Activated += OnWindowActivated;
@@ -248,7 +264,7 @@ public sealed partial class SectionDetailView : UserControl
         // closed, so this is the first moment there is anywhere to say it.
         // On Loaded rather than in the constructor: presenting needs a
         // XamlRoot, and the view has none until it is in the tree.
-        Loaded += (_, _) => TakeAnythingTheScheduledDeployFound();
+        Loaded += (_, _) => { TakeAnythingTheScheduledDeployFound(); OfferTheLinksChecklistIfWaiting(); };
         Unloaded += (_, _) => { _isTornDown = true; StopPreview(); _window.Activated -= OnWindowActivated; };
         RefreshChrome();
         _ = RefreshPublishedMarker();
@@ -267,6 +283,7 @@ public sealed partial class SectionDetailView : UserControl
         // wait until they clicked away and back. It is a File.Exists when
         // nothing is waiting.
         TakeAnythingTheScheduledDeployFound();
+        OfferTheLinksChecklistIfWaiting();
     }
 
     /// <summary>
@@ -597,7 +614,113 @@ public sealed partial class SectionDetailView : UserControl
 
     private void NoteHealthFindings(IReadOnlyList<SiteHealthFinding> findings, bool cameFromPublishing)
     {
+        // The #333 finding is announced BEFORE the links checklist exists, so
+        // it is HELD until the build's marker decides (#392): dropped when the
+        // checklist will really be shown, put back otherwise. Other findings
+        // go first as before, and the checklist follows when they have gone.
+        var held = findings.Where(f => f.Name == LinksIntoHiddenPagesCheck).ToList();
+        if (held.Count > 0 && !cameFromPublishing && _previewRunner.IsRunning)
+        {
+            findings = findings.Except(held).ToList();
+            if (_linksChecklistDecided is null)
+            {
+                _heldLinksFinding = held;
+                // A build that never prints a marker (an older builder) gets
+                // the alert after all.
+                _ = ReleaseTheHeldLinksFindingLater();
+            }
+            else if (_linksChecklistDecided == false)
+            {
+                _healthQueue.Note(held, false);
+            }
+        }
         if (_healthQueue.Note(findings, cameFromPublishing)) QueueHealthPresentation();
+    }
+
+    // ---- The links checklist (#392, #399, #405) ---------------------------
+
+    private const string LinksIntoHiddenPagesCheck = "linksIntoHiddenPages";
+    private IReadOnlyList<SiteHealthFinding>? _heldLinksFinding;
+    /// <summary>Null until this build's marker arrives; then whether the checklist is being shown.</summary>
+    private bool? _linksChecklistDecided;
+    private bool _linksChecklistUp;
+    private string? _linksChecklistShownFor;
+
+    private async Task ReleaseTheHeldLinksFindingLater()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(45));
+        if (_linksChecklistDecided is null) ReleaseTheHeldLinksFinding();
+    }
+
+    private void ReleaseTheHeldLinksFinding()
+    {
+        if (_heldLinksFinding is not { } held) return;
+        _heldLinksFinding = null;
+        if (_healthQueue.Note(held, false)) QueueHealthPresentation();
+    }
+
+    private void DecideTheLinksChecklist(LinksChecklistMarker marker)
+    {
+        var offer = LinksChecklistShowing.AfterAWatchedBuild(_course, _sectionNumber, marker);
+        _linksChecklistDecided = offer is not null;
+        if (offer is null) { ReleaseTheHeldLinksFinding(); return; }
+        _heldLinksFinding = null;
+        _ = PresentTheLinksChecklistAsync(offer, "after a build in this window");
+    }
+
+    /// <summary>For a build this window did not watch: a fresh offer with something new.</summary>
+    private void OfferTheLinksChecklistIfWaiting()
+    {
+        if (_previewRunner.IsRunning || _deployRunner.IsRunning) return;
+        if (LinksChecklistShowing.ForABuildNotWatched(_course, _sectionNumber) is { } offer)
+            _ = PresentTheLinksChecklistAsync(offer, "when the section was opened");
+    }
+
+    /// <summary>The menu item: whenever an offer exists; a stale one asks for a preview first.</summary>
+    public async Task OpenTheLinksChecklistFromTheMenuAsync()
+    {
+        if (LinksChecklistShowing.Offer(_course, _sectionNumber) is not { } offer) return;
+        if (!LinksChecklistShowing.IsFresh(_course, _sectionNumber))
+        {
+            await SayAsync(LinksChecklistWording.Fill(LinksChecklistWording.NeedsAPreviewFirst,
+                new Dictionary<string, string> { ["course"] = _course.Code, ["section"] = _sectionNumber.ToString() }));
+            return;
+        }
+        _linksChecklistShownFor = null;
+        await PresentTheLinksChecklistAsync(offer, "from the menu");
+    }
+
+    private async Task PresentTheLinksChecklistAsync(LinksChecklistOffer offer, string occasion)
+    {
+        if (_linksChecklistUp || _window.Workspace.WorkspacePath is not { } folder) return;
+        if (offer.BuildId is { } id && id == _linksChecklistShownFor) return;   // once per build
+        _linksChecklistUp = true;
+        try
+        {
+            // Other findings first (siteHealth.repair.oneAlertAtATime).
+            while ((_healthDialogIsUp || _healthQueue.PendingCount > 0) && !_isTornDown) await Task.Delay(300);
+            if (_isTornDown) return;
+            _linksChecklistShownFor = offer.BuildId;
+            string? said = await LinksChecklistDialog.OfferAsync(folder, _course, _sectionNumber, offer, occasion,
+                                                                  ShowHealthDialogAsync);
+            if (said is not null) await SayAsync(said);
+            _ = RefreshPublishedMarker();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"Links checklist: {ex.Message}");
+        }
+        finally { _linksChecklistUp = false; }
+    }
+
+    private async Task SayAsync(string sentence)
+    {
+        await ShowHealthDialogAsync(new ContentDialog
+        {
+            Title = LinksChecklistWording.MenuItem.TrimEnd('…'),
+            Content = new TextBlock { Text = sentence, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = "OK",
+        });
     }
 
     private void QueueHealthPresentation()
