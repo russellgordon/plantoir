@@ -79,7 +79,8 @@ public class AssistPromptShelfTests
             "Publish Unit 2, Day 3",
             // "Unpublish Unit 2, Day 3" left this set with #217: the hide and
             // unpublish frame answers it in code, as it does on the mac.
-            "Deploy at 6:30 AM",
+            // "Deploy at 6:30 AM" left this set with #193: the deploy-at-a-time
+            // family answers it in code, as it does on the mac.
             "Cancel scheduled deploy",
         };
 

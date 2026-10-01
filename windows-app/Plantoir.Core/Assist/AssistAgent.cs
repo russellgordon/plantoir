@@ -602,6 +602,16 @@ public sealed class AssistAgent
     /// </remarks>
     public Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
 
+    /// <summary>
+    /// The wall clock, for the one thing a day cannot answer: whether a time
+    /// of day is still to come TODAY (#193). Read only by
+    /// <see cref="WithTheMomentSettled"/>, together with <see cref="Today"/>.
+    /// </summary>
+    public Func<DateTime> Now { get; init; } = () => DateTime.Now;
+
+    /// <summary>The zone the wall clock is in — the machine's own, unless a test says otherwise.</summary>
+    public TimeZoneInfo TimeZone { get; init; } = TimeZoneInfo.Local;
+
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
 
@@ -672,6 +682,29 @@ public sealed class AssistAgent
         if (PreviewAskedForPlainly(text) is { } handled) return handled;
         if (await CardCommand(text, cancellation) is { } commanded) return commanded;
 
+        // "deploy at 6:30" — morning or evening, and nobody can tell which
+        // (#281). Asked in code; and "deploy at 6.30 pm" — a time the family
+        // reads but does not set — answered with the spelling to use (#288).
+        // Both go into the TRANSCRIPT ONLY. Appending either to the model's
+        // conversation "for context" passes every wording test and lets the
+        // model act on the time a turn later: measured, every such sentence
+        // reached deploy_section 10 of 10 on the smaller assistant. Nothing is
+        // set and nothing waits; the sentence named matches in code next turn.
+        if (AssistCardCommand.MorningOrEvening(text) is { } question)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked whether the time was morning or evening; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.MorningOrEvening(question)) };
+        }
+        if (AssistCardCommand.TimeToSayAs(text) is { } respelling)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked for the time in a spelling it can set; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.SayTheTimeAs(respelling)) };
+        }
+
         // InvariantCulture, and this class's one clock. A machine whose
         // default calendar is not Gregorian renders "yyyy" in ITS year —
         // 2569 for Thai Buddhist — so an affected teacher's assistant would
@@ -714,15 +747,22 @@ public sealed class AssistAgent
     {
         if (AssistCardCommand.Matching(text) is { } match)
         {
+            var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
+            // "deploy at 6:30 am" carries a time of day, never a date: the
+            // moment is settled HERE, once, so the card, the trail line and
+            // the act all carry the same one (#193).
+            string? moment = SettleTheMoment(cardArguments);
             ActivityTrail.Note(
                 ActivityTrail.Event.AssistantMatchedAFixedPhrase,
-                "matched in code, not sent to the model — ran " + match.ToolName,
+                "matched in code, not sent to the model — ran " + match.ToolName +
+                (moment is null ? "" : " for " + moment),
                 _courseCode,
                 _section);
 
-            if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
+            if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) ||
+                match.ToolName.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
             {
-                return AskFirst(text, "deploy_section", match.ToJsonObject(_courseCode, _section, Today()));
+                return AskFirst(text, match.ToolName, cardArguments);
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
             {
@@ -878,10 +918,17 @@ public sealed class AssistAgent
     {
         _awaiting = call;
         string tool = call["function"]?["name"]?.GetValue<string>() ?? "";
+        // Chosen by the tool's NAME, not by "needs approval" (#260): a
+        // scheduled card names a moment that is not now, and "Shall I
+        // deploy?" reads as now. A third approval tool falls to the "now"
+        // question, which is the safe reading for a deploy.
+        string question = tool.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase)
+            ? AssistWording.ScheduleQuestion
+            : AssistWording.DeployQuestion;
         return new List<Line>
         {
             new("assistant", Explain(call)),
-            new("assistant", AssistWording.DeployQuestion, NeedsApproval: true, Pending: tool),
+            new("assistant", question, NeedsApproval: true, Pending: tool),
         };
     }
 
@@ -1045,6 +1092,35 @@ public sealed class AssistAgent
             arguments["date"] = settled;
             return true;
         });
+    }
+
+    /// <summary>
+    /// The same settling for a <c>when</c> the MODEL wrote — "06:30" from a
+    /// model is the same trap as "06:30" from a card (#193): read as today,
+    /// silently, by the server's lenient reader. Gated on the tool declaring
+    /// <c>when</c>. A whole moment, or anything the settler cannot read, is
+    /// left exactly as the model wrote it.
+    /// </summary>
+    private JsonObject WithTheMomentSettled(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name || !Declares(name, "when")) return call;
+        return WithArgumentsRewritten(call, arguments => SettleTheMoment(arguments) is not null);
+    }
+
+    /// <summary>
+    /// Settle <c>arguments["when"]</c> in place against this class's clock, and
+    /// return the whole moment — or null when there was none to settle. A
+    /// moment that was already whole is returned too, untouched.
+    /// </summary>
+    private string? SettleTheMoment(JsonObject arguments)
+    {
+        if (arguments["when"] is not JsonValue given || !given.TryGetValue(out string? when)) return null;
+        if (ScheduledMoment.Settle(when, Today(), Now(), TimeZone) is { } settled)
+        {
+            arguments["when"] = settled;
+            return settled;
+        }
+        return null;
     }
 
     /// <summary>
@@ -1590,6 +1666,7 @@ public sealed class AssistAgent
             // read this same object. Today that is the relative day; a
             // section binding belongs beside it.
             call = WithTheDaySettled(call);
+            call = WithTheMomentSettled(call);
             if (BoundToThisWindow(call) is { } refused)
             {
                 // Nothing runs: no plan, no card, no tool. The turn comes back

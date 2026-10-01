@@ -75,6 +75,16 @@ public class ContractTests
         Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
         Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
 
+        // #281/#288: rendered by running this app's own functions on the
+        // inputs the generator used, so the keys test the code path rather
+        // than a template.
+        Assert.Equal(wording["morningOrEvening"]!.ToString(),
+                     AssistWording.MorningOrEvening(AssistCardCommand.MorningOrEvening("deploy at 6:30")!));
+        Assert.Equal(wording["sayTheTimeAs"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6.30 pm")!));
+        Assert.Equal(wording["sayTheTimeAsWithoutTheComma"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6:30 pm,")!));
+
         // #180: a call the model made for another course.
         Assert.Equal(wording["askedAboutAnotherCourse"]!.ToString(),
                      AssistWording.AskedAboutAnotherCourse("{course}", "{otherCourse}"));
