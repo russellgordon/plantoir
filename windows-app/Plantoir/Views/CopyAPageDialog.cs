@@ -70,6 +70,8 @@ public sealed class CopyAPageDialog
     private readonly HashSet<string> _unticked = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CheckBox> _rowBoxes = new(StringComparer.Ordinal);
     private StackPanel _sentences = new();
+    private StackPanel? _askPanel;
+    private bool _painting;
     private TextBlock _header = new();
 
     private static string Say(string key, params (string, string)[] fills) => CopyPageWording.Say(key, fills);
@@ -152,15 +154,19 @@ public sealed class CopyAPageDialog
         _stage = Stage.Ask;
         _dialog.PrimaryButtonText = "Copy";
         _dialog.CloseButtonText = _session.BackupName is null ? "Cancel" : "Done";
-        var panel = new StackPanel { Spacing = 10, MinWidth = 440 };
-        panel.Children.Add(_picker);
-        panel.Children.Add(_destination);
-        panel.Children.Add(_folder);
-        panel.Children.Add(_alsoLinked);
-        panel.Children.Add(_askNote);
-        foreach (string key in new[] { "copiesStartHidden", "datesAreKept", "nothingIsWrittenOver" })
-            panel.Children.Add(new TextBlock { Text = Say(key), TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
-        _dialog.Content = panel;
+        // Built once and shown again on "Copy another": a control can have only one parent.
+        if (_askPanel is null)
+        {
+            _askPanel = new StackPanel { Spacing = 10, MinWidth = 440 };
+            _askPanel.Children.Add(_picker);
+            _askPanel.Children.Add(_destination);
+            _askPanel.Children.Add(_folder);
+            _askPanel.Children.Add(_alsoLinked);
+            _askPanel.Children.Add(_askNote);
+            foreach (string key in new[] { "copiesStartHidden", "datesAreKept", "nothingIsWrittenOver" })
+                _askPanel.Children.Add(new TextBlock { Text = Say(key), TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        }
+        _dialog.Content = _askPanel;
         RefreshAsk();
     }
 
@@ -208,8 +214,8 @@ public sealed class CopyAPageDialog
     {
         var box = new CheckBox { Content = text, IsChecked = true, IsEnabled = enabled };
         AutomationProperties.SetAutomationId(box, "copyPageRow:" + name);
-        box.Checked += (_, _) => { _unticked.Remove(name); Replan(); };
-        box.Unchecked += (_, _) => { _unticked.Add(name); Replan(); };
+        box.Checked += (_, _) => { if (_painting) return; _unticked.Remove(name); Replan(); };
+        box.Unchecked += (_, _) => { if (_painting) return; _unticked.Add(name); Replan(); };
         _rowBoxes[name] = box;
         return box;
     }
@@ -241,12 +247,18 @@ public sealed class CopyAPageDialog
         string course = ReferenceCourse.ShownCode(destination);
         _header.Text = Say("willCopy", ("pages", plan.Pages.Count.ToString()), ("course", course), ("folder", _request.IntoFolder));
         var required = plan.Pages.Where(p => p.Required && !p.IsChosen).Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
-        foreach (var (name, box) in _rowBoxes)
+        string? chosen = plan.Pages.FirstOrDefault(p => p.IsChosen)?.Name;
+        _painting = true;
+        try
         {
-            if (!required.Contains(name)) { box.IsEnabled = name != plan.Pages.FirstOrDefault(p => p.IsChosen)?.Name; continue; }
-            box.IsChecked = true;
-            box.IsEnabled = false;
+            foreach (var (name, box) in _rowBoxes)
+            {
+                // Shown inside a page that comes: ticked and fixed while it does.
+                if (required.Contains(name)) { box.IsChecked = true; box.IsEnabled = false; }
+                else box.IsEnabled = name != chosen;
+            }
         }
+        finally { _painting = false; }
         _sentences.Children.Clear();
         if (required.Count > 0) Add(_sentences, Say("embeddedPagesAlwaysComeAlong"));
         int brought = plan.Brought.Count();
