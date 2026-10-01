@@ -847,7 +847,7 @@ Four things that cost a day each if you do not know them:
   `add_classes` and `make_room_for_classes` pairs). The local 13's full digest is pinned
   (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades, and
   that is true of the MCP list as well as the local one. **Windows'
-  `plantoir-mcp.exe` also serves 40, but not the same 40** — five tools on
+  `plantoir-mcp.exe` also serves 42, but not the same 42** — five tools on
   each side are the other's to have or to decline, so the two MCP surfaces are
   still not the same product; which five, and why, is in
   `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
