@@ -3329,10 +3329,13 @@ may treat that unit as a real one:
 `plantoir-mcp` the `_meta` teacher summary (`Proposing(forModel, forTeacher)`).
 The text content — what the in-app model and Claude Code read — is the class
 form byte for byte; `ClubNounTests` flips `class_noun` and compares. Refusals
-are one string for both and keep the ordinary wording. (Questions for Russell:
-whether "never in plantoir-mcp's results" was meant to include `_meta`. The
-in-app window's only channel is that result, so the teacher's meeting card
-travels there; Claude Code ignores `_meta`.)
+are one string for both and keep the ordinary wording. Whether "never in
+plantoir-mcp's results" was meant to include `_meta` was asked of Russell
+(bundle 7, ruling 4) and DECIDED on 2026-10-01: it was not — the teacher's
+summary is the teacher's copy. The in-app window's only channel is that result,
+so the teacher's meeting card travels there; Claude Code ignores `_meta`. The
+decision is written into the contract as `file-formats.json` →
+`courseConfigKeys` → `class_noun.whatTheModelReads` (parity bundle 10).
 
 ### The wizard and Course Settings (#274, #390, #387)
 
