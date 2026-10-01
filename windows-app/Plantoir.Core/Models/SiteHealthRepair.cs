@@ -231,6 +231,9 @@ public static class SiteHealthRepair
         IReadOnlyList<SiteHealthFinding> findings, Course course,
         Occasion occasion = Occasion.Building)
     {
+        // Never on a course kept for reference (#241): the button is not
+        // drawn there, and this is what any other caller meets.
+        if (ReferenceCourse.IsKeptForReference(course)) return null;
         var wanted = Repairable(findings);
         if (wanted.Count == 0) return null;
 

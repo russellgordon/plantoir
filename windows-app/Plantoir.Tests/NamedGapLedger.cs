@@ -135,14 +135,6 @@ internal static class NamedGapLedger
         // its feature lands, and its mend-check says so.
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
             "settings save held back"),
-        Owed(ActivityTrailEvents, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
-            "course kept for reference", "course could not be kept for reference",
-            "reference course school year changed", "reference course pages locked again"),
-        Owed(ActivityTrailEvents, 244, "this app cannot import courses for reference yet (mac #206 branch B)",
-            "course imported for reference", "course could not be imported for reference",
-            "unfinished import for reference tidied away", "course import for reference stopped"),
-        Owed(ActivityTrailEvents, 247, "this app cannot copy a page from another course yet (mac #207)",
-            "pages copied from another course"),
         Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
             "put today's class on the front page", "left the front page as it was"),
         Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",
@@ -158,8 +150,6 @@ internal static class NamedGapLedger
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
         Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
             "class_page_scheme", "front_page_heading", "class_noun"),
-        Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
-            "kept_for_reference", "reference_school_year"),
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
         Owed(FrontPageDateCases, 274,
@@ -192,8 +182,6 @@ internal static class NamedGapLedger
             "wouldMakeRoomForAMeeting", "yourNextUpcomingForAMeeting"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
-        Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
-            "askedAboutAReferenceCourse", "deployRefusedForAReferenceCourse"),
         Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
             "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
