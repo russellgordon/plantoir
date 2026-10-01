@@ -87,7 +87,5 @@ public static class LinksChecklistShowing
     private static bool HoldsSomethingNew(Course course, int section, LinksChecklistOffer offer) =>
         LinksChecklist.HoldsSomethingNew(offer, LinksChecklist.ReadAnswered(course.DirectoryPath, section).Offered);
 
-    private static bool IsKeptForReference(Course course) =>
-        course.Configuration.Values["kept_for_reference"] is Newtonsoft.Json.Linq.JValue { Type: Newtonsoft.Json.Linq.JTokenType.Boolean } kept
-        && kept.ToObject<bool>();
+    private static bool IsKeptForReference(Course course) => ReferenceCourse.IsKeptForReference(course);
 }

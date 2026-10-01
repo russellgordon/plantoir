@@ -308,6 +308,18 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
                 App.LogDiagnostic($"WorkspaceViewModel.Reload: DiscoverCourses found {Courses.Count} courses");
                 ArchivedItems = Workspace.FindArchivedItems(_state.FolderPath);
                 BackupItems = Workspace.FindBackups(_state.FolderPath);
+                // Reference courses, on every read of the folder and never on
+                // a timer (#241/#244): sweep an unfinished import's leftovers,
+                // lock again what came unlocked, turn off any deploy one still
+                // has set. Off the UI thread — about 0.8 s per 1,200 files to
+                // lock, 0.1 s to find nothing to do (measured, doc 09).
+                string folder = _state.FolderPath;
+                var courses = Courses;
+                _ = Task.Run(() =>
+                {
+                    try { ReferenceCourseUpkeep.BringUpToDate(folder, courses); }
+                    catch (Exception error) { App.LogDiagnostic("reference upkeep: " + error.Message); }
+                });
             }
         }
         App.LogDiagnostic("WorkspaceViewModel.Reload: calling NotifyLoaded()");

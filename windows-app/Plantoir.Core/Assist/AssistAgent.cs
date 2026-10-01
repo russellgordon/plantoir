@@ -517,9 +517,11 @@ public sealed class AssistAgent
                 $"{_courseCode} window; nothing was read", _courseCode, _section);
             string? here = CoursesInTheFolder()
                 .FirstOrDefault(code => code.Equals(other, StringComparison.OrdinalIgnoreCase));
+            string? kept = ReferenceCourseNamed(other);
             return new List<Line>
             {
-                new("assistant", here is not null
+                new("assistant", kept is not null ? AssistWording.AskedAboutAReferenceCourse(_courseCode, kept)
+                    : here is not null
                     ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
                     : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, other)),
             };
@@ -901,6 +903,15 @@ public sealed class AssistAgent
             if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) ||
                 match.ToolName.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
             {
+                // No card for a deploy that cannot happen (#241): the refusal
+                // is said instead of a question it would then take back.
+                if (CourseIsKeptForReference())
+                {
+                    string refused = AssistWording.DeployRefusedForAReferenceCourse(_courseCode);
+                    _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
+                    _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = refused });
+                    return new List<Line> { new("assistant", refused) };
+                }
                 return AskFirst(text, match.ToolName, cardArguments);
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
@@ -1303,6 +1314,23 @@ public sealed class AssistAgent
     public Func<IReadOnlyList<string>> CoursesInTheFolder { get; init; } = () => Array.Empty<string>();
 
     /// <summary>
+    /// The code a teacher reads when <c>name</c> — as the model or the
+    /// teacher wrote it — names a course KEPT FOR REFERENCE and no course
+    /// being taught; otherwise null (#241). Such a course is answered with
+    /// <see cref="AssistWording.AskedAboutAReferenceCourse"/>, never with the
+    /// #180 sentence's "open it and ask me there": the assistant is not offered
+    /// on a reference course at all.
+    /// </summary>
+    public Func<string, string?> ReferenceCourseNamed { get; init; } = _ => null;
+
+    /// <summary>
+    /// Whether this window's course is, NOW, kept for reference (#241, doors
+    /// 2–4). Asked first in the deploy hand-back, BEFORE a preview is stopped:
+    /// a refusal any later kills a preview the teacher was reading, for nothing.
+    /// </summary>
+    public Func<bool> CourseIsKeptForReference { get; init; } = () => false;
+
+    /// <summary>
     /// For a call the MODEL made in this window, <c>course</c> and
     /// <c>section</c> are this window's - or the turn is refused.
     /// </summary>
@@ -1385,6 +1413,8 @@ public sealed class AssistAgent
             $"{_courseCode} window - nothing was run from it",
             _courseCode, _section);
 
+        if (ReferenceCourseNamed(trimmed) is { } kept)
+            return AssistWording.AskedAboutAReferenceCourse(_courseCode, kept);
         string? here = CoursesInTheFolder()
             .FirstOrDefault(code => code.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
         return here is not null
@@ -1958,6 +1988,13 @@ public sealed class AssistAgent
             ShowPreviewInApp.Invoke();
             _handedToApp = true;
             return Answer(call, AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
+        }
+        if ((name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase)
+             || name.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
+            && CourseIsKeptForReference())
+        {
+            _handedToApp = true;
+            return Answer(call, AssistWording.DeployRefusedForAReferenceCourse(_courseCode));
         }
         if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) &&
             (StartDeployInApp is not null || StartDeployInAppAsync is not null))

@@ -1577,6 +1577,21 @@ public sealed partial class SectionDetailView : UserControl
             // stop-preview-then-deploy sequence against the first's
             // (row 318a).
             if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
+            // FIRST, before anything is stopped, built or uploaded (#241, door
+            // 1): a course kept for reference is never deployed. The button is
+            // not drawn on one; this is what the assistant's hand-back, or a
+            // course marked while this window was open, meets. The marker as
+            // SAVED, and never whether the pages are locked.
+            if (ReferenceCourse.KeptOnDisk(_course.DirectoryPath) is { } kept)
+            {
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "This section can't be deployed",
+                    Content = ReferenceCourse.RefusalSentence(kept),
+                    CloseButtonText = "OK",
+                });
+                return AssistWording.DeployRefusedForAReferenceCourse(kept);
+            }
             if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet"))
                 return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
