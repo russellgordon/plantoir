@@ -100,6 +100,9 @@ public sealed class UnitWordRenameContractTests : IDisposable
         Assert.Equal(words["renameButton"]!.ToString(), UnitWordRenameWording.RenameButton);
         Assert.Equal(words["sheetTitle"]!.ToString(), UnitWordRenameWording.SheetTitle("{word}"));
         Assert.Equal(words["rowCaption"]!.ToString(), UnitWordRenameWording.RowCaption("{word}"));
+        // #274: a numbered course's caption and its disabled Rename….
+        Assert.Equal(words["rowCaptionNumbered"]!.ToString(), UnitWordRenameWording.RowCaptionNumbered("{word}"));
+        Assert.Equal(words["renameLockedNumbered"]!.ToString(), UnitWordRenameWording.RenameLockedNumbered);
         Assert.Equal(words["proseIsLeftAlone"]!.ToString(), UnitWordRenameWording.ProseIsLeftAlone);
         Assert.Equal(words["lookingOver"]!.ToString(), UnitWordRenameWording.LookingOver);
         Assert.Equal(problems["empty"]!.ToString(), UnitWordRenameWording.ProblemEmpty);

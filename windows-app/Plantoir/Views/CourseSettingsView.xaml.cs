@@ -593,7 +593,40 @@ public sealed partial class CourseSettingsView : UserControl
         unitWordRow.Children.Add(unitWord);
         unitWordRow.Children.Add(renameUnitWord);
         Form.Children.Add(FormBuilders.LabeledRow(UnitWordRenameWording.FieldLabel, unitWordRow));
-        Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaption(Config.UnitWord)));
+        if (Config.Naming.IsNumbered)
+        {
+            // A club's word was chosen in the wizard with its folder, heading
+            // and noun (#274): Rename… is DISABLED, and says why beneath it.
+            renameUnitWord.IsEnabled = false;
+            Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaptionNumbered(Config.UnitWord)));
+            var locked = FormBuilders.ExampleCaption(UnitWordRenameWording.RenameLockedNumbered);
+            AutomationProperties.SetAutomationId(locked, "renameLockedNumbered");
+            Form.Children.Add(locked);
+        }
+        else
+        {
+            Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaption(Config.UnitWord)));
+        }
+
+        // The club's three settings, LOCKED — a label and the value, no
+        // control — and only those the course RECORDED (#274, #387; mac #376).
+        var clubRows = ClubSettingsRows.Shown(Config);
+        if (clubRows.Count > 0)
+        {
+            var group = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+            AutomationProperties.SetAutomationId(group, "clubLockedRows");
+            foreach (var row in clubRows)
+            {
+                var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                line.Children.Add(new TextBlock { Text = row.Label, FontSize = 13 });
+                var value = new TextBlock { Text = row.Value, FontSize = 13, Opacity = 0.8 };
+                AutomationProperties.SetAutomationId(value, "clubLockedRow_" + row.Key);
+                line.Children.Add(value);
+                group.Children.Add(line);
+            }
+            group.Children.Add(FormBuilders.ExampleCaption(ClubSettingsRows.LockedCaption));
+            Form.Children.Add(group);
+        }
 
         if (Config.IsClub(CourseNameCatalogs.Shared))
         {
