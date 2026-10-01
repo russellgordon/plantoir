@@ -177,6 +177,33 @@ public class AssistantReadsSettingsAtTheCallTests : IDisposable
         Assert.True(checkedSomething > 0, $"“{name}” checked nothing.");
     }
 
+    /// <summary>
+    /// A refusal at the ACT is on the trail, naming the destination by kind
+    /// (#344 / mac #322): the contradiction #322 took a code read to find
+    /// would sit two lines under "saved the settings".
+    /// </summary>
+    [Fact]
+    public void ARefusalAtTheActIsOnTheTrailWithTheDestinationByKind()
+    {
+        string trail = Path.Combine(_root, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            WriteCourse("ICS3U", new[] { 1 }, "netlify", "");
+            var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+
+            tools.ScheduleDeploy("ICS3U", 1, "2030-09-09 06:30");
+
+            string line = File.ReadAllLines(trail).Single(l => l.Contains("could not set a scheduled deploy"));
+            Assert.Contains("deploying to Netlify", line);
+            Assert.Contains("has never been deployed to Netlify", line);
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        }
+    }
+
     // ---- The fixture ------------------------------------------------------
 
     private void WriteCourse(string code, int[] sections, string? target, string folderPath)
