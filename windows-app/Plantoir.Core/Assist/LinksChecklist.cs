@@ -294,8 +294,7 @@ public static class LinksChecklist
         var json = new JsonObject
         {
             ["version"] = 1,
-            ["answeredAt"] = answeredAtUtc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'",
-                                                                       System.Globalization.CultureInfo.InvariantCulture),
+            ["answeredAt"] = answeredAtUtc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture),
             ["offered"] = new JsonArray(offered.Select(p => (JsonNode)JsonValue.Create(p)!).ToArray()),
             ["leftUnticked"] = new JsonArray(leftUnticked.Select(p => (JsonNode)JsonValue.Create(p)!).ToArray()),
         };
