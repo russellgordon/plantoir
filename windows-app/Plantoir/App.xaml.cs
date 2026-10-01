@@ -179,13 +179,23 @@ public partial class App : Application
                                                          : new List<RememberedWindow>();
         var folders = LastWorkingFolder.FoldersToOpen(
             Settings.RestoreWindowsOnLaunch, remembered.Select(entry => entry.Path).ToList(), Settings.WorkspacePath);
+
+        // The scheduled-publish toast (#324): a click while Plantoir runs
+        // arrives on a background thread and is carried to this one; a click
+        // that STARTED Plantoir is routed once its windows are open.
+        var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        Services.ScheduledPublishNotifier.Register(argument =>
+            dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(argument)));
+        string? launchedBy = Services.ScheduledPublishNotifier.LaunchedFromAToast();
+
         if (remembered.Count == 0)
-        {
             OpenWindow(folders[0], null);
-            return;
-        }
-        foreach (var entry in remembered)
-            OpenWindow(entry.Path, entry);
+        else
+            foreach (var entry in remembered)
+                OpenWindow(entry.Path, entry);
+
+        if (launchedBy is not null)
+            dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(launchedBy));
     }
 
     /// <summary>
