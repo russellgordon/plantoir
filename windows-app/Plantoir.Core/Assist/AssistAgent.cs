@@ -795,9 +795,6 @@ public sealed class AssistAgent
         var withLinks = System.Text.RegularExpressions.Regex.Match(request,
             @"^(?<verb>publish|unpublish)\s+(?<title>.+?),?\s+and everything it links to$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var named = System.Text.RegularExpressions.Regex.Match(request,
-            @"^(?<verb>publish|unpublish)\s+(?<title>unit\s+\d+,\s*day\s+\d+)$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         var planned = System.Text.RegularExpressions.Regex.Match(request,
             @"^what would publishing\s+(?<title>.+?)\s+change\??$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -816,13 +813,11 @@ public sealed class AssistAgent
             return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value, includeLinked: true),
                                     cancellation);
         }
-        if (named.Success)
-        {
-            string tool = named.Groups["verb"].Value.StartsWith("un", StringComparison.OrdinalIgnoreCase)
-                ? "unpublish_pages" : "publish_pages";
-            return await RunCommand(text, tool, PageArguments(named.Groups["title"].Value, includeLinked: false),
-                                    cancellation);
-        }
+        // The old "publish|unpublish Unit N, Day M" shape lived here and was
+        // deleted in bundle 5a's fix round: it answered "publish unit 4, day
+        // 3" in code, where hideIsUnpublish.refused sends that sentence to the
+        // model (publishing is the direction the contract deliberately did not
+        // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
                                     PageArguments(planned.Groups["title"].Value, includeLinked: true),
@@ -1384,6 +1379,21 @@ public sealed class AssistAgent
     private static readonly HashSet<string> TheWindowSupplies = new(StringComparer.Ordinal) { "course", "section" };
 
     /// <summary>
+    /// Optional arguments that only EXTEND a write that already has a sensible
+    /// default, as <c>tool.argument</c> — so they do not make an empty call
+    /// "need more" (bundle 5a fix round, ruling 2). Windows' local
+    /// <c>add_next_class</c> declares <c>unit</c> and <c>days</c> where the
+    /// mac's declares only course and section; counted, they refused an empty
+    /// call the mac runs — an unchosen difference. Named rather than inferred
+    /// from "optional", because <c>publish_pages</c>' <c>pages</c> is optional
+    /// too and an empty publish must still be refused.
+    /// </summary>
+    internal static readonly HashSet<string> OptionalExtras = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "add_next_class.unit", "add_next_class.days",
+    };
+
+    /// <summary>
     /// Judge a call's arguments against the tool's own schema —
     /// <c>app-rules.json</c> → <c>modelTiers.requirements</c> → "A finished
     /// reply that wrote nothing runs a tool only when the window supplies
@@ -1434,7 +1444,8 @@ public sealed class AssistAgent
             : call["function"]?["arguments"]?.ToJsonString();
         var parameters = SchemaOf(name)?["parameters"];
         var required = (parameters?["required"] as JsonArray)?.Select(item => item?.ToString() ?? "") ?? Enumerable.Empty<string>();
-        var properties = (parameters?["properties"] as JsonObject)?.Select(pair => pair.Key) ?? Enumerable.Empty<string>();
+        var properties = ((parameters?["properties"] as JsonObject)?.Select(pair => pair.Key) ?? Enumerable.Empty<string>())
+            .Where(property => !OptionalExtras.Contains($"{name}.{property}"));
         return Judge(arguments, required, properties, readOnly: !IsWriteTool(name));
     }
 
