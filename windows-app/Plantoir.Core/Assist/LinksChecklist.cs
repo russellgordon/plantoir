@@ -218,6 +218,13 @@ public static class LinksChecklist
 
     // ---- The answered file (file-formats.json → linksChecklistAnswered) ----
 
+    /// <summary>
+    /// offeredWhen.onlyWhenSomethingNew: an offer whose every page the teacher
+    /// has already answered is not shown again on its own; a new page brings it back.
+    /// </summary>
+    public static bool HoldsSomethingNew(LinksChecklistOffer offer, IReadOnlySet<string> answeredOffered) =>
+        offer.Rows.Any(row => !answeredOffered.Contains(Key(row.Place)));
+
     public static string AnsweredPathFor(string courseDirectory, int section) =>
         Path.Combine(courseDirectory, ".publish_state", $"section{section}.links-checklist-answered.json");
 
