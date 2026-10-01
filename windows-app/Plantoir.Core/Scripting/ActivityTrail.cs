@@ -431,6 +431,12 @@ public static class ActivityTrail
         RememberedTimetableSetAside,
         SectionAdded,
         PageSettingsLeftAsTheyWere,
+        /// <summary>
+        /// Making room for a class could not finish every page (#422): a
+        /// rename whose new name was taken, a save that failed. Carries the
+        /// course, section and counts by kind — never a page's name.
+        /// </summary>
+        MakingRoomDidNotFinishEveryPage,
         ClassCopyNotMade,
         WordForAUnitRenamed,
         /// <summary>
@@ -607,6 +613,7 @@ public static class ActivityTrail
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
+        Event.MakingRoomDidNotFinishEveryPage => "making room did not finish every page",
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
