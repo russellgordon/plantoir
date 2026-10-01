@@ -93,6 +93,23 @@ public static class TaskScheduling
     /// </summary>
     public const string TokenArgument = "--token";
 
+    /// <summary>
+    /// What a scheduled run's command line asks for: the job to run (a task
+    /// name, or a job path taken as is) and the task's token, or null when the
+    /// line is not a scheduled run. Program.Main's parsing, here so it is
+    /// tested (bundle 4 fix review M1).
+    /// </summary>
+    public static (string JobPath, string? Token)? ScheduledRunFrom(IReadOnlyList<string> args)
+    {
+        int run = args.ToList().IndexOf(RunArgument);
+        if (run < 0 || run + 1 >= args.Count) return null;
+        string named = args[run + 1];
+        string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase) ? named : JobPath(named);
+        int at = args.ToList().IndexOf(TokenArgument);
+        string? token = at >= 0 && at + 1 < args.Count ? args[at + 1] : null;
+        return (job, token);
+    }
+
     // ---- Names --------------------------------------------------------------
 
     /// <summary>

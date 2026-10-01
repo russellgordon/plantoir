@@ -762,6 +762,18 @@ GitHub issue [#227](https://github.com/russellgordon/plantoir/issues/227),
 2026-09-25. Two holes, both of which ended in "Published" over a folder that
 was empty, stale, or somewhere else entirely.
 
+**The path rule, on both platforms:** the app refuses any partial path; a
+launcher given one on a command line takes a plain relative name from the
+working folder. That INCLUDES `..` — `..\..\x` (or `../../x`) publishes
+OUTSIDE the working folder, on purpose and the same on both: a teacher may
+already publish to any absolute folder they choose, so escaping the working
+folder is not a new power, and refusing `..` on one platform alone would be
+the drift this rule exists to prevent. Windows' `deploy.ps1`
+(`Resolve-PublishFolder`, since bundle 4) additionally REFUSES a
+drive-relative (`C:foo`) or root-relative (`\out`) path, which .NET would
+otherwise resolve against the process's directory; the mac has no such
+shapes.
+
 **A relative `--to-folder` was handed to rsync as it was typed, and rsync reads
 a colon before the first `/` as a REMOTE computer.** Measured on macOS 26.6 with
 `/usr/bin/rsync` (openrsync, protocol 29), from a copy of `deploy.sh` in a
