@@ -19,7 +19,7 @@ nothing to ask for and no way to leave them out", and unpublish_pages' says
 pages ONLY they link to go with them. Windows' tools take an includeLinked
 argument that defaults to FALSE, so neither sentence is true here today. A
 description that lies to the router lies to Claude Code too; those two wait
-for the behaviour (bundle 9's new windows issue).
+for the behaviour (#420).
 
 Usage:
     python research/ai-assist/windows-description-arms.py BEFORE.json AFTER.json [COURSE]

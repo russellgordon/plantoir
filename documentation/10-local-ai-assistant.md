@@ -3657,7 +3657,8 @@ and its `note` says so.
 
 - **The local model is shown the same text** — only the example course is
   rewritten — **never a shortened copy.** Windows' `Briefly()` trim is what
-  its router reads today; measured on the smaller assistant, trimming the
+  its router reads today (since #352, 2026-10-01, only for `publish_pages` and
+  `unpublish_pages` — see "On Windows: measured, and moved" below); measured on the smaller assistant, trimming the
   contract text that way ties on the 29-probe suite but loses 40 control
   trials on teachers-say, so the decision is to stop trimming, not to trim the
   new text. (`research/ai-assist/description-convergence-results.txt`.)
@@ -3722,7 +3723,7 @@ to leave them out") and `unpublish_pages`' sweep promise are untrue there.
 Those two descriptions did NOT move: they keep Windows' text, and the local
 model still reads them through `Briefly()` (`AssistAgent.StillShortened`,
 mirrored as `STILL_SHORTENED` in `narrow-tools.py` and pinned by
-`NarrowToolsMirrorTests`). The behaviour is a new `windows` issue (bundle 9);
+`NarrowToolsMirrorTests`). The behaviour is [#420](https://github.com/russellgordon/plantoir/issues/420), and the hold is recorded in `toolDescriptions.measuredDepartures` (two entries, issue 420);
 the hold lifts when it lands, and `EveryDescriptionIsTheContractsOwn` fails
 the day either one matches the contract, so the hold cannot outlive its reason.
 
@@ -3746,7 +3747,7 @@ and what Claude Code does with the new text.
 **What moved.** `PlantoirTools` serves the contract's text for every shared
 tool but those two (26 descriptions changed); `NarrowToLocal` stops
 shortening them; the shipped local surface was re-dumped after the change and
-is byte-identical to the measured AFTER arm. The procedure the old Windows
+is identical to the measured AFTER arm once parsed (the files differ only in how one em-dash is escaped). The procedure the old Windows
 bodies carried for Claude Code (plan first and read it out; look at the
 preview before deploying; a scheduled deploy needs the computer awake; send
 the WHOLE timetable; `matching`; `publish:` vs `publishForSectionN:` vs

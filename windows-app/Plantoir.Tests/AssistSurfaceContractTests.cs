@@ -888,7 +888,7 @@ public class AssistSurfaceContractTests
     /// <para>publish_pages and unpublish_pages are held at their own text
     /// (<c>AssistAgent.StillShortened</c>): the contract's sentences say linked
     /// pages always come along, and here they come only with includeLinked —
-    /// a behaviour difference with its own windows issue. The test fails the
+    /// a behaviour difference owned by #420 and recorded in toolDescriptions.measuredDepartures. The test fails the
     /// day one of them matches, so the hold cannot outlive its reason.</para>
     /// </remarks>
     [Fact]

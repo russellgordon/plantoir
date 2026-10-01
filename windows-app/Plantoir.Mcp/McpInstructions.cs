@@ -24,8 +24,10 @@ public static class McpInstructions
 {
     public const string Text =
         "Plantoir turns a teacher's course notes into a website per class section. These tools act on one working folder.\n\n" +
-        "Plan, show, then act. Every tool that changes pages has a plan_ twin. Call the plan first, show the teacher " +
-        "what it said in full, and wait for them to agree before calling the tool that writes. Making room part-way " +
+        "Plan, show, then act. Most tools that change pages have a plan_ twin: call the plan first, show the teacher " +
+        "what it said in full, and wait for them to agree before calling the tool that writes. For one that has none " +
+        "(roll_over_section, back_up_course), say what it will do and wait for the teacher; undo_last_change takes " +
+        "back what this conversation did. Making room part-way " +
         "through a unit (plan_make_room_for_classes) moves and renames more pages than anything else: read the whole " +
         "plan, link count included, because the teacher cannot check that without opening every page.\n\n" +
         "Publishing is not deploying. Publishing a page only decides whether it is built into the section's site and " +
