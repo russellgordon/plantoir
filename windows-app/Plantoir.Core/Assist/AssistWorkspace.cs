@@ -1938,7 +1938,9 @@ public sealed partial class AssistWorkspace
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+        throw new AssistRefusal(other.Kind == WorkLease.Copying
+            ? AssistWording.CourseIsBeingCopied(course.Code)
+            : AssistWording.CourseIsBusy(course.Code));
     }
 
     /// <summary>
@@ -1952,7 +1954,12 @@ public sealed partial class AssistWorkspace
     /// </summary>
     private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked) =>
         ClaimTheBuildUnlessDeclined(course, section, asked)
-            ?? throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+            ?? throw new AssistRefusal(_lastDeclinedBy == WorkLease.Copying
+                ? AssistWording.CourseIsBeingCopied(course.Code)
+                : AssistWording.CourseIsBusy(course.Code));
+
+    /// <summary>The kind of lease that last declined a build here, for the refusal's sentence.</summary>
+    private string? _lastDeclinedBy;
 
     /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
     private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked)
@@ -1961,6 +1968,7 @@ public sealed partial class AssistWorkspace
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
             return claim;
         claim.Dispose();
+        _lastDeclinedBy = other.Kind;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
         return null;
@@ -2657,6 +2665,10 @@ public sealed partial class AssistWorkspace
     /// </summary>
     private string AssistantBackup(Course course, int sectionNumber)
     {
+        // The course is BUSY while it is zipped (#360, mac #351): Plantoir's
+        // own Preview and Deploy, a scheduled publish and any other assistant
+        // see this lease and stand off, as they do on the mac.
+        using var copying = WorkLease.Take(_folder, course.Code, WorkLease.Copying);
         var clock = System.Diagnostics.Stopwatch.StartNew();
         string made;
         try

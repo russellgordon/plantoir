@@ -497,6 +497,10 @@ public static class AssistWording
     public static string BackingUpFirst(string course) =>
         $"Saving a copy of {course} first, so this can be undone — a course with lots of pictures can take a minute.";
 
+    /// <summary>Another program is zipping a copy of the course, so a build or deploy waits.</summary>
+    public static string CourseIsBeingCopied(string course) =>
+        $"A copy of {course} is being saved in Plantoir. Wait for that to finish, then ask again.";
+
     /// <summary>The plan no longer fits once the copy was saved, so nothing was changed.</summary>
     public static string ChangedWhileSavingACopy(string course, string section) =>
         $"Nothing was changed: {course} Section {section} changed while a copy of it was being saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh.";
