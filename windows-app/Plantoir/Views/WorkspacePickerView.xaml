@@ -48,6 +48,10 @@
                        Text="This folder is empty. Set it up as your new working folder? Everything needed will be added for you, and you can create your first course right away." />
         </StackPanel>
 
+        <!-- #320: the remembered working folder could not be reopened, and why. -->
+        <TextBlock x:Name="NotReopenedText" MaxWidth="460" TextWrapping="Wrap" TextAlignment="Center"
+                   Visibility="Collapsed" AutomationProperties.AutomationId="lastWorkingFolderNotReopened" />
+
         <TextBlock x:Name="ProblemText" MaxWidth="460" TextWrapping="Wrap" TextAlignment="Center"
                    Foreground="{ThemeResource SystemFillColorCriticalBrush}" Visibility="Collapsed" />
 

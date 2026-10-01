@@ -133,8 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 320, "reopening the last working folder does not record either outcome yet (mac #311)",
-            "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
             "settings save held back"),
         Owed(ActivityTrailEvents, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
