@@ -1156,10 +1156,15 @@ does its own post-run work.
   the mac said so.
 
   The honest version: **this side needs no mark at all**, because the run IS
-  Plantoir and writes the line once as it finishes. Windows cannot do that —
-  Task Scheduler runs plain PowerShell with nothing of the app loaded — so the
-  line is written by a sweep when the app next opens, and a sweep with no memory
-  would write it again every launch. Hence a `.noted` sidecar, kept beside the
+  Plantoir and writes the line once as it finishes. Windows could not do that
+  until parity bundle 3: Task Scheduler then ran plain PowerShell with nothing of
+  the app loaded, so the line is written by a sweep when the app next opens.
+  Since bundle 3 Task Scheduler starts `Plantoir.exe --run-scheduled-deploy`
+  (the task is registered from XML with `DisallowStartIfOnBatteries` false,
+  `StopIfGoingOnBatteries` false and `StartWhenAvailable` true), so the run IS
+  Plantoir on Windows too; the code still writes the line from the sweep when
+  the app next opens (`ScheduledPublishOutcome`), not from the run, and a sweep
+  with no memory would write it again every launch. Hence a `.noted` sidecar, kept beside the
   record rather than inside it because the record's modification time is what
   dates the notice. Two platforms, one property — a line per run, dated to the
   run — reached the only way each of them can.

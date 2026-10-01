@@ -1,5 +1,29 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-01 — overnight parity run
+
+Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `0d040a81`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `0d36bd84` (the skip is the native-build test, which needs a runtime).
+
+| Bundle | dev | Totals after |
+|---|---|---|
+| 1 plumbing | `cce2ca9e` | 53 / 1509 / 1562 |
+| 2 writers | `8f35af79` | 34 / 1576 / 1610 |
+| 3 trail, leases, scheduled deploys, quit | `53d22566` | 32 / 1636 / 1668 |
+| 4 preview and publish | `84c23dac` | 27 / 1697 / 1724 |
+| 5a assistant chain | `9ddf2a7b` | 19 / 1774 / 1793 |
+| 5b assistant, the rest | `8752e296` | 17 / 1940 / 1957 |
+| 6a course creation | `3d946d0d` | 9 / 2016 / 2025 |
+| 6b reference, import, Copy a Page | `ed2da05e` | 7 / 2118 / 2126 |
+| 7 clubs and settings | `905a20c3` | 0 / 2159 / 2160 |
+| 8 Windows-only UI, runner, updates | `0d36bd84` | 0 / 2209 / 2210 |
+
+- **Handed to the mac** (issues labelled `mac`): #407, #408, #409, #410, #411, #412, #413, #415, #416, #418.
+- **`verify-deploy.ps1`** was run three times, after bundles 4, 5b and 6b: 37 passed, 0 failed, 0 skipped each time.
+- **UI tests written and UNPROVEN** (the desktop was locked, so none has been seen passing): `ReferenceCourseUiTests`, `CopyAPageDialogUiTests`, `ClubSettingsUiTests`, `CourseSettingsSaveUiTests`, `ListTablesUiTests`, `MarksPoolRemovalUiTests` (updated), the four new `[UiFact]`s in `NewCourseWizardUiTests`, and the toast and All Backups dialog tests from bundle 8. `LinksChecklistUiTests` is the one that was run (passed 1/1, bundle 5b). Their first green run is owed on an unlocked desktop.
+- **Leftover worktree folders** that `git worktree remove` could not delete (path too long; git no longer lists them, delete by hand): `plantoir-bundle5a`, `plantoir-bundle5b`, `plantoir-bundle5b-b`, `plantoir-bundle5b-c`, `plantoir-bundle6a`, `plantoir-bundle6b`, `plantoir-bundle6b-copy`, `plantoir-bundle7`, `plantoir-bundle8`, all beside the main clone in `Desktop\Developer`.
+- **Still open:** #157 (two wording keys kept against it), #308 and #318 (partly landed), #352 (the #114 half needs a routing measurement), #370 and #380 (website flags and picture retake; no installer cut), #191 and #214 (unmeasured), #414 (Copy a Page fuzz: reproduce or explain the 856), #417 (a timing flake in `ScheduledPublishWatcherTests`).
+- **#337 (updates)** is on `dev` but inert: no feed, no key, no release, and the download stays at 1.1.0. What Russell must do and test before a release is in the closing comment on #337 (key generation, the feed, and the unexercised installer paths `/PLANTOIRUPDATE`, `/RELAUNCH`, `/NOCLOSEAPPLICATIONS`, `/RETURNTO`, the refusal relaunch).
+
 What each project in the solution is, and what state the app is in. First take
 built overnight 2026-08-11 by Claude Code, per `WINDOWS-HANDOFF.md` — a file
 since absorbed into [`documentation/`](../documentation/README.md) and deleted;

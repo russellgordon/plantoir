@@ -2680,8 +2680,8 @@ against 13 — the twenty-two that exist, plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
 (Windows' separate `plantoir-mcp.exe` serves 42 — 40 since #340 brought the How I
-Teach tools there on 2026-09-30 — the mac's 37 less its start-of-year pair,
-plus five of its own; "The two MCP surfaces are not the same
+Teach tools there on 2026-09-30, 42 since bundle 6a's start-of-year pair — the
+mac's 37 plus five of its own; the mac has none Windows lacks; "The two MCP surfaces are not the same
 product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
 which recorded the gap when the counts differed, is closed.) Six of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses, and reading or
@@ -3606,7 +3606,7 @@ the 13-tool local surface and the 37-tool MCP one (32 until #209 added three
 How I Teach tools and #96 the start-of-year pair; `toolDescriptions` pins all
 37). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 42 since bundle 6a's start-of-year pair (40 after #340 on 2026-09-30), not the same set — see "The two MCP surfaces are not
+serves 42: the mac's 37 plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair); the mac has none Windows lacks — see "The two MCP surfaces are not
 the same product" below; `AssistSurfaceContractTests`' own comment there still
 says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
 pinned that sum for longer than the prose said so; it is 22 + 15 MCP-only = 37: 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
