@@ -43,7 +43,44 @@ public static class TaskScheduling
     /// The date formats schtasks might want, most likely first. Which one is
     /// correct depends on the machine's locale, and it accepts exactly one.
     /// </summary>
-    private static readonly string[] DateFormats = ["yyyy/MM/dd", "MM/dd/yyyy", "dd/MM/yyyy"];
+    private static void PutBack(string jobPath, string kept)
+    {
+        try
+        {
+            if (File.Exists(kept)) File.Move(kept, jobPath, overwrite: true);
+            else File.Delete(jobPath);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// The task's definition: one start at <paramref name="when"/>, run as the
+    /// teacher, on battery too and not stopped by unplugging, and run as soon
+    /// as possible after a start that was missed (the lateness window then
+    /// decides whether it is still worth doing).
+    /// </summary>
+    internal static string TaskXml(string runner, string taskName, DateTime when)
+    {
+        static string X(string v) => System.Security.SecurityElement.Escape(v);
+        string user = $"{Environment.UserDomainName}\\{Environment.UserName}";
+        string start = when.ToString("yyyy-MM-dd'T'HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+        return $"""
+            <?xml version="1.0" encoding="UTF-16"?>
+            <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+              <Triggers><TimeTrigger><StartBoundary>{start}</StartBoundary><Enabled>true</Enabled></TimeTrigger></Triggers>
+              <Principals><Principal id="Author"><UserId>{X(user)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+              <Settings>
+                <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+                <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+                <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+                <StartWhenAvailable>true</StartWhenAvailable>
+                <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>
+                <Enabled>true</Enabled>
+              </Settings>
+              <Actions Context="Author"><Exec><Command>{X(runner)}</Command><Arguments>{X($"{RunArgument} \"{taskName}\"")}</Arguments></Exec></Actions>
+            </Task>
+            """;
+    }
 
     /// <summary>What the task passes Plantoir to say "run this scheduled deploy now".</summary>
     public const string RunArgument = "--run-scheduled-deploy";
@@ -99,71 +136,50 @@ public static class TaskScheduling
         string taskName = NameFor(courseCode, section, workingFolder);
         var existing = For(workingFolder, courseCode, section);
 
-        // The job is written beside its final name first and moved into place
-        // only once Windows has accepted the task: a refusal must leave an
-        // existing task's job exactly as it was.
+        // The job goes into place BEFORE the task is replaced (bundle 3 fix
+        // round, ruling 3): a run finishing in between reads the NEW job, sees
+        // a token that is not its own, and leaves the new task alone. The old
+        // job is kept aside so a refusal can put it back exactly.
         string jobPath = JobPath(taskName);
-        string pending = jobPath + ".new";
+        string kept = jobPath + ".kept";
         try
         {
             Directory.CreateDirectory(ScheduledScriptsDirectory());
+            if (File.Exists(jobPath)) File.Copy(jobPath, kept, overwrite: true);
             var job = new ScheduledRun.Job(taskName, workingFolder, courseCode, section,
                 new DateTimeOffset(when).ToUniversalTime(),
-                promised.Select(DeployCommand.DestinationDescription).ToList());
-            File.WriteAllText(pending, ScheduledRun.WriteJob(job));
+                promised.Select(DeployCommand.DestinationDescription).ToList(),
+                Guid.NewGuid().ToString("N"));
+            File.WriteAllText(jobPath, ScheduledRun.WriteJob(job));
         }
         catch (Exception error)
         {
+            PutBack(jobPath, kept);
             return $"The scheduled deploy could not be written down: {error.Message}";
         }
 
-        // The task NAME, not the job's path, is what the command carries:
-        // schtasks refuses a /TR over 261 characters, and runner + job path
-        // came to 548 in a deep folder on this PC (bundle 3's end-to-end probe).
-        string command = TaskRunCommand(runner, taskName);
-
-        // schtasks accepts the date in the format the MACHINE's locale uses,
-        // and rejects every other one outright — "Invalid Start Date (Date
-        // should be in yyyy/mm/dd format)" on the machine this was written on,
-        // which is not the format the docs and most examples show. Rather than
-        // hardcode one and move the bug to somebody else's computer, try the
-        // plausible ones until Windows accepts one. It says so itself when it
-        // does not.
-        string lastError = "";
-        bool accepted = false;
-        foreach (string format in DateFormats)
+        // Registered from XML (ruling 1): schtasks /Create /SC ONCE leaves
+        // DisallowStartIfOnBatteries and StopIfGoingOnBatteries TRUE and no
+        // StartWhenAvailable, so a laptop on battery never published and one
+        // unplugged mid-run was killed mid-upload. The XML also carries the
+        // moment in one invariant form, so no locale date format is guessed,
+        // and keeps the command short (the task's NAME, not the job's path).
+        string xmlPath = Path.Combine(Path.GetTempPath(), $"plantoir-task-{Guid.NewGuid():N}.xml");
+        var (exitCode, output) = (1, "");
+        try
         {
-            var (exitCode, output) = Run([
-                "/Create", "/F",
-                "/TN", taskName,
-                "/TR", command,
-                "/SC", "ONCE",
-                "/SD", when.ToString(format),
-                "/ST", when.ToString("HH:mm"),
-            ]);
-            if (exitCode == 0) { accepted = true; break; }
-            lastError = output.Trim();
-
-            // Only a date-format complaint is worth another go; anything else
-            // (a bad name, no permission) will fail identically every time.
-            if (!lastError.Contains("Start Date", StringComparison.OrdinalIgnoreCase)) break;
+            File.WriteAllText(xmlPath, TaskXml(runner, taskName, when), System.Text.Encoding.Unicode);
+            (exitCode, output) = Run(["/Create", "/F", "/TN", taskName, "/XML", xmlPath]);
         }
+        catch (Exception error) { output = error.Message; }
+        finally { try { File.Delete(xmlPath); } catch { } }
 
-        if (!accepted)
+        if (exitCode != 0)
         {
-            try { File.Delete(pending); } catch { }
-            return $"Windows would not accept the scheduled task: {lastError}";
+            PutBack(jobPath, kept);
+            return $"Windows would not accept the scheduled task: {output.Trim()}";
         }
-
-        try { File.Move(pending, jobPath, overwrite: true); }
-        catch (Exception error)
-        {
-            // Registered but with nothing to run: take it away again rather
-            // than leave an alarm that fails at half six.
-            Run(["/Delete", "/F", "/TN", taskName]);
-            try { File.Delete(pending); } catch { }
-            return $"The scheduled deploy could not be written down: {error.Message}";
-        }
+        try { File.Delete(kept); } catch { }
 
         // Set before #309 under the old name: retired now that the new one
         // stands, or the section would deploy twice.
