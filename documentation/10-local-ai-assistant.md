@@ -6373,6 +6373,8 @@ before changing it:
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
+> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 40 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
+
 A reference course is read-only to every tool on both surfaces. The gate is one
 check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are
 worth keeping.

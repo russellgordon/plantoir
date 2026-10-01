@@ -3605,6 +3605,8 @@ call, the confirmation's extra sentence and the "Could not remove" alert.
 
 ## A reference course, and what FROZEN means on disk
 
+> **On Windows (bundle 6b, 2026-10-01):** NTFS has no `uchg`, so the lock is DENY entries on every content file plus a delete-child deny on each folder holding one — measured to refuse write, rename-over, rename and delete, and NOT carried by any ordinary copy; the read-only attribute was rejected because it travels into the build and publishes hidden pages. Unlock matches the entry's SHAPE, whoever it names. `robocopy /SEC` and `/COPYALL` are the one copy that carries it (and stall on it). Everything Windows does differently, with its numbers, is in `12-windows-app.md` → "Courses kept for reference on Windows".
+
 A reference course is last year's course — or a course full of example content
 — kept in this year's sidebar to be read, and never deployed. The rules both
 apps share are
@@ -3901,6 +3903,8 @@ deployable one, and a deploy that reports success is the worst direction this
 feature can fail in.
 
 ### Importing last year's folder
+
+> **On Windows:** a stream copy with a bytes progress bar and Stop (NTFS has no clone: 507 MB end to end in 5.2–5.6 s on an NVMe, 90–97 MB/s), every reparse point left behind rather than copied as a link, and the staging folder made with `CreateDirectoryW` so the create is exclusive. See `12-windows-app.md` → "The import".
 
 The second way a reference course is made, and the one a teacher reaches for
 first: **File ▸ Import Courses for Reference…**, point at the folder last

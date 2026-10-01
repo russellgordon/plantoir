@@ -185,6 +185,23 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 6b: reference courses, importing, Copy a Page (2026-10-01)
+
+- **#241 / #298 — courses kept for reference.** Marker read strictly, school
+  years, the shelf rule, Keep a Copy (staged, claimed, one failure line), the
+  NTFS lock (deny entries; `ReferenceLock`), every deploy door refusing on the
+  marker alone (15, tabled in `documentation/12-windows-app.md`), the MCP write
+  gate on each tool's own ReadOnly flag, the withheld interface and the
+  read-only summary, upkeep on every folder read. The shared build no longer
+  publishes a hidden page whose file is read-only (`_writable`).
+- **#244 / #245 — Import Courses for Reference….** Modern layout only (the
+  older layouts are mac-only by decision). Stream copy with a bytes progress
+  bar and Stop; 507 MB in ~5.4 s on this PC.
+- **#247 / #258 / #384 — Copy a Page** (see the bundle's ready note).
+- **Not measured yet:** OneDrive with locked files, an elevated token, and
+  what Obsidian for Windows shows on a locked page (so
+  `obsidianOpensThemForReading` is not said here).
+
 ## Parity run, bundle 5a: the assistant chain through AssistAgent (2026-09-30)
 
 Branch `issue/bundle5a-assistant-chain` (built on `issue/159-settle-the-day-once`).
