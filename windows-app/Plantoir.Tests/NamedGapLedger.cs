@@ -147,8 +147,6 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 244, "this app cannot import courses for reference yet (mac #206 branch B)",
             "course imported for reference", "course could not be imported for reference",
             "unfinished import for reference tidied away", "course import for reference stopped"),
-        Owed(ActivityTrailEvents, 247, "this app cannot copy a page from another course yet (mac #207)",
-            "pages copied from another course"),
         Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
             "put today's class on the front page", "left the front page as it was"),
         Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",
