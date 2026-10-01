@@ -62,30 +62,16 @@ public sealed partial class CourseSettingsView : UserControl
     /// that lives in a view can be pinned by no test. A FILE has no marks pool
     /// to consider, so it needs only the exclusion.</para>
     /// </summary>
-    private void RecordExclusion(string scope, string kind, string name)
-    {
-        if (kind == "folder") FolderRemoval.RemoveFolderFromCourse(Config, _course.DirectoryPath, scope, name);
-        else Config.Exclude(scope, name);
-        // No section on the line: these lists are COURSE-wide, and the
-        // two-argument overload exists for exactly that. Naming the course's
-        // first section would assert a section that had nothing to do with the
-        // change -- and on a course numbered [3, 5] it would say "/3", which a
-        // person reading the trail would believe.
-        ActivityTrail.Note(ActivityTrail.Event.ItemExcluded,
-            $"{_course.Code}: removed the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” from this course's site");
-    }
+    private void RecordExclusion(string scope, string kind, string name) =>
+        CourseSettingsExclusions.RecordExclusion(Config, _course.Code, _course.DirectoryPath, scope, kind, name);
 
     /// <summary>
     /// A teacher added a name back. The trail line goes on ONLY when the name
     /// really was excluded — an ordinary new folder is not a re-inclusion, and
     /// a line saying it was would be believed.
     /// </summary>
-    private void RecordReInclusion(string scope, string kind, string name)
-    {
-        if (!Config.ReInclude(scope, name)) return;
-        ActivityTrail.Note(ActivityTrail.Event.ItemReIncluded,
-            $"{_course.Code}: added the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” back to this course's site");
-    }
+    private void RecordReInclusion(string scope, string kind, string name) =>
+        CourseSettingsExclusions.RecordReInclusion(Config, _course.Code, scope, kind, name);
 
     /// <summary>
     /// Redraw the controls whose rows carry a protection state, because that
@@ -512,17 +498,27 @@ public sealed partial class CourseSettingsView : UserControl
     private List<string> MarksPool() =>
         Config.MaterializedGradedFolders(GradedFolderChoicesNow());
 
-    private ProtectionContext Protection() => new(
-        InWizard: false,
-        CurriculumCoverageEnabled: Config.OverallIncludesCurriculumCoverage,
-        // Course Settings has no curriculum-PAGES switch - that choice is made
-        // once, in the wizard - so it can never be the reason here.
-        CurriculumPagesEnabled: false,
-        Jurisdiction: SpecialNames.DefaultJurisdiction,
-        ResolvedCurriculumFolder: Config.ResolvedCurriculumFolder,
-        GradedFolders: MarksPool(),
-        PerSectionFolders: Config.PerSectionFolders,
-        ResolvedClassFolder: ClassFolderRule.Name(Config.ClassFolder, Config.PerSectionFolders));
+    /// <summary>
+    /// The context a row is DRAWN with: the walk taken once for this pass,
+    /// shared by the checklist and all three lists (#348 — a walk per row was
+    /// measured on the mac at 53 ms each on a 400-folder course).
+    /// </summary>
+    private ProtectionContext Protection() => CourseSettingsProtection.For(Config, _walkedFolders);
+
+    /// <summary>
+    /// The context a row is ACTED ON with: the disk walked afresh, because the
+    /// marks floor depends on it, and a folder deleted in Explorer while this
+    /// page is open — #80's own scenario — must count as gone.
+    /// </summary>
+    private ProtectionContext ProtectionWhenActedOn()
+    {
+        _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
+        _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
+        return CourseSettingsProtection.For(Config, _walkedFolders);
+    }
+
+    /// <summary>This pass's walk, every occurrence kept (see <see cref="Protection"/>).</summary>
+    private IReadOnlyList<WalkedFolder> _walkedFolders = Array.Empty<WalkedFolder>();
 
     // ---- Font sample text ------------------------------------------------
 
@@ -558,10 +554,8 @@ public sealed partial class CourseSettingsView : UserControl
 
         // Walked once per pass, before anything asks what the Marks list
         // offers or what the pool currently holds.
-        _nestedFolderNames = GradedFolderChoices.NestedFolderNames(
-            _course.DirectoryPath,
-            Config.ExcludedItems(CourseConfiguration.SharedScope),
-            Config.ExcludedItems(CourseConfiguration.PerSectionScope));
+        _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
+        _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
 
         // -------- Settings — Overall --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
@@ -699,7 +693,8 @@ public sealed partial class CourseSettingsView : UserControl
             name => { RecordReInclusion(CourseConfiguration.SharedScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.Shared); },
             name => ItemProtectionRule.For(name, ItemList.SharedFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the shared folders", name, reason),
-            name => _ = OpenRenameFolderDialog(name, FolderScope.Shared)));
+            name => _ = OpenRenameFolderDialog(name, FolderScope.Shared),
+            name => ItemProtectionRule.For(name, ItemList.SharedFolders, ProtectionWhenActedOn())));
         Form.Children.Add(FormBuilders.StringListEditor("Shared files (all sections)", true,
             () => Config.SharedFiles, v => Config.SharedFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.SharedScope, "file", name),
@@ -712,7 +707,8 @@ public sealed partial class CourseSettingsView : UserControl
             name => { RecordReInclusion(CourseConfiguration.PerSectionScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.PerSection); },
             name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the per-section folders", name, reason),
-            name => _ = OpenRenameFolderDialog(name, FolderScope.PerSection)));
+            name => _ = OpenRenameFolderDialog(name, FolderScope.PerSection),
+            name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, ProtectionWhenActedOn())));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section files", true,
             () => Config.PerSectionFiles, v => Config.PerSectionFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.PerSectionScope, "file", name),
@@ -752,7 +748,8 @@ public sealed partial class CourseSettingsView : UserControl
             // it unblocks that folder's row in the lists above too.
             () => { MarkChanged(); RebuildProtectedRows(); },
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, Protection()),
-            (name, reason) => RecordRemovalBlocked("the marks list", name, reason)));
+            (name, reason) => RecordRemovalBlocked("the marks list", name, reason),
+            name => ItemProtectionRule.For(name, ItemList.GradedFolders, ProtectionWhenActedOn())));
         // BELOW the list, not above it: the caption says "a page in one of
         // these", and above the list "these" followed the section header
         // "Marks" and referred to nothing. The mac has always drawn it here.
@@ -985,7 +982,10 @@ public sealed partial class CourseSettingsView : UserControl
 
     private void Revert_Click(object sender, RoutedEventArgs e)
     {
-        Config.RevertToFile(_course.ConfigFilePath);
+        // Counts this copy's unsaved exclusion changes and says so on the
+        // trail before the file is read back (#348): the click lines stay,
+        // and this one says they were taken back.
+        CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath);
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;

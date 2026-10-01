@@ -137,8 +137,6 @@ internal static class NamedGapLedger
             "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
             "settings save held back"),
-        Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
-            "exclusions reverted"),
         Owed(ActivityTrailEvents, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "course kept for reference", "course could not be kept for reference",
             "reference course school year changed", "reference course pages locked again"),

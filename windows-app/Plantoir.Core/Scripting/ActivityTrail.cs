@@ -117,6 +117,15 @@ public static class ActivityTrail
         /// </summary>
         CourseCreated,
         /// <summary>
+        /// Course Settings' Revert took back unsaved exclusion changes. Carries
+        /// the course and HOW MANY — never the names, which the click lines
+        /// beside it already carry. Russell, 2026-09-06: <c>item excluded</c>
+        /// is written on the click, so a Revert that takes the removal back
+        /// needs its own line or the trail says a folder was excluded when it
+        /// never was. Written only when the count is at least one.
+        /// </summary>
+        ExclusionsReverted,
+        /// <summary>
         /// A working folder was recognised as kept in sync by a cloud service.
         /// Carries the service's name — never the folder's path, which is a
         /// teacher's own filing and is redacted from the trail anyway.
@@ -415,6 +424,7 @@ public static class ActivityTrail
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
         Event.CourseCreated => "course created",
+        Event.ExclusionsReverted => "exclusions reverted",
         Event.SyncedFolderNoticed => "synced folder noticed",
         Event.SyncedFolderAccepted => "synced folder accepted",
         Event.FolderProblemFound => "folder problem found",
