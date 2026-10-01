@@ -204,6 +204,19 @@ public class AssistantReadsSettingsAtTheCallTests : IDisposable
         }
     }
 
+    /// <summary>#396: the trail names the destination that CAUSED the refusal, not every one.</summary>
+    [Fact]
+    public void TheTrailNamesTheDestinationThatCausedTheRefusal()
+    {
+        Assert.Equal("Cloudflare Pages",
+            ScheduledDeploy.CausingDestination(new ScheduledDeploy.Refusal("additionalCloudflareAccountMissing")));
+        Assert.Equal("a folder on this computer",
+            ScheduledDeploy.CausingDestination(new ScheduledDeploy.Refusal("deployFolderNeedsAttention")));
+        Assert.Equal("Netlify",
+            ScheduledDeploy.CausingDestination(new ScheduledDeploy.Refusal("neverDeployed", "Netlify")));
+        Assert.Null(ScheduledDeploy.CausingDestination(new ScheduledDeploy.Refusal("keptForReference")));
+    }
+
     // ---- The fixture ------------------------------------------------------
 
     private void WriteCourse(string code, int[] sections, string? target, string folderPath)

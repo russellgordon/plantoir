@@ -46,7 +46,7 @@ public sealed partial class AssistWorkspace
     /// </summary>
     internal static Func<string>? CloudflareAccountIdOverrideForTests;
 
-    private static string CurrentCloudflareAccountId() =>
+    internal static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
 
 
