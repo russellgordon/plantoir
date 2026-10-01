@@ -94,17 +94,28 @@ public static class BuildFreshness
         }
         catch { return true; }   // the built index cannot be read: rebuild rather than trust it
 
-        IEnumerable<string> pages;
-        try { pages = Directory.EnumerateFiles(publicDir, "*.html", SearchOption.AllDirectories); }
-        catch { return false; }
-        foreach (string page in pages)
+        // A page that cannot be OPENED is passed over (the contract's
+        // `unreadable` cases). A FOLDER that cannot be listed is different:
+        // the enumeration throws from inside the loop (MoveNext), and the
+        // pages beneath it were never looked at, so nobody can say they are
+        // not a preview's. That answers "rebuild" — the safe direction, as an
+        // unreadable front page does — rather than escaping NeedsRebuild and
+        // failing the Deploy with an error (bundle 4 review L2).
+        try
         {
-            if (!page.EndsWith(".html", StringComparison.Ordinal)) continue;
-            if (string.Equals(page, index, StringComparison.OrdinalIgnoreCase)) continue;
-            byte[] bytes;
-            try { bytes = File.ReadAllBytes(page); }
-            catch { continue; }
-            if (CarriesTheClient(bytes)) return true;
+            foreach (string page in Directory.EnumerateFiles(publicDir, "*.html", SearchOption.AllDirectories))
+            {
+                if (!page.EndsWith(".html", StringComparison.Ordinal)) continue;
+                if (string.Equals(page, index, StringComparison.OrdinalIgnoreCase)) continue;
+                byte[] bytes;
+                try { bytes = File.ReadAllBytes(page); }
+                catch { continue; }
+                if (CarriesTheClient(bytes)) return true;
+            }
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            return true;
         }
         return false;
     }

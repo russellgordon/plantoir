@@ -318,6 +318,22 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   }
 }
 
+# Where a --to-folder value publishes, resolved ONCE against the working
+# folder (#304), or $null when it cannot be told. A plain relative name
+# ("out site", "Sites\x") is taken from the working folder, as deploy.sh
+# takes it. A DRIVE-relative ("C:foo") or ROOT-relative ("\out") path is
+# refused: [IO.Path]::IsPathRooted calls both rooted, and GetFullPath then
+# resolves them against the PROCESS directory, which is the hole the review
+# of bundle 4 found (L1). Fully qualified means a drive and a separator, or
+# a UNC path - the test the app's DeployFolderProblem makes.
+function Resolve-PublishFolder([string]$Asked, [string]$WorkingFolder) {
+  $p = $Asked.Trim()
+  if ($p.Length -eq 0) { return $null }
+  if ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^[\\/][\\/]') { return [IO.Path]::GetFullPath($p) }
+  if ($p -match '^[A-Za-z]:' -or $p -match '^[\\/]') { return $null }
+  return [IO.Path]::GetFullPath((Join-Path -Path $WorkingFolder -ChildPath $p))
+}
+
 function Test-CarriesLiveReload([string]$root) {
   # Does any page under $root still carry the preview's live-reload client?
   #
@@ -473,9 +489,12 @@ if ($TO_FOLDER) {
   # Set-Location does not change - so a relative path could be created in one
   # folder and copied into another. The two-argument GetFullPath does not
   # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
-  $folderAsked = $TO_FOLDER.Trim()
-  if (-not [IO.Path]::IsPathRooted($folderAsked)) { $folderAsked = Join-Path -Path $ScriptDir -ChildPath $folderAsked }
-  $folderAsked = [IO.Path]::GetFullPath($folderAsked)
+  $folderAsked = Resolve-PublishFolder $TO_FOLDER $ScriptDir
+  if (-not $folderAsked) {
+    Write-Host "That publishing folder is only partly written: a drive with no folder after it, or a folder with no drive."
+    Write-Host "   Give the folder's full location, then try again. Nothing was published."
+    exit 1
+  }
   $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
   # Not New-Item -Path, which reads [ and ] in a folder name as wildcards.
   $null = [IO.Directory]::CreateDirectory($targetDir)

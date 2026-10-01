@@ -253,6 +253,39 @@ public class BuildOutputLocationTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Review L2: a sub-folder of public\ that cannot be LISTED means rebuild
+    /// (its pages were never looked at), never an error out of NeedsRebuild.
+    /// Made unlistable for this account with a deny ACE, removed afterwards.
+    /// </summary>
+    [Fact]
+    public void AFolderThatCannotBeListedMeansRebuild()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string publicDir = Path.Combine(_root, "unlistable-" + Guid.NewGuid().ToString("N"), "public");
+        string locked = Path.Combine(publicDir, "notes");
+        Directory.CreateDirectory(locked);
+        File.WriteAllText(Path.Combine(publicDir, "index.html"), "<html><body>Welcome</body></html>");
+        File.WriteAllText(Path.Combine(locked, "day-1.html"), "<html><body>Day 1</body></html>");
+        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var deny = new System.Security.AccessControl.FileSystemAccessRule(me,
+            System.Security.AccessControl.FileSystemRights.ListDirectory,
+            System.Security.AccessControl.AccessControlType.Deny);
+        var info = new DirectoryInfo(locked);
+        var acl = System.IO.FileSystemAclExtensions.GetAccessControl(info);
+        acl.AddAccessRule(deny);
+        System.IO.FileSystemAclExtensions.SetAccessControl(info, acl);
+        try
+        {
+            Assert.True(BuildFreshness.BuiltForPreview(publicDir));
+        }
+        finally
+        {
+            acl.RemoveAccessRule(deny);
+            System.IO.FileSystemAclExtensions.SetAccessControl(info, acl);
+        }
+    }
+
     [Fact]
     public void ABuildNewerThanTheContentAndNotAPreviewNeedsNoRebuild()
     {
