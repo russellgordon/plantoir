@@ -38,6 +38,12 @@ public static class ActivityTrail
         /// missed; never the names themselves.
         /// </summary>
         AssistantNamedNoPage,
+        /// <summary>The links checklist was shown (#392/#399/#405): counts per group, listed under another page, shown ticked, the occasion. Never a page's name.</summary>
+        OfferedToPublishPagesThatLinksLeadTo,
+        /// <summary>The links checklist's Publish: counts, and the PLACES of the published pages (at most ten), never page content.</summary>
+        PublishedPagesThatLinksLedTo,
+        /// <summary>Not Now, or Publish with rows left: every page left hidden, the followers in brackets. Written only when above 0.</summary>
+        LeftPagesHiddenThatLinksLeadTo,
         /// <summary>
         /// The model's call named a course other than this window's, and the
         /// turn was refused (#180). Carries this window's course and section,
@@ -380,6 +386,9 @@ public static class ActivityTrail
         Event.AssistantCouldNotAnswer => "assistant could not answer",
         Event.AssistantNamedAToolItWasNotOffered => "assistant named a tool it was not offered",
         Event.AssistantNamedNoPage => "assistant named no page it could find",
+        Event.OfferedToPublishPagesThatLinksLeadTo => "offered to publish pages that links lead to",
+        Event.PublishedPagesThatLinksLedTo => "published pages that links led to",
+        Event.LeftPagesHiddenThatLinksLeadTo => "left pages hidden that links lead to",
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
         Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",

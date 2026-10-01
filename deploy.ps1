@@ -405,6 +405,38 @@ function Test-CarriesLiveReload([string]$root) {
 # ======================
 $COURSE_DIR_HOST  = Normalize-HostPath (Join-Path -Path (Get-Location) -ChildPath ("courses\{0}" -f $COURSE_CODE))
 $MERGED_DIR_HOST  = Normalize-HostPath (Join-Path -Path $COURSE_DIR_HOST -ChildPath ".merged_output")
+# The published-pages record (#392 / mac #379; contracts/file-formats.json ->
+# publishedPagesRecord). The folder branch never enters deploy.py, so it
+# records itself, as deploy.sh's record_published_pages does: after the copy
+# succeeded, copy .visible-pages.json into
+# courses/<CODE>/.publish_state/section<N>.published-pages/<yyyyMMddTHHmmssZ>-folder.json,
+# only when its buildId is .build-id's (a list from an earlier build is never
+# taken for this site's). Any failure records nothing and publishes anyway,
+# because the pages are already out. On Windows both files sit in
+# PLANTOIR_BUILD_ROOT\<CODE>\section<N>\, beside public\ — no .merged_output
+# level (the trap firstDeployMarkers warns about).
+# BEGIN Record-PublishedPages
+function Record-PublishedPages([string]$built, [string]$course, [string]$section, [string]$destination) {
+  try {
+    $listing = Join-Path $built ".visible-pages.json"
+    $idFile = Join-Path $built ".build-id"
+    if (-not (Test-Path -LiteralPath $listing) -or -not (Test-Path -LiteralPath $idFile)) { return }
+    $current = ([System.IO.File]::ReadAllText($idFile)).Trim()
+    $text = [System.IO.File]::ReadAllText($listing)
+    if ($text -notmatch '"buildId"\s*:\s*"([^"]*)"') { return }
+    if ([string]::IsNullOrEmpty($current) -or $Matches[1] -ne $current) { return }
+    $folder = Join-Path "courses" (Join-Path $course (Join-Path ".publish_state" ("section{0}.published-pages" -f $section)))
+    New-Item -ItemType Directory -Force -Path $folder -ErrorAction Stop | Out-Null
+    $name = "{0}-{1}.json" -f ([DateTime]::UtcNow.ToString("yyyyMMdd'T'HHmmss'Z'", [System.Globalization.CultureInfo]::InvariantCulture)), $destination
+    $temporary = Join-Path $folder (".{0}.{1}.tmp" -f $name, $PID)
+    Copy-Item -LiteralPath $listing -Destination $temporary -ErrorAction Stop
+    Move-Item -LiteralPath $temporary -Destination (Join-Path $folder $name) -Force -ErrorAction Stop
+  } catch {
+    # Recording is never worth failing a publish that already happened.
+  }
+}
+# END Record-PublishedPages
+
 $SECTION_DIR_HOST = Normalize-HostPath (Join-Path -Path $MERGED_DIR_HOST -ChildPath ("section{0}" -f $SECTION_NUM))
 $PUBLIC_DIR_HOST  = Normalize-HostPath (Join-Path -Path $SECTION_DIR_HOST -ChildPath "public")
 if ($NATIVE_RUNTIME) {
@@ -588,6 +620,7 @@ if ($TO_FOLDER) {
     exit 1
   }
   $global:LASTEXITCODE = 0
+  Record-PublishedPages $SECTION_DIR_HOST $COURSE_CODE $SECTION_NUM "folder"
   Write-Host "Published."
   Write-Host (" Folder: {0}" -f $targetDir)
   Write-Host " Upload that folder to your web host however you prefer (e.g. SFTP)."
