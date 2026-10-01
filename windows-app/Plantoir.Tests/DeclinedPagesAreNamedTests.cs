@@ -181,6 +181,73 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
     }
 
     /// <summary>
+    /// #421: getting a section ready for the year NAMES a class the writer
+    /// declines, rather than saying it went into draft while students can
+    /// still see it (the damaging direction). Counted among the pages left as
+    /// they were — one trail line, not a second one.
+    /// </summary>
+    [Fact]
+    public void StartOfYearNamesAClassItCouldNotPutIntoDraft()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        // Visible (no key at all) and no column-0 place for a new one.
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), "---\n  a: 1\ncreated: 2026-09-10T07:00:00.000-0400\n---\nBody.\n");
+        Class("Unit 1, Day 3", "2026-09-12");
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md"),
+            "---\ntitle: Home\n---\n# Most Recent Class\n![[Unit 1, Day 3]]\n");
+        string before = File.ReadAllText(ClassPath("Unit 1, Day 2"));
+
+        var workspace = Open();
+        var proposal = workspace.PlanStartOfYear("ICS3U", 1);
+        Assert.Equal(2, proposal.Plan.Classes.Count());
+        var outcome = workspace.PrepareForStartOfYear("ICS3U", 1, proposal.Code, StartOfYearAskedFrom.TheAssistant);
+
+        Assert.True(outcome.Changed);
+        Assert.Equal(before, File.ReadAllText(ClassPath("Unit 1, Day 2")));
+        Assert.True(Plantoir.Core.Models.PageFrontmatter.IsDraft(File.ReadAllText(ClassPath("Unit 1, Day 3")), 1));
+        Assert.Equal(StartOfYearWording.Fill(StartOfYearWording.Done, ("pages", StartOfYearWording.PagesCounted(1)))
+            + " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 1, Day 2" }), outcome.Message);
+        Assert.Contains($"— {StartOfYearWording.ClassesCounted(1)} and", TrailText);
+        // Everything but the one page put into draft — the declined class among them.
+        Assert.Contains($"{proposal.Plan.Pages.Count - 1} left as they were", TrailText);
+        Assert.DoesNotContain(ActivityTrail.PageSettingsLeftAsTheyWereLine("getting ready for the start of the year", 1), TrailText);
+    }
+
+    /// <summary>
+    /// #421: the links checklist's Publish NAMES a ticked page the writer
+    /// declines, instead of counting it as left hidden (or remembering it as
+    /// unticked), and records the count on the trail.
+    /// </summary>
+    [Fact]
+    public void TheLinksChecklistNamesAPageItCouldNotPublish()
+    {
+        string concepts = Path.Combine(_folder, "courses", "ICS3U", "Concepts");
+        Directory.CreateDirectory(concepts);
+        File.WriteAllText(Path.Combine(concepts, "Ohm.md"), "---\npublishForSection1: false\n---\nA sentence.\n");
+        // Hidden (the build reads `publish:` on any page) and no column-0
+        // place for this page's own key, publishForSection1.
+        string noRoom = "---\n  a: 1\npublish: false\n---\nA sentence.\n";
+        File.WriteAllText(Path.Combine(concepts, "Watt.md"), noRoom);
+
+        var workspace = Open();
+        LinksChecklistRow Row(string place) =>
+            new(place, LinksChecklist.NotReachedGroup, true, Array.Empty<string>(), Path.GetFileName(place), null, null, null);
+        var sheet = workspace.OpenLinksChecklist(new LinksChecklistOffer("ICS3U", 1, "build-1",
+            new[] { Row("Concepts/Ohm"), Row("Concepts/Watt") }));
+        Assert.Equal(2, sheet.Rows.Count);
+
+        var published = workspace.PublishAndRemember(sheet);
+
+        Assert.Equal(noRoom, File.ReadAllText(Path.Combine(concepts, "Watt.md")));
+        Assert.Equal(new[] { "Concepts/Ohm" }, published.Written);
+        Assert.Equal(new[] { "Watt" }, published.Declined);
+        Assert.Empty(published.RememberedUnticked);
+        Assert.Empty(published.LeftWithTheirPage);
+        Assert.EndsWith(AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Watt" }), published.Reply(sheet));
+        Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("publishing pages that links lead to", 1), TrailText);
+    }
+
+    /// <summary>
     /// Review F1: "moved N onto later class days" counts what was WRITTEN, as
     /// the mac counts — never a class it declined or a write that failed.
     /// </summary>

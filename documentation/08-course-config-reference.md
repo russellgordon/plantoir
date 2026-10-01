@@ -894,7 +894,35 @@ separately from the reader:
   and the count. Pinned by `DeclinedPagesAreNamedTests`. The make-room
   reply's "moved N onto later class days" counts only classes actually
   written, as the mac's `ClassInsertionPlanner` does (a declined class, one
-  already on its date and a failed write are not "moved"; review F1). The first two are not reached by the fixed reader or writer at all
+  already on its date and a failed write are not "moved"; review F1).
+  **Getting a section ready for the start of the year and the links
+  checklist's Publish name them too since 2026-10-01** (#421, bundle 10 —
+  the two callers bundle 9 found still dropping the outcome). Start of year
+  (`AssistWorkspace.StartOfYear.cs`) used to discard the `DraftEdit`, so the
+  reply could say a class went into draft while students could still see it
+  — the damaging direction; now a declined page is NOT saved (not even the
+  half of a two-key write that succeeded: `publish: false` beside a stray
+  `publishForSection<N>: true` still leaves the page up), is named with
+  `pagesWhoseSettingsCannotBeAddedTo` after the `done` sentence (alone, when
+  nothing at all went into draft), and the "Put into draft: N" count and the
+  trail line's class/page counts are what WAS put into draft; the declined
+  page is one of the line's "N left as they were", as
+  `activityTrail.mustRecord` says, never a second line. The links checklist
+  (`PublishLinksChecklist`) used to count a declined ticked page as "left
+  hidden" and remember it as if the teacher had left it; now it collects the
+  ticked classes' plan-time `CannotBeAddedTo`, any write-time decline of a
+  class's page or a ticked row (a declined row gets no date either), keeps
+  them out of `Written`, the remembered-unticked list and the
+  left-with-their-page list, names them at the end of the reply
+  (`LinksChecklistPublished.Reply`, which the dialog now calls), and records
+  `page settings left as they were` with the act "publishing pages that
+  links lead to". Rejected: naming them on the start-of-year PLAN (the
+  contract's `startOfYear` says nothing of declines, and probing the writer
+  for every page at plan time changes no code the plan hashes — left for the
+  mac to decide, not invented here). Pinned by
+  `DeclinedPagesAreNamedTests.StartOfYearNamesAClassItCouldNotPutIntoDraft`
+  and `.TheLinksChecklistNamesAPageItCouldNotPublish`.
+  The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
