@@ -117,6 +117,19 @@ public static class ActivityTrail
         /// </summary>
         CourseCreated,
         /// <summary>
+        /// Course Settings' "Create and Open" made an EMPTY How I Teach page,
+        /// or could not, and why (#360, mac #329). Opening a page that is
+        /// there writes nothing.
+        /// </summary>
+        HowITeachPageStarted,
+        /// <summary>
+        /// The assistant zipped a course: the backup's file name, its size in
+        /// MB and how long it took in seconds, one decimal each — or that it
+        /// could not, and why (#360, mac #351). One line per REAL zip; the
+        /// conversation's copy reused by a later write writes nothing.
+        /// </summary>
+        AssistantBackedUpACourse,
+        /// <summary>
         /// Which curriculum coverage maps a build wrote (#345, mac #128): each
         /// map's title, the folder it was built from and how many expectations
         /// it shows — or that it wrote none. From the build's PLANTOIR_MAPS:
@@ -462,6 +475,8 @@ public static class ActivityTrail
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
         Event.CourseCreated => "course created",
+        Event.HowITeachPageStarted => "How I Teach page started",
+        Event.AssistantBackedUpACourse => "assistant backed up a course",
         Event.CurriculumMapsBuilt => "curriculum maps built",
         Event.SectionMadeReadyForTheStartOfTheYear => "section made ready for the start of the year",
         Event.StartOfYearChangeUndone => "start of the year change undone",

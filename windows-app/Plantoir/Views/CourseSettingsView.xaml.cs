@@ -735,6 +735,31 @@ public sealed partial class CourseSettingsView : UserControl
             (name, reason) => RecordRemovalBlocked("the per-section files", name, reason)));
         Form.Children.Add(FormBuilders.ExampleCaption(SpecialNames.ContentStructureTip));
 
+        // -------- How I Teach (#360, howITeachPage.settingsButton) --------
+        // Beside the curriculum folders: Open when the course has a page,
+        // Create and Open when it has none (exactly createdBytes, CreateNew,
+        // never over a page made a moment earlier), then the PAGE in Obsidian.
+        var howITeachRow = FormBuilders.LabeledRow(HowITeachSettingsRow.RowLabel, new StackPanel());
+        var howITeachButton = new Button { Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath) };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(howITeachButton, "howITeachButton");
+        var howITeachProblem = FormBuilders.WarningCaption("");
+        howITeachProblem.Visibility = Visibility.Collapsed;
+        howITeachButton.Click += (_, _) =>
+        {
+            var (outcome, page, problem) = HowITeachSettingsRow.Press(_course.DirectoryPath, _course.Code);
+            howITeachProblem.Text = problem ?? "";
+            howITeachProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            howITeachButton.Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath);
+            if (page is not null)
+                _ = FolderActions.OpenInObsidian(_course.DirectoryPath, _course.DirectoryPath,
+                    BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
+        };
+        howITeachRow.Children.RemoveAt(1);
+        howITeachRow.Children.Add(howITeachButton);
+        howITeachRow.Children.Add(FormBuilders.ExampleCaption(HowITeachSettingsRow.Caption));
+        howITeachRow.Children.Add(howITeachProblem);
+        Form.Children.Add(howITeachRow);
+
         // -------- Curriculum folders (#345, specialNames.curriculumFoldersOffer) --------
         // Only with two or more candidates; ticked are the folders with a map,
         // then every declared folder; a tick writes the ticked ones FIRST so the

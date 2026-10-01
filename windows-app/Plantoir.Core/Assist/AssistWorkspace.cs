@@ -112,7 +112,17 @@ public sealed partial class AssistWorkspace
     /// assistant chat about Section N"). Per-change undo is
     /// <see cref="UndoHistory"/>'s promise and is unchanged.</para>
     /// </summary>
-    private string BackUpOnceForThisConversation(Course course, int sectionNumber)
+    private string BackUpOnceForThisConversation(Course course, int sectionNumber, IProgress<string>? progress = null)
+    {
+        // One copy in flight per course: a second write arriving while the
+        // first is zipping waits for it and reuses it rather than zipping again.
+        lock (_conversationBackups)
+        {
+            return BackUpOnceForThisConversationHeld(course, sectionNumber, progress);
+        }
+    }
+
+    private string BackUpOnceForThisConversationHeld(Course course, int sectionNumber, IProgress<string>? progress)
     {
         // The recorded copy is reused even if it has since gone — deleted from
         // the Backups list, or pruned by five later conversations. Taking a
@@ -125,8 +135,8 @@ public sealed partial class AssistWorkspace
             ConversationBackupPath = existing;
             return existing;
         }
-        string made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                                  new BackupMaker.Assistant(sectionNumber));
+        progress?.Report(AssistWording.BackingUpFirst(course.Code));
+        string made = AssistantBackup(course, sectionNumber);
         _conversationBackups[course.Code] = made;
         ConversationBackupPath = made;
         return made;
@@ -1528,7 +1538,7 @@ public sealed partial class AssistWorkspace
         if (plan.Publishes) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber, progress); }
         catch (Exception error)
         {
             // No backup, no edits. This is the one step that has no fallback.
@@ -2634,8 +2644,40 @@ public sealed partial class AssistWorkspace
     {
         var course = Course(courseCode);
         int number = Section(course, sectionNumber);
-        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                                    new BackupMaker.Assistant(number)));
+        return Relative(AssistantBackup(course, number));
+    }
+
+    /// <summary>
+    /// The one door every assistant zip goes through — the conversation's first
+    /// copy, back_up_course, and getting a section ready — so each REAL zip
+    /// leaves one <c>assistant backed up a course</c> line with its file name,
+    /// size and time (#360, mac #351): "the window hung after I approved" and
+    /// "where did this zip come from" were unanswerable before it. A failed
+    /// copy is never remembered, and says why.
+    /// </summary>
+    private string AssistantBackup(Course course, int sectionNumber)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string made;
+        try
+        {
+            made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                               new BackupMaker.Assistant(sectionNumber));
+        }
+        catch (Exception error)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantBackedUpACourse,
+                $"assistant could not back up the course: {error.Message}", course.Code, sectionNumber);
+            throw;
+        }
+        double megabytes = 0;
+        try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
+        ActivityTrail.Note(ActivityTrail.Event.AssistantBackedUpACourse,
+            $"assistant backed up the course as {Path.GetFileName(made)} " +
+            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            course.Code, sectionNumber);
+        return made;
     }
 
     // ---- Helpers ---------------------------------------------------------

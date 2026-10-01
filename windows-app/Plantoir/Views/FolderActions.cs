@@ -132,9 +132,11 @@ public static class FolderActions
     /// seed defaults, patch auto-reveal, register, then open the link
     /// (Obsidian restores its windows on relaunch).
     /// </summary>
-    public static async Task OpenInObsidian(string revealFolder, string vaultPath, string bundledDefaultsPath)
+    public static async Task OpenInObsidian(string revealFolder, string vaultPath, string bundledDefaultsPath,
+                                            string? page = null)
     {
-        string target = ObsidianTarget(revealFolder, vaultPath);
+        // A PAGE, when one is named (the How I Teach row opens the page, not the vault).
+        string target = page ?? ObsidianTarget(revealFolder, vaultPath);
         string uri = ObsidianUri(target);
         string? registryJson = null;
         try { registryJson = File.Exists(ObsidianRegistryPath) ? File.ReadAllText(ObsidianRegistryPath) : null; }
