@@ -71,7 +71,7 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
         string sentence = AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 1, Day 2" });
 
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false, draft: true, publishes: false);
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, draft: true, publishes: false);
 
         Assert.Equal(new[] { "Unit 1, Day 2" }, plan.CannotBeAddedTo.Select(p => p.Title));
         Assert.Empty(plan.Changes);
@@ -93,7 +93,7 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
 
         var workspace = Open();
         var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1", "Unit 1, Day 2" },
-            includeLinked: false, draft: true, publishes: false);
+            draft: true, publishes: false);
         var result = await workspace.Apply(plan, preview: false);
 
         Assert.Contains("Unpublished “Unit 1, Day 1”.", result.Message);
@@ -173,7 +173,7 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
 
         // A HIDE of the newest class, which the writer declines: Day 2 stays
         // visible, so the front page must not be planned back onto Day 1.
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false, draft: true, publishes: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, draft: true, publishes: false);
 
         Assert.Equal(new[] { "Unit 1, Day 2" }, plan.CannotBeAddedTo.Select(p => p.Title));
         Assert.True(plan.Index is null || plan.Index.ToClass == "Unit 1, Day 2",

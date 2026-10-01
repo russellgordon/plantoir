@@ -763,7 +763,7 @@ public class PageVisibilityCertaintyTests : IDisposable
     public void APageWhoseFlagCannotBeReadIsNotOnTheAlreadyRightList()
     {
         UnreadableClass();
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         Assert.Empty(plan.AlreadyRight);
         var change = Assert.Single(plan.Changes);
@@ -775,13 +775,13 @@ public class PageVisibilityCertaintyTests : IDisposable
     public void ThereIsNoNothingToDoSentenceForAPageWhoseFlagCannotBeRead()
     {
         UnreadableClass();
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
         Assert.Null(plan.NothingToDoSentence);
 
         // The control: the same page saying plainly what was asked for.
         Write("section1/All Classes/Unit 1, Day 2.md",
               "title: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n");
-        var settled = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false);
+        var settled = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" });
         Assert.Equal("It's already been published.", settled.NothingToDoSentence);
     }
 
@@ -805,7 +805,7 @@ public class PageVisibilityCertaintyTests : IDisposable
         Write("Concepts/Ohm's Law.md",
               "title: Ohm's Law\npublishForSection1: !!str false\ncreated: 2026-01-01T07:00:00.000-0400\n");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         var move = Assert.Single(plan.DateMoves, m => m.Page.Title == "Ohm's Law");
         Assert.Equal(new DateOnly(2026, 9, 8), move.To);
@@ -823,7 +823,7 @@ public class PageVisibilityCertaintyTests : IDisposable
         var workspace = Open();
 
         await workspace.Apply(
-            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false),
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }),
             preview: false);
 
         string after = File.ReadAllText(path);

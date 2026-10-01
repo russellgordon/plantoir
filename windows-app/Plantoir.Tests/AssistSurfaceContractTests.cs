@@ -188,12 +188,10 @@ public class AssistSurfaceContractTests
                 "`mac` issue so the entry is removed from the contract.");
         }
 
+        // The four `…publish_pages.includeLinked` entries left this list with
+        // #420 (parity bundle 10): the flag is gone, as on the mac.
         var notEnumeratedHere = new[]
         {
-            "publish_pages.includeLinked",
-            "unpublish_pages.includeLinked",
-            "plan_publish_pages.includeLinked",
-            "plan_unpublish_pages.includeLinked",
             "add_next_class.unit", "add_next_class.days",
             "plan_add_next_class.unit", "plan_add_next_class.days",
             "read_remembered_timetable.scope", "read_remembered_timetable.revise",

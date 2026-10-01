@@ -94,7 +94,7 @@ public class ClassFolderMembershipTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 1, Day 1.md", unpublished: true,
              body: "See [[Reference]].");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         var reference = Assert.Single(plan.Changes, c => c.Page.Title == "Reference");
         Assert.True(reference.BecauseLinked);
@@ -120,7 +120,7 @@ public class ClassFolderMembershipTests : IDisposable
         Dated("ICS3U", "section1/All Classes/Unit 1, Day 1.md", "2026-09-10", unpublished: true,
               body: "See [[Glossary]].");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         var move = Assert.Single(plan.DateMoves, m => m.Page.Title == "Glossary");
         Assert.Equal("Unit 1, Day 1", move.TakenFrom);
@@ -227,7 +227,7 @@ public class ClassFolderMembershipTests : IDisposable
 
     private PlannedPage PlannedFor(string code, int section, string title)
     {
-        var plan = Open().PlanPublish(code, section, new[] { title }, includeLinked: false);
+        var plan = Open().PlanPublish(code, section, new[] { title });
         return Assert.Single(plan.NamedPages);
     }
 

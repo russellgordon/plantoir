@@ -566,14 +566,26 @@ public sealed partial class AssistWorkspace
     ///   convenience here, it is the difference between usable and not.
     /// * A safety contract linked from BOTH the first class (which must stay
     ///   up) and a later one (which must come down) made the task
-    ///   unsatisfiable: <c>includeLinked</c> took it down, and nothing could
+    ///   unsatisfiable: following links took it down, and nothing could
     ///   put just that page back. Being able to name any page directly
     ///   dissolves it. That shape — a shared page reachable from several
     ///   classes — is the normal shape of a course, not an edge case.
+    ///
+    /// <para><b>Links are ALWAYS followed, in both directions (#420).</b> A
+    /// publish takes every page the named pages link to, transitively,
+    /// stopping at a class; an unpublish takes a linked page only when nothing
+    /// students can still see needs it (<c>shared-rules.json</c> →
+    /// <c>followingLinks</c>). There is no argument for it: Windows used to
+    /// take an <c>includeLinked</c> flag that defaulted to false, so a
+    /// model's publish that left it out published a page whose links led to
+    /// pages students could not see — the one thing the contract says
+    /// publishing must never do. The mac removed the flag for the same reason
+    /// (<c>toolSchemas.departures.absentHere</c>: it asked the MODEL how far a
+    /// publish should reach).</para>
     /// </summary>
     public PublishPlan PlanPublish(
         string courseCode, int sectionNumber, IReadOnlyList<string> pageTitles,
-        bool includeLinked, bool draft = false, bool publishes = true,
+        bool draft = false, bool publishes = true,
         DateOnly? onOrAfter = null, DateOnly? before = null)
     {
         var course = Course(courseCode);
@@ -877,35 +889,32 @@ public sealed partial class AssistWorkspace
                              "because another class students can still see links to " +
                              (stillNeeded == 1 ? "it" : "them") + ".");
         }
-        else // publishing
+        else // publishing: ALWAYS takes what the pages link to (#420)
         {
-            if (includeLinked)
+            var seenLinked = new HashSet<string>(named.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
+            var queue = new Queue<PlannedPage>(named);
+            while (queue.Count > 0)
             {
-                var seenLinked = new HashSet<string>(named.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
-                var queue = new Queue<PlannedPage>(named);
-                while (queue.Count > 0)
+                var cur = queue.Dequeue();
+                if (linksFrom.TryGetValue(cur.Title, out var targets))
                 {
-                    var cur = queue.Dequeue();
-                    if (linksFrom.TryGetValue(cur.Title, out var targets))
+                    foreach (var target in targets)
                     {
-                        foreach (var target in targets)
+                        if (pagesByTitle.TryGetValue(target, out var targetPage))
                         {
-                            if (pagesByTitle.TryGetValue(target, out var targetPage))
+                            if (seenLinked.Add(targetPage.Title))
                             {
-                                if (seenLinked.Add(targetPage.Title))
+                                if (!targetPage.IsClassPage)
                                 {
-                                    if (!targetPage.IsClassPage)
-                                    {
-                                        linked.Add(targetPage with { ViaLink = true });
-                                        queue.Enqueue(targetPage);
-                                    }
-                                    else
-                                    {
-                                        // The stop (#173): neither published
-                                        // nor walked through, and named to the
-                                        // teacher (#203).
-                                        stoppedAt.Add(targetPage);
-                                    }
+                                    linked.Add(targetPage with { ViaLink = true });
+                                    queue.Enqueue(targetPage);
+                                }
+                                else
+                                {
+                                    // The stop (#173): neither published
+                                    // nor walked through, and named to the
+                                    // teacher (#203).
+                                    stoppedAt.Add(targetPage);
                                 }
                             }
                         }
@@ -1923,7 +1932,7 @@ public sealed partial class AssistWorkspace
         foreach (var page in unitPages)
         {
             var pagePlan = PlanPublish(
-                course.Code, section, new[] { page.Title }, includeLinked: true, draft: !publishing, publishes: publishing);
+                course.Code, section, new[] { page.Title }, draft: !publishing, publishes: publishing);
             foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
             if (pagePlan.ChangesNothing) continue;

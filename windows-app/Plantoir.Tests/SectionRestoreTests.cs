@@ -142,7 +142,7 @@ public sealed class SectionRestoreTests : IDisposable
         for (int change = 0; change < 7; change++)   // odd, so it ends unpublished; more than MostBackupsKept
         {
             bool draft = change % 2 == 0;        // starts published, so the first change unpublishes
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false, draft: draft);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, draft: draft);
             var result = await workspace.Apply(plan, preview: false);
             Assert.True(result.Succeeded, result.Message);
         }
