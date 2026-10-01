@@ -72,10 +72,24 @@ public class WizardToPreviewUiTests
                                      TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500)).Result,
                     "the server answered, but the window never offered Open in Browser");
         // ...and the web view in the window SHOWS the page (its text, through UI Automation).
-        Assert.True(Retry.WhileFalse(() => app.FindOrNull("previewWebView", TimeSpan.FromSeconds(1)) is { } view
-                                           && DrivenApp.TextsUnder(view).Any(t => t.Contains(marker, StringComparison.Ordinal)),
-                                     TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500)).Result,
-                    "the server has the page, but the window's own preview never showed it");
+        // Any element's name, not only Text: Chromium exposes a paragraph's
+        // words as Text on one pass and as a Group's name on another, and its
+        // tree is built lazily after the first UI Automation question — the
+        // fourth run of bundle 11 missed it inside 60 s with Text only.
+        var seen = new List<string>();
+        bool shown = Retry.WhileFalse(() =>
+        {
+            try
+            {
+                if (app.FindOrNull("previewWebView", TimeSpan.FromSeconds(1)) is not { } view) return false;
+                seen = view.FindAllDescendants().Select(e => { try { return e.Name ?? ""; } catch { return ""; } })
+                           .Where(n => n.Length > 0).ToList();
+                return seen.Any(n => n.Contains(marker, StringComparison.Ordinal));
+            }
+            catch { return false; }
+        }, TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(1)).Result;
+        Assert.True(shown, "the server has the page, but the window's own preview never showed it; the view exposed "
+                           + $"{seen.Count} named elements: " + string.Join(" | ", seen.Take(12)));
 
         // And the build is where the launchers keep it: the real builds root, not the working folder.
         string builtIndex = Path.Combine(app.RealBuildsRoot, Code, "section1", "public", "index.html");
