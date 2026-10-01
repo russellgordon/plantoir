@@ -108,6 +108,10 @@ public class CopyAPageEndToEndUiTests
 
         // 2. A destination whose folders are not on disk has nowhere to put it.
         OpenCopyAPage(app, Source);
+        // The page first: typed into a picker just opened, as in the copy test.
+        // Typed after a combo box had been driven, the keystrokes never reached
+        // the picker (bundle 11, run 3) — a harness matter, not the product's.
+        ChoosePage(app, "Watt");
         app.Find("copyPageDestination", "Copy into").AsComboBox().Select(Nowhere);
         ExpectSentence(app, EndToEnd.Say(wording["thatCourseHasNowhereToPutIt"]!, ("course", Nowhere)));
         Assert.False(app.Find(CopyAPageDialogIds.Primary, "the Copy button").IsEnabled);
@@ -115,7 +119,6 @@ public class CopyAPageEndToEndUiTests
         // 3. A destination being deployed right now is refused before anything is written.
         //    The lease is a real one, held by THIS process, exactly as a deploy holds it.
         app.Find("copyPageDestination", "Copy into").AsComboBox().Select(Destination);
-        ChoosePage(app, "Watt");
         using (WorkLease.Take(app.WorkspacePath, Destination, WorkLease.Publishing))
         {
             var copy = app.Find(CopyAPageDialogIds.Primary, "the Copy button").AsButton();
