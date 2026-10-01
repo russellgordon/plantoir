@@ -1725,6 +1725,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, null, publishing: true, error));
+        }
     }
 
     /// <summary>
@@ -1875,6 +1884,48 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, pages, publishing: !draft, error));
+        }
+    }
+
+    /// <summary>
+    /// What a publish that stopped part way says (#165). Shaped on the mac's
+    /// inline sentence in <c>AssistToolRunner</c> ("Unit 4 was only partly
+    /// published: ...") -- the mac has no <c>AssistWording</c> key for it, so
+    /// this is Windows' own until a key is proposed (the bundle-5b handover to the mac).
+    /// Names the conversation's copy when there is one, because the undo
+    /// entry is abandoned on a throw and that copy is what puts it back.
+    /// </summary>
+    private string OnlyPartlyDone(string course, int section, string[]? pages, bool publishing, Exception error)
+    {
+        string verb = publishing ? "published" : "unpublished";
+        string? unitWord = null;
+        int? unit = null;
+        if (pages is { Length: 1 })
+        {
+            try
+            {
+                unitWord = workspace.UnitWordForCourse(course);
+            }
+            catch { /* the unit word is a nicety; the sentence stands without it */ }
+            if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], unitWord);
+        }
+        string what = unit is { } number ? $"{unitWord} {number}" : "The pages";
+        string reason = error is UnauthorizedAccessException
+            ? "Plantoir doesn’t have permission to change one of them."
+            : error.Message;
+        string said = $"{what} {(unit is null ? "were" : "was")} only partly {verb}: {reason}";
+        if (workspace.ConversationBackupPath is not null)
+            said += $" A copy from before this conversation changed anything is saved — " +
+                    $"{AssistSectionRestore.ButtonTitle(section)} puts the section back.";
+        return said;
     }
 
     private async Task<CallToolResult?> WholeUnitRequested(
