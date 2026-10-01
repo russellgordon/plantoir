@@ -531,6 +531,8 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         // Backing up stays available mid-preview — it only reads (row 106).
         menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        // On EVERY course row, a reference course's included: it only reads (#247).
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
 
         var reviseItems = ReviseItems(course, section: null);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
@@ -996,6 +998,15 @@ public sealed partial class SidebarPane : UserControl
         {
             await ShowError("Could not remove", error.Message);
         }
+    }
+
+    /// <summary>Copy a Page from This Course… (#247): the dialog does the rest.</summary>
+    private async Task OpenCopyAPage(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        await CopyAPageDialog.ShowAsync(course, Workspace.Courses, folder, ShowDialogSafelyAsync);
+        Workspace.Reload();
+        _window.ApplyState();
     }
 
     // ---- Backups (row 106) -------------------------------------------------
