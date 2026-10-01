@@ -2792,3 +2792,52 @@ teacher DID — it is the consequence of what they did, recorded one line up.
 ---
 
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)
+
+## The links checklist on Windows (#392, #399, #405)
+
+The mac's sheet (documentation/09-mac-app.md → "The links checklist (#379)") is,
+on this side, split in two, and only the first half is built.
+
+**Built and contract-tested** — everything that decides what a press WRITES:
+`Plantoir.Core/Assist/LinksChecklist.cs` (offer reader, the pure gate, the
+answered file, the record release), `LinksChecklistWording.cs`, and
+`AssistWorkspace.LinksChecklist.cs` (`OpenLinksChecklist`, `PublishLinksChecklist`,
+`PublishAndRemember`, `NotNow`, the trail lines). Runners:
+`LinksChecklistGateContractTests` (followingARow 10, comingWithAClass 12),
+`LinksChecklistPublishContractTests` (publishCases 15, through the sheet model),
+`LinksChecklistWordingContractTests`, `PublishedPagesRecordTests`.
+
+Three decisions worth knowing before changing any of it:
+
+- **A page a ticked class brings is dated by THAT class, directly.** The
+  assistant's `InheritedDates` picks the earliest class anywhere that can reach
+  a page, and in the contract's fixture a visible "Unit 1, Day 1" reaches the
+  worksheet through "How Marks Work", so iv-b, iv-d, iv-j, iv-k and iv-m were
+  dated 2026-09-08 instead of the ticked class's 2026-10-20. The publisher
+  walks each ticked class's own reach (stopping at classes) and dates the
+  pages the class plan changes; the first class in the sheet's order wins.
+- **"Locked" is "has a parent row, NONE of which goes".** A row under a row
+  that goes, with its own tick off, is simply unticked (followingARow case 7);
+  reading locked as "has a parent and does not go" fails it.
+- **Places are compared in composed form (Form C)** on both sides, the trap
+  #405 names: C#'s string equality is ordinal, Swift's is canonical.
+
+**Not built** — the WinUI sheet (grouped checkboxes over `LinksChecklistSheet`,
+`ShownOrder` for the indent, `SecondLine` for each row's second line), showing
+it after a watched build when the `PLANTOIR_LINKS_CHECKLIST:` marker's buildId
+equals the file's (holding the #333 finding until then), on section open for
+an unwatched publish when the offer is fresh and holds something new
+(`LinksChecklist.HoldsSomethingNew`), the menu item, and
+`linksIntoHiddenPagesWillBeOffered` in the assistant. `NoteOffered` has no
+caller until the sheet exists. Also not run here: `linksChecklist.naming`'s
+two laid-out cases and `datingPagesAClassBrings.publishedBeforeIsRecorded`
+(a page in the published-pages record keeps its date when a class brings it).
+
+**The folder deploy's record.** `deploy.ps1`'s `Record-PublishedPages` (between
+BEGIN/END markers so the test runs it as written) reads `.build-id` and
+`.visible-pages.json` from `PLANTOIR_BUILD_ROOT\<CODE>\section<N>\` — no
+`.merged_output` level on this platform — and records only when the list's
+buildId is the site's. **Every rollover** (same website or new, not only
+`ReleaseSite`) moves the fragments to `.published-pages.previous-<stamp>/`,
+keeps the folder, removes the answered file, and records it all in the undo
+history.
