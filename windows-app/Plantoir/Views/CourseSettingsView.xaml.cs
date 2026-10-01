@@ -858,10 +858,9 @@ public sealed partial class CourseSettingsView : UserControl
 
         // -------- Sidebar Visibility --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Sidebar Visibility", null));
-        Form.Children.Add(FormBuilders.MembershipToggleList("Hide from the site's sidebar",
-            Config.AllSidebarItems, () => Config.HiddenItems, v => Config.HiddenItems = v, MarkChanged));
-        Form.Children.Add(FormBuilders.MembershipToggleList("Expandable in the site's sidebar",
-            Config.AllSidebarItems, () => Config.ExpandableItems, v => Config.ExpandableItems = v, MarkChanged));
+        Form.Children.Add(FormBuilders.SidebarVisibilityTable(Config.AllSidebarItems,
+            () => Config.HiddenItems, v => Config.HiddenItems = v,
+            () => Config.ExpandableItems, v => Config.ExpandableItems = v, MarkChanged));
 
         // -------- Marks --------
         // Which folders hold work that counts for marks. Before this key
