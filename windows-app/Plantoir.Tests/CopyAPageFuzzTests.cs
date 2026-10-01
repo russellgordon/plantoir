@@ -44,10 +44,15 @@ public class CopyAPageFuzzTests
         var clock = Stopwatch.StartNew();
         var certified = new List<(string Source, string Composed)>();
         int refused = 0;
+        // PLANTOIR_FUZZ_SKIP: generate (so the seeded sequence is unchanged) but
+        // do not ask the build about the first K sources - to re-run only the
+        // tail of a long run that failed late, without paying for its head.
+        int skip = int.TryParse(Environment.GetEnvironmentVariable("PLANTOIR_FUZZ_SKIP"), out int asked2) ? asked2 : 0;
         for (int i = 0; i < n; i++)
         {
             string source = Generate(random);
             var sections = Enumerable.Range(1, 3).Where(_ => random.Next(2) == 0).DefaultIfEmpty(1).ToList();
+            if (i < skip) continue;
             string? composed = CopyPageFrontmatter.Compose(source, sections);
             if (composed is not null && CopyPageFrontmatter.IsCertainlyHidden(composed, sections)) certified.Add((source, composed));
             else refused++;
@@ -64,8 +69,8 @@ public class CopyAPageFuzzTests
             File.WriteAllText(dump, string.Join("\n====\n", published.Select(p => $"{p.First.Composed}\n-> {p.Second.Problem} {string.Join(",", p.Second.HiddenIn)}")));
         _output.WriteLine($"fuzz: {n} sources, {certified.Count} certified, {refused} refused, " +
                           $"{published.Count} certified-and-not-hidden; compose {composeMs} ms, build oracle {oracleMs} ms");
-        Assert.True(certified.Count >= n / 10, $"only {certified.Count} of {n} certified - the generator has stopped exercising the guard");
-        Assert.True(refused >= n / 10, $"only {refused} of {n} refused - the generator has stopped exercising the refusals");
+        Assert.True(certified.Count >= (n - skip) / 10, $"only {certified.Count} of {n} certified - the generator has stopped exercising the guard");
+        Assert.True(refused >= (n - skip) / 10, $"only {refused} of {n} refused - the generator has stopped exercising the refusals");
         Assert.True(published.Count == 0,
             $"{published.Count} pages certified hidden here were NOT hidden by the build. First:\n" +
             string.Join("\n====\n", published.Take(3).Select(p => $"{p.First.Composed}\n-> {p.Second.Problem} {string.Join(",", p.Second.HiddenIn)}")));
