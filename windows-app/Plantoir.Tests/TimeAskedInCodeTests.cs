@@ -95,20 +95,20 @@ public class TimeAskedInCodeTests : IDisposable
 
     /// <summary>
     /// The trap #193 named in the server: <c>ReadTheMoment</c> reads a bare
-    /// "00:00" as TODAY at midnight — already gone — and an outside client
-    /// calling <c>plan_scheduled_deploy</c> was refused for a moment it never
-    /// meant. Settled first, it is the NEXT midnight.
+    /// "06:30" as TODAY at 06:30, silently. The server refuses it loudly, as
+    /// the mac's <c>--mcp-stdio</c> does; the app's own calls arrive settled.
     /// </summary>
     [Fact]
-    public void TheServerSettlesABareTimeBeforeItReadsIt()
+    public void TheServerRefusesABareTimeRatherThanReadingItAsToday()
     {
         string folder = Directory.CreateTempSubdirectory("plantoir-bare-time").FullName;
         try
         {
             RelativeDayFreshnessTests.ACourseThatHasDeployedBefore(folder);
             var tools = new Plantoir.Mcp.PlantoirTools(new AssistWorkspace(folder, new FakeLauncher()));
-            string planned = tools.PlanScheduledDeploy("ICS3U", 1, "00:00").Detail();
-            Assert.DoesNotContain("has already passed", planned);
+            string planned = tools.PlanScheduledDeploy("ICS3U", 1, "23:59").Detail();
+            Assert.Contains("isn't a time I can read", planned);
+            Assert.DoesNotContain(DateTime.Now.ToString("dddd d MMMM"), planned);
         }
         finally
         {

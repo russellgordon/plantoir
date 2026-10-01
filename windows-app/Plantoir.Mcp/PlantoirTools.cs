@@ -356,16 +356,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "if it is a laptop, with the lid open. Plantoir does not wake it. Replaces any deploy already " +
                  "scheduled for the same section. Use cancel_scheduled_deploy to call it off.")]
     /// <summary>
-    /// A bare time of day — "06:30", "tomorrow 06:30" — settled into the whole
-    /// moment it means BEFORE it is read (#193). ReadTheMoment's lenient step
-    /// would otherwise read "06:30" as TODAY at 06:30, silently, usually a
-    /// moment already past. A whole moment comes back unchanged (the settler
-    /// is idempotent), so the app's own settled calls pass straight through.
+    /// A bare time of day — "06:30", "tomorrow 06:30" — is REFUSED here, never
+    /// read (#193). <c>ReadTheMoment</c>'s lenient step would read "06:30" as
+    /// TODAY at 06:30, silently, usually a moment already past: the trap the
+    /// mac's handover named at this line. The app settles its own calls into
+    /// whole moments in <c>AssistAgent</c> before they cross, so only an
+    /// outside client can arrive here with a bare time — and the mac's
+    /// <c>--mcp-stdio</c> deliberately settles nothing and refuses it too,
+    /// because this tool's schema asks for <c>YYYY-MM-DD HH:MM</c>. Settling
+    /// it here instead was the first draft, and was a divergence from the mac.
     /// </summary>
     private string Settled(string when)
     {
-        var now = DateTime.Now;
-        return ScheduledMoment.Settle(when, Today(), now) ?? when;
+        if (ScheduledMoment.Settle(when, Today(), DateTime.Now) is not null)
+            throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
+        return when;
     }
 
     public CallToolResult ScheduleDeploy(
