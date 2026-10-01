@@ -1571,16 +1571,14 @@ entries above rather than in this table. Re-derive it; do not subtract.
 
 **And the exemptions inside lists that ARE run**, because "run" is not the
 whole answer for a list a named key has been lifted out of:
-`windows-app/Plantoir.Tests/NamedGapLedger.cs` holds exactly two, both
-[#158](https://github.com/russellgordon/plantoir/issues/158) at v1.3.0 — the
-`word for a unit renamed` trail event out of `activityTrail.mustRecord` (47
-entries since [#166](https://github.com/russellgordon/plantoir/issues/166) added
-`assistant answer was cut off` and
-[#163](https://github.com/russellgordon/plantoir/issues/163) added
-`class copy not made`, both of which Windows will have to record or ledger),
-and `renameUnitWord.explanation` out of
-`specialNames.platformWording.keys` (4). Both fail the moment the gap closes or
-the requirement is withdrawn. The two exemption sets in `FileFormatContractTests`
+`windows-app/Plantoir.Tests/NamedGapLedger.cs` holds 6 keys as of 2026-10-01
+(the end of the overnight parity run): 4 on
+[#308](https://github.com/russellgordon/plantoir/issues/308) (the caller-side
+wording that names declined pages) and 2 on
+[#157](https://github.com/russellgordon/plantoir/issues/157) (`noCoursesYet`,
+`whatPublishingMeans`). Both issues are open, and no entry is owned by a closed
+issue. Every entry fails the moment the gap closes or the requirement is
+withdrawn. The two exemption sets in `FileFormatContractTests`
 — `knowinglyAbsent` for `wizardAnswerKeys` and `knowinglyNotFollowed` for
 `writingRules` — are **both empty today**, kept so the next knowing divergence
 is named in a run's output rather than in a comment.
