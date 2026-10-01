@@ -77,7 +77,8 @@ public class AssistPromptShelfTests
         var goesToTheModel = new HashSet<string>(StringComparer.Ordinal)
         {
             "Publish Unit 2, Day 3",
-            "Unpublish Unit 2, Day 3",
+            // "Unpublish Unit 2, Day 3" left this set with #217: the hide and
+            // unpublish frame answers it in code, as it does on the mac.
             "Deploy at 6:30 AM",
             "Cancel scheduled deploy",
         };

@@ -425,6 +425,14 @@ public static class AssistWording
     /// </summary>
     public const string NoCourseNamed = "No course was named, so nothing was done.";
 
+    /// <summary>
+    /// The model answered with the teacher's own request (#217). Deliberately
+    /// GENERAL: the guard fires on any request answered in plain words, so
+    /// advice about pages or verbs would be false for a whole class of them.
+    /// </summary>
+    public const string DidNotFollowThat =
+        "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
+
     // MARK: - A call the model made for another course (#180)
 
     /// <summary>
