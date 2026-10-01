@@ -41,7 +41,7 @@ public interface IChatModel
 /// <para>A null <see cref="FinishReason"/> means the engine did not say, which
 /// is read as finished — the scripted test models build replies that way.</para>
 /// </remarks>
-public sealed record ModelReply(JsonObject Message, string? FinishReason = null)
+public sealed record ModelReply(JsonObject Message, string? FinishReason = null, int? CompletionTokens = null)
 {
     /// <summary>The engine stopped because it reached the cap, not because the answer was done.</summary>
     public bool WasCutOff => string.Equals(FinishReason, "length", StringComparison.OrdinalIgnoreCase);
@@ -460,6 +460,28 @@ public sealed class AssistAgent
         return priming;
     }
 
+    /// <summary>
+    /// What "assistant chose a tool" carries (#164; <c>shared-rules.json</c> →
+    /// <c>activityTrail.mustRecord</c>): the tool, the argument NAMES, the
+    /// seconds, the completion tokens and whether it waited for the button.
+    /// NAMES, never values: which tool with which arguments filled in answers
+    /// the routing question completely, and the values are a teacher's page
+    /// titles. The names are what tell "duplicate Unit 3, Day 2 as my next
+    /// class" from a plain "add the next class" — the same tool either way.
+    /// </summary>
+    internal static string ChoseAToolLine(string tool, JsonObject call, TimeSpan took, int? tokens, bool waited) =>
+        $"the assistant chose {tool.Replace('_', ' ')} {WithArguments(ArgumentsOf(call).Select(pair => pair.Key))}, " +
+        "in " + took.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " +
+        (tokens is { } n ? n.ToString(CultureInfo.InvariantCulture) + " tokens" : "tokens not reported") + ", " +
+        (waited ? "waiting for the teacher's button" : "without waiting for a button");
+
+    /// <summary>"with course, section, pages" — argument names only, in the order given.</summary>
+    internal static string WithArguments(IEnumerable<string> names)
+    {
+        var listed = names.ToList();
+        return listed.Count == 0 ? "with no arguments" : "with " + string.Join(", ", listed);
+    }
+
     /// <summary>A line for the transcript.</summary>
     public sealed record Line(string Speaker, string Text, bool NeedsApproval = false, string? Pending = null);
 
@@ -801,6 +823,7 @@ public sealed class AssistAgent
             ActivityTrail.Note(
                 ActivityTrail.Event.AssistantMatchedAFixedPhrase,
                 "matched in code, not sent to the model — ran " + match.ToolName +
+                " " + WithArguments(match.Arguments.Keys) +
                 (moment is null ? "" : " for " + moment),
                 _courseCode,
                 _section);
@@ -1628,7 +1651,9 @@ public sealed class AssistAgent
 
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
+            var asking = System.Diagnostics.Stopwatch.StartNew();
             var modelAnswer = await _model.Ask(_messages, _schemas, cancellation);
+            asking.Stop();
             if (modelAnswer?.Message is not { } reply)
             {
                 // An ENGINE failure, and deliberately not wound back: the
@@ -1747,7 +1772,9 @@ public sealed class AssistAgent
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
-                $"the assistant chose {name.Replace('_', ' ')}", _courseCode, _section);
+                ChoseAToolLine(name, call, asking.Elapsed, modelAnswer.CompletionTokens,
+                               waited: NeedsApproval(name) || (ConfirmationMode() && PlanTwins.ContainsKey(name))),
+                _courseCode, _section);
             if (NeedsApproval(name))
             {
                 // The one rule this loop owns whatever the settings say. A

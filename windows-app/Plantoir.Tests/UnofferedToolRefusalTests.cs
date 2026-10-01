@@ -167,3 +167,57 @@ public class UnofferedToolRefusalTests : IDisposable
         Assert.Equal(AssistAgent.PlanTwins.Count, AssistAgent.PlanTwins.Values.Distinct().Count());
     }
 }
+
+/// <summary>
+/// #164: "assistant chose a tool" carries the argument NAMES (never values),
+/// the seconds, the completion tokens and whether it waited for the button;
+/// "assistant matched a fixed phrase" carries the names too.
+/// </summary>
+[Collection(SharedActivityState.Name)]
+public class TrailCarriesArgumentNamesTests : IDisposable
+{
+    private readonly string _trail = Path.Combine(Path.GetTempPath(), $"plantoir-trail-names-{Guid.NewGuid():N}.txt");
+
+    public TrailCarriesArgumentNamesTests() => ActivityTrail.SetCustomLogPathForTesting(_trail);
+
+    public void Dispose()
+    {
+        ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        try { File.Delete(_trail); } catch { }
+    }
+
+    private string Line(string marker) =>
+        File.ReadAllText(_trail).Split('\n').Single(line => line.Contains(marker, StringComparison.Ordinal));
+
+    [Fact]
+    public void AChosenToolCarriesItsArgumentNamesAndNeverTheirValues()
+    {
+        var model = new ScriptModel().Calls("publish_pages",
+            "{\"course\":\"VVH2O\",\"section\":1,\"pages\":[\"Secret Lesson Title\"]}");
+        var agent = new AssistAgent(model, new CannedTools(), new JsonArray(), "VVH2O", 1) { ConfirmationMode = () => true };
+
+        agent.Say("publish my lesson", CancellationToken.None).GetAwaiter().GetResult();
+
+        string line = Line("the assistant chose publish pages");
+        Assert.Contains("with course, section, pages", line);
+        Assert.Contains(" s, ", line);
+        Assert.Contains("tokens not reported", line);
+        Assert.Contains("waiting for the teacher's button", line);
+        Assert.DoesNotContain("Secret Lesson Title", File.ReadAllText(_trail));
+    }
+
+    [Fact]
+    public void AFixedPhraseCarriesItsArgumentNames()
+    {
+        var agent = new AssistAgent(new ScriptModel(), new CannedTools(), new JsonArray(), "VVH2O", 1);
+
+        agent.Say("duplicate Unit 3, Day 2 as my next class", CancellationToken.None).GetAwaiter().GetResult();
+        agent.Say("add the next class page", CancellationToken.None).GetAwaiter().GetResult();
+
+        var lines = File.ReadAllText(_trail).Split('\n').Where(l => l.Contains("ran add_next_class")).ToList();
+        Assert.Equal(2, lines.Count);
+        Assert.Contains("duplicate", lines[0]);
+        Assert.DoesNotContain("Unit 3, Day 2", lines[0]);
+        Assert.Contains("with no arguments", lines[1]);
+    }
+}
