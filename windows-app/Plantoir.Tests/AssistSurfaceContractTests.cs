@@ -548,9 +548,9 @@ public class AssistSurfaceContractTests
     /// The contract's MCP surface is a SUBSET of what this app serves, not an
     /// equality — and the difference is a known one, not drift.
     ///
-    /// <para>The contract carries the mac's 32 — counted, not remembered; this
+    /// <para>The contract carries the mac's 37 — counted, not remembered; this
     /// said 25 until 2026-09-09, which was the number before the rollover
-    /// tools landed — and <c>plantoir-mcp.exe</c> serves 37. So the same
+    /// tools landed — and <c>plantoir-mcp.exe</c> serves 40. So the same
     /// question asked of Claude Code gets a different toolbox
     /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
     /// the mac's to decide. What must hold either way is that every tool the
