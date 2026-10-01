@@ -360,6 +360,17 @@ public sealed partial class AssistWorkspace
         string placeOrTitle(string path) => PlaceOf(course, Relative(path));
     }
 
+    /// <summary>
+    /// The rollover's release of the published-pages record (#392), recorded
+    /// in this workspace's undo history so "undo that" puts it back.
+    /// </summary>
+    public void ReleasePublishedPagesForARollover(Course course, int section)
+    {
+        using var recording = UndoHistory.Record(_undo, $"released section {section}'s record of published pages");
+        LinksChecklist.ReleasePublishedPages(course.DirectoryPath, section, DateTime.Now, _undo);
+        recording.Done();
+    }
+
     // ---- The trail (activityTrail.mustRecord) ----------------------------
 
     /// <summary>Record that the sheet was shown. <paramref name="occasion"/> is in words: "after a preview", "from the menu".</summary>

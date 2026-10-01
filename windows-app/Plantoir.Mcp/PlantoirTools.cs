@@ -1396,6 +1396,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     {
         if (!IsARollover(website, rollover)) return "";
 
+        // EVERY rollover, same website or new (#392): the published-pages
+        // record and the checklist's answers belong to last year's classes.
+        workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
+
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {
             ActivityTrail.Note(
