@@ -158,9 +158,12 @@ public class PagesDatedByTheBuildTests
             if (c.AsObject().ContainsKey("expectCreatedDayOnWindows") && c["expectCreatedDayOnWindows"] is null)
                 expect = null;
 
+            var pointer = new SectionIndex.Pointer(
+                c["classes"]!.AsArray().Select(k => k!["title"]!.ToString()).ToList(),
+                pointAt, $"section1/All Classes/{pointAt}.md", c["frontPageHeading"]?.ToString());
             string after = created is null
-                ? SectionIndex.WithMostRecent(index, pointAt) ?? index
-                : SectionIndex.PointedAndDated(index, pointAt, DateOnly.Parse(created[..10]), "T07:00:00.000+0000") ?? index;
+                ? SectionIndex.Repointed(index, pointer) ?? index
+                : SectionIndex.PointedAndDated(index, pointer, DateOnly.Parse(created[..10]), "T07:00:00.000+0000") ?? index;
             string? day = CreatedDay(after);
 
             if (expect is null)

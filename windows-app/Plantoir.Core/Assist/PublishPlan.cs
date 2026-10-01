@@ -299,7 +299,8 @@ public sealed record IndexChange(
     string ToClass,
     DateOnly? FromDate,
     DateOnly ToDate,
-    bool HeadingMissing)
+    bool HeadingMissing,
+    SectionIndex.Pointer? Pointer = null)
 {
     public bool WillChange => !HeadingMissing && (FromClass != ToClass || FromDate != ToDate);
 

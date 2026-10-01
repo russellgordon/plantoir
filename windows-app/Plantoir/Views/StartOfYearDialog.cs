@@ -35,7 +35,7 @@ public static class StartOfYearDialog
             ActivityTrail.Note(ActivityTrail.Event.StartOfYearNotDone,
                 $"did not get ready for the start of the year from the app — nothing was changed ({(proposal.Plan.First is null ? "noFirstClass" : "nothingToDo")})",
                 course.Code, section);
-            return proposal.Text;
+            return proposal.TeacherText;
         }
 
         // The title is the sheet's own; the body is the plan without its code
@@ -69,7 +69,7 @@ public static class StartOfYearDialog
         {
             // Over MCP these are the assistant's sentences; from the app the sheet's own.
             if (outcome.Message == AssistWording.StartOfYearPlanHasChanged(course.Code, section.ToString()))
-                return StartOfYearWording.ChangedSinceShown + "\n\n" + workspace.PlanStartOfYear(course.Code, section).Text;
+                return StartOfYearWording.ChangedSinceShown + "\n\n" + workspace.PlanStartOfYear(course.Code, section).TeacherText;
             if (outcome.Message == AssistWording.StartOfYearNeedsABackup(course.Code))
                 return StartOfYearWording.Fill(StartOfYearWording.BackupFailed, ("course", course.Code));
             return outcome.Message;

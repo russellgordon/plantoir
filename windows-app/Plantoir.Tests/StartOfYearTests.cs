@@ -34,7 +34,7 @@ public class StartOfYearTests : IDisposable
     /// here by WHAT they need rather than by name, so a new club case is
     /// skipped for the same reason and a non-club case never is.
     /// </summary>
-    private static bool NeedsClubs(JsonNode c) => c["naming"] is not null;
+    private static bool NeedsClubs(JsonNode c) => false;   // #274 landed: clubs run like every other case
 
     // ---- Laying a case out -------------------------------------------------
 
@@ -48,7 +48,10 @@ public class StartOfYearTests : IDisposable
         File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
         File.WriteAllText(Path.Combine(CourseDir, "course_config.json"),
             "{\"course_code\":\"TEST\",\"course_name\":\"Test\",\"num_sections\":1,\"section_numbers\":[1]," +
-            "\"shared_folders\":[\"Concepts\"],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[\"Key Links.md\"]}");
+            "\"shared_folders\":[\"Concepts\"],\"per_section_folders\":[\"All Classes\"],\"per_section_files\":[\"Key Links.md\"]" +
+            (c["naming"] is JsonNode naming
+                ? $",\"unit_word\":\"{naming["word"]}\",\"class_page_scheme\":\"{naming["scheme"]}\",\"class_noun\":\"{naming["noun"]}\""
+                : "") + "}");
 
         var paths = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var page in c["pages"]!.AsArray())
@@ -142,7 +145,7 @@ public class StartOfYearTests : IDisposable
             if (!proposal.Text.Contains(marker, StringComparison.Ordinal))
                 problems.Add($"{name}: the plan carries no {warning} warning");
         }
-        if (c["expectIntroContains"] is JsonNode intro && !proposal.Text.Contains(intro.ToString(), StringComparison.Ordinal))
+        if (c["expectIntroContains"] is JsonNode intro && !proposal.TeacherText.Contains(intro.ToString(), StringComparison.Ordinal))
             problems.Add($"{name}: the intro does not contain “{intro}”");
         foreach (var expected in c["expectPlanNames"]?.AsArray() ?? new JsonArray())
         {

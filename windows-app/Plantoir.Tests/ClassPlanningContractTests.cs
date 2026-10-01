@@ -463,6 +463,37 @@ public class ClassPlanningContractTests
         }
     }
 
+    /// <summary>
+    /// <c>sectionIndexPointer.cases</c> (#274 item 8, #406): which line of a
+    /// front page is repointed, found by the CLASS PAGE it names and written in
+    /// the form the teacher wrote (<c>writtenAs</c>). <c>expectBodyOnWindows</c>
+    /// wins where present (this app inserts under the course's heading when no
+    /// line transcludes a class); <c>null</c> means the page is left as it is.
+    /// </summary>
+    [Fact]
+    public void TheFrontPageIsRepointedAsTheContractSays()
+    {
+        var cases = ContractLoader.LoadJson("class-planning.json")["sectionIndexPointer"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 27, $"sectionIndexPointer.cases lost cases: {cases.Count}");
+        var failures = new List<string>();
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            string body = c["indexBody"]!.ToString();
+            string pointAt = c["pointAt"]!.ToString();
+            var pointer = new SectionIndex.Pointer(
+                c["classTitles"]!.AsArray().Select(t => t!.ToString()).ToList(), pointAt,
+                c["pointAtPath"]?.ToString() ?? $"section1/All Classes/{pointAt}.md",
+                c["frontPageHeading"]?.ToString());
+            JsonNode? expectNode = c.AsObject().ContainsKey("expectBodyOnWindows") ? c["expectBodyOnWindows"] : c["expectBody"];
+            string? expect = expectNode?.ToString();
+            string? actual = SectionIndex.Repointed(body, pointer);
+            if (actual != expect)
+                failures.Add($"{name}:\n  expected {(expect is null ? "unchanged" : System.Text.Json.JsonSerializer.Serialize(expect))}\n  got      {(actual is null ? "unchanged" : System.Text.Json.JsonSerializer.Serialize(actual))}");
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
     [Fact]
     public void DatingPagesAClassBrings_FrontmatterKeys_MatchContract()
     {

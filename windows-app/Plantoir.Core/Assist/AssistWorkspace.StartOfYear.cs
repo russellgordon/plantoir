@@ -19,7 +19,15 @@ public sealed record StartOfYearProposal(
     int Section,
     StartOfYearPlan Plan,
     string Text,
-    string Code);
+    string Code)
+{
+    /// <summary>
+    /// The plan in the course's own noun — what the TEACHER reads (the app's
+    /// sheet, the window's card). <see cref="Text"/> is the class form, which
+    /// is what the model and plantoir-mcp's text content carry (#274).
+    /// </summary>
+    public string TeacherText { get; init; } = Text;
+}
 
 /// <summary>What a write did: the sentence to say, the backup, and the files written (before → after).</summary>
 public sealed record StartOfYearOutcome(
@@ -91,7 +99,13 @@ public sealed partial class AssistWorkspace
         bool actionable = plan.First is not null && !plan.NothingToDo;
         string text = StartOfYearWording.Describe(plan, course.Code, section, DateOnly.FromDateTime(DateTime.Now),
             scheduled, actionable ? code : null);
-        return new StartOfYearProposal(course.Code, section, plan, text, code);
+        var noun = course.Configuration.ClassNoun;
+        return new StartOfYearProposal(course.Code, section, plan, text, code)
+        {
+            TeacherText = noun == ClassNoun.Class ? text
+                : StartOfYearWording.Describe(plan, course.Code, section, DateOnly.FromDateTime(DateTime.Now),
+                    scheduled, actionable ? code : null, noun),
+        };
     }
 
     private static string StartOfYearCode(Course course, int section, IEnumerable<StartOfYearPage> pages)
@@ -192,7 +206,7 @@ public sealed partial class AssistWorkspace
                 string index = SectionIndex.PathFor(course, section);
                 string before = File.ReadAllText(index);
                 string tail = SiblingTimeAndOffset(course, section, classes);
-                if (SectionIndex.PointedAndDated(before, Path.GetFileNameWithoutExtension(newest),
+                if (SectionIndex.PointedAndDated(before, PointerFor(course, section, newest),
                         DateOf(course, section, newest) ?? default, tail) is { } after && after != before)
                 {
                     Save(index, after);

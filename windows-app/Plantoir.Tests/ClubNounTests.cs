@@ -58,6 +58,7 @@ public sealed class ClubNounTests : IDisposable
         ("next page", tools => tools.PlanAddNextClass("ICS3U", 1)),
         ("duplicate", tools => tools.PlanAddNextClass("ICS3U", 1, duplicate: "Week 1")),
         ("add pages", tools => tools.PlanAddClasses("ICS3U", 1, 1, 2)),
+        ("start of year", tools => tools.PlanPrepareForStartOfYear("ICS3U", 1)),
     };
 
     [Fact]
