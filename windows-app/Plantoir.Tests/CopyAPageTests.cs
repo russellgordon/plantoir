@@ -156,6 +156,28 @@ public class CopyAPageTests : IDisposable
         Assert.Contains(outcome.Skipped, s => s.Reason == "aPageOfThatNameIsAlreadyHere");
     }
 
+    /// <summary>
+    /// A write that fails part way leaves NO page behind (review M1, ruling
+    /// 1): the half-written copy — its settings possibly cut off before the
+    /// keys that hide it — is removed, never left to be published.
+    /// </summary>
+    [Fact]
+    public void AWriteThatFailsPartWayLeavesNoPageBehind()
+    {
+        var source = Build(_root, JsonNode.Parse("""{"folder":"ICS4U-2025","sharedFolders":["Concepts"],"pages":[{"path":"Concepts/Recursion.md","text":"Body\n"}],"media":[]}""")!);
+        var destination = Build(_root, JsonNode.Parse("""{"folder":"ICS4U","sharedFolders":["Concepts"],"pages":[],"media":[]}""")!);
+        var request = new CoursePageCopy.Request(source, destination, "Concepts/Recursion.md", "Concepts", false);
+        var plan = CoursePageCopy.MakePlan(request);
+        CoursePageCopy.WhileWritingAPage = _ => throw new IOException("There is not enough space on the disk.");
+        CoursePageCopy.Outcome outcome;
+        try { outcome = CoursePageCopy.Copy(plan, request, new CoursePageCopy.Session(_ => "B.zip")); }
+        finally { CoursePageCopy.WhileWritingAPage = null; }
+        Assert.False(File.Exists(Path.Combine(destination.DirectoryPath, "Concepts", "Recursion.md")));
+        Assert.Empty(outcome.PagesCreated);
+        Assert.Empty(outcome.MustBeRemoved);
+        Assert.Contains(outcome.Skipped, s => s.Reason == "thePageCouldNotBeWritten");
+    }
+
     [Fact]
     public void OneBackupIsTakenPerSessionNotPerPress()
     {
