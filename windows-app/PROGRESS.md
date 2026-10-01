@@ -509,6 +509,18 @@ count parsed from launcher output); and the wizard's answer pump against the
 real `setup_course.py`, exit 0 with a full course scaffolded, using the same
 `NewCourseCreator.PumpAnswers` the Create Course button uses.
 
+**Since bundle 11 (2026-10-01) through the real window, by `[UiFact]`s that run
+the real launchers** (opt-in, `run-ui-tests.ps1`): the wizard's Create then
+Preview, with the served front page read back over HTTP and from the web view
+and Stop silencing the address (`WizardToPreviewUiTests`); Import Courses for
+Reference… through the Windows folder picker, the course shelved by year and
+locked on disk (`ImportForReferenceUiTests`); a course kept for reference —
+summary, no Deploy, pages locked, Keep a Copy and its refusal
+(`ReferenceCourseUiTests`); Copy a Page through its checklist, both copies
+hidden, the published destination without them, and three refusals
+(`CopyAPageEndToEndUiTests`); and Deploy to a folder, the published folder
+read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
+
 ## The hard-won platform lessons (do not relearn these)
 
 1. **ConPTY std-handle hygiene.** A process whose own stdio is redirected leaks

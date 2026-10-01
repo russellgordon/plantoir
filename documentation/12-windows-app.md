@@ -867,6 +867,48 @@ caches from the same variable.
 Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
 real globally unique site — `verify-deploy.ps1` owns those).
 
+**What the first unlocked runs taught (bundle 11, 2026-10-01, this PC: Intel
+i5-8365U, 16 GB, Windows 11 26200).** Eleven tests written while the desktop
+was locked had never run; the first whole run failed 9 of 33, and every one of
+these is now written into the harness rather than left to be rediscovered:
+
+- **A ContentDialog is a `Window` of class `Popup`, named by its title.** There
+  is no "ContentDialog" class in the UIA tree, and an empty `Popup` sits beside
+  it; `DrivenApp.OpenDialog` tells them apart by the dialog's own buttons.
+- **A panel has no automation peer.** An `AutomationId` set on a `StackPanel`
+  or a `UserControl` never reaches the tree (`clubLockedRows`,
+  `referenceSummary` — the latter moved to its `ScrollViewer`). A test that
+  asserts such an element ABSENT passes whatever the screen shows.
+- **A folded TreeView item has no children in the tree.** The sidebar's
+  Backups group starts folded; unfold it (ExpandCollapse) before asserting a
+  backup row is there or gone.
+- **`AutomationProperties.AutomationId` replaces `x:Name`, case-sensitively.**
+  `DeployButton` matched nothing; the id is `deployButton`.
+- **`SetScrollPercent(-1, 100)` on Course Settings' form stuck at 2.8 %**; a
+  `LargeIncrement` walk reaches the bottom.
+- **An empty `TextBlock` has no Name** (`PropertyNotSupportedException`), and a
+  UIA query can time out (`COMException 0x80131505`) while the app draws a
+  dialog — both mean "nothing yet", not a fault.
+- **Click a control only once it has a clickable point**; a dialog opened
+  straight after another closed is still arriving (`NoClickablePointException`).
+- **WebView2's page text** arrives through UIA lazily, sometimes as Text and
+  sometimes as another element's name, and once (1 run in 4) not at all until
+  the view had the focus.
+
+Three PRODUCT faults the same runs found, all fixed in bundle 11: Keep a Copy
+for Reference… (and Import, same shape) closed the app on its first progress
+report — a `Progress<T>` made inside `Task.Run` reports on a pool thread
+(`ProgressMadeOnTheInterfaceThreadTests` now refuses the shape); choosing a
+folder and then Netlify again in Course Settings left Revert on
+(`CourseConfiguration.DeployTarget` now restores the saved spelling); and
+every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
+
+Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
+29–32 s; its first preview served 52 s after Preview was pressed; publishing a
+one-section course to a folder 1 m 52 s – 3 m 3 s per test (build included);
+the end-to-end set of 13 tests 17 m 40 s – 20 m 33 s; the whole suite of 40,
+43 m 38 s.
+
 ### Never start the app with its output redirected
 
 `ConPtyProcess.Start` already carries this as a CAUTION, and it is repeated
@@ -3598,8 +3640,15 @@ test that must be edited to measure is not one Russell can run from the
 script), an automation property carrying a count (a screen reader would
 announce it), and a trail line (a teacher-visible record of a key that did
 nothing, with a contract entry and a mac issue for a measurement aid). A
-teacher's run never redirects, so it never writes the file. Unproven until
-`run-ui-tests.ps1` runs on an unlocked desktop.
+teacher's run never redirects, so it never writes the file.
+
+**Measured, 2026-10-01 13:40 (bundle 11, run 1, unlocked desktop, Intel
+i5-8365U, Windows 11 26200), verbatim:** "F2: not delivered (the dialog kept
+it) / Ctrl+Shift+R: not delivered (the dialog kept it) / Ctrl+N: not delivered
+(the dialog kept it) / Ctrl+O: not delivered (the dialog kept it)". The test
+passed in every whole-suite run after. So WinUI does not deliver the window's
+four accelerators while a ContentDialog is up, on this build; the guard is
+belt and braces, and costs nothing.
 
 ### A wrapping panel squeezed narrow (#214, the mac's #211)
 
@@ -3622,3 +3671,12 @@ deliberately: putting it on screen needs a real publish, which builds into the
 teacher's real builds folder because `--state-dir` redirects only what the app
 resolves (see "Driving the real interface"). Same construct, so the notice's
 number stands for both until a measurement says otherwise.
+
+**Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
+"window 900x737; notice 631x157 (top 135 below the window's top)". The
+resize to 500 px was NOT honoured: the window would go no narrower than 900,
+so the squeeze a teacher can make is bounded there, and at that width the
+notice is 157 px of a 737 px window, inside it. The test's own wait for the
+width to reach 520 times out silently; it should say so if the window's
+minimum ever drops (left as it is: the assertion that matters — the notice
+stays inside the window — holds at the narrowest width a teacher can reach).
