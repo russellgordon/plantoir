@@ -5458,6 +5458,63 @@ teacher meets in the first ten seconds.
   Measured: two PDFs and one `.html` across the real courses, and the only
   pages linking them are class pages, which are never copyable.
 
+### On Windows (#247, #258's half, #384): what differs, and what was measured
+
+The Windows port is `Plantoir.Core/Models/CoursePageCopy.cs` (the plan and the
+copy), `CopyPageFrontmatter.cs` (the four steps and the guard) and
+`CopyPageWording.cs` (every `copyingAPageBetweenCourses.wording` key, compared
+with the contract by `CopyAPageFrontmatterTests`), drawn by
+`Plantoir/Views/CopyAPageDialog.cs`. The rules are the contract's and all 32
+`cases`, 9 `frontmatterCases` and 36 `builderAgreement.cases` run on Windows.
+Four things are different in HOW, and each was measured rather than assumed
+(i5-8365U, 16 GB, Samsung 980 NVMe, NTFS, Windows 11 build 26200, Python 3.14,
+python-frontmatter/PyYAML as `scripts/` pins them):
+
+- **NTFS does not refuse an accent twin.** `FileMode.CreateNew` refuses a name
+  differing only by CASE (an `IOException` with HResult `0x80070050`,
+  `ERROR_FILE_EXISTS`, which is the ordinary "already here" skip) — but a name
+  differing only by NFC/NFD spelling is created as a SECOND file
+  (`CopyAPageNamesTests.NtfsDoesNotRefuseAnAccentTwinButDoesRefuseACaseTwin`).
+  On the mac `O_EXCL` refuses both. So on Windows the name index — NFC, then
+  `ToUpperInvariant`, ordinal, `.md` dropped, over the whole destination — is
+  the ONLY guard against a twin, and it is updated after EACH successful write
+  (bundle-6 ruling 5): two incoming pictures that are twins of each other both
+  plan as new, and the index written after the first is what makes the second a
+  skip (`TwoAccentTwinPicturesInOneRunMakeOneFileAndOneSkip`; with the per-write
+  update removed the test finds two files). Writes keep the SOURCE's exact
+  UTF-16 name: .NET's listing and `Path.Combine` leave an NFD name as stored.
+- **Every write is a stream copy into `FileMode.CreateNew`.** No `File.Copy`
+  (it carries the read-only attribute) and never a `File.Exists` check before a
+  write. A page that appears between the plan and the write is caught by the
+  exclusive create (`ALateCollisionIsASkipNotAnOverwrite`, with a racing
+  creator injected right before the write). Nothing written carries a lock or a
+  read-only bit, and `ReferenceLock.Clear` runs on each file before the read-back
+  anyway (`CopyAPageClearsTheLockTests` locks the source with design A and a
+  read-only bit first).
+- **There is no YAML library in this app**, so the guard is a narrow whitelist
+  language (`CopyPageFrontmatter.BuilderAgrees`) that REFUSES anchors, aliases,
+  tags, block scalars, flow mappings, directives, indented fences, a lone CR,
+  tabs, control characters and digit-led values PyYAML resolves but cannot
+  construct — "certified" is true by construction for what it accepts. That the
+  restriction is SOUND is fuzz-backed, not proven: `CopyAPageFuzzTests` composes
+  generated sources in C# and asks ONE Python pool, which imports
+  `scripts/build_site.py` and runs the real `process_frontmatter` for sections
+  1–4, whether each certified page is hidden. 5,000 sources (the default, ~30 s):
+  2,017 certified, 2,983 refused, **0 certified and not hidden**. One run of
+  PLANTOIR_FUZZ_N=1000000 (1 h 20 min on the hardware above): 401,096 certified, 598,904 refused, and **856 certified and NOT hidden by the build** — the guard is NOT yet sound at that scale. The failing shapes were not captured by that run (the failure message printed none); a 100,000-source run was clean, and a 400,000-source run with PLANTOIR_FUZZ_DUMP set was in progress when this was written. OPEN: find the shapes and narrow the language before this ships. Every one of the 12,128 pages Plantoir ships
+  (`support/example_content` + `support/skeletons`) is certified: **0 false
+  refusals**. With the guard widened to admit `&`/`*` values (an anchor or
+  alias), the same fuzz finds 5 published pages — the oracle has teeth.
+- **The scroll region (#384)** is one `ScrollViewer` with `MaxHeight` 380 epx on
+  the checklist and 320 on the result, around the rows AND every per-page
+  sentence; `CopyAPageDialogUiTests.CheckListAndSentencesScrollAsOne` asserts a
+  minimum height as well as the ceiling, with eleven rows and seventy sentences
+  at the window's smallest height.
+
+`draftSectionTwo` and `createdForSectionTwo` (#258's half) are stripped by
+exact name with the plain pair, before the guard is asked; the import of the
+2024-25 layout itself was decided NO for Windows.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
