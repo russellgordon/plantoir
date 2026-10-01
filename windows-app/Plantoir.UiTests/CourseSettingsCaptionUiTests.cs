@@ -82,10 +82,16 @@ public class CourseSettingsCaptionUiTests
         var scroll = form.Patterns.Scroll.PatternOrDefault;
         Assert.True(scroll is not null, "the Course Settings form offers no scroll pattern");
 
+        // Walked a page at a time, not by percentage. Measured on the first
+        // unlocked run (bundle 11, a 793 x 483 window): SetScrollPercent(-1,
+        // 100) on this ScrollViewer left it at 2.8 %, so a percentage walk
+        // never reached anything below the first screenful; LargeIncrement
+        // moves it a viewport each time.
+        scroll!.SetScrollPercent(-1, 0);
         bool visible = false;
-        for (int step = 0; step <= 10 && !visible; step++)
+        for (int step = 0; step <= 60 && !visible; step++)
         {
-            scroll!.SetScrollPercent(-1, Math.Min(100, step * 10));
+            if (step > 0) scroll.Scroll(ScrollAmount.NoAmount, ScrollAmount.LargeIncrement);
             visible = Retry.WhileFalse(() =>
             {
                 var caption = form.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))

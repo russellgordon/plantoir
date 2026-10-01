@@ -46,7 +46,12 @@ public class CourseSettingsSaveUiTests
 
         app.Find("deployTargetPicker", "Deploy to").AsComboBox().Select(0);   // back to Netlify: nothing unsaved
         Assert.True(Retry.WhileFalse(() => !app.Find("revertButton", "Revert").IsEnabled, TimeSpan.FromSeconds(3)).Result);
-        Assert.Equal("", app.Find("savedConfirmation", "the note beside Save").Name);
+        // An EMPTY TextBlock reports no Name at all (PropertyNotSupported,
+        // measured on the second run of bundle 11) — that is the empty note.
+        string note;
+        try { note = app.Find("savedConfirmation", "the note beside Save").Properties.Name.ValueOrDefault ?? ""; }
+        catch (FlaUI.Core.Exceptions.PropertyNotSupportedException) { note = ""; }
+        Assert.Equal("", note);
     }
 
     [UiFact]

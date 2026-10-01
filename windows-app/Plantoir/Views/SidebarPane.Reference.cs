@@ -305,10 +305,16 @@ public sealed partial class SidebarPane
         var working = WorkingDialog($"Copying {shown}…");
         var showing = ShowDialogSafelyAsync(working.Dialog);
         string? failure = null;
+        // Made HERE, on the interface's thread, never inside Task.Run: a
+        // Progress<T> reports on the context it was CREATED on, and one made on
+        // a pool thread set the bar's Maximum from that thread —
+        // RPC_E_WRONG_THREAD, and the whole app closed the moment the first
+        // progress arrived (found by ReferenceCourseUiTests, bundle 11).
+        var progress = new Progress<ReferenceTreeCopier.Progress>(p => working.Report(p.Copied, p.Total));
+        string coursesDirectory = Workspace.CoursesDirectory();
         try
         {
-            await Task.Run(() => ReferenceCopier.KeepACopy(course, folderName, year, Workspace.CoursesDirectory(),
-                new Progress<ReferenceTreeCopier.Progress>(p => working.Report(p.Copied, p.Total))));
+            await Task.Run(() => ReferenceCopier.KeepACopy(course, folderName, year, coursesDirectory, progress));
         }
         catch (ReferenceCopier.NotMade notMade) { failure = notMade.Message; }
         finally { working.Dialog.Hide(); await showing; }
@@ -430,15 +436,20 @@ public sealed partial class SidebarPane
         var showing = ShowDialogSafelyAsync(working.Dialog);
         string sourceName = Path.GetFileName(Path.TrimEndingDirectorySeparator(chosen.Path));
         List<ReferenceImport.Outcome> outcomes;
+        // On the interface's thread, for the reason KeepACopy's says: a
+        // Progress<T> made inside Task.Run reports on a pool thread.
+        var progress = new Progress<ReferenceImport.Progress>(p =>
+        {
+            working.Dialog.Title = ReferenceImport.Copying(p.Course);
+            working.Report(p.Copied, p.Total);
+        });
+        string coursesDirectory = Workspace.CoursesDirectory();
+        var existingCodes = Workspace.Courses.Select(c => c.Code).ToList();
+        var shelf = ReferenceCourse.Shelf(Workspace.Courses, Today);
         try
         {
-            outcomes = await Task.Run(() => ReferenceImport.ImportCourses(requests, Workspace.CoursesDirectory(),
-                Workspace.Courses.Select(c => c.Code), ReferenceCourse.Shelf(Workspace.Courses, Today), sourceName,
-                new Progress<ReferenceImport.Progress>(p =>
-                {
-                    working.Dialog.Title = ReferenceImport.Copying(p.Course);
-                    working.Report(p.Copied, p.Total);
-                }), stop.Token));
+            outcomes = await Task.Run(() => ReferenceImport.ImportCourses(requests, coursesDirectory,
+                existingCodes, shelf, sourceName, progress, stop.Token));
         }
         finally { working.Dialog.Hide(); await showing; }
 
