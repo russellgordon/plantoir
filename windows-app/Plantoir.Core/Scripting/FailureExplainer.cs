@@ -8,7 +8,8 @@ namespace Plantoir.Core.Scripting;
 public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
-        SectionIsBeingDeployedExplanation(output)
+        ReferenceCourseExplanation(output)
+        ?? SectionIsBeingDeployedExplanation(output)
         ?? FolderCopyExplanation(output)
         ?? SetupExplanation(output)
         ?? VaultLinkExplanation(output)
@@ -39,6 +40,35 @@ public static class FailureExplainer
         output.Contains("untrusted mount point")
             ? "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again."
             : null;
+
+    /// <summary>
+    /// A launcher refused a course kept for reference (#241,
+    /// <c>app-rules.json → failureExplanations</c> cases 0–2): the refusal is
+    /// LIFTED with its cross taken off, and the "cannot tell" refusal, which
+    /// the launchers print over two lines, is joined into the teacher's one.
+    /// deploy.sh ends its first line with an em dash; deploy.ps1 with a plain
+    /// hyphen, because Windows PowerShell 5.1 reads a script without a
+    /// byte-order mark in the machine's code page — both read the same here.
+    /// Matters most for a deploy set to happen on its own, which runs with the
+    /// app closed: without it the teacher meets "did not finish".
+    /// </summary>
+    private static string? ReferenceCourseExplanation(string output)
+    {
+        const string refusalTail = "is kept for reference, so it is never deployed. Deploy the course you are teaching instead.";
+        string[] lines = output.Replace("\r", "").Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index].Trim().TrimStart('❌', ' ');
+            if (line.EndsWith(refusalTail, StringComparison.Ordinal)) return line;
+            if (line.StartsWith("Plantoir cannot tell whether ", StringComparison.Ordinal)
+                && line.TrimEnd('-', '—', ' ').EndsWith("is kept for reference", StringComparison.Ordinal)
+                && index + 1 < lines.Length)
+            {
+                return line.TrimEnd('-', '—', ' ') + " — " + lines[index + 1].Trim();
+            }
+        }
+        return null;
+    }
 
     /// <summary>
     /// preview.ps1 refused because this very section is being deployed (#386,

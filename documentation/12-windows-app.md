@@ -3000,3 +3000,214 @@ buildId is the site's. **Every rollover** (same website or new, not only
 `ReleaseSite`) moves the fragments to `.published-pages.previous-<stamp>/`,
 keeps the folder, removes the answered file, and records it all in the undo
 history.
+
+## Courses kept for reference on Windows (#241, #244, #245, #298)
+
+The rule is the contract's (`shared-rules.json → referenceCourses`) and the
+mac's write-up is `09-mac-app.md` → "A reference course, and what FROZEN
+means on disk". This section is what Windows does DIFFERENTLY, and why.
+Code: `Plantoir.Core/Models/Reference*.cs`, `ObsidianAddOns.cs`,
+`SchoolYear.cs`, `Plantoir.Mcp/ReferenceWriteGate.cs`,
+`Plantoir/Views/SidebarPane.Reference.cs`, `ReferenceSummaryView.cs`.
+Tests: `ReferenceCourseTests`, `ReferenceLockTests`, `ReferenceRefusalTests`,
+`ReferenceMarkerAgreementTests`, `ReferenceCopierTests`, `ReferenceImportTests`,
+`ReferenceInterfaceTests`, `ReferenceBuildKeepsHiddenPagesHiddenTests`,
+`scripts/test_build_keeps_a_readonly_hidden_page_hidden.py`, and the UI tests
+`ReferenceCourseUiTests`.
+
+### The lock is deny entries, not the read-only attribute (design A5)
+
+NTFS has no `uchg`. Measured on this PC (i5-8365U, 16 GB, Samsung 980 NVMe,
+Windows 11 26200) before anything was written:
+
+| | Read-only attribute | Deny on the file only | **Deny on the file + deny delete-child on its folder (chosen)** |
+|---|---|---|---|
+| write in place | refused | refused | refused |
+| rename-over (`File.Replace`, `os.replace`) | refused | refused | refused |
+| rename | allowed | allowed | refused |
+| delete, `Remove-Item -Force`, Explorer | allowed (they clear the bit first) | allowed (the parent's inherited FILE_DELETE_CHILD wins) | refused |
+| add a new file beside it | allowed | allowed | allowed |
+| replace the UNLOCKED `course_config.json` from a `.tmp` | n/a | n/a | allowed |
+| make and remove the `.merged_output` junction | n/a | n/a | allowed |
+| does a COPY carry it? | **yes** (`File.Copy`, `shutil.copy2`) | no | no |
+
+So: on every content file an explicit DENY of `WriteData, AppendData,
+WriteExtendedAttributes, WriteAttributes, Delete` for this account, and on
+every folder holding a locked file a DENY of `DeleteSubdirectoriesAndFiles`
+for that folder only — never inherited by its contents, which would stop the
+preview's link and Obsidian's `workspace.json` (the mac's "never lock the
+directories" finding again).
+
+**Rejected: the read-only attribute.** It TRAVELS. The native build copies
+each page with `shutil.copy2`, the copy is read-only, the frontmatter rewrite
+fails, the copy keeps `draft: true`, and the page the teacher HID is
+published. Reproduced end to end with a real native build
+(`ReferenceBuildKeepsHiddenPagesHiddenTests`; must-fail: without the fix
+below, the hidden page is in `public/`). **Rejected: a lock file** that
+Plantoir's own writers check — Obsidian, Explorer and editors never read it,
+and the marker already is the in-app gate.
+
+**Belt and braces in the shared build.** `build_site._writable` makes the
+BUILD's own copy writable before every write it makes to a page
+(`process_frontmatter`, the dating write, the unreadable page's hide, the
+wikilink rewrite). A no-op on the mac. A read-only page can still reach any
+course from OneDrive, a zip, or another tool.
+
+**Never-locked names**: the contract's six, plus `desktop.ini` and
+`Thumbs.db` (Windows' twins of `.DS_Store`), plus anything ending `.tmp`.
+
+**Unlock matches the SHAPE, whoever it names** (bundle-6 ruling 3). Windows
+MERGES two deny entries for one account into one (measured: a teacher's own
+`ReadData` deny plus ours came back as a single entry carrying both), so
+Unlock takes OUR bits out of any explicit deny entry that carries all of
+them and leaves the rest of that entry — a teacher's own rule survives. A
+course carried from another account, whose entries name a SID that is not
+this user, still unlocks.
+
+**Cost, .NET 9 ACL API**, 1,200 files: lock 808–820 ms (every file read back,
+plus the census), a pass with nothing to do 113–129 ms, unlock 409–473 ms.
+The planner's PowerShell 5.1 probe: 607 / 209 / 397 ms. The mac: 59.5 ms and
+23 ms. So every pass runs off the UI thread, on folder read and on an act,
+never on a timer.
+
+**The census** is a separate plain listing (recursive, links skipped)
+classified by the never-locked rule alone, so a walk that skipped a folder
+cannot agree with itself (the mac's 842-of-934 fault).
+
+**Honest limits, never in the GUI.** New files can be added. The owner can
+remove the entries (Properties → Security). An entry does not sync, so the
+lock is per-machine. Another account is not denied. **`robocopy /SEC`,
+`/COPYALL` and `/COPY:…S` CARRY the lock — and then stall on it**, retrying
+a file whose attributes it cannot set (by default a million times at 30 s;
+measured by the plan review). `Copy-Item`, Explorer and a zip do not carry
+it. Nothing in this repository may use those flags:
+`ReferenceLockTests.NoRobocopyInThisRepositoryCopiesSecurity` (must-fail:
+`/SEC` on deploy.ps1's mirror turns it red). A teacher's own script that
+does is answered by Unlock, which matches the shape. **And the refusal to
+deploy never depends on any of it**: every door asks the marker.
+
+**Not measured, owed:** OneDrive with locked files under it (whether its
+client keeps the entries, and whether a deny on `WriteAttributes`/`Delete`
+stops it dehydrating or syncing — the fallback is to drop `WriteAttributes`);
+an elevated token (the deny is by user SID, so it should still apply); and
+what Obsidian for Windows shows on a page it cannot save — which is why
+`referenceCourses.wording.obsidianOpensThemForReading`, a macOS measurement,
+is NOT said on Windows yet.
+
+### A byte-order mark used to hide a course
+
+`CourseConfiguration.FromBytes` kept a BOM as U+FEFF and Newtonsoft refused
+it, so a settings file saved by Notepad made its course vanish from the
+sidebar — and a reference course with one was not a course at all
+(`markerAgreement`, "a byte-order mark at the head of the file"). The BOM is
+stripped before parsing now.
+
+### The fifteen doors on Windows
+
+| # | Door | Windows chokepoint | Test |
+|---|---|---|---|
+| 1 | section window's Deploy | `SectionDetailView.DeployAsync`, first check (and the button is not drawn) | `TheDeployButtonsFlowRefusesFirst`, UI `AReferenceCourseHasNoDeployButtonAndNoRepairButton` |
+| — | the runner behind it | `MultiDestinationDeployRunner.RunAsync`, before the first destination | `TheMultiDestinationRunnerRefusesBeforeTheFirstDestination` |
+| 2–4 | local assistant's deploy and its card's Go | `AssistAgent`: no card for such a course; the hand-back refuses BEFORE any preview stop | `TheLocalAssistantsDeployIsRefusedBeforeThePreviewIsStopped`, `TheApprovalCardsGoIsRefusedToo` |
+| 3 | headless deploy | `AssistWorkspace.Deploy`, first | `TheHeadlessDeployRefusesFirst` |
+| 5, 7 | MCP `deploy_section`, `schedule_deploy` | plantoir-mcp's call-tool filter, `ReferenceWriteGate` | `TheWriteGateRefusesEveryWriteAndSaysWhichKind`, `TheGateIsChosenByEachToolsOwnReadOnlyFlag` |
+| 6, 8, 10 | assistant scheduling, the Schedule Deploy… dialog, `plan_scheduled_deploy` | `ScheduledDeploy.Problem`, first — before "that time has already passed" | `TheScheduleSheetRefusesWhateverTimeWasAsked`, `PlanningAScheduledDeployRefusesToo` |
+| 9, 11, 12, 13 | an alarm firing, `deploy.bat` by hand, `--to-folder` | `deploy.ps1`'s host-side check | `ReferenceMarkerAgreementTests` — all 26 rows against the REAL launcher (must-fail: the check off, and "the marker, plainly" goes past it) |
+| 14 | `deploy.py` | inherited | `scripts/test_reference_course.py` |
+| 15 | `verify-deploy.ps1` | inherits the above | opt-in, not run by bundle 6b |
+
+**The MCP write gate** reads each tool's OWN `ReadOnly` flag off its
+`[McpServerTool]` attribute, over all 42 tools plantoir-mcp serves (not the
+mac's 22), and takes the three exemptions from the contract. A test adds a
+fake write tool and sees it gated without being named. `undo_last_change` is
+the only write tool with no course argument and is gated by the course its
+newest recorded change touched. The local window is told nothing about a
+reference course in `list_courses`; an outside session is told its folder,
+code, kind and year. A bare code with no live course is refused naming the
+candidates.
+
+### Staging and the claim (#245)
+
+As the mac: `courses/.plantoir-importing-<FOLDER>`, renamed into place last.
+Two Windows choices: the folder is made with `CreateDirectoryW`, which refuses
+an existing folder atomically (`Directory.CreateDirectory` does not), and the
+in-app key is the courses folder's `GetFinalPathNameByHandle` spelling folded
+to upper case (NTFS is case-insensitive). The import lease carries line 4 —
+the owner's start, the mac's spelling — and an import lease with no name line
+is judged as written by Plantoir.
+
+### The import
+
+The copy is a 1 MB-chunk STREAM copy, never `File.Copy` from the source
+(which carries the read-only bit and alternate streams; CopyFileEx was
+rejected for the same reason). Opened read-only with ReadWrite|Delete
+sharing; only attributes and times are read. The walk is our own, one folder
+at a time, hidden and system entries INCLUDED, and never lists what it leaves
+behind. **Every reparse point is left behind**: the mac copies a symlink as a
+link, but making one needs a privilege a teacher lacks (WinError 1314) and a
+junction cannot be copied faithfully; the only link in a modern course is
+`.merged_output`, left behind by name anyway. A `.lnk` is an ordinary file
+and comes.
+
+**Measured** end to end through `ReferenceImport.ImportCourses` (walk, copy,
+clear, settings, lock, rename): a generated course of 507 MB in 605 files
+(4 × 110 MB, 300 × 150 KB, 300 pages) beside a 110 MB `.merged_output` that is
+skipped — **5.21 s and 5.63 s, 97 and 90 MB/s**, 24–31 progress reports, on
+the NVMe above with Defender on and freshly written random data. The
+planner's warm-cache probe of the bare copy was 431 MB/s by stream and
+670 MB/s by `File.Copy`; the gap is the lock pass and the scanner reading new
+files. A cold USB disk is estimated at 20–100 MB/s, so the bar is in BYTES,
+reports at most every 100 ms, and Stop answers within one chunk. The trail's
+"course imported" line carries the size and the seconds, so real speeds come
+back in problem reports.
+
+The import's CLEAR step (unlock, drop read-only bits) is a guard: a stream
+copy carries neither today, which a test asserts directly
+(`AStreamCopyCarriesNeitherTheBitNorTheLock`); the must-fail (switch to
+`File.Copy` and drop the clear) turns it and
+`ImportFromAFolderHoldingAReferenceCourse` red.
+
+### What the interface withholds
+
+Hidden, never greyed, on a reference course: the Deploy button, Schedule
+Deploy…, Rename (the File menu item, F2 and the context menu all ask
+`CourseThatCanBeRenamed`), Add Section…, Keep a Copy…, every Revise item,
+the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
+refuses on its own), and the Course Settings form, replaced by
+`ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
+The footer's Remove on a reference course's section removes the whole course;
+`ArchiveAndRemoveSection` refuses with `staysAsItIs` for any other caller.
+Import Courses for Reference… is on the File menu, beside Restore from
+Archive…. The calm note is shown before Obsidian opens, once per course,
+remembered in the state folder.
+## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
+
+What a Windows implementer needs that the mac's write-up cannot give; the
+rules and the reasoning are in `documentation/09-mac-app.md` → "Copying a page
+from one course into another", and its "On Windows" subsection has the numbers.
+
+- **"Already here" is an HResult, not a check.** Every page and picture is
+  written by stream into `new FileStream(path, FileMode.CreateNew, …)`. An
+  `IOException` whose `HResult` is `0x80070050` (`ERROR_FILE_EXISTS`) — or
+  `0x800700B7` — is the ordinary skip, in the index's words. `File.Exists` then
+  `File.WriteAllText` has a window; `File.Copy` carries the read-only attribute.
+- **NTFS creates an NFD twin of an NFC name** (and refuses a case twin). The
+  name index (`CoursePageCopy.Fold`: `Normalize(FormC)` then
+  `ToUpperInvariant`, ordinal) is therefore the only guard, and it is updated
+  after every successful write. Run every comparison ordinally:
+  `string.Contains(string)` is ordinal; `IndexOf(string)` without a
+  `StringComparison` is culture-sensitive and is what would fuse a combining
+  mark with the space after a colon — Swift's trap, inverted.
+- **The guard is fuzzed against the real build, in one Python pool.**
+  `Plantoir.Tests/BuildFrontmatterOracle.cs` writes the pages to a temp folder
+  and runs a `multiprocessing.Pool` that imports `scripts/build_site.py`, calls
+  `frontmatter.load` and the real `process_frontmatter` for sections 1–4, and
+  reads `publish` as `patches/publish.ts` does. It caches
+  `_get_excluded_note_config` (which re-reads the contracts on every call) and
+  nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
+  PC — every file open pays for Defender — and 30 s across the pool. Set
+  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0. The cause is not known.** The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net. The discrepancy is tracked as an open `windows` issue ("Copy a Page fuzz: reproduce or explain the 856"). Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
+- **The dialog** is a `ContentDialog` whose primary button cancels its own
+  close (`args.Cancel = true` under a deferral) so one dialog walks the three
+  stages; the picker is an `AutoSuggestBox` fed only on
+  `AutoSuggestionBoxTextChangeReason.UserInput`, so nothing opens on focus.

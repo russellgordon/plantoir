@@ -206,6 +206,22 @@ start-of-year Go does not stop and restart the preview, the club case waits for
 #274, and
 `courseIsBeingCopied` (the course is not counted busy while `plantoir-mcp`
 zips it).
+## Parity run, bundle 6b: reference courses, importing, Copy a Page (2026-10-01)
+
+- **#241 / #298 — courses kept for reference.** Marker read strictly, school
+  years, the shelf rule, Keep a Copy (staged, claimed, one failure line), the
+  NTFS lock (deny entries; `ReferenceLock`), every deploy door refusing on the
+  marker alone (15, tabled in `documentation/12-windows-app.md`), the MCP write
+  gate on each tool's own ReadOnly flag, the withheld interface and the
+  read-only summary, upkeep on every folder read. The shared build no longer
+  publishes a hidden page whose file is read-only (`_writable`).
+- **#244 / #245 — Import Courses for Reference….** Modern layout only (the
+  older layouts are mac-only by decision). Stream copy with a bytes progress
+  bar and Stop; 507 MB in ~5.4 s on this PC.
+- **#247 / #258 / #384 — Copy a Page** (see the bundle's ready note).
+- **Not measured yet:** OneDrive with locked files, an elevated token, and
+  what Obsidian for Windows shows on a locked page (so
+  `obsidianOpensThemForReading` is not said here).
 
 ## Parity run, bundle 5a: the assistant chain through AssistAgent (2026-09-30)
 

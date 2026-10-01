@@ -434,6 +434,44 @@ public static class ActivityTrail
         /// address the site answers at now — the address can change.
         /// </summary>
         CloudflareProjectMadeAgain,
+        /// <summary>
+        /// Keep a Copy for Reference… made a reference course (#241): the
+        /// folder it was given, the code and year it shows, how many sections,
+        /// which course it came from, and — only when there were any — the
+        /// Obsidian add-ons left behind, by folder name.
+        /// </summary>
+        CourseKeptForReference,
+        /// <summary>
+        /// Keep a Copy was pressed and no copy was made (#241 / mac #287):
+        /// written ONCE, from the catch around the whole act, with the
+        /// sentence the teacher was shown.
+        /// </summary>
+        CourseCouldNotBeKeptForReference,
+        /// <summary>Set School Year… re-filed a reference course: the code, the folder, the year before and after.</summary>
+        ReferenceCourseSchoolYearChanged,
+        /// <summary>
+        /// A pass found a reference course's pages unlocked and locked them
+        /// again, or some would not stay locked — written only when a pass
+        /// actually did something. The answer to "my reference course let me
+        /// edit a page".
+        /// </summary>
+        ReferenceCoursePagesLockedAgain,
+        /// <summary>Import Courses for Reference… brought a course in (#244): the folder it was read from, the folder it was given, code, year, sections.</summary>
+        CourseImportedForReference,
+        /// <summary>A course the import summary lists as not imported, with the sentence it showed — written before every early way out.</summary>
+        CourseCouldNotBeImportedForReference,
+        /// <summary>A staging folder an unfinished import left was removed when the working folder was read.</summary>
+        UnfinishedImportForReferenceTidiedAway,
+        /// <summary>The teacher pressed Stop: the course in hand was not kept, and was removed.</summary>
+        CourseImportForReferenceStopped,
+        /// Copy a Page from This Course… finished (#247 / mac #207): ONE line at
+        /// the end of a copy, in every outcome — the course the pages came from
+        /// by folder name, the course and folder they landed in, the counts, and
+        /// the backup's file name. Never a page's title or a picture's name: on
+        /// disk a copied page looks exactly like one the teacher typed, and this
+        /// is the only answer to "where did this come from?".
+        /// </summary>
+        PagesCopiedFromAnotherCourse,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -520,6 +558,15 @@ public static class ActivityTrail
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
         Event.CloudflareProjectMadeAgain => "cloudflare project made again",
+        Event.CourseKeptForReference => "course kept for reference",
+        Event.CourseCouldNotBeKeptForReference => "course could not be kept for reference",
+        Event.ReferenceCourseSchoolYearChanged => "reference course school year changed",
+        Event.ReferenceCoursePagesLockedAgain => "reference course pages locked again",
+        Event.CourseImportedForReference => "course imported for reference",
+        Event.CourseCouldNotBeImportedForReference => "course could not be imported for reference",
+        Event.UnfinishedImportForReferenceTidiedAway => "unfinished import for reference tidied away",
+        Event.CourseImportForReferenceStopped => "course import for reference stopped",
+        Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

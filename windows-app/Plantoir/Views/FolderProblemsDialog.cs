@@ -33,7 +33,7 @@ public static class FolderProblemsDialog
     /// <see cref="SiteHealthRepair.ButtonTitle"/> decides, from the check's
     /// NAME, and returns null for the four that are never offered.</para>
     /// </summary>
-    public static ContentDialog Findings(IReadOnlyList<SiteHealthFinding> findings)
+    public static ContentDialog Findings(IReadOnlyList<SiteHealthFinding> findings, bool repairIsOffered = true)
     {
         var dialog = new ContentDialog
         {
@@ -41,7 +41,11 @@ public static class FolderProblemsDialog
             Content = Body(findings),
             CloseButtonText = "OK",
         };
-        if (SiteHealthRepair.ButtonTitle(findings) is { } repairLabel)
+        // A course kept for reference is told its findings and offered no
+        // repair (#241): a repair CREATES files inside the course, and the
+        // folders are left unlocked so the preview works, so it would succeed
+        // on a frozen course. The button is not drawn at all.
+        if (repairIsOffered && SiteHealthRepair.ButtonTitle(findings) is { } repairLabel)
         {
             dialog.PrimaryButtonText = repairLabel;
             dialog.DefaultButton = ContentDialogButton.Primary;

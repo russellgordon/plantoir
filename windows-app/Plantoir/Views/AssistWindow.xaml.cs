@@ -535,7 +535,24 @@ public sealed partial class AssistWindow : Window
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
             // Asked only when the model names another course, to say whether
             // that course is here to be opened (#180).
-            CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder).Select(c => c.Code).ToList(),
+            CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder)
+                .Where(c => !ReferenceCourse.IsKeptForReference(c)).Select(c => c.Code).ToList(),
+            // A course kept for reference is named by the code a teacher reads,
+            // and only when no course being taught answers to it (#241).
+            ReferenceCourseNamed = named =>
+            {
+                var courses = Workspace.DiscoverCourses(_folder);
+                if (courses.Any(c => !ReferenceCourse.IsKeptForReference(c)
+                                     && c.Code.Equals(named.Trim(), StringComparison.OrdinalIgnoreCase))) return null;
+                return courses.Where(ReferenceCourse.IsKeptForReference)
+                    .Where(c => c.Code.Equals(named.Trim(), StringComparison.OrdinalIgnoreCase)
+                                || ReferenceCourse.ShownCode(c).Equals(named.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .Select(ReferenceCourse.ShownCode).FirstOrDefault();
+            },
+            // Read from disk at the call: a course marked by hand while this
+            // window was open is refused all the same (doors 2-4).
+            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
+                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
             // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
             // because it is a code in the shipped lists, not because of its
             // shape (#305 / mac #167).

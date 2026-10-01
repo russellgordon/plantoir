@@ -31,7 +31,13 @@ public sealed class CourseConfiguration
 
     public static CourseConfiguration FromBytes(byte[] data)
     {
-        var token = JToken.Parse(Encoding.UTF8.GetString(data));
+        // A byte-order mark is not part of the JSON: Notepad writes one, and
+        // Encoding.GetString keeps it as U+FEFF, which the parser refuses — so a
+        // settings file saved there made its course vanish from the sidebar,
+        // and a reference course read as ordinary (markerAgreement, "a
+        // byte-order mark at the head of the file").
+        string text = Encoding.UTF8.GetString(data).TrimStart('\uFEFF');
+        var token = JToken.Parse(text);
         if (token is not JObject obj)
             throw new InvalidDataException("course_config.json does not hold a JSON object.");
         return new CourseConfiguration(obj, data);
@@ -294,6 +300,59 @@ public sealed class CourseConfiguration
     public string CourseCode => StringValue("course_code");
 
     public void SetCourseCode(string code) => _values["course_code"] = code;
+
+    // ---- Kept for reference (#241; shared-rules.json → referenceCourses) ----
+
+    /// <summary>
+    /// Whether this course is KEPT FOR REFERENCE — never deployed, its pages
+    /// locked. Read STRICTLY: a JSON <c>true</c> at the top level and nothing
+    /// else. Newtonsoft hands back an Integer for <c>1</c>, a Float for
+    /// <c>1.0</c> and a String for <c>"true"</c>, so all three read false here
+    /// (the mac read <c>1</c> as true through NSNumber's bridging and froze a
+    /// course every launcher then deployed — <c>markerAgreement</c>,
+    /// <c>appReadsAsReference</c>). Absent means false: the reverse would make
+    /// a live course silently undeployable. The launchers refuse the odd
+    /// values with their own "cannot tell" sentence, which is the direction
+    /// that publishes nothing and freezes nothing.
+    /// </summary>
+    public bool KeptForReference =>
+        _values["kept_for_reference"] is JValue { Type: JTokenType.Boolean } kept && (bool)kept!;
+
+    /// <summary>
+    /// The school year a reference course was taught in, AS STORED — the
+    /// calendar year it started in, or whatever a hand edit left there. Read
+    /// it through <see cref="SchoolYear.Read"/>, which turns anything out of
+    /// range into "Other".
+    /// </summary>
+    public JToken? StoredReferenceSchoolYear => _values["reference_school_year"];
+
+    /// <summary>
+    /// Files the course under <paramref name="startingYear"/>, or under no
+    /// year. Null clears the key rather than writing a JSON null, so a course
+    /// nobody filed writes the file it always did.
+    /// </summary>
+    public void SetReferenceSchoolYear(int? startingYear)
+    {
+        if (startingYear is int year) _values["reference_school_year"] = year;
+        else _values.Remove("reference_school_year");
+    }
+
+    /// <summary>
+    /// Makes this the settings of a reference course in ONE act: the marker,
+    /// the year, and the neutralisation (<c>referenceCourses.neutralises</c>)
+    /// that leaves an OLDER Plantoir — one that has never heard of the marker
+    /// — with nowhere to deploy to either. Per-page visibility is untouched.
+    /// </summary>
+    public void MarkKeptForReference(int? startingYear)
+    {
+        _values["kept_for_reference"] = true;
+        SetReferenceSchoolYear(startingYear);
+        _values["deploy_target"] = "local_folder";
+        _values["deploy_folder_path"] = "";
+        _values.Remove("additional_deploy_targets");
+        // Never claim last year's domain: the live course that replaced it may use it.
+        _values.Remove("custom_domains");
+    }
 
     public string CourseName
     {

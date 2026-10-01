@@ -316,6 +316,41 @@ public static class WorkLease
         return string.Equals(Cut(a), Cut(b), StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The body of a lease this process writes: id, name, the moment (UTC,
+    /// "O"), and — when <paramref name="withStart"/> — this process's START on
+    /// line 4, the mac's spelling (seconds since 1970, a dot, six digits).
+    /// The import lease carries line 4 since #244 (#245's ask): every copy of
+    /// Plantoir is called Plantoir, so without the start a recycled id read as
+    /// alive would refuse every retry of that import until the unrelated
+    /// process exited.
+    /// </summary>
+    public static string LeaseBody(bool withStart)
+    {
+        using var me = Process.GetCurrentProcess();
+        string body = $"{Environment.ProcessId}\n{me.ProcessName}\n{DateTime.UtcNow:O}\n";
+        if (withStart)
+        {
+            try { body += StartMoment(me.StartTime) + "\n"; }
+            catch { /* no start to record: the name check still applies */ }
+        }
+        return body;
+    }
+
+    /// <summary>
+    /// Whether the process a lease names is alive here, by the liveness rule.
+    /// An IMPORT lease with no name line is judged as written by Plantoir, the
+    /// only program that ever wrote one (<c>workLeases.liveness</c>, the two
+    /// import cases) — never on the id alone.
+    /// </summary>
+    public static bool OwnerIsAlive(int pid, string? recordedName, string? recordedStart, string kind) =>
+        recordedName is null && kind != Importing
+            ? false
+            : IsAliveOnThisMachine(pid, recordedName ?? "Plantoir", recordedStart);
+
+    /// <summary>The import lease's kind: a reference course's staging folder is being made.</summary>
+    public const string Importing = "import";
+
     /// <summary>The liveness rule, asked of this machine's real process table.</summary>
     private static bool IsAliveOnThisMachine(int pid, string leaseName, string? leaseStart)
     {

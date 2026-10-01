@@ -157,6 +157,14 @@ public static class CourseArchiver
 
     private static string RemoveCourse(Course course, string coursesDirectory)
     {
+        // A reference course is locked (#241): UNLOCK after the cancel and
+        // before the archive, so the one thing that can stop a removal is
+        // still the cancel, and a locked tree never meets the delete. Asked of
+        // what is ON DISK rather than of the marker, so a course marked by
+        // hand, or carried from another computer, is released all the same;
+        // a course with nothing locked costs one walk. The teacher is told
+        // nothing about it.
+        ReferenceLock.Unlock(course.DirectoryPath);
         string archivePath = ArchiveCourseWithoutRemoving(course, coursesDirectory);
         CourseRestorer.DeleteTree(course.DirectoryPath);
         // A build outlives the content it was made from. Archive this course
@@ -199,6 +207,11 @@ public static class CourseArchiver
     /// </summary>
     public static string ArchiveAndRemoveSection(Course course, int sectionNumber, string coursesDirectory)
     {
+        // A reference course stays as it is (#241): removing a section
+        // changes the course. The sidebar does not offer it; this is what any
+        // other caller meets, in a sentence rather than the file system's own.
+        if (ReferenceCourse.IsKeptForReference(course))
+            throw new InvalidOperationException(ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(course)));
         // CANCEL FIRST (#239), and only this working folder's deploy of this
         // section. This used to cancel AFTER archiving and ignore a failure.
         var turnedOff = Plantoir.Core.Assist.ScheduledDeployRemoval.TurnOffFirst(
