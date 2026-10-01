@@ -443,15 +443,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Work out what adding curriculum transclusions to a page would do, changing nothing. " +
                  "Show the teacher what it says — it quotes each expectation's wording so they can tell " +
                  "whether it fits their lesson without looking it up — then wait for them to agree.")]
-    public string PlanCurriculumMentions(
+    public CallToolResult PlanCurriculumMentions(
         [Description("The course code, for example ADA1O.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title, for example \"Movement Concepts\".")] string page,
         [Description("The expectation codes to add, separated by commas — for example \"A1.1, A2.2\".")]
         string codes)
-        => Guarded(() => workspace.PlanCurriculumMentions(course, section, page,
-                             codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                         .Describe());
+        => Guarded(() =>
+        {
+            // Marked as a PLAN (#350 / mac #327): the window reads an unmarked
+            // answer as a refusal and never offers Go, which left
+            // add_curriculum_mentions unrunnable from the app. A plan that
+            // adds nothing is an ANSWER, not a proposal — there is nothing to
+            // agree to.
+            var plan = workspace.PlanCurriculumMentions(course, section, page,
+                codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return plan.ChangesNothing ? Answering(plan.Describe()) : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_curriculum_mentions", Title = "Point a page at curriculum expectations",
                    Destructive = false, Idempotent = true)]

@@ -482,10 +482,17 @@ public sealed partial class AssistWindow : Window
         // Narrowed before the model ever sees them — see AssistAgent for the
         // measurements. Fewer tools is both better routing and a shorter
         // prompt, and the prompt is what makes the first answer slow.
-        var schemas = AssistAgent.NarrowToLocal(await _tools.Tools(_closing.Token), _course.Code);
+        var served = await _tools.Tools(_closing.Token);
+        var schemas = AssistAgent.NarrowToLocal(served, _course.Code);
 
         _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
         {
+            // The full surface, so a tool the model names but was not shown
+            // is refused rather than run (#350 / mac #327).
+            ServedTools = served
+                .Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .OfType<string>()
+                .ToList(),
             // A tool that narrates gets its words on the thinking indicator,
             // where "Thinking" alone would be a lie minutes long.
             OnToolProgress = NoteToolProgress,
