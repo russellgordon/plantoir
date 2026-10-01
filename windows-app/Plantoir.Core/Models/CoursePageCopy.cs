@@ -628,7 +628,11 @@ public static class CoursePageCopy
             {
                 using (var stream = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+                {
                     writer.Write(composed);
+                    writer.Flush();
+                    WhileWritingAPage?.Invoke(target);
+                }
             }
             catch (IOException e) when (e.HResult is ErrorFileExists or ErrorAlreadyExists)
             {
@@ -638,7 +642,18 @@ public static class CoursePageCopy
             }
             catch
             {
-                outcome.Skipped.Add(new Skip(page.Name, "thePageCouldNotBeWritten"));
+                // OUR file exists now, maybe empty, maybe cut off inside its
+                // settings — never a page left behind half-written (review M1,
+                // ruling 1). It never reached the read-back, so it goes here,
+                // and one that will not go is said as must-be-removed.
+                ReferenceLock.Clear(target);
+                try { File.Delete(target); } catch { }
+                if (File.Exists(target))
+                {
+                    outcome.MustBeRemoved.Add(target);
+                    outcome.Skipped.Add(new Skip(page.Name, "theCopyIsStillThereAndMustBeRemoved"));
+                }
+                else outcome.Skipped.Add(new Skip(page.Name, "thePageCouldNotBeWritten"));
                 continue;
             }
             pageIndex.Add(PageKey(fileName));                                    // after EACH write (ruling 5)
@@ -677,6 +692,9 @@ public static class CoursePageCopy
 
     /// <summary>A test's racing creator: called with a page's path after every check and before its write.</summary>
     internal static Action<string>? BeforeWritingAPage { get; set; }
+
+    /// <summary>For tests: called with the page's path after its text is written and before it is closed — a test throws here to fail a write mid-way.</summary>
+    internal static Action<string>? WhileWritingAPage { get; set; }
 
     /// <summary>Copies a file to a name that must not exist yet, by stream: no attribute and no access entry travels.</summary>
     private static void CreateExclusively(string from, string to)
