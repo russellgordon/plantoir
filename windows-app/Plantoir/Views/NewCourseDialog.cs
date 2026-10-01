@@ -116,8 +116,7 @@ public sealed class NewCourseDialog : ContentDialog
     /// turning the toggle off can put the defaults back for exactly the lists
     /// the teacher has NOT edited since. Null until a skeleton is adopted.
     /// </summary>
-    private (List<string> SharedFolders, List<string> SharedFiles, List<string> PerSectionFolders,
-             List<string> PerSectionFiles, List<string> GradedFolders)? _adopted;
+    private WizardStructure.Lists? _adopted;
     private bool _includeCurriculum = true;
     private bool _includeCurriculumCoverage = true;
     private bool _includeCoverageNotes = true;
@@ -789,19 +788,30 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private void AdoptSkeletonStructure()
     {
+        // The guard is HERE, at the entry point, not on the toggle: adoption
+        // runs on every code change, so a teacher who declined the skeleton
+        // and then corrected a typo must not be handed it back.
         if (!_startsFromSkeleton) return;
         var skeleton = SkeletonCatalog.StructureToAdopt(
             ExampleContentRoot, SkeletonsRoot, NormalizedCode, _sharedFolders,
             WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
         if (skeleton is null) return;
-        _sharedFolders = skeleton.SharedFolders.ToList();
-        _sharedFiles = skeleton.SharedFiles.ToList();
-        _perSectionFolders = skeleton.PerSectionFolders.ToList();
-        _perSectionFiles = skeleton.PerSectionFiles.ToList();
-        _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(skeleton);
-        _adopted = (_sharedFolders.ToList(), _sharedFiles.ToList(), _perSectionFolders.ToList(),
-                    _perSectionFiles.ToList(), _gradedFolders.ToList());
+        _adopted = WizardStructure.Adopting(skeleton);
+        ApplyLists(_adopted);
         RebuildStructureLists();
+    }
+
+    /// <summary>The editor's five lists, as the pure seam reads them.</summary>
+    private WizardStructure.Lists CurrentLists() =>
+        new(_sharedFolders, _sharedFiles, _perSectionFolders, _perSectionFiles, _gradedFolders);
+
+    private void ApplyLists(WizardStructure.Lists lists)
+    {
+        _sharedFolders = lists.SharedFolders.ToList();
+        _sharedFiles = lists.SharedFiles.ToList();
+        _perSectionFolders = lists.PerSectionFolders.ToList();
+        _perSectionFiles = lists.PerSectionFiles.ToList();
+        _gradedFolders = lists.GradedFolders?.ToList();
     }
 
     /// <summary>
@@ -820,17 +830,8 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private void RestoreGenericStructure()
     {
-        if (_adopted is not { } adopted) return;
-        if (_sharedFolders.SequenceEqual(adopted.SharedFolders))
-            _sharedFolders = (_useLcs ? WizardDefaults.LcsSharedFolders : WizardDefaults.SharedFolders).ToList();
-        if (_sharedFiles.SequenceEqual(adopted.SharedFiles))
-            _sharedFiles = (_useLcs ? WizardDefaults.LcsSharedFiles : WizardDefaults.SharedFiles).ToList();
-        if (_perSectionFolders.SequenceEqual(adopted.PerSectionFolders))
-            _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
-        if (_perSectionFiles.SequenceEqual(adopted.PerSectionFiles))
-            _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
-        if (_gradedFolders is not null && _gradedFolders.SequenceEqual(adopted.GradedFolders))
-            _gradedFolders = null;      // re-inferred from the restored lists
+        if (_adopted is null) return;
+        ApplyLists(WizardStructure.RestoringDefaults(CurrentLists(), _adopted, _useLcs));
         _adopted = null;
         RebuildStructureLists();
     }
@@ -1263,11 +1264,7 @@ public sealed class NewCourseDialog : ContentDialog
             && SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, code, _sharedFolders,
                                                 WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders) is { } lateAdopted)
         {
-            _sharedFolders = lateAdopted.SharedFolders.ToList();
-            _sharedFiles = lateAdopted.SharedFiles.ToList();
-            _perSectionFolders = lateAdopted.PerSectionFolders.ToList();
-            _perSectionFiles = lateAdopted.PerSectionFiles.ToList();
-            _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(lateAdopted);
+            ApplyLists(WizardStructure.Adopting(lateAdopted));
         }
 
         // The skeleton decides its own sidebar, whatever the teacher has
