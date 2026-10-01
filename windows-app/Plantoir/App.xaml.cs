@@ -74,6 +74,10 @@ public partial class App : Application
 
         LogDiagnostic("App.OnLaunched starting");
         if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
+        // #155: AFTER the redirect, so the line lands in the run's own
+        // startup.log. For the developer only — never on the trail.
+        if (Plantoir.Core.Scripting.StdioState.Describe(Plantoir.Core.Scripting.StdioState.FileTypeOf) is { } redirected)
+            LogDiagnostic(redirected);
 
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
 

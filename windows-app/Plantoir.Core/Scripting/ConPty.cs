@@ -46,9 +46,11 @@ public sealed class ConPtyProcess : IDisposable
     /// console handles or none, as in a GUI app. A creator whose own stdio
     /// is redirected to pipes leaks those handles into the child, and
     /// wsl.exe then reports "the input device is not a TTY", breaking every
-    /// interactive docker exec. Test harnesses must therefore run with
-    /// their own console (e.g. ShellExecute-launched), never with
-    /// redirected stdio.
+    /// interactive docker exec. Since #155 (bundle 8) Start ZEROES this
+    /// process's std handles around CreateProcessW, which measured enough to
+    /// bind the child to its pseudo console from a redirected parent
+    /// (Plantoir.Tests.ConPtyRedirectedParentTests). Launching harnesses with
+    /// their own console (ShellExecute) is still the safer habit.
     /// </summary>
     // 400 columns: ConPTY re-renders soft-wrapped lines with the boundary
     // character duplicated, which corrupts transcript lines and could split
@@ -87,10 +89,39 @@ public sealed class ConPtyProcess : IDisposable
 
         string? environmentBlock = BuildEnvironmentBlock(extraEnvironment);
 
-        bool created = CreateProcessW(
-            null, commandLine, nint.Zero, nint.Zero, bInheritHandles: false,
-            EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-            environmentBlock, workingDirectory, ref startupInfo, out var processInfo);
+        // #155: a creator whose OWN std handles are pipes (a test host, a
+        // shell redirect) hands them to the child instead of the pseudo
+        // console — measured: from `dotnet test`'s host (stdout=pipe,
+        // stderr=pipe) "cmd /c echo PTY-OK" left only ConPTY's two mode
+        // sequences in the transcript; with the handles zeroed around
+        // CreateProcessW it arrives. Zeroed under ONE process-wide gate and
+        // put back in finally, so two Starts cannot interleave and leave a
+        // handle zeroed. Rejected: FreeConsole (#155 — it detaches the whole
+        // process), and reusing the per-instance _ptyGate (it would not
+        // serialise two Starts). Cost: while the gate is held, another thread
+        // writing to Console loses that output; the GUI app writes none.
+        bool created;
+        PROCESS_INFORMATION processInfo;
+        lock (s_stdHandleGate)
+        {
+            nint savedIn = GetStdHandle(STD_INPUT_HANDLE), savedOut = GetStdHandle(STD_OUTPUT_HANDLE), savedErr = GetStdHandle(STD_ERROR_HANDLE);
+            try
+            {
+                SetStdHandle(STD_INPUT_HANDLE, nint.Zero);
+                SetStdHandle(STD_OUTPUT_HANDLE, nint.Zero);
+                SetStdHandle(STD_ERROR_HANDLE, nint.Zero);
+                created = CreateProcessW(
+                    null, commandLine, nint.Zero, nint.Zero, bInheritHandles: false,
+                    EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+                    environmentBlock, workingDirectory, ref startupInfo, out processInfo);
+            }
+            finally
+            {
+                SetStdHandle(STD_INPUT_HANDLE, savedIn);
+                SetStdHandle(STD_OUTPUT_HANDLE, savedOut);
+                SetStdHandle(STD_ERROR_HANDLE, savedErr);
+            }
+        }
         if (!created)
         {
             int error = Marshal.GetLastWin32Error();
@@ -294,4 +325,6 @@ public sealed class ConPtyProcess : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool SetStdHandle(int nStdHandle, nint hHandle);
+
+    private static readonly object s_stdHandleGate = new();
 }

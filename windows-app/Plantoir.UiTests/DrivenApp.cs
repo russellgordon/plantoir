@@ -91,10 +91,25 @@ public sealed class DrivenApp : IDisposable
         // Closed rather than refused: two copies would fight over the
         // foreground, and a physical click meant for the sidebar would land in
         // whichever window happened to be in front.
-        foreach (var other in Process.GetProcessesByName("Plantoir"))
+        //
+        // But never a BUSY one (#155): a build, publish or any other live
+        // lease in a folder the real settings know, or any running
+        // plantoir-mcp, is work a kill would cut short. MachineWork holds the
+        // rule (shared with the updater); the leases a kill orphans are swept,
+        // by the killed pid only.
+        var running = Process.GetProcessesByName("Plantoir");
+        if (running.Length > 0)
         {
-            Console.WriteLine($"Closing a running Plantoir (pid {other.Id}) so the tests can drive their own.");
-            try { other.Kill(true); other.WaitForExit(5000); } catch { }
+            var folders = Plantoir.Core.Assist.MachineWork.KnownFolders(Plantoir.Core.Assist.MachineWork.RealSettingsPath());
+            if (Plantoir.Core.Assist.MachineWork.WhyBusy(Plantoir.Core.Assist.MachineWork.Read(folders)) is { } why)
+                throw new InvalidOperationException($"{why} Not closing it; run again when it finishes.");
+            foreach (var other in running)
+            {
+                Console.WriteLine($"Closing a running Plantoir (pid {other.Id}) so the tests can drive their own.");
+                try { other.Kill(true); other.WaitForExit(5000); } catch { }
+                foreach (string swept in Plantoir.Core.Assist.MachineWork.SweepLeasesOf(other.Id, folders))
+                    Console.WriteLine($"Removed the lease it left: {swept}");
+            }
         }
 
         // The folder name carries THIS RUN's token when the runner supplied
