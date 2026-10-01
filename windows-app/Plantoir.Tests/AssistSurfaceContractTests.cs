@@ -252,6 +252,15 @@ public class AssistSurfaceContractTests
             // narrowed schema, and NarrowToolsMirrorTests pins that the
             // measurement script strips it too.
             "add_next_class.duplicate", "plan_add_next_class.duplicate",
+
+            // "What does Unit 2, Day 3 link to?" (#305 / mac #167): the same
+            // binder reason. The mac keeps `answer: "links"` out of every
+            // schema because its card and runner share a process; here the
+            // window reaches read_page over JSON-RPC, so the three keys the
+            // links phrasing fills are DECLARED, and AssistAgent's
+            // CardOnlyArguments takes them out of the local model's schema
+            // (mirrored in narrow-tools.py, pinned by NarrowToolsMirrorTests).
+            "read_page.answer", "read_page.asTyped", "read_page.onlyIfFound",
         }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
 
         // Exact set in both directions over the two halves together (#122's
@@ -531,9 +540,6 @@ public class AssistSurfaceContractTests
     /// <summary>MCP tools the contract names and this server does not serve yet, with the issue that owns each.</summary>
     private static readonly Dictionary<string, string> KnownMissingMcpTools = new(StringComparer.Ordinal)
     {
-        ["read_how_i_teach"] = "#340 (bundle 5b)",
-        ["plan_write_how_i_teach"] = "#340 (bundle 5b)",
-        ["write_how_i_teach"] = "#340 (bundle 5b)",
         ["plan_prepare_for_start_of_year"] = "#355 (bundle 5b)",
         ["prepare_for_start_of_year"] = "#355 (bundle 5b)",
     };
@@ -542,9 +548,9 @@ public class AssistSurfaceContractTests
     /// The contract's MCP surface is a SUBSET of what this app serves, not an
     /// equality — and the difference is a known one, not drift.
     ///
-    /// <para>The contract carries the mac's 32 — counted, not remembered; this
+    /// <para>The contract carries the mac's 37 — counted, not remembered; this
     /// said 25 until 2026-09-09, which was the number before the rollover
-    /// tools landed — and <c>plantoir-mcp.exe</c> serves 37. So the same
+    /// tools landed — and <c>plantoir-mcp.exe</c> serves 40. So the same
     /// question asked of Claude Code gets a different toolbox
     /// depending on the machine, which is written up in documentation/10-local-ai-assistant.md and is
     /// the mac's to decide. What must hold either way is that every tool the

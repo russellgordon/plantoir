@@ -83,6 +83,52 @@ public sealed class ScheduledDeploy
     /// thing being walked around here is a deploy that would sit waiting on a
     /// question at half six in the morning.
     /// </summary>
+    /// <summary>
+    /// "scheduled deploy could not be set" for a refusal at the ACT, before
+    /// anything was written (#344 / mac #322): schedule_deploy from either
+    /// assistant. Carries the moment, the destinations by KIND — never a
+    /// folder's path — and the refusal's first sentence. Not written by the
+    /// approval card or plan_scheduled_deploy, which are advisory and repeat;
+    /// the schedule dialog cannot reach it, because its button is disabled
+    /// while the same check refuses.
+    /// </summary>
+    /// <remarks>
+    /// Since #396 the destination is the one that CAUSED the refusal — a
+    /// course that also deploys to Cloudflare Pages, refused over the Account
+    /// ID, is "deploying to Cloudflare Pages", where it used to name the
+    /// primary whatever the cause. A refusal that is not about a destination
+    /// (a time already passed, a course kept for reference) names every
+    /// destination by kind, joined "A and B".
+    /// </remarks>
+    public static void NoteRefusedAtTheAct(AssistWorkspace workspace, string courseCode, int sectionNumber,
+                                           DateTime moment, string refusal)
+    {
+        string kinds;
+        string code = courseCode;
+        try
+        {
+            var course = workspace.Course(courseCode);
+            code = course.Code;
+            kinds = CausingDestination(RefusalOf(course, sectionNumber, AssistWorkspace.CurrentCloudflareAccountId()))
+                    ?? Models.DeployCommand.EveryDestinationByType(course.Configuration);
+        }
+        catch (Exception) { kinds = "its destination"; }
+        int stop = refusal.IndexOf(". ", StringComparison.Ordinal);
+        string first = stop > 0 ? refusal[..(stop + 1)] : refusal;
+        Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.ScheduledDeployCouldNotBeSet,
+            $"could not set a scheduled deploy for {DateText.Stamp(moment)}, deploying to {kinds}: {first}",
+            code, sectionNumber);
+    }
+
+    /// <summary>The destination, by kind, a refusal was ABOUT (#396), or null when it is about none.</summary>
+    internal static string? CausingDestination(Refusal? refusal) => refusal?.Key switch
+    {
+        "deployFolderNeedsAttention" or "additionalDeployFolderNeedsAttention" => "a folder on this computer",
+        "cloudflareAccountMissing" or "additionalCloudflareAccountMissing" => "Cloudflare Pages",
+        "neverDeployed" or "additionalDestinationNeverDeployed" => refusal.Destination,
+        _ => null,
+    };
+
     public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now, string cloudflareAccountID = "")
     {
         if (when <= now)
@@ -180,9 +226,12 @@ public sealed class ScheduledDeploy
                 $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. " +
                 $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
             "neverDeployed" =>
-                $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
-                "what to call the website. Nobody would be there to answer that at the scheduled time, " +
-                "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.",
+                // Names the destination (#344 / mac #322): a teacher who
+                // expected somewhere else sees the disagreement at once.
+                $"{course.Code} Section {sectionNumber} has never been deployed to {refusal.Destination}, so deploying " +
+                "it there asks what to call the website. Nobody would be there to answer that at the scheduled " +
+                $"time, and it would wait. Deploy it to {refusal.Destination} once from Plantoir, and after that " +
+                "it can be scheduled.",
             "additionalDestinationNeverDeployed" =>
                 $"{course.Code} Section {sectionNumber} has never been deployed to {refusal.Destination}, " +
                 "so deploying it there asks what to call that site. Nobody would be there to answer " +

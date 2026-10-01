@@ -482,10 +482,17 @@ public sealed partial class AssistWindow : Window
         // Narrowed before the model ever sees them — see AssistAgent for the
         // measurements. Fewer tools is both better routing and a shorter
         // prompt, and the prompt is what makes the first answer slow.
-        var schemas = AssistAgent.NarrowToLocal(await _tools.Tools(_closing.Token), _course.Code);
+        var served = await _tools.Tools(_closing.Token);
+        var schemas = AssistAgent.NarrowToLocal(served, _course.Code);
 
         _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
         {
+            // The full surface, so a tool the model names but was not shown
+            // is refused rather than run (#350 / mac #327).
+            ServedTools = served
+                .Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .OfType<string>()
+                .ToList(),
             // A tool that narrates gets its words on the thinking indicator,
             // where "Thinking" alone would be a lie minutes long.
             OnToolProgress = NoteToolProgress,
@@ -526,6 +533,10 @@ public sealed partial class AssistWindow : Window
             // Asked only when the model names another course, to say whether
             // that course is here to be opened (#180).
             CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder).Select(c => c.Code).ToList(),
+            // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
+            // because it is a code in the shipped lists, not because of its
+            // shape (#305 / mac #167).
+            IsACourseCode = code => Plantoir.Services.CourseNameCatalogs.Shared.Names(code) is not null,
             // What a scheduled card would replace, read by task name (#261).
             ScheduleDeployItWouldReplace = when =>
                 TaskScheduling.MomentItWouldReplace(_folder, _course.Code, _section, when, DateTime.Now),
@@ -542,7 +553,10 @@ public sealed partial class AssistWindow : Window
             // Every destination, by type, in the saved order (#400): the card
             // for a course deploying to Netlify AND Cloudflare Pages said
             // "Netlify" alone.
-            DestinationProvider = () => DeployCommand.EveryDestinationByType(_course.Configuration),
+            // Read from disk at the call, never from this window's snapshot
+            // (#344 / mac #322): a destination changed in Course Settings
+            // after the window opened must be the one the card names.
+            DestinationProvider = () => DeployCommand.EveryDestinationByTypeAtTheCall(_folder, _course.Code, _course.Configuration),
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.

@@ -25,6 +25,26 @@ public static class ActivityTrail
         AssistantChoseATool,
         AssistantCouldNotAnswer,
         /// <summary>
+        /// The model named a tool that exists but was not on the list it was
+        /// shown, and the turn was refused with nothing run (#350 / mac #327).
+        /// Carries the course, the section and the tool IN WORDS — never the
+        /// teacher's sentence and never the argument values.
+        /// </summary>
+        AssistantNamedAToolItWasNotOffered,
+        /// <summary>
+        /// A publish or hide named no page the section has (only words
+        /// meaning every page, or names that all matched nothing) and was
+        /// refused (#352 / mac #197). Carries the word or HOW MANY names
+        /// missed; never the names themselves.
+        /// </summary>
+        AssistantNamedNoPage,
+        /// <summary>The links checklist was shown (#392/#399/#405): counts per group, listed under another page, shown ticked, the occasion. Never a page's name.</summary>
+        OfferedToPublishPagesThatLinksLeadTo,
+        /// <summary>The links checklist's Publish: counts, and the PLACES of the published pages (at most ten), never page content.</summary>
+        PublishedPagesThatLinksLedTo,
+        /// <summary>Not Now, or Publish with rows left: every page left hidden, the followers in brackets. Written only when above 0.</summary>
+        LeftPagesHiddenThatLinksLeadTo,
+        /// <summary>
         /// The model's call named a course other than this window's, and the
         /// turn was refused (#180). Carries this window's course and section,
         /// the course AS THE MODEL SPELT IT, and the tool it had chosen —
@@ -131,6 +151,25 @@ public static class ActivityTrail
         /// (ScheduledHealthFindings).
         /// </summary>
         PagesDatedByTheBuild,
+        /// <summary>
+        /// An outside assistant read a course's How I Teach page (#340, mac
+        /// #209): the course and the word count, or that there was none or it
+        /// was empty -- never a word of it.
+        /// </summary>
+        HowITeachPageRead,
+        /// <summary>
+        /// An outside assistant saved a course's How I Teach page: created or
+        /// replaced, the word counts, and the backup made first. Never the
+        /// words -- the question it answers is "did I write this, or did an
+        /// assistant?".
+        /// </summary>
+        HowITeachPageWritten,
+        /// <summary>
+        /// A build dropped a How I Teach page the course's settings had listed
+        /// for the site (the build's PLANTOIR_KEPT_OFF: line), so a page
+        /// earlier builds published is now kept back. The pages' places only.
+        /// </summary>
+        HowITeachPageKeptOff,
         /// <summary>
         /// A teacher put a section back to how it was when an assistant
         /// conversation started. Carries the course, the section and the
@@ -345,6 +384,11 @@ public static class ActivityTrail
         Event.AssistantMatchedAFixedPhrase => "assistant matched a fixed phrase",
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
+        Event.AssistantNamedAToolItWasNotOffered => "assistant named a tool it was not offered",
+        Event.AssistantNamedNoPage => "assistant named no page it could find",
+        Event.OfferedToPublishPagesThatLinksLeadTo => "offered to publish pages that links lead to",
+        Event.PublishedPagesThatLinksLedTo => "published pages that links led to",
+        Event.LeftPagesHiddenThatLinksLeadTo => "left pages hidden that links lead to",
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
         Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",
@@ -366,6 +410,9 @@ public static class ActivityTrail
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.FolderProblemNotRepaired => "folder problem not repaired",
         Event.PagesDatedByTheBuild => "pages dated by the build",
+        Event.HowITeachPageRead => "How I Teach page read",
+        Event.HowITeachPageWritten => "How I Teach page written",
+        Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",

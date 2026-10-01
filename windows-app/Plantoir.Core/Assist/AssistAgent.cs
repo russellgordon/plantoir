@@ -41,7 +41,7 @@ public interface IChatModel
 /// <para>A null <see cref="FinishReason"/> means the engine did not say, which
 /// is read as finished — the scripted test models build replies that way.</para>
 /// </remarks>
-public sealed record ModelReply(JsonObject Message, string? FinishReason = null)
+public sealed record ModelReply(JsonObject Message, string? FinishReason = null, int? CompletionTokens = null)
 {
     /// <summary>The engine stopped because it reached the cap, not because the answer was done.</summary>
     public bool WasCutOff => string.Equals(FinishReason, "length", StringComparison.OrdinalIgnoreCase);
@@ -168,6 +168,12 @@ public sealed class AssistAgent
     {
         "add_next_class.duplicate",
         "plan_add_next_class.duplicate",
+        // "What does <page> link to?" (#305 / mac #167): filled in code by
+        // the links phrasing; the mac keeps answer: "links" out of every
+        // schema, and this is that, on a server whose binder needs it declared.
+        "read_page.answer",
+        "read_page.asTyped",
+        "read_page.onlyIfFound",
     };
 
     /// <summary>
@@ -355,6 +361,10 @@ public sealed class AssistAgent
         ["remember_timetable"] = "plan_remember_timetable",
         ["re_date_classes"] = "plan_re_date_classes",
         ["make_room_for_classes"] = "plan_make_room_for_classes",
+        // Irregular, as the mac's AssistToolDefinition.irregularPlanTwins says:
+        // the twin is NOT plan_ + the write's name, and deriving it that way is
+        // how add_curriculum_mentions ran with no plan on the mac (#327 / #350).
+        ["add_curriculum_mentions"] = "plan_curriculum_mentions",
     };
 
     /// <summary>
@@ -454,6 +464,84 @@ public sealed class AssistAgent
             if (message is not null) priming.Add(message.DeepClone());
         priming.Add(new JsonObject { ["role"] = "user", ["content"] = "Hello." });
         return priming;
+    }
+
+    /// <summary>
+    /// What "assistant chose a tool" carries (#164; <c>shared-rules.json</c> →
+    /// <c>activityTrail.mustRecord</c>): the tool, the argument NAMES, the
+    /// seconds, the completion tokens and whether it waited for the button.
+    /// NAMES, never values: which tool with which arguments filled in answers
+    /// the routing question completely, and the values are a teacher's page
+    /// titles. The names are what tell "duplicate Unit 3, Day 2 as my next
+    /// class" from a plain "add the next class" — the same tool either way.
+    /// </summary>
+    internal static string ChoseAToolLine(string tool, JsonObject call, TimeSpan took, int? tokens, bool waited) =>
+        $"the assistant chose {tool.Replace('_', ' ')} {WithArguments(ArgumentsOf(call).Select(pair => pair.Key))}, " +
+        "in " + took.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " +
+        (tokens is { } n ? n.ToString(CultureInfo.InvariantCulture) + " tokens" : "tokens not reported") + ", " +
+        (waited ? "waiting for the teacher's button" : "without waiting for a button");
+
+    /// <summary>"with course, section, pages" — argument names only, in the order given.</summary>
+    internal static string WithArguments(IEnumerable<string> names)
+    {
+        var listed = names.ToList();
+        return listed.Count == 0 ? "with no arguments" : "with " + string.Join(", ", listed);
+    }
+
+    /// <summary>
+    /// Whether a word is a course code that EXISTS in the shipped course
+    /// lists (Ontario and British Columbia). Set by the window from the same
+    /// catalogs the New Course wizard reads; used only to tell "in SPH3U" (a
+    /// course) from "in Lab01" (part of a page's name) in a links question.
+    /// </summary>
+    public Func<string, bool>? IsACourseCode { get; set; }
+
+    /// <summary>
+    /// "What does &lt;page&gt; link to?", answered in code and in full (#305 /
+    /// mac #167). TRANSCRIPT ONLY: a code-matched turn never puts the
+    /// teacher's sentence into the model's conversation, so handing the
+    /// answer back would give the model a tool result with no question in
+    /// front of it, which is the lap on which the smaller assistant turned
+    /// this read-only question into a publish plan. Every branch ends the
+    /// turn; the one exception is "the quiz" when no page is called that,
+    /// which goes to the model as the sentence it was.
+    /// </summary>
+    private async Task<List<Line>?> LinksQuestion(string text, CancellationToken cancellation)
+    {
+        if (AssistCardCommand.LinksQuestion(text, _courseCode, _section, IsACourseCode) is not { } asked) return null;
+
+        if (asked.OtherCourse is { } other)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWasAskedAboutAnotherCourse,
+                $"matched in code, not sent to the model \u2014 asked what a page links to in {other} in this " +
+                $"{_courseCode} window; nothing was read", _courseCode, _section);
+            string? here = CoursesInTheFolder()
+                .FirstOrDefault(code => code.Equals(other, StringComparison.OrdinalIgnoreCase));
+            return new List<Line>
+            {
+                new("assistant", here is not null
+                    ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
+                    : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, other)),
+            };
+        }
+
+        var arguments = new JsonObject
+        {
+            ["course"] = _courseCode,
+            ["section"] = _section,
+            ["page"] = asked.Page,
+            ["answer"] = "links",
+        };
+        if (asked.AsTyped is { } typed) arguments["asTyped"] = typed;
+        if (asked.OnlyIfAPageIsCalled) arguments["onlyIfFound"] = "yes";
+
+        var answer = await _tools.CallTool("read_page", arguments, OnToolProgress, cancellation);
+        if (answer.NoPageFound) return null;   // "the quiz": the model has the conversation to read it against
+
+        ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+            "matched in code, not sent to the model \u2014 ran read_page " + WithArguments(arguments.Select(pair => pair.Key)),
+            _courseCode, _section);
+        return new List<Line> { new("tools", answer.Summary) };
     }
 
     /// <summary>A line for the transcript.</summary>
@@ -662,6 +750,40 @@ public sealed class AssistAgent
 
     private JsonObject? _awaiting;      // a write the teacher has not agreed to yet
 
+    /// <summary>
+    /// Every tool the SERVER serves — the full surface, not the narrowed list
+    /// the model is shown. Set by the window from the server's own listing.
+    ///
+    /// <para>It exists for one refusal (#350 / mac #327): a name that is on
+    /// this list and NOT on the list the model was shown is refused, nothing
+    /// runs and the turn is wound back. The server answers Claude Code as
+    /// well, so it serves every tool either client may call; before this, a
+    /// model that named <c>re_date_classes</c> — kept off its list because
+    /// re-dating a whole section is too big for a router right four times in
+    /// five — simply had it run. Null (the tests' default) means "not told",
+    /// and then nothing is refused, because a refusal decided from a list the
+    /// agent was never given would be a guess.</para>
+    ///
+    /// <para>A name that exists NOWHERE is unchanged: it goes to the server
+    /// and comes back as "no tool by that name", for the model to read.
+    /// Refusing those too was rejected on the mac — it changes documented
+    /// behaviour for no failure anyone has seen. Fixed phrasings never come
+    /// through here, so a tool only a card reaches keeps working.</para>
+    /// </summary>
+    public IReadOnlyCollection<string>? ServedTools { get; set; }
+
+    /// <summary>The names on the list the model was shown.</summary>
+    private HashSet<string> OfferedTools() => new(
+        _schemas.Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .Where(name => name is not null)!,
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether <paramref name="name"/> exists here but was not shown to the model.</summary>
+    internal bool WasNotOffered(string name) =>
+        ServedTools is { } served &&
+        served.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+        !OfferedTools().Contains(name);
+
     public bool IsAwaitingApproval => _awaiting is not null;
     public string? PendingTool => _awaiting?["function"]?["name"]?.GetValue<string>();
 
@@ -753,7 +875,15 @@ public sealed class AssistAgent
     /// </summary>
     private async Task<List<Line>?> CardCommand(string text, CancellationToken cancellation)
     {
-        if (AssistCardCommand.Matching(text) is { } match)
+        if (await LinksQuestion(text, cancellation) is { } answered) return answered;
+
+        // The links family is answered ONLY by LinksQuestion above, which reads
+        // the window. When that declined — another section, a title that is
+        // this window's own place, "the quiz" with no such page — the sentence
+        // belongs to the model; Matching's window-free reading of the same
+        // sentence must not run it as a card, or the answer (and a tool call)
+        // lands in the model's conversation (review finding, 2026-09-30).
+        if (AssistCardCommand.Matching(text) is { } match && !match.IsALinksQuestion)
         {
             var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
             // "deploy at 6:30 am" carries a time of day, never a date: the
@@ -763,7 +893,8 @@ public sealed class AssistAgent
             ActivityTrail.Note(
                 ActivityTrail.Event.AssistantMatchedAFixedPhrase,
                 "matched in code, not sent to the model — ran " + match.ToolName +
-                (moment is null ? "" : " for " + moment),
+                (moment is null ? "" : " for " + moment) +
+                " " + WithArguments(match.Arguments.Keys),
                 _courseCode,
                 _section);
 
@@ -1601,7 +1732,9 @@ public sealed class AssistAgent
 
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
+            var asking = System.Diagnostics.Stopwatch.StartNew();
             var modelAnswer = await _model.Ask(_messages, _schemas, cancellation);
+            asking.Stop();
             if (modelAnswer?.Message is not { } reply)
             {
                 // An ENGINE failure, and deliberately not wound back: the
@@ -1629,6 +1762,22 @@ public sealed class AssistAgent
                     ? $"the assistant's answer was cut off part way through {Spaced(begun)} — nothing was run from it"
                     : "the assistant's answer was cut off part way — nothing was run from it");
             }
+            // Below the cut-off gate and above the readability and course
+            // gates (the mac's order), and BEFORE the reply joins the
+            // conversation: a tool that exists but was not offered is
+            // refused, the turn is wound back, and nothing runs — no plan, no
+            // button (#350 / mac #327).
+            if (acting && calls![0]?["function"]?["name"]?.GetValue<string>() is { } named &&
+                WasNotOffered(named))
+            {
+                WindTheTurnBack();
+                ActivityTrail.Note(ActivityTrail.Event.AssistantNamedAToolItWasNotOffered,
+                    $"the assistant named {named.Replace('_', ' ')}, which it was not offered; nothing ran",
+                    _courseCode, _section);
+                lines.Add(new Line("assistant", AssistWording.DidNotFollowThat));
+                return lines;
+            }
+
             if (acting && calls![0] is JsonObject chosen)
             {
                 switch (WhatTheModelWroteFor(chosen))
@@ -1704,7 +1853,9 @@ public sealed class AssistAgent
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
-                $"the assistant chose {name.Replace('_', ' ')}", _courseCode, _section);
+                ChoseAToolLine(name, call, asking.Elapsed, modelAnswer.CompletionTokens,
+                               waited: NeedsApproval(name) || (ConfirmationMode() && PlanTwins.ContainsKey(name))),
+                _courseCode, _section);
             if (NeedsApproval(name))
             {
                 // The one rule this loop owns whatever the settings say. A

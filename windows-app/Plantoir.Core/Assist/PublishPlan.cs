@@ -67,6 +67,35 @@ public sealed class PublishPlan
     /// <summary>Backward-compatible dangling links list.</summary>
     public IReadOnlyList<DanglingLink> Dangling { get; init; } = Array.Empty<DanglingLink>();
 
+    /// <summary>
+    /// Linked classes a PUBLISH stopped at (#203 / mac #173): reached by a
+    /// link, neither published nor walked through.
+    /// </summary>
+    public IReadOnlyList<PlannedPage> StoppedAtClasses { get; init; } = Array.Empty<PlannedPage>();
+
+    /// <summary>
+    /// The sentence naming the linked classes left alone, or null. Only the
+    /// ones students cannot CERTAINLY see: a class whose flag the app cannot
+    /// read is not left out, because "already published" has to be something
+    /// the app is sure of.
+    /// </summary>
+    public string? LeftAloneSentence
+    {
+        get
+        {
+            var worth = StoppedAtClasses
+                .Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain))
+                .Select(page => page.DisplayTitle)
+                .ToList();
+            return worth.Count switch
+            {
+                0 => null,
+                1 => AssistWording.LinkedClassWasLeftAlone(worth),
+                _ => AssistWording.LinkedClassesWereLeftAlone(worth),
+            };
+        }
+    }
+
     public IEnumerable<PlannedPage> Named => NamedPages.Count > 0 ? NamedPages : Pages.Where(p => !p.ViaLink);
     public IEnumerable<PlannedPage> Linked => Pages.Where(p => p.ViaLink);
     public IEnumerable<PlannedPage> Changing => Changes.Select(c => c.Page);
@@ -162,6 +191,12 @@ public sealed class PublishPlan
                 lines.Add($"“{staying.Page.DisplayTitle}” stays visible, because {staying.Reason}");
                 listed++;
             }
+        }
+
+        if (Publishes && LeftAloneSentence is { } leftAlone)
+        {
+            lines.Add("");
+            lines.Add(leftAlone);
         }
 
         var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.Title), StringComparer.OrdinalIgnoreCase);
