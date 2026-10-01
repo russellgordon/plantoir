@@ -528,6 +528,16 @@ public class AssistSurfaceContractTests
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 
+    /// <summary>MCP tools the contract names and this server does not serve yet, with the issue that owns each.</summary>
+    private static readonly Dictionary<string, string> KnownMissingMcpTools = new(StringComparer.Ordinal)
+    {
+        ["read_how_i_teach"] = "#340 (bundle 5b)",
+        ["plan_write_how_i_teach"] = "#340 (bundle 5b)",
+        ["write_how_i_teach"] = "#340 (bundle 5b)",
+        ["plan_prepare_for_start_of_year"] = "#355 (bundle 5b)",
+        ["prepare_for_start_of_year"] = "#355 (bundle 5b)",
+    };
+
     /// <summary>
     /// The contract's MCP surface is a SUBSET of what this app serves, not an
     /// equality — and the difference is a known one, not drift.
@@ -544,15 +554,6 @@ public class AssistSurfaceContractTests
     /// drift went unseen — so the count is asserted too, and a change in it
     /// fails here saying which tools moved.</para>
     /// </summary>
-    /// <summary>MCP tools the contract names and this server does not serve yet, with the issue that owns each.</summary>
-    private static readonly Dictionary<string, string> KnownMissingMcpTools = new(StringComparer.Ordinal)
-    {
-        ["read_how_i_teach"] = "#340 (bundle 5b)",
-        ["plan_write_how_i_teach"] = "#340 (bundle 5b)",
-        ["write_how_i_teach"] = "#340 (bundle 5b)",
-        ["plan_prepare_for_start_of_year"] = "#355 (bundle 5b)",
-        ["prepare_for_start_of_year"] = "#355 (bundle 5b)",
-    };
 
     [Fact]
     public void EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere()

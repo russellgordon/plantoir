@@ -6922,12 +6922,12 @@ one line. `LocalModel.ReadReply` is the body reader, testable without a
 server. A #159 test that pinned unreadable arguments REACHING a tool was
 changed on purpose: they no longer do.
 
-**#262 — a difference from the mac worth knowing.** The rule reads each tool's
-own schema, and Windows' local `add_next_class` declares `unit` and `days`
-where the mac's declares only course and section — so an EMPTY model call to
-`add_next_class` is refused here and runs there. "Add the next class page" is a
-card and never meets it. Followed as written; recorded for Russell rather than
-excused by a list. "Changes pages" is this app's own list of writes, because the
+**#262 — the same rule as the mac, after a fix round.** The rule reads each tool's
+own schema. Windows' local `add_next_class` first declared `unit` and `days`
+where the mac's declares only course and section, so an EMPTY model call to it
+was refused here and ran there; the fix round made it run as on the mac, so
+there is no difference left to know. "Add the next class page" is a card and
+never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
 
