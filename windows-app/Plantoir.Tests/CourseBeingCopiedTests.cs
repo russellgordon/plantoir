@@ -34,4 +34,22 @@ public class CourseBeingCopiedTests
         Assert.Contains("WorkLease.Take(_folder, course.Code, WorkLease.Copying)",
             source.Substring(door, source.IndexOf("CourseArchiver.BackUpCourse", door, StringComparison.Ordinal) - door));
     }
+
+    /// <summary>Ruling 4: the window says the copy is being saved, not that the course is being built elsewhere.</summary>
+    [Fact]
+    public void TheWindowSaysACopyIsBeingSavedWhenThatIsWhatIsInTheWay()
+    {
+        Assert.Equal(AssistWording.CourseIsBeingCopied("X"), WorkLease.DeclinedInTheWindow("X", WorkLease.Copying));
+        Assert.Equal(AssistWording.CourseIsBeingBuiltElsewhere("X"), WorkLease.DeclinedInTheWindow("X", WorkLease.Building));
+        Assert.Equal(AssistWording.CourseIsBeingCopied("X"), WorkLease.DeclinedForTheAssistant("X", WorkLease.Copying));
+        string view = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "windows-app", "Plantoir", "Views", "SectionDetailView.xaml.cs"));
+        Assert.DoesNotContain("AssistWording.CourseIsBeingBuiltElsewhere(", view);
+        Assert.Contains("WorkLease.DeclinedInTheWindow(", view);
+    }
+
+    /// <summary>Ruling 5: the decline trail line names the kind of lease in the way.</summary>
+    [Fact]
+    public void TheDeclineLineNamesTheKind() =>
+        Assert.Contains("copy lease", WorkLease.DeclineTrailLine("Preview", Copy(7)));
 }

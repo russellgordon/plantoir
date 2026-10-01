@@ -346,4 +346,17 @@ public static class WorkLease
         long ticks = started.ToUniversalTime().Ticks - DateTime.UnixEpoch.Ticks;
         return $"{ticks / TimeSpan.TicksPerSecond}.{ticks % TimeSpan.TicksPerSecond / 10:D6}";
     }
+    /// <summary>
+    /// What a build or deploy turned away by another program's lease is told:
+    /// <see cref="CourseIsBeingCopied"/> when that lease is a copy being saved
+    /// (bundle 6a ruling 4, the mac's sentence), otherwise the window's
+    /// <see cref="CourseIsBeingBuiltElsewhere"/> or the assistant's
+    /// <see cref="CourseIsBusy"/>.
+    /// </summary>
+    public static string DeclinedInTheWindow(string course, string kind) =>
+        kind == Copying ? AssistWording.CourseIsBeingCopied(course) : AssistWording.CourseIsBeingBuiltElsewhere(course);
+
+    public static string DeclinedForTheAssistant(string course, string kind) =>
+        kind == Copying ? AssistWording.CourseIsBeingCopied(course) : AssistWording.CourseIsBusy(course);
+
 }
