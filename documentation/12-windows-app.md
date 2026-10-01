@@ -1348,7 +1348,7 @@ Windows figures are the v1.1.0 release assets.
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
-| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine); `get-pip.py` deliberately not (below) |
 | When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
 | The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
 
@@ -1360,10 +1360,30 @@ the same day.)
 1. **The mac installer is now almost twice Windows'**, because the mac still
    needs a Linux virtual machine and Windows does not.
 2. **The mac now checks every helper download against a pinned SHA-256**
-   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
-   Python, get-pip.py and the emoji font without checksums. It runs when the
-   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
-   rather than a defect — the Windows issue from #312 asks for it.
+   (the launchers' shared first-run block). **`fetch-runtime.ps1` now does
+   the same for the three FIXED downloads (#356, 2026-10-01)** — the Node zip,
+   the Python embeddable zip and the emoji font — and refuses (deleting the
+   file) on a mismatch. The pins were measured on the build PC (i5-8365U,
+   Windows 11 26200), not copied: Node's equals nodejs.org's own
+   `SHASUMS256.txt` for v20.18.1; the Python zip's `python.exe` and
+   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   equals the shipped font. Proven by running the script's own `Fetch` (lifted
+   out of the file by its syntax tree, against a `file://` copy): the right pin
+   keeps the file, one wrong hex digit refuses it and leaves nothing behind.
+   **`get-pip.py` is NOT hashed, deliberately**: `bootstrap.pypa.io` serves one
+   moving file with no versioned URL, so a hash would break the build on pip's
+   next release while protecting nothing the exact package versions (fetched by
+   pip from PyPI over TLS) do not. **Also rejected:** hashing the Quartz clone
+   (it is a tag on GitHub fetched by git, which checks its own objects) and
+   wrangler (`npm install` of an exact version; npm checks each package
+   against the registry's own integrity hash). It runs when the Windows app is BUILT, not on a teacher's PC;
+   the reason to do it anyway is that the build PC is where a swapped file
+   would enter every installer.
+3. **What #356 asked Windows to confirm, confirmed (2026-10-01):**
+   `scripts/test_helper_bootstrap.py` SKIPS here (`python
+   scripts\test_helper_bootstrap.py`: 5 tests, OK, skipped=5) and
+   `ContractTests.SharedRules_ActivityTrailEvents_Exist` is green with the two
+   mac-only events filtered by `appliesOn`.
 
 ## Behaviours with platform-specific mechanics
 
