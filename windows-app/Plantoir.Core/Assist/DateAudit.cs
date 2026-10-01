@@ -34,7 +34,7 @@ public static class DateAudit
         LinkGraph graph,
         Func<string, DateOnly?> dateOf,
         Func<string, string> name,
-        string? term = null)
+        ClassPageNaming? naming = null)
     {
         var problems = new List<string>();
         var dated = classPages.Where(p => dateOf(p) is not null).ToList();
@@ -60,7 +60,7 @@ public static class DateAudit
             // pattern misses the first page, `allNumbered` goes false, and the
             // whole check is silently skipped for exactly the courses it was
             // meant to help.
-            var parsed = UnitDay.Parse(Title(page), term);
+            var parsed = (naming ?? ClassPageNaming.Standard).Parse(Title(page));
             if (parsed is null) { allNumbered = false; break; }
             numbered.Add((parsed.Value.Unit, parsed.Value.Day, page));
         }

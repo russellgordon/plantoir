@@ -69,7 +69,13 @@ public sealed class NewCourseCreator
         // One line per creation, written BEFORE the launcher starts, so a
         // creation that fails part-way still says what was asked for — read
         // from the configuration just written, never from the interface.
-        ActivityTrail.Note(ActivityTrail.Event.CourseCreated, StartingContentLine(
+        var written = CourseConfiguration.FromDictionary(configuration);
+        ActivityTrail.Note(ActivityTrail.Event.CourseCreated, written.Naming.IsNumbered
+            // A club (#274) says so, with its page word and class folder — the
+            // two things "my club's pages are not being seen" needs. Read from
+            // what was just written, never from the interface.
+            ? ClubLine(_courseCode, written.Naming, written.ClassFolder)
+            : StartingContentLine(
             _courseCode,
             takesExampleContent: configuration["prepopulate_example_content"]?.Type == JTokenType.Boolean
                                  && configuration["prepopulate_example_content"]!.Value<bool>(),
@@ -126,6 +132,10 @@ public sealed class NewCourseCreator
         }
         return $"created {courseCode} with empty folders";
     }
+
+    /// <summary>The <c>course created</c> line for a club (mac <c>NewCourseCreator</c>, #267).</summary>
+    public static string ClubLine(string courseCode, ClassPageNaming naming, string classFolder) =>
+        $"created {courseCode} as a club, with pages named “{naming.Title(1, 1)}” in “{classFolder}”";
 
     /// <summary>The family label a skeleton course is named by, or null for the general family.</summary>
     public static string? SkeletonSubject(string skeletonsRoot, string code)

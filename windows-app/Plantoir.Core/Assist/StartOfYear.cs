@@ -307,29 +307,33 @@ public static class StartOfYearWording
     /// The plan as words — what the app's sheet lists and what an outside
     /// assistant is shown — ending with the plan code on a line of its own.
     /// </summary>
+    /// <param name="noun">What the course calls a class page. A club's "meeting"
+    /// is for the TEACHER's copy only (#274) — the model's copy is the class form.</param>
     public static string Describe(StartOfYearPlan plan, string course, int section, DateOnly today,
-                                  DateTime? scheduledDeploy, string? planCode)
+                                  DateTime? scheduledDeploy, string? planCode, ClassNoun noun = ClassNoun.Class)
     {
+        string one = noun == ClassNoun.Meeting ? "meeting" : "class";
+        string many = noun == ClassNoun.Meeting ? "meetings" : "classes";
         string sectionText = section.ToString(CultureInfo.InvariantCulture);
         if (plan.First is not { } first)
-            return Fill(NoFirstClass, ("course", course), ("section", sectionText), ("noun", "class"));
+            return Fill(NoFirstClass, ("course", course), ("section", sectionText), ("noun", one));
 
         string firstName = first.Name;
         if (plan.NothingToDo)
-            return Fill(NothingToDoTemplate, ("nouns", "classes"), ("first", firstName));
+            return Fill(NothingToDoTemplate, ("nouns", many), ("first", firstName));
 
         var lines = new List<string>
         {
             Fill(SheetTitle, ("course", course), ("section", sectionText)),
             "",
-            Fill(Intro, ("noun", "class"), ("first", firstName)),
+            Fill(Intro, ("noun", one), ("first", firstName)),
             "",
         };
 
         var classes = plan.Classes.ToList();
         if (classes.Count > 0)
         {
-            lines.Add(Fill(ClassesHeading, ("classes", ClassesCounted(classes.Count))));
+            lines.Add(Fill(ClassesHeading, ("classes", Counted(classes.Count, one, many))));
             foreach (var draft in classes) lines.Add("• " + Line(plan, draft));
             lines.Add("");
         }
@@ -370,8 +374,8 @@ public static class StartOfYearWording
             lines.Add(Fill(ScheduledDeployTemplate, ("moment",
                 moment.ToString("dddd, MMMM d 'at' h:mm tt", CultureInfo.GetCultureInfo("en-US")))));
         if (!first.Visible)
-            lines.Add(Fill(FirstClassIsHiddenTemplate, ("first", firstName), ("noun", "class")));
-        lines.Add(Fill(PublishingFromNowOn, ("noun", "class")));
+            lines.Add(Fill(FirstClassIsHiddenTemplate, ("first", firstName), ("noun", one)));
+        lines.Add(Fill(PublishingFromNowOn, ("noun", one)));
 
         if (planCode is not null)
         {

@@ -69,7 +69,7 @@ public class ContractTests
 
         // The class-planning sentences hoisted on 2026-09-30, with the
         // generator's own examples.
-        Assert.Equal(wording["madeRoom"]!.ToString(), AssistWording.MadeRoom(1, "Unit", 3, 4));
+        Assert.Equal(wording["madeRoom"]!.ToString(), AssistWording.MadeRoom(1, "Unit 3, Day 4"));
         Assert.Equal(wording["movedToLaterDays"]!.ToString(), AssistWording.MovedToLaterDays(3));
         Assert.Equal(wording["movesAndBecomesADraft"]!.ToString(), AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"));
         Assert.Equal(wording["publishedTheClassOn"]!.ToString(), AssistWording.PublishedTheClassOn("2026-09-14"));
@@ -108,6 +108,70 @@ public class ContractTests
                      AssistWording.AskedAboutAnotherCourse("{course}", "{otherCourse}"));
         Assert.Equal(wording["askedAboutACourseThatIsNotHere"]!.ToString(),
                      AssistWording.AskedAboutACourseThatIsNotHere("{course}", "{otherCourse}"));
+
+        // #274 (mac #267): the class/meeting pairs, each rendered with the
+        // generator's own example values. The meeting form is the TEACHER's
+        // copy only — ClubNounTests pins that it never reaches the model.
+        void Pair(string key, string forAClass, string forAMeeting)
+        {
+            Assert.Equal(wording[key]!.ToString(), forAClass);
+            Assert.Equal(wording[key + "ForAMeeting"]!.ToString(), forAMeeting);
+        }
+        // #392 (mac #379).
+        Assert.Equal(wording["linksIntoHiddenPagesWillBeOffered"]!.ToString(),
+                     AssistWording.LinksIntoHiddenPagesWillBeOffered("{course}", "{section}"));
+        Pair("addedTheNextPage", AssistWording.AddedTheNextPage, AssistWording.AddedTheNextPageForAMeeting);
+        Pair("allScheduledDatesHaveConcluded",
+             AssistWording.AllScheduledDatesHaveConcluded(12, "{course}", "{section}", "Tuesday", "2026-12-15"),
+             AssistWording.AllScheduledDatesHaveConcludedForAMeeting(12, "{course}", "{section}", "Tuesday", "2026-12-15"));
+        Pair("datesForTheNextPage", AssistWording.DatesForTheNextPage, AssistWording.DatesForTheNextPageForAMeeting);
+        Pair("datesNotGivenYet", AssistWording.DatesNotGivenYet, AssistWording.DatesNotGivenYetForAMeeting);
+        Pair("datesToDuplicate", AssistWording.DatesToDuplicate, AssistWording.DatesToDuplicateForAMeeting);
+        Pair("datesToFindADaysPage", AssistWording.DatesToFindADaysPage, AssistWording.DatesToFindADaysPageForAMeeting);
+        Pair("datesToReDate", AssistWording.DatesToReDate, AssistWording.DatesToReDateForAMeeting);
+        Pair("datesToReplace", AssistWording.DatesToReplace("{course}", "{section}"),
+             AssistWording.DatesToReplaceForAMeeting("{course}", "{section}"));
+        Pair("everyDateIsSpokenFor", AssistWording.EveryDateIsSpokenFor, AssistWording.EveryDateIsSpokenForForAMeeting);
+        Assert.Equal(wording["linkedClassStaysVisibleForAMeeting"]!.ToString(), AssistWording.LinkedClassStaysVisibleForAMeeting("Week 4"));
+        Assert.Equal(wording["linkedClassWasLeftAloneForAMeeting"]!.ToString(), AssistWording.LinkedClassWasLeftAloneForAMeeting(new[] { "Week 4" }));
+        Assert.Equal(wording["linkedClassesWereLeftAloneForAMeeting"]!.ToString(),
+                     AssistWording.LinkedClassesWereLeftAloneForAMeeting(new[] { "Week 4", "Week 5" }));
+        Assert.Equal(wording["madeRoomForAMeeting"]!.ToString(), AssistWording.MadeRoomForAMeeting(1, "Week 5"));
+        Pair("makingRoomCannotBeUndone", AssistWording.MakingRoomCannotBeUndone, AssistWording.MakingRoomCannotBeUndoneForAMeeting);
+        Pair("mayIAskForYourDates", AssistWording.MayIAskForYourDates, AssistWording.MayIAskForYourDatesForAMeeting);
+        Pair("movedToLaterDays", AssistWording.MovedToLaterDays(3), AssistWording.MovedToLaterDaysForAMeeting(3));
+        Pair("movesAndBecomesADraft", AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"),
+             AssistWording.MovesAndBecomesADraftForAMeeting("{page}", "2026-12-15"));
+        Pair("movesToTheFirstDay", AssistWording.MovesToTheFirstDay("{page}", "2026-09-08"),
+             AssistWording.MovesToTheFirstDayForAMeeting("{page}", "2026-09-08"));
+        Pair("otherClassesWouldMoveAndLinksFollow", ClassChangeWording.OtherClassesWouldMoveAndLinksFollow(2),
+             ClassChangeWording.OtherClassesWouldMoveAndLinksFollowForAMeeting(2));
+        Pair("otherClassesWouldMoveKeepingTheirNames", ClassChangeWording.OtherClassesWouldMoveKeepingTheirNames(2),
+             ClassChangeWording.OtherClassesWouldMoveKeepingTheirNamesForAMeeting(2));
+        Pair("pagesAcrossTheDates", AssistWording.PagesAcrossTheDates("{course}", "{section}", 4, 12, 8),
+             AssistWording.PagesAcrossTheDatesForAMeeting("{course}", "{section}", 4, 12, 8));
+        Pair("pagesRunFrom", AssistWording.PagesRunFrom(12, "2026-09-08", "Tuesday", "2026-12-15", "Tuesday"),
+             AssistWording.PagesRunFromForAMeeting(12, "2026-09-08", "Tuesday", "2026-12-15", "Tuesday"));
+        Pair("pagesWithNoDayOfTheirOwn", AssistWording.PagesWithNoDayOfTheirOwn(2, "2026-12-15"),
+             AssistWording.PagesWithNoDayOfTheirOwnForAMeeting(2, "2026-12-15"));
+        Pair("publishedTheClassOn", AssistWording.PublishedTheClassOn("2026-09-14"), AssistWording.PublishedTheClassOnForAMeeting("2026-09-14"));
+        Pair("reDated", AssistWording.ReDated(12, 5), AssistWording.ReDatedForAMeeting(12, 5));
+        Pair("reDatedOnlyPagesTheyUse", AssistWording.ReDatedOnlyPagesTheyUse(3), AssistWording.ReDatedOnlyPagesTheyUseForAMeeting(3));
+        Pair("reDatingOntoTheDatesOnFile", AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"),
+             AssistWording.ReDatingOntoTheDatesOnFileForAMeeting("{course}", "{section}"));
+        Pair("sharingTheLastDay", AssistWording.SharingTheLastDay, AssistWording.SharingTheLastDayForAMeeting);
+        Pair("spareDatesAfterThese", AssistWording.SpareDatesAfterThese(3, "timetable.xlsx, block H"),
+             AssistWording.SpareDatesAfterTheseForAMeeting(3, "timetable.xlsx, block H"));
+        Pair("theNextWouldFallOn", AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"),
+             AssistWording.TheNextWouldFallOnForAMeeting("2026-09-14", "Monday"));
+        Pair("theSemesterBegins", AssistWording.TheSemesterBegins("Tuesday", "2026-09-08", 3),
+             AssistWording.TheSemesterBeginsForAMeeting("Tuesday", "2026-09-08", 3));
+        Pair("wouldAddPages", AssistWording.WouldAddPages(1, "Unit 4", "{course}", "{section}"),
+             AssistWording.WouldAddPagesForAMeeting(1, "{course}", "{section}"));
+        Pair("wouldMakeRoom", AssistWording.WouldMakeRoom(2, "Unit 3, Day 4", "{course}", "{section}"),
+             AssistWording.WouldMakeRoomForAMeeting(2, "Week 5", "{course}", "{section}"));
+        Pair("yourNextUpcoming", AssistWording.YourNextUpcoming(3, "{course}", "{section}"),
+             AssistWording.YourNextUpcomingForAMeeting(3, "{course}", "{section}"));
 
         // #241: a course kept for reference.
         Assert.Equal(wording["askedAboutAReferenceCourse"]!.ToString(),

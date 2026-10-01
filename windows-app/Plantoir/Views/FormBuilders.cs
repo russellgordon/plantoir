@@ -191,92 +191,45 @@ public static class FormBuilders
         protectionWhenActedOn ??= protectionFor;
         var panel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
-        var rows = new StackPanel { Spacing = 2 };
-        panel.Children.Add(rows);
+
+        // A TABLE with a selection, +/− at its lower left (#269, mac #266):
+        // − removes the SELECTED row, Delete does the same, + asks for a name
+        // in a small flyout. Replaces a − on every row and an always-visible
+        // add field. Single selection only — removing several at once would
+        // put several protection answers behind one gesture (rejected on the mac).
+        var list = new ListView
+        {
+            SelectionMode = ListViewSelectionMode.Single,
+            MaxHeight = 260,
+            BorderThickness = new Thickness(1),
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            CornerRadius = new CornerRadius(4),
+        };
+        AutomationProperties.SetAutomationId(list, "list:" + title);
+        AutomationProperties.SetName(list, title);
+        panel.Children.Add(list);
+        var empty = new TextBlock { Text = "None", Opacity = 0.7, FontSize = 12, Margin = new Thickness(8, 4, 0, 4) };
+
+        string Display(string item) =>
+            hidesMarkdownExtension && item.EndsWith(".md", StringComparison.Ordinal) ? item[..^3] : item;
 
         void Rebuild()
         {
-            rows.Children.Clear();
+            list.Items.Clear();
             var items = get();
-            if (items.Count == 0)
-                rows.Children.Add(new TextBlock { Text = "None", Opacity = 0.7, FontSize = 12 });
+            empty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             foreach (string item in items)
             {
-                var row = new Grid { ColumnSpacing = 8 };
+                string display = Display(item);
+                var row = new Grid { ColumnSpacing = 8, Tag = item };
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                string display = hidesMarkdownExtension && item.EndsWith(".md", StringComparison.Ordinal)
-                    ? item[..^3] : item;
                 row.Children.Add(new TextBlock { Text = display, VerticalAlignment = VerticalAlignment.Center });
 
-                // Captured only to decide what this row LOOKS like. Never to
-                // decide whether the removal may go ahead -- see DoRemove.
+                // Captured only to decide what this row LOOKS like: a blocked
+                // row carries its ⓘ, so the reason can be read before trying.
                 var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
-
-                void DoRemove()
-                {
-                    // Asked AGAIN, at the moment of the click. A row is drawn
-                    // once and can be clicked much later, and the answer moves
-                    // underneath it: removing a graded folder from one list
-                    // changes whether the last one in ANOTHER list may go. That
-                    // editor was not redrawn, so its captured answer is stale,
-                    // and acting on it would empty the marks pool while the
-                    // coverage map is on -- exactly the state the floor exists
-                    // to forbid. The redraw is the cosmetics; this is the guard.
-                    var now = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
-                    if (now.IsBlocked)
-                    {
-                        onRemovalBlocked?.Invoke(item, now.Reason);
-                        Rebuild();
-                        return;
-                    }
-
-                    var updated = get();
-                    if (!updated.Remove(item)) return;
-                    set(updated);
-                    onRemoved?.Invoke(item);
-                    changed();
-                    Rebuild();
-                }
-
-                FrameworkElement trailing;
-                if (protection.IsBlocked)
-                {
-                    trailing = BlockedReasonButton(protection.Reason, display,
-                        () => onRemovalBlocked?.Invoke(item, protection.Reason));
-                }
-                else
-                {
-                    var remove = new Button
-                    {
-                        Content = new FontIcon { Glyph = Glyphs.Remove, FontSize = 12 },
-                        Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                        BorderThickness = new Thickness(0),
-                        MinWidth = 28,
-                        MinHeight = 24,
-                        Padding = new Thickness(0),
-                        VerticalAlignment = VerticalAlignment.Center,   // align with the row's label
-                    };
-                    ToolTipService.SetToolTip(remove, $"Remove {display}");
-                    AutomationProperties.SetAutomationId(remove, "remove:" + display);
-                    // Whether to ASK is decided at the click too, not from the
-                    // drawing: the marks confirmation follows the disk (#348),
-                    // and a row drawn before a folder was deleted in Explorer
-                    // would otherwise ask, or not ask, about the wrong thing.
-                    remove.Click += async (_, _) =>
-                    {
-                        var now = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
-                        if (now.AsksFirst && !await ConfirmRemoval(panel.XamlRoot, now.Title, now.Message))
-                            return;
-                        DoRemove();
-                    };
-                    trailing = remove;
-                }
-
-                // A pencil beside the remove button, as on the mac. A rename
-                // living only in a context menu is invisible to everyone
-                // else (WINDOWS-BOOTSTRAP § 5), and double-click-to-edit
-                // fights the sheet the contract already words.
+                var trailing = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
                 if (onRenameRequested is not null)
                 {
                     var rename = new Button
@@ -293,39 +246,90 @@ public static class FormBuilders
                     AutomationProperties.SetAutomationId(rename, "rename:" + display);
                     string toRename = item;
                     rename.Click += (_, _) => onRenameRequested(toRename);
-                    var pair = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
-                    pair.Children.Add(rename);
-                    pair.Children.Add(trailing);
-                    trailing = pair;
+                    trailing.Children.Add(rename);
                 }
-
+                if (protection.IsBlocked)
+                    trailing.Children.Add(BlockedReasonButton(protection.Reason, display,
+                        () => onRemovalBlocked?.Invoke(item, protection.Reason)));
                 Grid.SetColumn(trailing, 1);
                 row.Children.Add(trailing);
-                rows.Children.Add(row);
+
+                var entry = new ListViewItem { Content = row, MinHeight = 32, Padding = new Thickness(8, 0, 4, 0) };
+                AutomationProperties.SetAutomationId(entry, $"row:{title}:{display}");
+                AutomationProperties.SetName(entry, display);
+                list.Items.Add(entry);
             }
         }
-        Rebuild();
 
-        var addRow = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 4, 0, 0) };
-        addRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        addRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var field = new TextBox
+        string? Selected() => (list.SelectedItem as ListViewItem)?.Content is Grid { Tag: string item } ? item : null;
+
+        // The one removal path, for − and Delete alike. Asked AGAIN at the
+        // moment of acting: a row is drawn once and acted on much later, and
+        // the answer moves underneath it (removing a graded folder from one
+        // list changes whether the last one in ANOTHER list may go). A blocked
+        // row is NOT disabled — a disabled − explains nothing — so the reason
+        // is shown and `removal blocked` recorded, as before.
+        async Task RemoveSelected(FrameworkElement anchor)
         {
-            PlaceholderText = hidesMarkdownExtension ? "Type new file name here" : "Type new folder name here",
-        };
-        var addButton = new Button
-        {
-            Content = new FontIcon { Glyph = Glyphs.Add, FontSize = 12 },
-            MinWidth = 28,
-            MinHeight = 24,
-            Padding = new Thickness(0),
-        };
+            if (!list.IsEnabled || Selected() is not { } item) return;
+            var now = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
+            if (now.IsBlocked)
+            {
+                onRemovalBlocked?.Invoke(item, now.Reason);
+                var flyout = new Flyout
+                {
+                    Content = new TextBlock { Text = now.Reason, TextWrapping = TextWrapping.Wrap, MaxWidth = 320 },
+                };
+                flyout.ShowAt(anchor);
+                return;
+            }
+            if (now.AsksFirst && !await ConfirmRemoval(panel.XamlRoot, now.Title, now.Message)) return;
+
+            var updated = get();
+            if (!updated.Remove(item)) return;
+            set(updated);
+            onRemoved?.Invoke(item);
+            changed();
+            Rebuild();
+        }
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        var addButton = new Button { Content = new FontIcon { Glyph = Glyphs.Add, FontSize = 12 }, MinWidth = 28, MinHeight = 24, Padding = new Thickness(0) };
+        var removeButton = new Button { Content = new FontIcon { Glyph = Glyphs.Remove, FontSize = 12 }, MinWidth = 28, MinHeight = 24, Padding = new Thickness(0) };
         ToolTipService.SetToolTip(addButton, hidesMarkdownExtension ? "Add new file…" : "Add new folder…");
+        ToolTipService.SetToolTip(removeButton, "Remove the selected row");
+        AutomationProperties.SetAutomationId(addButton, "add:" + title);
+        AutomationProperties.SetName(addButton, hidesMarkdownExtension ? "Add new file" : "Add new folder");
+        AutomationProperties.SetAutomationId(removeButton, "remove:" + title);
+        AutomationProperties.SetName(removeButton, "Remove " + title);
+        removeButton.Click += async (_, _) => await RemoveSelected(removeButton);
+
+        // Delete removes the selected row through the same path as −. A
+        // disabled list ignores it: the mac found `.disabled` did not stop its
+        // keys, so the handler asks rather than assuming WinUI does.
+        list.KeyDown += async (_, args) =>
+        {
+            if (args.Key != Windows.System.VirtualKey.Delete || !list.IsEnabled) return;
+            args.Handled = true;
+            await RemoveSelected(removeButton);
+        };
+
+        // + asks for a name in a flyout anchored to it, with the rules the add
+        // field always had: .md appended to a file, Media refused, duplicates ignored.
+        var field = new TextBox { PlaceholderText = hidesMarkdownExtension ? "New file name" : "New folder name", MinWidth = 220 };
+        AutomationProperties.SetAutomationId(field, "addField:" + title);
+        var confirm = new Button { Content = "Add" };
+        var addPanel = new StackPanel { Spacing = 8 };
+        addPanel.Children.Add(field);
+        addPanel.Children.Add(confirm);
+        var addFlyout = new Flyout { Content = addPanel };
+        addButton.Flyout = addFlyout;
+        addFlyout.Opened += (_, _) => { field.Text = ""; field.Focus(FocusState.Programmatic); };
 
         void Add()
         {
             string name = field.Text.Trim();
-            field.Text = "";
+            addFlyout.Hide();
             if (name.Length == 0) return;
             // Case-INSENSITIVE, because the filesystem is: "media" typed here
             // was accepted and then collided with the folder Plantoir links in.
@@ -339,15 +343,17 @@ public static class FormBuilders
             changed();
             Rebuild();
         }
-        addButton.Click += (_, _) => Add();
+        confirm.Click += (_, _) => Add();
         field.KeyDown += (_, args) =>
         {
             if (args.Key == Windows.System.VirtualKey.Enter) { Add(); args.Handled = true; }
         };
-        addRow.Children.Add(field);
-        Grid.SetColumn(addButton, 1);
-        addRow.Children.Add(addButton);
-        panel.Children.Add(addRow);
+
+        buttons.Children.Add(addButton);
+        buttons.Children.Add(removeButton);
+        panel.Children.Add(empty);
+        panel.Children.Add(buttons);
+        Rebuild();
         return panel;
     }
 
@@ -462,6 +468,94 @@ public static class FormBuilders
         return panel;
     }
 
+    /// <summary>
+    /// Hide and Expandable as ONE table with two checkbox columns —
+    /// Hide | Expandable | Folder or file (#269, mac #266; Russell's choice) —
+    /// so a folder's two sidebar settings sit on one row. Each column writes
+    /// only its own list. Rows are de-duplicated by exact name: the lists are
+    /// by name, so a shared and a per-section folder of one name could only
+    /// ever flip together. Each checkbox has its OWN accessible name ("Hide
+    /// Tasks", "Expandable: Tasks"); Space on a focused checkbox flips it
+    /// through the same handler as a click, and the row's context menu offers
+    /// both.
+    /// </summary>
+    public static StackPanel SidebarVisibilityTable(IReadOnlyList<string> allItems,
+        Func<List<string>> getHidden, Action<List<string>> setHidden,
+        Func<List<string>> getExpandable, Action<List<string>> setExpandable,
+        Action changed)
+    {
+        var panel = new StackPanel { Spacing = 2, Margin = new Thickness(0, 8, 0, 0) };
+        AutomationProperties.SetAutomationId(panel, "sidebarVisibilityTable");
+        var items = allItems.Distinct(StringComparer.Ordinal).ToList();
+        if (items.Count == 0)
+        {
+            panel.Children.Add(new TextBlock { Text = "No folders or files defined yet.", Opacity = 0.7, FontSize = 12 });
+            return panel;
+        }
+
+        Grid Row()
+        {
+            var grid = new Grid { ColumnSpacing = 8 };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(88) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            return grid;
+        }
+
+        var header = Row();
+        foreach (var (text, column) in new[] { ("Hide", 0), ("Expandable", 1), ("Folder or file", 2) })
+        {
+            var cell = new TextBlock { Text = text, FontWeight = FontWeights.SemiBold, FontSize = 12 };
+            Grid.SetColumn(cell, column);
+            header.Children.Add(cell);
+        }
+        panel.Children.Add(header);
+
+        void Toggle(Func<List<string>> get, Action<List<string>> set, string item, bool on)
+        {
+            var updated = get();
+            if (on && !updated.Contains(item)) updated.Add(item);
+            if (!on) updated.Remove(item);
+            set(updated);
+            changed();
+        }
+
+        foreach (string item in items)
+        {
+            string display = item.EndsWith(".md", StringComparison.Ordinal) ? item[..^3] : item;
+            var row = Row();
+            var hide = new CheckBox { IsChecked = getHidden().Contains(item), MinWidth = 0, MinHeight = 28 };
+            var expand = new CheckBox { IsChecked = getExpandable().Contains(item), MinWidth = 0, MinHeight = 28 };
+            AutomationProperties.SetName(hide, "Hide " + display);
+            AutomationProperties.SetName(expand, "Expandable: " + display);
+            AutomationProperties.SetAutomationId(hide, "hide:" + display);
+            AutomationProperties.SetAutomationId(expand, "expandable:" + display);
+            hide.Checked += (_, _) => Toggle(getHidden, setHidden, item, true);
+            hide.Unchecked += (_, _) => Toggle(getHidden, setHidden, item, false);
+            expand.Checked += (_, _) => Toggle(getExpandable, setExpandable, item, true);
+            expand.Unchecked += (_, _) => Toggle(getExpandable, setExpandable, item, false);
+            Grid.SetColumn(expand, 1);
+            var name = new TextBlock { Text = display, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(name, 2);
+            row.Children.Add(hide);
+            row.Children.Add(expand);
+            row.Children.Add(name);
+
+            var hideItem = new ToggleMenuFlyoutItem { Text = "Hide in the Sidebar" };
+            var expandItem = new ToggleMenuFlyoutItem { Text = "Expandable in the Sidebar" };
+            hideItem.Click += (_, _) => hide.IsChecked = hideItem.IsChecked;
+            expandItem.Click += (_, _) => expand.IsChecked = expandItem.IsChecked;
+            var menu = new MenuFlyout();
+            menu.Items.Add(hideItem);
+            menu.Items.Add(expandItem);
+            menu.Opening += (_, _) => { hideItem.IsChecked = hide.IsChecked == true; expandItem.IsChecked = expand.IsChecked == true; };
+            row.ContextFlyout = menu;
+            row.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);   // so a right-click anywhere on the row lands
+            panel.Children.Add(row);
+        }
+        return panel;
+    }
+
     /// <summary>Preset menu + one-emoji field + a hint at the system panel (Win+.).</summary>
     public static StackPanel EmojiChoiceField(string label, Func<string> get, Action<string> set, Action changed)
     {
@@ -496,7 +590,13 @@ public static class FormBuilders
             if (entry.Length == 0) { field.Text = get(); return; }
             var info = new System.Globalization.StringInfo(entry);
             string first = info.LengthInTextElements > 0 ? info.SubstringByTextElements(0, 1) : get();
-            if (first != get()) { set(first); changed(); }
+            // Compared with the STORED value's first emoji, not the stored
+            // value: a hand-edited "📚🔬" read as "📚" must not be written back
+            // merely because focus passed through the field (#387, mac #373
+            // freshOpenCases — the file keeps what it has until the teacher chooses).
+            var stored = new System.Globalization.StringInfo(get());
+            string storedFirst = stored.LengthInTextElements > 0 ? stored.SubstringByTextElements(0, 1) : "";
+            if (first != storedFirst) { set(first); changed(); }
             field.Text = first;
         };
 

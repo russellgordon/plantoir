@@ -49,8 +49,15 @@ public class WizardWordingTests
         string source = File.ReadAllText(Path.Combine(
             ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "NewCourseDialog.cs"));
 
-        Assert.Contains("PrimaryButtonText = WizardWording.CreateCourseButton;", source);
+        // Since #390 the button follows the club box: both words come from
+        // WizardWording.Panel, and NEVER from the code (ClubCodeRule) — a
+        // teacher can untick the box for a club-shaped code.
+        Assert.Contains("PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;", source);
+        Assert.Contains("PrimaryButtonText = words.CreateButton;", source);
+        Assert.Contains("var words = WizardWording.Panel(IsClub);", source);
+        Assert.DoesNotContain("WizardWording.Panel(IsClubCode", source);
         Assert.DoesNotContain($"PrimaryButtonText = \"{WizardWording.CreateCourseButton}\"", source);
+        Assert.DoesNotContain($"\"{WizardWording.ForAClub.CreateButton}\"", source);
     }
 
     /// <summary>

@@ -148,6 +148,7 @@ public sealed class LauncherRunner : ILauncherRunner
         var gate = new object();
         var findings = new List<Plantoir.Core.Models.SiteHealthFinding>();
         var findingsSeen = new HashSet<string>(StringComparer.Ordinal);
+        Plantoir.Core.Assist.LinksChecklistMarker? linksChecklist = null;
 
         void Capture(string? line)
         {
@@ -166,6 +167,14 @@ public sealed class LauncherRunner : ILauncherRunner
                 Plantoir.Core.Scripting.ActivityTrail.Note(
                     Plantoir.Core.Scripting.ActivityTrail.Event.CloudflareProjectMadeAgain,
                     remade.TrailSentence, remade.Course, remade.Section);
+                return;
+            }
+
+            // The links checklist's marker (#392): kept, so the assistant
+            // can say the checklist WILL be offered only when this build made one.
+            if (Plantoir.Core.Assist.LinksChecklistMarker.Parse(line) is { } checklist)
+            {
+                lock (gate) linksChecklist = checklist;
                 return;
             }
 
@@ -231,8 +240,8 @@ public sealed class LauncherRunner : ILauncherRunner
         }
 
         return process.ExitCode == 0
-            ? new LaunchOutcome(true, transcript, found, 0)
-            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found, process.ExitCode);
+            ? new LaunchOutcome(true, transcript, found, 0, linksChecklist)
+            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found, process.ExitCode, linksChecklist);
     }
 
     /// <summary>
