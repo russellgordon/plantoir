@@ -6,7 +6,46 @@ namespace Plantoir.Core.Models;
 
 public static class CurriculumRules
 {
-    private static readonly Regex ExpectationCodeRegex = new(@"^[A-Za-z]\d+\.\d+$", RegexOptions.Compiled);
+    /// <summary>
+    /// Three shapes since #345 (mac #128): <c>A1.1</c> (an Ontario or BC
+    /// expectation, either case), <c>1.A</c> (a College Board skill: digits, a
+    /// dot, ONE letter) and <c>CRD-1.A</c> (a learning objective: 2–4
+    /// capitals, a hyphen, digits, a dot, one capital). Whole name. Rejected,
+    /// so not re-proposed: <c>1.A.1</c> / <c>CRD-1.A.1</c>, never measured on a
+    /// real course.
+    /// </summary>
+    private static readonly Regex ExpectationCodeRegex =
+        new(@"^(?:[A-Za-z]\d+\.\d+|\d+\.[A-Za-z]|[A-Z]{2,4}-\d+\.[A-Z])$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>The shape every expectation had before #128: a letter, digits, a dot, digits.</summary>
+    private static readonly Regex LetterFirstCodeRegex = new(@"^[A-Za-z]\d+\.\d+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>A letter-first code (<c>A1.1</c>) — the shape the fallback scan prefers.</summary>
+    public static bool IsLetterFirstCode(string code) =>
+        !string.IsNullOrWhiteSpace(code) && LetterFirstCodeRegex.IsMatch(code.Trim());
+
+    /// <summary>
+    /// The coverage maps' titles, one per mapped folder in order
+    /// (<c>curriculumRules.coveragePageTitles</c>): the PRIMARY folder's map is
+    /// "Curriculum Coverage" — no existing site has its map renamed — and every
+    /// other is "&lt;Folder&gt; Coverage"; a title that would repeat an earlier
+    /// one, ignoring case, gets " (2)", " (3)"…
+    /// </summary>
+    public static List<string> CoveragePageTitles(IReadOnlyList<string> mapped, string? primary)
+    {
+        var titles = new List<string>();
+        foreach (string folder in mapped)
+        {
+            string title = primary is not null && string.Equals(folder, primary, StringComparison.OrdinalIgnoreCase)
+                ? "Curriculum Coverage"
+                : folder + " Coverage";
+            string candidate = title;
+            for (int n = 2; titles.Contains(candidate, StringComparer.OrdinalIgnoreCase); n++)
+                candidate = $"{title} ({n})";
+            titles.Add(candidate);
+        }
+        return titles;
+    }
     private static readonly Regex BlockAnchorRegex = new(@"\s+\^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
 
     /// <summary>

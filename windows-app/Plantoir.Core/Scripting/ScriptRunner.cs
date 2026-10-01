@@ -606,6 +606,13 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // The build's PLANTOIR_DATED: line (#279) rides the same line buffer:
         // it names the teacher's pages the build rewrote with their class's
         // date, and the trail is the only place that survives the console.
+        // The build's PLANTOIR_MAPS: line (#345): which coverage maps it wrote.
+        if (Plantoir.Core.Models.CoverageMapsBuilt.Parse(line) is { } maps)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.CurriculumMapsBuilt, maps.TrailSentence, maps.Course, maps.Section);
+            return;
+        }
+
         if (Plantoir.Core.Models.PagesDatedByTheBuild.Parse(line) is { } dated)
         {
             ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,

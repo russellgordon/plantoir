@@ -138,7 +138,7 @@ public sealed partial class CourseSettingsView : UserControl
         button.Click += async (_, _) =>
         {
             if (XamlRoot is null) return;
-            var dialog = SpecialFoldersHelpDialog.For(Config);
+            var dialog = SpecialFoldersHelpDialog.For(Config, CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath));
             dialog.XamlRoot = XamlRoot;
             await dialog.ShowAsync();
         };
@@ -420,10 +420,18 @@ public sealed partial class CourseSettingsView : UserControl
         string courseDirectory = _course.DirectoryPath;
         var sections = Config.SectionNumbers.ToList();
         RenameOutcome outcome;
+        List<string>? curriculumPages = null;
+        List<string>? curriculumLetterFirst = null;
         try
         {
             // Off the UI thread: the move is quick, but reading every page in
             // the course to rewrite links is not on a synced vault.
+            // The curriculum folders are decided from their pages, so they are
+            // read BEFORE the move (#345): afterwards the old name is not there.
+            var sharedBefore = Config.SharedFolders.Append(newName).ToList();
+            var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
+            curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
+            curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
             outcome = await Task.Run(() =>
             {
                 if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
@@ -440,7 +448,8 @@ public sealed partial class CourseSettingsView : UserControl
 
         try
         {
-            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope),
+            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope,
+                                                                        curriculumPages, curriculumLetterFirst),
                                 _course.ConfigFilePath);
         }
         catch (Exception error)
@@ -503,7 +512,14 @@ public sealed partial class CourseSettingsView : UserControl
     /// shared by the checklist and all three lists (#348 — a walk per row was
     /// measured on the mac at 53 ms each on a 400-folder course).
     /// </summary>
-    private ProtectionContext Protection() => CourseSettingsProtection.For(Config, _walkedFolders);
+    private ProtectionContext Protection() => CourseSettingsProtection.For(Config, _walkedFolders, _curriculum);
+
+    /// <summary>
+    /// This pass's curriculum folders, decided from the disk (#345): read once
+    /// per drawing like the walk, and afresh at the click.
+    /// </summary>
+    private CurriculumFolderRule.Resolution _curriculum =
+        new(Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
 
     /// <summary>
     /// The context a row is ACTED ON with: the disk walked afresh, because the
@@ -514,7 +530,8 @@ public sealed partial class CourseSettingsView : UserControl
     {
         _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
         _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
-        return CourseSettingsProtection.For(Config, _walkedFolders);
+        _curriculum = CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath);
+        return CourseSettingsProtection.For(Config, _walkedFolders, _curriculum);
     }
 
     /// <summary>This pass's walk, every occurrence kept (see <see cref="Protection"/>).</summary>
@@ -556,6 +573,7 @@ public sealed partial class CourseSettingsView : UserControl
         // offers or what the pool currently holds.
         _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
         _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
+        _curriculum = CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath);
 
         // -------- Settings — Overall --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
@@ -716,6 +734,31 @@ public sealed partial class CourseSettingsView : UserControl
             name => ItemProtectionRule.For(name, ItemList.PerSectionFiles, Protection()),
             (name, reason) => RecordRemovalBlocked("the per-section files", name, reason)));
         Form.Children.Add(FormBuilders.ExampleCaption(SpecialNames.ContentStructureTip));
+
+        // -------- Curriculum folders (#345, specialNames.curriculumFoldersOffer) --------
+        // Only with two or more candidates; ticked are the folders with a map,
+        // then every declared folder; a tick writes the ticked ones FIRST so the
+        // primary map keeps its name; the last ticked folder stays ticked.
+        var offered = CurriculumFoldersOffer.Offered(Config.SharedFolders, Config.CurriculumFolders);
+        if (offered.Count > 0)
+        {
+            List<string> Ticked() => CurriculumFoldersOffer.Ticked(Config.SharedFolders, Config.CurriculumFolders, _curriculum.Mapped);
+            var curriculumList = FormBuilders.MembershipToggleList(CurriculumFoldersOffer.Label, offered,
+                Ticked,
+                v => Config.CurriculumFolders = v,
+                () => { MarkChanged(); RebuildProtectedRows(); },
+                name =>
+                {
+                    var ticked = Ticked();
+                    return ticked.Count == 1 && ticked.Contains(name, StringComparer.OrdinalIgnoreCase)
+                        ? ItemProtection.Blocked(CurriculumFoldersOffer.LastStaysTicked)
+                        : ItemProtection.Ordinary;
+                },
+                (name, reason) => RecordRemovalBlocked("the curriculum folders", name, reason));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(curriculumList, "curriculumFoldersList");
+            Form.Children.Add(curriculumList);
+            Form.Children.Add(FormBuilders.ExampleCaption(CurriculumFoldersOffer.Caption));
+        }
 
         // -------- Sidebar Visibility --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Sidebar Visibility", null));

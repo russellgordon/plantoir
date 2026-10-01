@@ -117,6 +117,13 @@ public static class ActivityTrail
         /// </summary>
         CourseCreated,
         /// <summary>
+        /// Which curriculum coverage maps a build wrote (#345, mac #128): each
+        /// map's title, the folder it was built from and how many expectations
+        /// it shows — or that it wrote none. From the build's PLANTOIR_MAPS:
+        /// line, for a run the app starts and for a scheduled publish.
+        /// </summary>
+        CurriculumMapsBuilt,
+        /// <summary>
         /// A section was got ready for the start of the year (#355, mac #96):
         /// where it was asked from, how many classes and other pages went into
         /// draft (first used later / nothing students can see links to), how
@@ -455,6 +462,7 @@ public static class ActivityTrail
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
         Event.CourseCreated => "course created",
+        Event.CurriculumMapsBuilt => "curriculum maps built",
         Event.SectionMadeReadyForTheStartOfTheYear => "section made ready for the start of the year",
         Event.StartOfYearChangeUndone => "start of the year change undone",
         Event.StartOfYearNotDone => "start of the year not done",

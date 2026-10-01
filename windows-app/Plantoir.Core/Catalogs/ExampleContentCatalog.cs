@@ -36,6 +36,26 @@ public static class ExampleContentCatalog
     /// there are curriculum pages to include. Any unreadable manifest simply
     /// answers false, never throws.
     /// </summary>
+    /// <summary>
+    /// The folder this code's payload declares for its curriculum pages
+    /// (<c>curriculum_folder</c> in the manifest), or null. The wizard counts
+    /// it as holding pages while they are being installed (#345).
+    /// </summary>
+    public static string? CurriculumFolder(string exampleContentRoot, string code)
+    {
+        if (ManifestPath(exampleContentRoot, code) is not { } path) return null;
+        try
+        {
+            var manifest = JObject.Parse(File.ReadAllText(path));
+            return manifest["curriculum_folder"] is JValue { Type: JTokenType.String } value && ((string)value!).Length > 0
+                ? (string)value! : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public static bool IncludesCurriculum(string exampleContentRoot, string code)
     {
         if (ManifestPath(exampleContentRoot, code) is not { } path) return false;

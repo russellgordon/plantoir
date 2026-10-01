@@ -111,7 +111,15 @@ public sealed record ProtectionContext(
     /// present). A course never asked has the pool the historical rule infers
     /// from what is offered, before AND after.
     /// </summary>
-    bool PoolWasAsked = true);
+    bool PoolWasAsked = true,
+    /// <summary>
+    /// Every curriculum folder the course resolves to
+    /// (<c>curriculumFoldersResolution</c>'s <c>resolved</c>, #345). Null keeps
+    /// the single <see cref="ResolvedCurriculumFolder"/>.
+    /// </summary>
+    IReadOnlyList<string>? ResolvedCurriculumFolders = null,
+    /// <summary>In the wizard: the folder the payload declares, whose pages are installed while the curriculum switch is on.</summary>
+    string? DeclaredPayloadFolder = null);
 
 /// <summary>
 /// The context Course Settings protects its rows with, built in Core so the
@@ -120,21 +128,32 @@ public sealed record ProtectionContext(
 /// </summary>
 public static class CourseSettingsProtection
 {
-    public static ProtectionContext For(CourseConfiguration config, IReadOnlyList<WalkedFolder> walk) => new(
+    public static ProtectionContext For(CourseConfiguration config, IReadOnlyList<WalkedFolder> walk,
+                                        string? courseDirectory = null) => For(config, walk,
+        CurriculumFolderRule.ForCourse(config, courseDirectory));
+
+    /// <summary>
+    /// The context, with the curriculum folders decided from the disk
+    /// (<see cref="CurriculumFolderRule.ForCourse"/>: which shared folders hold
+    /// an expectation page). Without a course folder, the by-name rule.
+    /// </summary>
+    public static ProtectionContext For(CourseConfiguration config, IReadOnlyList<WalkedFolder> walk,
+                                        CurriculumFolderRule.Resolution curriculum) => new(
         InWizard: false,
         CurriculumCoverageEnabled: config.OverallIncludesCurriculumCoverage,
         // Course Settings has no curriculum-PAGES switch - that choice is made
         // once, in the wizard - so it can never be the reason here.
         CurriculumPagesEnabled: false,
         Jurisdiction: SpecialNames.DefaultJurisdiction,
-        ResolvedCurriculumFolder: config.ResolvedCurriculumFolder,
+        ResolvedCurriculumFolder: curriculum.Resolved.FirstOrDefault(),
         GradedFolders: config.MaterializedGradedFolders(
             GradedFolderChoices.For(config, GradedFolderChoices.NamesIn(walk))),
         PerSectionFolders: config.PerSectionFolders,
         ResolvedClassFolder: ClassFolderRule.Name(config.ClassFolder, config.PerSectionFolders),
         Walk: walk,
         SharedFolders: config.SharedFolders,
-        PoolWasAsked: config.GradedFolders is not null);
+        PoolWasAsked: config.GradedFolders is not null,
+        ResolvedCurriculumFolders: curriculum.Resolved);
 
     /// <summary>The walk Course Settings takes, with the course's own exclusions applied.</summary>
     public static List<WalkedFolder> Walk(CourseConfiguration config, string? courseDirectory) =>
@@ -213,28 +232,8 @@ public static class ItemProtectionRule
 
     private static ItemProtection SharedFolderProtection(string name, ProtectionContext context)
     {
-        if (IsTheCurriculumFolder(name, context))
-        {
-            if (context.InWizard)
-            {
-                if (context.CurriculumCoverageEnabled)
-                    return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCoverageMap);
-                if (context.CurriculumPagesEnabled)
-                    return ItemProtection.Blocked(
-                        SpecialNames.CurriculumFolderBlockedByCurriculumPages(context.Jurisdiction));
-            }
-            else if (context.CurriculumCoverageEnabled)
-            {
-                return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCoverageSetting);
-            }
+        if (CurriculumFolderProtection(name, context) is { } curriculum) return curriculum;
 
-            // Coverage is off, so nothing breaks today — but the expectations
-            // will not be there if it is turned on later, which is worth
-            // saying before the folder goes.
-            return ItemProtection.Consequential(
-                SpecialNames.RemoveCurriculumFolderTitle(name),
-                SpecialNames.RemoveCurriculumFolderMessage);
-        }
 
         return MarksFloorProtection(name, ItemList.SharedFolders, context)
                ?? GradedFolderConfirmation(name, ItemList.SharedFolders, context)
@@ -305,7 +304,37 @@ public static class ItemProtectionRule
     private static bool IsGraded(string name, ProtectionContext context) =>
         context.GradedFolders.Contains(name, StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsTheCurriculumFolder(string name, ProtectionContext context) =>
-        context.ResolvedCurriculumFolder is { } resolved &&
-        name.Equals(resolved, StringComparison.Ordinal);
+    /// <summary>
+    /// <c>specialNames.curriculumFolderProtection</c> (#345): for a shared
+    /// folder among the resolved curriculum folders — (1) the ONLY one while
+    /// the map is on is blocked; (2) in the wizard, the payload's declared
+    /// folder while its pages are being installed is blocked; (3) one of
+    /// several while the map is on asks, saying its own map goes; (4) with the
+    /// map off it asks. Null for a folder that is not a curriculum folder here,
+    /// whose removal the other rules (the marks pool) decide.
+    /// </summary>
+    public static ItemProtection? CurriculumFolderProtection(string name, ProtectionContext context)
+    {
+        var resolved = context.ResolvedCurriculumFolders
+                       ?? (context.ResolvedCurriculumFolder is { } one ? new[] { one } : Array.Empty<string>());
+        if (!resolved.Contains(name, StringComparer.Ordinal)) return null;
+
+        if (context.CurriculumCoverageEnabled && resolved.Count == 1)
+            return ItemProtection.Blocked(context.InWizard
+                ? SpecialNames.CurriculumFolderBlockedByCoverageMap
+                : SpecialNames.CurriculumFolderBlockedByCoverageSetting);
+        if (context.InWizard && context.CurriculumPagesEnabled
+            && (context.DeclaredPayloadFolder is null
+                || string.Equals(context.DeclaredPayloadFolder, name, StringComparison.OrdinalIgnoreCase)))
+            return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCurriculumPages(context.Jurisdiction));
+        if (context.CurriculumCoverageEnabled)
+            return ItemProtection.Consequential(
+                SpecialNames.RemoveCurriculumFolderWithItsMapTitle(name),
+                SpecialNames.RemoveCurriculumFolderWithItsMapMessage);
+        // Coverage is off, so nothing breaks today — but the expectations will
+        // not be there if it is turned on later, which is worth saying first.
+        return ItemProtection.Consequential(
+            SpecialNames.RemoveCurriculumFolderTitle(name),
+            SpecialNames.RemoveCurriculumFolderMessage);
+    }
 }
