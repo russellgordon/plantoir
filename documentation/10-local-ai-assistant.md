@@ -2678,7 +2678,7 @@ Claude Code is offered a **longer** list than the local model: 37 tools
 against 13 — the twenty-two that exist, plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
-(Windows' separate `plantoir-mcp.exe` serves 40 since #340 brought the How I
+(Windows' separate `plantoir-mcp.exe` serves 42 — 40 since #340 brought the How I
 Teach tools there on 2026-09-30 — the mac's 37 less its start-of-year pair,
 plus five of its own; "The two MCP surfaces are not the same
 product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
@@ -3605,7 +3605,7 @@ the 13-tool local surface and the 37-tool MCP one (32 until #209 added three
 How I Teach tools and #96 the start-of-year pair; `toolDescriptions` pins all
 37). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 40 since 2026-09-30 (#340), not the same set — see "The two MCP surfaces are not
+serves 42 since bundle 6a's start-of-year pair (40 after #340 on 2026-09-30), not the same set — see "The two MCP surfaces are not
 the same product" below; `AssistSurfaceContractTests`' own comment there still
 says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
 pinned that sum for longer than the prose said so; it is 22 + 15 MCP-only = 37: 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
@@ -6373,7 +6373,7 @@ before changing it:
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
-> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 40 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
+> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 42 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
 
 A reference course is read-only to every tool on both surfaces. The gate is one
 check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are

@@ -3117,7 +3117,7 @@ stripped before parsing now.
 | 15 | `verify-deploy.ps1` | inherits the above | opt-in, not run by bundle 6b |
 
 **The MCP write gate** reads each tool's OWN `ReadOnly` flag off its
-`[McpServerTool]` attribute, over all 40 tools plantoir-mcp serves (not the
+`[McpServerTool]` attribute, over all 42 tools plantoir-mcp serves (not the
 mac's 22), and takes the three exemptions from the contract. A test adds a
 fake write tool and sees it gated without being named. `undo_last_change` is
 the only write tool with no course argument and is gated by the course its
@@ -3206,7 +3206,7 @@ from one course into another", and its "On Windows" subsection has the numbers.
   `_get_excluded_note_config` (which re-reads the contracts on every call) and
   nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
   PC — every file open pays for Defender — and 30 s across the pool. Set
-  `PLANTOIR_FUZZ_N` to go bigger; one PLANTOIR_FUZZ_N=1000000 run took 1 h 20 min here and found **856 pages certified and not hidden** (of 401,096 certified) — an OPEN defect, see doc 09; set PLANTOIR_FUZZ_DUMP to a path to write the failing pages out, and PLANTOIR_FUZZ_SKIP to re-run only the tail of the seeded sequence (a 400,000 run was clean, and the tail, 400,000-999,999, was then run alone: 239,722 certified, 0 certified and not hidden, 40 min — the 856 did not reproduce and are read as an artefact of the one long run; see doc 09).
+  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0. The cause is not known.** The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net. The discrepancy is tracked as an open `windows` issue ("Copy a Page fuzz: reproduce or explain the 856"). Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
 - **The dialog** is a `ContentDialog` whose primary button cancels its own
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
