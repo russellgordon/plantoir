@@ -83,6 +83,39 @@ public sealed class ScheduledDeploy
     /// thing being walked around here is a deploy that would sit waiting on a
     /// question at half six in the morning.
     /// </summary>
+    /// <summary>
+    /// "scheduled deploy could not be set" for a refusal at the ACT, before
+    /// anything was written (#344 / mac #322): schedule_deploy from either
+    /// assistant. Carries the moment, the destinations by KIND — never a
+    /// folder's path — and the refusal's first sentence. Not written by the
+    /// approval card or plan_scheduled_deploy, which are advisory and repeat;
+    /// the schedule dialog cannot reach it, because its button is disabled
+    /// while the same check refuses.
+    /// </summary>
+    /// <remarks>
+    /// Names EVERY destination, joined "A and B". The mac's #396 refinement —
+    /// naming the one destination that CAUSED the refusal — needs Problem to
+    /// say which destination it refused for, and is not done here yet.
+    /// </remarks>
+    public static void NoteRefusedAtTheAct(AssistWorkspace workspace, string courseCode, int sectionNumber,
+                                           DateTime moment, string refusal)
+    {
+        string kinds;
+        string code = courseCode;
+        try
+        {
+            var course = workspace.Course(courseCode);
+            code = course.Code;
+            kinds = Models.DeployCommand.EveryDestinationByType(course.Configuration);
+        }
+        catch (Exception) { kinds = "its destination"; }
+        int stop = refusal.IndexOf(". ", StringComparison.Ordinal);
+        string first = stop > 0 ? refusal[..(stop + 1)] : refusal;
+        Scripting.ActivityTrail.Note(Scripting.ActivityTrail.Event.ScheduledDeployCouldNotBeSet,
+            $"could not set a scheduled deploy for {DateText.Stamp(moment)}, deploying to {kinds}: {first}",
+            code, sectionNumber);
+    }
+
     public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now, string cloudflareAccountID = "")
     {
         if (when <= now)

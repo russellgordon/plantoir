@@ -425,7 +425,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // contract's sentence is "Nothing was scheduled. " + the reason,
             // the same opening a refusal from the scheduler itself carries.
             try { plan = workspace.PlanScheduledDeploy(course, section, moment); }
-            catch (AssistRefusal refusal) { throw new AssistRefusal($"Nothing was scheduled. {refusal.Message}"); }
+            catch (AssistRefusal refusal)
+            {
+                ScheduledDeploy.NoteRefusedAtTheAct(workspace, course, section, moment, refusal.Message);
+                throw new AssistRefusal($"Nothing was scheduled. {refusal.Message}");
+            }
             // Where it goes and the Cloudflare Account ID are read when the
             // deploy RUNS now (#347), from the course's settings and the app's
             // own; what is written here is only what the teacher was told.
