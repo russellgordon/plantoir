@@ -671,7 +671,7 @@ public static class TaskScheduling
                 "$buildLog = $null",
                 "$buildErrLog = $null",
                 "try {",
-                $"  $healthDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "scheduled", "folder-problems"))}",
+                $"  $healthDir = {StateDirExpression(Path.Combine("scheduled", "folder-problems"))}",
                 "  New-Item -ItemType Directory -Force -Path $healthDir | Out-Null",
                 $"  $buildLog = Join-Path $healthDir ({PsQuote(SafeName(taskName))} + '-' + [Guid]::NewGuid().ToString('N') + '.log')",
                 "} catch { $healthDir = $null; $buildLog = $null }",
@@ -906,7 +906,7 @@ public static class TaskScheduling
                 "",
                 "# ---- Record what went out, for the app to pick up ------------------------",
                 "if ($allSucceeded -and $fingerprint) {",
-                $"  $pendingDir = Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", "scheduled", "pending"))}",
+                $"  $pendingDir = {StateDirExpression(Path.Combine("scheduled", "pending"))}",
                 "  New-Item -ItemType Directory -Force -Path $pendingDir | Out-Null",
                 "  $sentinel = [ordered]@{",
                 $"    courseCode = {PsQuote(courseCode)}",
@@ -970,6 +970,31 @@ public static class TaskScheduling
     /// record the same morning and erase each other's news:
     /// <c>ICS3U-section1.&lt;folder id&gt;.txt</c>, as the mac files its own.</para>
     /// </summary>
+    /// <summary>
+    /// The name of the environment variable that moves the wrapper's two
+    /// run-time folders (#179). TEST-ONLY, and deliberately not called
+    /// anything like <c>--state-dir</c>: the unit suite sets it on the CHILD
+    /// powershell.exe it runs the wrapper in, so a test's folder-problem
+    /// records and pending sentinels land in its own scratch folder instead of
+    /// the teacher's real <c>%LOCALAPPDATA%\Plantoir\scheduled</c>.
+    /// </summary>
+    public const string TestStateDirVariable = "PLANTOIR_TEST_WRAPPER_STATE_DIR";
+
+    /// <summary>
+    /// The PowerShell expression for a folder under the wrapper's state root.
+    /// The override is honoured ONLY when it points inside the temp folder, so
+    /// a variable left set system-wide by accident cannot send a teacher's real
+    /// 6 a.m. publish's records somewhere the app never looks; absent (or
+    /// anywhere else), it is exactly the old <c>Join-Path $env:LOCALAPPDATA
+    /// 'Plantoir\scheduled\…'</c>. Rejected: baking the paths at write time —
+    /// cheaper, but then a teacher's wrapper is only right while the baked path
+    /// stays right.
+    /// </summary>
+    internal static string StateDirExpression(string relative) =>
+        $"$(if ($env:{TestStateDirVariable} -and $env:TEMP -and ([IO.Path]::GetFullPath($env:{TestStateDirVariable})).StartsWith([IO.Path]::GetFullPath($env:TEMP), [StringComparison]::OrdinalIgnoreCase)) " +
+        $"{{ Join-Path $env:{TestStateDirVariable} {PsQuote(relative)} }} " +
+        $"else {{ Join-Path $env:LOCALAPPDATA {PsQuote(Path.Combine("Plantoir", relative))} }})";
+
     public static string HealthRecordName(string courseCode, int sectionNumber, string workingFolder) =>
         RecordNameWithId(courseCode, sectionNumber, FolderContainers.FolderIdentifier(workingFolder));
 

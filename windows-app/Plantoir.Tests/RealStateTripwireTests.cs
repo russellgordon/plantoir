@@ -25,7 +25,7 @@ public class RealStateTripwireTests
     {
         ["ClaudeCodeLauncher.cs"] = (2, "finds the user's own Claude Code install (home folder, LOCALAPPDATA Programs); read-only"),
         ["CodexLauncher.cs"] = (2, "finds the user's own Codex install (home folder, npm under APPDATA); read-only"),
-        ["TaskScheduling.cs"] = (4, "the installed exe path, and three lines of the scheduled wrapper a TEACHER runs (runtime, $healthDir, $pendingDir); the last two honour PLANTOIR_TEST_WRAPPER_STATE_DIR (#179)"),
+        ["TaskScheduling.cs"] = (3, "the installed exe path; the wrapper's runtime line; and StateDirExpression, the one place $healthDir and $pendingDir name LOCALAPPDATA (#179: overridable by PLANTOIR_TEST_WRAPPER_STATE_DIR inside TEMP only)"),
         ["FolderActions.cs"] = (1, "reads Obsidian's vault registry under APPDATA; never written by tests"),
         ["MarketingShotCapturer.cs"] = (2, "the developer-only marketing capture's default Teaching folder"),
         ["BuildOutputLocation.cs"] = (1, "the home folder, to say whether a builds root is under it; a parameter in tests"),
