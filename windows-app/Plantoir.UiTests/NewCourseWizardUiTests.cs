@@ -310,7 +310,7 @@ public class NewCourseWizardUiTests
     // ---- Driving the wizard -----------------------------------------------
 
     /// <summary>Press the button in the course list and wait for the wizard.</summary>
-    private static AutomationElement OpenWizard(DrivenApp app)
+    internal static AutomationElement OpenWizard(DrivenApp app)
     {
         // Invoked rather than clicked: a physical click can land while
         // something else briefly holds the foreground, and this button offers
@@ -340,7 +340,7 @@ public class NewCourseWizardUiTests
     /// version of <c>SpecialFoldersHelpUiTests</c> failed a DIFFERENT test each
     /// run for a reason unrelated to what that test checked.</para>
     /// </summary>
-    private static void PutCodeIn(DrivenApp app, string code)
+    internal static void PutCodeIn(DrivenApp app, string code)
     {
         var box = app.Find("newCourseCodeBox", "the course-code picker");
         var edit = Retry.WhileNull(() => box.FindFirstDescendant(cf => cf.ByControlType(ControlType.Edit)),
@@ -366,7 +366,7 @@ public class NewCourseWizardUiTests
     /// the failure, so the app's own explanation and the tail of its console
     /// are pulled into the message instead.</para>
     /// </summary>
-    private static void WaitForTheWorkToFinish(DrivenApp app)
+    internal static void WaitForTheWorkToFinish(DrivenApp app)
     {
         // Wait for the work to have STARTED before waiting for it to end.
         // Without this the next wait is racy in the direction that lies:
@@ -402,7 +402,7 @@ public class NewCourseWizardUiTests
     }
 
     /// <summary>The app's own words for the failure, when it has any.</summary>
-    private static string Explanation(DrivenApp app)
+    internal static string Explanation(DrivenApp app)
     {
         string why = app.FindOrNull("failureExplanation", TimeSpan.FromSeconds(1))?.Name ?? "";
         return why.Length > 0 ? $" It explained it as \"{why}\"." : " It explained nothing.";
@@ -414,7 +414,7 @@ public class NewCourseWizardUiTests
     /// read from a file, because the console is only in the visual tree once
     /// that pane is open.
     /// </summary>
-    private static string ConsoleTail(DrivenApp app)
+    internal static string ConsoleTail(DrivenApp app)
     {
         try
         {

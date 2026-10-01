@@ -29,21 +29,26 @@ namespace Plantoir.UiTests;
 /// trail, where nobody would ever look.</para>
 ///
 /// <para>Still NOT isolated, so nobody assumes otherwise: Credential Manager,
-/// and anything a CHILD process resolves for itself. The LAUNCHERS are the sharp edge and are worth
-/// naming separately: <c>preview.ps1</c> and <c>deploy.ps1</c> compute the
-/// builds root from the environment themselves, and the scheduled-task
-/// wrapper bakes the same into the script it registers. So a redirected run
-/// that PREVIEWED would look for its build where the launcher did not put it,
-/// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
-/// whose sentinels land in the teacher's real pending folder. Neither is done
-/// by any test today, and neither should be without reading this first.</para>
+/// and anything a CHILD process resolves for itself. The LAUNCHERS are the
+/// sharp edge: <c>preview.ps1</c>, <c>deploy.ps1</c> and <c>setup.ps1</c>
+/// compute the builds root from <c>$env:LOCALAPPDATA</c> themselves, so a
+/// preview or a deploy driven from a test builds into the REAL
+/// <c>%LOCALAPPDATA%\Plantoir\builds\&lt;id of the temp working folder&gt;</c>
+/// (<see cref="RealBuildsRoot"/>), not into the state folder. The scheduled-task
+/// wrapper would bake the same into a REAL Task Scheduler task, so no test
+/// schedules a deploy.</para>
 ///
-/// <para><b>One launcher IS run now</b> — <c>NewCourseWizardUiTests</c> presses
-/// Create, which runs <c>setup.ps1</c> — and it is safe for narrow reasons
-/// that nothing enforces. They are written out once, in
-/// <c>documentation/12-windows-app.md</c> under "The flags the app answers";
-/// read them before a test runs a DIFFERENT launcher, because preview and
-/// schedule would NOT be safe.</para>
+/// <para><b>Since bundle 11 (2026-10-01) the tests DO run the launchers end to
+/// end</b> — Russell lifted the old "never preview or publish from a test"
+/// rule, because nothing proved the newest features through the window. What
+/// remains is hygiene, and it lives HERE, in <see cref="Dispose"/>, so it runs
+/// when a test fails too: every preview a test declared with
+/// <see cref="WillServe"/> is stopped with the launcher's own
+/// <c>preview.ps1 CODE N --stop</c>, any process still naming this run's
+/// folders is ended, the real builds-root folder for this working folder is
+/// deleted, and a course the app locked for reference is unlocked so the
+/// temporary folder can go. <c>documentation/12-windows-app.md</c> → "Driving
+/// the real interface" says what a test that runs a launcher owes.</para>
 ///
 /// <para><b>A running Plantoir is closed, not worked around.</b> Russell's
 /// standing instruction (2026-09-06, and CLAUDE.md's Windows setup notes):
@@ -269,6 +274,186 @@ public sealed class DrivenApp : IDisposable
         return said;
     }
 
+    // ---- What the launchers leave behind (bundle 11) ----------------------
+
+    /// <summary>
+    /// Where the LAUNCHERS put this run's built sites: the real
+    /// <c>%LOCALAPPDATA%\Plantoir\builds\&lt;folder id&gt;</c>. The app's own idea
+    /// of it is under <c>--state-dir</c>, which no launcher reads, so this is
+    /// the one a test reads a build back from — and the one it must delete.
+    /// </summary>
+    public string RealBuildsRoot => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "builds",
+        FolderContainers.FolderIdentifier(WorkspacePath));
+
+    /// <summary>A folder beside the working folder, deleted with the run — for a
+    /// publish destination, or a folder to import from.</summary>
+    public string Scratch(string name)
+    {
+        string path = Path.Combine(_root, name);
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private readonly List<(string Code, int Section)> _served = new();
+
+    /// <summary>Say BEFORE pressing Preview that this section may be served, so
+    /// teardown stops it even when the test fails before it presses Stop.</summary>
+    public void WillServe(string code, int section) => _served.Add((code, section));
+
+    /// <summary>Every incidental dialog a wait answered, and what it said —
+    /// kept so a failure can say what the app put in the way.</summary>
+    public List<string> Answered { get; } = new();
+
+    public AutomationElement Desktop => Window.Automation.GetDesktop();
+
+    /// <summary>Right-click a sidebar row and press one item of its menu.</summary>
+    public void PressRowMenuItem(string rowAutomationId, string itemName)
+    {
+        var row = Find(rowAutomationId, $"the sidebar row {rowAutomationId}");
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            row.RightClick();
+            var item = Retry.WhileNull(
+                () => Desktop.FindFirstDescendant(cf => cf.ByName(itemName).And(cf.ByControlType(ControlType.MenuItem))),
+                TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
+            if (item is null) continue;
+            if (item.Patterns.Invoke.IsSupported) item.Patterns.Invoke.Pattern.Invoke();
+            else item.Click();
+            return;
+        }
+        throw new InvalidOperationException($"The menu of {rowAutomationId} never offered \"{itemName}\".");
+    }
+
+    /// <summary>Click a section's row, and wait for its toolbar's title
+    /// (<c>CODE-S1</c>, by the code a teacher reads — <paramref name="shownCode"/>
+    /// for a reference course whose folder is <c>CODE-2025</c>).</summary>
+    public void SelectSection(string code, int section, string? shownCode = null)
+    {
+        var node = Find($"sidebar-{code}-section{section}", $"the sidebar entry for {code} section {section}");
+        string title = $"{shownCode ?? code}-S{section}";
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            node.Click();
+            var arrived = Retry.WhileFalse(
+                () => (Window.FindFirstDescendant(cf => cf.ByAutomationId("SectionTitle"))?.Name ?? "").StartsWith(title, StringComparison.Ordinal),
+                TimeSpan.FromSeconds(6), TimeSpan.FromMilliseconds(250)).Result;
+            if (arrived) return;
+        }
+        throw new InvalidOperationException($"{code} section {section} never opened after three clicks on its sidebar entry.");
+    }
+
+    /// <summary>The ContentDialog on screen, if any, other than the ones named.</summary>
+    public AutomationElement? OpenDialog() =>
+        Window.FindFirstDescendant(cf => cf.ByClassName("ContentDialog"))
+        ?? Desktop.FindFirstDescendant(cf => cf.ByClassName("ContentDialog").And(cf.ByProcessId(Window.Properties.ProcessId.Value)));
+
+    /// <summary>
+    /// Wait for <paramref name="done"/>, ANSWERING whatever ordinary dialog the
+    /// app puts up meanwhile with its Close button — today's class ("Not
+    /// Today"), a folder-problem finding, the links checklist offer. Every one
+    /// is recorded in <see cref="Answered"/> with what it said, and a timeout
+    /// reports them, because a refusal answered here is the likeliest reason
+    /// the wait never ended.
+    /// </summary>
+    public bool WaitAnsweringDialogs(Func<bool> done, TimeSpan within)
+    {
+        var until = DateTime.UtcNow + within;
+        while (DateTime.UtcNow < until)
+        {
+            try { if (done()) return true; } catch { }
+            try
+            {
+                if (OpenDialog() is { } dialog
+                    && dialog.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")) is { } close
+                    && close.IsEnabled)
+                {
+                    string said = string.Join(" | ", TextsUnder(dialog));
+                    Answered.Add($"{dialog.Name}: {said}");
+                    Console.WriteLine($"Answered a dialog with Close: {dialog.Name}: {said}");
+                    close.AsButton().Invoke();
+                }
+            }
+            catch { }
+            Thread.Sleep(750);
+        }
+        try { return done(); } catch { return false; }
+    }
+
+    public string AnsweredSoFar => Answered.Count == 0 ? " No dialog was answered on the way."
+        : " Dialogs answered on the way: " + string.Join(" || ", Answered);
+
+    /// <summary>
+    /// Ends what a test that ran the launchers left running, and deletes the
+    /// real builds-root folder they made. Never fatal: it runs on the way out of
+    /// a test that may already have failed for a better reason.
+    /// </summary>
+    private void CleanUpAfterTheLaunchers()
+    {
+        string buildsRoot;
+        try { buildsRoot = RealBuildsRoot; } catch { return; }
+        if (_served.Count == 0 && !Directory.Exists(buildsRoot)) return;
+
+        string? runtime = Path.Combine(Path.GetDirectoryName(ExecutablePath)!, "runtime");
+        if (!File.Exists(Path.Combine(runtime, "manifest.json"))) runtime = null;
+        foreach (var (code, section) in _served)
+        {
+            // The launcher's own stop: it ends the section's build and serve by
+            // the directories they work in, which is what the app's Stop runs.
+            RunPowerShell($"& '{Path.Combine(WorkspacePath, "preview.ps1").Replace("'", "''")}' {code} {section} --stop",
+                          WorkspacePath, runtime);
+        }
+
+        // Anything still naming this run's folders: a deploy's launcher, its
+        // python, a serve the stop missed. Never this sweep's own process.
+        string needles = string.Join(",", new[] { _root, buildsRoot }.Select(p => "'" + p.Replace("'", "''") + "'"));
+        RunPowerShell(
+            "$needles = @(" + needles + "); " +
+            "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine } | " +
+            "Where-Object { $line = $_.CommandLine; @($needles | Where-Object { $line.IndexOf($_, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count -gt 0 } | " +
+            "ForEach-Object { Write-Output (\"ended \" + $_.Name + \" \" + $_.ProcessId); Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+            WorkspacePath, runtime: null);
+
+        if (Environment.GetEnvironmentVariable("PLANTOIR_UI_KEEP") == "1")
+        {
+            Console.WriteLine($"PLANTOIR_UI_KEEP: leaving this run's build at {buildsRoot}");
+            return;
+        }
+        for (int attempt = 1; attempt <= 6 && Directory.Exists(buildsRoot); attempt++)
+        {
+            try { Directory.Delete(buildsRoot, recursive: true); }
+            catch { Thread.Sleep(1000); }
+        }
+        if (Directory.Exists(buildsRoot))
+            Console.WriteLine($"Could not delete this run's build at {buildsRoot}.");
+    }
+
+    private static void RunPowerShell(string command, string workingDirectory, string? runtime)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("powershell.exe")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = workingDirectory,
+            };
+            foreach (string arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command })
+                psi.ArgumentList.Add(arg);
+            if (runtime is not null) psi.Environment["PLANTOIR_RUNTIME"] = runtime;
+            using var process = Process.Start(psi)!;
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(90_000);
+            if (output.Trim().Length > 0) Console.WriteLine(output.Trim());
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine($"Clean-up step failed: {error.Message}");
+        }
+    }
+
     public void Dispose()
     {
         try { _automation.Dispose(); } catch { }
@@ -280,6 +465,12 @@ public sealed class DrivenApp : IDisposable
             if (_app is not null && !_app.HasExited) _app.Kill();   // Kill waits for exit
         }
         catch { }
+        CleanUpAfterTheLaunchers();
+        // A course kept for reference is LOCKED by the app (deny entries) the
+        // moment the folder is read, and a locked tree refuses to be deleted —
+        // which is why the temporary folders of the reference tests outlived
+        // their runs before bundle 11.
+        try { Plantoir.Core.Models.ReferenceLock.Unlock(Path.Combine(WorkspacePath, "courses")); } catch { }
         // Deleted last, and never fatally: a locked file must not turn a
         // passing test red, and the folder is under TEMP either way.
         //
