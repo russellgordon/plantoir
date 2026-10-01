@@ -228,7 +228,9 @@ Branch `issue/bundle8-windows-ui`. Manual: doc 12 → "Bundle 8"; doc 11 →
   from the contract's `onClick` cases. Unproven on a real click.
 - **Accelerators** (#191): guarded under a ContentDialog; NOT measured.
   **#302**: the picker path bar's 520 limit dropped; not checked by eye.
-  **#214**: not measured.
+  **#214**: not measured. (Bundle 9: both now have a `[UiFact]` that MAKES
+  the measurement — `AcceleratorUnderDialogUiTests`,
+  `PanelHeightUnderSqueezeUiTests` — owed one run on an unlocked desktop.)
 - **The UI-test runner** (#155): startup.log says when stdio is redirected;
   never closes a busy Plantoir; sweeps only the killed pid's leases;
   `ConPtyProcess.Start` zeroes its std handles (measured: leak reproduced, then
