@@ -269,7 +269,8 @@ public sealed class AssistAgent
     /// (research/ai-assist/windows-description-convergence-results.txt).
     /// These two keep their Windows text, shortened, because the contract's
     /// sentences promise behaviour Windows does not have yet (includeLinked
-    /// defaults to false here); they move when that behaviour does.
+    /// defaults to false here); they move when that behaviour does (#420, and
+    /// recorded as contracts/assist-cases.json → toolDescriptions.measuredDepartures).
     /// </summary>
     internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
     {

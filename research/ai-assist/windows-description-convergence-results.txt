@@ -14,6 +14,14 @@ CONDITIONS (as registered)
   103 s cold read of the 2,942-token prompt. Weights qwen2.5-1.5b-instruct
   q4_k_m (the smaller assistant, this PC's tier). Larger tier NOT measured.
   Median turn 5.5-6.2 s; median 49-50 completion tokens (thinking is off).
+  The flags are INFERRED, not read off a log: neither server log carries the
+  full command line (PowerShell's error echo truncates it at --ctx-size), and
+  the registered "the results file says which backend ran" cannot be met. The
+  evidence for --reasoning off is indirect: median 49 and max 79 completion
+  tokens per run, max 272 of the 512 cap over every request in both logs
+  (final review's recount). Both arms of every suite ran on the same server
+  process, so the comparison is like for like. Next time: log argv or /props
+  at server start.
 
 DEVIATION, said plainly: the server was started as a background task with a
   2-hour limit and was killed at ~09:45, three minutes into S3. Both S3 arms
@@ -58,8 +66,8 @@ CRITERIA (pre-registration with the F4 note)
 
 DECISION: the descriptions MOVE (bundle 9 ruling P2). Windows' served
   descriptions become the contract text for every shared tool except
-  publish_pages and unpublish_pages, which wait for the behaviour (the new
-  windows issue on includeLinked); NarrowToLocal stops shortening every
+  publish_pages and unpublish_pages, which wait for the behaviour (#420,
+  includeLinked; recorded in toolDescriptions.measuredDepartures); NarrowToLocal stops shortening every
   description except those two; the procedural sentences Windows' MCP
   descriptions carried for Claude Code move to the server's MCP instructions.
   The "card: undo" loss is not a router change the app sees: that sentence is

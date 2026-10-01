@@ -3013,9 +3013,11 @@ numbers onto it: Windows' assistant window drives its tools through
 app's UI thread — the mac's 9.7 s main-thread zip has no analogue, and nothing
 was measured holding the window. Every assistant zip now leaves an `assistant
 backed up a course` line with its seconds, which is how that claim will be
-checked against a real course. What is NOT built: counting the course busy
-while the zip runs in `plantoir-mcp` (`courseIsBeingCopied`), so Preview and
-Deploy stay live meanwhile; that key stays in the ledger against #360.
+checked against a real course. (This said counting the course busy while
+the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
+stayed in the ledger against #360. It was built in parity bundle 6a —
+`AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
+and `NamedGapLedger` has been empty since bundle 9.)
 
 ---
 
