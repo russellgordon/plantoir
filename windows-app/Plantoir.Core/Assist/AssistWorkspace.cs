@@ -316,7 +316,7 @@ public sealed class AssistWorkspace
         try
         {
             var resolutions = WikiLinks.Resolve(
-                WikiLinks.Parse(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
+                WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
             foreach (var resolution in resolutions)
                 if (resolution.Outcome == LinkOutcome.Resolved)
                     protectedPaths.Add(Path.GetFullPath(resolution.Path!));
@@ -378,7 +378,7 @@ public sealed class AssistWorkspace
             try
             {
                 foreach (var resolution in WikiLinks.Resolve(
-                             WikiLinks.Parse(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
+                             WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
                     if (resolution.Outcome == LinkOutcome.Resolved)
                         reference.Add(Path.GetFullPath(resolution.Path!));
             }
@@ -586,7 +586,7 @@ public sealed class AssistWorkspace
             string fullPath = PagePaths.ResolveInside(_folder, page.RelativePath);
             string text = File.ReadAllText(fullPath);
             var targets = new List<string>();
-            foreach (var resolution in WikiLinks.Resolve(WikiLinks.Parse(text), course.DirectoryPath, section, fullPath))
+            foreach (var resolution in WikiLinks.Resolve(WikiLinks.PageLinks(text), course.DirectoryPath, section, fullPath))
             {
                 if (resolution.Problem is { } prob)
                 {
@@ -722,6 +722,7 @@ public sealed class AssistWorkspace
         }
 
         var linked = new List<PlannedPage>();
+        var stoppedAt = new List<PlannedPage>();
         var kept = new List<PlannedKept>();
         int protectedLinked = 0;
         int stillNeeded = 0;
@@ -780,13 +781,22 @@ public sealed class AssistWorkspace
                 // that decide to SKIP A WRITE are the ones that require
                 // VisibilityIsCertain. The mac collapses here too.
                 if (!candidate.IsVisibleToStudents) continue;
+                // A page that IS going down is not "staying" -- two classes
+                // named together link to each other, and the second must not
+                // be reported as kept because it is a class (#342).
+                if (goingDown.Contains(candidate.Title)) continue;
                 string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
                 if (reason != null && keptSeen.Add(candidate.Title))
                 {
                     kept.Add(new PlannedKept(candidate, reason));
+                    // A class has its own line ("stays visible, because it is
+                    // a class of its own") and no count: the protected
+                    // sentence below says index pages, curriculum and Key
+                    // Links, and a class among them would make it false
+                    // (#342 / mac #201).
                     if (reason.Contains("still links to it"))
                         stillNeeded++;
-                    else
+                    else if (reason != ClassOfItsOwn)
                         protectedLinked++;
                 }
             }
@@ -821,6 +831,13 @@ public sealed class AssistWorkspace
                                     {
                                         linked.Add(targetPage with { ViaLink = true });
                                         queue.Enqueue(targetPage);
+                                    }
+                                    else
+                                    {
+                                        // The stop (#173): neither published
+                                        // nor walked through, and named to the
+                                        // teacher (#203).
+                                        stoppedAt.Add(targetPage);
                                     }
                                 }
                             }
@@ -903,8 +920,12 @@ public sealed class AssistWorkspace
             InheritedDates = inherited,
             Index = index,
             Dangling = dangling,
+            StoppedAtClasses = stoppedAt,
         };
     }
+
+    /// <summary>The reason an unpublish leaves a linked class up (#342 / mac #201).</summary>
+    private const string ClassOfItsOwn = "it is a class of its own.";
 
 
     private static string? ReasonToKeep(
@@ -920,6 +941,13 @@ public sealed class AssistWorkspace
             return "it is in this section's Key Links.";
         if (PagePaths.IsCurriculum(course.DirectoryPath, page.RelativePath))
             return "it is a curriculum page.";
+        // An unpublish never takes a class down by following a link, and does
+        // not walk into one (#342 / mac #201, mirroring #173's publish stop).
+        // After the curriculum check and BEFORE the referrer test: the order
+        // is pinned on the mac -- a class in Key Links keeps its Key Links
+        // reason, and a class a visible page links to gets THIS reason.
+        if (page.IsClassPage)
+            return ClassOfItsOwn;
         if (PageStillLinking(page, referrers, goingDown) is { } referrer)
             return $"“{referrer.DisplayTitle}” still links to it.";
         return null;
@@ -954,7 +982,7 @@ public sealed class AssistWorkspace
         try { text = File.ReadAllText(page); } catch { return found; }
 
         foreach (var resolution in WikiLinks.Resolve(
-                     WikiLinks.Parse(text), course.DirectoryPath, section, page))
+                     WikiLinks.PageLinks(text), course.DirectoryPath, section, page))
         {
             if (resolution.Problem is { } problem)
             {

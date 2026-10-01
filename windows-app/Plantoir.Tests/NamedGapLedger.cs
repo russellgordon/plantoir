@@ -233,8 +233,6 @@ internal static class NamedGapLedger
             "howITeachPlanCreates", "howITeachPlanReplaces", "howITeachRead", "howITeachSaved", "howITeachTooLong"),
         Owed(AssistWordingKeys, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
             "startOfYearNeedsABackup", "startOfYearNeedsItsPlan", "startOfYearPlanHasChanged"),
-        Owed(AssistWordingKeys, 203, "the link walk stopping at a class page is not wired here yet (mac #173)",
-            "linkedClassesWereLeftAlone", "linkedClassStaysVisible", "linkedClassWasLeftAlone"),
         Owed(AssistWordingKeys, 305, "\"what does <page> link to?\" is not answered in code here yet (mac #167)",
             "linkedPageIsADraft", "linkedPageIsMissing", "pageCouldNotBeRead", "pageLinksTo", "pageLinksToNothing",
             "askedAboutACourseThatIsNotHere", "askedAboutAnotherCourse"),
