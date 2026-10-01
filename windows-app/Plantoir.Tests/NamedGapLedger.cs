@@ -158,8 +158,6 @@ internal static class NamedGapLedger
             "curriculum maps built"),
         Owed(ActivityTrailEvents, 360, "the assistant's own backup of a course is not recorded yet (mac #351)",
             "assistant backed up a course"),
-        Owed(ActivityTrailEvents, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
-            "section made ready for the start of the year", "start of the year change undone", "start of the year not done"),
 
         // ---- specialNames.platformWording.keys
 
@@ -200,8 +198,6 @@ internal static class NamedGapLedger
             "reDatingOntoTheDatesOnFileForAMeeting", "sharingTheLastDayForAMeeting", "spareDatesAfterTheseForAMeeting",
             "theNextWouldFallOnForAMeeting", "theSemesterBeginsForAMeeting", "wouldAddPagesForAMeeting",
             "wouldMakeRoomForAMeeting", "yourNextUpcomingForAMeeting"),
-        Owed(AssistWordingKeys, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
-            "startOfYearNeedsABackup", "startOfYearNeedsItsPlan", "startOfYearPlanHasChanged"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
         Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",

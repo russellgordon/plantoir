@@ -117,6 +117,23 @@ public static class ActivityTrail
         /// </summary>
         CourseCreated,
         /// <summary>
+        /// A section was got ready for the start of the year (#355, mac #96):
+        /// where it was asked from, how many classes and other pages went into
+        /// draft (first used later / nothing students can see links to), how
+        /// many were left, the backup's file name, whether the preview was
+        /// rebuilt. Never a page's name — the backup is how anyone finds them.
+        /// </summary>
+        SectionMadeReadyForTheStartOfTheYear,
+        /// <summary>A start-of-year change was undone: from where, how many pages put back, how many left because they changed since.</summary>
+        StartOfYearChangeUndone,
+        /// <summary>
+        /// Getting ready was asked for and nothing was changed, with the reason
+        /// (changedSinceShown, deployUnderWay, backupFailed, writeFailed,
+        /// noFirstClass, missingPlanCode, nothingToDo) — "I pressed the button
+        /// and nothing happened" leaves no file changed to show it.
+        /// </summary>
+        StartOfYearNotDone,
+        /// <summary>
         /// The APP reopened a working folder at launch rather than the teacher
         /// choosing one (#320). Carries the path (redacted) and which it was —
         /// the window's own folder or the last working folder. A window opened
@@ -438,6 +455,9 @@ public static class ActivityTrail
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
         Event.CourseCreated => "course created",
+        Event.SectionMadeReadyForTheStartOfTheYear => "section made ready for the start of the year",
+        Event.StartOfYearChangeUndone => "start of the year change undone",
+        Event.StartOfYearNotDone => "start of the year not done",
         Event.WorkingFolderReopened => "working folder reopened",
         Event.WorkingFolderNotReopened => "working folder not reopened",
         Event.ExclusionsReverted => "exclusions reverted",
