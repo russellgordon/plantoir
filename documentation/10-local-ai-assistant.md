@@ -869,6 +869,13 @@ Windows a DST requirement discovered here and never discussed there. It is a
 mac test and a named trap in the handover instead, to be proposed as a row once
 both sides have met it. The same goes for the fall-back convention.
 
+*Windows has now met both (parity bundle 5a, 2026-09-30):* `ScheduledMoment.Settle`
+moves a nonexistent wall time forward by the GAP — 02:30 onto 03:30, not onto
+03:00, the first minute that exists, which its first draft did and a test
+caught — and takes a repeated hour as its earlier instant. Both are pinned in
+`DeployAtATimeContractTests` against `America/Toronto`, and proposed back to
+the mac as `resolving` rows in the bundle's mac draft.
+
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read
 that time". That is a deliberate divergence from the `publish_class_on`
@@ -2731,11 +2738,13 @@ described in "Step 1" and "Step 2" above. The rows in the table are from
 before that change and stay as they were written; a re-run of the `--app-body`
 arm reproduces them only with `--uncapped`.
 
-**Windows is not fixed by that, and this is the part they owe.** Their cap
-bounds the wait, and `LocalModel.Ask` returns `choices[0].message` and drops
-the rest of the response, so the finish reason never leaves `Ask` and a
-cut-off call is acted on. They meet it MORE often than the mac ever did,
-because their cap fires where the mac's context used to.
+**Windows was not fixed by that, and was until 2026-09-30.** Its cap bounded
+the wait, but `LocalModel.Ask` returned `choices[0].message` and dropped the
+rest of the response, so the finish reason never left `Ask` and a cut-off call
+was acted on — MORE often than the mac ever met it, because that cap fires
+where the mac's context used to. Parity bundle 5a (#196) carries the reason
+out of `Ask`; see "The Windows half of the assistant chain" at the end of this
+page.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
@@ -5101,23 +5110,34 @@ times".
   per call rather than a stored date, because one `plantoir-mcp` can stay open
   longer than a calendar day.
 
-**The guarantee is the CARD path's, and only its.** When the MODEL sends
-`date: "tomorrow"` — which `ClassDateHelp` tells it not to, and which a small
-model will sometimes do anyway — the twin and the act each call `DayFor` and
-each read the clock, so the 23:59/00:01 case above still exists on that path.
-It is not closed here because this piece is the card path, and that is the only
-honest reason: normalising a model-supplied `date` inside `AssistAgent` after
-the model has already CHOSEN the tool would cost no routing accuracy at all —
-the model sees nothing of it — and is exactly the "steer with code" move
-recommended below. Cheap, and simply not done yet. Worth knowing before
-anybody reads the paragraph above as covering everything, and before anybody
-talks themselves out of the fix on the grounds that it needs a re-measurement.
-It does not.
+**When this was written the guarantee was the CARD path's, and only its.** When
+the MODEL sends `date: "tomorrow"` — which `ClassDateHelp` tells it not to, and
+which a small model will sometimes do anyway — the twin and the act each call
+`DayFor` and each read the clock, so the 23:59/00:01 case above still existed
+on that path. It was not closed here because this piece was the card path, and
+that was the only honest reason: normalising a model-supplied `date` inside
+`AssistAgent` after the model has already CHOSEN the tool would cost no routing
+accuracy at all — the model sees nothing of it — and is exactly the "steer with
+code" move recommended below. Cheap, and simply not done yet.
 
-**Done on the mac on 2026-09-10, and still owed on Windows** — see "The mac's
-half" below, and [issue #159](https://github.com/russellgordon/plantoir/issues/159).
-It cost fifty lines of code — 170 with the comments that explain them — and
-no re-measurement, exactly as predicted here.
+**Done on the mac on 2026-09-10 and on Windows on 2026-09-19** — see "The mac's
+half" and "The Windows half" below, and
+[issue #159](https://github.com/russellgordon/plantoir/issues/159). It cost
+fifty lines of code — 170 with the comments that explain them — and no
+re-measurement, exactly as predicted here.
+
+**The carve-out that REMAINS is the MCP surface, on both platforms, and it is a
+decision rather than a leftover.** An external client — Claude Code — calls
+`plan_publish_class_on` and then `publish_class_on` as two separate requests,
+each with its own words, and there is no single moment "the call is created" to
+settle at: inventing one would mean the server remembering plans between
+requests. So `PlantoirTools.DayFor` goes on reading `Today()` per call, and
+`Today` stays a `Func<DateOnly>` rather than a stored date, because one
+`plantoir-mcp` outlives a calendar day by a long way. The mac made the identical
+trade for `--mcp-stdio`, and #159 excluded it in as many words. The exposure is
+one minute of one night for a client that split its plan and its act across
+midnight; the exposure that was closed was every request in a window left open
+overnight.
 
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
@@ -5175,6 +5195,10 @@ machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine
 course has.
 
 **The rule is applied at the boundary this piece owns, and nowhere else.**
+(Two more of those sites went on 2026-09-19 — `AssistAgent`'s dateline and its
+"deploy tomorrow's class at 6:30" card — for the same reason the mac gave: they
+were being rewritten anyway by #159. See "The Windows half" below. The count
+below is from 2026-09-08 and has not been re-taken; #144 still owns the sweep.)
 Sixty-six sites in this app's product code still format a date with no culture,
 and several of them WRITE one, which is the half that matters: an affected
 machine would corrupt a section's dates DURABLY rather than merely print them
@@ -5366,6 +5390,146 @@ the trail, against a rule `contracts/shared-rules.json` states with its
 reasoning. The published date is in what the teacher was told instead
 ("Published the class on 2026-09-09."), which is why that sentence names the
 day it settled on rather than the word it was sent.
+
+### The Windows half: the same settling, and what the gate really tracks
+
+Written on Windows, 2026-09-19, answering
+[issue #159](https://github.com/russellgordon/plantoir/issues/159) — the mac's
+hand-back of the gap this app's own write-up above had described and left open.
+The shape is the mac's, decision for decision, because two apps that settle a
+day in different places will eventually settle it on different days.
+
+**What was wrong here.** Nothing captured a date — `PlantoirTools.Today` has
+always been a `Func<DateOnly>` read per call, so the mac's second half was
+already true on this side. What was missing is the first: the model's call is
+created in `AssistAgent.Run` and then READ THREE TIMES. `AskFirst` puts it in
+`_awaiting`, `ShowPlan` sends `ArgumentsOf(call)` to the `plan_` twin, and
+`Approve` hands the very same object to `RunTool`. A `date` still carrying the
+word `tomorrow` therefore reached `PlantoirTools.DayFor` twice, once for the
+twin and once for the act, each against a clock that had moved on between them.
+
+**What landed.**
+
+- **`AssistAgent.WithTheDaySettled(call)`**, called at the one place the model's
+  call is created, before the approval branch and before the twin. The three
+  readers then carry the same absolute `YYYY-MM-DD` by construction. It uses the
+  EXISTING reader, `SectionScheduleSource.ReadRelativeDay` — the one the card
+  path and the tool already share — so there is exactly one answer in this
+  product to what "monday" means, and no second parser to drift.
+- **`AssistAgent.Today`**, a `Func<DateOnly>` and this class's one clock. The
+  dateline, the scheduled-deploy card, the card path's own
+  `AssistCardCommand.ToJsonObject` and the settler all ask it. The mac learned
+  this the expensive way — an earlier draft read the machine's clock in the
+  agent while the runner had its own, and two existing tests stopped pinning
+  anything.
+- **`WithArgumentsRewritten(call, rewrite)`**, the round trip written once: a
+  call's `arguments` are a JSON STRING, so changing one means parse, edit,
+  re-serialise. It is deliberately not named for the day. Binding the model's
+  `course` and `section` to the window's own section is the next rewrite at this
+  same seam ([issue #180](https://github.com/russellgordon/plantoir/issues/180)),
+  and it goes beside the settler rather than parsing the same string again.
+
+**The gate is spelled `date`, and what it TRACKS is what consults the clock.**
+Only a tool whose own schema declares a `date` property is touched — asked of
+the surface the model was shown, never of a list kept beside the settling code,
+because a list is how the next tool with a date gets quietly left out. Today
+that is exactly `publish_class_on`, whose `date` reaches `DayFor`, the one
+place a relative word is read against a clock. Two things are excluded and for
+different reasons, and the difference is the part worth remembering:
+
+- **`schedule_deploy`'s `when` declares no `date` at all**, being a day AND a
+  time, so it is excluded by construction rather than by being remembered.
+- **`publish_pages` and `unpublish_pages` take `before` and `onOrAfter`**, which
+  go to `ParseDate` — `DateOnly.TryParse`, invariant, and it REFUSES "tomorrow".
+  They consult no clock, so there is nothing to settle. **A future forgiving
+  parser behind one of those names would reopen this hole with the gate shut.**
+  That is the trap, and it is why the sweep test
+  (`TheDaySettlerTouchesExactlyTheToolsThatDeclareADate`) asserts that the set
+  of tools this rewrite touches is exactly the set declaring a `date`: a new
+  clock-consulting argument under another name then becomes a visible decision
+  rather than a silence.
+
+**What the settler will not do.** A word the reader refuses — "next monday",
+which both platforms refuse rather than guess — passes through untouched, so the
+tool answers with its own sentence about it. An absolute date settles to itself.
+A `date` that is not a string at all passes through untouched too:
+`JsonNode.GetValue<string>()` THROWS on a number, and `"date": 20260920` is
+exactly the sort of thing a small model sends, so the read is `TryGetValue`.
+Malformed `arguments` are left exactly as they arrived, the way `ArgumentsOf`
+and `RunTool` already treat them.
+
+**Nothing the model sees changed** — no schema, no description, no
+`ClassDateHelp` — so no routing re-measurement is owed, exactly as the mac
+predicted. It has already chosen the tool by the time any of this runs.
+
+**The locale half, which was live rather than tidying.** `AssistAgent`'s
+dateline and the "deploy tomorrow's class at 6:30" card both formatted
+`yyyy-MM-dd` with `CurrentCulture`, so on a Thai-calendar machine the assistant
+was told the year was **2569** in the sentence it does all its date arithmetic
+from, on every single turn — and the card WROTE that year into a scheduled
+deploy, which is the half that lasts. Both are `InvariantCulture` now and built
+from the one clock.
+
+**And the READERS had to move with the writer, which is the part that would
+have shipped as a regression.** Measured under `th-TH` rather than reasoned
+about: before this piece BOTH halves were cultural, so the card wrote
+`2569-09-20 06:30` and every reader parsed it straight back to the right
+moment. Wrong on the wire and symmetric in practice — which is exactly why
+nobody had met it. Making the write invariant on its own would have turned
+"deploy tomorrow's class at 6:30" into a **refusal** on such a machine: a
+cultural parse of `2026-09-20 06:30` is **1483-09-20**, `ScheduledDeploy.Problem`
+sees a moment in the past and answers "…has already passed. Pick a time still
+to come.", and **nothing is scheduled at all** — after an approval card that
+said tomorrow, in the fifteenth century's weekday.
+
+Three readers of that same string, all fixed here: `AssistAgent.Explain`, which
+builds the card's sentence, and `plan_scheduled_deploy` and `schedule_deploy`
+in `Plantoir.Mcp/PlantoirTools.cs`, which is where it actually lands — the app
+reaches every tool through `plantoir-mcp`, so the card path crosses JSON-RPC
+and is parsed again on the far side. All three now call ONE reader,
+`ScheduledDeploy.ReadTheMoment`: the form the app WRITES, exact and invariant;
+then an invariant LENIENT parse, which covers what a model sends when it is
+close but not exact (`T` as the separator, a missing leading zero, "6:30 AM");
+and only then the machine's own culture, for a genuinely human-written shape
+with no fixed form to pin it to. This changes no tool schema and no
+description, so the model sees nothing of it. The DISPLAY stays cultural
+deliberately — that sentence is the teacher's, not a wire format — which is why
+the test renders the moment that is CORRECT through the machine's own culture
+and compares that, rather than asserting how Thai writes a Wednesday.
+
+**Symmetry at a boundary is the general rule** the
+[#144](https://github.com/russellgordon/plantoir/issues/144) family keeps
+teaching, and #144's own scope is WRITERS: `TimetableMemory` writes culturally
+and reads invariantly; this wrote invariantly and read culturally; each half
+looks right on its own, and neither is ever noticed from inside one function.
+An audit that greps writers alone finds one end of every one of these. Measured byte-identical on a Gregorian machine
+(en-CA: `" (Today is 2026-09-19, a Saturday.)"` either way), which is what keeps
+the routing measurements standing;
+`RelativeDayFreshnessTests.ANonGregorianMachineIsToldTheSameYearAsEverybodyElse`
+pins it by running the turn under `th-TH`. These are two of the writer sites
+that [issue #144](https://github.com/russellgordon/plantoir/issues/144) sweeps
+for; they are fixed here because this piece was rewriting those lines anyway.
+
+**The MCP server is deliberately unchanged**, for the reason given at the end of
+the card-path section above: two requests, no single moment to settle at, and
+the same posture the mac takes for `--mcp-stdio`.
+
+**A note for anyone writing a test at this seam.** Every other agent rig in the
+Windows suite constructs `AssistAgent` with an EMPTY schema array, because
+nothing else in the loop reads the schemas — which makes a schema-gated rewrite
+inert and every assertion about it vacuously true. `RelativeDayFreshnessTests`
+deserialises `contracts/assist-cases.json` → `toolSchemas.local` instead, the
+same surface the window narrows to. Mutation-checked both ways: with the
+settler's call removed the midnight test and the sweep go red; with the gate
+forced open the sweep goes red.
+
+**No contract case, and none proposable.** WHERE a word is settled stays a
+platform matter; `relativeDays.note` in `contracts/schedule-rules.json` now says
+what each side does. A midnight SCENARIO cannot be written either: the scenario
+grammar's `given` keys carry no clock, so a case pinning "the clock moves
+between the plan and the act" would need a key the mac does not implement — it
+would fail there or pass vacuously. The grammar such a case would need is
+proposed in #159's closing comment rather than added to `contracts/`.
 
 ### Settings are read at the call, not when the window opened (#322)
 
@@ -6711,3 +6875,95 @@ Written here so nobody adds it later thinking it was an oversight. The check
 that it stayed off is structural rather than a promise: no generated contract
 moved with the feature, so `assist-wording.json` and `assist-cases.json` cannot
 disagree with the Swift, and `--write-contracts` is not owed by it.
+
+---
+
+## The Windows half of the assistant chain (parity bundle 5a, 2026-09-30)
+
+Ten issues landed together on `issue/bundle5a-assistant-chain`, in the order
+they build on one another, all at one seam: the place in `AssistAgent` where a
+call is made. Everything here is provable with a scripted model, so no model
+was run and no routing number moved — nothing the model SEES changed (no
+schema, description, system prompt or dateline), which is what makes that
+claim true rather than hoped.
+
+**The order a model reply now meets, in `AssistAgent.Run`.** (1) An engine
+that did not answer: reported, not wound back. (2) `finish_reason: length`:
+nothing runs, `wording.answerWasCutOff`, wound back (#196) — ABOVE the
+tool-call branch, because a reply cut before the tool name arrives with no
+tool call and a raw `<tool_call>` fragment in its content. (3) Arguments that
+are not a JSON object: the same sentence, a different trail line. (4) Nothing
+written for a tool that needs more than the window supplies:
+`wording.answerLeftOutWhatItWasFor` (#262). (5) No tool call and the reply is
+the request handed back: `wording.didNotFollowThat`, wound back (#217) — below
+the tool branch, above the append. (6) The day settled (#159), the moment
+settled (#193), then course and section bound or the turn refused (#180).
+Only then is the tool chosen, carded or run.
+
+**One rewind, three callers.** `WindTheTurnBack` truncates the messages SENT
+TO THE MODEL to the count taken at the top of `Say`; the window's transcript
+is never touched, so the teacher's own sentence stays on screen. A lap after an
+approved call re-marks at its result, so a rewind can never erase a call that
+already ran. Not on an engine failure, as on the mac.
+
+**#180 — what was decided and rejected.** Gated on the tool's own schema
+declaring `course`/`section`, never on a list. Refused rather than rebound for
+another course (Russell, 2026-09-19); the window's spelling written for a
+casing difference; the folder's spelling named in the refusal; the model's
+spelling kept on the trail. `AssistWorkspace`'s locked-course refusal adopted
+the two contract sentences, which meant asking the folder again — `Courses()`
+has already filtered to the lock. Driven through `WindowBindingContractTests`,
+whose every case is a scripted MODEL call (a card phrasing never meets the
+binder).
+
+**#196 — the seam.** `IChatModel.Ask` returns `ModelReply(Message,
+FinishReason)`; a `JsonObject` converts implicitly so scripted test models stay
+one line. `LocalModel.ReadReply` is the body reader, testable without a
+server. A #159 test that pinned unreadable arguments REACHING a tool was
+changed on purpose: they no longer do.
+
+**#262 — the same rule as the mac, after a fix round.** The rule reads each tool's
+own schema. Windows' local `add_next_class` first declared `unit` and `days`
+where the mac's declares only course and section, so an EMPTY model call to it
+was refused here and ran there; the fix round made it run as on the mac, so
+there is no difference left to know. "Add the next class page" is a card and
+never meets the rule. "Changes pages" is this app's own list of writes, because the
+schemas the server hands out carry no read-only flag. A call naming no course
+answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
+
+**#193 — the trap at the server, and the choice made there.**
+`ScheduledDeploy.ReadTheMoment`'s lenient step reads a bare `"06:30"` as TODAY,
+silently. The app's calls are settled into whole moments in the agent (card
+path and model path, one clock: `Today` + `Now` + `TimeZone`), so they cross
+already whole. `plantoir-mcp` REFUSES a bare time, matching the mac's
+`--mcp-stdio`, which "deliberately settles nothing" (above). The first draft
+settled it in the server instead — forgiving, and a divergence — and was
+reversed. The scheduled card now asks `wording.scheduleQuestion`, chosen by the
+tool's NAME (#260), and the immediate card says "This happens now."
+
+**#281 and #288 — transcript only.** `AssistCardCommand.Time.cs` is a port of
+the mac's frame, `TimeOfDay`, `askedOutright`, `respellingReading` and its
+`DayPart` table, one reading behind the question and the spelling so a sentence
+is never both. Both replies return before anything is appended for the model.
+The must-fail for that is the damaging direction itself: appending the
+teacher's "deploy at 6:30" and the question "for context" turns
+`TimeAskedInCodeTests` red because the next request carries "6:30".
+`onlyDifference` is decided by running the matcher and comparing the MOMENTS.
+
+**#261 — read by name, not by folder.** Since #309 a task's name carries its
+folder, so `Schedule` replaces exactly the task named `NameFor(code, section,
+folder)` (`/Create /F`) plus this folder's pre-#309 task. `For()` finds tasks
+through the folder their JOB names, and a task whose job cannot be read belongs
+to no folder there — yet is still overwritten. `WhatSchedulingReplaces` asks
+by name first; the must-fail (asking `For()` alone) turns
+`ADeployWhoseJobCannotBeReadIsStillNamedBecauseItIsReadByName` red. Another
+folder's task for the same code is a different task and is neither replaced nor
+named — the mac's #237, closed here by construction. A refused `/Create` leaves
+the old task, so the failure sentence says it "still stands"; "turned off" is
+recorded only if it has actually gone.
+
+**Rejected, so nobody proposes them again.** Settling a bare time in the server
+(above). Folding the echo into "answer was cut off" (that answer finished).
+Steering any of this with a tool description (the measured precedent is in
+"Steer the model with code"). Splitting steps 6–9 into four commits: they share
+one frame and one settler, and the plan pairs #260 with #193.

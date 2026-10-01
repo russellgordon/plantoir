@@ -528,6 +528,16 @@ public class AssistSurfaceContractTests
             tools.Select(t => t!["function"]!["name"]!.ToString()));
     }
 
+    /// <summary>MCP tools the contract names and this server does not serve yet, with the issue that owns each.</summary>
+    private static readonly Dictionary<string, string> KnownMissingMcpTools = new(StringComparer.Ordinal)
+    {
+        ["read_how_i_teach"] = "#340 (bundle 5b)",
+        ["plan_write_how_i_teach"] = "#340 (bundle 5b)",
+        ["write_how_i_teach"] = "#340 (bundle 5b)",
+        ["plan_prepare_for_start_of_year"] = "#355 (bundle 5b)",
+        ["prepare_for_start_of_year"] = "#355 (bundle 5b)",
+    };
+
     /// <summary>
     /// The contract's MCP surface is a SUBSET of what this app serves, not an
     /// equality — and the difference is a known one, not drift.
@@ -544,6 +554,7 @@ public class AssistSurfaceContractTests
     /// drift went unseen — so the count is asserted too, and a change in it
     /// fails here saying which tools moved.</para>
     /// </summary>
+
     [Fact]
     public void EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere()
     {
@@ -595,6 +606,15 @@ public class AssistSurfaceContractTests
             foreach (string parameter in types.Keys)
                 if (!expectedTypes.ContainsKey(parameter)) onlyHere.Add($"{name}.{parameter}");
         }
+
+        // Known-missing, each with the issue that owns serving it (bundle 5b).
+        // Subtracted BY NAME so this test is green today and any NEW absence
+        // — a tool that loses its [McpServerTool] attributes, which bundle 5a
+        // did once — goes red here rather than hiding behind an old red.
+        foreach (var (tool, owner) in KnownMissingMcpTools)
+            Assert.True(missing.Contains(tool),
+                $"{tool} is served now: delete it from KnownMissingMcpTools ({owner}).");
+        missing.RemoveAll(KnownMissingMcpTools.ContainsKey);
 
         Assert.True(missing.Count == 0,
             "The contract describes MCP tools this app does not serve: " +
@@ -1114,6 +1134,49 @@ public class AssistSurfaceContractTests
             .GetValue<int>();
         Assert.Equal(cap, LocalModel.Request(new JsonArray(), new JsonArray())["max_tokens"]!.GetValue<int>());
         Answer("Every request caps how much the model may write");
+
+        // A reply the engine stopped part way runs no tool and says so (#196):
+        // a stopped call whose arguments PARSE — the measured 28-token case —
+        // reaches no tool, and the teacher hears answerWasCutOff. The finish
+        // reason must survive LocalModel's reading of the body to get there.
+        Assert.True(LocalModel.ReadReply(
+            """{"choices":[{"finish_reason":"length","message":{"role":"assistant"}}]}""")!.WasCutOff);
+        var stoppedModel = new WindowBindingContractTests.ScriptedModel();
+        stoppedModel.Then(new JsonObject
+        {
+            ["tool_calls"] = new JsonArray(new JsonObject
+            {
+                ["id"] = "call-0",
+                ["function"] = new JsonObject { ["name"] = "deploy_section", ["arguments"] = """{"course":"ICS3U","section":1}""" },
+            }),
+        }, "length");
+        var stoppedTools = new WindowBindingContractTests.RecordingTools();
+        var stoppedAgent = new AssistAgent(stoppedModel, stoppedTools,
+            ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+        var stoppedLines = stoppedAgent.Say("put that up for me the way we said", CancellationToken.None)
+            .GetAwaiter().GetResult();
+        Assert.Empty(stoppedTools.Calls);
+        Assert.Equal(AssistWording.AnswerWasCutOff, Assert.Single(stoppedLines).Text);
+        Answer("A reply the engine stopped part way runs no tool and says so");
+
+        // #262: every case is the tool's own required, properties and
+        // readOnly, and whether what the model wrote runs.
+        const string wroteNothing =
+            "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs";
+        var nothingCases = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == wroteNothing)!["cases"]!.AsArray();
+        Assert.True(nothingCases.Count >= 14, "the #262 cases have gone missing");
+        foreach (var item in nothingCases)
+        {
+            var judged = AssistAgent.Judge(
+                item!["arguments"]!.ToString(),
+                item["required"]!.AsArray().Select(r => r!.ToString()),
+                item["properties"]!.AsArray().Select(r => r!.ToString()),
+                item["readOnly"]!.GetValue<bool>());
+            Assert.True((judged == AssistAgent.WhatTheModelWrote.Readable) == item["readable"]!.GetValue<bool>(),
+                $"{item["name"]}: {item["tool"]} with “{item["arguments"]}” was judged {judged}");
+        }
+        Answer(wroteNothing);
 
         // The one that genuinely cannot be executed, named rather than dropped.
         // A polarity veto is a rule about how a MODEL is chosen: it governs the

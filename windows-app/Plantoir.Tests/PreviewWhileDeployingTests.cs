@@ -53,9 +53,9 @@ public class PreviewWhileDeployingTests : IDisposable
 
     private sealed class NoModel : IChatModel
     {
-        public System.Threading.Tasks.Task<JsonObject?> Ask(JsonArray messages, JsonArray tools,
+        public System.Threading.Tasks.Task<ModelReply?> Ask(JsonArray messages, JsonArray tools,
                                                             System.Threading.CancellationToken cancellation) =>
-            System.Threading.Tasks.Task.FromResult<JsonObject?>(null);
+            System.Threading.Tasks.Task.FromResult<ModelReply?>(null);
     }
 
     private sealed class NoTools : IToolServer
