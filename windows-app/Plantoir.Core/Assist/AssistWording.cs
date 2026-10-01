@@ -401,6 +401,41 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - A page list that names no page (#352 / mac #197)
+
+    /// <summary>
+    /// A publish whose page list was nothing but a word meaning every page
+    /// ("all", "everything" …) and no dates. <paramref name="example"/> is
+    /// something the teacher can type next — "Publish Unit 3".
+    /// </summary>
+    public static string EveryPageIsNotAPageToPublish(string example) =>
+        $"Nothing was published, because I need to know which pages. Say which ones — for example “{example}”.";
+
+    /// <summary>The hiding half of <see cref="EveryPageIsNotAPageToPublish"/>.</summary>
+    public static string EveryPageIsNotAPageToHide(string example) =>
+        $"Nothing was hidden, because I need to know which pages. Say which ones — for example “{example}”.";
+
+    /// <summary>The one name given matched no page. The teacher's sentence, not the model's "use list_pages".</summary>
+    public static string NoPageCalled(string course, string section, string page) =>
+        $"No page in {course} Section {section} is called “{page}”. Check the name as the sidebar shows it and ask again.";
+
+    /// <summary>
+    /// Two or more names, none of which matched. <paramref name="pages"/> is
+    /// already joined with "or" — "is called “a” and “b”" would say one page
+    /// has two names.
+    /// </summary>
+    public static string NoPagesCalled(string course, string section, string pages) =>
+        $"No page in {course} Section {section} is called {pages}. Check the names as the sidebar shows them and ask again.";
+
+    /// <summary>“a” or “b”, “a”, “b” or “c”.</summary>
+    internal static string ListingEither(IReadOnlyList<string> names)
+    {
+        var quoted = names.Select(name => $"“{name}”").ToList();
+        return quoted.Count <= 1
+            ? string.Concat(quoted)
+            : string.Join(", ", quoted.Take(quoted.Count - 1)) + " or " + quoted[^1];
+    }
+
     // MARK: - Shared fragments
 
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";

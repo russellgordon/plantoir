@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
 
@@ -178,13 +179,26 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
 
     private static AssistCardCommand? WholeUnit(string tidied)
     {
-        var prefixes = new[] { ("unpublish unit ", "unpublish_pages"), ("publish unit ", "publish_pages") };
+        // The two openings after the first pair are #197's: measured, "Publish
+        // all the classes in Unit 2." went to publish_class_on with TODAY's
+        // date 3 times in 3 on the smaller assistant — on a teaching day that
+        // publishes today's class and reports success, about a request for a
+        // unit. Same frame, nothing else widened: a literal opening and a bare
+        // number, nothing before or after, so a course or section named, a
+        // courtesy word or a question mark falls through to the model
+        // (pagesNamingNoPage.everythingInAUnit).
+        var prefixes = new[]
+        {
+            ("unpublish unit ", "unpublish_pages"), ("publish unit ", "publish_pages"),
+            ("publish all the classes in unit ", "publish_pages"), ("publish everything in unit ", "publish_pages"),
+        };
         foreach (var (prefix, tool) in prefixes)
         {
             if (tidied.StartsWith(prefix, StringComparison.Ordinal))
             {
                 string rest = tidied[prefix.Length..].Trim();
-                if (!string.IsNullOrEmpty(rest) && !rest.Contains(',') && int.TryParse(rest, out _))
+                if (!string.IsNullOrEmpty(rest) && !rest.Contains(',') && int.TryParse(rest, out _) &&
+                    (prefix.EndsWith(" in unit ", StringComparison.Ordinal) ? rest.All(char.IsDigit) : true))
                 {
                     return new AssistCardCommand(tool, new Dictionary<string, string>
                     {
