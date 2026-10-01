@@ -696,10 +696,10 @@ the suite could name, so that a red run means something again:
 | `activityTrail.mustRecord` | 58 events this app does not declare yet, each against the issue carrying its mac piece | `ContractTests.SharedRules_ActivityTrailEvents_Exist` |
 | `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
 | `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
-| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` does not name (#345, #274, #239, #241) | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
+| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` did not name (#345, #274, #239, #241) when bundle 1 took the count; `curriculum_folders` (#345) left with bundle 6a | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
 | `modelTiers.requirements` | none since parity bundle 5a (2026-09-30), which answered #196's and #262's three; the area stays so the next mac requirement can be held by name | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
 | `sectionIndexPointer.dateCases` | the club front-page case (#274) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
-| `gradedFolders.newCourse.cases` | the declined-skeleton case (#250), the club case (#274) | `GradedFoldersNewCourseContractTests` |
+| `gradedFolders.newCourse.cases` | the club case (#274); the declined-skeleton case (#250) since parity bundle 6a runs through `NewCourseAnswers` | `GradedFoldersNewCourseContractTests` |
 
 Bundle 5a (2026-09-30) paid five of those events (`assistant was asked about
 another course`, `assistant answer was cut off`, `assistant repeated the request
@@ -2794,6 +2794,151 @@ Plantoir's folders are chosen from the ordinary Windows picker.
 **No new trail event is owed.** `working folder opened` already records the
 act, its line is still true, and a selection being let go is not something a
 teacher DID — it is the consequence of what they did, recorded one line up.
+
+## Course creation and the smaller course pieces (parity bundle 6a)
+
+Bundle 6a (2026-09-30) brought eleven mac pieces across: the wizard's skeleton
+rules (#169, #250, #252, #349), the marks floor (#348), the problem report's
+unreadable trail (#316), reopening the last working folder (#320), Get Ready
+for the Start of the Year (#355, #389), one coverage map per curriculum folder
+(#345) and the How I Teach row (#360). The rules are contract data and the
+rows in `GUI-IMPROVEMENTS.md` (666–672) say what a teacher sees; this section
+is the Windows MECHANICS — what had to change shape here, what differs from the
+mac on purpose, and what was rejected.
+
+### The view could not be pinned, so the decisions moved into Core
+
+`NewCourseDialog` is a `ContentDialog` in the WinUI project, which
+`Plantoir.Tests` cannot reference (different target framework, and a
+`ContentDialog` cannot be built off a XAML thread). Three pure seams now carry
+what the dialog decides, and the dialog is thin call sites around them:
+
+- `WizardStructure` — `Adopting(family)` and `RestoringDefaults(current,
+  adopted, useLcs)`, the restore that used to be private to
+  `RestoreGenericStructure`. `wizard.skeletonToggle` runs against it.
+- `NewCourseAnswers.Decide` — the five structure lists, the sidebar, the three
+  starting-point keys and the marks pool, i.e. everything the Starting Content
+  answers decide in `course_config.json`.
+- `CourseSettingsProtection` / `CourseSettingsExclusions` — the context Course
+  Settings protects its rows with, and the click recorders and Revert.
+
+**Goldens before the fix, the mac's technique.** Before a line of #250 was
+written, a throwaway test ran the OLD rule over `NewCourseAnswers` for ADA1O,
+MCV4U, MCMPR11 and ICS4U with the pages taken, and AMU3M with the skeleton on
+and off, and wrote `Plantoir.Tests/Goldens/*.json`. `NewCourseAnswersTests`
+asserts those bytes afterwards: a teacher TAKING the ready-made pages must get
+exactly what they got before. The throwaway test was deleted in the same
+commit; the goldens are what it leaves.
+
+**One behaviour changed that no case asked for, and why it was taken.** Windows
+wrote `include_curriculum_coverage` from the raw switch, so a course with no
+curriculum pages to draw from was made with the map ON (the comment beside it
+called this "deliberately left alone" and raised it as a product question).
+#252's rule answers that question: the mac writes the map on only where the
+pages are offered and kept (`curriculumCoverageEnabled`), and the two apps must
+write the same file for the same clicks. Windows now does too. Rejected:
+keeping the raw switch for courses with no payload — it would be the one key
+the two apps disagree on for ~1,900 codes.
+
+### The marks floor walks the disk twice, on purpose
+
+`gradedFolders.floor` depends on which pooled folders exist on disk, so Course
+Settings walks the course ONCE per drawing (`GradedFolderChoices.WalkedFolders`,
+every occurrence kept with its course-level folder and the folder directly
+inside a section) and shares it between the checklist and the three lists — and
+walks AGAIN at the click (`StringListEditor` / `MembershipToggleList` gained a
+`protectionWhenActedOn`; the wizard passes none and its drawing rule is asked
+again). Whether to ASK is decided at the click too: the old editor decided
+"confirm or not" from the drawing, and a folder deleted in Explorer while
+Settings was open would then ask about the wrong thing. Rejected: a walk per
+row (the mac measured 53 ms per walk on a 400-folder course, ten-plus rows per
+drawing).
+
+One difference the runner absorbs rather than hides: with no `class_folder`
+recorded, Windows protects the first per-section folder as the class folder
+(`ClassFolderRule.Name`'s guess), where the mac protects only the literal "All
+Classes" or a recorded name. `floor`'s per-section fixtures say none of their
+folders is the class folder, so `MarksFloorContractTests` sets the resolved
+class folder to null for those cases. Whether the two apps should agree on
+which folder an unrecorded course protects is a separate question and was not
+taken here.
+
+### Reopening the last working folder: a path, not a bookmark
+
+Windows remembers the PATH. A folder moved on the same disk therefore reads as
+`gone`, which is honest; the mac's bookmark follows it. `unreadable` is said
+ONLY where listing the folder threw `UnauthorizedAccessException` —
+`Directory.Exists` cannot tell a denied folder from a missing one in every
+case, and the contract's one hard rule is that a denied folder is never called
+gone. `driveNotConnected` is the path's drive root not existing (an unplugged
+USB disk, an unmapped network letter). The Trash, privacy and outside-home
+reasons are `appliesOn: ["mac"]`. `AppSettings.Load` no longer nulls a
+`WorkspacePath` it cannot reach — that silent prune was the bug — and
+`NoteBecameKey` writes it, so "last" is the folder last in front. A Ctrl+N
+window goes through `AdoptInheritedPath`, which writes no trail line.
+
+### Get Ready for the Start of the Year: what the app's Go does NOT do yet
+
+The rule, the MCP pair and the sheet MATCH (`StartOfYearPlan`,
+`AssistWorkspace.PrepareForStartOfYear`, `StartOfYearDialog`). Two parts of the
+mac's app-side behaviour are not built here, and are said so rather than
+implied:
+
+- **Go does not stop and restart the preview.** The pages are written; a
+  preview that is showing keeps showing the old state until the next build.
+- **The undo does not notice a scheduled deploy reaching its moment.** It ends
+  at the next deploy started from THIS app (`SectionDetailView` ends it as the
+  publish begins), at the next change to the section's pages from anywhere (the
+  section's plan code no longer matches the one taken after the write), and at
+  quit (it lives in memory only). After an overnight scheduled deploy it still
+  offers itself until a page changes; the backup is the honest way back.
+
+The plan code is SHA-256 over every page of the section, path and bytes, eight
+hex digits. Rejected: a code over the plan's own entries only — a page the plan
+does not touch can change what step 3 decides (a link added to a leftover page
+keeps it), and the code exists to say "the section is the one you were shown".
+
+The MCP write takes a FRESH backup for the act through the same door as every
+other assistant zip (`AssistantBackup`), then works the plan out AGAIN after
+the copy and refuses with `changedWhileSavingACopy` when it no longer matches
+or can no longer be made. The app's Go uses the teacher's own backup
+(`BackupMaker.Teacher`), since the teacher pressed the button.
+
+### One coverage map per folder: decided from the disk, in Core
+
+`CurriculumFolderRule` is plural (`Resolve(declared, folders, withPages,
+withLetterFirstPages)`) and `FoldersWithPages` reads which SHARED folders hold
+an expectation page, recursively — the same thing the build reads. Course
+Settings reads it once per drawing and again at the click, like the walk. The
+wizard has no disk, so it counts the payload's declared folder while the
+curriculum pages are being installed (the old `null` at the protection's call
+site was the gap the issue named). A rename reads the pages BEFORE the move —
+afterwards the old name is not on disk — and passes them to
+`SpecialFolderRenamer.Renaming`, which writes `curriculum_folders` and the
+legacy `curriculum_folder` naming the primary.
+
+`PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
+publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
+`Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
+reader would never see the line. A wrapper written before this keeps its old
+scan until its schedule is set again.
+
+### The How I Teach row, and the CHECK items of #360
+
+The row writes with `FileMode.CreateNew` and opens THE PAGE
+(`FolderActions.OpenInObsidian` gained a `page` argument), never the vault.
+`HowITeachSettingsRowTests.ACreatedPageNeverWritesOverOneMadeAMomentEarlier`
+injects a page between the look and the write through a test-only overload.
+
+The CHECK items, answered by reading this app rather than measuring the mac's
+numbers onto it: Windows' assistant window drives its tools through
+`plantoir-mcp` (`McpClient`), so the zip runs in that process and never on the
+app's UI thread — the mac's 9.7 s main-thread zip has no analogue, and nothing
+was measured holding the window. Every assistant zip now leaves an `assistant
+backed up a course` line with its seconds, which is how that claim will be
+checked against a real course. What is NOT built: counting the course busy
+while the zip runs in `plantoir-mcp` (`courseIsBeingCopied`), so Preview and
+Deploy stay live meanwhile; that key stays in the ledger against #360.
 
 ---
 
