@@ -76,8 +76,11 @@ public static class StartOfYearDialog
         }
 
         string backupName = Path.GetFileName(outcome.BackupPath ?? "");
+        DateTime? scheduled = null;
+        try { scheduled = TaskScheduling.NextRun(folder, course.Code, section); } catch { }
         StartOfYearSessionUndo.Remember(folder, course.Code, section, new StartOfYearSessionUndo.Entry(
-            outcome.Written, outcome.BackupPath ?? "", workspace.PlanStartOfYear(course.Code, section).Code));
+            outcome.Written, outcome.BackupPath ?? "", workspace.PlanStartOfYear(course.Code, section).Code,
+            DateTime.Now, scheduled));
         return string.Join("\n\n", outcome.Message,
             StartOfYearWording.Fill(StartOfYearWording.UndoAvailable, ("backup", backupName)),
             StartOfYearWording.UndoEndsWhenYouQuit);
@@ -92,8 +95,13 @@ public static class StartOfYearDialog
         string backupName = Path.GetFileName(entry.BackupPath);
         var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
 
-        // The next change to the section's pages from anywhere ends it.
-        if (!string.Equals(workspace.PlanStartOfYear(course.Code, section).Code, entry.SectionCodeAfter, StringComparison.Ordinal))
+        // A scheduled deploy since the act ends it — the schedule read again
+        // now, as the sheet opens — and so does the next change to the
+        // section's pages from anywhere.
+        DateTime? lastScheduledRun = null;
+        try { lastScheduledRun = ScheduledPublishOutcome.Read(course.Code, section, folder)?.When; } catch { }
+        if (StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, DateTime.Now, lastScheduledRun)
+            || !string.Equals(workspace.PlanStartOfYear(course.Code, section).Code, entry.SectionCodeAfter, StringComparison.Ordinal))
         {
             StartOfYearSessionUndo.End(folder, course.Code, section);
             return StartOfYearWording.UndoHasEnded + " " + StartOfYearWording.Fill(StartOfYearWording.BackupHoldsIt, ("backup", backupName));

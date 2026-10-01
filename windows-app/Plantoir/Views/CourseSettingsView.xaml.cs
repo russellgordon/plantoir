@@ -426,14 +426,15 @@ public sealed partial class CourseSettingsView : UserControl
         {
             // Off the UI thread: the move is quick, but reading every page in
             // the course to rewrite links is not on a synced vault.
-            // The curriculum folders are decided from their pages, so they are
-            // read BEFORE the move (#345): afterwards the old name is not there.
             var sharedBefore = Config.SharedFolders.Append(newName).ToList();
-            var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
-            curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
-            curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
             outcome = await Task.Run(() =>
             {
+                // The curriculum folders are decided from their pages, so they
+                // are read BEFORE the move (#345) — afterwards the old name is
+                // not there — and off the UI thread, like the move itself.
+                var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
+                curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
+                curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
                 if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
                 // The folders already moved; only the links and the record remain.
                 int relinked = SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName);

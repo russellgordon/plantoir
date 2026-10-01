@@ -199,11 +199,11 @@ plural resolution from the disk, protection, checkboxes, the rename, the
 folders help, `curriculum maps built`) and #360 (the How I Teach row; every
 assistant zip on the trail). The Starting Content decisions moved into Core
 (`WizardStructure`, `NewCourseAnswers`) with six goldens from the old rule.
-Ledger entries deleted: nine trail events, three wording keys from #355 plus
+Ledger entries deleted: ten trail events, three wording keys from #355 plus
 two from #360, `curriculum_folders`, and the declined-skeleton newCourse case.
 Still open from these issues, said in `documentation/12-windows-app.md`: the
-start-of-year Go does not stop and restart the preview, its undo does not see a
-scheduled deploy reach its moment, the club case waits for #274, and
+start-of-year Go does not stop and restart the preview, the club case waits for
+#274, and
 `courseIsBeingCopied` (the course is not counted busy while `plantoir-mcp`
 zips it).
 
