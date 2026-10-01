@@ -273,19 +273,24 @@ marker jumped it forward several steps at once.
 
 ## Scheduled deploys
 
-There is no `launchd`. `TaskScheduling` writes a wrapper script into
-`%LOCALAPPDATA%\Plantoir\scheduled\` and registers it with **Task Scheduler**
-(`schtasks`). The wrapper fingerprints the section, builds it, deploys to each
-destination un-chained (one failing must not stop the others), and writes a
-sentinel the app picks up next time it runs.
+There is no `launchd`. `TaskScheduling` registers a task with **Task Scheduler**
+(`schtasks /Create /XML`), and since parity bundle 3 (#347, #289, #239) what
+the task starts is PLANTOIR: `Plantoir.exe --run-scheduled-deploy "<task
+name>"`, with no window, like the mac's launchd job. `ScheduledRun` decides at
+the moment itself (too late to be worth doing, another program building the
+course, whether the task still stands, where the course deploys NOW) and only
+then writes the wrapper script into `%LOCALAPPDATA%\Plantoir\scheduled\` from
+the settings as they are at that moment and runs it. The wrapper fingerprints
+the section, builds it, deploys to each destination un-chained (one failing
+must not stop the others), and writes a record the app picks up.
 
-What it registers is the SHELL: `schtasks /TR` gets
-`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
-"<wrapper>"`. (The mac's equivalent lesson — register the job as the APP, or
-the operating system announces that "bash" wants to run in the background —
-belongs to macOS Background Items and has no counterpart here. It is recorded
-as something to weigh, not as something this code
-does; do not go looking for app-registration code.)
+The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
+three settings the command-line switches cannot set: it may start on battery
+(`DisallowStartIfOnBatteries` false), is not stopped by going onto battery
+(`StopIfGoingOnBatteries` false) and starts as soon as possible after a missed
+start (`StartWhenAvailable` true). The older description here — a task that
+runs `powershell.exe -File "<wrapper>"` — is how a task set before bundle 3
+still runs until it drains; do not read it as the current design.
 
 Two rules learned the hard way, and they cover different halves of the same
 problem — **nobody answers a question at 6 a.m.**
@@ -3367,7 +3372,9 @@ Windows".
 test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
 models, builds and scheduled-publish state a test touches land there, not in
 the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
-suites do not share a settings file. `AppDataRedirectTests` pins it.
+suites do not share a settings file. `AppDataRedirectTests` pins it. The redirect has one documented limit: during
+a redirected UI test the launchers (`preview.ps1:512`) still write their trail
+lines to the real `Logs` folder, because they resolve it themselves.
 
 Two things the redirect cannot see, and what covers each:
 
