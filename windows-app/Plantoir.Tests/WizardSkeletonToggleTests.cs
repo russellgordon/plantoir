@@ -172,6 +172,16 @@ public class WizardSkeletonToggleTests
             if (written != saved.GetValue<bool>())
                 problems.Add($"{name}: use_skeleton expected {saved}, would be written {written}");
         }
+        // ABSENT MEANS NOT ASSERTED. Through the function the dialog writes
+        // from, with the curriculum toggle at its default (on).
+        if (c["expectSavedIncludeCurriculumPages"] is JsonNode savedPages)
+        {
+            bool written = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, new NewCourseAnswers.Choices(
+                code, Prepopulate: taking, StartsFromSkeleton: toggleOn, IncludeCurriculum: true, lists))
+                .Keys["include_curriculum_pages"]!.ToObject<bool>();
+            if (written != savedPages.GetValue<bool>())
+                problems.Add($"{name}: include_curriculum_pages expected {savedPages}, would be written {written}");
+        }
         return problems;
     }
 }

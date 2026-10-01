@@ -96,8 +96,8 @@ public static class NewCourseAnswers
             // The same capabilityExists && teacherSaidYes shape —
             // contracts/file-formats.json -> wizardAnswerKeys.
             ["use_skeleton"] = usesSkeleton,
-            ["include_curriculum_pages"] = taking
-                && ExampleContentCatalog.IncludesCurriculum(exampleContentRoot, code)
+            ["include_curriculum_pages"] = CourseConfiguration.CurriculumPagesOffered(
+                exampleContentRoot, skeletonsRoot, code, taking, choices.StartsFromSkeleton)
                 && choices.IncludeCurriculum,
         };
 

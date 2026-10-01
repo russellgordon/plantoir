@@ -1019,6 +1019,45 @@ public sealed class CourseConfiguration
                                               bool contentIncludesCurriculum, bool curriculumSwitchIsOn) =>
         hasExampleContent && prepopulating && contentIncludesCurriculum && curriculumSwitchIsOn;
 
+    /// <summary>
+    /// Whether a NEW course is offered the curriculum pages written for its
+    /// code (<c>file-formats.json</c> → <c>include_curriculum_pages</c>, GitHub
+    /// issue #252, the mac's #251): the code has a payload, that payload
+    /// declares a curriculum folder, AND either the teacher is taking the
+    /// payload or a skeleton is offered and wanted.
+    /// </summary>
+    /// <remarks>
+    /// <para>Beside <see cref="Catalogs.SkeletonCatalog.HasSkeleton"/> and
+    /// calling it rather than re-deriving it, for the same reason that one
+    /// exists: three surfaces ask — the toggles' enabled state, the three keys
+    /// written, and the <c>course created</c> line. Until #252 the wizard wrote
+    /// <c>hasContent &amp;&amp; prepopulate &amp;&amp; …</c>, so a teacher who
+    /// declined the ready-made pages and kept the subject's skeleton got the
+    /// skeleton's placeholder Curriculum folder (one fake expectation, A1.1)
+    /// instead of the payload's: MEASURED on the mac by driving the real
+    /// <c>setup_course.py</c>, ICS4U 2 curriculum pages against 61, MCMPR11 2
+    /// against 59. Nothing on either platform goes red when this is left out —
+    /// the Python's branch simply never runs — which is the trap.</para>
+    /// </remarks>
+    public static bool CurriculumPagesOffered(string exampleContentRoot, string skeletonsRoot, string code,
+                                              bool takingExampleContent, bool skeletonWanted)
+    {
+        if (!Catalogs.ExampleContentCatalog.HasContent(exampleContentRoot, code)) return false;
+        if (!Catalogs.ExampleContentCatalog.IncludesCurriculum(exampleContentRoot, code)) return false;
+        if (takingExampleContent) return true;
+        return Catalogs.SkeletonCatalog.HasSkeleton(exampleContentRoot, skeletonsRoot, code, takingExampleContent)
+               && skeletonWanted;
+    }
+
+    /// <summary>
+    /// Whether a NEW course's coverage map is switched on: only when the
+    /// curriculum pages are offered and kept, since the map is drawn from
+    /// them. The mac's <c>curriculumCoverageEnabled(curriculumPagesOffered:…)</c>.
+    /// </summary>
+    public static bool NewCourseCoverageEnabled(bool curriculumPagesOffered, bool includesCurriculumPages,
+                                                bool includesCurriculumCoverage) =>
+        curriculumPagesOffered && includesCurriculumPages && includesCurriculumCoverage;
+
     /// <summary>color_schemes is FLAT — {"color_schemes": {"sectionN": "id"}}, no "sections" wrapper.</summary>
     public string ColourSchemeId(int section) =>
         _values["color_schemes"] is JObject map && map[SectionKey(section)] is JValue { Type: JTokenType.String } v
