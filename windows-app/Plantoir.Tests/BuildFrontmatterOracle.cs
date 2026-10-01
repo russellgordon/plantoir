@@ -28,7 +28,7 @@ internal static class BuildFrontmatterOracle
     private const string Script = """
         import json, os, sys, shutil, tempfile, pathlib, functools, multiprocessing
 
-        def setup(scripts):
+        def setup(scripts, folder):
             global build_site, frontmatter, work
             sys.path.insert(0, scripts)
             import build_site as b, frontmatter as f
@@ -36,7 +36,7 @@ internal static class BuildFrontmatterOracle
             # The sentinel-note settings are read from the contracts on EVERY
             # call; cached for speed only. Visibility is decided by the real code.
             build_site._get_excluded_note_config = functools.lru_cache(maxsize=None)(build_site._get_excluded_note_config)
-            work = pathlib.Path(tempfile.mkdtemp(prefix="plantoir-oracle-"))
+            work = pathlib.Path(tempfile.mkdtemp(prefix="w", dir=folder))
 
         def check(item):
             i, text = item
@@ -64,8 +64,12 @@ internal static class BuildFrontmatterOracle
 
         if __name__ == "__main__":
             pages = json.load(open(sys.argv[2], encoding="utf-8"))
-            with multiprocessing.Pool(os.cpu_count(), initializer=setup, initargs=(sys.argv[1],)) as pool:
-                answers = pool.map(check, list(enumerate(pages)), chunksize=50)
+            folder = tempfile.mkdtemp(prefix="plantoir-oracle-")
+            try:
+                with multiprocessing.Pool(os.cpu_count(), initializer=setup, initargs=(sys.argv[1], folder)) as pool:
+                    answers = pool.map(check, list(enumerate(pages)), chunksize=50)
+            finally:
+                shutil.rmtree(folder, ignore_errors=True)
             with open(sys.argv[3], "w", encoding="utf-8") as out:
                 for answer in answers:
                     out.write(json.dumps(answer) + "\n")
