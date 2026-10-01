@@ -89,7 +89,8 @@ CARD_ONLY_ARGUMENTS = {
 EXAMPLE_COURSE = "ICS3U"
 
 # MIRROR of AssistAgent.StillShortened: the only tools whose description the
-# local model still reads through briefly() (#352).
+# local model still reads through briefly() (#352; kept by #420's step-b
+# measurement, 2026-10-01, which failed its pre-registered criteria).
 STILL_SHORTENED = {"publish_pages", "unpublish_pages"}
 
 

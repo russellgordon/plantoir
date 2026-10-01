@@ -78,3 +78,90 @@ DECISION: the descriptions MOVE (bundle 9 ruling P2). Windows' served
 WHAT THIS DOES NOT MEASURE: what Claude Code does with the converged MCP text
   and the new instructions field (no model of that kind was run here); the
   larger tier; dates other than 2026-10-01.
+
+======================================================================
+#420 STEP (b) - publish_pages and unpublish_pages - RESULTS.
+Measured 2026-10-01, 13:49-19:50 EDT, against the #420 section of the
+pre-registration beside this file (committed aa71836c at 13:48:59, before
+the first request at 13:49:43). Raw per-trial logs: plantoir-windows-run\logs\
+bundle10-420-S{1,2,3}-{before,after,middle}.txt on Russell's Windows PC.
+
+CONDITIONS (as registered, and this time READ OFF THE LOGS, ruling Q4)
+  Intel Core i5-8365U (4C/8T), 16 GB, Samsung 980 NVMe, Intel UHD 620,
+  Windows 11 Pro 26200. Each suite's server log opens with the full command
+  line, written by the runner before the server started:
+    llama-server.exe --model ...\qwen2.5-1.5b-instruct-q4_k_m.gguf --port 8099
+    --host 127.0.0.1 --ctx-size 8192 --threads 4 --reasoning off
+    --reasoning-budget 0 --jinja --parallel 1 --n-gpu-layers 999
+  then `--list-devices` ("Vulkan0: Intel(R) UHD Graphics 620 (8062 MiB, 7403
+  MiB free)") and /props. The server log at default verbosity still does not
+  say where the layers were held; the timings are #352's (prompt ~24-32
+  tokens/s, generation ~7.6 tokens/s), so this measured the same backend as
+  #352, whichever it was. A fresh server per suite; a server per suite-run
+  for the conditional MIDDLE arms of S1 and S2 (run after S3).
+
+DEVIATION, said plainly: S1's first run died at 14:33 after its BEFORE arm
+  had finished (a watcher held the progress file open; the runner's write
+  failed and it stopped, taking its server with it). Its BEFORE output is
+  kept (bundle10-420-S1-before-run1-scriptdied.txt, 161/220 - the same as
+  the re-run). S1 was re-run in full, BEFORE then AFTER, on one fresh server.
+  The S1 and S2 server logs were later overwritten by their MIDDLE runs'
+  (same runner, same command line); S2's and S3's were copied first.
+
+RESULTS (10 trials per probe, greedy)
+                                       BEFORE           AFTER            MIDDLE (flag gone, text held)
+  S1 trimmed-surface, course EXC2O
+     the 22 the model sees             161/220 (73.2%)  150/220 (68.2%)  190/220 (86.4%)
+     all 29                            221/290          210/290          260/290
+     polarity inversions               0                0                0
+     cut off / malformed               0 / 0            0 / 0            0 / 0
+     probes that differ BEFORE->AFTER: "HIDE - the inversion case" 1 -> 0
+       (the one unpublish_pages trial became a decline); "schedule a deploy"
+       10 -> 0 (all to deploy_section).
+  S2 teachers-say (EXC2O-rewritten surface)
+     TEST (10)                         90/100           90/100           90/100
+     CONTROL (15)                      130/150          120/150          120/150
+     OVERALL                           220/250 (88%)    210/250 (84%)    210/250 (84%)
+     wrong course / malformed / truncated  0/0/0        0/0/0            0/0/0
+     probes that differ: "ctl cancel_scheduled" 10 -> 0 (declined).
+  S3 trimmed-surface, course ICS3U
+     the 22 the model sees             160/220 (72.7%)  123/220 (55.9%)  160/220 (72.7%)
+     all 29                            220/290          183/290          220/290
+     polarity inversions               0                0                0
+     cut off / malformed               0 / 0            0 / 37           0 / 0
+     probes that differ BEFORE->AFTER: "no course named: hide" 10 -> 0 (10x
+       malformed), "typos" 10 -> 0 (malformed), "no course named: publish"
+       10 -> 3 (7x malformed), "deletion - no such tool" 0 -> 0 (cancel ->
+       malformed), "schedule a deploy" 10 -> 0 (deploy_section). The 37
+       malformed turns are the SERVER refusing the model's output mid-call
+       ("Unexpected empty grammar stack after accepting piece: ?", 37 times in
+       the S3 server log, none in BEFORE): an HTTP error the app would answer
+       as a turn it could not complete.
+     BEFORE->MIDDLE: "card: plan a publish" 0 -> 10 (publish_pages),
+       "schedule a deploy" 10 -> 0; promise-card model-seen 30/50 -> 40/50.
+
+CRITERIA (pre-registration, #420 section)
+  (a) VETO, any polarity inversion in AFTER ...... none (0, 0, 0)      PASS
+  (b) a changed tool losing a trial ............ unpublish_pages LOSES 11
+      (S1 "HIDE - the inversion case" 1 -> 0; S3 "no course named: hide"
+      10 -> 0); publish_pages loses none                              FAIL
+  (c) model-seen total falling >5 percentage points .. S1 -5.0 (not more
+      than 5), S2 -4.0, S3 -16.8                                      FAIL
+  (d) new cut-offs in AFTER ....................... none (but 37 new
+      malformed turns in S3, recorded above)                          PASS
+
+DECISION: the two descriptions DO NOT MOVE. publish_pages and unpublish_pages
+  keep their Windows text (shortened through Briefly() for the local model,
+  AssistAgent.StillShortened); the two toolDescriptions.measuredDepartures
+  entries stay, re-measured with these numbers; #420 stays open for the
+  description half (ruling Q3). The behaviour half (step a) has landed.
+  MIDDLE - the surface that therefore ships (the flag gone, the text held) -
+  is no worse than BEFORE: S1 161 -> 190/220 (+13.2 points: 'card: publish by name' and 'card: plan a publish' 0 -> 10 to publish_pages, the hide-inversion probe 1 -> 10 to unpublish_pages, 'card: undo' 0 -> 10), S2 220 -> 210/250 (-4.0: 'ctl cancel_scheduled' 10 -> 0, declined - the same loss as AFTER, so it comes from the schema, not the text; the probe went 0 -> 10 in #352's run, so it is a sensitive one), S3 160 -> 160/220; 0 inversions, 0 cut-offs, 0 malformed in all three. Measured against the AFTER criteria it would pass (a), (b) (unpublish_pages GAINS 9, publish_pages 20) and (d), and (c) on every suite.
+  Where the loss came from, as far as these logs show: the contract text in
+  full is longer than Briefly()'s first sentence, and with it the S3 course
+  turned two hide/publish requests into server-rejected calls; MIDDLE, which
+  differs from AFTER only in the two descriptions, shows none of it.
+
+WHAT THIS DOES NOT MEASURE: the larger tier; dates other than 2026-10-01;
+  what Claude Code does with either text (the MCP description is what it
+  reads, and it is unchanged by this decision).

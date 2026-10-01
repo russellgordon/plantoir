@@ -267,10 +267,16 @@ public sealed class AssistAgent
     /// (assist-cases.json → toolDescriptions) — measured before and after on
     /// this PC's tier with no regression and no polarity inversion
     /// (research/ai-assist/windows-description-convergence-results.txt).
-    /// These two keep their Windows text, shortened, because the contract's
-    /// sentences promise behaviour Windows does not have yet (includeLinked
-    /// defaults to false here); they move when that behaviour does (#420, and
-    /// recorded as contracts/assist-cases.json → toolDescriptions.measuredDepartures).
+    /// These two keep their Windows text, shortened. They were held first for
+    /// behaviour (#352: Windows' includeLinked defaulted to false, so the
+    /// contract's sentences were untrue here); #420 step (a) made the
+    /// behaviour match on 2026-10-01, and step (b) then MEASURED the move to
+    /// the contract text and it failed its pre-registered criteria on this
+    /// PC's tier (an unpublish_pages trial lost on the hide-inversion probe,
+    /// research/ai-assist/windows-description-convergence-results.txt, the
+    /// #420 section). So they stay, recorded as contracts/assist-cases.json →
+    /// toolDescriptions.measuredDepartures with those numbers, and #420 stays
+    /// open for the description half.
     /// </summary>
     internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
     {

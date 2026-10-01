@@ -3724,8 +3724,10 @@ Those two descriptions did NOT move: they keep Windows' text, and the local
 model still reads them through `Briefly()` (`AssistAgent.StillShortened`,
 mirrored as `STILL_SHORTENED` in `narrow-tools.py` and pinned by
 `NarrowToolsMirrorTests`). The behaviour is [#420](https://github.com/russellgordon/plantoir/issues/420), and the hold is recorded in `toolDescriptions.measuredDepartures` (two entries, issue 420);
-the hold lifts when it lands, and `EveryDescriptionIsTheContractsOwn` fails
-the day either one matches the contract, so the hold cannot outlive its reason.
+`EveryDescriptionIsTheContractsOwn` fails the day either one matches the
+contract, so the hold cannot outlive its record. (Since 2026-10-01 the
+behaviour HAS landed and the hold is kept for a measured routing reason
+instead — the next subsection.)
 
 **The measurement**, pre-registered before the first request
 (`research/ai-assist/windows-description-convergence-preregistration.txt`,
@@ -3763,6 +3765,52 @@ text (the mac's arm C lost 40 control trials on teachers-say); moving
 `publish_pages`/`unpublish_pages` too because their routing would not have
 moved (the sentence would lie to Claude Code); dropping the procedural
 sentences outright (nothing would tell Claude Code to plan first).
+
+#### On Windows: the behaviour landed, the text was measured and stays (#420, 2026-10-01)
+
+**Step (a), the behaviour.** `includeLinked` is gone: `AssistWorkspace.PlanPublish`
+always takes what the named pages link to (transitively, stopping at a
+class) and the unpublish sweep was already unconditional; the four tools
+(`publish_pages`, `unpublish_pages` and their `plan_` twins) no longer
+declare the flag, the card and the agent's code-matched phrasings stop
+sending it, and `FollowingLinksContractTests` runs every `followingLinks`
+case through the tools WITHOUT a flag — which is how the contract should
+have been run all along (the harness used to pass `includeLinked: true`,
+supplying the behaviour the contract says is unconditional). An old client
+that still sends the key is harmless: the SDK's binder drops undeclared
+arguments. `PublishFollowsLinksTests` pins the undo (one "undo that" puts
+every linked page back), the reply's count, the cards and the schema.
+
+**Step (b), the text — measured, and it FAILED.** Pre-registered before the
+first request (`windows-description-convergence-preregistration.txt`, the
+#420 section; ruling Q3: ANY inversion a veto, neither changed tool may lose
+a trial, ≤5 percentage points per suite), same three suites and tier as #352,
+this PC (i5-8365U, 16 GB, Intel UHD 620, Windows 11 26200), and this time the
+server's full command line and `--list-devices` written into each suite's log.
+BEFORE = dev's local surface; AFTER = the flag gone and the contract text in
+full. Trimmed-surface EXC2O model-seen 161→150/220; teachers-say 220→210/250;
+trimmed-surface ICS3U 160→**123**/220, with 37 turns the SERVER rejected
+mid-call ("Unexpected empty grammar stack", none in BEFORE). `unpublish_pages`
+lost 11 trials (the hide-inversion probe 1→0, ICS3U "no course named: hide"
+10→0). No polarity inversion anywhere. So the two descriptions stay at their
+Windows text, shortened for the local model (`AssistAgent.StillShortened`
+unchanged), the two `measuredDepartures` entries stay with these numbers, and
+#420 stays open for the description half. The conditional MIDDLE arm — the
+flag gone, the text held: the surface that ships — routes BETTER than
+BEFORE: EXC2O 161→**190**/220 (two publish-by-name cards 0→10 to
+`publish_pages`, the hide-inversion probe 1→10 to `unpublish_pages`), ICS3U
+160→160, teachers-say 220→210/250 (`ctl cancel_scheduled` 10→0, declined —
+the same loss AFTER had, so it comes from the schema; the probe went 0→10 in
+#352's run). 0 inversions, 0 malformed. So removing the flag, which the
+behaviour needed anyway, is also the better routing; it is the contract's
+longer TEXT that this tier does not take.
+**Rejected:** moving the text anyway because no inversion was seen (the
+registered criteria, not the veto alone, decide); trimming the contract text
+for Windows' router (a second description per tool is what #114 removed);
+re-registering looser criteria after reading the result. **Known, not
+changed:** the held text still says linked pages come "optionally" — untrue
+since step (a), and a routing change to fix; it is Russell's call (bundle 10
+ready note).
 
 ### The two MCP surfaces are not the same product
 
