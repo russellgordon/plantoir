@@ -203,8 +203,6 @@ internal static class NamedGapLedger
             "a club typed with a payload code is not given the payload's pool"),
 
         // ---- app-rules.json → modelTiers.requirements
-        Owed(ModelTierRequirements, 262, "a finished reply that wrote nothing is not checked against the window here yet",
-            "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs"),
 
         // ---- assist-wording.json → wording: sentences with no same-named
         // member here. Some are said by this app today in words built
@@ -237,8 +235,6 @@ internal static class NamedGapLedger
             "linkedPageIsADraft", "linkedPageIsMissing", "pageCouldNotBeRead", "pageLinksTo", "pageLinksToNothing"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
-        Owed(AssistWordingKeys, 262, "a finished reply that wrote nothing is not checked against the window here yet",
-            "answerLeftOutWhatItWasFor"),
         Owed(AssistWordingKeys, 217, "an echoed reply is not refused here yet (mac #215)",
             "didNotFollowThat"),
         Owed(AssistWordingKeys, 281, "\"deploy at 6:30\" with no am or pm is not asked about in code here yet (mac #194)",
@@ -273,8 +269,6 @@ internal static class NamedGapLedger
             "datesToFindADaysPage", "datesToReDate", "datesToReplace", "movesToTheFirstDay", "pagesAcrossTheDates",
             "pagesRunFrom", "pagesWithNoDayOfTheirOwn", "sharingTheLastDay", "spareDatesAfterThese",
             "theSemesterBegins", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
-        Owed(AssistWordingKeys, 262, "not said on Windows; #262 specifies it for a call naming no course",
-            "noCourseNamed"),
         Owed(AssistWordingKeys, 157,
             "not said on Windows; no open issue names it (listed in QUESTIONS-FOR-RUSSELL.md)",
             "noCoursesYet", "whatPublishingMeans"),

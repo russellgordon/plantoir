@@ -187,7 +187,10 @@ public sealed class AssistWorkspace
     /// </summary>
     public Course Course(string code)
     {
-        string wanted = code.Trim();
+        string wanted = (code ?? "").Trim();
+        // A call naming no course at all is said plainly (#262), rather than
+        // as a search for a course called nothing.
+        if (wanted.Length == 0) throw new AssistRefusal(AssistWording.NoCourseNamed);
         var courses = Courses();
         var found = courses.FirstOrDefault(c => string.Equals(c.Code, wanted, StringComparison.OrdinalIgnoreCase));
         if (found is not null) return found;

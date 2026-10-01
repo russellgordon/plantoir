@@ -1238,17 +1238,73 @@ public sealed class AssistAgent
 
     private static string Spaced(string tool) => tool.Replace('_', ' ');
 
-    /// <summary>
-    /// Whether a tool call's arguments can be read at all. An empty string and
-    /// an empty object ARE readable — <c>undo_last_change</c> genuinely takes
-    /// nothing — and whether an empty call may RUN is a separate question.
-    /// </summary>
-    internal static bool ArgumentsAreReadable(JsonObject call)
+    /// <summary>What a finished tool call's arguments amount to.</summary>
+    internal enum WhatTheModelWrote
     {
-        if (call["function"]?["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return true;
-        if (string.IsNullOrWhiteSpace(json)) return true;
-        try { return JsonNode.Parse(json) is JsonObject; }
-        catch (System.Text.Json.JsonException) { return false; }
+        /// <summary>Something to act on — however little; binding and the tool's own refusals decide the rest.</summary>
+        Readable,
+        /// <summary>Not a JSON object: bad JSON, or a fragment.</summary>
+        Unreadable,
+        /// <summary>Nothing at all, for a tool that needs more than the window supplies (#262).</summary>
+        NothingForWhatItNeeds,
+    }
+
+    /// <summary>The two arguments the section window supplies on its own.</summary>
+    private static readonly HashSet<string> TheWindowSupplies = new(StringComparer.Ordinal) { "course", "section" };
+
+    /// <summary>
+    /// Judge a call's arguments against the tool's own schema —
+    /// <c>app-rules.json</c> → <c>modelTiers.requirements</c> → "A finished
+    /// reply that wrote nothing runs a tool only when the window supplies
+    /// everything that tool needs", whose cases this is tested against.
+    /// </summary>
+    /// <remarks>
+    /// <para>Nothing written — an empty string, only whitespace, or an object
+    /// with no keys — runs only when the window can supply everything. A tool
+    /// needs more when its schema REQUIRES anything besides course and section
+    /// (a date, a page, a time), or when it CHANGES PAGES and declares anything
+    /// besides them (which pages, which dates): a write told only its section
+    /// has nothing to act on. A schema with no <c>required</c> key requires
+    /// nothing.</para>
+    ///
+    /// <para><b>The trap, either way round:</b> keying on <c>required</c>
+    /// alone. Refusing every tool with a required list refuses rebuild and
+    /// deploy, which the window supplies in full; running whenever the
+    /// required arguments are window-supplied runs an empty
+    /// <c>publish_pages</c>, whose real content is optional in its schema.</para>
+    /// </remarks>
+    internal static WhatTheModelWrote Judge(string? arguments, IEnumerable<string> required,
+                                            IEnumerable<string> properties, bool readOnly)
+    {
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            JsonNode? parsed;
+            try { parsed = JsonNode.Parse(arguments); }
+            catch (System.Text.Json.JsonException) { return WhatTheModelWrote.Unreadable; }
+            if (parsed is not JsonObject written) return WhatTheModelWrote.Unreadable;
+            if (written.Count > 0) return WhatTheModelWrote.Readable;
+        }
+
+        bool needsMore = required.Any(name => !TheWindowSupplies.Contains(name)) ||
+                         (!readOnly && properties.Any(name => !TheWindowSupplies.Contains(name)));
+        return needsMore ? WhatTheModelWrote.NothingForWhatItNeeds : WhatTheModelWrote.Readable;
+    }
+
+    /// <summary>
+    /// <see cref="Judge"/> for a call the model made, asked of the schema it
+    /// was shown. "Changes pages" is this app's own list of writes, since the
+    /// schemas the server hands out carry no read-only flag.
+    /// </summary>
+    private WhatTheModelWrote WhatTheModelWroteFor(JsonObject call)
+    {
+        string name = call["function"]?["name"]?.ToString() ?? "";
+        string? arguments = call["function"]?["arguments"] is JsonValue raw && raw.TryGetValue(out string? text)
+            ? text
+            : call["function"]?["arguments"]?.ToJsonString();
+        var parameters = SchemaOf(name)?["parameters"];
+        var required = (parameters?["required"] as JsonArray)?.Select(item => item?.ToString() ?? "") ?? Enumerable.Empty<string>();
+        var properties = (parameters?["properties"] as JsonObject)?.Select(pair => pair.Key) ?? Enumerable.Empty<string>();
+        return Judge(arguments, required, properties, readOnly: !IsWriteTool(name));
     }
 
     /// <summary>
@@ -1427,13 +1483,24 @@ public sealed class AssistAgent
                     ? $"the assistant's answer was cut off part way through {Spaced(begun)} — nothing was run from it"
                     : "the assistant's answer was cut off part way — nothing was run from it");
             }
-            if (acting && calls![0] is JsonObject chosen && !ArgumentsAreReadable(chosen))
+            if (acting && calls![0] is JsonObject chosen)
             {
-                // A finished answer whose arguments are not JSON: the model
-                // wrote bad JSON of its own accord. Same sentence, its own
-                // line — whoever reads a report needs to tell the two apart.
-                return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff,
-                    $"the assistant finished answering but what it wrote for {Spaced(begun)} could not be read — nothing was run from it");
+                switch (WhatTheModelWroteFor(chosen))
+                {
+                    case WhatTheModelWrote.Unreadable:
+                        // A finished answer whose arguments are not JSON: the
+                        // model wrote bad JSON of its own accord. Same sentence,
+                        // its own line — whoever reads a report needs to tell
+                        // the two apart.
+                        return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff,
+                            $"the assistant finished answering but what it wrote for {Spaced(begun)} could not be read — nothing was run from it");
+                    case WhatTheModelWrote.NothingForWhatItNeeds:
+                        // #262: it wrote NOTHING, and this tool needs more than
+                        // the window supplies. Not answerWasCutOff, whose advice
+                        // is about the teacher's request.
+                        return NothingRanFromIt(lines, AssistWording.AnswerLeftOutWhatItWasFor,
+                            $"the assistant finished answering but wrote nothing for {Spaced(begun)} — nothing was run from it");
+                }
             }
             _messages.Add(reply.DeepClone()!);
 

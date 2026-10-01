@@ -770,6 +770,17 @@ public class AssistWorkspaceTests : IDisposable
                      Assert.Throws<AssistRefusal>(() => workspace.Course(" ZZZ9Z\n")).Message);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ACallNamingNoCourseSaysSoPlainly(string code)
+    {
+        var refusal = Assert.Throws<AssistRefusal>(() => Open().Course(code));
+        Assert.Equal(AssistWording.NoCourseNamed, refusal.Message);
+        var locked = new AssistWorkspace(_folder, _launcher, lockedCourse: "ICS3U");
+        Assert.Equal(AssistWording.NoCourseNamed, Assert.Throws<AssistRefusal>(() => locked.Course(code)).Message);
+    }
+
     [Fact]
     public void ALockedSessionDoesNotEvenListTheOtherCourses()
     {

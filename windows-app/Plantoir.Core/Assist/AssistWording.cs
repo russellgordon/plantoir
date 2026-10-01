@@ -412,6 +412,19 @@ public static class AssistWording
         "I didn't get to the end of that, so I haven't changed anything. " +
         "Ask me again — a shorter sentence, or fewer pages at a time.";
 
+    /// <summary>
+    /// A finished reply named a tool and wrote NOTHING for it, and the tool
+    /// needs more than the window supplies (#262). Nothing ran.
+    /// </summary>
+    public const string AnswerLeftOutWhatItWasFor =
+        "I did not work out which pages, day or time you meant, so nothing was done. Please ask me again.";
+
+    /// <summary>
+    /// A call over MCP named no course — missing or blank (#262) — rather than
+    /// "There is no course called “”".
+    /// </summary>
+    public const string NoCourseNamed = "No course was named, so nothing was done.";
+
     // MARK: - A call the model made for another course (#180)
 
     /// <summary>

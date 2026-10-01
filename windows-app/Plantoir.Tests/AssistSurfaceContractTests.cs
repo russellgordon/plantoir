@@ -1139,6 +1139,25 @@ public class AssistSurfaceContractTests
         Assert.Equal(AssistWording.AnswerWasCutOff, Assert.Single(stoppedLines).Text);
         Answer("A reply the engine stopped part way runs no tool and says so");
 
+        // #262: every case is the tool's own required, properties and
+        // readOnly, and whether what the model wrote runs.
+        const string wroteNothing =
+            "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs";
+        var nothingCases = doc["modelTiers"]!["requirements"]!.AsArray()
+            .First(r => r!["rule"]!.ToString() == wroteNothing)!["cases"]!.AsArray();
+        Assert.True(nothingCases.Count >= 14, "the #262 cases have gone missing");
+        foreach (var item in nothingCases)
+        {
+            var judged = AssistAgent.Judge(
+                item!["arguments"]!.ToString(),
+                item["required"]!.AsArray().Select(r => r!.ToString()),
+                item["properties"]!.AsArray().Select(r => r!.ToString()),
+                item["readOnly"]!.GetValue<bool>());
+            Assert.True((judged == AssistAgent.WhatTheModelWrote.Readable) == item["readable"]!.GetValue<bool>(),
+                $"{item["name"]}: {item["tool"]} with “{item["arguments"]}” was judged {judged}");
+        }
+        Answer(wroteNothing);
+
         // The one that genuinely cannot be executed, named rather than dropped.
         // A polarity veto is a rule about how a MODEL is chosen: it governs the
         // routing suite in research/ai-assist/, which is measured by hand and
