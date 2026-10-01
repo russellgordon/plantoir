@@ -82,6 +82,17 @@ Neither app takes a default value for the second argument, so a call site
 that has not been made to think about the example-content toggle fails to
 compile.
 
+On Windows the rule is called from three pure seams rather than from the
+view, because `NewCourseDialog` cannot be reached by a test:
+`WizardStructure.Adopting` / `RestoringDefaults` (the editor's five lists),
+`NewCourseAnswers.Decide` (the keys the Starting Content answers write — the
+three starting-point keys, the lists, the sidebar and the marks pool), and
+`CourseConfiguration.CurriculumPagesOffered`, which calls `HasSkeleton` rather
+than asking again. Six goldens captured from the old rule before the fix
+(`Plantoir.Tests/Goldens/`) pin that a teacher TAKING the ready-made pages
+still gets the same keys byte for byte (`documentation/12-windows-app.md` →
+"Course creation and the smaller course pieces").
+
 Both apps asked the wrong question until 2026-09-21
 ([#248](https://github.com/russellgordon/plantoir/issues/248)): "does
 example content EXIST for this code?" rather than "is the teacher TAKING
