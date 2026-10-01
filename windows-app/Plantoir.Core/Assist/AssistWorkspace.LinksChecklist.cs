@@ -360,6 +360,66 @@ public sealed partial class AssistWorkspace
         string placeOrTitle(string path) => PlaceOf(course, Relative(path));
     }
 
+    // ---- The trail (activityTrail.mustRecord) ----------------------------
+
+    /// <summary>Record that the sheet was shown. <paramref name="occasion"/> is in words: "after a preview", "from the menu".</summary>
+    public static void NoteOffered(LinksChecklistSheet sheet, string occasion)
+    {
+        int Count(string group) => sheet.Rows.Count(r => r.Group == group);
+        int under = LinksChecklist.ShownOrder(sheet.Rows).Count(x => x.Depth > 0);
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.OfferedToPublishPagesThatLinksLeadTo,
+            $"offered to publish pages that links lead to, {occasion}: {Count(LinksChecklist.FromAClassGroup)} used by a class, " +
+            $"{Count(LinksChecklist.NotReachedGroup)} linked from other pages, {Count(LinksChecklist.ClassGroup)} classes; " +
+            $"{under} listed under another page; {sheet.ShownTicked.Count} ticked",
+            sheet.CourseCode, sheet.Section);
+    }
+
+    /// <summary>Record a Publish press: counts and at most ten PLACES — never anything written on a page.</summary>
+    public static void NotePublished(LinksChecklistSheet sheet, LinksChecklistPublished result)
+    {
+        var places = result.Written.Take(10).ToList();
+        string named = string.Join(", ", places) + (result.Written.Count > 10 ? $" and {result.Written.Count - 10} more" : "");
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.PublishedPagesThatLinksLedTo,
+            $"published {result.Written.Count} {(result.Written.Count == 1 ? "page" : "pages")} that links led to; " +
+            $"{result.ClassesPublished} classes bringing {result.BroughtByClasses} more ({result.CameWithAClass} of them on the list); " +
+            $"{result.RememberedUnticked.Count} left unticked, {result.LeftWithTheirPage.Count} left with the page they come under: {named}",
+            sheet.CourseCode, sheet.Section);
+        NoteLeftHidden(sheet, "Publish with some unticked", result.RememberedUnticked.Count + result.LeftWithTheirPage.Count,
+                       result.LeftWithTheirPage.Count);
+    }
+
+    private static void NoteLeftHidden(LinksChecklistSheet sheet, string how, int total, int followers)
+    {
+        if (total <= 0) return;
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.LeftPagesHiddenThatLinksLeadTo,
+            $"left {total} {(total == 1 ? "page" : "pages")} hidden that links lead to ({followers} with the page they come under), {how}",
+            sheet.CourseCode, sheet.Section);
+    }
+
+    /// <summary>
+    /// The sheet's Publish: write, remember what was unticked, record it.
+    /// The answered file's leftUnticked holds only rows whose OWN tick was off.
+    /// </summary>
+    public LinksChecklistPublished PublishAndRemember(LinksChecklistSheet sheet)
+    {
+        var result = PublishLinksChecklist(sheet);
+        var course = Course(sheet.CourseCode);
+        LinksChecklist.WriteAnswered(course.DirectoryPath, sheet.Section, sheet.Rows.Select(r => r.Place),
+                                     result.RememberedUnticked, DateTime.UtcNow);
+        NotePublished(sheet, result);
+        return result;
+    }
+
+    /// <summary>Not Now: nothing written but the answer; every row left (0 followers, since the press leaves every row).</summary>
+    public void NotNow(LinksChecklistSheet sheet)
+    {
+        var course = Course(sheet.CourseCode);
+        var unticked = sheet.Rows.Where(r => !(sheet.Ticks.TryGetValue(LinksChecklist.Key(r.Place), out bool on) && on))
+                                 .Select(r => r.Place).ToList();
+        LinksChecklist.WriteAnswered(course.DirectoryPath, sheet.Section, sheet.Rows.Select(r => r.Place), unticked, DateTime.UtcNow);
+        NoteLeftHidden(sheet, "Not Now", sheet.Rows.Count, 0);
+    }
+
     /// <summary>Every page of the course by its place (course-relative, no .md), in composed form.</summary>
     private Dictionary<string, string> PlaceIndex(Course course) =>
         Directory.EnumerateFiles(course.DirectoryPath, "*.md", SearchOption.AllDirectories)
