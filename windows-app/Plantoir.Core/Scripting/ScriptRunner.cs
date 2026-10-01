@@ -120,6 +120,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             _healthFindings.Clear();
             _healthFindingsSeen.Clear();
             Notify(nameof(HealthFindings));
+            LinksChecklistMarker = null;
         }
         NotifyRunState();
 
@@ -581,12 +582,27 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (_unscannedHealthOutput.Length > 8000 &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
             !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
-            !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput))
+            !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Assist.LinksChecklistMarker.Prefix, StringComparison.Ordinal))
             _unscannedHealthOutput = "";
     }
 
+    /// <summary>
+    /// The last <c>PLANTOIR_LINKS_CHECKLIST:</c> line this run printed (#392):
+    /// the build wrote its links checklist BEFORE printing it, so the window
+    /// reads the file when this arrives — mid-build, never on the #333 finding.
+    /// </summary>
+    public Plantoir.Core.Assist.LinksChecklistMarker? LinksChecklistMarker { get; private set; }
+
     private void RecordHealthFinding(string line)
     {
+        if (Plantoir.Core.Assist.LinksChecklistMarker.Parse(line) is { } offered)
+        {
+            LinksChecklistMarker = offered;
+            Notify(nameof(LinksChecklistMarker));
+            return;
+        }
+
         // The build's PLANTOIR_DATED: line (#279) rides the same line buffer:
         // it names the teacher's pages the build rewrote with their class's
         // date, and the trail is the only place that survives the console.
