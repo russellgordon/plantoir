@@ -245,6 +245,20 @@ public static class ActivityTrail
         /// </summary>
         QuitAskedAboutWorkUnderWay,
         /// <summary>
+        /// A deploy, or setting one, read the SAVED settings while some window
+        /// held unsaved Course Settings edits (#357 / mac #335). Carries the
+        /// act, the destination KINDS used and whether the unsaved edits named
+        /// a different kind — never a path or a site name.
+        /// </summary>
+        DeployUsedTheSavedSettings,
+        /// <summary>A preview started while Course Settings held unsaved edits in any window (#272 / mac #265).</summary>
+        PreviewStartedWithUnsavedSettings,
+        /// <summary>
+        /// Course Settings' Preview Again rebuilt the open previews of the
+        /// course (#272): which sections, or that none was still open.
+        /// </summary>
+        PreviewAgainAfterSettingsSaved,
+        /// <summary>
         /// A remembered timetable named a date that cannot be a class date —
         /// the file was written by this app before #144, on a PC whose
         /// regional format uses another calendar — and was set aside, so the
@@ -324,6 +338,9 @@ public static class ActivityTrail
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
         Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
+        Event.DeployUsedTheSavedSettings => "deploy used the saved settings",
+        Event.PreviewStartedWithUnsavedSettings => "preview started with unsaved settings",
+        Event.PreviewAgainAfterSettingsSaved => "preview again after settings saved",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",

@@ -29,6 +29,12 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     /// that course (the same file) with nothing unsaved reads it again
     /// (#272 / mac #265, <c>savingSettings.rule</c>).
     /// </summary>
+    public static bool AnyCopyHasUnsavedChanges(string configPath) =>
+        _windowModels.ToList().SelectMany(model => model.Courses).Any(course =>
+            string.Equals(Path.GetFullPath(course.ConfigFilePath), Path.GetFullPath(configPath),
+                          StringComparison.OrdinalIgnoreCase) &&
+            course.Configuration.HasUnsavedChanges);
+
     public static void OtherCopiesReread(string configPath, CourseConfiguration saved)
     {
         foreach (var model in _windowModels.ToList())

@@ -1037,6 +1037,20 @@ public sealed partial class CourseSettingsView : UserControl
             // list, but said.
             var afterSave = new List<string>();
             if (report.ReplacedChangesFromElsewhere.Contains("hidden")) afterSave.Add(CourseConfiguration.SaveReplacedSidebarChange);
+            // A Save never reaches a running preview or publish (#272): say
+            // which, and offer Preview Again for a preview. A publish wins
+            // over a preview: it is the one that sends the old settings out.
+            PreviewAgainButton.Visibility = Visibility.Collapsed;
+            if (workingFolder is not null && CourseActivity.IsPublishing(workingFolder, _course.Code))
+            {
+                afterSave.Add(SavedSettings.SavedWhilePublishing);
+            }
+            else if (OpenPreviewsOfThisCourse().Count > 0)
+            {
+                afterSave.Add(SavedSettings.SavedWhilePreviewing);
+                PreviewAgainButton.IsEnabled = true;
+                PreviewAgainButton.Visibility = Visibility.Visible;
+            }
             afterSave.AddRange(aboutScheduled);
             SaveStatus.Text = afterSave.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", afterSave);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
@@ -1056,6 +1070,52 @@ public sealed partial class CourseSettingsView : UserControl
                 "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+        }
+    }
+
+    /// <summary>This course's previews open anywhere in this app, for this working folder.</summary>
+    private List<PreviewLeases.Lease> OpenPreviewsOfThisCourse()
+    {
+        string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
+        return PreviewLeases.Active
+            .Where(lease => workingFolder is not null && WorkingFolder.IsTheSame(lease.FolderPath, workingFolder) &&
+                            string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Preview Again (#272 / mac #265): stop and start every open preview of
+    /// this course, in whichever window shows it, so it bakes in what was just
+    /// saved. Removes only the preview sentence; a replaced-sidebar sentence
+    /// stays. When none is open any more the button stays, disabled, with
+    /// settingsPreviewAgainNothingOpen.
+    /// </summary>
+    private async void PreviewAgain_Click(object sender, RoutedEventArgs e)
+    {
+        var open = OpenPreviewsOfThisCourse();
+        if (open.Count == 0)
+        {
+            PreviewAgainButton.IsEnabled = false;
+            SaveStatus.Text = SaveStatus.Text.Replace(SavedSettings.SavedWhilePreviewing, SavedSettings.PreviewAgainNothingOpen);
+            ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+                "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
+            return;
+        }
+        SaveStatus.Text = SaveStatus.Text.Replace(" " + SavedSettings.SavedWhilePreviewing, "")
+                                         .Replace(SavedSettings.SavedWhilePreviewing, "");
+        PreviewAgainButton.Visibility = Visibility.Collapsed;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+            "Preview Again pressed in Course Settings for " + _course.Code + ": rebuilt section(s) " +
+            string.Join(", ", open.Select(lease => lease.SectionNumber).Distinct().OrderBy(n => n)));
+        foreach (var lease in open)
+        {
+            if (App.WindowFor(lease.FolderPath) is not { } main) continue;
+            try
+            {
+                await main.StopPreviewForAsync(lease.FolderPath, lease.CourseCode, lease.SectionNumber);
+                main.ShowPreviewFor(lease.CourseCode, lease.SectionNumber);
+            }
+            catch (Exception error) { App.LogDiagnostic($"PreviewAgain_Click: {error}"); }
         }
     }
 
