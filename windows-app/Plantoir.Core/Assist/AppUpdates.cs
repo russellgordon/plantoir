@@ -123,8 +123,22 @@ public static class AppUpdates
     /// Restart Manager must not close plantoir-mcp or a scheduled run on the
     /// update path; the app quits itself first.
     /// </summary>
-    public static string InstallerArguments(bool relaunch) =>
-        "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1" + (relaunch ? " /RELAUNCH=1" : "");
+    public static string InstallerArguments(bool relaunch, string? returnTo = null) =>
+        "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1" + (relaunch ? " /RELAUNCH=1" : "") +
+        (string.IsNullOrEmpty(returnTo) ? "" : $" \"/RETURNTO={returnTo}\"");
+
+    /// <summary>
+    /// What installer.iss starts Plantoir with when it REFUSES an update
+    /// (ruling 12): a plantoir-mcp started between the app's last check and
+    /// setup, so the teacher is not left with Plantoir simply gone.
+    /// </summary>
+    public const string UpdateNotInstalledArgument = "--update-not-installed";
+
+    /// <summary>The `update held while work is under way` line for that launch, or null when it is an ordinary one.</summary>
+    public static string? NotInstalledLine(IEnumerable<string> arguments) =>
+        arguments.Any(a => string.Equals(a, UpdateNotInstalledArgument, StringComparison.OrdinalIgnoreCase))
+            ? $"the new version was not installed: {UpdateWording.AssistantElsewhereWork} had started; it will be offered again"
+            : null;
 
     /// <summary>
     /// Whether this copy may update itself (ruling 3). installer.iss allows an

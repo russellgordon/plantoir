@@ -142,8 +142,20 @@ public class AppUpdatesContractTests
         Assert.Contains("{param:RELAUNCH|0}", iss);
         Assert.Contains("Check: WantsRelaunch", iss);
         Assert.Contains("{param:PLANTOIRUPDATE|0}", iss);
-        Assert.Contains("if not IsUpdate then", iss);
-        Assert.Contains("function InitializeSetup", iss);                 // refuses an update while plantoir-mcp runs   // the update path skips the taskkill (ruling 2)
+        Assert.Contains("if not IsUpdate then", iss);   // the update path skips the taskkill (ruling 2)
+        Assert.Contains("function InitializeSetup", iss);   // refuses an update while plantoir-mcp runs
+        Assert.Contains("--update-not-installed", iss);                    // ruling 12: a refusal reopens the app
+        Assert.Contains("\"/RETURNTO=C:\\P\\Plantoir.exe\"", AppUpdates.InstallerArguments(true, @"C:\P\Plantoir.exe"));
+    }
+
+    [Fact]
+    public void ARefusedUpdateIsSaidOnTheNextLaunchOnly()
+    {
+        Assert.Null(AppUpdates.NotInstalledLine(new[] { "Plantoir.exe" }));
+        Assert.Null(AppUpdates.NotInstalledLine(new[] { "Plantoir.exe", "--state-dir", "x" }));
+        string? line = AppUpdates.NotInstalledLine(new[] { "Plantoir.exe", AppUpdates.UpdateNotInstalledArgument });
+        Assert.NotNull(line);
+        Assert.Contains("offered again", line);
     }
 
     [Fact]

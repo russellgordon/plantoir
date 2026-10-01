@@ -92,6 +92,9 @@ public sealed class AppUpdater : IDisposable
     /// <summary>Whether this copy will ever check: a feed is set and the copy is per-user.</summary>
     public bool IsActive => !string.IsNullOrWhiteSpace(_feed);
 
+    /// <summary>The executable a refused update reopens (ruling 12).</summary>
+    public string? ReturnTo { get; set; } = Environment.ProcessPath;
+
     /// <summary>Whether NetSparkle was ever constructed (never, while the feed is empty).</summary>
     public bool HasEngine => _sparkle is not null;
 
@@ -133,9 +136,9 @@ public sealed class AppUpdater : IDisposable
     /// <summary>A day by the wall clock since the last daily check; records the new one when due.</summary>
     internal bool DailyCheckIsDue(DateTime nowUtc)
     {
-        if (_lastDailyCheck() is { } last && nowUtc - last < TimeSpan.FromSeconds(AppUpdates.CheckEverySeconds)) return false;
-        _rememberDailyCheck(nowUtc);
-        return true;
+        // Stamped by CheckAsync only when the check got an ANSWER (ruling 13):
+        // an offline morning does not count as the day's check.
+        return !(_lastDailyCheck() is { } last && nowUtc - last < TimeSpan.FromSeconds(AppUpdates.CheckEverySeconds));
     }
 
     /// <summary>Where the last daily check is kept (the app passes its settings).</summary>
@@ -185,6 +188,8 @@ public sealed class AppUpdater : IDisposable
             return;
         }
 
+        if (!teacherAsked && info.Status is UpdateStatus.UpdateAvailable or UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped)
+            _rememberDailyCheck(DateTime.UtcNow);
         var newest = info.Updates?.OrderByDescending(u => u).FirstOrDefault();
         switch (info.Status)
         {
@@ -270,7 +275,7 @@ public sealed class AppUpdater : IDisposable
             $"from {_running} to {PreparedVersion}, " + (askedAgain
                 ? "once the work it was held for had finished, and opening again"
                 : "straight away, and opening again"));
-        _prompts.QuitForInstall(_installerPath, AppUpdates.InstallerArguments(relaunch: true));
+        _prompts.QuitForInstall(_installerPath, AppUpdates.InstallerArguments(relaunch: true, ReturnTo));
     }
 
     /// <summary>
@@ -293,7 +298,7 @@ public sealed class AppUpdater : IDisposable
             ActivityTrail.Note(ActivityTrail.Event.UpdateInstalling,
                 $"from {_running} to {PreparedVersion}, as Plantoir quits, without opening again" +
                 (Prepared == AppUpdates.Prepared.PostponedAtInstall && workUnderWay ? $"; {whatIsUnderWay} was still going on" : ""));
-            return (_installerPath, AppUpdates.InstallerArguments(relaunch: false));
+            return (_installerPath, AppUpdates.InstallerArguments(relaunch: false, ReturnTo));
         }
         return null;
     }

@@ -140,8 +140,23 @@ public class AppUpdaterTests
             .RememberingDailyChecksIn(() => last, when => last = when);
         var now = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
         Assert.True(updater.DailyCheckIsDue(now));
+        last = now;                                          // a check that got an answer
         Assert.False(updater.DailyCheckIsDue(now.AddHours(23)));
         Assert.True(updater.DailyCheckIsDue(now.AddHours(24)));
+    }
+
+    /// <summary>Ruling 13: an offline or failed daily check does not stamp the day.</summary>
+    [Fact]
+    public async Task AFailedDailyCheckDoesNotCountAsTheDays()
+    {
+        DateTime? last = null;
+        var reader = new FakeReader { Answer = "not a feed" };
+        using var updater = Make("https://example.invalid/windows.xml", new FakePrompts(), reader)
+            .RememberingDailyChecksIn(() => last, when => last = when);
+        await updater.CheckAsync(teacherAsked: false);
+        Assert.True(reader.Reads > 0, "the fake feed was never read");
+        Assert.Null(last);
+        Assert.True(updater.DailyCheckIsDue(DateTime.UtcNow));
     }
 
     [Fact]
