@@ -565,10 +565,14 @@ separately from the reader:
   took both on 2026-09-30 (#177/#308, bundle 2): `CourseRestorer
   .FrontmatterBounds` is gone, `SettingPerSectionKeys` walks
   `PageVisibilityReader.LinesOwnedByKey`, and `SectionRestoreTests` runs
-  `backups.restoringOneSectionsKeys`. One small difference, Windows' on
-  purpose: blank lines before the opening fence are KEPT by Windows' restore,
-  where the mac's `settingPerSectionKeys` starts its rebuilt page at the fence
-  and drops them (harmless to the build; told to the mac). The trap to avoid
+  `backups.restoringOneSectionsKeys`. Blank lines before the opening fence
+  are DROPPED by both restores: the mac's `settingPerSectionKeys` starts its
+  rebuilt page at the fence, and Windows' does the same since 2026-10-01
+  (parity bundle 10). Windows had kept them from bundle 2 and asked the mac
+  whether to keep them too; Russell chose one behaviour, the mac's, and the
+  ask was withdrawn. Harmless to the build either way — the case is
+  `restoringOneSectionsKeys` → "a blank line before the opening fence is
+  dropped from the restored page". The trap to avoid
   is reading "one fence finder" and making the MAC strict, which puts the
   second-block bug straight back.
 

@@ -215,10 +215,16 @@ public sealed class SectionRestoreTests : IDisposable
         Assert.True(failures.Count == 0, string.Join("\n", failures));
     }
 
-    /// <summary>#177: a restore reaches the pages the build reads — a <c>----</c> fence, and a blank line before the fence.</summary>
+    /// <summary>
+    /// #177: a restore reaches the pages the build reads — a <c>----</c> fence,
+    /// and a blank line before the fence, which the restored page DROPS, as
+    /// the mac's does (Russell, 2026-10-01; bundle 2 had kept it). The shared
+    /// case is in <c>restoringOneSectionsKeys</c>.
+    /// </summary>
     [Theory]
     [InlineData("----\ntitle: x\npublishForSection1: true\n----\nbody", "----\ntitle: x\npublishForSection1: false\n----\nbody")]
-    [InlineData("\n---\ntitle: x\npublishForSection1: true\n---\nbody", "\n---\ntitle: x\npublishForSection1: false\n---\nbody")]
+    [InlineData("\n---\ntitle: x\npublishForSection1: true\n---\nbody", "---\ntitle: x\npublishForSection1: false\n---\nbody")]
+    [InlineData("\n\n---\ntitle: x\npublishForSection1: true\n---\nbody", "---\ntitle: x\npublishForSection1: false\n---\nbody")]
     public void ARestoreReachesAPageTheBuildReads(string live, string expected)
     {
         Assert.Equal(expected, CourseRestorer.SettingPerSectionKeys(1, live, "---\npublishForSection1: false\n---\n").Text);
