@@ -2897,7 +2897,9 @@ Three consequences that follow, each of which cost something to learn:
 `publish_pages` and `unpublish_pages` used to take an `includeLinked`
 boolean with no default, so the MODEL decided. That is the same reasoning
 this design exists to keep out of the model, and a boolean is the thing that
-inverted polarity on the 3B. It is gone, and the rules are now code:
+inverted polarity on the 3B. It is gone, and the rules are now code
+(on Windows too since 2026-10-01, #420 step (a), where it had lingered with a
+default of false — "On Windows: the behaviour landed" below):
 
 **Publishing always publishes the pages it links to.** Never publish a page
 whose links lead somewhere students cannot see — that is the whole point.
