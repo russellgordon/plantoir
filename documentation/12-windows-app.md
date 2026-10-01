@@ -2880,18 +2880,20 @@ window goes through `AdoptInheritedPath`, which writes no trail line.
 ### Get Ready for the Start of the Year: what the app's Go does NOT do yet
 
 The rule, the MCP pair and the sheet MATCH (`StartOfYearPlan`,
-`AssistWorkspace.PrepareForStartOfYear`, `StartOfYearDialog`). Two parts of the
-mac's app-side behaviour are not built here, and are said so rather than
+`AssistWorkspace.PrepareForStartOfYear`, `StartOfYearDialog`). One part of the
+mac's app-side behaviour is not built here, and is said so rather than
 implied:
 
 - **Go does not stop and restart the preview.** The pages are written; a
   preview that is showing keeps showing the old state until the next build.
-- **The undo does not notice a scheduled deploy reaching its moment.** It ends
-  at the next deploy started from THIS app (`SectionDetailView` ends it as the
-  publish begins), at the next change to the section's pages from anywhere (the
-  section's plan code no longer matches the one taken after the write), and at
-  quit (it lives in memory only). After an overnight scheduled deploy it still
-  offers itself until a page changes; the backup is the honest way back.
+
+The undo ends at the next deploy started from THIS app (`SectionDetailView`
+ends it as the publish begins), at a scheduled deploy — the one set at the time
+of the act reaching its moment, or the section's outcome record showing a run
+since (`StartOfYearSessionUndo.EndedByAScheduledDeploy`, read when the undo
+sheet opens) — at the next change to the section's pages from anywhere (the
+section's plan code no longer matches the one taken after the write), and at
+quit (it lives in memory only).
 
 The plan code is SHA-256 over every page of the section, path and bytes, eight
 hex digits. Rejected: a code over the plan's own entries only — a page the plan
@@ -2922,6 +2924,12 @@ publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
 `Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
 reader would never see the line. A wrapper written before this keeps its old
 scan until its schedule is set again.
+
+The build prints the line from the contract's own prefix
+(`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
+through `contracts.section`), which is why a search of `scripts/` for the
+literal string finds only the tests — a review of this bundle read that as
+"the build never prints it", and it was checked and found false.
 
 ### The How I Teach row, and the CHECK items of #360
 

@@ -583,6 +583,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
             !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
             !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput) &&
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.CoverageMapsBuilt.Marker, StringComparison.Ordinal) &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Assist.LinksChecklistMarker.Prefix, StringComparison.Ordinal))
             _unscannedHealthOutput = "";
     }

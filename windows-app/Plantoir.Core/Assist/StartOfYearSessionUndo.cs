@@ -12,17 +12,29 @@ namespace Plantoir.Core.Assist;
 /// <para>Three stores, none reaching another: this, the assistant window's
 /// "undo that", and an outside assistant's <c>undo_last_change</c>.</para>
 ///
-/// <para>Not seen, said in documentation/09: a deploy by an outside assistant,
-/// a launcher run from a terminal, and — on Windows, as of this piece — a
-/// scheduled deploy reaching its moment; after any of those the undo still
-/// offers itself until a page changes, and the backup is the honest way back.</para>
+/// <para>A SCHEDULED deploy ends it too (<see cref="EndedByAScheduledDeploy"/>):
+/// the one set at the time reaching its moment, or any whose record shows a
+/// run since the change — the schedule is read again when the undo sheet
+/// opens. Not seen: a deploy by an outside assistant and a launcher run from a
+/// terminal; after those the backup is the honest way back.</para>
 /// </remarks>
 public static class StartOfYearSessionUndo
 {
     public sealed record Entry(
         IReadOnlyDictionary<string, (string Before, string After)> Written,
         string BackupPath,
-        string SectionCodeAfter);
+        string SectionCodeAfter,
+        DateTime ActedAt = default,
+        DateTime? ScheduledAtTheTime = null);
+
+    /// <summary>
+    /// Whether a scheduled deploy has put the change in front of students since
+    /// the act: the one set at the time has reached its moment, or the section's
+    /// last scheduled run (its outcome record) happened after the act.
+    /// </summary>
+    public static bool EndedByAScheduledDeploy(Entry entry, DateTime now, DateTime? lastScheduledRun) =>
+        (entry.ScheduledAtTheTime is { } moment && moment <= now)
+        || (lastScheduledRun is { } ran && ran > entry.ActedAt);
 
     private static readonly Dictionary<string, Entry> Entries = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object Gate = new();

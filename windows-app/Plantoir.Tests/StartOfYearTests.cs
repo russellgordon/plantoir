@@ -266,6 +266,20 @@ public class StartOfYearTests : IDisposable
         Assert.True(putBack.Count >= 2);
     }
 
+    /// <summary>A scheduled deploy since the act ends the app's undo (startOfYear.undo.app).</summary>
+    [Fact]
+    public void AScheduledDeployEndsTheAppsUndo()
+    {
+        var acted = new DateTime(2026, 9, 1, 15, 0, 0);
+        var entry = new StartOfYearSessionUndo.Entry(new Dictionary<string, (string, string)>(), "b.zip", "code",
+            acted, ScheduledAtTheTime: acted.AddHours(15));
+        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(1), lastScheduledRun: null));
+        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(16), lastScheduledRun: null));
+        var unscheduled = entry with { ScheduledAtTheTime = null };
+        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(-1)));
+        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(3)));
+    }
+
     // ---- check_section's groups -------------------------------------------
 
     [Fact]
