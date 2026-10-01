@@ -2469,6 +2469,8 @@ manual.
 
 ## A course kept for reference is refused in the launcher, early
 
+> **deploy.ps1, measured (bundle 6b):** all 26 `markerAgreement` rows pass against the real launcher (`ReferenceMarkerAgreementTests`, about 100 s). deploy.ps1 ends its "cannot tell" headline with an ASCII hyphen where deploy.sh has an em dash — Windows PowerShell 5.1 reads a script without a byte-order mark in the machine's code page — and the app's `FailureExplainer` reads both shapes into the same sentence.
+
 `deploy.sh` and `deploy.ps1` both read `courses/<CODE>/course_config.json`
 before the flag loop and refuse, with a sentence, when it says
 `"kept_for_reference": true`. The full reasoning is

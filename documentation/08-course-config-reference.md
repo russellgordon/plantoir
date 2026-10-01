@@ -98,6 +98,8 @@ A representative example:
 
 ### Reference courses: kept, never deployed
 
+> **Windows reads `kept_for_reference` strictly too** — a JSON `true` and nothing else (Newtonsoft gives an Integer for `1` and a String for `"true"`) — and since bundle 6b a settings file starting with a byte-order mark is read rather than skipped.
+
 A reference course is last year's course — or a course full of example content
 — sitting in this year's sidebar so the teacher can read it, and which Plantoir
 never deploys. Two keys carry it, and the rules they obey are
