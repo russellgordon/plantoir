@@ -240,6 +240,32 @@ public sealed class CourseConfiguration
     private static byte[] Serialize(JObject values) =>
         new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
 
+    /// <summary>
+    /// How many unsaved exclusion changes this copy holds: names that differ,
+    /// in either direction and in both scopes, between the in-memory
+    /// <c>excluded_items</c> and what THIS copy last read or wrote — never the
+    /// file, because an exclusion another window saved meanwhile is not one of
+    /// this copy's changes (<c>excludedItems.recordedOnClick</c>; the mac
+    /// counted against the file first and reported a revert of a removal the
+    /// window never made). The count the <c>exclusions reverted</c> line carries.
+    /// </summary>
+    public int ExclusionChangesSinceLastRead()
+    {
+        if (_lastSavedData.Length == 0) return 0;
+        CourseConfiguration baseline;
+        try { baseline = new CourseConfiguration(ParseObject(_lastSavedData), _lastSavedData); }
+        catch { return 0; }
+        int changes = 0;
+        foreach (string scope in new[] { SharedScope, PerSectionScope })
+        {
+            var now = ExcludedItems(scope);
+            var then = baseline.ExcludedItems(scope);
+            changes += now.Except(then, StringComparer.Ordinal).Count();
+            changes += then.Except(now, StringComparer.Ordinal).Count();
+        }
+        return changes;
+    }
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
