@@ -105,6 +105,23 @@ public sealed class ClubNounTests : IDisposable
         Assert.Same(AssistPromptShelf.Groups, AssistPromptShelf.GroupsFor(ClassPageNaming.Standard, ClassNoun.Class));
     }
 
+    /// <summary>
+    /// make_room_for_classes AFTER Go (review M, ruling 1): the model's copy is
+    /// identical on a class course and a club and says no "meeting"; the club's
+    /// teacher reads MadeRoomForAMeeting.
+    /// </summary>
+    [Fact]
+    public void MakingRoomAfterGoSaysMeetingOnlyToTheTeacher()
+    {
+        var asAClass = Club(null).MakeRoomForClasses("ICS3U", 1, 1, 2);
+        string classModel = ModelCopy(asAClass).Replace(System.Text.RegularExpressions.Regex.Match(ModelCopy(asAClass), @"[^ ]*\.zip").Value, "");
+        var meeting = Club("meeting").MakeRoomForClasses("ICS3U", 1, 1, 2);
+        string meetingModel = ModelCopy(meeting).Replace(System.Text.RegularExpressions.Regex.Match(ModelCopy(meeting), @"[^ ]*\.zip").Value, "");
+        Assert.Equal(classModel, meetingModel);
+        Assert.DoesNotContain("meeting", meetingModel, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(AssistWording.MadeRoomForAMeeting(1, "Week 2"), TeacherCopy(meeting));
+    }
+
     /// <summary>A refusal is one string for both audiences, in the ordinary wording.</summary>
     [Fact]
     public void ARefusalKeepsTheOrdinaryWording()

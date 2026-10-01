@@ -766,6 +766,9 @@ public sealed partial class SectionDetailView : UserControl
 
             // Busy checks again, then decided again for the day ASKED.
             bool busy = IsDeploying || CourseActivity.IsBuildingElsewhere(folder, _course.Code);
+            if (busy)
+                ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas,
+                    $"{_course.Code}/{_sectionNumber} · left the front page as it was — it changed while the teacher was asked: {offer.Show} offered, it showed {offer.Shows}");
             var outcome = busy ? TodaysClassOnTheFrontPage.Outcome.NoLongerOffered
                                : workspace.ShowTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
             string? said = outcome switch
