@@ -155,8 +155,6 @@ internal static class NamedGapLedger
             "a club's front page, numbered pages"),
 
         // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
-        Owed(GradedFoldersNewCourseCases, 274, "this app has no clubs yet (mac #267)",
-            "a club typed with a payload code is not given the payload's pool"),
 
         // ---- app-rules.json → modelTiers.requirements
 

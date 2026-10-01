@@ -15,6 +15,16 @@ public static class UnitWordRenameWording
     public static string SheetTitle(string word) => $"Rename “{word}”";
     public static string RowCaption(string word) => $"Class pages are named “{word} 1, Day 1”.";
 
+    /// <summary>The row's caption in a NUMBERED course (#274): the one-number shape, never "Day".</summary>
+    public static string RowCaptionNumbered(string word) => $"Class pages are named “{word} 1”, “{word} 2” and so on.";
+
+    /// <summary>
+    /// Under the DISABLED Rename… in a numbered course (#274): a club's word,
+    /// folder, heading and noun are one choice made in the wizard.
+    /// </summary>
+    public const string RenameLockedNumbered =
+        "This course numbers its pages one after another, so its word was chosen when the course was made and cannot be renamed here.";
+
     public const string Explanation =
         "This renames every class page on this PC, in every section, and points your pages’ links at the new names. " +
         "It happens straight away, so Cancel in Settings will not undo it. To change it back, rename it again; " +
