@@ -491,7 +491,7 @@ if ($TO_FOLDER) {
   # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
   $folderAsked = Resolve-PublishFolder $TO_FOLDER $ScriptDir
   if (-not $folderAsked) {
-    Write-Host "That publishing folder is only partly written: a drive with no folder after it, or a folder with no drive."
+    Write-Host "That publishing folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
     Write-Host "   Give the folder's full location, then try again. Nothing was published."
     exit 1
   }

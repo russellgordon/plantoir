@@ -30,16 +30,10 @@ public static class Program
         // COM wrappers and Application.Start, none of which a run with no
         // window needs — and a window appearing at half six is not something
         // a teacher asked for.
-        int run = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.RunArgument);
-        if (run >= 0 && run + 1 < args.Length)
+        // The task's own name (its job is found from it; a path is taken as
+        // is) and its token — parsed by TaskScheduling.ScheduledRunFrom, tested.
+        if (Plantoir.Core.Assist.TaskScheduling.ScheduledRunFrom(args) is var (job, token))
         {
-            // The task's own name; its job is found from it. A path is taken as is.
-            string named = args[run + 1];
-            string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase)
-                ? named
-                : Plantoir.Core.Assist.TaskScheduling.JobPath(named);
-            int at = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.TokenArgument);
-            string? token = at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
             var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job, taskToken: token);
             Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
             return;
