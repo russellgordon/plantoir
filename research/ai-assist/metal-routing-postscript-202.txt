@@ -1,0 +1,80 @@
+POSTSCRIPT TO metal-routing-results.txt — what was DONE about #202
+=================================================================
+Written 2026-09-19. A separate file rather than a line inside the results,
+because a results file records what a run printed on the day it ran and is
+never edited afterwards; this is a fact about the CODE, not a re-measurement.
+
+THE SENTENCE IN THE RESULTS FILE THAT IS NO LONGER TRUE
+-------------------------------------------------------
+metal-routing-results.txt, under "WHAT THIS NUMBER IS NOT":
+
+  "Five of the 29 probes never reach the model in the app — AssistCardCommand
+   answers them in code — and the app also rewrites the course and section
+   (`boundToThisSection`) and settles relative dates (`withTheDaySettled`)
+   before any call runs. The suite does neither, so its "wrong course" and
+   "fabricated date" counters are STRICTER than the shipped product."
+
+Half of that is still exactly right. The SECTION is still taken back, and a
+relative date is still settled, so the suite is still stricter than the product
+about both. **The COURSE is no longer rewritten.**
+
+WHAT CHANGED, 2026-09-19 (issue #202, the mac half of #180)
+-----------------------------------------------------------
+A model call whose `course` is not this window's is REFUSED before anything
+runs — no settling, no plan twin, no approval card, no tool — and the teacher
+is told, naming both courses. Rewriting it meant "publish MCV4U's class", typed
+in a VVH2O window, publishing a VVH2O class and reporting success. Any
+differing code is refused, including one that names no course in the folder,
+which gets a second sentence of its own because the first one tells the teacher
+to go and open that course.
+
+So for the wrong-course counter specifically, the suite is now LESS strict than
+the product rather than more: a response it counts as one fault is, in the app,
+a turn that does not run at all.
+
+The suite's own comment was corrected in trimmed-surface-suite.py (its
+`app_corrected` list now says "refused by the app" rather than "rewritten by
+the app"). No results file was edited.
+
+WHAT THE WRONG-COURSE COUNTERS ACTUALLY HOLD, COUNTED PER FILE
+--------------------------------------------------------------
+Counted across research/ai-assist/*.txt by file, 2026-09-19, because the arm
+attribution in the scratchpad script written for #202 (p202_tally2.py) is
+broken: its `course=([A-Z0-9]+)` regex captures the T of `real-course=True`
+and reports the arm's course as "T". Count per file instead.
+
+  trimmed-surface-results.txt   118 EXC2O + 16 ICS3U + 3 ICS2O   19 wrong
+  conversational-residue        228 VVH2O                          0 wrong
+  promise-card                   73 VVH2O                          0 wrong
+  macos-native                  358 EXC2O                          0 wrong
+  shipped-surface                27 EXC2O                          0 wrong
+  (cache-restore 3 ICS3U and token-cap 1 VVH2O are that arm's own course too;
+   they are single-turn experiments rather than routing runs.)
+
+Every wrong value in the whole folder is in ONE file, whose arms 1-2 are the
+only ones run without `--real-course`: the model was shown the placeholder
+`ICS3U` in the schema and echoed it (16), or invented a code (3, all on one
+probe). Arm 3 of that same file, with `--real-course`, is clean.
+
+  686 recorded responses outside that one file, 0 wrong course codes.
+
+(The plan and the plan review for #202 quote the same fact with ARM
+attribution rather than by file — 589 + 45 = 634 responses taken with
+`--real-course`, 0 wrong. Either count says the same thing; the per-file one is
+the one that can be re-run in a line, above.)
+
+That is the configuration the app always runs in — AssistAgent.toolDefinitions
+maps namingTheRealCourse(courseCode) over every definition before the model is
+sent it — which is why refusing every differing code costs a teacher
+essentially nothing, and why the measurement is quoted as the COST of the rule
+rather than as an argument for narrowing it.
+
+WHY NO ROUTING RE-MEASUREMENT IS OWED
+-------------------------------------
+No tool was added or removed; no description, parameter, `required`,
+`needsApproval` or plan twin changed; the system prompt is untouched. Checked
+rather than asserted: after the change, `Plantoir --write-contracts`
+regenerated contracts/assist-cases.json and its `tools` and `toolSchemas` keys
+compare EQUAL, key for key, against origin/dev, and `git diff` over
+AssistToolSurface.swift and AssistToolDefinition.swift is empty. Everything
+this change does happens AFTER the model has answered.

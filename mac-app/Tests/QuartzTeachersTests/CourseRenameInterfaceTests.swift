@@ -180,6 +180,20 @@ final class CourseRenameInterfaceTests: XCTestCase {
 
     /// A code the rule refuses never gets as far as the file system, and its
     /// reason is shown under the field rather than in an alert.
+    ///
+    /// **No `await` between opening the field and the last assertion, on
+    /// purpose (#293).** This test used to select the course, open the
+    /// field in the same turn, and then wait. Waiting hands the turn to two
+    /// things that both want the keyboard: the field, which takes focus as
+    /// it appears, and the sidebar, which takes it back one turn after a
+    /// selection change. When the test host was the frontmost app, the field
+    /// lost focus, committed the unchanged code and closed (2 of 2 runs);
+    /// with another app in front it could not commit and the test passed
+    /// (4 of 4). So it read as a flake that came and went with whatever was
+    /// frontmost. Asserting in the same turn leaves nothing for either to
+    /// do, and pressing Return through `renameFromTheField` checks what the
+    /// test always claimed — that Return is refused — rather than only that
+    /// the field survived a wait.
     @MainActor
     func testAnUnusableCodeIsShownUnderTheFieldRatherThanInAnAlert() async throws {
         let fixtureURL: URL = try FixtureWorkspace.materialize()
@@ -191,17 +205,32 @@ final class CourseRenameInterfaceTests: XCTestCase {
         workspace.chooseWorkspace(at: fixtureURL)
         await settle()
         let course: Course = try XCTUnwrap(workspace.courses.first)
+        let tooLong: String = "MUCH TOO LONG A CODE"
+
+        // From here to the end of the assertions: no suspension point.
         workspace.selection = SidebarSelection.course(course.code)
         workspace.beginRenamingSelectedCourse()
-        await settle()
+        XCTAssertEqual(workspace.renamingCourseCode, course.code, "the field opened")
 
-        XCTAssertEqual(
-            CourseCodeRule.problem("MUCH TOO LONG A CODE", existingCodes: [course.code], currentCode: course.code),
-            "A course code can be at most 12 characters.",
-            "the field shows this under itself rather than raising an alert"
+        XCTAssertNotNil(
+            workspace.renameFieldProblem(course, typed: tooLong),
+            "the field shows a reason under itself — the same function it draws"
         )
+        let renamed: Bool = workspace.renameFromTheField(course, typed: tooLong)
+        XCTAssertFalse(renamed, "Return is refused")
         XCTAssertNil(workspace.renameProblem, "and nothing has gone wrong that needs an alert")
         XCTAssertEqual(workspace.renamingCourseCode, course.code, "the field is still open")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: course.directoryURL.path),
+            "the course's folder has not moved"
+        )
+        let normalizedTooLong: String = CourseCodeRule.normalized(tooLong)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: fixtureURL.appendingPathComponent("courses").appendingPathComponent(normalizedTooLong).path
+            ),
+            "and nothing was made under the refused code"
+        )
 
         workspace.renamingCourseCode = nil
         try? FileManager.default.removeItem(at: fixtureURL)

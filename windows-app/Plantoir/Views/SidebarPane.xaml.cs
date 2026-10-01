@@ -376,14 +376,18 @@ public sealed partial class SidebarPane : UserControl
             // rather than anything of ours being written down: the teacher
             // can delete the task themselves, and a badge promising a deploy
             // that will not happen is worse than no badge.
-            row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
+            row.ScheduledDeploy = Workspace.WorkspacePath is { } scheduledIn
+                ? TaskScheduling.NextRun(scheduledIn, course.Code, number)
+                : null;
             // Re-read on every pass for the same reason as the clock above, and
             // read rather than remembered: the record is on disk, an overnight
             // run writes it with nothing of ours alive, and the teacher can
             // clear it from inside the section — so anything cached here would
             // be wrong within a click. FAILURES only; a run that worked leaves a
             // notice inside the section and no badge.
-            var outcome = ScheduledPublishOutcome.Read(course.Code, number);
+            var outcome = Workspace.WorkspacePath is { } recordedIn
+                ? ScheduledPublishOutcome.Read(course.Code, number, recordedIn)
+                : null;
             row.PublishStopped =
                 outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
                     ? result.When
@@ -604,7 +608,9 @@ public sealed partial class SidebarPane : UserControl
         // Scheduling without going through the assistant: the same act, and
         // most teachers setting a 6:30 deploy know exactly what they want and
         // should not have to describe it in a sentence first.
-        var scheduled = TaskScheduling.NextRun(course.Code, number);
+        var scheduled = Workspace.WorkspacePath is { } scheduledIn
+            ? TaskScheduling.NextRun(scheduledIn, course.Code, number)
+            : null;
         if (scheduled is { } when)
         {
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
@@ -681,37 +687,15 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
-        // Advice, not a refusal: the classes a deploy would put the site up
-        // without. The assistant's tool has said this since it existed
-        // (ScheduledDeploy.Describe), and so has the mac's sheet; this door
-        // said nothing, so a teacher scheduled 6:30 AM without being told
-        // tomorrow's page was unpublished — the one thing the description
-        // exists to tell them. Date-independent, so it is read once; the
-        // button stays enabled, because "publish first" is advice the teacher
-        // may have a reason to ignore. Shown only while there is no refusal,
-        // as on the mac, where the problem is shown alone.
-        string? advice = ScheduledDeploy.UnpublishedClassesSentence(
-            ScheduledDeploy.UnpublishedClassesIn(course, number));
-        var unpublished = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Visibility = Visibility.Collapsed,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorCautionBrush"],
-        };
-        AutomationProperties.SetAutomationId(unpublished, "unpublishedClassesNote");
-
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Text = $"{course.Code} Section {number} will deploy on its own at the time you pick. " +
-                   "This computer must be switched on and awake then — plugged in if it is a laptop, " +
-                   "with the lid open. Plantoir does not wake it up.",
+            // Names EVERY destination (#400); nothing about unpublished classes.
+            Text = ScheduledDeploy.DialogOpening(course, number),
         });
         body.Children.Add(day);
         body.Children.Add(time);
-        body.Children.Add(unpublished);
         body.Children.Add(warning);
 
         var dialog = new ContentDialog
@@ -735,9 +719,6 @@ public sealed partial class SidebarPane : UserControl
             warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
 
-            bool showAdvice = problem is null && advice is not null;
-            unpublished.Text = showAdvice ? advice! : "";
-            unpublished.Visibility = showAdvice ? Visibility.Visible : Visibility.Collapsed;
         }
 
         DateTime? Chosen() => day.Date is { } picked
@@ -753,10 +734,10 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
-        if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when, course.DirectoryPath,
-                                    course.Configuration.AllDeployDestinations,
-                                    Workspace.Settings.CloudflareAccountId) is { } failure)
+        // Where it goes and the Account ID are read when it RUNS (#347); the
+        // destinations handed over here are only what the teacher was told.
+        if (TaskScheduling.Schedule(folder, course.Code, number, when,
+                                    course.Configuration.AllDeployDestinations) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;
@@ -789,7 +770,13 @@ public sealed partial class SidebarPane : UserControl
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
-        if (TaskScheduling.Cancel(TaskScheduling.NameFor(course.Code, number)) is { } problem)
+        if (Workspace.WorkspacePath is not { } cancelIn
+            || TaskScheduling.For(cancelIn, course.Code, number) is not { } scheduled)
+        {
+            Refresh();   // gone already — the clock goes with it
+            return;
+        }
+        if (TaskScheduling.Cancel(scheduled) is { } problem)
         {
             await ShowError("That couldn't be cancelled",
                 $"Windows would not remove the scheduled task: {problem}");
@@ -931,6 +918,15 @@ public sealed partial class SidebarPane : UserControl
             title = $"Remove {course.Code}?";
             message = $"Nothing is deleted. {course.Code} and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.";
         }
+
+        // Said BEFORE anything happens (#239): removing turns this folder's
+        // scheduled deploys for it off, first. Asked of the scheduler, so a
+        // section removed earlier that left one behind is named too.
+        var scheduled = ScheduledDeployRemoval.ScheduledSections(askedIn!, course.Code, sectionNumber);
+        if (scheduled.Count > 0)
+            message += "\n\n" + (sectionNumber is int removing
+                ? ScheduledDeployRemoval.ConfirmationSectionRemoved(removing)
+                : ScheduledDeployRemoval.ConfirmationCourseRemoved(course.Code, scheduled));
 
         var dialog = new ContentDialog
         {

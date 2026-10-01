@@ -21,6 +21,27 @@ final class ScriptRunnerStatusTests: XCTestCase {
         XCTAssertEqual(runner.friendlyPhase, "Starting the preview…")
     }
 
+    /// The launchers' "Starting Colima…" became "Starting the website
+    /// builder…" (#228). If the marker here had not moved with it, the phase
+    /// would fall back to whatever came before — silently.
+    @MainActor
+    func testStartingTheWebsiteBuilderIsAPhase() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput( "🐳 Setting up this Mac…\n")
+        runner.receiveOutput( "▶️  Starting the website builder…\n")
+        XCTAssertEqual(runner.friendlyPhase, "Starting up (first time can take a few minutes)…")
+    }
+
+    /// The wait that follows a start: until GitHub #263 the launchers said
+    /// "Waiting for the container runtime", and the marker moved with them.
+    @MainActor
+    func testWaitingForTheWebsiteBuilderIsAPhase() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput( "▶️  Starting the website builder…\n")
+        runner.receiveOutput( "⏳ Waiting for the website builder to be ready…\n")
+        XCTAssertEqual(runner.friendlyPhase, "Starting up…")
+    }
+
     @MainActor
     func testDefaultPhaseIsWorking() {
         let runner: ScriptRunner = ScriptRunner()
@@ -235,7 +256,7 @@ final class PreviewAddressTests: XCTestCase {
 
     @MainActor
     func testOrdinaryOutputAnnouncesNothing() {
-        XCTAssertNil(ScriptRunner.previewAddress(in: "🚀 Starting container if needed...\n"))
+        XCTAssertNil(ScriptRunner.previewAddress(in: "🚀 Getting this folder's website builder ready…\n"))
     }
 
     // MARK: - Slow-step reassurance

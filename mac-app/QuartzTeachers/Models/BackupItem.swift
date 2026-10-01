@@ -165,7 +165,7 @@ struct BackupItem: Identifiable, Hashable {
             return nil
         }
         let stamp: String = pieces[0] + "_" + pieces[1]
-        guard let backedUpAt = ArchivedItem.date(fromStamp: stamp) else {
+        guard let backedUpAt = ArchiveStamp.moment(from: stamp) else {
             return nil
         }
 

@@ -477,7 +477,7 @@ internal static class PageVisibilityReader
     /// line, because that is what makes the line a mapping at all. Measured:
     /// <c>publish:false</c> is one plain scalar, so a page whose whole
     /// frontmatter is that line arrives at Quartz with no keys and is PUBLISHED
-    /// — and a page with another key beside it stops the build. Either way it is
+    /// — and a page with another key beside it cannot be parsed (it stopped the build until #246; since, the build hides the page and names it). Either way it is
     /// not this page's flag, and reading it as one called a live page
     /// hidden.</para>
     /// </remarks>
@@ -529,25 +529,149 @@ internal static class PageVisibilityReader
     // ---- Finding the block ------------------------------------------------
 
     /// <summary>
-    /// Is this line one of the fences around a page's frontmatter?
+    /// Is this line the CLOSING fence of a page's frontmatter?
     /// </summary>
     /// <remarks>
-    /// Three dashes OR MORE, with nothing after them but spaces and tabs —
-    /// which is python-frontmatter's own boundary (<c>^-{3,}\s*$</c>), and
-    /// therefore the build's. A page fenced with <c>----</c> really does have
-    /// frontmatter, and reading it as an ordinary page said a hidden page was
-    /// visible. Note that <c>...</c> is NOT a fence here: python-frontmatter
-    /// does not accept one, and accepting it read the block as ending early.
+    /// <para>Three dashes OR MORE, with nothing after them but spaces and tabs
+    /// and <b>nothing before them at all</b> — python-frontmatter's own
+    /// boundary, <c>^-{3,}\s*$</c>, matched line by line, so a line of
+    /// INDENTED dashes is not a fence: it is part of the value above it. A
+    /// page fenced with <c>----</c> really does have frontmatter. <c>...</c>
+    /// is NOT a fence: python-frontmatter does not accept one.</para>
+    /// <para>Until #308 (the mac's #188) this trimmed LEADING spaces too.
+    /// Measured on the mac: <c>publish: false</c> over <c>  ---</c> is the
+    /// plain scalar <c>"false ---"</c> and the site PUBLISHES the page, while
+    /// this reader ended the block at the <c>  ---</c> and answered hidden —
+    /// so "hide this page" was a no-op the teacher was told had worked. Over
+    /// 3,000 generated pages the asymmetric finder disagreed with
+    /// python-frontmatter 0 times; the symmetric one 1,316
+    /// (<c>research/frontmatter-fences/</c>).</para>
     /// </remarks>
     internal static bool IsFence(string line)
     {
-        string bare = TrimYamlSpaces(line);
+        string bare = TrimTrailingYamlSpaces(line);
         if (bare.Length < 3) return false;
         foreach (char character in bare)
         {
             if (character != '-') return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// Is this the line that OPENS a page's frontmatter? The same dashes, but
+    /// indentation IS allowed: python-frontmatter strips the whole document
+    /// before it matches, so the indent in front of the first line is gone by
+    /// the time it looks. A symmetric "never indented" finder was REJECTED on
+    /// the mac: it sees no block behind an indented opener, and a writer then
+    /// prepends a second block and turns the teacher's into body text (#140).
+    /// </summary>
+    internal static bool IsOpeningFence(string line) => IsFence(TrimYamlSpaces(line));
+
+    /// <summary>A string without the spaces and tabs at its END, or a carriage return; the start is left alone.</summary>
+    internal static string TrimTrailingYamlSpaces(string text)
+    {
+        string bare = TrimCarriageReturn(text);
+        int end = bare.Length;
+        while (end > 0 && (bare[end - 1] == ' ' || bare[end - 1] == '\t')) end--;
+        return bare[..end];
+    }
+
+    /// <summary>
+    /// A line YAML steps over while looking for a key's value: blank, or a
+    /// <c># note</c> at ANY indent. Shared by every walk, so a reader and a
+    /// writer cannot step differently.
+    /// </summary>
+    internal static bool IsSteppedOverLookingForAValue(string line)
+    {
+        string content = TrimYamlSpaces(line);
+        return content.Length == 0 || content.StartsWith('#');
+    }
+
+    /// <summary>
+    /// Every line below a key that goes wherever the key's own line goes when
+    /// that line is REMOVED rather than rewritten (a section restore).
+    /// </summary>
+    /// <remarks>
+    /// The same walk as <c>PageFrontmatter.ContinuationLines</c> except that an
+    /// indented line counts whether or not it is a comment: once the key has
+    /// gone, a <c># note</c> left under it joins whatever arrives in its place.
+    /// Measured on the mac: a live <c>draftSection1: &gt;-</c> / <c>  # note</c>
+    /// restored as <c>publishForSection1: |-</c> / <c>  false</c> /
+    /// <c>  # note</c> made the value <c>"false\n# note"</c> and PUBLISHED a
+    /// page the teacher had held back. Two functions rather than one with a
+    /// flag, because the reason they differ is a sentence (mac #182).
+    /// </remarks>
+    internal static List<int> LinesOwnedByKey(
+        IReadOnlyList<string> lines, int keyIndex, int closeIndex, bool keyValueWasEmpty)
+    {
+        int lastOwned = keyIndex;
+        for (int position = keyIndex + 1; position < closeIndex && position < lines.Count; position++)
+        {
+            string bare = TrimCarriageReturn(lines[position]);
+            if (bare.StartsWith(' ') || bare.StartsWith('\t')) { lastOwned = position; continue; }
+            if (IsSteppedOverLookingForAValue(bare)) continue;
+            if (keyValueWasEmpty)
+            {
+                string content = TrimYamlSpaces(bare);
+                if (content == "-" || content.StartsWith("- ", StringComparison.Ordinal)) { lastOwned = position; continue; }
+            }
+            break;
+        }
+        return Enumerable.Range(keyIndex + 1, lastOwned - keyIndex).ToList();
+    }
+
+    /// <summary>
+    /// Where a brand-new top-level key may be written into this block, or null
+    /// when there is nowhere in it that one can go (mac #186).
+    /// </summary>
+    /// <remarks>
+    /// The first line inside the block — unless the block's own first line,
+    /// blank lines and notes aside, is INDENTED or is not a key at all: then
+    /// there is no column-0 level for a key to join. Measured on the mac:
+    /// <c>publish: false</c> written above <c>  false</c> is the string
+    /// "false false" and the page stays PUBLISHED while the teacher is told it
+    /// was hidden; above <c>  a: 1</c> it makes a block the build cannot read.
+    /// The END of the block was measured and rejected (no shape where the end
+    /// works and the top does not), as were writing at the block's indent and
+    /// re-indenting the teacher's YAML.
+    /// </remarks>
+    internal static int? PlaceForANewTopLevelKey(IReadOnlyList<string> lines, int openIndex, int closeIndex)
+    {
+        for (int position = openIndex + 1; position < closeIndex && position < lines.Count; position++)
+        {
+            string bare = TrimCarriageReturn(lines[position]);
+            if (IsSteppedOverLookingForAValue(bare)) continue;
+            if (bare.StartsWith(' ') || bare.StartsWith('\t')) return null;
+            return NamesATopLevelKey(bare) ? openIndex + 1 : null;
+        }
+        return openIndex + 1;   // nothing but blanks and notes: an empty mapping
+    }
+
+    /// <summary>
+    /// Does this column-0 line name a key of the page's own mapping? Not a
+    /// sequence entry, not a bare scalar (<c>a:1</c>), not a flow collection;
+    /// a quoted key and YAML's explicit <c>? key</c> do count.
+    /// </summary>
+    internal static bool NamesATopLevelKey(string line)
+    {
+        if (line.StartsWith("? ", StringComparison.Ordinal)) return true;
+        if (line.StartsWith('{') || line.StartsWith('[')) return false;
+        if (line.StartsWith('-') && (line.Length == 1 || line[1] == ' ' || line[1] == '\t')) return false;
+        string rest = line;
+        bool quoted = false;
+        if (rest.Length > 0 && (rest[0] == '"' || rest[0] == '\''))
+        {
+            int closing = rest.IndexOf(rest[0], 1);
+            if (closing < 0) return false;
+            rest = rest[(closing + 1)..];
+            quoted = true;
+        }
+        int colon = rest.IndexOf(':');
+        if (colon < 0) return false;
+        if (colon == 0 && !quoted) return false;
+        int after = colon + 1;
+        return after >= rest.Length || rest[after] == ' ' || rest[after] == '\t';
     }
 
     /// <summary>
@@ -569,7 +693,7 @@ internal static class PageVisibilityReader
         string[] lines = pageText.Split('\n');
         int open = 0;
         while (open < lines.Length && TrimYamlSpaces(lines[open]).Length == 0) open++;
-        if (open >= lines.Length || !IsFence(lines[open])) return null;
+        if (open >= lines.Length || !IsOpeningFence(lines[open])) return null;
         for (int index = open + 1; index < lines.Length; index++)
         {
             if (IsFence(lines[index])) return (open, index);
@@ -586,7 +710,7 @@ internal static class PageVisibilityReader
         foreach (string line in pageText.Split('\n'))
         {
             if (TrimYamlSpaces(line).Length == 0) continue;
-            return IsFence(line);
+            return IsOpeningFence(line);
         }
         return false;
     }

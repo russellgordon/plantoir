@@ -10,7 +10,10 @@ import SwiftUI
 /// word per line and becomes hundreds of points tall — which is what pushed
 /// the window's path bar off the bottom of the screen the first time this
 /// notice was shown. The texts take the width they are given and wrap in it;
-/// `CloudSyncNoticeLayoutTests` measures the result.
+/// `CloudSyncNoticeLayoutTests` measures the result. The whole failure class,
+/// its four occurrences and the fixes that do NOT work are written up in
+/// `documentation/09-mac-app.md` → "A blank window: when a child claims a size
+/// the window cannot give".
 struct CloudSyncExplanationView: View {
 
     // MARK: - Stored properties
@@ -110,6 +113,10 @@ struct CloudSyncNoticeContentView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5))
+        // A container element with its own identifier (#353): without `.contain`
+        // SwiftUI applies an identifier on a stack to every element inside it,
+        // and the inner identifiers (cloudSyncDetailsButton, cloudSyncGotItButton) never reach the tree.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("cloudSyncNotice")
     }
 }

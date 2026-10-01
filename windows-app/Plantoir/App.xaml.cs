@@ -33,7 +33,7 @@ public partial class App : Application
         {
             string dir = Plantoir.Core.Models.AppDataRoot.Current;
             Directory.CreateDirectory(dir);
-            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
+            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{Plantoir.Core.Models.DateText.Invariant(DateTime.Now, "yyyy-MM-dd HH:mm:ss.fff")}] {message}\n");
         }
         catch { }
     }
@@ -90,6 +90,16 @@ public partial class App : Application
         // trail lines and shows nothing.
         try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); }
         catch (Exception ex) { LogDiagnostic($"Scheduled-publish trail sweep failed: {ex}"); }
+
+        // ONE watch on the records' folder for the whole app (#218): a run that
+        // finishes while Plantoir is open reaches every window at once, and its
+        // trail line is written then rather than at the next launch (the sweep
+        // is idempotent — each record's line is written once).
+        Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += () =>
+        {
+            try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); } catch { }
+        };
+        Plantoir.Core.Assist.ScheduledPublishWatcher.Start();
 
         try
         {
@@ -257,6 +267,10 @@ public partial class App : Application
         window.ShowSyncNoticeIfNeeded();
         return window;
     }
+
+    /// <summary>Whether closing this window quits the app: it is the last one still open (#231).</summary>
+    public static bool ClosingThisQuits(MainWindow window) =>
+        _windows.Where(open => !open.IsClosed).All(open => ReferenceEquals(open, window));
 
     /// <summary>Recorded while the windows still exist — a list rewritten as they close shrinks to nothing.</summary>
     public static void RememberOpenWindows()

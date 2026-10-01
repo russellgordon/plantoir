@@ -221,8 +221,7 @@ final class AssistModelLibrary {
         guard let active = AssistActivity.active else {
             return nil
         }
-        return "Close the assistant for \(active.courseCode) Section \(active.sectionNumber) "
-             + "before removing this."
+        return AssistActivity.closeTheAssistant(active, "before removing this.")
     }
 
     /// Whether the Remove button does anything right now.

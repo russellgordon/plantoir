@@ -32,6 +32,18 @@ struct AssistSavedFile: Equatable {
     let after: String?
 }
 
+/// What kind of change an `AssistChange` was, so an undo from either surface
+/// can say which event it was undoing (#96). An enum rather than a Bool, so a
+/// third kind is a case rather than a second flag.
+nonisolated enum AssistChangeKind: Equatable {
+
+    /// Everything the assistant has always recorded.
+    case ordinary
+
+    /// A section got ready for the start of the year, in one act.
+    case startOfYear
+}
+
 /// One thing the assistant did, in a form that can be taken straight back.
 struct AssistChange: Equatable {
 
@@ -70,13 +82,46 @@ struct AssistChange: Equatable {
 
     let files: [AssistSavedFile]
 
+    /// Which kind of change this was. `.ordinary` unless said otherwise.
+    let kind: AssistChangeKind
+
+    /// Whether the change belongs to the COURSE rather than to one section —
+    /// the How I Teach page (#209), which is one page per course. Such a
+    /// change still carries a section number, because an undo entry and a
+    /// backup name need one, but `description` does not say it: "wrote the
+    /// How I Teach page in ICS4U Section 1" would be wrong about a page that
+    /// belongs to every section (#209 plan review, item 6).
+    var appliesToTheWholeCourse: Bool = false
+
     // MARK: - Computed properties
 
     /// The same clause with the section on the end, for anywhere that has not
     /// already said which section it is talking about: "unpublished Unit 4,
-    /// Day 23 in ADA1O Section 1".
+    /// Day 23 in ADA1O Section 1". A change to the whole course names the
+    /// course alone.
     var description: String {
+        if appliesToTheWholeCourse {
+            return "\(whatHappened) in \(courseCode)"
+        }
         return "\(whatHappened) in \(courseCode) Section \(sectionNumber)"
+    }
+
+    // MARK: - Initializer
+
+    init(whatHappened: String,
+         courseCode: String,
+         sectionNumber: Int,
+         rebuildsThePreview: Bool,
+         files: [AssistSavedFile],
+         appliesToTheWholeCourse: Bool = false,
+         kind: AssistChangeKind = .ordinary) {
+        self.whatHappened = whatHappened
+        self.courseCode = courseCode
+        self.sectionNumber = sectionNumber
+        self.rebuildsThePreview = rebuildsThePreview
+        self.files = files
+        self.appliesToTheWholeCourse = appliesToTheWholeCourse
+        self.kind = kind
     }
 }
 

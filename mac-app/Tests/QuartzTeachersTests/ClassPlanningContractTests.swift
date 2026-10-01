@@ -21,9 +21,23 @@ final class ClassPlanningContractTests: XCTestCase {
             // A case with no `term` uses the default word, which is what a
             // course says when `unit_word` is absent from its configuration.
             let term: String = ClassPageTerm.cleaned(testCase["term"] as? String)
-            let numbers: UnitDay? = UnitDay(pageTitle: title, term: term)
-            XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, "\(term): \(title)")
-            XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, "\(term): \(title)")
+            // A case with no `scheme` is the ordinary one — what a course
+            // says when `class_page_scheme` is absent (#267).
+            let scheme: ClassPageScheme = ClassPageScheme.reading(testCase["scheme"] as? String)
+            let naming: ClassPageNaming = ClassPageNaming(word: term, scheme: scheme)
+            let numbers: UnitDay? = UnitDay(pageTitle: title, naming: naming)
+            if scheme == .numbered {
+                // One number, and a runner asserts the NUMBER: that it is
+                // held as unit 1 is this app's seam, not the contract's.
+                XCTAssertTrue(testCase.keys.contains("expectNumber"), "\(term): \(title) names no expectNumber")
+                XCTAssertEqual(numbers?.day, testCase["expectNumber"] as? Int, "\(term) (numbered): \(title)")
+                if let numbers = numbers {
+                    XCTAssertEqual(numbers.title.lowercased(), title.lowercased(), "\(term) (numbered): \(title)")
+                }
+            } else {
+                XCTAssertEqual(numbers?.unit, testCase["expectUnit"] as? Int, "\(term): \(title)")
+                XCTAssertEqual(numbers?.day, testCase["expectDay"] as? Int, "\(term): \(title)")
+            }
         }
     }
 
@@ -45,23 +59,86 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertEqual(titles, try XCTUnwrap(section["expectOrder"] as? [String]))
     }
 
+    /// The same order under the one-number scheme (#267).
+    func testNumberedSchemeClassesSortByNumber() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("numberedClassOrder")
+        let numbered: [String: Any] = try XCTUnwrap(section["numberedScheme"] as? [String: Any])
+        let (root, _, course) = try makeWorkspace(
+            word: numbered["word"] as? String, scheme: numbered["scheme"] as? String
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        for title in try XCTUnwrap(numbered["input"] as? [String]) {
+            try writeClass(title, on: "2026-09-08", in: course)
+        }
+        let sorted: [ClassPageSummary] = ClassInsertionPlanner.numberedClasses(
+            among: ClassPages.list(forSection: 1, in: course)
+        )
+        var titles: [String] = []
+        for page in sorted {
+            titles.append(page.title)
+        }
+        XCTAssertEqual(titles, try XCTUnwrap(numbered["expectOrder"] as? [String]))
+    }
+
     // MARK: - What the next class would be called
 
     func testTheNextClassIsNamedAsTheContractSays() throws {
         for testCase in try ClassPlanningContractTests.cases(in: "nextClass") {
-            let (root, _, course) = try makeWorkspace()
+            if testCase["existingClasses"] != nil {
+                try checkTheNextClassIsDated(testCase)
+                continue
+            }
+            let (root, _, course) = try makeWorkspace(
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
             defer { try? FileManager.default.removeItem(at: root) }
 
             for title in try XCTUnwrap(testCase["existing"] as? [String]) {
                 try writeClass(title, on: "2026-09-08", in: course)
             }
+            let naming: ClassPageNaming = course.configuration.classPageNaming
             let next: UnitDay = NextClassPlanner.nextUnitAndDay(
-                after: ClassPages.list(forSection: 1, in: course)
+                after: ClassPages.list(forSection: 1, in: course), naming: naming
             )
             let what: String = (try XCTUnwrap(testCase["existing"] as? [String])).joined(separator: " / ")
+            if naming.isNumbered {
+                // One number (#267): assert it, and the title the course's
+                // word makes of it — never a unit, and never a Day.
+                let number: Int = try XCTUnwrap(testCase["expectNumber"] as? Int, "after [\(what)]")
+                XCTAssertEqual(next.day, number, "after [\(what)]")
+                XCTAssertEqual(next.title, "\(naming.word) \(number)", "after [\(what)]")
+                continue
+            }
             XCTAssertEqual(next.unit, testCase["expectUnit"] as? Int, "after [\(what)]")
             XCTAssertEqual(next.day, testCase["expectDay"] as? Int, "after [\(what)]")
         }
+    }
+
+    /// The dated form of a `nextClass` case (#267): the real planner, with
+    /// the case's timetable remembered, asserting the title AND the date.
+    private func checkTheNextClassIsDated(_ testCase: [String: Any]) throws {
+        let (root, _, course) = try makeWorkspace(
+            meetingDates: try XCTUnwrap(testCase["timetable"] as? [String]),
+            word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var what: [String] = []
+        for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
+            let title: String = try XCTUnwrap(existing["title"])
+            try writeClass(title, on: try XCTUnwrap(existing["date"]), in: course)
+            what.append(title)
+        }
+        let plan: PlaceholderClassPlan = try NextClassPlanner.plan(forSection: 1, in: course)
+        let planned: PlannedClass = try XCTUnwrap(plan.classes.first, "after \(what)")
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        let number: Int = try XCTUnwrap(testCase["expectNumber"] as? Int)
+        XCTAssertEqual(planned.title, naming.title(unit: 1, day: number), "after \(what)")
+        XCTAssertEqual(
+            planned.date.text, try XCTUnwrap(testCase["expectDate"] as? String),
+            "after \(what): the next page's date"
+        )
     }
 
     // MARK: - Making room
@@ -70,19 +147,20 @@ final class ClassPlanningContractTests: XCTestCase {
         for testCase in try ClassPlanningContractTests.cases(in: "insertion") {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let (root, _, course) = try makeWorkspace(
-                meetingDates: try XCTUnwrap(testCase["timetable"] as? [String])
+                meetingDates: try XCTUnwrap(testCase["timetable"] as? [String]),
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
             )
             defer { try? FileManager.default.removeItem(at: root) }
 
+            // An entry with no `date` is a page with no `created` (#267).
             for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
-                try writeClass(
-                    try XCTUnwrap(existing["title"]), on: try XCTUnwrap(existing["date"]), in: course
-                )
+                try writeClass(try XCTUnwrap(existing["title"]), on: existing["date"], in: course)
             }
 
+            let position: (unit: Int, day: Int) = try ClassPlanningContractTests.position(of: testCase)
             let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
-                unit: try XCTUnwrap(testCase["insertAtUnit"] as? Int),
-                atDay: try XCTUnwrap(testCase["insertAtDay"] as? Int),
+                unit: position.unit,
+                atDay: position.day,
                 count: try XCTUnwrap(testCase["count"] as? Int),
                 forSection: 1,
                 in: course
@@ -109,6 +187,45 @@ final class ClassPlanningContractTests: XCTestCase {
                 }
             }
 
+            // Where a move lands, and what does not move at all (#267: a
+            // numbered course keeps its date gaps).
+            if let movedTo = testCase["expectMovedTo"] as? [String: String] {
+                for (title, date) in movedTo {
+                    var landed: String? = nil
+                    for move in plan.moves where move.title == title {
+                        landed = move.to.text
+                    }
+                    XCTAssertEqual(landed, date, "\(name): where \(title) moves to")
+                }
+            }
+            if let notMoved = testCase["expectNotMoved"] as? [String] {
+                for move in plan.moves {
+                    XCTAssertFalse(
+                        notMoved.contains(move.title),
+                        "\(name): \(move.title) must keep its date, and was moved from "
+                        + "\(move.from?.text ?? "none") to \(move.to.text)"
+                    )
+                }
+            }
+
+            // The new pages' own days (#267: after the page before them).
+            if let addedOn = testCase["expectAddedOn"] as? [String: String] {
+                for (title, date) in addedOn {
+                    var landed: String? = nil
+                    for planned in plan.added where planned.title == title {
+                        landed = planned.date.text
+                    }
+                    XCTAssertEqual(landed, date, "\(name): the day the new \(title) takes")
+                }
+            }
+            if testCase["expectNoMoves"] as? Bool == true {
+                var moved: [String] = []
+                for move in plan.moves {
+                    moved.append("\(move.title) \(move.from?.text ?? "none") → \(move.to.text)")
+                }
+                XCTAssertEqual(moved, [], "\(name): nothing may move")
+            }
+
             if let mentions = testCase["expectProblemMentions"] as? String {
                 let said: String = plan.problems.joined(separator: " ")
                 XCTAssertTrue(
@@ -120,28 +237,680 @@ final class ClassPlanningContractTests: XCTestCase {
     }
 
     func testTheRefusalsAreTheOnesTheContractNames() throws {
-        let (root, _, course) = try makeWorkspace()
-        defer { try? FileManager.default.removeItem(at: root) }
-        try writeClass("Unit 1, Day 1", on: "2026-09-08", in: course)
-
         for testCase in try ClassPlanningContractTests.cases(in: "refusals") {
+            let (root, _, course) = try makeWorkspace(
+                word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
+            defer { try? FileManager.default.removeItem(at: root) }
+            try writeClass(
+                course.configuration.classPageNaming.title(unit: 1, day: 1), on: "2026-09-08", in: course
+            )
+
             let expected: String = try XCTUnwrap(testCase["expectProblem"] as? String)
             do {
-                _ = try ClassInsertionPlanner.plan(
-                    unit: try XCTUnwrap(testCase["insertAtUnit"] as? Int),
-                    atDay: try XCTUnwrap(testCase["insertAtDay"] as? Int),
-                    count: try XCTUnwrap(testCase["count"] as? Int),
-                    forSection: 1,
-                    in: course
-                )
+                if testCase["startANewUnit"] as? Bool == true {
+                    _ = try NextClassPlanner.plan(forSection: 1, in: course, startingANewUnit: true)
+                } else if let unit = testCase["addDaysToUnit"] as? Int {
+                    _ = try NextClassPlanner.plan(
+                        addingDays: try XCTUnwrap(testCase["count"] as? Int), toUnit: unit,
+                        forSection: 1, in: course
+                    )
+                } else {
+                    let position: (unit: Int, day: Int) = try ClassPlanningContractTests.position(of: testCase)
+                    _ = try ClassInsertionPlanner.plan(
+                        unit: position.unit,
+                        atDay: position.day,
+                        count: try XCTUnwrap(testCase["count"] as? Int),
+                        forSection: 1,
+                        in: course
+                    )
+                }
                 XCTFail("Should have been refused as \(expected)")
             } catch let problem as ClassInsertionPlanner.Problem {
+                XCTAssertEqual(ClassPlanningContractTests.name(of: problem), expected)
+            } catch let problem as NextClassPlanner.Problem {
                 XCTAssertEqual(ClassPlanningContractTests.name(of: problem), expected)
             }
         }
     }
 
+    /// The position the two make-room sentences name, in the course's own
+    /// words (#268).
+    func testTheMakeRoomSentencesNameThePositionAsTheCourseDoes() throws {
+        let insertion: [String: Any] = try ClassPlanningContractTests.section("insertion")
+        let block: [String: Any] = try XCTUnwrap(insertion["positionInSentences"] as? [String: Any])
+        for testCase in try XCTUnwrap(block["cases"] as? [[String: Any]]) {
+            let naming: ClassPageNaming = ClassPageNaming(
+                word: ClassPageTerm.cleaned(testCase["term"] as? String),
+                scheme: ClassPageScheme.reading(testCase["scheme"] as? String)
+            )
+            let plan: ClassInsertionPlan = ClassInsertionPlan(
+                courseCode: "ICS3U", sectionNumber: 1,
+                unit: try XCTUnwrap(testCase["unit"] as? Int),
+                atDay: try XCTUnwrap(testCase["atDay"] as? Int),
+                naming: naming, added: [], renames: [], moves: [], linksToRewrite: 0, problems: []
+            )
+            XCTAssertEqual(plan.positionTitle, testCase["position"] as? String, naming.word)
+        }
+    }
+
+    /// Where "make room" lands in a numbered course, read from the tool's
+    /// two arguments (#267).
+    func testTheNumberedMakeRoomPositionIsReadAsTheContractSays() throws {
+        let insertion: [String: Any] = try ClassPlanningContractTests.section("insertion")
+        let reading: [String: Any] = try XCTUnwrap(insertion["numberedPosition"] as? [String: Any])
+        for testCase in try XCTUnwrap(reading["cases"] as? [[String: Any]]) {
+            let unit: Int? = testCase["unit"] as? Int
+            let atDay: Int? = testCase["atDay"] as? Int
+            XCTAssertEqual(
+                ClassInsertionPlanner.numberedPosition(unit: unit, atDay: atDay),
+                testCase["expect"] as? Int,
+                "unit \(String(describing: unit)), atDay \(String(describing: atDay))"
+            )
+        }
+    }
+
+    // MARK: - Duplicating a lesson as the next class
+
+    /// The three `duplication` cases, run through the REAL tool.
+    ///
+    /// **Not through a re-implementation of the rule, and the undo is ASKED
+    /// for rather than read off a list.** What the contract fixes is what a
+    /// teacher gets when they say "undo that", and a test that inspected the
+    /// history would pass on a change that recorded an entry the undo path
+    /// then declined to honour. `MakeRoomForClassesTests` makes the same
+    /// argument about the tool it covers.
+    func testDuplicatingMatchesTheContract() async throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("duplication")
+        // The rule the cases are cases OF, read rather than restated. A rule
+        // nobody explained is a rule the next reader simplifies away.
+        let undoRule: [String: Any] = try XCTUnwrap(section["undoRule"] as? [String: Any])
+        let statedRule: String = try XCTUnwrap(undoRule["rule"] as? String)
+        XCTAssertNotNil(undoRule["why"] as? String, "undoRule has no 'why'")
+        XCTAssertNotNil(undoRule["saidWhy"] as? String, "undoRule has no 'saidWhy'")
+        // What is SAID either side of the gate, by the contract's own names
+        // (#185): the plan warns exactly when the undo will be withheld, and
+        // the reply says the way back, or that the page can be taken back.
+        let planWarns: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["planWarns"] as? String, "undoRule has no 'planWarns'")
+        )
+        let replySaysWhenWithheld: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["replySaysWhenWithheld"] as? String)
+        )
+        let replySaysWhenOffered: String = try ClassPlanningContractTests.wordingKey(
+            try XCTUnwrap(undoRule["replySaysWhenOffered"] as? String)
+        )
+        let wording: [String: String] = try ClassPlanningContractTests.committedWording()
+        let forcedUnpublished: Bool =
+            (section["forcedUnpublished"] as? [String: Any])?["value"] as? Bool == true
+
+        for testCase in try ClassPlanningContractTests.cases(in: "duplication") {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let made = try AssistFixture.makeRunner()
+            defer { try? FileManager.default.removeItem(at: made.root) }
+            try ClassPlanningContractTests.name(
+                made.course, word: testCase["word"] as? String, scheme: testCase["scheme"] as? String
+            )
+            try rememberTimetable(
+                try XCTUnwrap(testCase["timetable"] as? [String]), in: made.course
+            )
+
+            // Every page gets a body of its own, so a rename can be checked by
+            // where the WORDS ended up rather than by trusting the planner to
+            // have moved what it said it moved.
+            for existing in try XCTUnwrap(testCase["existingClasses"] as? [[String: String]]) {
+                let title: String = try XCTUnwrap(existing["title"])
+                try AssistFixture.write(
+                    page: title, publish: "true", date: try XCTUnwrap(existing["date"]),
+                    body: "the words of \(title)", in: made.course
+                )
+            }
+
+            // Asked of the plan BEFORE anything runs, because a plan changes
+            // nothing: the rename order is the contract's highest-stakes
+            // field and the number on the card is read from the same object.
+            let source: String = try XCTUnwrap(testCase["duplicate"] as? String)
+            let numbers: UnitDay = try XCTUnwrap(
+                UnitDay(pageTitle: source, naming: made.course.configuration.classPageNaming), name
+            )
+            let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+                unit: numbers.unit, atDay: numbers.day + 1, count: 1,
+                forSection: 1, in: made.course
+            )
+            var renames: [String] = []
+            for rename in plan.renames {
+                renames.append("\(rename.from) → \(rename.to)")
+            }
+            XCTAssertEqual(
+                renames, try XCTUnwrap(testCase["expectRenamesInOrder"] as? [String]),
+                "\(name): renames, in order"
+            )
+            XCTAssertEqual(
+                plan.otherClassesMoving, testCase["expectOtherClassesMoving"] as? Int,
+                "\(name): how many other classes the card says move"
+            )
+            // The gate itself, against the rule the contract states in words:
+            // an undo is offered exactly when nothing else moves.
+            let undoOffered: Bool = try XCTUnwrap(testCase["expectUndoOffered"] as? Bool)
+            XCTAssertEqual(
+                plan.movesAnythingElse, !undoOffered,
+                "\(name): the contract's rule is “\(statedRule)” — this plan has "
+                + "\(plan.renames.count) renames and \(plan.moves.count) date moves"
+            )
+
+            // The plan, before Go: the card in the course's own noun, the
+            // model's copy in "class" whatever the course says (#267).
+            let planned: AssistToolOutcome = await outcome(
+                made.runner, "plan_add_next_class",
+                ["course": "ICS3U", "section": 1, "duplicate": source]
+            )
+            XCTAssertTrue(planned.isPlan, "\(name): the plan came back as \(planned.detail)")
+            var cardWarningKey: String = planWarns
+            if made.course.configuration.classNoun == .meeting {
+                cardWarningKey = planWarns + "ForAMeeting"
+            }
+            let cardWarning: String = try XCTUnwrap(wording[cardWarningKey], cardWarningKey)
+            let modelWarning: String = try XCTUnwrap(wording[planWarns], planWarns)
+            if undoOffered {
+                XCTAssertFalse(
+                    planned.forTheCard.contains(cardWarning),
+                    "\(name): nothing else moves, so the card must not say the undo will not help"
+                )
+                XCTAssertFalse(
+                    planned.detail.contains(modelWarning),
+                    "\(name): nothing else moves, so the plan must not say the undo will not help"
+                )
+            } else {
+                XCTAssertTrue(
+                    planned.forTheCard.contains(cardWarning),
+                    "\(name): the undo will be withheld, so the card must say so before Go — "
+                    + planned.forTheCard
+                )
+                XCTAssertTrue(
+                    planned.detail.contains(modelWarning),
+                    "\(name): the undo will be withheld, so the plan must say so — \(planned.detail)"
+                )
+            }
+
+            let said: String = await run(
+                made.runner, "add_next_class",
+                ["course": "ICS3U", "section": 1, "duplicate": source]
+            )
+
+            let newTitle: String = try XCTUnwrap(testCase["expectNewTitle"] as? String)
+            let copyURL: URL = AssistFixture.pageURL(of: newTitle, in: made.course)
+            let copy: String = try XCTUnwrap(
+                try? String(contentsOf: copyURL, encoding: .utf8),
+                "\(name): no copy was made at \(newTitle) — \(said)"
+            )
+            XCTAssertTrue(
+                copy.contains("the words of \(source)"), "\(name): the copy is not a copy"
+            )
+            XCTAssertTrue(
+                copy.contains("created: \(try XCTUnwrap(testCase["expectDate"] as? String))"),
+                "\(name): the copy is dated for the wrong day — \(copy)"
+            )
+            if forcedUnpublished {
+                XCTAssertFalse(
+                    AssistPageVisibility.publishes(in: copy, forSection: 1),
+                    "\(name): a copy of a published lesson must start hidden"
+                )
+            }
+
+            // A rename really happened when the renamed page holds the words
+            // the OLD name's page held.
+            for step in try XCTUnwrap(testCase["expectRenamesInOrder"] as? [String]) {
+                let parts: [String] = step.components(separatedBy: " → ")
+                let from: String = try XCTUnwrap(parts.first)
+                let to: String = try XCTUnwrap(parts.last)
+                let moved: String = try XCTUnwrap(
+                    try? String(contentsOf: AssistFixture.pageURL(of: to, in: made.course),
+                                encoding: .utf8),
+                    "\(name): \(to) is not there"
+                )
+                XCTAssertTrue(
+                    moved.contains("the words of \(from)"), "\(name): \(from) did not become \(to)"
+                )
+            }
+
+            let undone: String = await run(made.runner, "undo_last_change", [:])
+            if undoOffered {
+                XCTAssertNotEqual(
+                    undone, AssistWording.nothingToUndo,
+                    "\(name): nothing else moved, so the copy must be takeable back"
+                )
+                // Taken AWAY, not blanked. `aCreatedPageCanBeTakenBack` says
+                // "takes the page away again", and a blank class page left
+                // standing is a sentence a teacher would believe and that
+                // would not be true.
+                XCTAssertFalse(
+                    FileManager.default.fileExists(atPath: copyURL.path),
+                    "\(name): the undo left a blank class page where the copy was"
+                )
+                XCTAssertTrue(
+                    said.contains(try XCTUnwrap(wording[replySaysWhenOffered], replySaysWhenOffered)),
+                    "\(name): the reply must say the copy can be taken back — \(said)"
+                )
+            } else {
+                XCTAssertEqual(
+                    undone, AssistWording.nothingToUndo,
+                    "\(name): a partial undo is worse than none — \(undone)"
+                )
+                XCTAssertTrue(
+                    said.contains(try XCTUnwrap(wording[replySaysWhenWithheld], replySaysWhenWithheld)),
+                    "\(name): the reply must say where the way back is — \(said)"
+                )
+                XCTAssertTrue(
+                    FileManager.default.fileExists(atPath: copyURL.path),
+                    "\(name): nothing may have been half-undone"
+                )
+            }
+        }
+    }
+
+    /// The copy starts hidden even when the page it was copied from carries a
+    /// per-section publish key.
+    ///
+    /// The plain `publish: false` the copy is given is NOT the last word: the
+    /// build consults `publishForSection<N>` first, so a source carrying
+    /// `publishForSection1: true` — which the page a teacher names may well
+    /// be, since a shared course-level page is nameable here — leaves the copy
+    /// visible to students the moment it exists, with the FILE still reading
+    /// `publish: false`. Measured through the real toolchain image; the table
+    /// is in `documentation/10-local-ai-assistant.md`.
+    func testTheCopyIsHiddenEvenWhenItsSourceCarriesAPerSectionKey() async throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("duplication")
+        let forced: [String: Any] = try XCTUnwrap(section["forcedUnpublished"] as? [String: Any])
+        try XCTSkipUnless(forced["value"] as? Bool == true)
+
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16"], in: made.course
+        )
+        // Written by hand: `AssistFixture.write` builds a fixed template of
+        // title, publish and created, and the whole point here is the key it
+        // does not have.
+        try writeRawPage(
+            """
+            ---
+            title: Unit 1, Day 1
+            publish: true
+            publishForSection1: true
+            created: 2026-09-08T07:00:00.000-0400
+            ---
+
+            a lesson that started life as a shared page
+            """,
+            named: "Unit 1, Day 1", in: made.course
+        )
+
+        _ = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+
+        let copy: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ))
+        XCTAssertFalse(
+            AssistPageVisibility.publishes(in: copy, forSection: 1),
+            "The copy was visible to students the moment it was made: \(copy)"
+        )
+        XCTAssertEqual(
+            AssistPageVisibility.answer(in: copy, forSection: 1), .hidden,
+            "Hidden has to be CERTAIN here, not merely unsaid: \(copy)"
+        )
+
+        // **And the copy can still be PUBLISHED.** Hiding it by writing a
+        // per-section key of its own would pass every assertion above and
+        // leave a page nobody can ever publish: the publish path picks its key
+        // from where the page LIVES, so it writes the plain one, and the
+        // per-section key goes on beating it — while the teacher is told
+        // "Published 1 page" every time they ask. A failure that reports
+        // success is worse than the one it replaced.
+        let said: String = await run(
+            made.runner, "publish_pages",
+            ["course": "ICS3U", "section": 1, "pages": ["Unit 1, Day 2"]]
+        )
+        let published: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ))
+        XCTAssertTrue(
+            AssistPageVisibility.publishes(in: published, forSection: 1),
+            "The copy was hidden in a way that cannot be undone — \(said)\n\(published)"
+        )
+        // Asked of the frontmatter LINES, not of the whole file: a page shaped
+        // like the example content's `_DUPLICATE ME.md` names the key in a
+        // `%%` comment in its body, and a substring test would fail on the one
+        // page most likely to be duplicated.
+        XCTAssertTrue(
+            ClassPlanningContractTests.perSectionKeys(in: published).isEmpty,
+            "No per-section key belongs on a page inside one section's own folder: \(published)"
+        )
+    }
+
+    /// A source this app cannot read well enough to be sure of is ABANDONED
+    /// rather than copied.
+    ///
+    /// **A tab used as indentation reaches it**, which is not a corner: the
+    /// reader answers `.unreadable` there because the build's own parser
+    /// throws on the same page, so nothing this writes can make the copy
+    /// certainly hidden. A copy of a lesson students can already see is the
+    /// one thing that must not be written on a guess.
+    ///
+    /// The other half of the assertion is what the teacher is LEFT with. The
+    /// room has been made by the time this is answered, so the planner's blank
+    /// class page is standing on the copy's day — hidden, which is the safe
+    /// end state — and nothing goes on the undo list, because taking back a
+    /// page this never wrote is not something an undo can honour.
+    func testASourceThisAppCannotReadIsNotCopiedAtAll() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let scratchFolderURL: URL = made.root.appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: scratchFolderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer { ActivityTrail.store = previousStore }
+
+        try rememberTimetable(["2026-09-08", "2026-09-10", "2026-09-14"], in: made.course)
+        // The tab is the whole fixture. Everything else about this page is
+        // ordinary, and it is published, which is what makes the copy
+        // dangerous.
+        try writeRawPage(
+            "---\ntitle: Unit 1, Day 1\ntags:\n\t- a\npublish: true\n"
+            + "created: 2026-09-08T07:00:00.000-0400\n---\n\nthe words of Unit 1, Day 1\n",
+            named: "Unit 1, Day 1", in: made.course
+        )
+
+        let said: String = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+
+        XCTAssertEqual(
+            said,
+            AssistWording.theCopyCouldNotBeMadeHidden(
+                page: "Unit 1, Day 1", as: "Unit 1, Day 2",
+                backupNamed: ClassPlanningContractTests.backupName(in: said)
+            ),
+            "The refusal is the contract's sentence, not one of its own: \(said)"
+        )
+
+        let standing: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 2", in: made.course), encoding: .utf8
+        ), "The planner's blank page should still be there")
+        XCTAssertFalse(
+            standing.contains("the words of Unit 1, Day 1"),
+            "The copy was written after all: \(standing)"
+        )
+        XCTAssertEqual(
+            AssistPageVisibility.answer(in: standing, forSection: 1), .hidden,
+            "What is left standing must be certainly hidden: \(standing)"
+        )
+
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("did not copy a class"),
+            "A duplicate abandoned after the room was made must leave a line: \(trail)"
+        )
+
+        let undone: String = await run(made.runner, "undo_last_change", [:])
+        XCTAssertEqual(
+            undone, AssistWording.nothingToUndo,
+            "Nothing was copied, so nothing may be offered back: \(undone)"
+        )
+    }
+
+    /// A lesson still sitting where the copy would go is never written over.
+    ///
+    /// **Deterministic, and it has to be**, because the shape only arises when
+    /// the planner skips a rename. A page it cannot read stops the rename
+    /// above it, which leaves the next destination occupied, which stops that
+    /// rename too — and the page the copy was meant to BECOME is still
+    /// somebody's class when the copy is written. The refusal also has to
+    /// survive the planner's link rewriting, which changes the destination's
+    /// own text: a guard that asked "is this still the same words?" would
+    /// answer no and take the lesson.
+    func testALessonStillSittingWhereTheCopyWouldGoIsNeverWrittenOver() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        let scratchFolderURL: URL = made.root.appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: scratchFolderURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratchFolderURL)
+        defer { ActivityTrail.store = previousStore }
+
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16", "2026-09-18",
+             "2026-09-22", "2026-09-24", "2026-09-28", "2026-09-30"],
+            in: made.course
+        )
+        let dates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16",
+                               "2026-09-18", "2026-09-22"]
+        for day in 1...6 {
+            try AssistFixture.write(
+                page: "Unit 1, Day \(day)", publish: "true", date: dates[day - 1],
+                body: day == 3
+                    ? "a real lesson that links to [[Unit 1, Day 6]]"
+                    : "the words of Unit 1, Day \(day)",
+                in: made.course
+            )
+        }
+        // Day 5 cannot be read at all, which is what stops the rename above it.
+        try Data([0xFF, 0xFE, 0x41]).write(
+            to: AssistFixture.pageURL(of: "Unit 1, Day 5", in: made.course)
+        )
+
+        let said: String = await run(
+            made.runner, "add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 2"]
+        )
+
+        let lesson: String = try XCTUnwrap(try? String(
+            contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 3", in: made.course), encoding: .utf8
+        ))
+        XCTAssertTrue(
+            lesson.contains("a real lesson that links to"),
+            "The lesson was written over by the copy: \(lesson)"
+        )
+        XCTAssertTrue(said.contains("Unit 1, Day 3"), "The refusal must say which page: \(said)")
+        XCTAssertEqual(
+            said,
+            AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: "Unit 1, Day 3",
+                backupNamed: ClassPlanningContractTests.backupName(in: said)
+            ),
+            "The refusal is the contract's sentence, not one of its own: \(said)"
+        )
+
+        // The room HAD been made by the time it refused, so the trail carries
+        // the one line that explains classes that moved with no copy to show
+        // for it.
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(
+            trail.contains("did not copy a class"),
+            "A refusal after a half-applied shuffle must leave a line: \(trail)"
+        )
+    }
+
+    /// The plan card says how many classes move even when nothing is renamed.
+    ///
+    /// Contract case 2's shape. Keyed on the rename count the card said
+    /// nothing at all here, and this is the card a teacher agrees to.
+    func testThePlanSaysHowManyClassesMoveWhenNothingIsRenamed() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18"],
+            in: made.course
+        )
+        for existing in [("Unit 1, Day 1", "2026-09-08"), ("Unit 1, Day 2", "2026-09-10"),
+                         ("Unit 2, Day 1", "2026-09-12"), ("Unit 2, Day 2", "2026-09-14")] {
+            try AssistFixture.write(
+                page: existing.0, publish: "true", date: existing.1,
+                body: "the words of \(existing.0)", in: made.course
+            )
+        }
+
+        let card: String = await card(
+            made.runner, "plan_add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 2"]
+        )
+        XCTAssertTrue(
+            card.contains(AssistWording.otherClassesWouldMove(moving: 2, renaming: 0)),
+            "Two classes are about to be re-dated and the card did not say so: \(card)"
+        )
+    }
+
+    /// And still says the links are rewritten when something IS renamed.
+    ///
+    /// Contract case 1's shape. True before this was touched; it is here so a
+    /// refactor cannot lose the branch that was already right.
+    func testThePlanStillSaysLinksAreRewrittenWhenSomethingIsRenamed() async throws {
+        let made = try AssistFixture.makeRunner()
+        defer { try? FileManager.default.removeItem(at: made.root) }
+        try rememberTimetable(
+            ["2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16"], in: made.course
+        )
+        for existing in [("Unit 1, Day 1", "2026-09-08"), ("Unit 1, Day 2", "2026-09-10"),
+                         ("Unit 2, Day 1", "2026-09-12")] {
+            try AssistFixture.write(
+                page: existing.0, publish: "true", date: existing.1,
+                body: "the words of \(existing.0)", in: made.course
+            )
+        }
+
+        let card: String = await card(
+            made.runner, "plan_add_next_class",
+            ["course": "ICS3U", "section": 1, "duplicate": "Unit 1, Day 1"]
+        )
+        XCTAssertTrue(
+            card.contains(AssistWording.otherClassesWouldMove(moving: 2, renaming: 1)),
+            "One page is renamed and two move, and the card must say both: \(card)"
+        )
+    }
+
     // MARK: - Private
+
+    /// The backup's file name as the refusal names it, or nil when it names
+    /// none — so the assertion above compares the whole sentence rather than
+    /// re-deriving a path the test fixture chose.
+    /// Every per-section key this page carries as a top-level frontmatter
+    /// line, asked through the app's own matcher rather than by looking for
+    /// the word anywhere in the file.
+    private static func perSectionKeys(in pageText: String) -> [String] {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return []
+        }
+        let lines: [String] = pageText.components(separatedBy: "\n")
+        var found: [String] = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            if let key = AssistPageVisibility.perSectionKey(namedIn: bare) {
+                found.append(key)
+            }
+        }
+        return found
+    }
+
+    private static func backupName(in sentence: String) -> String? {
+        for word in sentence.components(separatedBy: " ") {
+            let bare: String = word.trimmingCharacters(in: CharacterSet(charactersIn: ",."))
+            if bare.hasSuffix(".zip") {
+                return bare
+            }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func rememberTimetable(_ dates: [String], in course: Course) throws {
+        try SectionTimetableStore.applyRememberTimetable(
+            try SectionTimetableStore.planRememberTimetable(
+                dates: dates, source: "timetable.xlsx, block H", forSection: 1, in: course
+            )
+        )
+    }
+
+    @MainActor
+    private func writeRawPage(_ text: String, named title: String, in course: Course) throws {
+        try text.write(
+            to: AssistFixture.pageURL(of: title, in: course), atomically: true, encoding: .utf8
+        )
+    }
+
+    @MainActor
+    private func run(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> String {
+        return await outcome(runner, tool, arguments).detail
+    }
+
+    /// What a plan card actually shows, which is not the same string as the
+    /// summary a caller reads back.
+    @MainActor
+    private func card(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> String {
+        return await outcome(runner, tool, arguments).forTheCard
+    }
+
+    @MainActor
+    private func outcome(
+        _ runner: AssistToolRunner, _ tool: String, _ arguments: [String: Any]
+    ) async -> AssistToolOutcome {
+        let encoded: Data = (try? JSONSerialization.data(withJSONObject: arguments)) ?? Data("{}".utf8)
+        return await runner.run(
+            call: AssistToolCall(
+                id: UUID().uuidString,
+                type: "function",
+                function: AssistToolCall.Function(
+                    name: tool, arguments: String(decoding: encoded, as: UTF8.self)
+                )
+            )
+        )
+    }
+
+    private static func name(of problem: NextClassPlanner.Problem) -> String {
+        switch problem {
+        case .noTimetable:
+            return "noTimetable"
+        case .noUnitsInANumberedCourse:
+            return "noUnitsInANumberedCourse"
+        }
+    }
+
+    /// Where a case makes room: `insertAtNumber` for a numbered course
+    /// (#267), which this app holds as unit 1 — the contract names only the
+    /// number — or `insertAtUnit` and `insertAtDay`.
+    private static func position(of testCase: [String: Any]) throws -> (unit: Int, day: Int) {
+        if let number = testCase["insertAtNumber"] as? Int {
+            return (1, number)
+        }
+        return (
+            try XCTUnwrap(testCase["insertAtUnit"] as? Int),
+            try XCTUnwrap(testCase["insertAtDay"] as? Int)
+        )
+    }
+
+    /// Give a fixture course a case's word and scheme, on disk and in memory.
+    @MainActor
+    private static func name(_ course: Course, word: String?, scheme: String?) throws {
+        if word == nil && scheme == nil {
+            return
+        }
+        if let word {
+            course.configuration.unitWord = word
+        }
+        if let scheme {
+            course.configuration.classPageScheme = ClassPageScheme.reading(scheme)
+        }
+        try course.configuration.write(to: course.directoryURL.appendingPathComponent("course_config.json"))
+    }
 
     private static func name(of problem: ClassInsertionPlanner.Problem) -> String {
         switch problem {
@@ -164,6 +933,7 @@ final class ClassPlanningContractTests: XCTestCase {
         meetingDates: [String] = ["2026-09-08", "2026-09-10", "2026-09-14", "2026-09-16",
                                   "2026-09-18", "2026-09-22"],
         word: String? = nil,
+        scheme: String? = nil,
         sectionNumbers: [Int] = [1]
     ) throws -> (root: URL, coursesURL: URL, course: Course) {
         let root: URL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -187,6 +957,9 @@ final class ClassPlanningContractTests: XCTestCase {
         if let word {
             configuration["unit_word"] = word
         }
+        if let scheme {
+            configuration["class_page_scheme"] = scheme
+        }
         try JSONSerialization.data(withJSONObject: configuration, options: [.prettyPrinted])
             .write(to: courseURL.appendingPathComponent("course_config.json"))
         let loaded: CourseConfiguration = try CourseConfiguration(
@@ -202,13 +975,17 @@ final class ClassPlanningContractTests: XCTestCase {
         return (root, coursesURL, course)
     }
 
-    private func writeClass(_ title: String, on date: String, in course: Course, section: Int = 1) throws {
+    /// A class page; `date` nil writes one with no `created` at all.
+    private func writeClass(_ title: String, on date: String?, in course: Course, section: Int = 1) throws {
+        var created: String = ""
+        if let date {
+            created = "created: \(date)T07:00:00.000-0400\n"
+        }
         let page: String = """
         ---
         title: \(title)
         publish: true
-        created: \(date)T07:00:00.000-0400
-        ---
+        \(created)---
 
         \(title)
         """
@@ -312,6 +1089,32 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNil(moved["unit 4, day 2"], "A class was moved off its own day")
     }
 
+    /// The date half of the stop decided in issue #173.
+    ///
+    /// The CASES are run against a real course, through `publish_pages`, in
+    /// `AssistToolRunnerTests.testTheDatesAClassBringsStopAtAClassAsTheContractSays`
+    /// — the same split this file's sibling in `shared-rules.json` makes, and
+    /// for the same reason: a synthetic page graph can be built to agree with
+    /// whatever it is asked. What is pinned here is that the file says it, says
+    /// why, and lists the stop among the reasons a page does not move.
+    func testTheReachStopsAtAClassPageAndTheRuleSaysSo() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("datingPagesAClassBrings")
+        let stop: [String: Any] = try XCTUnwrap(section["reachStopsAtAClassPage"] as? [String: Any])
+        XCTAssertEqual(stop["value"] as? Bool, true)
+        XCTAssertNotNil(stop["why"] as? String)
+
+        var saysTheWalkStops: Bool = false
+        for reason in try XCTUnwrap(section["doesNotMoveWhen"] as? [String]) {
+            if reason.contains("only THROUGH another class page") {
+                saysTheWalkStops = true
+            }
+        }
+        XCTAssertTrue(
+            saysTheWalkStops,
+            "doesNotMoveWhen does not name the page a different class brings"
+        )
+    }
+
     // MARK: - Dating non-class pages
 
     func testNonClassPagesContractExistsAndIsDocumented() throws {
@@ -412,6 +1215,121 @@ final class ClassPlanningContractTests: XCTestCase {
         XCTAssertNotNil(section["howAPageIsRenamed"])
     }
 
+    // MARK: - Repointing the front page
+
+    /// `sectionIndexPointer` (#267): the front page's class embed is found by
+    /// the page it names, never by the heading above it. The mac never
+    /// inserts an embed, so every case the contract gives Windows its own
+    /// answer for (`expectBodyOnWindows`) must be one the mac leaves alone.
+    func testTheFrontPageIsRepointedAsTheContractSays() throws {
+        let section: [String: Any] = try ClassPlanningContractTests.section("sectionIndexPointer")
+        let noEmbed: [String: Any] = try XCTUnwrap(section["whenNoClassIsTransclusion"] as? [String: Any])
+        XCTAssertNotNil(noEmbed["mac"] as? String)
+        XCTAssertNotNil(noEmbed["windows"] as? String)
+
+        let cases: [[String: Any]] = try ClassPlanningContractTests.cases(in: "sectionIndexPointer")
+        XCTAssertGreaterThanOrEqual(cases.count, 27)
+        let writtenAs: [String: Any] = try XCTUnwrap(section["writtenAs"] as? [String: Any])
+        XCTAssertNotNil(writtenAs["rule"] as? String)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let body: String = try XCTUnwrap(testCase["indexBody"] as? String, name)
+            let pointAt: String = try XCTUnwrap(testCase["pointAt"] as? String, name)
+            let titles: [String] = try XCTUnwrap(testCase["classTitles"] as? [String], name)
+            var classTitles: Set<String> = []
+            for title in titles {
+                classTitles.insert(title.lowercased())
+            }
+            // Where the class lives decides the folder path a line keeps
+            // (`writtenAs`, #397).
+            let pointAtPath: String = (testCase["pointAtPath"] as? String) ?? "section1/All Classes/\(pointAt).md"
+            let page: AssistSectionPage = AssistSectionPage(
+                title: pointAt,
+                displayTitle: pointAt,
+                fileURL: URL(fileURLWithPath: "/courses/CLUB/\(pointAtPath)"),
+                relativePath: "courses/CLUB/\(pointAtPath)",
+                isSectionLocal: true,
+                isVisibleToStudents: true,
+                visibilityIsCertain: true,
+                date: nil,
+                linkedTitles: [],
+                classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(pointAt).md"
+            )
+            let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
+                body, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400",
+                courseDirectory: URL(fileURLWithPath: "/courses/CLUB")
+            )
+            let expected: String? = testCase["expectBody"] as? String
+            XCTAssertEqual(result?.text, expected, name)
+            if testCase["expectBodyOnWindows"] != nil {
+                XCTAssertNil(expected, "\(name): the mac never inserts, so a case where Windows differs must leave the page alone here")
+            }
+        }
+    }
+
+    /// `sectionIndexPointer.dateCases` (#275): the front page's DATE follows
+    /// the class its embed names — and a front page with no class embed keeps
+    /// its own. Every case with a `pointAt` is run through the pointer, with
+    /// that class's date handed in (the repointing test above hands in none,
+    /// which is how the no-embed case passed while the pointer re-dated a
+    /// hand-made front page on every publish). Cases without `pointAt` are the
+    /// build's alone; `scripts/test_dates_follow_the_class.py` runs every case.
+    func testTheFrontPagesDateFollowsTheClassItShows() throws {
+        let pointer: [String: Any] = try ClassPlanningContractTests.section("sectionIndexPointer")
+        let dateCases: [String: Any] = try XCTUnwrap(pointer["dateCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(dateCases["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 13)
+
+        var ranThroughThePointer: Int = 0
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            guard let pointAt = testCase["pointAt"] as? String else {
+                continue
+            }
+            let indexText: String = try XCTUnwrap(testCase["indexText"] as? String, name)
+            var classTitles: Set<String> = []
+            var pointAtDay: CalendarDay?
+            for pageClass in try XCTUnwrap(testCase["classes"] as? [[String: Any]], name) {
+                let title: String = try XCTUnwrap(pageClass["title"] as? String, name)
+                classTitles.insert(title.lowercased())
+                if title == pointAt, let created = pageClass["created"] as? String {
+                    pointAtDay = CalendarDay(text: String(created.prefix(10)))
+                }
+            }
+            let sectionNumber: Int = (testCase["section"] as? Int) ?? 1
+            let page: AssistSectionPage = AssistSectionPage(
+                title: pointAt,
+                displayTitle: pointAt,
+                fileURL: URL(fileURLWithPath: "/courses/TEST/section\(sectionNumber)/All Classes/\(pointAt).md"),
+                relativePath: "courses/TEST/section\(sectionNumber)/All Classes/\(pointAt).md",
+                isSectionLocal: true,
+                isVisibleToStudents: true,
+                visibilityIsCertain: true,
+                date: pointAtDay,
+                linkedTitles: [],
+                classFolderNames: ["All Classes"],
+                pathWithinSection: "All Classes/\(pointAt).md"
+            )
+            let result: SectionIndexPointer.Result? = SectionIndexPointer.repointing(
+                indexText, at: page, classTitles: classTitles, createdTail: "T07:00:00.000-0400",
+                courseDirectory: URL(fileURLWithPath: "/courses/TEST")
+            )
+            let textAfter: String = result?.text ?? indexText
+            let createdAfter: String? = PageFrontmatter.rawValue(forKey: "created", in: textAfter)
+            let createdBefore: String? = PageFrontmatter.rawValue(forKey: "created", in: indexText)
+
+            if let expectedDay = testCase["expectCreatedDay"] as? String {
+                XCTAssertTrue((createdAfter ?? "").hasPrefix(expectedDay),
+                              "\(name): the front page reads \(createdAfter ?? "no date")")
+            } else {
+                XCTAssertEqual(createdAfter, createdBefore, "\(name): the front page's own date must stay")
+            }
+            ranThroughThePointer += 1
+        }
+        XCTAssertGreaterThanOrEqual(ranThroughThePointer, 9, "the contract lost the pointer's date cases")
+    }
+
     private static func section(_ name: String) throws -> [String: Any] {
         let url: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -425,5 +1343,27 @@ final class ClassPlanningContractTests: XCTestCase {
 
     private static func cases(in name: String) throws -> [[String: Any]] {
         return try XCTUnwrap(section(name)["cases"] as? [[String: Any]])
+    }
+
+    /// "wording.otherClassesMoved" → "otherClassesMoved": the way one contract
+    /// file names a sentence in another.
+    private static func wordingKey(_ reference: String) throws -> String {
+        let prefix: String = "wording."
+        XCTAssertTrue(reference.hasPrefix(prefix), "“\(reference)” does not name a sentence")
+        return String(reference.dropFirst(prefix.count))
+    }
+
+    /// The sentences as COMMITTED in `contracts/assist-wording.json`, so a
+    /// case is checked against what the other platform reads, not against a
+    /// Swift name that could be renamed underneath it.
+    private static func committedWording() throws -> [String: String] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/assist-wording.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        return try XCTUnwrap(all["wording"] as? [String: String], "No wording in assist-wording.json")
     }
 }

@@ -43,7 +43,7 @@ standards for accuracy, and it is alive now.
 
 ## Where this course does it
 
-- Rita Joe's ["I Lost My Talk"](I%20Lost%20My%20Talk), a Mi'kmaw poem
+- Rita Joe's [[I Lost My Talk|"I Lost My Talk"]], a Mi'kmaw poem
   about the Shubenacadie residential school, which we read beside her own
   account of writing it.
 - [[Sugar Falls]], the graphic novel David A. Robertson and Scott B.

@@ -58,8 +58,8 @@ other two here, for THIS task. Nobody else ever sees this note — it is a
 comment, so it never appears on the website.
 
 Keep it to plain text. A wikilink or a transclusion written inside these
-markers still counts as a link everywhere else in the system, so a hidden
-note would quietly claim curriculum coverage no student page provides.
+markers is invisible on the site and is not a link anywhere in Plantoir,
+so write bare codes and page names as words.
 
 OBSERVE — Unit ?, Day ?, which period
 

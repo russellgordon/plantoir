@@ -28,6 +28,58 @@ final class SiteHealthContractTests: XCTestCase {
         siteHealth = try XCTUnwrap(all["siteHealth"] as? [String: Any])
     }
 
+    /// `siteHealth.linksIntoHiddenPages.cases` through the mac's own reader of
+    /// the same question, `AssistSectionGraph.linksIntoHiddenPages` — the one
+    /// check_section answers with (#333). The build's reader runs the same
+    /// cases in `scripts/test_links_into_hidden_pages.py`; if the two stopped
+    /// agreeing, a teacher would be told different things by the build and by
+    /// the assistant about the same links.
+    func testTheLinksIntoHiddenPagesCasesHoldForTheSectionGraph() throws {
+        let block: [String: Any] = try XCTUnwrap(siteHealth["linksIntoHiddenPages"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 10, "the contract lost cases")
+        for oneCase in cases {
+            let name: String = try XCTUnwrap(oneCase["name"] as? String)
+            let laidOut: [[String: Any]] = try XCTUnwrap(oneCase["pages"] as? [[String: Any]], name)
+            var pages: [AssistSectionPage] = []
+            for laid in laidOut {
+                let path: String = try XCTUnwrap(laid["path"] as? String, name)
+                let body: String = laid["body"] as? String ?? ""
+                let visible: Bool = laid["visible"] as? Bool ?? true
+                let url: URL = URL(fileURLWithPath: "/c/ICS3U/\(path)")
+                var withinSection: String = path
+                if path.hasPrefix("section1/") {
+                    withinSection = String(path.dropFirst("section1/".count))
+                }
+                pages.append(AssistSectionPage(
+                    title: url.deletingPathExtension().lastPathComponent,
+                    displayTitle: url.deletingPathExtension().lastPathComponent,
+                    fileURL: url, relativePath: path,
+                    isSectionLocal: path.hasPrefix("section1/"),
+                    isVisibleToStudents: visible, visibilityIsCertain: true, date: nil,
+                    linkedTitles: AssistSectionGraph.linkTargets(in: body),
+                    classFolderNames: ["All Classes"], pathWithinSection: withinSection
+                ))
+            }
+            let graph: AssistSectionGraph = AssistSectionGraph(courseCode: "ICS3U", sectionNumber: 1, pages: pages)
+            var found: [[String]] = []
+            for link in graph.linksIntoHiddenPages() {
+                var from: String = link.fromRelativePath
+                if from.lowercased().hasSuffix(".md") {
+                    from = String(from.dropLast(3))
+                }
+                found.append([from, link.toTitle])
+            }
+            let expected: [[String]] = try XCTUnwrap(oneCase["expect"] as? [[String]], name)
+            var expectedByTitle: [[String]] = []
+            for pair in expected {
+                let to: String = (pair[1] as NSString).lastPathComponent
+                expectedByTitle.append([pair[0], to])
+            }
+            XCTAssertEqual(found, expectedByTitle, name)
+        }
+    }
+
     func testTheMarkerPrefixMatchesTheContract() throws {
         let marker: [String: Any] = try XCTUnwrap(siteHealth["marker"] as? [String: Any])
         let prefix: String = try XCTUnwrap(marker["prefix"] as? String)
@@ -47,6 +99,10 @@ final class SiteHealthContractTests: XCTestCase {
             let sentence: String = try XCTUnwrap(check["sentence"] as? String)
                 .replacingOccurrences(of: "{course}", with: "ICS3U")
                 .replacingOccurrences(of: "{section}", with: "1")
+                .replacingOccurrences(of: "{page}", with: "College Board Curriculum Coverage")
+            // Filled as the build fills it, so nothing is left in braces (#128
+            // gave handWrittenCoveragePage a {page} of its own).
+            XCTAssertFalse(sentence.contains("{page}"), name)
             let detail: String = try XCTUnwrap(check["detail"] as? String)
             let fixable: Bool = try XCTUnwrap(check["fixable"] as? Bool)
 
@@ -191,21 +247,35 @@ final class SiteHealthContractTests: XCTestCase {
     /// Rule 1: the interface never names the machinery. These sentences are
     /// shown to a teacher verbatim — in a dialog, and in the assistant's
     /// answer — so a stray "container" or "script" would reach them directly.
+    ///
+    /// EVERY string of a check is swept, not only `sentence` and `detail`:
+    /// since #246 a check can carry pieces the toolchain assembles into them
+    /// (`sentenceForSeveral`, `pageWithLine`, `frontPage`…), and a word in
+    /// one of those reaches a teacher just the same. `name` is an identifier,
+    /// and `why` and `fill` are written for whoever maintains the check.
     func testNoCheckNamesTheMachinery() throws {
         let checks: [[String: Any]] = try XCTUnwrap(siteHealth["checks"] as? [[String: Any]])
         let forbidden: [String] = [
             "toolchain", "script", "docker", "container", "wsl", "python",
             "json", "stdout", "quartz", "repository", "config",
+            "yaml", "frontmatter", "symlink", "vault",
         ]
+        let notShown: Set<String> = ["name", "why", "fill"]
         for check in checks {
             let name: String = (check["name"] as? String) ?? "unnamed"
-            let shown: String = ((check["sentence"] as? String) ?? "")
-                + " " + ((check["detail"] as? String) ?? "")
-            for word in forbidden {
-                XCTAssertFalse(
-                    shown.lowercased().contains(word),
-                    "\(name) says \"\(word)\" to a teacher"
-                )
+            for (key, value) in check {
+                if notShown.contains(key) {
+                    continue
+                }
+                guard let shown = value as? String else {
+                    continue
+                }
+                for word in forbidden {
+                    XCTAssertFalse(
+                        shown.lowercased().contains(word),
+                        "\(name).\(key) says \"\(word)\" to a teacher"
+                    )
+                }
             }
         }
     }
@@ -216,5 +286,47 @@ final class SiteHealthContractTests: XCTestCase {
     func testTheScheduledDeployRuleIsStillWrittenDown() throws {
         let rule: String = try XCTUnwrap(siteHealth["scheduledDeployPublishesAnyway"] as? String)
         XCTAssertTrue(rule.lowercased().contains("never refuses"), rule)
+    }
+
+    /// `siteHealth.marker.consoleCases` (#153), each played through ONE fresh
+    /// runner chunk by chunk as `howToRunACase` says: what the console shows,
+    /// after every chunk where the case asks, and which findings were read.
+    func testTheConsoleCasesHold() throws {
+        let marker: [String: Any] = try XCTUnwrap(siteHealth["marker"] as? [String: Any])
+        let consoleCases: [String: Any] = try XCTUnwrap(marker["consoleCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(consoleCases["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4, "the contract lost console cases")
+
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let chunks: [String] = try XCTUnwrap(testCase["chunks"] as? [String], name)
+            let expectShown: [String] = try XCTUnwrap(testCase["expectShown"] as? [String], name)
+            let expectFindings: [String] = try XCTUnwrap(testCase["expectFindings"] as? [String], name)
+            let afterEachChunk: [[String]]? = testCase["expectShownAfterEachChunk"] as? [[String]]
+            if let afterEachChunk {
+                XCTAssertEqual(afterEachChunk.count, chunks.count, "\(name): one entry per chunk")
+            }
+
+            let runner: ScriptRunner = ScriptRunner()
+            var chunkIndex: Int = 0
+            for chunk in chunks {
+                runner.receiveOutput(chunk)
+                if let afterEachChunk, chunkIndex < afterEachChunk.count {
+                    XCTAssertEqual(
+                        runner.transcript.displayText,
+                        afterEachChunk[chunkIndex].joined(separator: "\n"),
+                        "\(name): after chunk \(chunkIndex + 1)"
+                    )
+                }
+                chunkIndex += 1
+            }
+            XCTAssertEqual(runner.transcript.displayText, expectShown.joined(separator: "\n"), name)
+
+            var foundNames: [String] = []
+            for finding in runner.healthFindings {
+                foundNames.append(finding.name)
+            }
+            XCTAssertEqual(foundNames, expectFindings, name)
+        }
     }
 }

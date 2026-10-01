@@ -1,0 +1,105 @@
+"WHAT DOES THIS PAGE LINK TO?" — RE-MEASURED FOR #167, 2026-09-25
+=================================================================
+Written 2026-09-25 by the #167 planner (Claude Opus). A results file: it
+records what the runs printed on the day they ran and is not edited afterwards.
+Raw output is committed beside it: link-question-29-large.txt,
+link-question-29-small.txt, link-question-grid-large.txt,
+link-question-grid-small.txt; the grid's script is link-question-grid.py.
+
+CONDITIONS (they belong to these numbers and to nothing else)
+--------------------------------------------------------------
+  machine    Mac16,8, Apple M4 Pro (8 performance cores), 48 GiB
+  engine     llama.cpp b10435 (commit 9e40df63b), Metal — the llama-server
+             bundled in the Debug build of dev 68214a6c
+  models     .large  qwen3-4b-q4_k_m.gguf, 2,497,280,256 bytes (the size
+                     AssistModelTier expects), fetched from the app's own
+                     download URL into a scratch folder
+             .small  qwen2.5-1.5b-instruct-q4_k_m.gguf, 1,117,320,736 bytes,
+                     the app's own downloaded copy
+  flags      AssistServerHost.serverArguments, per tier: --ctx-size 16384
+             (.large) / 8192 (.small) --reasoning off --reasoning-budget 0
+             --threads 4 (half of 8 performance cores) --n-gpu-layers 999
+             --jinja --parallel 1
+  body       the app's (--app-body): temperature 0, tool_choice auto,
+             max_tokens 512 read from AssistModelClient.swift
+  prompt     the shipped system prompt, read out of AssistAgent.swift
+             (--prompt shipped); the 13-tool local surface from the contract
+             at dev 68214a6c — local sha256 46b96562…, mcp sha256 9bcc7eb7…
+  dateline   "(Today is <date>, a <weekday>.)" on the END of the message
+
+PART ONE — the 29-probe suite, VVH2O section 1, 10 trials, 2026-09-25 (a Friday)
+---------------------------------------------------------------------------------
+  python3 research/ai-assist/trimmed-surface-suite.py tools-local.json 10 \
+      --date-appended --real-course --course VVH2O --prompt shipped --app-body
+
+                              .large (Qwen3 4B)    .small (Qwen2.5 1.5B)
+  all probes                  290/290              210/290
+  the 23 the model SEES       230/230              160/230
+  Windows-comparable 18       180/180              120/180
+  `read` (the #167 probe)     10/10 read_page      0/10 (10x check_section)
+  polarity inversions         0                    0
+  misses that were a WRITE    0                    50
+
+So on THIS date the larger assistant answers the verbatim probe correctly,
+10 of 10, and scores 290/290 overall. That is not a fix. #167's own comments
+(2026-09-19) already showed the probe is decided by the dateline's weekday
+word and the course code — 88 of 92 days right for VVH2O, and 2026-09-18 one
+of the 4 wrong — and greedy decoding makes ten trials of one date one
+measurement repeated ten times. Part two is the measurement that matters.
+
+PART TWO — the link question across courses and dates, one greedy trial per cell
+---------------------------------------------------------------------------------
+6 courses (VVH2O EXC2O ICS3U SPH3U MPM2D ENG4U) x 14 dates (2026-09-21 ..
+2026-10-04) = 84 cells per sentence. Right = read_page or list_pages.
+
+  sentence                                         .large        .small
+  What does "Unit 2, Day 3" in <C> section 1       55/84         54/84
+    link to?  (#167 verbatim)                      29x check     30x check
+  What does "Unit 2, Day 3" link to?               14/84         61/84
+  What does Unit 2, Day 3 link to?                  0/84          0/84
+  Which pages does Unit 2, Day 3 link to?           0/84          0/84
+                                                                 (53x check,
+                                                                  31x publish_pages)
+  What links are on Unit 2, Day 3?                  0/84          0/84
+  Show me the links from Unit 2, Day 3             84/84          0/84
+  Where does Unit 2, Day 3 point to?                0/84          0/84
+  TOTAL                                           153/588       115/588
+
+Every wrong answer on the larger assistant is check_section. On the smaller
+one, "Which pages does Unit 2, Day 3 link to?" is answered with
+publish_pages on 31 of 84 cells — a WRITE, for a read-only question (a
+teacher sees a plan first by default, which is why it is not worse).
+
+WHAT THIS SAYS
+--------------
+  - The weakness #167 named is real and much wider than one probe: the
+    plainest phrasing a teacher would type ("What does Unit 2, Day 3 link
+    to?") is 0 of 84 on BOTH tiers. The verbatim probe is the lucky member
+    of its family.
+  - It is not a regression in anything shipped: #167's 2026-09-19 comment found
+    the local surface byte-identical to August's, and it is unchanged since.
+  - The family is a fixed frame around a page title — the shape #194 and
+    #277 moved into code — so it is answerable without the model. See
+    #167's plan for the decision.
+
+POSTSCRIPT — what was done with it (implementation, 2026-09-25)
+---------------------------------------------------------------
+Added by the #167 implementer (Claude Opus) when these files were committed;
+the numbers above are unchanged.
+
+  - The family is answered IN CODE now (AssistCardCommand.linksQuestion, the
+    ninth parsed family; contracts/assist-cases.json -> linksQuestion). No
+    tool description, schema or prompt byte moved: local surface sha256
+    46b96562...2cd96cb6 and mcp 9bcc7eb7...9cef36f7 before and after,
+    `Plantoir --write-contracts` run twice. Nothing new reaches the model, so
+    no routing re-run was owed.
+  - The next run of trimmed-surface-suite.py prints `read` as intercepted —
+    "read -> read_page" — because the #167 probe names its own window's course
+    and section, which the family accepts. So "intercepted in code before the
+    model" goes from 6 to 7 of 29 and "the N the model SEES" from 23 to 22.
+    Checked with --intercept-only against this branch: "links-question guard
+    agrees with 56 contract rows ... (7 of 29 probes)". A number quoted from
+    before this change is out of 23; one from after it is out of 22.
+  - WINDOWS' model still sees the probe until their app answers the family in
+    code too, so a Windows routing number is not comparable on that probe
+    until then.

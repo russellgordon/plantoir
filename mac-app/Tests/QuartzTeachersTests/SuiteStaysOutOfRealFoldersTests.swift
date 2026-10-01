@@ -1,0 +1,209 @@
+import XCTest
+@testable import QuartzTeachers
+
+/// The suite never reaches the teacher's own scheduled-deploy notes, agents
+/// or assistant launch files — asked of the resolvers themselves, with every
+/// override cleared, so a test that forgets to pass a home of its own is
+/// still sent somewhere harmless (issue #240).
+///
+/// The same guard `BuildOutputLocationTests.testTheSuiteNeverBuildsIntoTheRealApplicationSupport`
+/// keeps for built websites. Each case here was a real reach before the fix:
+/// the success and findings sentinels were written and deleted for `ICS3U`
+/// section 1, the `assist/` folder was written by both launcher doors, and
+/// the agents folder was listed about 344 times in one run of the suite.
+@MainActor
+final class SuiteStaysOutOfRealFoldersTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    private var savedAgentsOverride: URL?
+    private var savedScriptsOverride: URL?
+    private var savedSupportOverride: URL?
+
+    /// The teacher's own home, asked for once and only so that nothing
+    /// below may answer it.
+    private let realHomePath: String = FileManager.default.homeDirectoryForCurrentUser.path
+
+    // MARK: - Computed properties
+
+    /// Where the teacher's own `Library` is, which nothing here may answer.
+    private var realLibraryPath: String {
+        return realHomePath + "/Library"
+    }
+
+    // MARK: - Set-up
+
+    override func setUp() {
+        super.setUp()
+        savedAgentsOverride = ScheduledDeploy.launchAgentsDirectoryOverride
+        savedScriptsOverride = ScheduledDeploy.scheduledScriptsDirectoryOverride
+        savedSupportOverride = ClaudeCodeLauncher.supportDirectoryOverride
+        ScheduledDeploy.launchAgentsDirectoryOverride = nil
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = nil
+        ClaudeCodeLauncher.supportDirectoryOverride = nil
+    }
+
+    override func tearDown() {
+        ScheduledDeploy.launchAgentsDirectoryOverride = savedAgentsOverride
+        ScheduledDeploy.scheduledScriptsDirectoryOverride = savedScriptsOverride
+        ClaudeCodeLauncher.supportDirectoryOverride = savedSupportOverride
+        super.tearDown()
+    }
+
+    // MARK: - The guards
+
+    func testTheSuiteNeverTouchesTheRealScheduledNotes() {
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1)
+            + ".0a1b2c3d"
+        let success: URL = ScheduledDeploy.successSentinelURL(label: label)
+        let findings: URL = ScheduledDeploy.findingsSentinelURL(
+            courseCode: "ICS3U", sectionNumber: 1, folderID: "0a1b2c3d"
+        )
+        let log: URL = ScheduledDeploy.logURL(label: label)
+        let scripts: URL = ScheduledDeploy.scheduledScriptsDirectoryURL()
+
+        XCTAssertFalse(success.path.hasPrefix(realLibraryPath), success.path)
+        XCTAssertFalse(findings.path.hasPrefix(realLibraryPath), findings.path)
+        XCTAssertFalse(log.path.hasPrefix(realLibraryPath), log.path)
+        XCTAssertFalse(scripts.path.hasPrefix(realLibraryPath), scripts.path)
+
+        // The stopped-run records: the sidebar's badge and the section's
+        // notice read them whenever a window is built, and Dismiss deletes
+        // one. They name their home explicitly, so this asks the home they
+        // name rather than a resolver's default.
+        let stopped: URL = ScheduledPublishOutcome.directory(inHomeFolder: ScheduledDeploy.homeForScheduledNotes)
+        XCTAssertFalse(stopped.path.hasPrefix(realLibraryPath), stopped.path)
+    }
+
+    /// The preferences door (#154) did not quietly move the unit host
+    /// somewhere the product's `=== PlantoirDefaults.shared` guards would no
+    /// longer recognise: under the suite it IS the standard store, which
+    /// every guard refuses to write.
+    func testThePreferencesDoorIsTheStandardStoreUnderTheSuite() {
+        XCTAssertTrue(PlantoirDefaults.shared === UserDefaults.standard)
+    }
+
+    func testTheSuiteNeverReadsTheRealLaunchAgents() {
+        let agents: URL = ScheduledDeploy.launchAgentsDirectoryURL()
+        XCTAssertFalse(agents.path.hasPrefix(realLibraryPath), agents.path)
+        let plist: URL = ScheduledDeploy.plistURL(
+            label: ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1)
+        )
+        XCTAssertFalse(plist.path.hasPrefix(realLibraryPath), plist.path)
+    }
+
+    func testTheSuiteNeverWritesTheRealAssistFolder() throws {
+        let support: URL = try ClaudeCodeLauncher.supportDirectory()
+        XCTAssertFalse(support.path.hasPrefix(realLibraryPath), support.path)
+    }
+
+    /// The redirect above would be DANGEROUS without this: a test that forgot
+    /// the override would write its plist into the throwaway folder and then
+    /// hand it to the real launchd. So the real launchctl refuses under the
+    /// suite whether or not the override is set.
+    func testTheRealLaunchControlRefusesEvenWithNoOverride() {
+        let result = LaunchControl.run(arguments: ["print", "gui/501"])
+        XCTAssertEqual(result.exitCode, -1)
+        XCTAssertEqual(result.output, LaunchControl.refusedUnderATestRun)
+    }
+
+    // MARK: - Every default home is the throwaway one (#264)
+
+    /// Every resolver that used to default to the real home now defaults to
+    /// `RealHome.forFiles`, so a test that calls one WITHOUT naming a home —
+    /// and then runs what it built, as `ScheduledPublishOutcomeTests` does
+    /// with the generated wrapper — is sent to the suite's throwaway home.
+    /// The source scan in `RealHomeTripwireTests` says nothing ELSE may ask
+    /// for a home; this says the one door that may answers the right one.
+    func testEveryDefaultHomeIsTheSuitesThrowawayOne() {
+        let throwaway: String = RealHome.homeWhileTesting.path
+        XCTAssertEqual(RealHome.forFiles.path, throwaway)
+
+        var answers: [String: String] = [:]
+        answers["HelperPrograms.binDirectory"] = HelperPrograms.binDirectory()
+        answers["HelperPrograms.exportLine"] = HelperPrograms.exportLine()
+        answers["HelperPrograms.pathValue"] = HelperPrograms.pathValue(inheriting: "/usr/bin:/bin")
+        answers["PreviewStopper.stopCommand PATH"] = PreviewStopper.stopCommand(
+            courseCode: "ICS3U", sectionNumber: 1, workspaceURL: URL(fileURLWithPath: "/tmp/w"),
+            inheriting: ["PATH": "/usr/bin:/bin"]
+        ).environment["PATH"] ?? ""
+        answers["PreviewReachability.askTheBuilderCommand PATH"] = PreviewReachability.askTheBuilderCommand(
+            containerName: "c", portInsideTheBuilder: 8081, inheriting: ["PATH": "/usr/bin:/bin"]
+        ).environment["PATH"] ?? ""
+        answers["FolderContainers.quitScript"] = FolderContainers.quitScript(folderPaths: ["/tmp/w"])
+        answers["ScheduledDeploy.oneShotCommand"] = ScheduledDeploy.oneShotCommand(
+            courseCode: "ICS3U", sectionNumber: 1, workspaceURL: URL(fileURLWithPath: "/tmp/w"),
+            deployArgumentsList: [["ICS3U", "1"]]
+        )
+        answers["AssistModelStore.directoryURL"] = AssistModelStore.directoryURL.path
+        answers["ProblemReportStore.defaultFolderURL"] = ProblemReportStore.defaultFolderURL().path
+        answers["FolderActions.obsidianRegistryFileURL"] = FolderActions.obsidianRegistryFileURL.path
+        answers["BuildOutputLocation.buildsRoot(inHomeFolder: forFiles)"] =
+            BuildOutputLocation.buildsRoot(inHomeFolder: RealHome.forFiles).path
+        answers["RealHome.expandingTilde"] = RealHome.expandingTilde(in: "~/Sites/ICS3U")
+        answers["QuartzCheckoutLayout.place"] = QuartzCheckoutLayout.place(
+            of: RealHome.forFiles.appendingPathComponent("Documents")
+        )
+
+        for (name, answer) in answers {
+            XCTAssertFalse(answer.contains(realHomePath + "/"), "\(name) named the real home: \(answer)")
+        }
+        XCTAssertTrue(answers["HelperPrograms.binDirectory"]?.hasPrefix(throwaway + "/") ?? false)
+        XCTAssertTrue(answers["ScheduledDeploy.oneShotCommand"]?.contains(throwaway + "/Library/") ?? false)
+        XCTAssertTrue(answers["AssistModelStore.directoryURL"]?.hasPrefix(throwaway + "/") ?? false)
+        XCTAssertEqual(answers["RealHome.expandingTilde"], throwaway + "/Sites/ICS3U")
+        XCTAssertEqual(answers["QuartzCheckoutLayout.place"], "~/Documents")
+    }
+
+    /// `~` means a home only at the very start, and `~name/` — another
+    /// account's home — is left exactly as typed rather than looked up.
+    func testATypedTildeIsExpandedOnlyAtTheStart() {
+        let throwaway: String = RealHome.homeWhileTesting.path
+        XCTAssertEqual(RealHome.expandingTilde(in: "~"), throwaway)
+        XCTAssertEqual(RealHome.expandingTilde(in: "~/"), throwaway)
+        XCTAssertEqual(RealHome.expandingTilde(in: "/Sites/~/x"), "/Sites/~/x")
+        XCTAssertEqual(RealHome.expandingTilde(in: "~colleague/Sites"), "~colleague/Sites")
+        XCTAssertEqual(RealHome.expandingTilde(in: ""), "")
+    }
+
+    // MARK: - The real rules, still pinned
+
+    /// The redirect applies only when nobody names a home. A home named
+    /// explicitly — as the app names the real one when it writes the script
+    /// launchd will run — is used exactly.
+    func testAHomeNamedExplicitlyIsUsedExactly() throws {
+        let home: URL = URL(fileURLWithPath: "/Users/teacher", isDirectory: true)
+        let label: String = ScheduledDeploy.agentLabel(
+            courseCode: "ICS3U", sectionNumber: 1,
+            workingFolder: URL(fileURLWithPath: "/Users/teacher/Teaching")
+        )
+        let folderID: String = try XCTUnwrap(ScheduledDeploy.folderID(fromLabel: label))
+
+        XCTAssertEqual(
+            ScheduledDeploy.successSentinelURL(label: label, inHomeFolder: home).path,
+            "/Users/teacher/Library/Application Support/Plantoir/scheduled/\(label).succeeded"
+        )
+        XCTAssertEqual(
+            ScheduledDeploy.findingsSentinelURL(
+                courseCode: "ICS3U", sectionNumber: 1, folderID: folderID, inHomeFolder: home
+            ).path,
+            "/Users/teacher/Library/Application Support/Plantoir/scheduled/\(label).findings"
+        )
+        XCTAssertEqual(
+            ScheduledDeploy.logURL(label: label, inHomeFolder: home).path,
+            "/Users/teacher/Library/Logs/Plantoir/\(label).log"
+        )
+
+        let script: String = ScheduledDeploy.oneShotCommand(
+            courseCode: "ICS3U",
+            sectionNumber: 1,
+            workspaceURL: URL(fileURLWithPath: "/Users/teacher/Teaching"),
+            deployArgumentsList: [["ICS3U", "1"]],
+            homeFolder: home
+        )
+        XCTAssertTrue(
+            script.contains("/Users/teacher/Library/Application Support/Plantoir/scheduled/\(label).succeeded"),
+            "The script launchd runs must name the home it was given, not the suite's throwaway one."
+        )
+    }
+}

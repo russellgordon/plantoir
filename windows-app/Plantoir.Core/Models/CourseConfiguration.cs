@@ -408,6 +408,24 @@ public sealed class CourseConfiguration
         set => _values["footer_html"] = value;
     }
 
+    /// <summary>The window when nothing usable is stored: a week.</summary>
+    public const int DefaultMayRunLateDays = 7;
+
+    /// <summary>
+    /// How long after its moment a scheduled deploy of this course is still
+    /// worth running (#239; <c>scheduledDeployCancellation.theSetting</c>): 1,
+    /// 3, 7 or 14 days, and anything else — absent, 0, 5, 365, not a number —
+    /// means a week. Read at the run, off disk. This app offers no control for
+    /// it yet; the key is still PRESERVED on every save, because the settings
+    /// are kept as a JObject and edited key by key, so a teacher's choice made
+    /// on a Mac survives a save on Windows.
+    /// </summary>
+    public int ScheduledDeployMayRunLateDays =>
+        _values["scheduled_deploy_may_run_late_days"] is JValue { Type: JTokenType.Integer } stored
+        && stored.ToObject<long>() is 1 or 3 or 7 or 14
+            ? (int)stored.ToObject<long>()
+            : DefaultMayRunLateDays;
+
     public List<string> SharedFolders { get => StringList("shared_folders"); set => SetStringList("shared_folders", value); }
     public List<string> SharedFiles { get => StringList("shared_files"); set => SetStringList("shared_files", value); }
     public List<string> PerSectionFolders { get => StringList("per_section_folders"); set => SetStringList("per_section_folders", value); }

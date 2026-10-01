@@ -89,12 +89,14 @@ public static class CourseRenamer
             throw new InvalidOperationException($"There is already something called {newCode} in this working folder.");
         }
 
-        var scheduledSections = new List<int>();
-        foreach (int section in course.SectionNumbers)
-        {
-            if (TaskScheduling.Exists(TaskScheduling.NameFor(course.Code, section)))
-                scheduledSections.Add(section);
-        }
+        // Asked of the SCHEDULER, and of this working folder's deploys only
+        // (#239, #309): a section removed earlier can have left one behind that
+        // the settings no longer list, and another folder's ICS3U is not ours.
+        string workingFolder = Path.GetDirectoryName(coursesDirectory.TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? coursesDirectory;
+        var scheduled = TaskScheduling.InFolder(workingFolder)
+            .Where(task => TaskScheduling.SameCode(task.CourseCode, course.Code))
+            .ToList();
 
         string previousCode = course.Code;
         course.Configuration.SetCourseCode(newCode);
@@ -121,14 +123,22 @@ public static class CourseRenamer
 
         var stopped = new List<int>();
         var unstopped = new List<int>();
-        foreach (int section in scheduledSections)
+        foreach (var task in scheduled)
         {
-            string? cancelError = TaskScheduling.Cancel(TaskScheduling.NameFor(previousCode, section));
+            // Cancelled by the name it REALLY has — one set before #309 has
+            // the folder-less one, and a rebuilt name would miss it.
+            string? cancelError = TaskScheduling.Cancel(task);
             if (cancelError is null)
-                stopped.Add(section);
-            else
-                unstopped.Add(section);
+            {
+                if (!stopped.Contains(task.Section)) stopped.Add(task.Section);
+                Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.ScheduledDeployTurnedOff,
+                    $"turned off: the course was renamed to {newCode}", previousCode, task.Section);
+            }
+            else if (!unstopped.Contains(task.Section))
+                unstopped.Add(task.Section);
         }
+        stopped.Sort();
+        unstopped.Sort();
 
         return new Outcome(newCode, stopped, unstopped);
     }

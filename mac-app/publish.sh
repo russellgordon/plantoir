@@ -4,6 +4,10 @@
 #
 #     ./publish.sh              # unsigned / ad-hoc bundle (local packaging test)
 #     ./publish.sh -Sign        # signed & notarized production release DMG
+#     ./publish.sh -Sign --rehearsal-feed https://plantoir.app/updates/rehearsal-204/macos.xml
+#                               # a DRESS-REHEARSAL build of the updater (#204):
+#                               # its own feed, a "-rehearsal.<build>" version and
+#                               # a REHEARSAL asset name, so it can never be cut
 #
 # Output lands in mac-app/dist/Plantoir-macOS.dmg with its SHA-256 printed for
 # the release notes.
@@ -25,6 +29,8 @@ cd "${HERE}"
 SIGN=false
 KEYCHAIN_PROFILE="${NOTARYTOOL_PROFILE:-notarytool-profile}"
 IDENTITY=""
+REHEARSAL_FEED=""
+PRODUCTION_FEED="https://plantoir.app/updates/macos.xml"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -41,9 +47,13 @@ while [[ $# -gt 0 ]]; do
       KEYCHAIN_PROFILE="$2"
       shift 2
       ;;
+    --rehearsal-feed)
+      REHEARSAL_FEED="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: ./publish.sh [-Sign] [--identity <name>] [--keychain-profile <profile>]"
+      echo "Usage: ./publish.sh [-Sign] [--identity <name>] [--keychain-profile <profile>] [--rehearsal-feed <url>]"
       exit 1
       ;;
   esac
@@ -52,6 +62,25 @@ done
 echo "============================================================"
 echo "  Plantoir macOS Release Packaging"
 echo "============================================================"
+
+# A rehearsal build (#204) may point only at a throwaway feed on plantoir.app,
+# never the real one: a rehearsal that read the production feed would be
+# offered teachers' real updates, and one on another host is a feed nobody
+# checks. The dress rehearsal is RELEASING.md → "The dress rehearsal".
+if [[ -n "${REHEARSAL_FEED}" ]]; then
+  # Only with -Sign — a rehearsal is two SIGNED builds — and only an exact,
+  # plain address: no query, no fragment (the slice-2 review's L9;
+  # check-update-keys.sh pins the exact value in the bundle as well).
+  if [[ "${SIGN}" != true ]]; then
+    echo "❌ --rehearsal-feed is for the signed dress-rehearsal builds; pass -Sign too."
+    exit 1
+  fi
+  if ! [[ "${REHEARSAL_FEED}" =~ ^https://plantoir\.app/updates/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.xml$ ]] || [[ "${REHEARSAL_FEED}" == "${PRODUCTION_FEED}" ]]; then
+    echo "❌ --rehearsal-feed must be a throwaway feed under https://plantoir.app/updates/, never ${PRODUCTION_FEED}."
+    exit 1
+  fi
+  echo "🎭 REHEARSAL BUILD — feed ${REHEARSAL_FEED}. This DMG must never be attached to a release."
+fi
 
 # ---- Preflight ---------------------------------------------------------------
 if [[ "${SIGN}" == true ]]; then
@@ -87,6 +116,17 @@ fi
 echo ""
 echo "📦 Step 1: Checking llama.cpp engine..."
 ./Vendor/fetch-llama.sh
+# The updater (#204): `project.yml` embeds Vendor/Sparkle/Sparkle.framework,
+# so it must be in place before step 2 generates the project. Its helpers are
+# signed item by item in step 4 (release/sign-updater.sh).
+echo "📦 Checking Sparkle (the updater)..."
+./Vendor/fetch-sparkle.sh
+# The website builder's helper programs and starting disk (#312): project.yml
+# carries Vendor/helpers as a resource folder, so it must be in place before
+# step 2 generates the project. The programs are signed in step 4
+# (release/sign-helpers.sh), which writes their MANIFEST again.
+echo "📦 Checking the website builder's helper programs..."
+./Vendor/fetch-helpers.sh
 
 # ---- 2. Generate Xcode Project -----------------------------------------------
 echo ""
@@ -106,12 +146,21 @@ mkdir -p "${BUILD_DIR}"
 BUILD_NUMBER="$(git -C "${HERE}" rev-list --count HEAD 2>/dev/null || echo 0)"
 echo "   - Build number: ${BUILD_NUMBER} (git rev-list --count HEAD)"
 
+EXTRA_SETTINGS=()
+EXPECTED_FEED="${PRODUCTION_FEED}"
+if [[ -n "${REHEARSAL_FEED}" ]]; then
+  MARKETING="$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"/\1/p' project.yml | head -n 1)"
+  EXTRA_SETTINGS+=("PLANTOIR_UPDATE_FEED_URL=${REHEARSAL_FEED}" "MARKETING_VERSION=${MARKETING}-rehearsal.${BUILD_NUMBER}")
+  EXPECTED_FEED="${REHEARSAL_FEED}"
+fi
+
 xcodebuild -project Plantoir.xcodeproj \
   -scheme Plantoir \
   -configuration Release \
   -derivedDataPath "${BUILD_DIR}/DerivedData" \
   ENABLE_HARDENED_RUNTIME=YES \
   CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
+  ${EXTRA_SETTINGS[@]+"${EXTRA_SETTINGS[@]}"} \
   build
 
 APP_SOURCE="${BUILD_DIR}/DerivedData/Build/Products/Release/Plantoir.app"
@@ -124,11 +173,21 @@ STAGE_APP="${BUILD_DIR}/Plantoir.app"
 rm -rf "${STAGE_APP}"
 cp -a "${APP_SOURCE}" "${STAGE_APP}"
 
+# A Release that lost its update feed, or carries the wrong key, ships an app
+# that never offers an update and says nothing (#204). Asked of the BUILT
+# bundle, in every mode.
+./release/check-update-keys.sh "${STAGE_APP}" "${EXPECTED_FEED}"
+
 # ---- 4. Code Signing ---------------------------------------------------------
 if [[ "${SIGN}" == true ]]; then
   echo ""
   echo "✍️  Step 4: Bottom-up Code Signing with Hardened Runtime..."
   ENTITLEMENTS="${HERE}/QuartzTeachers/QuartzTeachers.entitlements"
+
+  # The updater's own code FIRST, item by item, framework last (#204): Xcode's
+  # Code Sign On Copy re-signs only the framework's top level, and its helpers
+  # arrive ad-hoc. Never --deep; never the app's entitlements on them.
+  ./release/sign-updater.sh "${STAGE_APP}" "${IDENTITY}"
 
   # Sign all real .dylib files inside the bundle (skip symlinks)
   echo "   - Signing dynamic libraries..."
@@ -143,12 +202,21 @@ if [[ "${SIGN}" == true ]]; then
     codesign --force --timestamp --options runtime --sign "${IDENTITY}" "${LLAMA_SERVER}"
   fi
 
+  # The website builder's helper programs (#312), one by one — limactl with
+  # its own entitlements, never the app's — and their MANIFEST written again
+  # from the signed bytes, BEFORE the app, so the app's signature seals it.
+  echo "   - Signing the website builder's helper programs..."
+  ./release/sign-helpers.sh "${STAGE_APP}" "${IDENTITY}"
+
   # Sign main application bundle
   echo "   - Signing Plantoir.app with entitlements..."
   codesign --force --timestamp --options runtime --entitlements "${ENTITLEMENTS}" --sign "${IDENTITY}" "${STAGE_APP}"
 
   # Verify bundle signature
   codesign --verify --deep --strict --verbose=2 "${STAGE_APP}"
+  # …which cannot see an updater helper left on another team (measured for
+  # #204). This can, and refuses BEFORE a five-minute notarization round trip.
+  ./release/check-signatures.sh "${STAGE_APP}"
   echo "✅ Application bundle signed and verified."
 else
   echo ""
@@ -161,6 +229,11 @@ echo "💿 Step 5: Packaging Drag-and-Drop DMG..."
 DIST_DIR="${HERE}/dist"
 mkdir -p "${DIST_DIR}"
 DMG_PATH="${DIST_DIR}/Plantoir-macOS.dmg"
+if [[ -n "${REHEARSAL_FEED}" ]]; then
+  # A name the cut-release skill refuses to attach (it takes only the frozen
+  # asset names), so a rehearsal DMG can never reach a teacher by mistake.
+  DMG_PATH="${DIST_DIR}/Plantoir-macOS-REHEARSAL.dmg"
+fi
 rm -f "${DMG_PATH}"
 
 DMG_STAGE="${BUILD_DIR}/dmg_staging"
@@ -190,6 +263,19 @@ else
   echo "   Using native hdiutil to create APFS disk image..."
   hdiutil create -fs APFS -volname "Plantoir" -srcfolder "${DMG_STAGE}" -ov -format UDZO "${DMG_PATH}"
 fi
+
+# LZMA (ULMO) rather than create-dmg's zlib (UDZO), since the app carries the
+# website builder's starting disk (#312): 432 MB rather than 466 MB, measured
+# with the same payload (410 MB at the rehearsal), for about 30-70 s more
+# here; macOS 15, the app's minimum,
+# reads it. Converted BEFORE the DMG is signed, because converting drops the
+# signature. The window layout create-dmg wrote is inside the volume and
+# survives the conversion (checked at the #312 rehearsal).
+echo "   Recompressing the disk image with LZMA (ULMO)..."
+ULMO_PATH="${DIST_DIR}/.Plantoir-ULMO.dmg"
+rm -f "${ULMO_PATH}"
+hdiutil convert "${DMG_PATH}" -format ULMO -o "${ULMO_PATH}" -quiet
+mv -f "${ULMO_PATH}" "${DMG_PATH}"
 
 # ---- 6. Sign DMG, Notarize & Staple ------------------------------------------
 if [[ "${SIGN}" == true ]]; then
@@ -224,3 +310,6 @@ echo "Size:    ${SIZE}"
 echo "SHA-256: ${HASH}"
 echo ""
 echo "Next: Upload ${DMG_PATH} to GitHub Release."
+echo ""
+echo "Do not rebuild, re-sign or re-staple this DMG before the release is cut:"
+echo "the update feed (website/update_feed.py) is signed against these exact bytes."

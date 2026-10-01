@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -331,7 +332,7 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
                 // Buddhist - and the tool would then look for a class on a day
                 // no course has.
                 obj["date"] = day is { } read
-                    ? read.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    ? DateText.Iso(read)
                     : v;
             }
             else if (k == "pages")

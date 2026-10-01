@@ -1,7 +1,8 @@
 import Foundation
 
 /// What happened to a publish that was set to happen on its own, kept where
-/// the app can find it the next time the teacher opens Plantoir.
+/// the app can find it — the moment it is written if the section is on screen,
+/// and whenever the teacher next opens that section otherwise.
 ///
 /// A scheduled publish runs at half six in the morning with the app closed.
 /// Until this existed, a run that did not get through said so in the section's
@@ -32,12 +33,16 @@ nonisolated enum ScheduledPublishOutcome {
 
     /// How a scheduled publish turned out.
     ///
-    /// The two FAILURE kinds are the two a launcher can tell apart without
-    /// guessing: `deploy.sh` and `deploy.py` exit **3** when a question went
-    /// unanswered and **1** for everything else. `buildNeededAnAnswer` splits
-    /// the first of those by WHICH LEG stopped, because a scheduled publish
-    /// builds before it publishes and the two legs send a teacher to two
-    /// different buttons. The list here and the one in
+    /// A launcher can report two failures without guessing: `preview.sh`,
+    /// `deploy.sh` and `deploy.py` exit **3** when a question went unanswered
+    /// and anything else non-zero for everything else. Each of those is split
+    /// by WHICH LEG stopped — the build or a destination — because a scheduled
+    /// publish builds before it publishes and the two legs send a teacher to
+    /// two different buttons. That gives four failure kinds; the other kinds
+    /// are a run that got through and runs that stood down without attempting
+    /// anything. Which leg and code give which kind is a case list in the
+    /// contract (`scheduledPublishStopped.whichKind`), run against the real
+    /// wrapper by `ScheduledPublishOutcomeTests`. The list here and the one in
     /// `contracts/shared-rules.json` → `scheduledPublishStopped` → `kinds` are
     /// pinned against each other by a test, so a kind added on one platform
     /// cannot be missed on the other.
@@ -66,7 +71,38 @@ nonisolated enum ScheduledPublishOutcome {
         /// correctly and it is false.
         case buildNeededAnAnswer = "build needed an answer"
 
-        /// Any other non-zero exit.
+        /// Any other non-zero exit from the BUILD, before any destination
+        /// was reached — so nothing was published anywhere. (#137)
+        ///
+        /// Russell's decision, 2026-09-23. A SEPARATE kind from
+        /// `didNotFinish` for `buildNeededAnAnswer`'s reason: that sentence
+        /// names a DESTINATION that stopped, and none was contacted. Until
+        /// #137 this side filled the slot with `buildDestinationName` — a
+        /// phrase that is not a destination — and sent the teacher to
+        /// Publish; this sentence names nothing and sends them to PREVIEW,
+        /// which is the button that rebuilds the pages and shows why they
+        /// would not build.
+        ///
+        /// ANY code but 3, not only 1: a build launcher that could not be run
+        /// at all, or was stopped by a signal, exits with another code, and
+        /// the pages were not built either way.
+        ///
+        /// REJECTED, and recorded so they are not proposed again: merging the
+        /// two build kinds (it loses `buildNeededAnAnswer`'s promise that one
+        /// answer lets the section publish on its own after that); rewording
+        /// `didNotFinish` to cover both (a sentence that fits a revoked token
+        /// and a page that would not build names neither the place nor the
+        /// fix); and telling the two apart by the record's destination line,
+        /// which would make a display string carry meaning.
+        case buildDidNotFinish = "build did not finish"
+
+        /// Any other non-zero exit from a DESTINATION — a revoked token, a
+        /// network that was down.
+        ///
+        /// A build that fails INSIDE a destination's own rebuild still lands
+        /// here, as that destination's exit 1, because the exit code is all
+        /// the wrapper has. See `documentation/07-deployment.md` for when a
+        /// scheduled run can reach that.
         case didNotFinish = "did not finish"
 
         /// It worked.
@@ -78,15 +114,62 @@ nonisolated enum ScheduledPublishOutcome {
         /// nowhere to look, and "it did" is an answer worth having.
         case succeeded = "succeeded"
 
+        /// The day it was set for had gone by, so the run stood down and
+        /// deployed nothing.
+        ///
+        /// Nothing was attempted and nothing failed — which is exactly why it
+        /// could not be filed under any of the failures above. `didNotFinish`'s
+        /// own sentence names a DESTINATION that stopped, and there was none:
+        /// filling that slot in would read correctly and be false, which is
+        /// the mistake `buildNeededAnAnswer` was created to stop being made,
+        /// and the contract records it as REJECTED in as many words.
+        ///
+        /// Added 2026-09-20 with the fix for a scheduled deploy outliving its
+        /// course. **Windows does not have the fault**: their task is created
+        /// with `/SC ONCE`, which has no annual recurrence to close. What they
+        /// owe is to say whether their task is set to run after a MISSED
+        /// start, and to carry this kind only if it is.
+        case tooLateToRun = "too late to run"
+
+        /// Another program on this Mac was still building or publishing the
+        /// course after the run had waited ten minutes for it, so the run
+        /// STOOD DOWN (#156): deployed nothing, cleared the job away, and said
+        /// so. Two builds of one section clear the same folder, so going
+        /// ahead would have spoiled both; standing down at once would have
+        /// cost a night's publish to a build that finishes in thirty seconds.
+        /// A separate kind for the reason `tooLateToRun` is one — nothing was
+        /// attempted, so there is no destination for a sentence to name.
+        case courseWasBusy = "course was busy"
+
+        /// The run read the course's settings when it fired (GitHub #323)
+        /// and would not deploy the way the course is set NOW: everything the
+        /// schedule sheet refuses except a time already passed, or settings
+        /// that could not be read. So it STOOD DOWN — deployed nothing,
+        /// cleared the job away, and said why. Unlike the other stand-downs
+        /// the record's second line is SHOWN: it is the reason
+        /// (`ScheduledDeploy.RunRefusal.reasonClause`), a clause true at the
+        /// run. One kind rather than one per refusal: seven kinds for one
+        /// situation a teacher reads the same way, and the folder and account
+        /// reasons carry varying text anyway.
+        case couldNotRunAsSetNow = "could not run as set now"
+
         /// Whether this is something the teacher should be chased about.
         ///
-        /// All three failures are; a success is news rather than a problem, so it
-        /// gets the sentence in the section and NOT a warning badge in the
-        /// sidebar. A badge on every section that published fine overnight is
-        /// a badge nobody reads by Wednesday.
+        /// The test is not "did something break" but "is the site other than
+        /// the teacher expects". Every failure is, and so is a run that
+        /// stood down — which is NOT a failure, and still earns the badge,
+        /// because the site the teacher was expecting is not there either way
+        /// and the whole reason this type exists is that silence reads as
+        /// "nothing was ever scheduled". `scheduledPublishStopped.attention`
+        /// says the same in the contract, and said only "every failure" until
+        /// 2026-09-20. A success is news rather than a problem, so it gets the
+        /// sentence in the section and NOT a warning badge in the sidebar: a
+        /// badge on every section that published fine overnight is a badge
+        /// nobody reads by Wednesday.
         var needsAttention: Bool {
             switch self {
-            case .neededAnAnswer, .buildNeededAnAnswer, .didNotFinish:
+            case .neededAnAnswer, .buildNeededAnAnswer, .buildDidNotFinish, .didNotFinish,
+                 .tooLateToRun, .courseWasBusy, .couldNotRunAsSetNow:
                 return true
             case .succeeded:
                 return false
@@ -118,18 +201,32 @@ nonisolated enum ScheduledPublishOutcome {
     /// What the record calls the build, when the BUILD is what stopped.
     ///
     /// A scheduled publish builds before it publishes, so a run can stop
-    /// before any destination is reached. For a build that failed OUTRIGHT
-    /// this stands in for a destination in the teacher's sentence, so it has
-    /// to read naturally in "publishing to ___ stopped".
+    /// before any destination is reached. It is written for BOTH build kinds
+    /// and shown for NEITHER: `buildNeededAnAnswer`'s sentence and
+    /// `buildDidNotFinish`'s name no destination, because there was none.
+    /// (Until #137 a build that failed outright put this phrase in the
+    /// teacher's sentence as though it were a destination.)
     ///
-    /// For `buildNeededAnAnswer` it is written to the record and never shown:
-    /// that sentence names no destination, because there was none. The line is
-    /// still written so every record has ONE shape — two lines, the kind and
-    /// then a name — which is what `stopped(inHomeFolder:course:section:)`
+    /// The line is still written so every record has ONE shape — two lines, the kind and
+    /// then a name — which is what `stopped(inHomeFolder:course:section:folderID:)`
     /// reads and what a person opening the file in TextEdit sees. A record
     /// whose second line was sometimes absent would be a second format for a
     /// shell script to get right at half six in the morning.
+    ///
+    /// The VALUE is kept although nobody sees it now. REJECTED renaming it
+    /// when #137 stopped showing it: only a person opening the file would see
+    /// the difference, and keeping it means a record written by a wrapper
+    /// scheduled before #137 and one written after differ only in the kind.
     static let buildDestinationName: String = "your website (it could not be built)"
+
+    /// The same stand-in, for a run that stood down without attempting
+    /// anything.
+    ///
+    /// Written into the record and never shown, exactly as
+    /// `buildDestinationName` is for `buildNeededAnAnswer`: every record has
+    /// ONE shape — the kind, then a name — and a second line that is sometimes
+    /// absent would be a second format for something else to get right.
+    static let nothingWasDeployedName: String = "your website (nothing was deployed)"
 
     // MARK: - Functions
 
@@ -152,10 +249,95 @@ nonisolated enum ScheduledPublishOutcome {
             .appendingPathComponent("stopped")
     }
 
-    /// The file that stands for one section.
-    static func recordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
+    /// The file that stands for one section IN ONE WORKING FOLDER:
+    /// `<course>-section<N>.<folder id>.txt` (#237).
+    ///
+    /// The folder's id is `BuildOutputLocation.folderIdentifier`, the one a
+    /// scheduled deploy's label ends with. Until #237 the record was named for
+    /// the course and section alone — harmless while a section could have only
+    /// one alarm on the Mac, and a race once two working folders could each
+    /// hold one: both wrappers begin by clearing the record, so one folder's
+    /// run erased the other's failure, and whichever finished last wore the
+    /// badge in BOTH sidebars.
+    static func recordURL(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> URL {
+        return directory(inHomeFolder: home)
+            .appendingPathComponent("\(course)-section\(section).\(folderID).txt")
+    }
+
+    /// The name a record had before #237, which a wrapper written then still
+    /// writes. Read only by `fileUnderTheFolder`, which moves it to the
+    /// folder's own name straight after such a run — never by a badge or a
+    /// notice, because nothing in it says which folder it belongs to, and
+    /// reading it would show folder A's failure in folder B.
+    static func legacyRecordURL(inHomeFolder home: URL, course: String, section: Int) -> URL {
         return directory(inHomeFolder: home)
             .appendingPathComponent("\(course)-section\(section).txt")
+    }
+
+    /// Straight after a run of a job set before #237: move the record its
+    /// wrapper wrote under the old, folder-less name to this folder's name.
+    ///
+    /// Safe to attribute HERE and nowhere else, because this is the one moment
+    /// the owner is known — the run was started for this folder's section, and
+    /// the record was written by it a moment ago. (Only one job per section
+    /// can carry the old label on a Mac, so no other run is writing that name
+    /// at the same time.) A job whose label carries a folder id wrote the new
+    /// name itself and this does nothing.
+    static func fileUnderTheFolder(
+        inHomeFolder home: URL,
+        course: String,
+        section: Int,
+        folderID: String,
+        jobLabel: String?
+    ) {
+        if let jobLabel, ScheduledDeploy.folderID(fromLabel: jobLabel) != nil {
+            return
+        }
+        let legacy: URL = legacyRecordURL(inHomeFolder: home, course: course, section: section)
+        if !FileManager.default.fileExists(atPath: legacy.path) {
+            return
+        }
+        let destination: URL = recordURL(
+            inHomeFolder: home, course: course, section: section, folderID: folderID
+        )
+        // This run's record replaces an older one of this folder's, as the
+        // wrapper's own first line would have cleared it. `rename(2)` in one
+        // folder, so the watcher sees one whole file arrive.
+        try? FileManager.default.removeItem(at: destination)
+        try? FileManager.default.moveItem(at: legacy, to: destination)
+    }
+
+    /// Where a record is assembled before it is moved into place, so that it is
+    /// complete the instant it exists.
+    ///
+    /// **In the PARENT of the record folder, and that is measured rather than
+    /// tidy.** `ScheduledPublishWatcher` watches the record folder for entries
+    /// arriving, and what it sees depends entirely on how the wrapper writes:
+    ///
+    /// | how the record is written | events | first event readable |
+    /// |---|---|---|
+    /// | two `echo`s (what this used to do) | 1 | **0 of 40** |
+    /// | one `printf` of both lines | 1 | **0 of 40** |
+    /// | temp INSIDE the record folder, then `mv` | 3 | 2 of them carry no file |
+    /// | temp in the PARENT, then `mv` | **1** | **40 of 40** |
+    ///
+    /// (Measured 2026-09-19 on this Mac — Apple silicon, APFS — 40 trials each,
+    /// reading the record inside the event handler exactly as `record(at:)`
+    /// does. The rename-OVER-an-existing-record case is 40 of 40 too.)
+    ///
+    /// The reason all three of the losing shapes lose is the same: the event is
+    /// the directory entry being CREATED, which happens before any bytes are
+    /// written, and the write that finishes the file changes no directory entry,
+    /// so there is no second event to catch it with. `/bin/mv` within one
+    /// filesystem is `rename(2)`, and both paths are under Application Support
+    /// by construction, so the move is atomic and the entry appears whole.
+    ///
+    /// So: do NOT "tidy" this next to its target, and do not replace the move
+    /// with a single write however much shorter it looks.
+    static func partialRecordURL(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> URL {
+        return directory(inHomeFolder: home)
+            .deletingLastPathComponent()
+            .appendingPathComponent("\(course)-section\(section).\(folderID).txt.partial")
     }
 
     /// Write down that a scheduled publish stopped, unless one is already
@@ -169,9 +351,10 @@ nonisolated enum ScheduledPublishOutcome {
         _ stopped: Stopped,
         inHomeFolder home: URL,
         course: String,
-        section: Int
+        section: Int,
+        folderID: String
     ) -> Bool {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+        let url: URL = recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID)
         if FileManager.default.fileExists(atPath: url.path) {
             return false
         }
@@ -195,8 +378,28 @@ nonisolated enum ScheduledPublishOutcome {
     /// The date comes from the FILE, not from the app: it is when the run
     /// wrote its record, and reading it later must not re-date an overnight
     /// problem to the morning somebody noticed it.
-    static func stopped(inHomeFolder home: URL, course: String, section: Int) -> Stopped? {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+    static func stopped(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> Stopped? {
+        return record(at: recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID))
+    }
+
+    /// The same, for the working folder the teacher has open — the id
+    /// computed by the one function the scheduling side baked in.
+    static func stopped(inHomeFolder home: URL, course: String, section: Int, workingFolder: URL) -> Stopped? {
+        return stopped(
+            inHomeFolder: home, course: course, section: section,
+            folderID: BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolder.path)
+        )
+    }
+
+    /// The same read, of one record file, for a caller that has the path rather
+    /// than the course and section.
+    ///
+    /// `ScheduledPublishWatcher` uses it to tell a record that can be acted on
+    /// from one that is still being written: a half-written record — one line,
+    /// or a kind nobody recognises — reads as `nil` here rather than as a wrong
+    /// notice, which is why the watcher can watch a file until this stops
+    /// returning `nil` and be sure of what it then shows.
+    static func record(at url: URL) -> Stopped? {
         guard let body = try? String(contentsOf: url, encoding: .utf8) else {
             return nil
         }
@@ -221,8 +424,8 @@ nonisolated enum ScheduledPublishOutcome {
     /// run, which leaves the message standing after a teacher has already
     /// fixed the problem themselves — and the next scheduled run that would
     /// clear it could be a week away.
-    static func clear(inHomeFolder home: URL, course: String, section: Int) {
-        let url: URL = recordURL(inHomeFolder: home, course: course, section: section)
+    static func clear(inHomeFolder home: URL, course: String, section: Int, folderID: String) {
+        let url: URL = recordURL(inHomeFolder: home, course: course, section: section, folderID: folderID)
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -244,15 +447,15 @@ nonisolated enum ScheduledPublishOutcome {
     /// wrapper runs. Plantoir runs the wrapper.
     ///
     /// The line carries the course, the section and which destination stopped
-    /// — or, when the BUILD stopped for a question, that it stopped before any
-    /// destination was reached, because none was.
+    /// — or, when the BUILD stopped, for a question or outright, that it
+    /// stopped before any destination was reached, because none was.
     ///
     /// NEVER the question's own text: that comes from a launcher's console,
     /// and a line naming a credential prompt would put a teacher's own words
     /// on the trail.
     @discardableResult
-    static func noteOnTrail(inHomeFolder home: URL, course: String, section: Int) -> Bool {
-        guard let stopped = stopped(inHomeFolder: home, course: course, section: section) else {
+    static func noteOnTrail(inHomeFolder home: URL, course: String, section: Int, folderID: String) -> Bool {
+        guard let stopped = stopped(inHomeFolder: home, course: course, section: section, folderID: folderID) else {
             return false
         }
         // One `ActivityTrail.note(.event, …)` per branch rather than a
@@ -281,6 +484,18 @@ nonisolated enum ScheduledPublishOutcome {
                 "a scheduled publish stopped — building the pages needed an answer",
                 course: course, section: section, at: stopped.when
             )
+        case .buildDidNotFinish:
+            // The SAME event as didNotFinish, for buildNeededAnAnswer's reason:
+            // the run did not finish, which is what that event is about, and
+            // an event of its own would put a distinction on the trail that
+            // means nothing to the person reading it. The line names no
+            // destination because none was reached (#137) — see
+            // `activityTrail.mustRecord` for that event, which says so.
+            ActivityTrail.note(
+                .scheduledPublishDidNotFinish,
+                "a scheduled publish stopped — the pages could not be built",
+                course: course, section: section, at: stopped.when
+            )
         case .didNotFinish:
             ActivityTrail.note(
                 .scheduledPublishDidNotFinish,
@@ -291,6 +506,39 @@ nonisolated enum ScheduledPublishOutcome {
             ActivityTrail.note(
                 .scheduledPublishFinished,
                 "a scheduled publish finished, publishing to " + stopped.destination,
+                course: course, section: section, at: stopped.when
+            )
+        case .tooLateToRun:
+            // The SAME event, and the same words, that removing a course
+            // writes — because the same thing happened to the teacher's alarm.
+            // The phrase comes from `ScheduledDeployCleanup.Reason` rather
+            // than being retyped here, so the three ways a scheduled deploy
+            // gets turned off cannot drift into three different sentences.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy "
+                + ScheduledDeployCleanup.Reason.theDayItWasSetForHadGoneBy.trailPhrase,
+                course: course, section: section, at: stopped.when
+            )
+        case .courseWasBusy:
+            // The same event as the branch above: the job was turned off by
+            // something other than the teacher asking. The wait itself, with
+            // the other program's process id, is its own line
+            // (`scheduledPublishWaitedForTheCourse`), written by the run.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy because the course was still being built "
+                + "somewhere else after ten minutes",
+                course: course, section: section, at: stopped.when
+            )
+        case .couldNotRunAsSetNow:
+            // The same event again, and generic, the `courseWasBusy`
+            // precedent: the run's own `scheduled publish read the course's
+            // settings` line carries the reason, just above this one.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy "
+                + ScheduledDeployCleanup.Reason.itCouldNotDeployAsTheCourseIsSetNow.trailPhrase,
                 course: course, section: section, at: stopped.when
             )
         }
@@ -320,6 +568,16 @@ nonisolated enum ScheduledPublishOutcome {
                  + "before it started, because building the pages needed an answer nobody was "
                  + "there to give. Preview this section once yourself, answer the question, and "
                  + "it can publish on its own after that."
+        case .buildDidNotFinish:
+            // No destination, on purpose: none was reached (#137). It sends
+            // the teacher to PREVIEW, which rebuilds the pages and shows why
+            // they would not build; the last clause echoes
+            // `AssistWording.couldNotBuildBeforeDeploying`. Russell's starting
+            // wording, 2026-09-23, his to polish.
+            return "\(course) Section \(section) was set to publish on its own, and it stopped "
+                 + "before it started — the pages could not be built, so nothing went up "
+                 + "anywhere. Preview this section once yourself, and the reason will be in "
+                 + "that section's window."
         case .didNotFinish:
             return "\(course) Section \(section) was set to publish on its own, and it did not "
                  + "finish — publishing to \(stopped.destination) stopped, so nothing went up "
@@ -327,6 +585,52 @@ nonisolated enum ScheduledPublishOutcome {
         case .succeeded:
             return "\(course) Section \(section) published on its own to "
                  + "\(stopped.destination). Your students have the new pages."
+        case .tooLateToRun:
+            // No destination, on purpose: none was reached, and none was
+            // going to be. The sentence says what Plantoir chose and why, so
+            // that a teacher meeting it does not go looking for a failure
+            // there was not.
+            //
+            // Russell's wording, 2026-09-20. It is written for the ordinary
+            // case — the computer was off or asleep when the moment came —
+            // because that is what nearly every teacher meeting it has had
+            // happen, and it tells them WHY. The check is `abs(now -
+            // intended)`, so it also refuses a job whose moment is in the
+            // FUTURE by more than the window (a clock that was wrong when the
+            // deploy was set and was corrected afterwards); "too long has
+            // passed" is slightly off there, and that trade was accepted
+            // knowingly: the earlier always-true wording ("at a time that is
+            // too far from now") read so awkwardly that it explained nothing.
+            // "This computer", not "this Mac": the sentence is the shared
+            // contract's, and Windows shows the same words if it adopts it.
+            return "\(course) Section \(section) was set to deploy on its own, but this computer "
+                 + "wasn’t awake at that time and too long has passed since. Plantoir left the site "
+                 + "as it was. Deploy it yourself when you’re ready, or schedule another from the "
+                 + "section’s menu."
+        case .courseWasBusy:
+            // No destination, for tooLateToRun's reason. Says what was in the
+            // way without naming a program, since it may be any of three.
+            return "\(course) Section \(section) was set to deploy on its own, but the course was "
+                 + "still being built somewhere else on this computer after ten minutes of waiting, "
+                 + "so Plantoir left the site as it was rather than build it twice at once. Deploy it "
+                 + "yourself when that has finished, or schedule another from the section’s menu."
+        case .couldNotRunAsSetNow:
+            // A course kept for reference is never deployed, so "Deploy it
+            // yourself" would be false (#323 review, L-a): its own sentence,
+            // `sentences.couldNotRunAsSetNowForAReferenceCourse`, chosen by the
+            // reason the record carries.
+            if stopped.destination == ScheduledDeployRefusal.keptForReference.reasonClause {
+                return "\(course) Section \(section) was set to deploy on its own, but the course is kept "
+                     + "for reference now, and a course kept for reference is never deployed — so Plantoir "
+                     + "left the site as it was and turned that deploy off."
+            }
+            // The reason is the record's second line: a clause true at the
+            // run, with no remedy of its own (#323 review, M3) — the remedy is
+            // this sentence's, and it is true for every reason.
+            return "\(course) Section \(section) was set to deploy on its own, but it could not deploy "
+                 + "the way the course is set now — \(stopped.destination) — so Plantoir left the site "
+                 + "as it was. Deploy it yourself from the section, or schedule another from the "
+                 + "section’s menu."
         }
     }
 }

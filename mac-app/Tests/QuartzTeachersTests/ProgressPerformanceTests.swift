@@ -14,7 +14,7 @@ final class ProgressPerformanceTests: XCTestCase {
         let runner: ScriptRunner = ScriptRunner()
         runner.milestones = TaskMilestones.deploy
         runner.isRunning = true
-        runner.receiveOutput( "Ensuring container is running\n")
+        runner.receiveOutput( "Getting this folder's website builder ready…\n")
         for lineNumber in 1...lineCount {
             runner.receiveOutput( "  …uploaded \(lineNumber)/\(lineCount) required files to the site\n")
         }

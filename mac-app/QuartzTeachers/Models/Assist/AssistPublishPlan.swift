@@ -27,12 +27,50 @@ struct AssistPublishChange {
 /// links to has to stay, or that other class is left pointing at nothing.
 struct AssistPublishKept {
 
+    /// Why a linked page stays: decided when the plan is made, and put into
+    /// words only when the plan is DESCRIBED.
+    ///
+    /// A reason rather than a finished string because one of them names the
+    /// course's noun (#201), and the noun belongs to the reader, not to the
+    /// plan: the model is always given "class", while a club's card says
+    /// "meeting" (#267, `AssistPublishPlan.describe(mostListed:noun:)`). A
+    /// clause baked at plan time would put "meeting" in the model's text.
+    ///
+    /// The four clauses that were strings before #201 are byte-identical to
+    /// what they were — the Windows suite pins the referrer line.
+    enum Reason: Equatable {
+        case folderLandingPage
+        case keyLinks
+        case curriculum
+        case aClassOfItsOwn
+        case stillLinkedFrom(String)
+
+        // MARK: - Functions
+
+        /// The clause that finishes "“Ohm's Law” stays visible, because …",
+        /// ending with its own full stop.
+        func finishing(noun: ClassNoun) -> String {
+            switch self {
+            case .folderLandingPage:
+                return "it is a folder's landing page, which following links never takes down."
+            case .keyLinks:
+                return "it is in this section's Key Links."
+            case .curriculum:
+                return "it is a curriculum page."
+            case .aClassOfItsOwn:
+                return AssistWording.aLinkedClassStaysBecause(noun: noun)
+            case .stillLinkedFrom(let referrer):
+                return "“\(referrer)” still links to it."
+            }
+        }
+    }
+
     // MARK: - Stored properties
 
     let page: AssistSectionPage
 
-    /// The clause that finishes "“Ohm's Law” stays: …".
-    let reason: String
+    /// Why it stays; `Reason.finishing(noun:)` puts it into words.
+    let reason: Reason
 }
 
 /// One page whose date would move onto the class's day.
@@ -88,10 +126,41 @@ struct AssistPublishPlan {
     /// Pages already the way they were asked to be.
     let alreadyRight: [AssistSectionPage]
 
+    /// Pages the writer would DECLINE: their settings have no column-0 level
+    /// for a new key to join, so nothing can be written to them safely.
+    ///
+    /// Asked at plan time by running the real writer over the page's own text
+    /// — not by a second copy of its rule — so the card cannot promise
+    /// something the writing step then quietly skips.
+    /// [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
+    let noRoomForAKey: [AssistSectionPage]
+
     /// Pages an unpublish reached by following a link and left published, each
-    /// with the reason. Always empty when publishing: publishing a page
-    /// publishes everything it links to, with nothing held back.
+    /// with the reason. Always empty when publishing: publishing takes every
+    /// page it reaches, and the one thing it does not reach is said in
+    /// `linkedClassesLeftAlone` instead.
+    ///
+    /// Since #201 this includes a linked CLASS students can see, with the
+    /// reason "it is a class of its own": an unpublish stops at a class the
+    /// way publishing does, and says so here.
     let kept: [AssistPublishKept]
+
+    /// The other classes this publish followed a link onto and left alone —
+    /// only the ones students cannot already see.
+    ///
+    /// Always empty when unpublishing. An unpublish stops at a class too
+    /// (#201, 2026-09-26), but a class it stopped at is said in `kept`, with
+    /// its own reason, because the sentence this list is said with — "publish
+    /// it when you get to that class" — would be false about it.
+    ///
+    /// A teacher is told about these because the alternative is a plan quietly
+    /// smaller than the one they pictured: a link on the page they just
+    /// published leads somewhere students cannot follow, and nothing else in
+    /// the app would ever tell them so. A class already published needs no
+    /// sentence — it is not a surprise, and "publish it when you get to that
+    /// class" would be false about it — so `AssistPublishPlanner` leaves those
+    /// out.
+    let linkedClassesLeftAlone: [AssistSectionPage]
 
     let dateMoves: [AssistPublishDateMove]
 
@@ -114,17 +183,19 @@ struct AssistPublishPlan {
         guard changesNothing, unknownNames.isEmpty, !namedPages.isEmpty else {
             return nil
         }
+        // A page the writer would decline is not a page that is "already
+        // hidden". Without this, asking to hide such a page answered "It's
+        // already hidden." about a page students can read.
+        guard noRoomForAKey.isEmpty else {
+            return nil
+        }
         // Every page they named is already the way they asked for it — and
         // this app is SURE of that for every one of them. A page whose flag
         // cannot be read is not "already done"; it is a page to write.
         for page in namedPages where page.isVisibleToStudents != publishes || !page.visibilityIsCertain {
             return nil
         }
-        let done: String = publishes ? "published" : "hidden"
-        if namedPages.count == 1 {
-            return publishes ? "It's already been published." : "It's already hidden."
-        }
-        return "They have already been \(done)."
+        return AssistWording.alreadyTheWayYouAsked(publishing: publishes, pages: namedPages.count)
     }
 
     var verb: String {
@@ -132,6 +203,17 @@ struct AssistPublishPlan {
     }
 
     // MARK: - Functions
+
+    /// One line of the "N linked pages stay visible:" list — the single place
+    /// that frame is written, so `AssistContract` renders the contract's
+    /// `linkedClassStaysVisible` through the same code the plan uses. The
+    /// reasons are written to finish this sentence, and each ends with its
+    /// own full stop.
+    static func stayingVisibleLine(title: String,
+                                   reason: AssistPublishKept.Reason,
+                                   noun: ClassNoun) -> String {
+        return "“\(title)” stays visible, because \(reason.finishing(noun: noun))"
+    }
 
     /// The plan in words, meant to be read aloud to a teacher.
     ///
@@ -156,7 +238,11 @@ struct AssistPublishPlan {
     /// none of them is how a person says it — `publishForSection1` especially,
     /// which is the name of a line in a file, shown to somebody who asked to
     /// hide a lesson.
-    func describe(mostListed: Int = 15) -> String {
+    ///
+    /// `noun` is what the course calls one of its class pages (#267). The
+    /// model is always given the `.class` form; a club's CARD says
+    /// "meeting" — see `AssistToolOutcome.planned(_:plan:card:)`.
+    func describe(mostListed: Int = 15, noun: ClassNoun = .class) -> String {
         var lines: [String] = []
         lines.append("\(courseCode) Section \(sectionNumber): \(verb)ing.")
         lines.append("")
@@ -199,6 +285,27 @@ struct AssistPublishPlan {
             lines.append("\(alreadyRight.count) \(word) already \(publishes ? "visible" : "hidden").")
         }
 
+        // The pages that will be left alone. Said on the card, BEFORE the
+        // teacher presses Go, because a refusal they only hear about
+        // afterwards is one they have already been told did not happen.
+        if !noRoomForAKey.isEmpty {
+            lines.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey))
+        }
+
+        // The classes a link landed on, which this publish left where they
+        // are. Said once, here, so it appears on the plan card AND in the
+        // reply afterwards — `describe()` is the text used for both.
+        if !linkedClassesLeftAlone.isEmpty {
+            lines.append("")
+            var names: [String] = []
+            for page in linkedClassesLeftAlone {
+                names.append(page.displayTitle)
+            }
+            lines.append(AssistWording.linkedClassesWereLeftAlone(
+                AssistPublishPlan.listing(names), count: names.count, noun: noun
+            ))
+        }
+
         // The pages that STAY. Every one of them is a page a student can still
         // reach, and a teacher who is told only what came down has no way to
         // tell whether the tool thought about the rest.
@@ -212,10 +319,9 @@ struct AssistPublishPlan {
                     lines.append("…and \(kept.count - listed) more.")
                     break
                 }
-                // The reasons are written to finish this sentence, and each
-                // ends with its own full stop.
-                lines.append("“\(staying.page.displayTitle)” stays visible, "
-                             + "because \(staying.reason)")
+                lines.append(AssistPublishPlan.stayingVisibleLine(
+                    title: staying.page.displayTitle, reason: staying.reason, noun: noun
+                ))
                 listed += 1
             }
         }
@@ -251,6 +357,69 @@ struct AssistPublishPlan {
     }
 
     /// "a", "a and b", "a, b and c" — the way a sentence says a list.
+    /// The sentence for pages the writer declined, naming a few of them.
+    static func sayingPagesWithNoRoomForAKey(_ pages: [AssistSectionPage]) -> String {
+        var names: [String] = []
+        for page in pages {
+            names.append(page.displayTitle)
+        }
+        return sayingPagesWithNoRoomForAKey(named: names)
+    }
+
+    /// The same, from titles already to hand.
+    static func sayingPagesWithNoRoomForAKey(named names: [String]) -> String {
+        return AssistWording.pagesWhoseSettingsCannotBeAddedTo(listingAFew(names), count: names.count)
+    }
+
+    /// The sentence for pages whose new date could not be set, naming a few.
+    static func sayingPagesWhoseNewDateCouldNotBeSet(named names: [String]) -> String {
+        return AssistWording.pagesWhoseNewDateCouldNotBeSet(listingAFew(names), count: names.count)
+    }
+
+    /// `listing`, naming at most `mostNamed` and counting the rest — "“a”,
+    /// “b”, “c” and 2 more" — for a sentence that names a few pages without
+    /// turning into a list. Always names at least one: "0 pages" with nothing
+    /// named is the silence #186 closes.
+    static func listingAFew(_ names: [String], mostNamed: Int = 3) -> String {
+        if names.count <= mostNamed {
+            return listing(names)
+        }
+        var quoted: [String] = []
+        var position: Int = 0
+        while position < mostNamed {
+            quoted.append("“\(names[position])”")
+            position += 1
+        }
+        return quoted.joined(separator: ", ") + " and \(names.count - mostNamed) more"
+    }
+
+    /// "“a” or “b”", "“a”, “b” or “c”" — the way a sentence says "none of
+    /// these", naming at most `mostNamed` and counting the rest (#197).
+    ///
+    /// Its own function rather than `listing` with a different last word,
+    /// because "is called “a” and “b”" says one page has two names.
+    nonisolated static func listingEither(_ names: [String], mostNamed: Int = 3) -> String {
+        var quoted: [String] = []
+        for name in names {
+            quoted.append("“\(name)”")
+        }
+        if quoted.count <= 1 {
+            return quoted.first ?? ""
+        }
+        if quoted.count > mostNamed {
+            var shown: [String] = []
+            var position: Int = 0
+            while position < mostNamed {
+                shown.append(quoted[position])
+                position += 1
+            }
+            let others: Int = quoted.count - mostNamed
+            return shown.joined(separator: ", ") + " or \(others) \(others == 1 ? "other" : "others")"
+        }
+        let last: String = quoted.removeLast()
+        return quoted.joined(separator: ", ") + " or " + last
+    }
+
     static func listing(_ names: [String]) -> String {
         var quoted: [String] = []
         for name in names {
@@ -278,19 +447,26 @@ struct AssistPublishPlan {
 /// precisely the reasoning this design exists to keep out of a router. The two
 /// rules are not mirror images of each other, and each is written down once:
 ///
-/// * **Publishing always takes the pages it links to.** Publishing a page whose
-///   links lead somewhere students cannot see is the one thing publishing must
-///   never do.
+/// * **Publishing takes the pages it links to, and stops at another class.**
+///   Publishing a page whose links lead somewhere students cannot see is the
+///   one thing publishing must never do — so it takes what it links to, and
+///   what those link to in turn. The one stop is a link that lands on another
+///   CLASS: a class goes up when the teacher names that class, and material
+///   reachable only through it belongs to it (issue #173). The plan says which
+///   classes were left alone.
 /// * **Unpublishing takes a linked page only when nothing else needs it** — no
 ///   other page links to it, and it is not one of the pages a section cannot do
 ///   without. Hiding a concept page that Unit 3, Day 2 also links to would
-///   break that class to tidy this one.
+///   break that class to tidy this one. And, since #201 (2026-09-26), it stops
+///   at another class exactly as publishing does: a class comes down when the
+///   teacher names it, and a linked class that stays is named in the plan.
 enum AssistPublishPlanner {
 
     // MARK: - Functions
 
     /// What publishing these pages would do — along with everything they link
-    /// to, always, so no published page points at a page students cannot see.
+    /// to, so no published page points at a page students cannot see, and
+    /// stopping wherever a link lands on another class.
     static func planPublishing(
         titles: [String],
         onOrAfter: CalendarDay?,
@@ -307,7 +483,10 @@ enum AssistPublishPlanner {
         // on. Same teacher, same class, two different results depending on
         // which sentence they used.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return plan(
             publishes: true, titles: titles,
@@ -365,7 +544,10 @@ enum AssistPublishPlanner {
         // second rule here with a different condition, which is how the two
         // routes to the same act came to disagree.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages
+            titles: titles, graph: graph, classPages: classPages,
+            publishedBefore: PublishedPagesRecord.places(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )
         )
         return .success(plan(
             publishes: true, titles: titles,
@@ -432,8 +614,13 @@ enum AssistPublishPlanner {
         // How far the verb reaches, decided by the verb itself.
         var linked: [AssistSectionPage] = []
         var kept: [AssistPublishKept] = []
+        var linkedClassesLeftAlone: [AssistSectionPage] = []
         if publishes {
-            linked = graph.linkedPages(from: named)
+            let reach: AssistLinkedReach = graph.reachFollowingLinks(from: named)
+            linked = reach.pages
+            linkedClassesLeftAlone = classesWorthTellingTheTeacherAbout(
+                among: reach.classPagesStoppedAt
+            )
         } else {
             let sweep: UnpublishSweep = pagesTakenDownAlongside(
                 named: named, graph: graph, in: course
@@ -444,13 +631,16 @@ enum AssistPublishPlanner {
 
         var changes: [AssistPublishChange] = []
         var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
         appendChanges(
             for: named, becauseLinked: false, publishes: publishes,
-            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
         )
         appendChanges(
             for: linked, becauseLinked: true, publishes: publishes,
-            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
         )
 
         // A page whose date would move but whose visibility is already right
@@ -464,9 +654,113 @@ enum AssistPublishPlanner {
             namedPages: named,
             changes: changes,
             alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
             kept: kept,
+            linkedClassesLeftAlone: linkedClassesLeftAlone,
             dateMoves: dateMoves
         )
+    }
+
+    /// What hiding EXACTLY these pages would do — no sweep, no link
+    /// following, nothing named by title (#96).
+    ///
+    /// For a caller that has already decided every page, which is what
+    /// "Get Ready for the Start of the Year" does: its own rule chooses the
+    /// pages, and a sweep on top would be a second rule deciding the same
+    /// thing. Built from PAGES rather than titles on purpose (the plan's M9):
+    /// `graph.page(titled:)` keys on the file name, so two pages with the same
+    /// name in two folders would resolve to whichever came first and the
+    /// wrong one would be written.
+    ///
+    /// The change-building half is `appendChanges`, the same one every other
+    /// plan uses, so "already hidden", the certainty rule and the #186
+    /// decline all mean here what they mean everywhere else.
+    static func planHiding(
+        exactly pages: [AssistSectionPage],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> AssistPublishPlan {
+        var changes: [AssistPublishChange] = []
+        var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
+        appendChanges(
+            for: pages, becauseLinked: false, publishes: false,
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
+        )
+        return AssistPublishPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            publishes: false,
+            unknownNames: [],
+            namedPages: pages,
+            changes: changes,
+            alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
+            kept: [],
+            linkedClassesLeftAlone: [],
+            dateMoves: []
+        )
+    }
+
+    /// What publishing EXACTLY these pages would do, carrying the date moves
+    /// the caller has already worked out — the mirror of `planHiding(exactly:)`
+    /// (#379).
+    ///
+    /// For the links checklist, whose pages and dates were decided by the
+    /// build's rule (`datingPagesAClassBrings.fromTheLinksChecklist`): no link
+    /// following here, because following links is what chose the pages. The
+    /// change-building half is `appendChanges`, so the certainty rule and the
+    /// #186 decline mean here what they mean everywhere else.
+    static func planPublishing(
+        exactly pages: [AssistSectionPage],
+        dateMoves: [AssistPublishDateMove],
+        forSection sectionNumber: Int,
+        in course: Course
+    ) -> AssistPublishPlan {
+        var changes: [AssistPublishChange] = []
+        var alreadyRight: [AssistSectionPage] = []
+        var noRoomForAKey: [AssistSectionPage] = []
+        appendChanges(
+            for: pages, becauseLinked: false, publishes: true,
+            forSection: sectionNumber, into: &changes, alreadyRight: &alreadyRight,
+            noRoomForAKey: &noRoomForAKey
+        )
+        return AssistPublishPlan(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            publishes: true,
+            unknownNames: [],
+            namedPages: pages,
+            changes: changes,
+            alreadyRight: alreadyRight,
+            noRoomForAKey: noRoomForAKey,
+            kept: [],
+            linkedClassesLeftAlone: [],
+            dateMoves: dateMoves
+        )
+    }
+
+    /// Of the classes the walk stopped at, the ones worth a sentence.
+    ///
+    /// **Only the ones students cannot already see, and certainly cannot.** The
+    /// sentence exists to explain a link students cannot follow yet; about a
+    /// class that is already published it is false, and it would tell a teacher
+    /// to go and publish a page that is already published. A class whose flag
+    /// this app will not read is NOT left out: "already published" has to be
+    /// something the app is sure of, the same requirement `appendChanges` makes
+    /// of "already the way you asked".
+    private static func classesWorthTellingTheTeacherAbout(
+        among stoppedAt: [AssistSectionPage]
+    ) -> [AssistSectionPage] {
+        var worthSaying: [AssistSectionPage] = []
+        for page in stoppedAt {
+            if page.isVisibleToStudents && page.visibilityIsCertain {
+                continue
+            }
+            worthSaying.append(page)
+        }
+        return worthSaying
     }
 
     private static func appendChanges(
@@ -475,7 +769,8 @@ enum AssistPublishPlanner {
         publishes: Bool,
         forSection sectionNumber: Int,
         into changes: inout [AssistPublishChange],
-        alreadyRight: inout [AssistSectionPage]
+        alreadyRight: inout [AssistSectionPage],
+        noRoomForAKey: inout [AssistSectionPage]
     ) {
         for page in pages {
             // "Already the way you asked" needs CERTAINTY, not just a match.
@@ -491,7 +786,20 @@ enum AssistPublishPlanner {
             // A page that cannot be read cannot be changed either, and
             // listing it would promise the teacher something the writing step
             // then quietly skips.
-            guard (try? String(contentsOf: page.fileURL, encoding: .utf8)) != nil else {
+            guard let text = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+                continue
+            }
+            // The same argument, one step further: a page the WRITER would
+            // decline is not a change either. Asked by running the real
+            // writer over the page's own text — this read was already being
+            // made and thrown away — because a second copy of the rule here
+            // is a second copy to keep in step (#186).
+            let trial: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
+                published: publishes, in: text,
+                forSection: sectionNumber, isSectionLocal: page.isSectionLocal
+            )
+            if trial.outcome == .noRoomForAKey {
+                noRoomForAKey.append(page)
                 continue
             }
             changes.append(AssistPublishChange(
@@ -535,6 +843,16 @@ enum AssistPublishPlanner {
     /// somewhere other than a lesson, so a link count says nothing useful about
     /// whether it is still needed.
     ///
+    /// A fourth never, of a different kind (#201): another CLASS page. It is
+    /// not one of the contract's `neverTakenDownByFollowingLinks` — those are
+    /// exclusions, pages reached from somewhere other than a lesson — but a
+    /// STOP in the walk, the same stop publishing and date-moving make, so it
+    /// is written once in `followingLinks.stopsAtAClassPage.appliesTo`. The
+    /// walk still REACHES the class (`pagesLinkedFrom` does not filter it):
+    /// it has to arrive at the `kept` pass, or the teacher is never told it
+    /// stayed. `reasonToKeep` is where it stops, so a class is neither
+    /// collected nor entered.
+    ///
     /// Worked out to a fixed point rather than in one pass: when a page joins
     /// the ones coming down, the pages only IT linked to become free to follow
     /// as well, and stopping after one lap would leave half a chain published.
@@ -559,7 +877,7 @@ enum AssistPublishPlanner {
                 if goingDown.contains(candidate.lowercasedTitle) {
                     continue
                 }
-                let reason: String? = reasonToKeep(
+                let reason: AssistPublishKept.Reason? = reasonToKeep(
                     candidate, mustStay: mustStay, referrers: referrers,
                     goingDown: goingDown, graph: graph, in: course
                 )
@@ -594,6 +912,32 @@ enum AssistPublishPlanner {
 
     /// Why this page is being left published, or nil when nothing stands in
     /// the way of taking it down with the rest.
+    ///
+    /// **An unpublish stops at another class** (issue #201, decided by
+    /// Russell 2026-09-26 to mirror #173's publishing rule): a class is hidden
+    /// when the teacher names it, and a link from the class coming down
+    /// neither takes another class with it nor reaches THROUGH it to that
+    /// class's own material. The pages the teacher named are never stopped —
+    /// they are in `goingDown` before this is ever asked — so "unpublish Unit
+    /// 4" and an unpublish by dates lose nothing. The rule is shared as
+    /// `followingLinks.stopsAtAClassPage` in `contracts/shared-rules.json`.
+    ///
+    /// The order is load-bearing, both ways:
+    /// - the class test sits BELOW the three exclusions, so a class Key Links
+    ///   points at still says Key Links, and `theOrderIsLoadBearing` is
+    ///   untouched;
+    /// - and ABOVE the referrer test, because "a class of its own" is the
+    ///   unconditional reason and "X still links to it" a contingent one: said
+    ///   about a class, it tells the teacher the class would follow X down the
+    ///   day X is hidden, and it would not.
+    ///
+    /// REJECTED: stopping in `pagesLinkedFrom` instead (right about what comes
+    /// down, and SILENT — the class never reaches the `kept` pass, so nothing
+    /// tells the teacher); walking past the class to the material beyond it
+    /// (that material is the class's, and hiding it breaks a class nobody
+    /// named); and a fourth entry in `neverTakenDownByFollowingLinks` (a class
+    /// is a stop, not an exclusion). documentation/10-local-ai-assistant.md →
+    /// "Unpublishing stops there too (#201)".
     private static func reasonToKeep(
         _ page: AssistSectionPage,
         mustStay: Set<String>,
@@ -601,22 +945,25 @@ enum AssistPublishPlanner {
         goingDown: Set<String>,
         graph: AssistSectionGraph,
         in course: Course
-    ) -> String? {
+    ) -> AssistPublishKept.Reason? {
         if page.isFolderIndex {
-            return "it is a folder's landing page, which following links never takes down."
+            return .folderLandingPage
         }
         if mustStay.contains(page.lowercasedTitle) {
-            return "it is in this section's Key Links."
+            return .keyLinks
         }
         // `build_site.py`'s own rule: any FOLDER segment containing
         // "curriculum", so a course whose folder is called "Ontario
         // Curriculum" is covered exactly as a plain one is.
         if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
-            return "it is a curriculum page."
+            return .curriculum
+        }
+        if page.isClassPage {
+            return .aClassOfItsOwn
         }
         if let stillLinking = pageStillLinking(to: page, referrers: referrers,
                                                goingDown: goingDown, graph: graph) {
-            return "“\(stillLinking)” still links to it."
+            return .stillLinkedFrom(stillLinking)
         }
         return nil
     }
@@ -653,6 +1000,13 @@ enum AssistPublishPlanner {
             // when that draft is published, everything it links to is
             // published with it, and the plan says so. So a page taken down
             // here comes back the moment anything visible needs it again.
+            //
+            // That held with one exception from #173 (publishing stops at a
+            // class, so a CLASS this sweep took down did not come back by
+            // publishing the page that referred to it) until #201 closed it
+            // on 2026-09-26: this sweep no longer takes a class down at all,
+            // so both reaches stop in the same place and the argument holds
+            // without an exception.
             if !referrer.isVisibleToStudents {
                 continue
             }
@@ -743,7 +1097,19 @@ enum AssistPublishPlanner {
     /// silently. "unit" is still accepted alongside it because a teacher types
     /// what they are used to and the model echoes what it was shown; the unit
     /// NUMBER is the answer either way, so accepting both cannot be ambiguous.
-    static func unitNamed(_ raw: String, term: String = ClassPageTerm.standard) -> Int? {
+    ///
+    /// **Nil, always, in a numbered course (#267).** A club's pages are
+    /// "Week 1", "Week 2", held inside this app as unit 1 — so reading
+    /// "Week 1" as a unit would make "publish Week 1", the most ordinary
+    /// request a club has, publish EVERY meeting at once, and "Week 3" would
+    /// find no unit and be refused instead of publishing the page. A numbered
+    /// course has no units; its titles go to the page path, which acts on the
+    /// one page named. No default naming, so a caller cannot forget this.
+    static func unitNamed(_ raw: String, naming: ClassPageNaming) -> Int? {
+        if naming.isNumbered {
+            return nil
+        }
+        let term: String = naming.word
         let tidied: String = raw
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: ".!"))
@@ -776,6 +1142,11 @@ enum AssistPublishPlanner {
     static func classPages(inUnit unit: Int, from classPages: [ClassPageSummary]) -> [ClassPageSummary] {
         var found: [ClassPageSummary] = []
         for summary in classPages {
+            // A numbered course has no units (see `unitNamed`): its pages
+            // are never a unit's pages, whatever this app holds them as.
+            if summary.naming.isNumbered {
+                continue
+            }
             guard let numbers = summary.unitAndDay, numbers.unit == unit else {
                 continue
             }
@@ -826,16 +1197,16 @@ enum AssistPublishPlanner {
     /// pre-populated course and a hand-published one date their pages the same
     /// way.
     ///
-    /// "Never published" is inferred from the page being hidden now, because
-    /// nothing on disk records a page's history. A page published once and
-    /// later hidden therefore counts as never published, and would take a new
-    /// date. Recording the truth would mean a new frontmatter key on every
-    /// page, agreed with the Python and the Windows app; the inference costs
-    /// nothing and is right in every case anybody has met.
+    /// "Published before" is READ from the section's published-pages record
+    /// since #379 (`publishedBeforeIsRecorded`, replacing the inference that
+    /// every hidden page was never published): a page a deploy put on a site
+    /// and that was hidden since keeps its date. A date on the page is not
+    /// the sign — 7,114 of 7,118 payload pages carry one.
     static func dateMovesFollowingClasses(
         titles: [String],
         graph: AssistSectionGraph,
-        classPages: [ClassPageSummary]
+        classPages: [ClassPageSummary],
+        publishedBefore: Set<String> = []
     ) -> [AssistPublishDateMove] {
         // Only the NAMED pages that are really classes with a date. Publishing
         // an ordinary page moves nothing: there is no class day to inherit.
@@ -867,7 +1238,12 @@ enum AssistPublishPlanner {
         var claimed: Set<String> = []
         var moves: [AssistPublishDateMove] = []
         for entry in named {
-            for page in graph.linkedPages(from: [entry.page]) {
+            // The same reach publishing uses, so the two halves of one publish
+            // cannot disagree about how far it went. It stops at a class, so a
+            // page reachable only THROUGH another class is never offered a
+            // date here — it takes the date of the class that actually brings
+            // it, when that class is published.
+            for page in graph.reachFollowingLinks(from: [entry.page]).pages {
                 if claimed.contains(page.lowercasedTitle) {
                     continue
                 }
@@ -882,11 +1258,22 @@ enum AssistPublishPlanner {
                     continue
                 }
                 // A class's date is its place in the schedule.
+                //
+                // Belt and braces since #173: the reach above no longer hands
+                // back a class page at all. Kept because this is where
+                // `class-planning.json` → `datingPagesAClassBrings` names the
+                // rule, and a rule upheld only by the absence of a page is one
+                // a later reader deletes without knowing they have.
                 if page.isClassPage {
                     continue
                 }
                 claimed.insert(page.lowercasedTitle)
                 if page.date == entry.day {
+                    continue
+                }
+                // Published before and hidden again: it keeps its date
+                // (#379, Russell's decision 4; `publishedBeforeIsRecorded`).
+                if PublishedPagesRecord.lists(page.fileURL, in: publishedBefore) {
                     continue
                 }
                 moves.append(AssistPublishDateMove(
@@ -898,27 +1285,38 @@ enum AssistPublishPlanner {
         return moves
     }
 
-    /// Carry the plan out. Returns the change record so it can be undone.
+    /// Carry the plan out. Returns the change record so it can be undone, and
+    /// the titles of any pages the writer DECLINED as it went (#186).
+    ///
+    /// The plan asked the same question before the card was shown, so the
+    /// second list is almost always empty. It is returned all the same,
+    /// because "almost always" is a page the teacher edited in Obsidian
+    /// between reading the card and pressing Go — and a reply that claimed
+    /// that page would be claiming a write that did not happen.
     static func apply(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
-        in course: Course
-    ) throws -> AssistChange {
+        in course: Course,
+        repointsTheFrontPage: Bool = true
+    ) throws -> (change: AssistChange, leftAlone: [String]) {
         // Every file this plan touches, gathered first, so a page that both
         // changes visibility and moves date is written once.
         var editsByPath: [String: (url: URL, isSectionLocal: Bool)] = [:]
         var publishByPath: [String: Bool] = [:]
         var dateByPath: [String: CalendarDay] = [:]
+        var titleByPath: [String: String] = [:]
 
         for change in plan.changes {
             let path: String = change.page.fileURL.path
             editsByPath[path] = (change.page.fileURL, change.page.isSectionLocal)
             publishByPath[path] = change.willBeVisible
+            titleByPath[path] = change.page.displayTitle
         }
         for move in plan.dateMoves {
             let path: String = move.page.fileURL.path
             editsByPath[path] = (move.page.fileURL, move.page.isSectionLocal)
             dateByPath[path] = move.to
+            titleByPath[path] = move.page.displayTitle
         }
 
         var paths: [String] = []
@@ -933,35 +1331,60 @@ enum AssistPublishPlanner {
         )
 
         var saved: [AssistSavedFile] = []
+        // Pages that were planned as changes and then declined at the moment
+        // of writing, and the pages whose VISIBILITY actually moved — what the
+        // teacher is told is built from these, not from the plan.
+        var leftAlone: [String] = []
+        var movedTitles: [String] = []
         for path in paths {
             guard let edit = editsByPath[path] else {
                 continue
             }
             let before: String = try String(contentsOf: edit.url, encoding: .utf8)
             var text: String = before
+            var declined: Bool = false
+            var visibilityMoved: Bool = false
 
             if let published = publishByPath[path] {
-                text = AssistPageVisibility.setting(
+                let result: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                     published: published, in: text,
                     forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
-                ).text
+                )
+                if result.outcome == .noRoomForAKey {
+                    declined = true
+                }
+                if result.outcome == .written {
+                    visibilityMoved = true
+                }
+                text = result.text
             }
             if let day = dateByPath[path] {
-                text = PageFrontmatter.settingCreated(
+                let result: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                     in: text,
                     key: PageFrontmatter.createdKey(
                         forSection: sectionNumber, isSectionLocal: edit.isSectionLocal
                     ),
                     to: day,
                     fallbackTail: tail
-                ).text
+                )
+                if result.outcome == .noRoomForAKey {
+                    declined = true
+                }
+                text = result.text
             }
 
+            let title: String = titleByPath[path] ?? edit.url.deletingPathExtension().lastPathComponent
+            if declined {
+                leftAlone.append(title)
+            }
             if text == before {
                 continue
             }
             try text.write(to: edit.url, atomically: true, encoding: .utf8)
             saved.append(AssistSavedFile(fileURL: edit.url, before: before, after: text))
+            if visibilityMoved {
+                movedTitles.append(title)
+            }
         }
 
         // The section's landing page follows its most recent visible class.
@@ -971,12 +1394,18 @@ enum AssistPublishPlanner {
         // takes the index back with them. An undo that restored the lessons
         // and left the front page pointing at the wrong one would be a worse
         // state than either.
-        if let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
+        //
+        // Not for the links checklist (#379, the director's ruling F1): a
+        // class ticked there is published because a link leads to it, and
+        // the front page keeps following the class it follows today.
+        if repointsTheFrontPage,
+           let repointed = SectionIndexPointer.repointIndex(forSection: sectionNumber, in: course) {
             saved.append(repointed)
         }
 
-        return AssistChange(
-            whatHappened: "\(plan.verb)ed \(AssistPublishPlanner.namingWhatMoved(in: plan, savedCount: saved.count))",
+        let change: AssistChange = AssistChange(
+            whatHappened: "\(plan.verb)ed "
+                + AssistPublishPlanner.namingWhatMoved(movedTitles: movedTitles, savedCount: saved.count),
             courseCode: plan.courseCode,
             sectionNumber: sectionNumber,
             // Publishing and hiding rebuild the preview, so taking them back
@@ -984,6 +1413,7 @@ enum AssistPublishPlanner {
             rebuildsThePreview: true,
             files: saved
         )
+        return (change: change, leftAlone: leftAlone)
     }
 
     /// What to call the thing that moved, for a sentence read back to the
@@ -999,11 +1429,13 @@ enum AssistPublishPlanner {
     ///
     /// Three or more falls back to a count, because a sentence listing nine
     /// class titles is not a sentence anybody reads.
-    private static func namingWhatMoved(in plan: AssistPublishPlan, savedCount: Int) -> String {
-        var names: [String] = []
-        for change in plan.changes {
-            names.append(change.page.displayTitle)
-        }
+    ///
+    /// **Built from the pages actually WRITTEN, not from the plan** (#186).
+    /// The two used to be the same list; they stopped being the same the day
+    /// the writer learned to decline a page it cannot change safely, and an
+    /// undo labelled "unpublished Unit 4, Day 23" about a page nothing was
+    /// written to would be the claim this piece removes.
+    private static func namingWhatMoved(movedTitles names: [String], savedCount: Int) -> String {
         if names.count == 1 {
             return names[0]
         }
@@ -1034,13 +1466,46 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     case unreadableTime(String)
     case nothingNamed
     case openEndedPublish(CalendarDay)
+    /// A publish or a hide whose page list was nothing but a word meaning
+    /// every page — "all", "everything" — with no dates to narrow it (#197).
+    ///
+    /// Its own case rather than `nothingNamed`, whose sentence ("No pages and
+    /// no dates were given") is false about a call that said "all". The
+    /// example is something the teacher can type next, built from the
+    /// section's own pages by `AssistToolRunner.exampleOfWhichPages`.
+    case askedForEveryPage(publishing: Bool, example: String)
+    /// Every name in a publish or a hide matched no page in the section
+    /// (#197). Refused by name, instead of a plan that changes nothing and a
+    /// "Nothing needed changing." that reports success about a request that
+    /// found nothing at all.
+    case noPageByThatName(names: [String], course: String, section: Int)
     case notInThisBuild(String)
+    /// The course named is kept for reference, so nothing may write to it and
+    /// nothing may deploy it.
+    ///
+    /// A case of its own rather than another `notInThisBuild`, so the contract
+    /// can pin it BY NAME: this is the refusal that must never quietly become
+    /// a success, and a free-text refusal is one nothing can assert on.
+    case keptForReference(String)
+    /// A course was named by its CODE alone, no live course has that code,
+    /// and one or more courses kept for reference show it.
+    case askedForACourseByItsCodeAlone(String, [String])
+    /// A teacher or a model asked to publish or hide the course's How I Teach
+    /// page by name (#209). Its own case so a test can pin it by name: it is
+    /// never on the website, and "no page is called that" would be untrue.
+    case howITeachIsNeverPublished(String)
 
     var errorDescription: String? {
         switch self {
         case .noWorkingFolder:
             return "No working folder is open, so there is nothing to look at."
         case .noSuchCourse(let code):
+            // An EMPTY code is no course named at all (issue #198): only an
+            // MCP caller can send one, and naming "“”" as a course that is
+            // not here is false and reads as blaming the teacher.
+            if code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return AssistWording.noCourseNamed
+            }
             return "There is no course called “\(code)” in this working folder."
         case .noSuchSection(let code, let number):
             return "\(code) has no Section \(number)."
@@ -1068,8 +1533,43 @@ enum AssistToolRefusal: LocalizedError, Equatable {
                  + "almost certainly not what was meant. For ONE day's class, use publish_class_on with "
                  + "that date. For a stretch of classes, give both onOrAfter and before. To publish "
                  + "particular pages, name them."
+        case .askedForEveryPage(let publishing, let example):
+            if publishing {
+                return AssistWording.everyPageIsNotAPageToPublish(example: example)
+            }
+            return AssistWording.everyPageIsNotAPageToHide(example: example)
+        case .noPageByThatName(let names, let code, let number):
+            // The teacher's sentences, not `noSuchPage`'s, which tells the
+            // MODEL to use list_pages: a write's refusal ends the turn and is
+            // read by the teacher (#167's reason for `noPageCalled`).
+            if names.count == 1 {
+                return AssistWording.noPageCalled(page: names[0], course: code, section: String(number))
+            }
+            return AssistWording.noPagesCalled(
+                pages: AssistPublishPlan.listingEither(names), course: code, section: String(number)
+            )
         case .notInThisBuild(let what):
             return what
+        case .askedForACourseByItsCodeAlone(let code, let candidates):
+            // Named rather than guessed. Two courses deliberately SHOW the
+            // same code — that is what makes a reference course readable to a
+            // teacher — so a guess here would look right every time and be
+            // wrong half of it.
+            let listed: String = candidates.joined(separator: ", ")
+            if candidates.count == 1 {
+                return "No course you are teaching is called \(code). "
+                     + "\(listed) is kept for reference and shows that code — name it as \(listed)."
+            }
+            return "No course you are teaching is called \(code). "
+                 + "These are kept for reference and show that code: \(listed). "
+                 + "Name the one you mean."
+        case .howITeachIsNeverPublished(let code):
+            return AssistWording.howITeachIsNeverPublished(course: code)
+        case .keptForReference(let code):
+            // The FROZEN sentence, not the deploy one: this refusal covers
+            // every write, and "it is never deployed" answers a question
+            // nobody asked of "add a class to ICS3U".
+            return ReferenceWording.staysAsItIs(course: code)
         }
     }
 

@@ -46,18 +46,18 @@ that system end to end is the skill [[The Gadget]] will demand of you.
    [[First Programs]] and [[Decisions and Loops]]:
 
    ```python
-from time import sleep
+   from time import sleep
 
-# turn_on() and turn_off() come from the class
-# interface library — or the simulator, same names.
-blinks = 10
-for count in range(1, blinks + 1):
-    turn_on()
-    print("Blink", count, "of", blinks)
-    sleep(1)
-    turn_off()
-    sleep(1)
-```
+   # turn_on() and turn_off() come from the class
+   # interface library — or the simulator, same names.
+   blinks = 10
+   for count in range(1, blinks + 1):
+       turn_on()
+       print("Blink", count, "of", blinks)
+       sleep(1)
+       turn_off()
+       sleep(1)
+   ```
 
 5. **Bench check, connect, run.** Count the blinks against your
    prediction — and notice the loop ends with `turn_off()`, because a

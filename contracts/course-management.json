@@ -1,4 +1,298 @@
 {
+  "backups": {
+    "note": "What happens to backups over time, and how the space they take is counted (issue #242). DECIDED by Russell, 2026-09-21 (option C): keep every backup a teacher makes, and make the space they take VISIBLE - per course and in total - with a way to delete several at once. The assistant's own backups keep their cap. AUTHORED; edit as text. pruneCases run the pruning that follows a new backup, sizeCases the count, deleteCases the delete. Formatting a byte count is each platform's own ('105.6 MB' on the mac, the way Finder writes it), so the cases carry bytes only.",
+    "assistantKept": 5,
+    "assistantKeptWhy": "The assistant saves one backup per conversation whether or not anybody asked, so it clears up after itself: the five most recent of ITS backups of a course are kept, counted per course, and a backup whose stamp cannot be true is neither counted nor deleted (zipNames.couldHaveBeenStamped).",
+    "teacherBackupsPruned": "never",
+    "teacherBackupsPrunedWhy": "A backup made on purpose before a risky change should not vanish because ten more were made after it - deciding on a teacher's behalf that last month's copy has expired is not the app's call. The fault was never that they are kept but that nothing SHOWED the space, so the space is shown and deleting old ones is made easy; the teacher decides what goes. A cap for teacher backups with the oldest shown before removal was the alternative considered and not chosen.",
+    "mediaIsAlwaysIncluded": true,
+    "mediaIsAlwaysIncludedWhy": "Every backup carries the whole course, Media included - measured at 467 MB and 9.7 s for a real course with 487 MB of Media. REJECTED, and recorded so it is not proposed again: a lighter backup that leaves Media out. Restoring one would DELETE the course's Media.",
+    "sizeIsLogical": true,
+    "sizeIsLogicalWhy": "The size shown is the file's LOGICAL size (on the mac, fileSize), never what it occupies on this disk. A working folder kept in iCloud Drive can have its backups evicted to the cloud, where they take almost nothing on this disk while costing their whole size in the teacher's cloud storage - and costing it on this disk again the moment one is restored. Measured on the sparse shape of an evicted file: logical 244.84 GB, on disk 'Zero KB'. The on-disk number would tell that teacher their backups take nothing. Not measured on a real evicted file, and whether a deleted file keeps costing cloud storage while in that service's own recently-deleted folder is not measured either - so nothing promises the space is freed at once.",
+    "neverDeletedWhileAConversationCanRestoreFromIt": true,
+    "neverDeletedWhileAConversationCanRestoreFromItWhy": "An open assistant conversation offers 'Restore Section N...' from the backup it made before its first change. Deleting that backup - one click after selecting the assistant's backups, which is exactly what the #242 plan review reasoned from the code - leaves a button that fails after the teacher has agreed to it. So a delete leaves it alone, deletes everything else asked for, and says which assistant window to close (the same 'Close the assistant for <course> Section <n> first' a second assistant window is refused with).",
+    "pruneCases": [
+      {
+        "name": "the assistant keeps its five most recent, and none of the teacher's is touched",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-01_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-03_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-04_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-05_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-06_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-07_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-08-21_090000.zip",
+          "ICS3U_backup_2026-08-22_090000.zip",
+          "ICS3U_backup_2026-08-23_090000.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section1.zip"
+        ],
+        "why": "Seven assistant backups and three of the teacher's: the two OLDEST assistant backups go. The teacher's three are not counted among the five and are not deleted, however old."
+      },
+      {
+        "name": "a teacher's own backups are never pruned, however many there are",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-01-15_080000.zip",
+          "ICS3U_backup_2026-02-15_080000.zip",
+          "ICS3U_backup_2026-03-15_080000.zip",
+          "ICS3U_backup_2026-04-15_080000.zip",
+          "ICS3U_backup_2026-05-15_080000.zip",
+          "ICS3U_backup_2026-06-15_080000.zip",
+          "ICS3U_backup_2026-07-15_080000.zip",
+          "ICS3U_backup_2026-08-15_080000.zip",
+          "ICS3U_backup_2026-09-15_080000.zip",
+          "ICS3U_backup_2025-10-15_080000.zip",
+          "ICS3U_backup_2025-11-15_080000.zip",
+          "ICS3U_backup_2025-12-15_080000.zip"
+        ],
+        "expectDeleted": [],
+        "why": "Twelve of the teacher's own backups and none of the assistant's: nothing is deleted. Russell's decision on #242."
+      },
+      {
+        "name": "an archive and the setup wizard's zip are never pruned",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-10_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-11_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-12_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-13_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-14_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-15_120000_assistant-section2.zip",
+          "ICS3U_2026-08-10_143005.zip",
+          "2026-08-10_143005.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-10_120000_assistant-section2.zip"
+        ],
+        "why": "Six assistant backups beside an archive and the wizard's automatic zip: only the oldest assistant backup goes. The other two share the folder but are not backups at all."
+      }
+    ],
+    "sizeCases": [
+      {
+        "name": "backups are counted per course and in total; archives and the wizard's zips are not",
+        "files": [
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-01_120000.zip",
+            "bytes": 11300000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-02_120000_assistant-section1.zip",
+            "bytes": 15900000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-08-20_083000.zip",
+            "bytes": 105000
+          },
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_2026-08-19_140000.zip",
+            "bytes": 9000000
+          },
+          {
+            "course": "ICS4U",
+            "name": "2026-08-18_101500.zip",
+            "bytes": 800
+          },
+          {
+            "course": "CODING",
+            "name": "CODING_backup_2026-09-03_070000.zip",
+            "bytes": 2000000
+          }
+        ],
+        "expectCourses": [
+          {
+            "courseCode": "CODING",
+            "count": 1,
+            "bytes": 2000000
+          },
+          {
+            "courseCode": "ICS4U",
+            "count": 3,
+            "bytes": 27305000
+          }
+        ],
+        "expectTotalCount": 4,
+        "expectTotalBytes": 29305000,
+        "why": "The shape of Russell's real folder early in a term: teacher and assistant backups of two courses, beside an archive and a setup-wizard zip that are not in the Backups list and so are not in its total - a number the teacher cannot act on from that list would only mislead. Courses are listed in course-code order."
+      },
+      {
+        "name": "the logical size counts, not what the file takes on this disk",
+        "files": [
+          {
+            "course": "ICS4U",
+            "name": "ICS4U_backup_2026-09-05_120000.zip",
+            "bytes": 467000000,
+            "sparse": true
+          }
+        ],
+        "expectCourses": [
+          {
+            "courseCode": "ICS4U",
+            "count": 1,
+            "bytes": 467000000
+          }
+        ],
+        "expectTotalCount": 1,
+        "expectTotalBytes": 467000000,
+        "why": "A file whose contents are not on this disk - the shape of one a cloud service has evicted - still counts at its whole size, which is what it costs in the teacher's cloud storage and what it will take again when restored. A runner makes it sparse (the mac truncates an empty file to the size) so the case costs no disk; counted by what the disk holds it would be nearly nothing."
+      }
+    ],
+    "deleteCases": [
+      {
+        "name": "several backups are deleted at once, and only those",
+        "backups": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-04_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "heldByAnOpenConversation": [],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-03_120000.zip",
+          "ICS3U_backup_2026-09-05_120000.zip"
+        ],
+        "expectKept": [],
+        "why": "Three of five, permanently - as the single delete always was and as its confirmation says."
+      },
+      {
+        "name": "the backup an open assistant conversation can restore from is kept, and the rest are deleted",
+        "backups": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-09-01_120000.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "heldByAnOpenConversation": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000.zip"
+        ],
+        "expectKept": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "why": "The assistant window for Section 2 is open and made this backup before its first change; its Restore button puts the section back from it. It is kept and the teacher is told which window to close. The other backup asked for is still deleted - one refusal is not a reason to stop."
+      },
+      {
+        "name": "an older assistant backup is not held just because the assistant is open",
+        "backups": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip",
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "delete": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip"
+        ],
+        "heldByAnOpenConversation": [
+          "ICS3U_backup_2026-09-02_120000_assistant-section2.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-08-01_120000_assistant-section2.zip"
+        ],
+        "expectKept": [],
+        "why": "Only the backups the OPEN conversation made are held. An assistant backup from an earlier conversation about the same section is an ordinary backup now, and a rule keyed on 'made by the assistant' or 'this section' would refuse it for nothing."
+      }
+    ],
+    "restoringOneSectionsKeys": {
+      "note": "Putting ONE section back from an assistant conversation's backup (\"Restore Section N…\") swaps that section's per-section keys on every page SHARED by the course's sections - the pages outside the section<N> folders - and leaves every other byte alone (CourseRestorer.settingPerSectionKeys on the mac). `live` is the page as it is now, `backup` as the backup has it, `after` the page the restore must write, compared as BYTES. A key's value can live on the lines below it (issue #182): both halves of the swap carry and drop a key WITH the lines it owns - the continuation walk, except that an indented `# note` under a key that is REMOVED goes with it - and restored lines go after the last line any per-section key OWNS. When the live page has no line of this section and its block has no column-0 level for a new key (issue #186's shape), the page is left exactly as it is and `expectCouldNotBePutBack` is true: the restore COUNTS those pages and says so after it is done (AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack). `expectSite` is what the built site does with `after`, per section, `visible` or `hidden` - measured 2026-09-25 (python-frontmatter 1.3.0 / PyYAML 6.0.3, then js-yaml on JSON_SCHEMA and patches/publish.ts) and re-judged by scripts/check_visibility_against_the_site.py inside the image on every verify.sh run. Every `after` differs from what the restore wrote before #182 except the last case, which is the guard. Windows' CourseRestorer still finds the block with its own strict FrontmatterBounds (#177) and copies key LINES only; wiring these in is the acceptance for both (the windows issue from #182).",
+      "cases": [
+        {
+          "name": "a live key whose value is a MAPPING below it, and a backup with no key: the key goes WITH its value",
+          "section": 1,
+          "live": "---\npublishForSection1:\n  a: 1\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "visible",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "Dropping the key's line alone left `  a: 1` orphaned under nothing - a block the build cannot read (it stopped the build until #246, and hides the page since, so a restore that should leave it shown hid it in every section). Measured 2026-09-25."
+        },
+        {
+          "name": "a backup whose value runs onto the line below: the value comes back WITH its key",
+          "section": 1,
+          "live": "---\npublishForSection1: true\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: >-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\npublishForSection1: >-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The backup HIDES section 1 (`>-` folds `false` onto the key). Carrying the key's line alone restored `publishForSection1: >-` - an empty value, so the page the teacher had held back came back PUBLISHED. Measured 2026-09-25."
+        },
+        {
+          "name": "the restored key goes after the last line another section's key OWNS, never between that key and its value",
+          "section": 1,
+          "live": "---\ntitle: x\npublishForSection2: >-\n  false\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ntitle: x\npublishForSection2: >-\n  false\npublishForSection1: false\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "hidden"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "Section 1 has no line of its own on the live page, so the backup's goes after the last per-section key. Placed after the last line that merely NAMES one, it landed between section 2's `>-` and its `  false`: section 2 read an empty value and was PUBLISHED, and section 1 read \"false false\" and was published too. Measured 2026-09-25."
+        },
+        {
+          "name": "a page with no column-0 level for a new key is left exactly as it is, and SAID",
+          "section": 1,
+          "live": "---\n  a: 1\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: false\n---\n\nThe lesson.\n",
+          "after": "---\n  a: 1\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "visible",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": true,
+          "why": "Issue #186's shape, met by a restore. The live block's first line is indented, so a key written anywhere in it is not a key: appended, it made a block the build cannot read (it stopped the build until #246; since then the page is hidden and named as unreadable on every build). So the page is left byte for byte, the section stays VISIBLE though the backup held it back, and the restore says how many pages it could not put back - AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack. The safe direction in the file, and not a silent one."
+        },
+        {
+          "name": "a note under a dropped key goes WITH the key, or it joins what arrives in its place",
+          "section": 1,
+          "live": "---\ndraftSection1: >-\n  # note\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\npublishForSection1: |-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\npublishForSection1: |-\n  false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The one clause where a REMOVAL differs from a rewrite (PageVisibilityReader.linesOwnedByKey against continuationLineIndices): with the live key gone, its indented `# note` belongs to whatever lands there. Left behind, it joined the restored literal block scalar - the value became \"false\\n# note\", not false - and the page the backup held back came back PUBLISHED. Measured 2026-09-25."
+        },
+        {
+          "name": "the plain swap, where nothing runs onto another line",
+          "section": 1,
+          "live": "---\ncreatedSection1: 2026-09-01\npublishForSection1: true\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The guard: what every restore did before #182 and must go on doing. Passes on the old code too, on purpose."
+        }
+      ]
+    }
+  },
   "courseCode": {
     "mostCharacters": 12,
     "normalized": [
@@ -33,8 +327,8 @@
       { "typed": "AP  CALC", "existing": [], "expectProblem": "A course code can’t have two spaces in a row.", "expectShort": "No double spaces", "why": "Two in a row is a typo every time, and it is checked before the character rule so the commonest mistake gets the sentence that names it." },
       { "typed": "  ICS4U  ", "existing": [], "expectProblem": null, "expectShort": null, "why": "Leading and trailing spaces are TRIMMED rather than refused — the stored code never carries one, and refusing a teacher for a space they did not mean to type helps nobody." },
       { "typed": "   ", "existing": [], "expectProblem": null, "expectShort": null, "why": "Nothing but spaces trims to nothing, which is not-ready-yet rather than an error." },
-      { "typed": "ics4u", "existing": ["ICS4U"], "expectProblem": "A course named ICS4U already exists — choose a different code.", "expectShort": "ICS4U already exists", "why": "The clash is found case-insensitively — see normalized." },
-      { "typed": "  MPM2D  ", "existing": ["ICS4U", "MPM2D"], "expectProblem": "A course named MPM2D already exists — choose a different code.", "expectShort": "MPM2D already exists", "why": "Whitespace never hides a clash." },
+      { "typed": "ics4u", "existing": ["ICS4U"], "expectProblem": "A course named ICS4U already exists. If that's last year's, keep a copy of it for reference and then remove it.", "expectShort": "ICS4U already exists", "why": "The clash is found case-insensitively — see normalized." },
+      { "typed": "  MPM2D  ", "existing": ["ICS4U", "MPM2D"], "expectProblem": "A course named MPM2D already exists. If that's last year's, keep a copy of it for reference and then remove it.", "expectShort": "MPM2D already exists", "why": "Whitespace never hides a clash." },
       { "typed": "ICS3U!", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes" },
       { "typed": "CS-CLUB", "existing": [], "expectProblem": null, "expectShort": null, "why": "A hyphen is ALLOWED, reversed 2026-08-23. This case used to expect a refusal, on the reasoning that a hyphen is punctuation like any other and CS CLUB with a space is the way to write a club. That reasoning was written before British Columbia's codes were in the app: 55 of the 117 codes in support/british_columbia_secondary_courses.json contain a dash — MTEL-12, MFMP-10, MMA--09 — so the rule was refusing more than half of one province's real courses. A dash is safe everywhere a code travels: legal in a folder name, in a zip's name, and in a launchd label." },
       { "typed": "MTEL-12", "existing": [], "expectProblem": null, "expectShort": null, "why": "A real BC course code, and the one Russell was trying to create when he found the rule refusing it." },
@@ -47,8 +341,34 @@
       { "typed": "ROBOTICS CLUB", "existing": [], "expectProblem": "A course code can be at most 12 characters.", "expectShort": "12 characters at most", "why": "Thirteen. The limit counts the space." },
       { "typed": "ICS3U", "existing": ["ICS3U"], "currentCode": "ICS3U", "expectProblem": null, "expectShort": null, "why": "A course does not clash with itself. Re-typing a course's own code while renaming it is a teacher changing their mind, which is allowed." },
       { "typed": "ics3u", "existing": ["ICS3U"], "currentCode": "ICS3U", "expectProblem": null, "expectShort": null, "why": "Nor does it clash with its own capitalisation." },
-      { "typed": "MPM2D", "existing": ["ICS3U", "MPM2D"], "currentCode": "ICS3U", "expectProblem": "A course named MPM2D already exists — choose a different code.", "expectShort": "MPM2D already exists", "why": "Renaming onto ANOTHER course's code is still a clash." }
+      { "typed": "MPM2D", "existing": ["ICS3U", "MPM2D"], "currentCode": "ICS3U", "expectProblem": "A course named MPM2D already exists. If that's last year's, keep a copy of it for reference and then remove it.", "expectShort": "MPM2D already exists", "why": "Renaming onto ANOTHER course's code is still a clash." },
+      { "typed": "work", "existing": [], "expectProblem": "WORK is a name Plantoir keeps for its own use. Choose a different course code.", "expectShort": "Kept for Plantoir’s use", "why": "Kept for Plantoir itself (GitHub issue #101, Russell's decision of 2026-09-25): the Windows app builds each preview in a folder named work beside every course's built website (<buildRoot>\\work, next to <buildRoot>\\<CODE>), so a course of that code would share its folder with the build. Refused on BOTH platforms, because a code one app accepts and the other refuses is a course a teacher can make on one computer and not open on the other. Rejected: refusing it on Windows only, and renaming Windows' folder instead (the clash goes, but the name stays free for the next thing to want it). The sentence says the name is kept, never what for - rule 1." },
+      { "typed": "  Work  ", "existing": [], "expectProblem": "WORK is a name Plantoir keeps for its own use. Choose a different course code.", "expectShort": "Kept for Plantoir’s use", "why": "Compared after normalizing, so neither the case typed nor surrounding spaces get a code past the rule." },
+      { "typed": "WORK", "existing": ["WORK"], "expectProblem": "WORK is a name Plantoir keeps for its own use. Choose a different course code.", "expectShort": "Kept for Plantoir’s use", "why": "The kept name is checked BEFORE the clash, so a folder of that name already here does not turn the answer into 'keep a copy for reference', which would invite making another one." },
+      { "typed": "work", "existing": ["WORK"], "currentCode": "WORK", "expectProblem": null, "expectShort": null, "why": "A course that already carries the name (made on a Mac before it was kept) may have its own code re-typed while renaming. It cannot be GIVEN the name; renaming it away is how it leaves." },
+      { "typed": "WORKS", "existing": [], "expectProblem": null, "expectShort": null, "why": "Only the whole name is kept. A code that merely starts with it names a different folder." },
+      { "typed": "WORK 1", "existing": [], "expectProblem": null, "expectShort": null },
+      { "typed": "A;B", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "#402: a semicolon is the shape the launchers' check of who owns a running job reads as a separator (#388), so a course of this code could have its live deploy misread as gone. Both apps always refused it; this case pins it, and since #402 the command-line setup refuses it too." },
+      { "typed": "A\\B", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "#402: a backslash is a folder separator on Windows and the other shape #388's owner check reads apart. Pinned on every platform." },
+      { "typed": "C++", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "#402: the command-line setup used to accept it, and nothing else in this list pinned a plus sign." },
+      { "typed": "ICS.4U", "existing": [], "expectProblem": "A course code can only use letters, numbers, spaces and dashes.", "expectShort": "Letters, numbers, dashes", "why": "#402: a dot inside a code — the shape shared-rules.json's label cases (#388) guard, since a label reads a dot as a separator. A LEADING dot is refused earlier and differently at the command line; see commandLine." }
     ],
+    "commandLine": {
+      "appliesOn": ["mac", "windows"],
+      "rule": "The command-line setup (scripts/setup_course.py, which setup.sh and setup.ps1 both run) asks the rule above of a typed code, with no existing codes: re-running it over an existing course is how the command line changes a course's settings, not a clash. In this order: (1) a code beginning with a dot is refused first, whatever is on disk, with its own sentence; (2) a code that is ONE bare folder name (no slash, no backslash, no colon or drive, not absolute, not . or .., not ending in a dot or a space — Windows drops those when it reads a path, so 'ICS4U.' would find ICS4U's settings) whose courses/<CODE>/course_config.json already exists is let through, with a note when it is outside the rule; (3) anything else must pass the rule and is told the wizard's full sentence (expectProblem), then asked again. Only the shared Python runs these cases (scripts/test_course_code_rule.py): neither app has a command line of its own. A folder given a course_config.json by hand is let through by (2) — deliberate hand-editing, and the same maintenance path.",
+      "why": "GitHub #402. Until then the command-line setup refused only a leading dot, so it could make CAFÉ, C++ or A;B — codes neither app can make, and which the launchers' owner check can misread (#388's known limits). Step (2) exists for two reasons. Both apps write courses/<CODE>/course_config.json BEFORE they answer this prompt (mac NewCourseCreator, Windows NewCourseCreator.cs), so an app's New Course run always reaches (2) and never (3): a difference between an app's rule and this one — Windows has no WORK yet — can never leave an app answering the same code forever. And refusing a command-line teacher's own existing course would lock them out of maintaining it while protecting nothing. It is CourseCodeRule's own precedent: a course never clashes with itself. The bare-name condition exists because a path joins rather than appends: courses/ + 'ICS4U/' is courses/ICS4U, and courses/ + an absolute path is that path — writing outside courses/ is the damaging direction, so anything that is not plainly one name goes to the rule, which refuses it.",
+      "rejected": "The launchers refusing the same codes (#402's second half): a course made before #402 would stop previewing and publishing, and its scheduled publishes would start failing — a certain failure to close a narrow race — and it is a second copy of the rule in bash 3.2 and PowerShell. #388's guards stay for courses made before #402 or by hand. Refusing an existing course's own code here: see why. Reading the sentences from this file at run time: a missing contract would stop the setup starting, and these cases already pin every sentence.",
+      "cases": [
+        { "typed": "café", "existingCourse": false, "expect": "refused", "said": "❌ A course code can only use letters, numbers, spaces and dashes.", "why": "The issue's own example: upper-cased to CAFÉ, then refused with the app wizard's sentence." },
+        { "typed": "C++", "existingCourse": true, "expect": "accepted", "said": "⚠️ C++ is kept as it is, because a course with this code is already here. A course code can only use letters, numbers, spaces and dashes. To change this course's code, rename the course in Plantoir.", "why": "A course already here keeps working at the command line; the note says what the rule is and where to rename. Worded to be true for a course made before #402 AND for one an app created a moment ago." },
+        { "typed": "C++", "existingCourse": "folderWithoutSettings", "expect": "refused", "said": "❌ A course code can only use letters, numbers, spaces and dashes.", "why": "A folder with no course_config.json is not a course." },
+        { "typed": ".plantoir-importing-ICS4U", "existingCourse": true, "expect": "refused", "said": "❌ A course code cannot begin with a dot.", "why": "The reference import's staging folder exists WITH a course_config.json, so the dot has to be checked before the existing-course step, or the wizard would write into it." },
+        { "typed": "ICS4U/", "existingCourse": true, "expect": "refused", "said": "❌ A course code can only use letters, numbers, spaces and dashes.", "why": "Not a bare folder name, so the existing-course step does not apply even though courses/ICS4U/course_config.json exists (a path joins: courses/ + 'ICS4U/' is courses/ICS4U). The rule then refuses the slash." },
+        { "typed": "work", "existingCourse": false, "expect": "refused", "said": "❌ WORK is a name Plantoir keeps for its own use. Choose a different course code.", "why": "The kept name is part of the rule at the command line too (#101)." },
+        { "typed": "ics4u", "existingCourse": true, "expect": "accepted", "said": null, "why": "An ordinary re-run over an existing course: no clash, no note." },
+        { "typed": "AP CALC", "existingCourse": false, "expect": "accepted", "said": null }
+      ]
+    },
     "renameEffects": [
       { "effect": "courseFolderMoves", "expect": true, "why": "The code IS the folder name under courses/, so renaming is a move. Everything inside the folder travels with it untouched." },
       { "effect": "courseCodeInSettingsRewritten", "expect": true, "why": "The app reads a course's code from its FOLDER name while the site builder and the social-card maker read it from course_config.json. A pair that disagree produce a sidebar saying one thing and a published page saying another, with no error anywhere." },
@@ -152,6 +472,58 @@
         "expect": false
       }
     ],
+    "addingKeysToAPage": {
+      "cases": [
+        {
+          "after": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: true\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\n---\nBody line one.\n",
+          "shape": "an ordinary three-dash fence (the control: this always worked)"
+        },
+        {
+          "after": "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: false\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n----\nBody line one.\n",
+          "before": "----\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: false\n----\nBody line one.\n",
+          "shape": "a fence of four dashes, on a page hidden in section 1"
+        },
+        {
+          "after": "\n---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: true\n---\nBody line one.\n",
+          "before": "\n---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\n---\nBody line one.\n",
+          "shape": "a blank line before the fence"
+        },
+        {
+          "after": "---\r\ntitle: Loops\r\ncreatedSection1: 2026-09-08T07:00:00.000-0400\r\npublishForSection1: false\r\ncreatedSection2: 2026-09-25T07:00:00.000-0400\r\npublishForSection2: false\r\n---\r\nBody line one.\r\n",
+          "before": "---\r\ntitle: Loops\r\ncreatedSection1: 2026-09-08T07:00:00.000-0400\r\npublishForSection1: false\r\n---\r\nBody line one.\r\n",
+          "shape": "Windows line endings, on a page hidden in section 1"
+        },
+        {
+          "after": "--- \ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: true\n--- \nBody line one.\n",
+          "before": "--- \ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1: true\n--- \nBody line one.\n",
+          "shape": "a space after the fence"
+        },
+        {
+          "after": "---\ntitle: Loops\ncreated: 2026-09-08T07:00:00.000-0400\npublish: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\ncreated: 2026-09-08T07:00:00.000-0400\npublish: false\n---\nBody line one.\n",
+          "shape": "no per-section keys at all: a plain created date already covers every section, so nothing is added"
+        },
+        {
+          "after": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\npublishForSection1:\n  false\n---\nBody line one.\n",
+          "shape": "the setting for section 1 on the line BELOW its key, hidden: the pair goes after the whole value, and is held back because a value that runs onto the next line is not copied (measured: put between the key and its value, as before the review of #175, section 1 read no setting and was PUBLISHED, and section 2 read 'false false', also published)"
+        },
+        {
+          "after": "---\ntitle: Loops\npublishForSection1: false\n  ---\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\npublishForSection1: false\n  ---\n---\nBody line one.\n",
+          "shape": "issue #188: section 1's value runs into a line of INDENTED dashes, which is part of it rather than the closing fence (the site reads \"false ---\" and PUBLISHES section 1): the pair goes after the dashes and is held back, because a value that runs onto the next line is not copied. Measured 2026-09-25: before #188 the pair went ABOVE the dashes, so section 1 turned HIDDEN and section 2 read \"false ---\" and was PUBLISHED; now section 1 is unchanged (visible) and section 2 is hidden"
+        }
+      ],
+      "created": "2026-09-25T07:00:00.000-0400",
+      "existingSections": [
+        1
+      ],
+      "measured": "GitHub #175, 2026-09-25, each of the first five `before`s run through the build's own process_frontmatter for section 2 (python-frontmatter 1.3.0, PyYAML 6.0.3): every one comes out with NO publish key — shown to students — and every `after` comes out with section 1's value, so the two pages hidden in section 1 stay hidden. Before the fix the mac skipped every shape but the first (the page left unchanged). Pointing the finder at the shared rule while keeping the old character-count splice was measured too: the three shapes whose fence is not exactly `---` on the first line got a new date ending in a stray character of the old text (`…-0400e`), and the Windows-line-ending page lost its frontmatter entirely — the build read no keys and printed the block as the page's first lines.",
+      "rule": "Adding a section gives every course-level page that carries per-section keys a `createdSection<N>` (the given date) and a `publishForSection<N>` copied from the LOWEST existing section, as two new lines straight after the last per-section key and its whole value (any lines it continues onto). The copy is written HELD BACK (`false`) instead when the lowest section's setting cannot be read as one value: its value runs onto the next line, it is not complete on its own line, or it is a legacy `draftSection<N>` value the reader cannot tell - the safe direction, counted on the trail's `section added` line. The frontmatter is found the way the build finds it — a fence of three dashes or more, blank lines allowed before it, spaces after it — and the page is changed ONLY by inserting those lines: the teacher's fence, anything before it, the body and the line endings (a new line takes the ending of the line it follows) stay byte for byte. A page with no per-section keys is left alone.",
+      "section": 2,
+      "why": "A page the finder missed got no key for the new section, and a page with no key is SHOWN — so a page the teacher had hidden in section 1 was published in the new section, and nothing said so. The issue's first reading, that a missed page 'falls back to its plain publish: value', is wrong for the ordinary course-level page, which has no plain key. Whole-file equality is the test because a check for the new key's presence passes the wrong splice."
+    },
     "entryProblems": [
       {
         "entry": "",
@@ -244,22 +616,26 @@
       {
         "kind": "backup",
         "maker": "teacher",
-        "name": "ICS3U_backup_2026-08-11_221530.zip"
+        "name": "ICS3U_backup_2026-08-11_221530.zip",
+        "moment": "2026-08-11 22:15:30"
       },
       {
         "kind": "backup",
         "maker": "assistant",
         "name": "ICS3U_backup_2026-08-11_221530_assistant-section3.zip",
+        "moment": "2026-08-11 22:15:30",
         "section": 3,
         "why": "The assistant's own backups say so in the name, so a teacher can see which copies Plantoir made and what each was for. A name WITHOUT that ending is one of the teacher's own — which is exactly what every backup made before this existed is, and why the suffix is added rather than the teacher's being marked."
       },
       {
         "kind": "archive",
-        "name": "ICS3U_2026-08-10_143005.zip"
+        "name": "ICS3U_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05"
       },
       {
         "kind": "archive",
         "name": "ICS3U-section2_2026-08-10_143005.zip",
+        "moment": "2026-08-10 14:30:05",
         "section": 2
       },
       {
@@ -287,7 +663,28 @@
         "why": "Not a zip."
       }
     ],
+    "couldHaveBeenStamped": {
+      "earliest": "2025-01-01 00:00:00",
+      "futureAllowanceDays": 2,
+      "cases": [
+        { "stamp": "2026-08-10_143005", "expect": true },
+        { "stamp": "2569-08-09_141530", "expect": false, "why": "What a Buddhist-calendar machine wrote before the mac pinned its formatter. Read as Gregorian it is the year 2569, five centuries from now." },
+        { "stamp": "5786-11-26_141530", "expect": false, "why": "The same, from a Hebrew-calendar machine." },
+        { "stamp": "0008-08-09_141530", "expect": false, "why": "A Japanese-calendar machine: Reiwa 8, read as the year 8." },
+        { "stamp": "1448-02-26_141530", "expect": false, "why": "An Islamic-calendar machine." },
+        { "stamp": "2018-12-03_141530", "expect": false, "why": "An ETHIOPIC machine, and the case the bounds exist for: read as Gregorian it is an ordinary date in the past that a person would not blink at. Only 'before Plantoir could have written one' separates it, which is why the floor is a date in this product's own history rather than a round number." },
+        { "stamp": "9999-12-31_235959", "expect": false, "why": "No calendar can explain it." },
+        { "daysFromNow": -1, "expect": true, "why": "Yesterday, computed rather than written, so the list does not go stale." },
+        { "daysFromNow": 1, "expect": true, "why": "Inside the future allowance: the stamp is LOCAL time on both ends, so a zip written at UTC+14 and read at UTC-12 is 26 hours ahead of this machine's now." },
+        { "daysFromNow": 5, "expect": false }
+      ],
+      "note": "Whether a moment is one Plantoir could have stamped into a zip's name. Shared because it is the rule that decides what gets DELETED: PruneBackups (CourseArchiver on both sides) sorts the assistant's backups by the date in their NAME and throws the tail away, so a name written in another machine's calendar — 2569, on a folder carried from a pre-fix Mac — parses cleanly, sorts as the newest thing in the folder, takes one of the five kept places and pushes a real backup off the disk. A stamp this refuses must be neither counted nor deleted; it is still LISTED, so the teacher can restore or delete it themselves. The floor is 2025-01-01 because the archive feature was written on 2026-08-09 and nothing of this kind can be older: set a year and a half earlier it refuses no real name, and it still clears the nearest wrong reading (Ethiopic, 7 years 8 months behind) by six years. ASCII digits and a Gregorian reading throughout, so this list runs identically under en_US_POSIX and CultureInfo.InvariantCulture — unlike the mac's own migration for the old spellings, which is deliberately NOT shared. Proposed from the mac 2026-09-10 (issue #160); Windows deserialises zipNames by key name, so an unknown block leaves its suite GREEN until it is wired up, and issue #161 asks for that. The guard itself is already there: #161's first half landed on 2026-09-19, with these same two bounds held by a test of its own until this list replaces it."
+    },
     "courseCode": "ICS3U",
+    "moment": {
+      "format": "yyyy-MM-dd HH:mm:ss, in the LOCAL time zone",
+      "note": "The moment a recognised name is read as. Pinned because the stamp is written and read in the GREGORIAN calendar on every machine, whatever calendar the machine itself is set to. A date formatter given no locale renders `yyyy` in the CURRENT LOCALE'S calendar, so the same instant is spelled `2569-08-09_141530` on a Buddhist-calendar machine, `0008-08-09_141530` on a Japanese one and `1448-02-26_141530` on an Islamic one (measured on macOS 26 for 2026-08-09 14:15:30) — none of them a name this file says Plantoir writes, and none of them sortable once the folder is opened anywhere else. Windows has always pinned `CultureInfo.InvariantCulture`; the mac pinned `en_US_POSIX` on 2026-09-10 for issue #160, and also goes on READING the old spellings, because a teacher on such a machine has zips already named that way and refusing them would empty their Archives and Backups lists on the day they updated. That reading half is the mac's own migration and is deliberately not a case here: the mac cannot check it on the other side, because .NET's TryParseExact does not treat native digits the way Foundation does. Issue #161 carries what Windows was asked to do about it. The live defect it named — a backup named in another machine's calendar sorts as the newest thing in the folder, and their PruneBackups had no guard against a date that cannot be true — was fixed there on 2026-09-19; what is still owed is asserting these values."
+    },
     "note": "Three kinds of zip live side by side in `courses/_backups/<CODE>/`, told apart by NAME. Each parser accepts only its own form, so the three can never appear in each other's lists — an archive showing up under Backups is a teacher restoring the wrong thing. The timestamp is `yyyy-MM-dd_HHmmss` and contains an underscore of its own, which is why the pieces are counted rather than split on the last underscore."
   }
 }

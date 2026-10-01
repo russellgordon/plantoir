@@ -1,7 +1,11 @@
 import Foundation
 
 /// One page of a section, as the tools see it.
-struct AssistSectionPage {
+///
+/// `nonisolated`: a plain value with no course in it. Copying a page between
+/// courses builds these off the main actor, so that the #173 walk below can be
+/// CALLED rather than re-implemented.
+nonisolated struct AssistSectionPage {
 
     // MARK: - Stored properties
 
@@ -114,12 +118,35 @@ struct AssistSectionPage {
 }
 
 /// A link on one page that leads to another.
-struct AssistSectionLink {
+nonisolated struct AssistSectionLink {
 
     // MARK: - Stored properties
 
     let fromRelativePath: String
     let toTitle: String
+}
+
+/// What following one or more pages' links reaches, and the class pages the
+/// walk stopped at on the way.
+///
+/// Two halves rather than one list, because a caller needs both and they mean
+/// opposite things: the first is what a verb acts on, the second is what a
+/// teacher has to be TOLD was left alone. Returning only the first made the
+/// stop invisible — a plan quietly smaller than the one the teacher pictured,
+/// with no way to tell "it decided" from "it missed it".
+nonisolated struct AssistLinkedReach {
+
+    // MARK: - Stored properties
+
+    /// The material reached: transitive, and never a class page.
+    let pages: [AssistSectionPage]
+
+    /// The class pages a link landed on, which the walk did not enter.
+    ///
+    /// Never one of the pages it started from — those are seeded as seen
+    /// before the walk begins, so a class the teacher NAMED is not reported
+    /// here as one that was left alone.
+    let classPagesStoppedAt: [AssistSectionPage]
 }
 
 /// Every page in one section, what links to what, and who can see it.
@@ -128,7 +155,7 @@ struct AssistSectionLink {
 /// link — publishing a class along with what it uses, checking what students
 /// would meet — works from the same picture rather than each walking the folder
 /// its own way.
-struct AssistSectionGraph {
+nonisolated struct AssistSectionGraph {
 
     // MARK: - Stored properties
 
@@ -173,36 +200,80 @@ struct AssistSectionGraph {
     // MARK: - Functions
 
     /// Read one section's pages off disk.
+    @MainActor
     static func read(forSection sectionNumber: Int, in course: Course, workspaceURL: URL?) -> AssistSectionGraph {
         var pages: [AssistSectionPage] = []
-        for pageURL in ClassPages.pagesOfSection(sectionNumber, in: course) {
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
             guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
                 continue
             }
-            let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
-                pageAt: pageURL, forSection: sectionNumber, in: course
-            )
-            let dateKey: String = PageFrontmatter.createdKey(
-                forSection: sectionNumber, isSectionLocal: isSectionLocal
-            )
-            let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
-                in: text, forSection: sectionNumber
-            )
-            pages.append(AssistSectionPage(
-                title: pageURL.deletingPathExtension().lastPathComponent,
-                displayTitle: displayName(forPageAt: pageURL, in: text),
-                fileURL: pageURL,
-                relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
-                isSectionLocal: isSectionLocal,
-                isVisibleToStudents: visibility != .hidden,
-                visibilityIsCertain: visibility != .cannotTell,
-                date: PageFrontmatter.createdDay(in: text, key: dateKey),
-                linkedTitles: linkTargets(in: text),
-                classFolderNames: ClassFolder.names(for: course),
-                pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+            pages.append(AssistSectionGraph.page(
+                at: pageURL, text: text, forSection: sectionNumber, in: course,
+                workspaceURL: workspaceURL, readingLinks: true
             ))
         }
         return AssistSectionGraph(courseCode: course.code, sectionNumber: sectionNumber, pages: pages)
+    }
+
+    /// The section's CLASS pages alone, read exactly as `read` reads them but
+    /// without their links (`linkedTitles` is empty) — for the question about
+    /// today's class at Preview (#397), which is asked on every press of the
+    /// button and needs each class's date, visibility and file name, nothing
+    /// more. Membership is `isClassPage`, decided from the path BEFORE the file
+    /// is opened, so the other pages of a large course are never read;
+    /// `TodaysClassOnTheFrontPageTests` pins that it names the same pages as
+    /// `read`'s class pages.
+    @MainActor
+    static func classPages(forSection sectionNumber: Int, in course: Course) -> [AssistSectionPage] {
+        var pages: [AssistSectionPage] = []
+        let classFolders: [String] = ClassFolder.names(for: course)
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: sectionNumber, in: course) {
+            if pageURL.lastPathComponent.lowercased() == "index.md" {
+                continue
+            }
+            let within: String = pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+            if !ClassFolder.isClassPage(relativePath: within, classFolders: classFolders) {
+                continue
+            }
+            guard let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
+                continue
+            }
+            pages.append(AssistSectionGraph.page(
+                at: pageURL, text: text, forSection: sectionNumber, in: course,
+                workspaceURL: nil, readingLinks: false
+            ))
+        }
+        return pages
+    }
+
+    /// One page, read — the single place both readers above build a page.
+    @MainActor
+    private static func page(
+        at pageURL: URL, text: String, forSection sectionNumber: Int, in course: Course,
+        workspaceURL: URL?, readingLinks: Bool
+    ) -> AssistSectionPage {
+        let isSectionLocal: Bool = AssistPageVisibility.isSectionLocal(
+            pageAt: pageURL, forSection: sectionNumber, in: course
+        )
+        let dateKey: String = PageFrontmatter.createdKey(
+            forSection: sectionNumber, isSectionLocal: isSectionLocal
+        )
+        let visibility: PageVisibilityAnswer = AssistPageVisibility.answer(
+            in: text, forSection: sectionNumber
+        )
+        return AssistSectionPage(
+            title: pageURL.deletingPathExtension().lastPathComponent,
+            displayTitle: displayName(forPageAt: pageURL, in: text),
+            fileURL: pageURL,
+            relativePath: relativePath(of: pageURL, workspaceURL: workspaceURL),
+            isSectionLocal: isSectionLocal,
+            isVisibleToStudents: visibility != .hidden,
+            visibilityIsCertain: visibility != .cannotTell,
+            date: PageFrontmatter.createdDay(in: text, key: dateKey),
+            linkedTitles: readingLinks ? linkTargets(in: text) : [],
+            classFolderNames: ClassFolder.names(for: course),
+            pathWithinSection: pathWithinSection(of: pageURL, forSection: sectionNumber, in: course)
+        )
     }
 
     /// What a teacher calls this page, which is not always what the file is
@@ -264,19 +335,97 @@ struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
-    /// The pages these ones link to, and the pages THOSE link to, and so on.
+    /// The page a link leads to, the way the site resolves it: by file name,
+    /// whatever the capitals — and, failing that, a folder named that whose
+    /// landing page (`index.md`) is in this section, since "[[Unit 2]]"
+    /// written for a folder reaches its landing page on the site (#167).
+    func pageALinkLeadsTo(_ target: String) -> AssistSectionPage? {
+        if let page = page(titled: target) {
+            return page
+        }
+        let wanted: String = normalized(target)
+        if wanted.isEmpty {
+            return nil
+        }
+        for page in pages where page.isFolderIndex {
+            let folder: String = page.fileURL.deletingLastPathComponent().lastPathComponent
+            if folder.lowercased() == wanted {
+                return page
+            }
+        }
+        return nil
+    }
+
+    /// Every page a teacher may mean by `title` — by file name first, because
+    /// that is how links find a page; then by the name the sidebar SHOWS, which
+    /// is how a teacher finds it, including a folder's landing page named by its
+    /// folder (#167).
+    ///
+    /// One page is the answer. Two or more by the name the sidebar shows is a
+    /// question back to the teacher, never a guess. Two FILES with one name — a
+    /// section's own page and a course-wide page — still resolve to the first in
+    /// path order, the rule `init` already applies to every link; that is a
+    /// known limit, not something this answers.
+    func pagesATeacherMayMean(_ title: String) -> [AssistSectionPage] {
+        if let page = page(titled: title) {
+            return [page]
+        }
+        let wanted: String = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if wanted.isEmpty {
+            return []
+        }
+        var found: [AssistSectionPage] = []
+        for page in pages {
+            var matches: Bool = page.displayTitle.lowercased() == wanted
+            if page.isFolderIndex {
+                let folder: String = page.fileURL.deletingLastPathComponent().lastPathComponent
+                if folder.lowercased() == wanted {
+                    matches = true
+                }
+            }
+            if matches {
+                found.append(page)
+            }
+        }
+        return found
+    }
+
+    /// The pages these ones link to, and the pages THOSE link to, and so on —
+    /// stopping at any class page a link lands on.
     ///
     /// Transitive on purpose. "Publish tomorrow's class and everything it links
     /// to" means the concept page the class points at AND the snippet that
     /// concept page points at; stopping at one hop leaves a student one click
     /// from nothing.
-    func linkedPages(from starting: [AssistSectionPage]) -> [AssistSectionPage] {
+    ///
+    /// **A class page is the one stop, and it is a decision rather than an
+    /// oversight.** A class goes up when the teacher names THAT class, so a
+    /// link landing on another class is not collected and is not followed
+    /// through: material reachable only through that class belongs to it and
+    /// goes up with it. Publishing Day 4's worksheet because Day 3 links to
+    /// Day 4 puts it in front of students a day early and dates it to the
+    /// wrong lesson. REJECTED was the middle position — leave the linked class
+    /// alone but walk past it to the material beyond — for those same two
+    /// reasons. Decided 2026-09-19, issue #173, after the two apps were found
+    /// to disagree: Windows stopped, the mac walked through.
+    /// `contracts/shared-rules.json` → `followingLinks.stopsAtAClassPage`.
+    ///
+    /// **The pages STARTED from are never stopped.** They are seeded as seen
+    /// before the walk begins, so naming two classes makes both of them
+    /// starting points, and publishing a whole unit — which names every class
+    /// in it, one plan each — loses nothing.
+    ///
+    /// The name says `reach` rather than `linkedPages` on purpose: the rule
+    /// changed under the old name's promise once already, and renaming it made
+    /// the compiler hand every caller over to be read again.
+    func reachFollowingLinks(from starting: [AssistSectionPage]) -> AssistLinkedReach {
         var seen: Set<String> = []
         for page in starting {
             seen.insert(page.lowercasedTitle)
         }
 
         var found: [AssistSectionPage] = []
+        var classPagesStoppedAt: [AssistSectionPage] = []
         var queue: [AssistSectionPage] = starting
         while !queue.isEmpty {
             let page: AssistSectionPage = queue.removeFirst()
@@ -290,11 +439,18 @@ struct AssistSectionGraph {
                     // that does not exist. Not this tool's business to invent.
                     continue
                 }
+                if linked.isClassPage {
+                    // The walk ends here: the class is neither collected nor
+                    // entered. Only the class itself was marked seen, so a
+                    // page this one ALSO reaches directly is still collected.
+                    classPagesStoppedAt.append(linked)
+                    continue
+                }
                 found.append(linked)
                 queue.append(linked)
             }
         }
-        return found
+        return AssistLinkedReach(pages: found, classPagesStoppedAt: classPagesStoppedAt)
     }
 
     /// Links a student could click on a page they can see, that lead to a page
@@ -328,7 +484,15 @@ struct AssistSectionGraph {
     /// reach, and students find them anyway through the site's explorer. Folder
     /// landing pages are left out: an `index.md` is the way in to a folder, not
     /// a page anybody was ever going to link to.
-    func visiblePagesNothingLinksTo() -> [AssistSectionPage] {
+    ///
+    /// `leavingOut` is a set of FILE PATHS that are never reported either —
+    /// check_section passes the section's curriculum pages and its Key Links
+    /// page (`pagesNeverInTheAudit`), which is what Windows' `Unreferenced`
+    /// has always left out and what `shared-rules.json` → `sectionCheck` now
+    /// pins for both (#96). A curriculum page is reached through the coverage
+    /// map, not through a link, so "linked from nowhere" said nothing useful
+    /// about it and the two apps disagreed about it for no reason anyone chose.
+    func visiblePagesNothingLinksTo(leavingOut excluded: Set<String> = []) -> [AssistSectionPage] {
         var linkedFromSomewhere: Set<String> = []
         for page in pages {
             for target in page.linkedTitles {
@@ -341,6 +505,9 @@ struct AssistSectionGraph {
             if !page.isVisibleToStudents || page.isFolderIndex || page.isClassPage {
                 continue
             }
+            if excluded.contains(page.fileURL.standardizedFileURL.path) {
+                continue
+            }
             if linkedFromSomewhere.contains(page.lowercasedTitle) {
                 continue
             }
@@ -349,22 +516,120 @@ struct AssistSectionGraph {
         return orphans
     }
 
+    /// Visible pages a class students cannot see links to, and no class they
+    /// CAN see links to — the "linked but missed" group (#96).
+    ///
+    /// **The issue's own definition, not the start-of-year rule's**, and that
+    /// independence is the point of it. A bulk change that should have taken
+    /// these pages down with the classes that use them, and did not, leaves
+    /// exactly this shape behind: the classes are hidden, and a page only they
+    /// use is still up. "Its being empty is what proved the job complete" —
+    /// so it must be able to go RED when the start-of-year rule is wrong,
+    /// which it could not if it were the same predicate (the plan review's
+    /// H2, measured: 55 SNC1W and 81 ICS3U pages flagged when the rule leaks,
+    /// 0 when it does not).
+    ///
+    /// Only a CLASS'S link counts, on either side. A visible concept page
+    /// linking to it does not rescue it — the concept web and "How Marks
+    /// Work" are exactly the pages that held concepts up when the first
+    /// start-of-year rule was measured. Class pages and folder landing pages
+    /// are never in this group, and neither is anything in `leavingOut`
+    /// (curriculum pages, Key Links and the pages it lists).
+    ///
+    /// Disjoint from `visiblePagesNothingLinksTo` by construction: a page here
+    /// has a class linking to it.
+    func visiblePagesLinkedButMissed(leavingOut excluded: Set<String> = []) -> [AssistSectionPage] {
+        var linkedByAVisibleClass: Set<String> = []
+        var linkedByAHiddenClass: Set<String> = []
+        for page in pages where page.isClassPage {
+            for target in page.linkedTitles {
+                if target == page.lowercasedTitle {
+                    continue
+                }
+                if page.isVisibleToStudents {
+                    linkedByAVisibleClass.insert(target)
+                } else {
+                    linkedByAHiddenClass.insert(target)
+                }
+            }
+        }
+
+        var missed: [AssistSectionPage] = []
+        for page in pages {
+            if !page.isVisibleToStudents || page.isFolderIndex || page.isClassPage {
+                continue
+            }
+            if excluded.contains(page.fileURL.standardizedFileURL.path) {
+                continue
+            }
+            // Only the page links resolve to: two files with one name share a
+            // title, and the first in path order is the one a link reaches.
+            guard let resolved = pagesByTitle[page.lowercasedTitle],
+                  resolved.fileURL == page.fileURL else {
+                continue
+            }
+            if !linkedByAHiddenClass.contains(page.lowercasedTitle) {
+                continue
+            }
+            if linkedByAVisibleClass.contains(page.lowercasedTitle) {
+                continue
+            }
+            missed.append(page)
+        }
+        return missed
+    }
+
+    /// The pages check_section never reports as linked from nowhere or as
+    /// linked but missed, by file path: the section's curriculum pages, its
+    /// Key Links page, and every page Key Links lists (#96).
+    ///
+    /// Each is reached some other way than by a class's link — the coverage
+    /// map, or the panel on every page — so neither group says anything
+    /// useful about them. The same pages the start-of-year rule never
+    /// touches, less the ones only it knows about (the first class and its
+    /// pages).
+    @MainActor
+    static func pagesNeverInTheAudit(of graph: AssistSectionGraph, in course: Course) -> Set<String> {
+        var paths: Set<String> = []
+        let keyLinks: Set<String> = AssistPublishPlanner.pagesThisSectionCannotDoWithout(graph: graph)
+        for page in graph.pages {
+            if keyLinks.contains(page.lowercasedTitle) && !page.isClassPage {
+                paths.insert(page.fileURL.standardizedFileURL.path)
+                continue
+            }
+            if AssistCurriculumMentions.isCurriculum(pageAt: page.fileURL, in: course) {
+                paths.insert(page.fileURL.standardizedFileURL.path)
+            }
+        }
+        return paths
+    }
+
     /// Every wikilink target on a page, lowercased.
     ///
     /// The pattern is `WikiLinkRewriter`'s own, so a link this reads is exactly
     /// a link a rename would rewrite — one definition of "a link", not two.
+    /// That includes a link whose alias pipe is escaped, `[[Ohm's Law\|Ohm]]`,
+    /// as Obsidian writes it inside a table: the pattern stops the name before
+    /// the backslash, so publishing follows it, the dates a class brings reach
+    /// it, and the site check counts it (#294 — before then the name was read
+    /// as `Ohm's Law\`, matched no page, and was silently dropped).
+    ///
+    /// A link written inside code is an EXAMPLE of a link, and is not read
+    /// (#313): Quartz draws none, so publishing must not follow one, and the
+    /// site check must not count one. The matches come from
+    /// `WikiLinkRewriter.linkMatches`, the same entry point every other
+    /// reader and rewriter uses. Until #313 this read every match, code and
+    /// all: 1,896 across `support/`, each one a page a publish could take
+    /// along that nothing on the site leads to.
+    ///
+    /// A Markdown-style link to a page, `[text](Worksheet.md)` or
+    /// `[text](<Unit 1/Worksheet.md>)`, is read too, through the same mask
+    /// (see `everyLinkAsWritten`).
     static func linkTargets(in text: String) -> [String] {
-        guard let expression = try? NSRegularExpression(pattern: WikiLinkRewriter.pattern) else {
-            return []
-        }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
         var targets: [String] = []
         var seen: Set<String> = []
-        for match in expression.matches(in: text, range: whole) {
-            guard let targetRange = Range(match.range(at: 2), in: text) else {
-                continue
-            }
-            let target: String = normalized(String(text[targetRange]))
+        for written in AssistSectionGraph.everyLinkAsWritten(in: text) {
+            let target: String = normalized(written)
             if target.isEmpty || seen.contains(target) {
                 continue
             }
@@ -372,6 +637,140 @@ struct AssistSectionGraph {
             targets.append(target)
         }
         return targets
+    }
+
+    /// Every wiki-link on a page as the teacher WROTE it — capitals kept, each
+    /// once, in the order they appear — for the answer to "what does this page
+    /// link to?" (#167).
+    ///
+    /// The pattern is `WikiLinkRewriter`'s, so a link here is a link there, and
+    /// a picture or a page EMBEDDED with `![[…]]` is included — whether it is a
+    /// page is decided by what it resolves to, not by how it was written. Two
+    /// things differ from `linkTargets`, and both were MEASURED across the 39
+    /// example-content payloads before being chosen (2026-09-25): read this
+    /// way, 30,930 links and embeds (each counted once per page) and every one
+    /// resolved to a page — no dead link reported where there is none.
+    ///
+    /// - A link inside `code` or a fenced code block is an EXAMPLE of a link,
+    ///   not a link: the Scavenger Hunt pages show `[[Page Name]]` to teach the
+    ///   syntax. Read with the code left in, 188 targets came back as links to
+    ///   pages that do not exist. This function used to strip code with its
+    ///   own line walker; since #313 every reader shares one mask
+    ///   (`WikiLinkRewriter.linkMatches`), because that walker was wrong in
+    ///   both directions: it flipped its fence on any line STARTING with `~~~`,
+    ///   so a Python traceback's `~~~~^^^^` inside a ```` ```text ```` block
+    ///   ended the fence and the real closer opened a new one — 22 real links
+    ///   dropped on four ICS4U pages — and it saw no fence inside a `>`
+    ///   callout, so 270 examples on the Scavenger Hunt pages read as links.
+    /// - A link inside a table escapes its pipe, `[[Ohm's Law\|Ohm]]`. When
+    ///   this was written the shared pattern kept the backslash on the name,
+    ///   and read that way 69 real links came back dead, so this function
+    ///   stripped it by hand. Since #294 the pattern itself stops before the
+    ///   backslash, for every reader, and the hand strip is gone: a second
+    ///   strip here would only hide a regression of the first.
+    ///
+    /// So since #313 the two readers see exactly the same links, and differ
+    /// only in how they hand a name back: this one as written, that one
+    /// normalised for the index.
+    static func linksAsWritten(in text: String) -> [String] {
+        var written: [String] = []
+        var seen: Set<String> = []
+        for asWritten in AssistSectionGraph.everyLinkAsWritten(in: text) {
+            var target: String = asWritten.trimmingCharacters(in: .whitespaces)
+            if target.lowercased().hasSuffix(".md") {
+                target = String(target.dropLast(3))
+            }
+            let key: String = normalized(target)
+            if key.isEmpty || seen.contains(key) {
+                continue
+            }
+            seen.insert(key)
+            written.append(target)
+        }
+        return written
+    }
+
+    /// Every link on a page, in the order it appears: each wikilink's name
+    /// as written, and each Markdown-style link's destination — in either
+    /// shape, `](Unit%201/Worksheet.md)` or `](<Unit 1/Worksheet.md>)` —
+    /// decoded, with any `#heading` or `?query` taken off. Both go through
+    /// the one mask (`MarkdownCode.notALinkRanges`), so a link in code or in
+    /// a `%%` comment is not read in either style.
+    ///
+    /// **Why Markdown-style links are read at all** (folded into #325 by the
+    /// director's ruling, 2026-09-26): before, publishing never followed one,
+    /// so a class that linked its worksheet as `[worksheet](Worksheet.md)`
+    /// published without it, and hiding the worksheet never noticed the class
+    /// still led there. Obsidian writes wikilinks unless its "Use
+    /// [[Wikilinks]]" setting is off, so this is rare — measured at ONE local
+    /// Markdown link in all of `support/`, ENL1W's, which was itself dead and
+    /// is now a wikilink — but a teacher who turned the setting off writes
+    /// nothing else. The destination is resolved the way a wikilink is, by
+    /// its last component; a destination with a scheme (`https:`, `mailto:`),
+    /// or one that is only a `#heading`, names no page.
+    ///
+    /// Each shape is read by ONE pattern, `FolderPathRewriter`'s own
+    /// (`markdownLinkPattern` refuses a `<`, `angleBracketedLinkPattern`
+    /// takes it), so a destination is never read twice.
+    static func everyLinkAsWritten(in text: String) -> [String] {
+        var located: [(location: Int, name: String)] = []
+        for match in WikiLinkRewriter.linkMatches(in: text) {
+            guard let targetRange = Range(match.range(at: 2), in: text) else {
+                continue
+            }
+            located.append((location: match.range.location, name: String(text[targetRange])))
+        }
+        let mask: [NSRange] = MarkdownCode.notALinkRanges(in: text)
+        for expression in [AssistSectionGraph.markdownLinkExpression, AssistSectionGraph.angleBracketedLinkExpression] {
+            guard let expression else {
+                continue
+            }
+            for match in MarkdownCode.matches(of: expression, in: text, outside: mask) {
+                guard let targetRange = Range(match.range(at: 2), in: text),
+                      let name = AssistSectionGraph.pageNamedByDestination(String(text[targetRange])) else {
+                    continue
+                }
+                located.append((location: match.range.location, name: name))
+            }
+        }
+        located.sort { first, second in
+            return first.location < second.location
+        }
+        var names: [String] = []
+        for entry in located {
+            names.append(entry.name)
+        }
+        return names
+    }
+
+    nonisolated private static let markdownLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.markdownLinkPattern)
+
+    nonisolated private static let angleBracketedLinkExpression: NSRegularExpression? =
+        try? NSRegularExpression(pattern: FolderPathRewriter.angleBracketedLinkPattern)
+
+    /// What a Markdown destination names as a page, as written but decoded,
+    /// or nil when it names nothing in the course.
+    private static func pageNamedByDestination(_ destination: String) -> String? {
+        var text: String = destination.trimmingCharacters(in: .whitespaces)
+        if text.isEmpty || text.hasPrefix("#") || text.hasPrefix("//") {
+            return nil
+        }
+        if let scheme = text.range(of: #"^[A-Za-z][A-Za-z0-9+.\-]*:"#, options: .regularExpression),
+           !scheme.isEmpty {
+            return nil
+        }
+        for separator in ["#", "?"] {
+            if let cut = text.firstIndex(of: Character(separator)) {
+                text = String(text[..<cut])
+            }
+        }
+        text = text.removingPercentEncoding ?? text
+        let tidied: String = text.trimmingCharacters(in: .whitespaces)
+        if tidied.isEmpty {
+            return nil
+        }
+        return tidied
     }
 
     /// A link target or a teacher's page name reduced to the form the index
@@ -397,6 +796,7 @@ struct AssistSectionGraph {
     /// lesson. Shared pages live outside the section folder and fall back to
     /// their own last two components, which is enough for the rule to see the
     /// folder they sit in.
+    @MainActor
     static func pathWithinSection(of url: URL, forSection sectionNumber: Int, in course: Course) -> String {
         let full: String = url.standardizedFileURL.path
         let root: String = course.sectionDirectoryURL(forSection: sectionNumber)

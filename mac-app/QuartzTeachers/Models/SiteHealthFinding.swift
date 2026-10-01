@@ -36,6 +36,25 @@ struct SiteHealthFinding: Equatable, Identifiable {
 
     var id: String { return "\(course)/\(section)/\(name)" }
 
+    /// The activity-trail line for this finding, in the shape
+    /// `contracts/shared-rules.json` → `activityTrail.mustRecord` →
+    /// "folder problem found" → `carries` gives — curly apostrophe included,
+    /// which is what that contract and Windows' `TrailSentence` say. It lives
+    /// here because TWO places write it: `ScriptRunner`, as a build's output
+    /// arrives, and `ScheduledDeploy.recordFolderProblems`, at the end of a
+    /// scheduled run. Written out in each, the mac once wrote a straight
+    /// apostrophe the contract did not (#153).
+    ///
+    /// A sentence a teacher would recognise, carrying the stable check NAME in
+    /// brackets. Both halves earn their place: rule 5 says a trail line must
+    /// read as something that happened rather than as a function name, while
+    /// the name is what somebody reading the trail months later can match
+    /// against the contract — the product wording will have been reworded by
+    /// then.
+    nonisolated var trailSentence: String {
+        return "found a problem with this course’s folders (\(name))"
+    }
+
     // MARK: - Functions
 
     /// The marker the toolchain prints. Pinned by
@@ -51,12 +70,18 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// real build has long since scrolled past them.
     nonisolated static func findings(in text: String) -> [SiteHealthFinding] {
         var found: [SiteHealthFinding] = []
-        for rawLine in linesOf(text) {
-            let line: String = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard line.hasPrefix(markerPrefix) else {
+        for line in linesOf(text) {
+            // From the prefix ONWARD, not only a line that starts with it:
+            // something else writing half a line into the same terminal glues
+            // the marker to its tail ("Building…PLANTOIR_HEALTH: {…}"), and
+            // `hasPrefix` then dropped the finding outright — no dialog, no
+            // trail line, nothing in the assistant's answer (#153, measured).
+            // Windows' `SiteHealthFinding.Parse` reads from `IndexOf` the same
+            // way.
+            guard let prefixRange = line.range(of: markerPrefix) else {
                 continue
             }
-            let payload: String = String(line.dropFirst(markerPrefix.count))
+            let payload: String = String(line[prefixRange.upperBound...])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let data = payload.data(using: .utf8),
                   let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -84,15 +109,59 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// The wording is the toolchain's own, carried in the marker line, which is
     /// what stops the assistant describing the same problem in different words
     /// from the section window.
-    static func appending(to message: String, from runner: ScriptRunner) -> String {
+    static func appending(to message: String, from runner: ScriptRunner, courseDirectory: URL? = nil) -> String {
         if runner.healthFindings.isEmpty {
             return message
         }
         var parts: [String] = [message]
         for finding in runner.healthFindings {
+            if let offered = sentenceWhenTheChecklistIsOffered(
+                for: finding, from: runner, courseDirectory: courseDirectory
+            ) {
+                parts.append(offered)
+                continue
+            }
             parts.append(finding.sentence + " " + finding.detail)
         }
         return parts.joined(separator: "\n\n")
+    }
+
+    /// For the #333 finding when the same build wrote a links checklist offer
+    /// for its section (#379): the section window will offer the pages, so
+    /// the assistant says that instead of reading ten pairs aloud. Only when
+    /// the build SAID so — a builder older than the app writes no offer, and
+    /// then the finding's own words are the honest ones.
+    ///
+    /// And only when a checklist will really come (implementation review,
+    /// N3): the offer on disk is this build's and holds a page the teacher
+    /// has not already answered. Its callers are the paths with NO section
+    /// window (`AssistSiteWork`), so "when you next open" is the true
+    /// sentence; an "offered now" variant was removed on review because no
+    /// honest lookup of an open window exists here.
+    static func sentenceWhenTheChecklistIsOffered(
+        for finding: SiteHealthFinding, from runner: ScriptRunner, courseDirectory: URL?
+    ) -> String? {
+        guard finding.name == LinksChecklistRouting.findingName, let courseDirectory else {
+            return nil
+        }
+        var marker: LinksChecklistMarker?
+        for candidate in runner.linksChecklistMarkers where candidate.section == finding.section {
+            marker = candidate
+        }
+        guard let marker,
+              let read = LinksChecklistOffer.read(courseDirectory: courseDirectory, section: finding.section),
+              LinksChecklistGate.markerMatches(marker, offer: read.offer) else {
+            return nil
+        }
+        let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+            courseDirectory: courseDirectory, section: finding.section
+        )
+        if !LinksChecklistGate.holdsSomethingNew(read.offer, answered: answered) {
+            return nil
+        }
+        return AssistWording.linksIntoHiddenPagesWillBeOffered(
+            course: finding.course, section: String(finding.section)
+        )
     }
 
     /// Splits output into lines, on SCALARS rather than Characters.
@@ -129,8 +198,16 @@ struct SiteHealthFinding: Equatable, Identifiable {
     /// Rule 1: the interface never names the machinery, and a raw JSON blob in
     /// the console is machinery. The human-readable sentence is printed
     /// separately by the toolchain, so hiding this line loses nothing.
+    ///
+    /// A line CARRYING the prefix anywhere counts, and the WHOLE line goes
+    /// (#153). What precedes a glued marker is half a line of progress
+    /// chatter, which is not a sentence anybody needs; and a check that only
+    /// looked at the start showed the teacher the raw JSON whenever the marker
+    /// arrived glued to something else. This is Windows' own rule
+    /// (`TranscriptBuilder.CarriesTheHealthMarker`), adopted. It cannot catch
+    /// ordinary output by accident: no script contains the prefix as a
+    /// literal — `site_health.py` reads it from the contract.
     nonisolated static func isMarkerLine(_ line: String) -> Bool {
-        return line.trimmingCharacters(in: .whitespacesAndNewlines)
-            .hasPrefix(markerPrefix)
+        return line.contains(markerPrefix)
     }
 }

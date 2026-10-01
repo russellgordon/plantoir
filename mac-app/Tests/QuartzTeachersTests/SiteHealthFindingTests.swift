@@ -122,7 +122,7 @@ final class SiteHealthFindingTests: XCTestCase {
 
     /// The bug this design exists to avoid.
     ///
-    /// Every other structured-line reader in `ScriptRunner` works from
+    /// Most other structured-line readers in `ScriptRunner` work from
     /// `transcript.recentText(maximumCharacters: 8000)`, which is a TAIL. The
     /// health lines are printed in the middle of a build, so on a real build
     /// they are far outside that window by the end. Collecting as output
@@ -219,7 +219,7 @@ final class SiteHealthFindingTests: XCTestCase {
                        "hiding the line must not stop the app from reading it")
     }
 
-    func testEveryFindingReachesTheActivityTrail() {
+    func testEveryFindingReachesTheActivityTrail() throws {
         let folderURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("health-trail-\(UUID().uuidString)")
         let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
@@ -231,18 +231,150 @@ final class SiteHealthFindingTests: XCTestCase {
         runner.receiveOutput(curriculumLine + "\n")
 
         let trail: String = store.activityText(includingPrompts: false)
-        XCTAssertTrue(trail.contains("found a problem with this course's folders"), trail)
+        let finding: SiteHealthFinding = try XCTUnwrap(SiteHealthFinding.findings(in: curriculumLine).first)
+        XCTAssertTrue(trail.contains("ICS3U/1 · " + finding.trailSentence), trail)
         XCTAssertTrue(trail.contains("curriculumCoverageFoundNothing"), trail)
         // The NAME travels, not the wording: a sentence gets reworded, a name
         // is what somebody searching the trail months later can match on.
         XCTAssertFalse(trail.contains("could not be built"), trail)
     }
+
+    // MARK: - #153: the console never shows a marker, and never loses one
+
+    /// Something else wrote half a line into the terminal, and the marker was
+    /// glued to its tail. Measured against the old code: the raw JSON was
+    /// SHOWN and the finding was DROPPED — no dialog, no trail line, and
+    /// nothing in the assistant's answer.
+    func testAMarkerGluedToAPartialLineIsReadAndHidden() {
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("Building…")
+        runner.receiveOutput(mediaLine + "\r\n")
+        runner.receiveOutput("done\r\n")
+        XCTAssertEqual(runner.healthFindings.count, 1, "a glued marker must still be read")
+        XCTAssertEqual(runner.healthFindings.first?.name, "mediaFolderMissing")
+        let shown: String = runner.transcript.displayText
+        XCTAssertFalse(shown.contains(SiteHealthFinding.markerPrefix), shown)
+        XCTAssertEqual(shown, "done", "the glued line goes whole, chatter and all")
+    }
+
+    /// The health payload is the longest line a build prints, so it is the
+    /// likeliest to arrive in two chunks — and until the newline arrived, the
+    /// first half was on screen as raw JSON, through BOTH ways of reading the
+    /// transcript.
+    func testAHalfArrivedMarkerIsNotShownWhileItArrives() {
+        var transcript: TranscriptBuilder = TranscriptBuilder()
+        transcript.append(rawText: "ok\r\n")
+        let cut: String.Index = mediaLine.index(mediaLine.startIndex, offsetBy: 60)
+        transcript.append(rawText: String(mediaLine[..<cut]))
+        XCTAssertEqual(transcript.displayText, "ok")
+        XCTAssertFalse(transcript.recentText(maximumCharacters: 8000).contains(SiteHealthFinding.markerPrefix))
+        transcript.append(rawText: String(mediaLine[cut...]) + "\r\n")
+        XCTAssertEqual(transcript.displayText, "ok")
+        XCTAssertFalse(transcript.recentText(maximumCharacters: 8000).contains(SiteHealthFinding.markerPrefix))
+    }
+
+    /// Half a marker cut after `"sentence":` ends in a colon — a question's
+    /// shape — so after a quiet spell the prompt check would have offered raw
+    /// JSON to the teacher as something to answer.
+    func testHalfAMarkerIsNeverAQuestion() {
+        let cut: String.Index = mediaLine.index(mediaLine.startIndex, offsetBy: 60)
+        let half: String = String(mediaLine[..<cut]).trimmingCharacters(in: .whitespaces)
+        XCTAssertTrue(half.hasSuffix(":"), half)
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion(half))
+        XCTAssertFalse(ScriptRunner.looksLikeQuestion("PLANTOIR_DATED: {\"course\":"))
+        XCTAssertTrue(ScriptRunner.looksLikeQuestion("Enter Netlify site name:"), "real prompts still ask")
+    }
+
+    /// The trail sentence is the one the contract writes down — read out of
+    /// `activityTrail.mustRecord` → "folder problem found" → `carries`, not
+    /// retyped here. The mac wrote a straight apostrophe where the contract
+    /// and Windows both write a curly one.
+    func testTheTrailSentenceIsTheContractsOwn() throws {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let trail: [String: Any] = try XCTUnwrap(all["activityTrail"] as? [String: Any])
+        let events: [[String: Any]] = try XCTUnwrap(trail["mustRecord"] as? [[String: Any]])
+        var carries: String = ""
+        for event in events {
+            if (event["event"] as? String) == ActivityTrail.Event.folderProblemFound.rawValue {
+                carries = try XCTUnwrap(event["carries"] as? String)
+            }
+        }
+        let pieces: [String] = carries.components(separatedBy: "'")
+        XCTAssertEqual(pieces.count, 3,
+                       "carries must hold exactly two ASCII quotes around its example, or this reads the wrong span: \(carries)")
+        guard pieces.count == 3 else {
+            return
+        }
+        let example: String = pieces[1]
+
+        let finding: SiteHealthFinding = SiteHealthFinding(
+            name: "curriculumCoverageFoundNothing", sentence: "", detail: "",
+            fixable: false, course: "ICS3U", section: 1
+        )
+        XCTAssertEqual(finding.trailSentence, example)
+    }
+
+    /// Item 3 of #153, checked rather than asserted: the assistant (and
+    /// `Plantoir --mcp-stdio`) builds its answer from the findings, never from
+    /// the console — so a glued finding reaches the answer, and no machinery
+    /// does.
+    func testTheAssistantsAnswerCarriesAGluedFindingAndNoMachinery() throws {
+        let folderURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("health-trail-\(UUID().uuidString)")
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        let previous: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = store
+        defer {
+            ActivityTrail.store = previous
+            try? FileManager.default.removeItem(at: folderURL)
+        }
+
+        let runner: ScriptRunner = ScriptRunner()
+        runner.receiveOutput("Building…")
+        runner.receiveOutput(mediaLine + "\r\n")
+        runner.receiveOutput("done\r\n")
+
+        let answer: String = SiteHealthFinding.appending(to: "Done.", from: runner)
+        XCTAssertTrue(answer.contains("The Media folder for ICS3U is not there."), answer)
+        XCTAssertFalse(answer.contains(SiteHealthFinding.markerPrefix), answer)
+        XCTAssertFalse(answer.contains("\"fixable\""), answer)
+
+        let trail: String = store.activityText(includingPrompts: false)
+        XCTAssertTrue(trail.contains("(mediaFolderMissing)"), trail)
+    }
 }
 
 /// The overnight path: a scheduled deploy publishes anyway and leaves what it
 /// found for somebody to read when they are next at the machine.
+///
+/// Every call names a throwaway home. The course is `ICS3U` section 1 — "a
+/// course a teacher plausibly has" — so before issue #240 these tests deleted
+/// the real `~/Library/Application Support/Plantoir/scheduled/…findings` file
+/// of whoever ran the suite, and wrote (then restored) the real log.
 @MainActor
 final class ScheduledDeployFolderProblemTests: XCTestCase {
+
+    // MARK: - Stored properties
+
+    private var homeFolderURL: URL = URL(fileURLWithPath: "/")
+
+    // MARK: - Set-up
+
+    override func setUpWithError() throws {
+        homeFolderURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("folder-problems-home-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: homeFolderURL, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: homeFolderURL)
+    }
 
     // MARK: - Functions
 
@@ -253,62 +385,109 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         """
     }
 
-    override func tearDown() {
-        _ = ScheduledDeploy.takeFolderProblems(courseCode: "ICS3U", sectionNumber: 1)
-        super.tearDown()
+    /// The working folder the scheduled job belongs to, and the label its
+    /// plist would carry there (#237).
+    private var workingFolderURL: URL {
+        return homeFolderURL.appendingPathComponent("Teaching", isDirectory: true)
     }
 
-    func testFindingsAreReadOutOfTheLogAndReportedOnce() throws {
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1)
+    private var jobLabel: String {
+        return ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: workingFolderURL)
+    }
+
+    private var courseDirectoryURL: URL {
+        return workingFolderURL.appendingPathComponent("courses").appendingPathComponent("ICS3U")
+    }
+
+    private func writableLogURL() throws -> URL {
+        let log: URL = ScheduledDeploy.logURL(label: jobLabel, inHomeFolder: homeFolderURL)
         try FileManager.default.createDirectory(
             at: log.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        let previousLog: String? = try? String(contentsOf: log, encoding: .utf8)
-        defer {
-            if let previousLog {
-                try? previousLog.write(to: log, atomically: true, encoding: .utf8)
-            } else {
-                try? FileManager.default.removeItem(at: log)
-            }
-        }
+        return log
+    }
+
+    func testFindingsAreReadOutOfTheLogAndReportedOnce() throws {
+        let log: URL = try writableLogURL()
         try("Deploying ICS3U…\n" + markerLine("mediaFolderMissing") + "\nDeploy complete\n")
             .write(to: log, atomically: true, encoding: .utf8)
 
-        ScheduledDeploy.recordFolderProblems(section: (
-            courseDirectory: URL(fileURLWithPath: "/tmp"), courseCode: "ICS3U", sectionNumber: 1
-        ), fromByteOffset: 0)
+        ScheduledDeploy.recordFolderProblems(label: jobLabel, section: (
+            courseDirectory: courseDirectoryURL, courseCode: "ICS3U", sectionNumber: 1
+        ), fromByteOffset: 0, inHomeFolder: homeFolderURL)
 
         let first: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
-            courseCode: "ICS3U", sectionNumber: 1
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
         )
         XCTAssertEqual(first.count, 1)
         XCTAssertEqual(first.first?.name, "mediaFolderMissing")
 
         // Consumed: reported once, not every time the app opens.
         XCTAssertTrue(ScheduledDeploy.takeFolderProblems(
-            courseCode: "ICS3U", sectionNumber: 1
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
         ).isEmpty)
     }
 
-    func testAProblemPutRightStopsBeingReported() throws {
-        let log: URL = ScheduledDeploy.logURL(courseCode: "ICS3U", sectionNumber: 1)
-        try FileManager.default.createDirectory(
-            at: log.deletingLastPathComponent(), withIntermediateDirectories: true
+    /// The overnight path leaves its own trail line (#153). Before, a
+    /// scheduled run's findings reached the trail only if somebody later
+    /// opened the section — and even then nothing noted them — so the path
+    /// the check exists for left no line at all.
+    func testAScheduledRunLeavesTheTrailLineItself() throws {
+        let folderURL: URL = homeFolderURL.appendingPathComponent("trail", isDirectory: true)
+        let store: ProblemReportStore = ProblemReportStore(folderURL: folderURL)
+        let previous: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = store
+        defer { ActivityTrail.store = previous }
+
+        let log: URL = try writableLogURL()
+        let lastNight: String = markerLine("sectionIndexMissing") + "\n"
+        let tonight: String = "Deploying ICS3U…\n"
+            + markerLine("mediaFolderMissing") + "\n"
+            + markerLine("curriculumCoverageFoundNothing") + "\n"
+            + markerLine("mediaFolderMissing") + "\n"
+            + "Deploy complete\n"
+        try (lastNight + tonight).write(to: log, atomically: true, encoding: .utf8)
+
+        ScheduledDeploy.recordFolderProblems(label: jobLabel, section: (
+            courseDirectory: courseDirectoryURL, courseCode: "ICS3U", sectionNumber: 1
+        ), fromByteOffset: UInt64(lastNight.utf8.count), inHomeFolder: homeFolderURL)
+
+        let media: SiteHealthFinding = try XCTUnwrap(
+            SiteHealthFinding.findings(in: markerLine("mediaFolderMissing")).first
         )
-        let previousLog: String? = try? String(contentsOf: log, encoding: .utf8)
-        defer {
-            if let previousLog {
-                try? previousLog.write(to: log, atomically: true, encoding: .utf8)
-            } else {
-                try? FileManager.default.removeItem(at: log)
-            }
-        }
-        let section = (courseDirectory: URL(fileURLWithPath: "/tmp"),
+        let curriculum: SiteHealthFinding = try XCTUnwrap(
+            SiteHealthFinding.findings(in: markerLine("curriculumCoverageFoundNothing")).first
+        )
+        let trail: String = store.activityText(includingPrompts: false)
+        XCTAssertEqual(trail.components(separatedBy: "ICS3U/1 · " + media.trailSentence).count - 1, 1,
+                       "one line per DISTINCT finding: \(trail)")
+        XCTAssertEqual(trail.components(separatedBy: "ICS3U/1 · " + curriculum.trailSentence).count - 1, 1, trail)
+        XCTAssertFalse(trail.contains("sectionIndexMissing"), "an earlier night's finding was noted again")
+
+        // Reading the record when the section is opened notes nothing more:
+        // one run's finding is one line, whether or not anybody looks.
+        let linesBefore: Int = trail.components(separatedBy: "\n").count
+        let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+            courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+            inHomeFolder: homeFolderURL
+        )
+        XCTAssertEqual(taken.count, 2, "a finding printed twice is kept once, so the dialog lists it once")
+        let linesAfter: Int = store.activityText(includingPrompts: false).components(separatedBy: "\n").count
+        XCTAssertEqual(linesAfter, linesBefore)
+    }
+
+    func testAProblemPutRightStopsBeingReported() throws {
+        let log: URL = try writableLogURL()
+        let section = (courseDirectory: courseDirectoryURL,
                        courseCode: "ICS3U", sectionNumber: 1)
 
         let firstNight: String = markerLine("mediaFolderMissing") + "\n"
         try firstNight.write(to: log, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordFolderProblems(section: section, fromByteOffset: 0)
+        ScheduledDeploy.recordFolderProblems(
+            label: jobLabel, section: section, fromByteOffset: 0, inHomeFolder: homeFolderURL
+        )
 
         // The next night's run is clean — and launchd APPENDS to this log, it
         // never truncates it, so the first night's marker line is still in the
@@ -319,12 +498,52 @@ final class ScheduledDeployFolderProblemTests: XCTestCase {
         let sizeBeforeSecondRun: UInt64 = UInt64(firstNight.utf8.count)
         try (firstNight + "Deploy complete\n").write(to: log, atomically: true, encoding: .utf8)
         ScheduledDeploy.recordFolderProblems(
-            section: section, fromByteOffset: sizeBeforeSecondRun
+            label: jobLabel, section: section, fromByteOffset: sizeBeforeSecondRun, inHomeFolder: homeFolderURL
         )
 
         XCTAssertTrue(
-            ScheduledDeploy.takeFolderProblems(courseCode: "ICS3U", sectionNumber: 1).isEmpty,
+            ScheduledDeploy.takeFolderProblems(
+                courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: workingFolderURL,
+                inHomeFolder: homeFolderURL
+            ).isEmpty,
             "a problem that has been put right must stop being reported"
         )
     }
+
+    // MARK: - The links checklist (#379)
+
+    /// The assistant says the checklist will be offered, instead of reading
+    /// ten pairs aloud — only when the same build wrote the offer, and only
+    /// while the teacher has not already answered it (review N3).
+    func testTheLinksFindingSaysTheChecklistWillBeOfferedWhenTheBuildWroteOne() throws {
+        let finding: String = "PLANTOIR_HEALTH: {\"name\": \"linksIntoHiddenPages\", \"sentence\": \"11 links lead to hidden pages.\", "
+            + "\"detail\": \"Publish the page each one leads to: pairs.\", \"fixable\": false, \"course\": \"ICS4U\", \"section\": 1}"
+        let marker: String = "PLANTOIR_LINKS_CHECKLIST: {\"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"b1\", \"pages\": 1, \"ticked\": 1}"
+        let course: URL = FileManager.default.temporaryDirectory.appendingPathComponent("links-said-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: course) }
+        let offerURL: URL = LinksChecklistOffer.fileURL(courseDirectory: course, section: 1)
+        try FileManager.default.createDirectory(at: offerURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try ("{\"version\": 1, \"course\": \"ICS4U\", \"section\": 1, \"buildId\": \"b1\", \"pages\": "
+             + "[{\"place\": \"Concepts/Worksheet\", \"group\": \"fromAClass\", \"ticked\": true, \"why\": \"dated\", "
+             + "\"date\": \"2026-09-08\"}]}").write(to: offerURL, atomically: true, encoding: .utf8)
+
+        let withOffer: ScriptRunner = ScriptRunner()
+        withOffer.receiveOutput(finding + "\r\n" + marker + "\r\n")
+        let said: String = SiteHealthFinding.appending(to: "Done.", from: withOffer, courseDirectory: course)
+        XCTAssertTrue(said.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")), said)
+        XCTAssertFalse(said.contains("pairs"), said)
+
+        // Answered already (Not Now on the same set): no promise of a sheet.
+        try LinksChecklistAnswered(offered: ["Concepts/Worksheet"], leftUnticked: ["Concepts/Worksheet"])
+            .write(courseDirectory: course, section: 1)
+        let afterNotNow: String = SiteHealthFinding.appending(to: "Done.", from: withOffer, courseDirectory: course)
+        XCTAssertFalse(afterNotNow.contains(AssistWording.linksIntoHiddenPagesWillBeOffered(course: "ICS4U", section: "1")),
+                       "It promised a checklist the teacher has already answered: \(afterNotNow)")
+
+        let olderBuilder: ScriptRunner = ScriptRunner()
+        olderBuilder.receiveOutput(finding + "\r\n")
+        let saidBefore: String = SiteHealthFinding.appending(to: "Done.", from: olderBuilder, courseDirectory: course)
+        XCTAssertTrue(saidBefore.contains("pairs"), "With no offer the finding's own words are the honest ones: \(saidBefore)")
+    }
+
 }

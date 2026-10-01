@@ -19,7 +19,54 @@ import Foundation
 /// * `![[Unit 2, Day 3]]` — a transclusion
 /// * `[[Unit 2, Day 3#Agenda]]`
 /// * `[[Unit 2, Day 3#^a1b2c3]]`
+/// * `[[Unit 2, Day 3\|Tuesday]]` — the alias pipe ESCAPED, which is how
+///   Obsidian writes an alias inside a Markdown table, so that the cell does
+///   not end at the pipe (#294). The same form turns up in prose too, and
+///   Quartz reads it as a link wherever it is. The backslash is not part of
+///   the name, and a rename leaves it exactly where it was: dropping it would
+///   split the table cell in two
 /// * and the combinations of those
+///
+/// ### Why the target stops BEFORE a backslash, and only there
+///
+/// The target is taken lazily up to — not including — an optional backslash
+/// that sits immediately before `]`, `|` or `#`. The lookahead is zero-width,
+/// so the backslash falls outside the match and every rewriter that replaces
+/// the match (or group 2) carries it through untouched. Measured over the
+/// 12,128 payload and skeleton pages: the same 38,659 links matched at the same offsets as
+/// the old `([^\]|#]+)`, and 229 captures changed, every one a name that used
+/// to end in the backslash of a `\|` (142 in tables, 87 in prose and in code
+/// examples; 39,570 and 230 over all of `support/`).
+///
+/// Rejected:
+/// * stripping the backslash in `AssistSectionGraph.linkTargets` alone —
+///   publishing would follow the link, and a rename or a class insertion
+///   would still leave it on the old name, which after an insertion is a
+///   DIFFERENT lesson. Eight readers share this pattern; one fix covers them.
+/// * excluding the backslash from names altogether (`[^\]|#\\]+`, closer to
+///   Quartz's own `wikilinkRegex`) — `[[a\b]]` would then capture `a`, and a
+///   rename of a page called `a` would rewrite it. The lookahead differs from
+///   the old pattern only at a backslash right before `]`, `|` or `#`.
+/// * skipping links inside code in the same change — decided since, by #313
+///   (below), with its own measurement.
+///
+/// ### A link written inside code is not a link (#313)
+///
+/// A `[[…]]` whose opening brackets sit inside a fenced code block or an
+/// inline code span is an EXAMPLE of a link, and Quartz draws none. So
+/// `linkMatches(in:)` — the pattern's matches with the ones that start in
+/// code taken out, by `MarkdownCode` — is THE one entry point: publishing,
+/// the dates a class brings, the site check, "what does this page link to?",
+/// copying, and this type's own `rewriting` and `countLinks`, which a page
+/// rename, a unit-word rename and a class insertion all go through. The
+/// REWRITERS skip code as well as the readers, on purpose: a rename plan
+/// that counted a link publishing does not follow would promise something
+/// untrue, and rewriting an example would edit what the teacher wrote.
+/// Rejected: readers skip code and rewriters do not (two definitions of a
+/// link again); each reader keeping its own stripper (how three came to
+/// disagree — the links answer dropped 22 real ICS4U links on a `~~~` inside
+/// a traceback). The rule is `contracts/shared-rules.json` →
+/// `readingALink.whatIsCode`.
 ///
 /// ## What is NOT handled
 ///
@@ -39,10 +86,28 @@ nonisolated enum WikiLinkRewriter {
 
     /// An optional `!`, the opening brackets, then the target — which runs up
     /// to the first `]`, `|` or `#`, so an alias, a heading and a block
-    /// reference are all left where they are.
-    static let pattern: String = #"(!?\[\[)([^\]|#]+)"#
+    /// reference are all left where they are. A backslash immediately before
+    /// that character (the `\|` of an alias in a table) is not part of the
+    /// target, and is not part of the match either. THE one definition of a
+    /// link on the mac: `FolderPathRewriter`, `PageReferences` and
+    /// `AssistSectionGraph` read this, not copies of it (#294).
+    static let pattern: String = #"(!?\[\[)([^\]|#]+?)(?=\\?[\]|#])"#
+
+    /// The pattern, compiled once.
+    static let expression: NSRegularExpression? = try? NSRegularExpression(pattern: pattern)
 
     // MARK: - Functions
+
+    /// Every link on a page, in order: the pattern's matches, less the ones
+    /// that start inside code (#313) or a `%%` comment (#331). THE one entry
+    /// point for every reader and rewriter of links on the mac — group 1 is
+    /// `[[` or `![[`, group 2 the name as written.
+    static func linkMatches(in text: String) -> [NSTextCheckingResult] {
+        guard let expression = WikiLinkRewriter.expression else {
+            return []
+        }
+        return MarkdownCode.matches(of: expression, in: text, outside: MarkdownCode.notALinkRanges(in: text))
+    }
 
     /// The text with every link to a renamed page pointing at its new name.
     /// Names are matched without regard to case, the way Obsidian resolves
@@ -58,11 +123,7 @@ nonisolated enum WikiLinkRewriter {
             byLowercasedName[from.trimmingCharacters(in: .whitespaces).lowercased()] = to
         }
 
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
-            return text
-        }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
-        let matches: [NSTextCheckingResult] = expression.matches(in: text, range: whole)
+        let matches: [NSTextCheckingResult] = WikiLinkRewriter.linkMatches(in: text)
 
         var result: String = ""
         var carriedTo: String.Index = text.startIndex
@@ -87,7 +148,9 @@ nonisolated enum WikiLinkRewriter {
 
     /// How many links in this text point at any of these page names. The
     /// number a plan reports, and the one a teacher could not check for
-    /// themselves without opening every page in the course.
+    /// themselves without opening every page in the course. Read with the
+    /// same `linkMatches` as `rewriting`, so the count is exactly what the
+    /// rewrite will move — a link shown inside code is neither (#313).
     static func countLinks(to names: [String], in text: String) -> Int {
         if names.isEmpty {
             return 0
@@ -97,11 +160,7 @@ nonisolated enum WikiLinkRewriter {
             wanted.append(name.trimmingCharacters(in: .whitespaces).lowercased())
         }
 
-        guard let expression = try? NSRegularExpression(pattern: pattern) else {
-            return 0
-        }
-        let whole: NSRange = NSRange(text.startIndex..<text.endIndex, in: text)
-        let matches: [NSTextCheckingResult] = expression.matches(in: text, range: whole)
+        let matches: [NSTextCheckingResult] = WikiLinkRewriter.linkMatches(in: text)
 
         var total: Int = 0
         for match in matches {

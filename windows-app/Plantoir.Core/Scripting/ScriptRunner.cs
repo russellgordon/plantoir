@@ -578,12 +578,23 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // prevent. So a carry that has outgrown any plausible line is dropped
         // only when it cannot become a finding.
         if (_unscannedHealthOutput.Length > 8000 &&
-            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal))
+            !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
+            !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput))
             _unscannedHealthOutput = "";
     }
 
     private void RecordHealthFinding(string line)
     {
+        // The build's PLANTOIR_DATED: line (#279) rides the same line buffer:
+        // it names the teacher's pages the build rewrote with their class's
+        // date, and the trail is the only place that survives the console.
+        if (Plantoir.Core.Models.PagesDatedByTheBuild.Parse(line) is { } dated)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,
+                               dated.TrailSentence, dated.Course, dated.Section);
+            return;
+        }
+
         var finding = Plantoir.Core.Models.SiteHealthFinding.Parse(line);
         if (finding is null) return;
         // The same section rebuilt in one task reports the same problem twice;

@@ -46,11 +46,47 @@ this skill automates its steps 5–6 and the note-writing.
    Asset names are LOAD-BEARING: `Plantoir-macOS.dmg` and `PlantoirSetup.exe`
    (and `Plantoir-win-x64.zip`), exactly — plantoir.app's download links resolve
    `releases/latest/download/<asset-name>`, so a renamed asset silently
-   breaks the site. Refuse to attach an asset under any other name.
+   breaks the site. Refuse to attach an asset under any other name — in
+   particular `Plantoir-macOS-REHEARSAL.dmg`, which `publish.sh
+   --rehearsal-feed` writes for the #204 dress rehearsal and which must never
+   reach a real release.
+3a. **When a mac DMG is attached, the release test files must have passed
+   BEFORE it was built with `-Sign`** (`RELEASING.md` step 4) —
+   `python3 mac-app/release/test_release_signing.py` and
+   `python3 website/test_update_feed.py` (macOS only, ad-hoc and throwaway
+   keys only; no suite runs them). Ask; if nobody can say, run them now, and
+   treat red as a stop that means the DMG is rebuilt after the fix. And decide
+   `--required-warning` for the update feed now: pass it when "Warnings the
+   release notes MUST carry" has a row for this release.
 
    The same evergreen URL is why a one-platform cut has to touch the site:
    the moment the new release becomes "latest", the missing platform's
    evergreen link 404s. See "Publish", step 2.
+3b. **The marketing screenshots must be taken, committed and checked BEFORE
+   anything is published — a stop, not a reminder.** `build.py --deploy`
+   (Publish, step 2) refuses while any `website/shots.json` entry marked
+   `awaiting_capture` lacks `site/img/<id>-light.png` or `-dark.png`
+   (`release_readiness_refusal`). Step 2 runs AFTER the release is public (step
+   1) and the feed is built (step 1a), so a refusal there leaves a published
+   release, an update feed that is not live, and a site still offering the
+   old version. So, before step 1:
+   - run the `marketing-screenshots` skill (`python3
+     website/shots/capture.py --scenes`, which takes every scene in BOTH
+     colour schemes) against the build being released;
+   - commit the promoted images on an issue branch and get them to `main`
+     with everything else (CLAUDE.md rule 6 — the merge is Russell's);
+   - `python3 website/build.py --check` must be clean, with **no
+     awaiting-capture note** in its output — except a note ending
+     "waiting on #<n>": a shot marked `waiting_on: "#<n>"` in shots.json goes
+     out without its picture by decision (`--deploy` lets it through). Read
+     that issue: if it is closed, the pictures should be there; if open, say
+     in the release hand-over that the site ships without them (v1.4.0:
+     #367, schedule and how-i-teach);
+   - dry-run the refusal itself with the new version, from `website/`:
+     `python3 -c 'import json,build; s=json.load(open("site.json"));
+     s["version"]="<version>"; print(build.release_readiness_refusal(s,
+     json.load(open("shots.json"))))'` must print `None`. (On 2026-09-27,
+     before v1.4.0, it named eight shots.)
 4. Confirm `<Version>` in `windows-app/Plantoir/Plantoir.csproj` matches
    the intended tag, and that the working tree is clean. Confirm you are on
    `main` with `dev` fully merged in (`git log main..dev` is empty) — the tag
@@ -166,24 +202,80 @@ gh release edit v<version> --draft=false -R <owner/repo>
    the git tag; if the other machine needs a real tag to build or verify
    against, push an annotated one yourself and target the draft at it.
 
+1a. **Build the mac's update feed — only when this cut attached a mac DMG,
+   and only NOW, after the release is published** (a feed deployed before its
+   download exists offers every teacher an update that 404s):
+
+```bash
+python3 website/update_feed.py macos --version <version> \
+  --dmg mac-app/dist/Plantoir-macOS.dmg --notes <approved-notes.md> [--required-warning]
+```
+
+   It must be the EXACT file you uploaded — hash it and compare with the
+   Downloads table first. `--notes` is the SAME approved notes file: the
+   generator drops, for the Mac's update window, the Downloads section with
+   its checksum table, every line labelled "(Windows)", and the
+   "Windows: …" sentence — which is one more reason to label platform-only
+   lines as the style rules above say. Run it from the main checkout. Since
+   2026-09-29 Sparkle's `generate_appcast` and `sign_update` there are on the
+   `plantoir-macos` key's access list: "Always Allow", Russell's choice so a
+   cut runs unattended. The trade-off he accepted is that those two tools can
+   use the key without asking. So no Keychain prompt appears. From any other
+   checkout or worktree it may still ask, once per tool (`generate_appcast`,
+   then `sign_update --verify`). Answer **Allow** there, and never "Always
+   Allow" for a second copy. If a prompt appears in the main checkout (after
+   `fetch-sparkle.sh` replaced the tools, say), answer **Allow**, finish the
+   cut, and tell Russell the grant needs renewing. Nothing prints the key. It writes
+   `website/updates/macos.xml` and `website/updates/macos-notes.html`; commit
+   both with the version line in step 2 (stage them by path). A cut with no mac
+   DMG leaves both alone. See `RELEASING.md` → "The update feed (macOS)".
+
+   **Deltas (#312).** When the feed already holds earlier builds, the run
+   downloads their DMGs (up to three, ~410 MB each, from their own releases),
+   makes a delta from each, puts every earlier item back as it was and signs
+   the feed once more — so `sign_update` signs a third time — silently from
+   the main checkout, or with a third prompt elsewhere (answer **Allow**). It prints each `.delta` it wrote beside the DMG.
+   **Upload every one of them to THIS release now, before step 2 deploys the
+   feed**:
+
+```bash
+gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
+```
+
+   A delta the feed names and the release lacks makes Sparkle fall back to the
+   full download silently. `build.py --deploy` does NOT refuse it: the check
+   runs AFTER the deploy (`update_feeds.verify_live`) and prints ❌ for a
+   delta that does not answer, so upload first and read that line. The first release
+   with Sparkle (v1.4.0) has none — nothing before it is in the feed.
+
 2. **Update and deploy plantoir.app**:
    Set `version` and `released` in `website/site.json`, redraw brand images,
    rebuild, and push.
 
-   **If this cut carries one platform only, fix that platform's download card
-   in `website/pages/index.html` in the same commit.** The cards use GitHub's
+   **If this cut carries one platform only, pin that platform's download card
+   in `website/site.json` → `downloads` in the same commit** — set its
+   `pinned` to the last version that has the asset (since v1.4.0 the cards are
+   drawn from that list; `index.html` holds only `{{download_cards}}`). The cards use GitHub's
    evergreen `releases/latest/download/<asset-name>` URL, which starts
    resolving to the NEW release the moment it publishes — and the release has
    no asset for the lagging platform, so that button 404s for every visitor on
    that OS. Pin it to the last release that HAS the asset
-   (`releases/download/v<older>/<asset-name>`), and add one short note saying
-   that platform is still on the older version.
+   (`releases/download/v<older>/<asset-name>`) — the card then says
+   "version <older>" by itself.
 
-   **Then un-pin it in the release that catches the platform up**, and delete
-   the note. A pinned card keeps working forever, which is exactly why it is
+   **Then un-pin it in the release that catches the platform up** (`pinned`
+   back to `null`). A pinned card keeps working forever, which is exactly why it is
    easy to forget: it serves an old version from a button that looks healthy.
-   The comment beside the card in `index.html` says all of this too — first
-   done for v1.1.0 (Windows only), 2026-08-20.
+   `site.json → downloads_note` says all of this too — first done for v1.1.0
+   (Windows only), 2026-08-20.
+
+   **And while the Windows card is pinned behind the mac, check
+   `site.json → availability`**: each v1.4.0-and-later feature section says
+   "On the Mac. The Windows version gets this in a later release." while its
+   `windows` flag is false. Flip the flags for what the Windows installer being
+   released actually has. **`new_in.version`** names the release the home
+   page's "New this year" list was written for; `--deploy` warns when it is not
+   this version's major.minor — rewrite the list for a new minor version.
 
 ```bash
 # Redraw brand images if needed
@@ -196,10 +288,15 @@ python3 website/build.py --check
 # Commit and push, then deploy — the Netlify site is NOT Git-connected,
 # so pushing publishes nothing; the deploy is its own explicit step
 git add website/site.json site/ brand/
+git add website/updates/macos.xml website/updates/macos-notes.html   # only when step 1a ran
 git commit -m "Update website for v<version> release"
 git push origin main
 python3 website/build.py --deploy
 ```
+
+Before publishing, `--deploy` refuses if any picture a Mac visitor is shown
+lacks its window's own corners (#375); that is a stop — retake the picture
+(`marketing-screenshots` skill), never mask or crop it to pass.
 
 `--deploy` fetches `https://plantoir.app` afterward on its own and confirms
 the live version-note line matches `site.json` — watch its output for the
@@ -207,7 +304,10 @@ the live version-note line matches `site.json` — watch its output for the
 new version. A ❌ means the site did not pick up the deploy after several
 retries; tell the user, point them at `https://app.netlify.com`, and do not
 report the release as complete until `python3 website/build.py
---verify-deploy` comes back ✅. A ⚠️ (network problem reaching the site, not
+--verify-deploy` comes back ✅ — which, since #204, also means every update feed
+is live as committed and its newest download answers (a mac cut is not
+complete while the feed line is ❌: teachers are either offered nothing or
+offered a download that is not there). A ⚠️ (network problem reaching the site, not
 a confirmed mismatch) is worth one retry of `--verify-deploy` before treating
 it as a real problem.
 

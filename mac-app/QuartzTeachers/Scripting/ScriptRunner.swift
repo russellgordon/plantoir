@@ -52,6 +52,19 @@ class ScriptRunner {
     /// one step for minutes, and a bar that does not move reads as a hang.
     var stepDetail: String = ""
 
+    /// What the launcher is waiting for before it sets the folder up again,
+    /// as the status line says it — "Waiting for Revise with Claude to finish
+    /// deploying MPM2D section 2…" — or empty (GitHub #378, decision 3).
+    /// Read from its `PLANTOIR_WAITING_FOR:` lines (`WorkspaceWait`), and
+    /// given back by `PLANTOIR_WAITING_FOR: over`, by the next milestone, and
+    /// by the run ending, so a launcher killed mid-wait never leaves the line
+    /// stuck on a wait that is not happening.
+    var waitingSentence: String = ""
+
+    /// When the current wait began, for the status line's counter. Kept
+    /// when what is waited for changes: the counter is the whole wait.
+    var waitingSince: Date?
+
     /// True when the teacher stopped the task themselves. Ending a task
     /// on purpose makes it exit non-zero, which is not a failure and
     /// must not be reported as one.
@@ -126,6 +139,92 @@ class ScriptRunner {
         return false
     }
 
+    // MARK: - Every run in flight, across every window
+
+    /// The runners with a script actually running, in any window.
+    ///
+    /// A runner is `@State` on the view that started it, so nothing outside
+    /// that view can reach one — which was fine until quitting needed to end
+    /// a preview the way the Stop button does. Registered here for the whole
+    /// life of a run and taken out again when it finishes, so nothing has to
+    /// be reset between tests either.
+    private(set) static var runsInFlight: [ScriptRunner] = []
+
+    /// Set once a process has begun to leave — the MCP server whose client
+    /// went away (#156) — so no launcher starts after the ones in flight have
+    /// been stopped. A deploy's next leg would otherwise begin the moment its
+    /// build was stopped, and outlive the process with no lease saying so.
+    static var refusesNewRuns: Bool = false
+
+    /// The launcher's process id while it runs, or nil.
+    var processIdentifier: Int32? {
+        guard let process else {
+            return nil
+        }
+        if !process.isRunning {
+            return nil
+        }
+        return process.processIdentifier
+    }
+
+    /// Ends every live PREVIEW, host side, the way the Stop button does.
+    ///
+    /// Called at quit, and deliberately narrow. A preview server's launcher
+    /// keeps running for as long as the preview is up, and — measured — a
+    /// child on a pseudo-terminal is reparented rather than killed when the
+    /// app goes, so without this the launcher can outlive the app, the quit
+    /// script's host-side check sees it, and the quit frees neither the
+    /// container nor the machine under it. That is the common case, not a
+    /// corner of one.
+    ///
+    /// A publish is NOT ended here, and that is a decision rather than an
+    /// oversight: the teacher was asked and chose to quit anyway, and
+    /// Plantoir should not then be the thing that kills their publish. It
+    /// will very likely stop on its own regardless — `deploy.sh` runs under
+    /// `set -euo pipefail` and its pseudo-terminal goes with the app, so its
+    /// next line of output fails (measured) — which is why the question says
+    /// quitting "could leave it unfinished" rather than promising either
+    /// outcome. `--build-only` is excluded for the same reason, being a
+    /// publish's own build, and `--stop` because a stop is the thing being
+    /// asked for.
+    static func stopEveryLivePreview() {
+        for runner in runsInFlight {
+            if runner.isALivePreview {
+                runner.stopByUser()
+            }
+        }
+    }
+
+    /// Adds a runner to the list, once.
+    private static func rememberInFlight(_ runner: ScriptRunner) {
+        for existing in runsInFlight where existing === runner {
+            return
+        }
+        runsInFlight.append(runner)
+    }
+
+    /// Takes a runner out of the list when its script has finished.
+    private static func forgetInFlight(_ runner: ScriptRunner) {
+        var remaining: [ScriptRunner] = []
+        for existing in runsInFlight where existing !== runner {
+            remaining.append(existing)
+        }
+        runsInFlight = remaining
+    }
+
+    /// Whether this run is a preview server rather than a build or a publish.
+    var isALivePreview: Bool {
+        if runScriptName != "preview.sh" {
+            return false
+        }
+        for argument in runArguments {
+            if argument == "--stop" || argument == "--build-only" {
+                return false
+            }
+        }
+        return isRunning
+    }
+
     // MARK: - Functions
 
     /// Starts a script (e.g. "preview.sh") from the working folder.
@@ -139,6 +238,10 @@ class ScriptRunner {
         keepingTranscript: Bool = false
     ) {
         if isRunning {
+            return
+        }
+        if ScriptRunner.refusesNewRuns {
+            launchProblem = "Plantoir is closing, so nothing new was started."
             return
         }
 
@@ -158,11 +261,15 @@ class ScriptRunner {
         // runner with `keepingTranscript: true`, and only the build phase
         // announces health. Clearing unconditionally emptied the array between
         // the two, so a deploy threw away the findings it had just collected.
-        resetHealthFindings(keepingTranscript: keepingTranscript)
+        // The preview's announced address is collected the same way and
+        // forgotten by the same call, for the same reason.
+        forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
         isBetweenPhases = false
         stepDetail = ""
+        waitingSentence = ""
+        waitingSince = nil
 
         let scriptURL: URL = workingDirectory.appendingPathComponent(scriptName)
         if !FileManager.default.fileExists(atPath: scriptURL.path) {
@@ -187,11 +294,14 @@ class ScriptRunner {
         newProcess.arguments = fullArguments
         newProcess.currentDirectoryURL = workingDirectory
 
-        // GUI apps inherit a minimal PATH; the scripts need Homebrew's
-        // programs (docker, colima) the same way a Terminal session has them.
-        var environment: [String: String] = ProcessInfo.processInfo.environment
-        let existingPath: String = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + existingPath
+        // GUI apps inherit a minimal PATH; the launchers need to find docker
+        // and colima the way a Terminal session does. One definition, shared
+        // with the quit path and with a scheduled publish — see
+        // `HelperPrograms`, which also explains why the pinned copies
+        // Plantoir downloaded come FIRST.
+        var environment: [String: String] = HelperPrograms.environment(
+            basedOn: ProcessInfo.processInfo.environment
+        )
         environment["TERM"] = "xterm-256color"
         newProcess.environment = environment
 
@@ -235,6 +345,7 @@ class ScriptRunner {
         runScriptName = scriptName
         runArguments = arguments
         runWorkingFolderPath = workingDirectory.path
+        ScriptRunner.rememberInFlight(self)
         // Redacted even here. The arguments carry a Cloudflare Account ID
         // and a folder path with the teacher's account name in it, and
         // `.public` in a Logger means exactly that — written out in full,
@@ -247,6 +358,14 @@ class ScriptRunner {
         // reports ("the preview is stuck") was the one thing that left no
         // trace at all.
         recordWrittenAt = nil
+        // A process that never passed through the app's launch — the one
+        // Claude Code starts with `--mcp-stdio` — has not asked the helper
+        // programs anything yet. Ask now, in the background, so the record
+        // this task writes when it finishes carries a measurement rather
+        // than "not checked yet".
+        if ProblemReportEnvironment.measuredHelperDescription == nil {
+            ScriptRunner.refreshHelperVersions()
+        }
         writeRecordOfRun(exitCode: nil)
         ActivityTrail.note(.taskStarted, "started " + LogRedactor.redacting(([scriptName] + arguments).joined(separator: " ")))
     }
@@ -425,8 +544,10 @@ class ScriptRunner {
         // Findings are read from the RAW text first: the transcript drops the
         // machine-readable lines on the way in (they are machinery, and a
         // teacher reads that console), so anything that wants them must take
-        // them before they are filtered out.
-        collectHealthFindings(in: text)
+        // them before they are filtered out. The preview's address is read
+        // from the same complete lines, as they arrive — see
+        // `announcedPreviewAddress` for why it cannot wait.
+        collectCompleteLines(in: text)
         transcript.append(rawText: text)
         advanceMilestones(with: text)
         lastOutputAt = Date()
@@ -479,13 +600,23 @@ class ScriptRunner {
 
     /// The local address the preview will serve at, once the launcher has
     /// announced it. The host port belongs to this folder's container and
-    /// is not knowable in advance, so the announcement is the truth.
+    /// is not knowable in advance, so the announcement is the truth — and
+    /// nil means nothing has been announced, never "try the usual port".
     var previewAddress: URL? {
-        return ScriptRunner.previewAddress(in: transcript.recentText(maximumCharacters: 8000))
+        return announcedPreviewAddress
     }
 
     /// Reads "Preview will be available at: http://localhost:8091/" from
     /// the output, taking the LAST announcement.
+    ///
+    /// Give it whole lines with the control sequences already taken out —
+    /// `rememberPreviewAnnouncement(in:)` does. Handed a raw chunk of
+    /// terminal output it can return an address with the RIGHT port and a
+    /// garbage path: Swift folds "\r\n" into one Character, so the split
+    /// below does not split terminal text at all, the "line" runs on to the
+    /// end of the chunk, and `URL(string:)` percent-encodes the rest into the
+    /// path (`http://127.0.0.1:8101/%0D%0A…`, measured on a real first
+    /// preview, GitHub #235).
     static func previewAddress(in text: String) -> URL? {
         let marker: String = "Preview will be available at: "
         var found: URL?
@@ -528,6 +659,35 @@ class ScriptRunner {
     /// 8,000-character window by the time anybody asks.
     private(set) var healthFindings: [SiteHealthFinding] = []
 
+    /// The build's word that it has written (or removed) the links checklist
+    /// offer (#379), collected as it arrives for the reason `healthFindings`
+    /// is. The window acts on THIS, never on the #333 finding alone: the
+    /// finding is announced before the offer can exist.
+    private(set) var linksChecklistMarkers: [LinksChecklistMarker] = []
+
+    /// The address the launcher announced for this run's preview — the last
+    /// one, when there is more than one — and nil until it has announced one.
+    ///
+    /// Collected as output ARRIVES, for the reason `healthFindings` is (read
+    /// its comment above). This used to be read back off
+    /// `recentText(maximumCharacters: 8000)`, and the announcement is printed
+    /// EARLY: on a real first preview it had scrolled out of that tail by the
+    /// time Quartz said its server had started — found at the first of the
+    /// preview wait's three phases, nil by the second — and survived only
+    /// because the wait happened to remember what it had seen (GitHub #235).
+    ///
+    /// Deliberately no fallback to the tail, and none to a port: nothing
+    /// reaches this runner by any road but `receiveOutput`, so a second
+    /// reader could only ever find a staler or a wronger answer.
+    ///
+    /// Read it only WHILE the run is going. A run that ends in the middle of
+    /// the announcement — right after `…localhost:8`, say — has that half
+    /// line read as finished when the run ends, and it parses as an address.
+    /// Harmless today (measured by the review: the preview wait returns on
+    /// the run's end before it looks), and written here so nobody trusts it
+    /// after the fact.
+    private(set) var announcedPreviewAddress: URL?
+
     /// Whatever arrived after the last newline, kept until the rest of the
     /// line turns up.
     ///
@@ -537,7 +697,13 @@ class ScriptRunner {
     /// straddle a read boundary; without this, a split marker line failed both
     /// the prefix test and the JSON parse and was dropped silently, and the
     /// finding never reached the dialog, the assistant, or the trail.
-    private var pendingHealthLine: String = ""
+    ///
+    /// The preview's announcement needs it just as much, and fails worse
+    /// without it: cut after `…localhost:8`, `:81` or `:810`, the first half
+    /// is a VALID address on the wrong port, and the rest of the line arrives
+    /// in the next chunk without the words that mark it — measured by cutting
+    /// the real line at every point.
+    private var pendingLine: String = ""
 
     /// Reads whatever is left in the carry-over buffer as a finished line.
     /// Seams for the tests, which cannot start a real script but must be able
@@ -548,52 +714,85 @@ class ScriptRunner {
     }
 
     func prepareForContinuationForTesting(keepingTranscript: Bool) {
-        resetHealthFindings(keepingTranscript: keepingTranscript)
+        forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
     }
 
     /// The one implementation, so the test seam above exercises what `run()`
     /// actually does rather than a copy of it. A duplicated reset would pass
     /// while the real path regressed — which is precisely how the scheduled
     /// log's append bug got through its own test.
-    private func resetHealthFindings(keepingTranscript: Bool) {
+    private func forgetWhatThePreviousRunSaid(keepingTranscript: Bool) {
         if keepingTranscript {
             return
         }
         healthFindings = []
-        pendingHealthLine = ""
+        linksChecklistMarkers = []
+        announcedPreviewAddress = nil
+        pendingLine = ""
     }
 
-    private func flushPendingHealthLine() {
-        let leftover: String = pendingHealthLine
-        pendingHealthLine = ""
+    private func flushPendingLine() {
+        let leftover: String = pendingLine
+        pendingLine = ""
         if leftover.isEmpty {
             return
         }
         rememberHealthFindings(in: leftover)
+        rememberPreviewAnnouncement(in: [leftover])
+        rememberWhatIsWaitedFor(in: [leftover])
     }
 
     private func rememberHealthFindings(in text: String) {
+        // The pages the build gave their class's date (#275, #276), by name.
+        // Read here because this is where finished lines of output arrive,
+        // carried over a chunk boundary like the health lines below.
+        for report in PagesDatedByTheBuild.reports(in: text) {
+            ActivityTrail.note(
+                .pagesDatedByTheBuild, report.trailSentence,
+                course: report.course, section: report.section
+            )
+        }
+        // Which curriculum maps the build wrote (#128), read the same way.
+        CoverageMapsBuilt.noteOnTheTrail(from: text)
+        // A launcher that waited for, or refused on, something running in
+        // the folder's workspace before remaking it (#94).
+        WorkspaceInUseReport.noteOnTheTrail(from: text)
+        // Work left in the workspace by a program that had closed, which the
+        // launcher ended before setting the folder up again (#378).
+        LeftoverWorkReport.noteOnTheTrail(from: text)
+        // A section's Cloudflare project made again because it was not in
+        // the account any more (2026-09-30).
+        CloudflareProjectRemadeReport.noteOnTheTrail(from: text)
+        // A preview whose address was held by something else on this Mac,
+        // or whose look could not be made (#310).
+        PreviewAddressHeldReport.noteOnTheTrail(from: text)
+        // The helper programs installed and the website builder created on
+        // a first run, and where each came from (#312).
+        HelperBootstrapReport.noteOnTheTrail(from: text)
+        // A How I Teach page the course had listed for the website, kept off
+        // it by this build (#209).
+        HowITeachKeptOffReport.noteOnTheTrail(from: text)
+        for marker in LinksChecklistMarker.markers(in: text) {
+            linksChecklistMarkers.append(marker)
+        }
         for finding in SiteHealthFinding.findings(in: text) {
             if healthFindings.contains(finding) {
                 continue
             }
             healthFindings.append(finding)
-            // A sentence a teacher would recognise, carrying the stable check
-            // NAME in brackets. Both halves earn their place: rule 5 says a
-            // trail line must read as something that happened rather than as a
-            // function name, while the name is what somebody reading the trail
-            // months later can match against the contract — the product
-            // wording will have been reworded by then.
+            // The sentence and why it is shaped so: `trailSentence`, which the
+            // scheduled run writes too.
             ActivityTrail.note(
-                .folderProblemFound,
-                "found a problem with this course's folders (\(finding.name))",
+                .folderProblemFound, finding.trailSentence,
                 course: finding.course, section: finding.section
             )
         }
     }
 
-    private func collectHealthFindings(in text: String) {
-        let combined: String = pendingHealthLine + text
+    /// Reads every line that is now complete, keeping the unfinished one for
+    /// the next chunk.
+    private func collectCompleteLines(in text: String) {
+        let combined: String = pendingLine + text
         // Scalar-based, via the same splitter the parser uses: Swift folds
         // "\r\n" into ONE Character, so splitting on "\n" does not split PTY
         // output at all.
@@ -606,8 +805,42 @@ class ScriptRunner {
         }
         // `carried` is now whatever followed the final newline — an unfinished
         // line, unless the chunk happened to end on one.
-        pendingHealthLine = carried
+        pendingLine = carried
         rememberHealthFindings(in: completeLines.joined(separator: "\n"))
+        rememberPreviewAnnouncement(in: completeLines)
+        rememberWhatIsWaitedFor(in: completeLines)
+    }
+
+    /// Turns the launcher's `PLANTOIR_WAITING_FOR:` lines into the status
+    /// line (#378). Read line by line, in order, so a wait that changes and
+    /// then ends inside one chunk ends.
+    private func rememberWhatIsWaitedFor(in lines: [String]) {
+        for wait in WorkspaceWait.waits(in: lines) {
+            if wait.isOver {
+                waitingSentence = ""
+                waitingSince = nil
+                continue
+            }
+            if waitingSince == nil {
+                waitingSince = Date()
+            }
+            waitingSentence = wait.statusSentence
+        }
+    }
+
+    /// Takes the address out of any complete line that announces one; the
+    /// last announcement wins, as it always has.
+    ///
+    /// The colour codes come out one WHOLE line at a time, never a chunk at a
+    /// time: a chunk can end in the middle of an escape sequence, and half of
+    /// one left in front of the address would be read as part of it.
+    private func rememberPreviewAnnouncement(in lines: [String]) {
+        for line in lines {
+            let plainLine: String = TranscriptBuilder.strippingControlSequences(from: line)
+            if let address = ScriptRunner.previewAddress(in: plainLine) {
+                announcedPreviewAddress = address
+            }
+        }
     }
 
     /// The folder a local-folder deploy published into, if the output
@@ -712,7 +945,19 @@ class ScriptRunner {
     }
 
     /// Prompt shapes the toolchain's scripts actually use.
+    ///
+    /// Never a marker line (#153): half a health payload cut after
+    /// `"sentence":` ends in a colon, and would otherwise be offered to the
+    /// teacher as something to answer, raw JSON and all.
     static func looksLikeQuestion(_ line: String) -> Bool {
+        // Every marker, by the one rule (#128) that subsumes each reader's own
+        // `isMarkerLine`.
+        if BuildMarkerLine.isMachineLine(line) {
+            return false
+        }
+        if HelperBootstrapReport.isMarkerLine(line) {
+            return false
+        }
         if line.hasSuffix(":") || line.hasSuffix("?") || line.hasSuffix(">") {
             return true
         }
@@ -900,6 +1145,7 @@ class ScriptRunner {
             return
         }
         unscannedOutput += newText
+        let reachedBefore: Int = reachedMilestoneCount
 
         // Take the HIGHEST milestone the new output reveals: a later
         // marker implies the earlier steps, so varying output never
@@ -920,6 +1166,25 @@ class ScriptRunner {
             unscannedOutput = String(unscannedOutput[matchedEnd...])
             // A count belongs to the step that reported it.
             stepDetail = ""
+        }
+
+        // A later step means any wait is over, even if its "over" line was
+        // lost (#378) — unless the wait began AFTER that step in this same
+        // stretch of output, which is the usual order: the step "Starting
+        // the website builder" is reached, then the launcher finds it must
+        // wait.
+        if reachedMilestoneCount > reachedBefore && !waitingSentence.isEmpty {
+            let marker: String = milestones[reachedMilestoneCount - 1].marker
+            let milestoneAt: Range<String.Index>? = newText.range(of: marker, options: .backwards)
+            let waitAt: Range<String.Index>? = newText.range(of: WorkspaceWait.markerPrefix, options: .backwards)
+            var stepCameLast: Bool = waitAt == nil
+            if let milestoneAt, let waitAt, milestoneAt.lowerBound > waitAt.lowerBound {
+                stepCameLast = true
+            }
+            if stepCameLast {
+                waitingSentence = ""
+                waitingSince = nil
+            }
         }
 
         if let progress = ScriptRunner.uploadProgress(in: newText) {
@@ -1026,6 +1291,12 @@ class ScriptRunner {
     /// culprit — a live "still working… (Ns)" timer counts up so the
     /// step never looks frozen. Mirrors the Windows app's behaviour.
     func milestoneText(asOf now: Date) -> String {
+        // What a launcher is waiting for names itself, with the wait's own
+        // counter, in place of "still working…" (#378, decision 3).
+        if isRunning && !waitingSentence.isEmpty, let since = waitingSince {
+            let seconds: Int = max(0, Int(now.timeIntervalSince(since)))
+            return WorkspaceWait.withCounter(waitingSentence, seconds: seconds)
+        }
         if !stepDetail.isEmpty {
             return "\(currentMilestoneLabel) \(stepDetail)"
         }
@@ -1048,6 +1319,11 @@ class ScriptRunner {
     /// A friendly description of what is happening right now, derived
     /// from markers in the output — used when no milestones are set.
     var friendlyPhase: String {
+        // A run with no milestones shows its phase in the heading instead;
+        // a named wait (#378) is the phase while it lasts.
+        if isRunning && !waitingSentence.isEmpty {
+            return waitingSentence
+        }
         let recentText: String = String(transcript.recentText(maximumCharacters: 4000))
         let phases: [(marker: String, label: String)] = [
             ("Launching Quartz preview", "Starting the preview…"),
@@ -1056,8 +1332,12 @@ class ScriptRunner {
             ("Parsing input files", "Building your site…"),
             ("Installing dependencies", "Preparing your site (first time can take a few minutes)…"),
             ("Pulling", "Downloading components (first time can take a few minutes)…"),
-            ("Starting Colima", "Starting up (first time can take a few minutes)…"),
-            ("Waiting for the container runtime", "Starting up…"),
+            // The launchers print "▶️  Starting the website builder…" here;
+            // it said "Starting Colima…" until 2026-09-23 (GitHub #228).
+            ("Starting the website builder", "Starting up (first time can take a few minutes)…"),
+            // "⏳ Waiting for the website builder to be ready…"; it said
+            // "Waiting for the container runtime…" until GitHub #263.
+            ("Waiting for the website builder", "Starting up…"),
             ("delta deploy", "Deploying your site…"),
             ("Uploaded", "Deploying your site…"),
             ("Deploying", "Deploying your site…"),
@@ -1118,14 +1398,22 @@ class ScriptRunner {
         // printed as the very last output would otherwise be lost — the exact
         // failure the buffer was added to prevent, surviving at the end of the
         // run instead of in the middle of it.
-        flushPendingHealthLine()
+        flushPendingLine()
+        waitingSentence = ""
+        waitingSince = nil
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
         lastExitCode = exitCode
         isRunning = false
+        ScriptRunner.forgetInFlight(self)
         terminal?.masterHandle.readabilityHandler = nil
         process = nil
         terminal = nil
         writeRecordOfRun(exitCode: exitCode)
+        // A task can change the answer: a first setup downloads the programs
+        // it did not find. Ask again, so every LATER record says what is
+        // there now. (This task's own record keeps the earlier answer, which
+        // was true when it was taken.)
+        ScriptRunner.refreshHelperVersions()
         ActivityTrail.note(
             .taskFinished,
             runScriptName + " — "
@@ -1258,6 +1546,19 @@ class ScriptRunner {
         recordWrittenAt = Date()
     }
 
+    /// Asks the helper programs their versions again, in the background.
+    ///
+    /// Never under the test suite: the suite runs real launchers through
+    /// this class, and a background check finishing in the middle of a test
+    /// would both probe the machine the suite runs on and change what a
+    /// later test's record says.
+    static func refreshHelperVersions() {
+        if WorkspaceModel.isRunningTests {
+            return
+        }
+        ProblemReportEnvironment.refreshHelpers()
+    }
+
     /// How a finished task is described in its record.
     ///
     /// Stopping a task on purpose makes it exit non-zero, and so does
@@ -1280,6 +1581,13 @@ class ScriptRunner {
         }
         if exitCode == 0 {
             return "Finished"
+        }
+        // Exit 3 means one thing in both launchers and deploy.py: run with
+        // --non-interactive, it reached a question and refused rather than
+        // wait for an answer nobody could give (#378 — an assistant's deploy
+        // from another app, or a publish set for later).
+        if exitCode == 3 {
+            return "Stopped at a question nobody was there to answer (exit 3)"
         }
         return "Failed (exit \(exitCode))"
     }

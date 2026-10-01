@@ -63,7 +63,11 @@ final class WindowFolderMemoryTests: XCTestCase {
     }
 
     @MainActor
-    func testAFolderThatHasGoneIsSkipped() throws {
+    /// Reversed by #311: a gone folder used to be skipped, so its window
+    /// met the picker with no word about why. It is handed out now, in
+    /// order, and the window that takes it says what happened
+    /// (`WorkspaceModel.reopen`, `ReopeningTheLastWorkingFolderTests`).
+    func testAFolderThatHasGoneIsStillHandedOutSoItsWindowCanSayWhy() throws {
         let folders: [String] = try makeFolders(2)
         defer { removeAll([folders[1]]) }
         try FileManager.default.removeItem(atPath: folders[0])
@@ -71,8 +75,9 @@ final class WindowFolderMemoryTests: XCTestCase {
             WindowFolderMemory.Entry(path: folders[0], frame: ""),
             WindowFolderMemory.Entry(path: folders[1], frame: ""),
         ])
-        XCTAssertEqual(WindowFolderMemory.claimNextEntry()?.path, folders[1],
-                       "A window should not be opened in a folder that no longer exists")
+        XCTAssertEqual(WindowFolderMemory.claimNextEntry()?.path, folders[0],
+                       "The gone folder's window must get its entry, to say why it could not be reopened")
+        XCTAssertEqual(WindowFolderMemory.claimNextEntry()?.path, folders[1])
     }
 
     @MainActor

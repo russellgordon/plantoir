@@ -48,13 +48,23 @@ final class AssistModelStore {
     nonisolated(unsafe) static var directoryOverride: URL?
 
     /// `~/Library/Application Support/Plantoir/models`.
+    ///
+    /// **Under the unit suite, the suite's throwaway home instead** (issue
+    /// #264), through `RealHome.forFiles`. Three tests used to stat the real
+    /// weights here, so a panel sentence they checked depended on what the
+    /// Mac running them had downloaded — a suite that answers differently on
+    /// a Mac with weights. The app a UI test drives has no XCTest in it and
+    /// keeps the real folder, which `AssistantRolloverUITests` needs: it runs
+    /// against a real model.
     static var directoryURL: URL {
         if let override = directoryOverride {
             return override
         }
-        let base: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("Plantoir", isDirectory: true)
-                   .appendingPathComponent("models", isDirectory: true)
+        return RealHome.forFiles
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support", isDirectory: true)
+            .appendingPathComponent("Plantoir", isDirectory: true)
+            .appendingPathComponent("models", isDirectory: true)
     }
 
     /// Where this tier's weights sit once downloaded.
@@ -70,7 +80,12 @@ final class AssistModelStore {
         guard FileManager.default.fileExists(atPath: path) else {
             return false
         }
-        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: path)
+        // Through a symbolic link to the file it names (#154): a UI test links
+        // the real weights into its state folder one file at a time, and
+        // `attributesOfItem` reports the LINK's own few bytes, which read as a
+        // truncated download.
+        let resolved: String = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: resolved)
         let size: Int64 = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
         return size == tier.downloadBytes
     }
@@ -165,7 +180,7 @@ final class AssistModelStore {
     /// size it was going to be.
     static func bytesOnDisk(for tier: AssistModelTier) -> Int64? {
         let url: URL = AssistModelStore.directoryURL.appendingPathComponent(tier.fileName)
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path) else {
             return nil
         }
         return (attributes[.size] as? NSNumber)?.int64Value

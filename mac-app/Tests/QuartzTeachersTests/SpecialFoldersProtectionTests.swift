@@ -4,7 +4,43 @@ import XCTest
 @MainActor
 final class SpecialFoldersProtectionTests: XCTestCase {
 
-    // MARK: - Helper methods
+    // MARK: - Stored properties
+
+    /// Where this test's trail lines go, and the store that was there before.
+    /// A removal through the list editor runs `folderWasRemoved`, which writes
+    /// an `.itemExcluded` line — without the redirect it would land in the
+    /// real `~/Library/Logs/Plantoir`.
+    var trailFolderURL: URL?
+    var previousTrailStore: ProblemReportStore?
+
+    // MARK: - Functions
+
+    override func setUp() async throws {
+        let folderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("special-folders-trail-\(UUID().uuidString)", isDirectory: true)
+        trailFolderURL = folderURL
+        previousTrailStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: folderURL)
+    }
+
+    override func tearDown() async throws {
+        if let previousTrailStore {
+            ActivityTrail.store = previousTrailStore
+        }
+        if let trailFolderURL {
+            try? FileManager.default.removeItem(at: trailFolderURL)
+        }
+    }
+
+    /// Removes a shared folder the way the teacher does, through the list
+    /// editor Course Settings builds: `removeItem(named:)` takes the name out
+    /// of the list, then `onRemove` runs `folderWasRemoved` — the exclusion,
+    /// then the pool. Issue #183: a hand replay of those steps stays green
+    /// when the shipped order changes, so these tests call its owner.
+    private func removeSharedFolderThroughTheListEditor(_ name: String, in view: CourseSettingsView) {
+        let editor: StringListEditorView = CourseSettingsGestureScript.editor(for: .sharedFolders, of: view)
+        editor.removeItem(named: name)
+    }
 
     private func makeCourse(
         in root: URL,
@@ -192,6 +228,20 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
     // MARK: - Wizard protection and marks tests
 
+    /// ICS3U declines its ready-made pages and keeps the computer studies
+    /// skeleton — which, since GitHub issue #251, still gets the Ontario
+    /// expectations written for ICS3U and a coverage map built over them.
+    ///
+    /// This asserted the OPPOSITE until that landed: the Curriculum folder
+    /// was merely `.consequential` ("you can take it out, here is what you
+    /// lose") because a skeleton course's curriculum folder held two
+    /// placeholder pages worth nothing. The same sentences that protect it
+    /// for a teacher taking the payload now protect it here, because the
+    /// same pages are in it. The marks pool moves with it for the same
+    /// reason: a coverage map with an empty pool counts nothing.
+    ///
+    /// The case where nothing is offered is
+    /// `testWizardStructureProtectionForACodeWithNoReadyMadePages` below.
     func testWizardStructureProtectionWithExampleContentDeclined() {
         let skeleton: SkeletonCatalog.Family = try! XCTUnwrap(SkeletonCatalog.family(forCode: "ICS3U"))
         let wizard: NewCourseWizardView = NewCourseWizardView(
@@ -207,19 +257,15 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         let curriculumProt: ItemProtection = wizard.wizardSharedFolderProtection(for: "Curriculum")
         XCTAssertEqual(
             curriculumProt,
-            .consequential(
-                title: SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"),
-                message: SpecialNames.removeCurriculumFolderMessage
-            )
+            .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageMap)
         )
 
         let tasksProt: ItemProtection = wizard.wizardSharedFolderProtection(for: "Tasks")
         XCTAssertEqual(
             tasksProt,
-            .consequential(
-                title: SpecialNames.removeGradedFolderTitle(for: "Tasks"),
-                message: SpecialNames.removeGradedFolderMessage
-            )
+            .blocked(reason: SpecialNames.lastGradedFolderBlockedWizard),
+            "Tasks is this skeleton's whole marks pool, and the coverage map counts the "
+            + "pages in it."
         )
 
         let classesProt: ItemProtection = wizard.wizardPerSectionFolderProtection(for: "All Classes")
@@ -227,6 +273,39 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
         let indexProt: ItemProtection = wizard.wizardPerSectionFileProtection(for: "index.md")
         XCTAssertEqual(indexProt, .blocked(reason: SpecialNames.sectionIndexFileBlocked))
+    }
+
+    /// The ~1,900 codes with no ready-made pages keep exactly the old
+    /// answers: their skeleton's Curriculum folder is empty and there is
+    /// nothing anywhere to fill it with, so taking it out costs a teacher
+    /// nothing they have not yet done.
+    func testWizardStructureProtectionForACodeWithNoReadyMadePages() {
+        XCTAssertFalse(ExampleContentCatalog.hasContent(forCode: "ICS2O"))
+        let skeleton: SkeletonCatalog.Family = try! XCTUnwrap(SkeletonCatalog.family(forCode: "ICS2O"))
+        let wizard: NewCourseWizardView = NewCourseWizardView(
+            courseCode: "ICS2O",
+            prepopulatesExampleContent: false,
+            sharedFolders: skeleton.sharedFolders,
+            sharedFiles: skeleton.sharedFiles,
+            perSectionFolders: skeleton.perSectionFolders,
+            perSectionFiles: skeleton.perSectionFiles,
+            gradedFolders: skeleton.gradedFolders
+        )
+
+        XCTAssertEqual(
+            wizard.wizardSharedFolderProtection(for: "Curriculum"),
+            .consequential(
+                title: SpecialNames.removeCurriculumFolderTitle(for: "Curriculum"),
+                message: SpecialNames.removeCurriculumFolderMessage
+            )
+        )
+        XCTAssertEqual(
+            wizard.wizardSharedFolderProtection(for: "Tasks"),
+            .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: "Tasks"),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        )
     }
 
     func testWizardGradedFoldersIncludedInConfigWhenNotUsingExampleContent() {
@@ -330,19 +409,18 @@ final class SpecialFoldersProtectionTests: XCTestCase {
 
         // The confirmation promises the folder leaves the marks pool, and
         // the build must never be handed a pool naming an excluded folder.
-        // Played in the order Course Settings does it — the list editor drops
-        // the name, then `onRemove` excludes it — because since 2026-09-09 the
-        // drop asks what the checklist offers, and it offers what the lists
-        // and the disk still hold.
-        course.configuration.sharedFolders = ["Concepts", "Tests"]
-        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Tasks")
+        // Run through the list editor, so it happens in the order Course
+        // Settings does it — the editor drops the name, then `onRemove`
+        // excludes it — because since 2026-09-09 the drop asks what the
+        // checklist offers, and it offers what the lists and the disk still
+        // hold.
+        removeSharedFolderThroughTheListEditor("Tasks", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Tests"])
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
 
         // A name that was never in the pool changes nothing.
-        course.configuration.sharedFolders = ["Tests"]
-        course.configuration.exclude("Concepts", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Concepts")
+        removeSharedFolderThroughTheListEditor("Concepts", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Tests"])
         XCTAssertEqual(course.configuration.gradedFolders, ["Tests"])
     }
 
@@ -387,11 +465,11 @@ final class SpecialFoldersProtectionTests: XCTestCase {
         )
         let view: CourseSettingsView = CourseSettingsView(course: course)
 
-        // In the order Course Settings really does it: the list editor drops
-        // the name, `onRemove` excludes it, and only then is the pool touched.
-        course.configuration.sharedFolders = ["Concepts", "Homework Tasks"]
-        course.configuration.exclude("Tasks", inScope: FolderScope.shared.exclusionKey)
-        view.dropFromMarksPool("Tasks")
+        // Through the list editor, so in the order Course Settings really
+        // does it: the editor drops the name, `onRemove` excludes it, and only
+        // then is the pool touched.
+        removeSharedFolderThroughTheListEditor("Tasks", in: view)
+        XCTAssertEqual(course.configuration.sharedFolders, ["Concepts", "Homework Tasks"])
 
         XCTAssertNil(course.configuration.gradedFolders)
     }

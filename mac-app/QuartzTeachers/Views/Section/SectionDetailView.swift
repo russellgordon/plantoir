@@ -31,7 +31,10 @@ struct SectionDetailView: View {
 
     @State var previewController = WebPreviewController()
     @State var previewURL: URL?
-    @State var isWaitingForServer: Bool = false
+    /// The wait for this window's preview, and the record ⌘Q reads while it
+    /// lasts (issue #232). Cleared only through `previewBuildWait.end()`, so
+    /// the record cannot outlive the wait — see `PreviewBuildWait`.
+    @State var previewBuildWait: PreviewBuildWait = PreviewBuildWait()
 
     /// The port this window's preview holds, while it holds one.
     @State var previewLease: PreviewLeases.Lease?
@@ -86,8 +89,51 @@ struct SectionDetailView: View {
     /// would be two names for one folder.
     @State var folderThisSectionWorksIn: URL?
 
-    /// Why a preview could not start, shown as an alert.
-    @State var previewRefusal: String?
+    /// What the preview alert says: why a preview could not start or did not
+    /// appear, or — since #397 — the question about today's class on the
+    /// front page.
+    ///
+    /// Each carries its own TITLE, because different things arrive in this
+    /// one alert and one title cannot be true of all of them. "Cannot Preview
+    /// Yet" is right for a refusal to start — another window holds the
+    /// section, so wait and it will work. It is wrong in front of a preview
+    /// that built, was served, and could not be reached: there the remedy is
+    /// restarting the Mac and "Yet" quietly says otherwise. A SECOND `.alert`
+    /// modifier was the obvious alternative and is the one thing this view
+    /// must not have — four alerts on it segfaulted SwiftUI's bridge, which is
+    /// why the folder dialogs share one, and why the #397 question rides this
+    /// one rather than adding a fourth.
+    ///
+    /// **Held after the alert has gone, and replaced only by the next one.**
+    /// Presentation is `previewAlertIsUp`; this is never cleared by the
+    /// dismissal, so the title and buttons cannot change while the alert
+    /// fades — clearing it there flashed "Cannot Preview Yet" behind a
+    /// question the teacher had just answered (#397 plan review, 2).
+    @State var previewAlert: PreviewAlert = .refusal(title: "", sentence: "")
+
+    /// Whether the preview alert is up. Written true only through
+    /// `showPreviewRefusal` and `pressPreview`; SwiftUI writes it false.
+    @State var previewAlertIsUp: Bool = false
+
+    enum PreviewAlert: Equatable {
+        case refusal(title: String, sentence: String)
+        case todaysClass(TodaysClassOnTheFrontPage.Offer)
+    }
+
+    /// A refusal that arrived while the question about today's class was up
+    /// — the assistant can start a preview then — shown once it has gone.
+    @State var heldPreviewRefusal: PreviewAlert?
+
+    /// Set by the question's answer, and acted on once the alert has GONE
+    /// (`afterThePreviewAlert`): the preview starts then, never from inside
+    /// the alert's own button, where a refusal it raised would be lost with
+    /// the dismissal (#397 plan review, 1).
+    @State var startPreviewWhenTheQuestionHasGone: Bool = false
+
+    /// Why the front page was not changed after Show on Front Page, said once
+    /// the question has gone — unless starting the preview had something to
+    /// say first (the trail has both).
+    @State var frontPageNotChanged: String?
 
     /// A publish that was set to happen on its own and did not get through.
     ///
@@ -96,6 +142,21 @@ struct SectionDetailView: View {
     /// scheduled run got through, when there has never been one, or when the
     /// teacher has dismissed it.
     @State var stoppedScheduledPublish: ScheduledPublishOutcome.Stopped?
+
+    /// Said when a preview starts while Course Settings holds changes nobody
+    /// saved (issue #265): the preview reads the saved settings, so the
+    /// switches and the page can disagree. Cleared when the preview stops or
+    /// starts again with nothing unsaved. Since #335 a deploy says its own
+    /// sentence here too — see `unsavedSettingsNoticeOwner`.
+    @State var unsavedSettingsNotice: String? = nil
+
+    /// Whose sentence `unsavedSettingsNotice` is (#335, the implementation
+    /// review's F3). A preview's end clears only the PREVIEW's sentence:
+    /// `releasePreviewLease()` is also reached from the preview's wait loops,
+    /// which poll once a second and can wake after a deploy has set its own
+    /// sentence, so relying on the deploy setting it after the stop was a
+    /// race that usually went the right way. A state, not an ordering.
+    @State var unsavedSettingsNoticeOwner: UnsavedSettingsNoticeOwner? = nil
 
     /// Folder problems the last build reported, shown once when it finishes.
     ///
@@ -139,6 +200,24 @@ struct SectionDetailView: View {
     /// again is what reaches students.
     @State var healthFindingsCameFromPublishing: Bool = false
 
+    /// The links checklist on screen (#379), or waiting for the alert in
+    /// front of it to go (`repair.oneAlertAtATime`).
+    @State var linksChecklist: LinksChecklistSheetModel?
+    @State var pendingLinksChecklist: LinksChecklistSheetModel?
+
+    /// The #333 finding, held while the build that reported it has not yet
+    /// said whether it wrote an offer — the finding is announced BEFORE the
+    /// build's date passes, and the offer after them (plan review, F14).
+    @State var heldLinksFinding: (finding: SiteHealthFinding, cameFromPublishing: Bool)?
+
+    /// This view's own window, by identity only — never retained — so the
+    /// links checklist is offered on the window that became key (#379).
+    @State var ownWindowID: ObjectIdentifier?
+
+    /// Offers already put in front of the teacher from this window, by build,
+    /// so the second look at a build's findings does not ask twice.
+    @State var linksChecklistBuildsHandled: Set<String> = []
+
     /// Why a deploy could not start, shown as an alert.
     @State var deployRefusal: String?
 
@@ -165,13 +244,23 @@ struct SectionDetailView: View {
 
     // MARK: - Computed properties
 
+    /// True from the press until the preview's page first answers or the run
+    /// ends — read through `previewBuildWait`, which is the only thing that
+    /// can change it (issue #232).
+    var isWaitingForServer: Bool {
+        return previewBuildWait.isWaiting
+    }
+
     /// What this section is CALLED — used wherever a sentence names it
     /// ("Deploying ICS3U-S1"). Deliberately without the " — Edited"
     /// marker: the marker is a statement about the window's contents, not
     /// part of the section's name, and "Deploying ICS3U-S1 — Edited" reads
     /// as though "Edited" were something being deployed.
     var sectionName: String {
-        return "\(course.code)-S\(sectionNumber)"
+        // `displayCode`: a reference course's window says "ICS3U-S1", never
+        // "ICS3U-2025-S1". Identical to `code` for every course a teacher
+        // teaches.
+        return "\(course.displayCode)-S\(sectionNumber)"
     }
 
     /// What the window's title bar says — the name, plus the marker when
@@ -190,34 +279,70 @@ struct SectionDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            // Base layer: always laid out in the normal, safe-area
-            // respecting flow. Keeping it mounted means its geometry is
-            // never inherited from the full-bleed web view above it —
-            // which is what dragged the progress header under the
-            // window's toolbar when a preview was restarted.
-            VStack(spacing: 0) {
-                if let stoppedScheduledPublish {
-                    stoppedPublishNotice(stoppedScheduledPublish)
-                }
-                if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
-                    consoleArea
-                } else {
-                    ContentUnavailableView(
-                        "No Preview Running",
-                        systemImage: "globe",
-                        description: Text(course.configuration.deploysToLocalFolder
-                            ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your deploy folder."
-                            : "Click Preview to build this section's website and see it here, or Deploy to put it online.")
-                    )
-                }
+        // The notice is ABOVE everything this section can show, including the
+        // site — one band, in one place, in every state.
+        //
+        // It used to sit in the base layer of the ZStack below, under the
+        // full-bleed web view: with a preview showing (the commonest state) a
+        // teacher saw nothing but a green tint bleeding through the toolbar,
+        // which is issue #219. Putting the band in the layer ABOVE the site
+        // would have meant writing it twice — once for each state — so it is
+        // here instead, outside the stack altogether. The site takes the room
+        // that is left and gets it back the moment the notice is dismissed.
+        //
+        // REJECTED: `.safeAreaInset(edge: .top)` on the web view, and a second
+        // copy of the band inside a cover-layer `VStack`. Both put the band
+        // inside the branch that exists only while a preview is up, so the
+        // no-preview case needs its own copy — two places to keep in step for
+        // one sentence — and both move the band between containers as previews
+        // start and stop.
+        VStack(spacing: 0) {
+            if let stoppedScheduledPublish {
+                ScheduledPublishNoticeView(
+                    outcome: stoppedScheduledPublish,
+                    course: course.code,
+                    sectionNumber: sectionNumber,
+                    dismiss: dismissScheduledPublishNotice
+                )
             }
+            if let unsavedSettingsNotice {
+                // Its own view, and never `fixedSize` — see the view. Since
+                // #335 it may be a deploy's sentence, named for UI tests by
+                // whose it is.
+                UnsavedSettingsNoticeView(sentence: unsavedSettingsNotice, identifier: unsavedSettingsNoticeIdentifier)
+            }
+            ZStack {
+                // Base layer: always laid out in the normal, safe-area
+                // respecting flow. Keeping it mounted means its geometry is
+                // never inherited from the full-bleed web view above it —
+                // which is what dragged the progress header under the
+                // window's toolbar when a preview was restarted.
+                VStack(spacing: 0) {
+                    if isWaitingForServer || isBusy || !previewRunner.transcript.lines.isEmpty || deployRunner.hasAnyOutput {
+                        consoleArea
+                    } else {
+                        // Fills the height it is offered, which is what keeps
+                        // the notice above it flush under the toolbar: a layer
+                        // that claims less than the stack offers is CENTRED by
+                        // it, and the notice floated mid-window. See the view's
+                        // own comment for the measurement.
+                        NoPreviewPlaceholderView(
+                            deploysToLocalFolder: course.configuration.deploysToLocalFolder,
+                            keptForReferenceCode: course.isKeptForReference ? course.displayCode : ""
+                        )
+                    }
+                }
 
-            // Cover layer: the site itself, deliberately full-bleed.
-            if let previewURL {
-                WebPreviewView(controller: previewController, url: previewURL)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier("previewWebView")
+                // Cover layer: the site itself, full-bleed within whatever
+                // room the notice leaves. It stays in this one branch however
+                // the notice comes and goes — the web view is a live WKWebView
+                // with a page scrolled to where the teacher left it, and
+                // moving it between containers is how that gets thrown away.
+                if let previewURL {
+                    WebPreviewView(controller: previewController, url: previewURL)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .accessibilityIdentifier("previewWebView")
+                }
             }
         }
         .navigationTitle(titleText)
@@ -229,13 +354,38 @@ struct SectionDetailView: View {
             // alone but is the other moment the folder has just been read.
             if !nowBusy {
                 refreshEditedMarker()
+                offerTheLinksChecklistIfWaiting()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshEditedMarker()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             refreshEditedMarker()
+            // A publish this window did not watch — scheduled, the assistant,
+            // the MCP server, a terminal — published as it is; the checklist
+            // is offered now (Russell's decision 3 on #379). Only when THIS
+            // window became key: the notification is app-wide, and the sheet
+            // belongs on the window the teacher is looking at (review, N5).
+            if let window = notification.object as? NSWindow, let ownWindowID,
+               ObjectIdentifier(window) != ownWindowID {
+                return
+            }
+            offerTheLinksChecklistIfWaiting()
+        }
+        .background(WindowAccessor { window in
+            ownWindowID = ObjectIdentifier(window)
+        })
+        // A scheduled run is a separate process, so the FILE it writes is the
+        // only event there is. Reading the watcher's counter here is what
+        // registers this view as an observer of it; when it moves — a record
+        // arrived, one was cleared, or the app came back to the front — the
+        // section re-reads its own record and the band appears where the
+        // teacher is already looking, instead of waiting for them to click away
+        // and back. The sidebar's badge follows the same counter, so the two
+        // move together.
+        .onChange(of: ScheduledPublishWatcher.shared.generation) { _, _ in
+            loadStoppedScheduledPublish()
         }
         .toolbar {
             // Every item is ALWAYS present (disabled when inapplicable):
@@ -283,14 +433,20 @@ struct SectionDetailView: View {
                     if previewRunner.isRunning {
                         stopPreview()
                     } else {
-                        startPreview()
+                        // The BUTTON, and only the button, may ask about
+                        // today's class first (#397); every other way in calls
+                        // `startPreview()` and is never held up by a question.
+                        pressPreview()
                     }
                 }
                 // The icon alone doesn't say what these two buttons do, so
                 // they wear their titles; the neighbouring icons are the
                 // familiar Obsidian and Safari actions and stay icon-only.
                 .labelStyle(.titleAndIcon)
-                .disabled(!previewRunner.isRunning && isBusy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // restore or removal is waiting on that zip to replace the
+                // folder a preview would be serving from.
+                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code)))
                 .help(previewRunner.isRunning ? "Stop previewing this section" : "Preview this section's website")
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
@@ -298,6 +454,13 @@ struct SectionDetailView: View {
                 // `publish:` flag decides whether students see it); the
                 // whole site is deployed. One word for both had the
                 // teacher and the assistant talking past each other.
+                // NOT DRAWN on a course kept for reference. The refusal
+                // behind it stays — every other way in still meets it — but a
+                // teacher meets this as a button that is not there, which is
+                // the same rule the sidebar follows for Schedule Deploy…: a
+                // greyed-out control that can never become available is a
+                // standing invitation to wonder what is wrong.
+                if !course.isKeptForReference {
                 Button("Deploy", systemImage: "paperplane.fill") {
                     startDeploy()
                 }
@@ -309,9 +472,12 @@ struct SectionDetailView: View {
                 // was clickable again the instant that phase started — a
                 // second click there raced its own stop-preview-then-deploy
                 // sequence against the first's.
-                .disabled(deployRunner.isRunning || isPreparingDeploy)
+                // Nor while a copy of the course is being zipped (#351): a
+                // removal waiting on that zip deletes what this would publish.
+                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code))
                 .help("Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
+                }
 
                 Button("Open in Browser", systemImage: "safari") {
                     openInBrowser()
@@ -341,10 +507,11 @@ struct SectionDetailView: View {
         // assistant and the buttons can never drift apart.
         .onAppear {
             // Looked for on every appearance rather than once at launch: a
-            // scheduled run can finish while the app is open, and a teacher
-            // coming back to this section should see it without relaunching.
-            // noteOnTrailIfNeeded is what keeps the trail from gaining a line
-            // each time.
+            // section opened after a run finished must show what it left, and
+            // this is also what a window restored at launch reads. A run that
+            // finishes while this section is ALREADY showing is the watcher's
+            // job, above. The trail line belongs to the run, not to either of
+            // these reads.
             loadStoppedScheduledPublish()
             guard let folder = workspace.workspaceURL else {
                 return
@@ -369,7 +536,7 @@ struct SectionDetailView: View {
                     },
                     startPreview: { startPreview() },
                     stopPreview: { await stopPreviewAndWait() },
-                    deploy: { await deployAndWait() }
+                    deploy: { await deployAndWait(pressedByTheAssistant: true) }
                 )
             )
         }
@@ -381,11 +548,29 @@ struct SectionDetailView: View {
             // Guard BEFORE consuming: `takeFolderProblems` deletes the record
             // as it reads it, so taking it while a dialog is already up threw
             // the overnight findings away permanently.
-            guard healthFindings.isEmpty else {
+            guard healthFindings.isEmpty, let workingFolderURL = workspace.workspaceURL else {
                 return
             }
-            let waiting: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
-                courseCode: course.code, sectionNumber: sectionNumber
+            let taken: [SiteHealthFinding] = ScheduledDeploy.takeFolderProblems(
+                courseCode: course.code, sectionNumber: sectionNumber,
+                inWorkingFolder: workingFolderURL
+            )
+            // The #333 finding leaves the alert only when the checklist will
+            // really be shown after it; otherwise the alert is the floor.
+            let checklist: LinksChecklistSheetModel? = linksChecklistWaiting(occasion: .onOpening)
+            // Also left out when the teacher has already answered this very
+            // offer — shown while the window was open, say — so the alert does
+            // not return for a finding they acted on (implementation review, N7).
+            var alreadyAnswered: Bool = false
+            if checklist == nil, !course.isKeptForReference,
+               let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) {
+                alreadyAnswered = !LinksChecklistGate.holdsSomethingNew(
+                    read.offer,
+                    answered: LinksChecklistAnswered.read(courseDirectory: course.directoryURL, section: sectionNumber)
+                )
+            }
+            let waiting: [SiteHealthFinding] = LinksChecklistRouting.findingsForTheAlert(
+                taken, checklistWillBeShown: checklist != nil || alreadyAnswered
             )
             if !waiting.isEmpty {
                 healthFindings = waiting
@@ -394,8 +579,17 @@ struct SectionDetailView: View {
                 healthFindingsCameFromPublishing = true
                 healthDialog = .findings
             }
+            // After the alert is up, so it waits behind it.
+            if let checklist {
+                requestLinksChecklist(checklist)
+            }
         }
         .onDisappear {
+            // FIRST, and unconditionally: the wait, and with it ⌘Q's record
+            // of a preview being built (issue #232). `stopPreview()` below
+            // ends it too; saying so here keeps a window that is going away
+            // from depending on what that function happens to do today.
+            previewBuildWait.end()
             // The key this section registered under, never the folder its
             // work belongs to and never the window's current one.
             if let folder = folderThisSectionRegisteredIn {
@@ -407,12 +601,22 @@ struct SectionDetailView: View {
             }
             stopPreview()
         }
-        .alert("Cannot Preview Yet", isPresented: previewRefusalBinding) {
-            Button("OK") {
-                previewRefusal = nil
+        .alert(previewAlertTitle, isPresented: $previewAlertIsUp) {
+            switch previewAlert {
+            case .todaysClass(let offer):
+                // Each answer only RECORDS; the preview starts from
+                // `afterThePreviewAlert`, once this alert has gone.
+                Button(FrontPageWording.show) {
+                    answerTodaysClass(offer, show: true)
+                }
+                Button(FrontPageWording.notToday, role: .cancel) {
+                    answerTodaysClass(offer, show: false)
+                }
+            case .refusal:
+                Button("OK") { }
             }
         } message: {
-            Text(previewRefusal ?? "")
+            Text(previewAlertMessage)
         }
         .alert("Cannot Deploy Yet", isPresented: deployRefusalBinding) {
             Button("OK") {
@@ -432,7 +636,16 @@ struct SectionDetailView: View {
         .alert(healthAlertTitle, isPresented: healthDialogBinding) {
             switch healthDialog {
             case .findings:
-                if let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
+                // No repair on a course kept for reference. The findings
+                // themselves still REPORT — a teacher may want to know a
+                // folder is missing — but the button would have offered to
+                // fix it and then said "That is already put right. Nothing
+                // needed changing." about a folder that is really gone,
+                // because the repair returns no attempts and the zero-attempt
+                // branch reads as "nothing needed doing". Found by review,
+                // 2026-09-20.
+                if !course.isKeptForReference,
+                   let title = SiteHealthRepair.buttonTitle(for: healthFindings) {
                     Button(title) {
                         // The marker is refreshed because a repair CHANGES the
                         // section's content on the teacher's behalf, and
@@ -487,6 +700,26 @@ struct SectionDetailView: View {
                 showAnythingWaiting()
             }
         }
+        .onChange(of: previewAlertIsUp) { _, isUp in
+            if !isUp {
+                afterThePreviewAlert()
+            }
+        }
+        // The build's word that it wrote the links checklist offer (#379).
+        // Printed after the date passes, so it follows the #333 finding.
+        .onChange(of: previewRunner.linksChecklistMarkers.count) { _, _ in
+            // The build has said whether it wrote an offer — mid-build, which
+            // is enough: the file is written before the marker. So the held
+            // finding is settled as though the build had finished.
+            settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
+        }
+        .sheet(item: $linksChecklist, onDismiss: {
+            refreshEditedMarker()
+        }, content: { model in
+            LinksChecklistSheet(model: model, onPublished: {
+                refreshEditedMarker()
+            })
+        })
     }
 
     /// The title of the folder-problem dialog.
@@ -557,6 +790,16 @@ struct SectionDetailView: View {
             healthFindings = next.findings
             healthFindingsCameFromPublishing = next.cameFromPublishing
             healthDialog = .findings
+            return
+        }
+        // The links checklist follows the alert (#379), never over it — nor
+        // over the preview alert, which carries the #397 question.
+        if previewAlertIsUp {
+            return
+        }
+        if let waiting = pendingLinksChecklist {
+            pendingLinksChecklist = nil
+            presentLinksChecklist(waiting)
         }
     }
 
@@ -606,9 +849,9 @@ struct SectionDetailView: View {
                     return false
                 }
                 for lease in PreviewLeases.active {
-                    if lease.folderPath == folder.path
-                        && lease.courseCode == course.code
-                        && lease.sectionNumber == sectionNumber {
+                    if lease.courseCode == course.code
+                        && lease.sectionNumber == sectionNumber
+                        && FolderIdentity.isSameFolder(lease.folderPath, folder.path) {
                         return true
                     }
                 }
@@ -645,10 +888,17 @@ struct SectionDetailView: View {
                 return
             }
             // The LEASE decides, not the window's appearance. A preview whose
-            // wait timed out has cleared `isWaitingForServer` and never set
+            // wait ran out has cleared `isWaitingForServer` and never set
             // `previewURL`, while still holding the port — so asking those two
             // would have skipped the stop and then been refused the lease,
             // raising a refusal alert out of a repair.
+            //
+            // Still true, and now of ONE path rather than of every timeout.
+            // A wait that ends because the builder said its server was up and
+            // then went quiet stops the run and hands the port back itself
+            // (`stopWaitingForThePreview`, issue #225); what is left holding a
+            // port in silence is the outer ten-minute bound — a run that never
+            // announced a server at all.
             if previewLease != nil || previewRunner.isRunning {
                 await stopPreviewAndWait()
             }
@@ -661,8 +911,20 @@ struct SectionDetailView: View {
     /// Only when the run actually produced some — a healthy course must never
     /// see a dialog, which is the difference between a warning that gets read
     /// and one that gets dismissed by habit.
-    func showHealthFindings(from runner: ScriptRunner?, cameFromPublishing: Bool = false) {
+    func showHealthFindings(
+        from runner: ScriptRunner?, cameFromPublishing: Bool = false, buildHasFinished: Bool = false
+    ) {
         guard let runner, !runner.healthFindings.isEmpty else {
+            return
+        }
+        // The #333 finding goes to the links checklist when this build wrote
+        // an offer for it (#379); everything else, and the finding itself
+        // when there is no offer, goes in the alert as before.
+        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+            in: runner.healthFindings, from: runner,
+            cameFromPublishing: cameFromPublishing, buildHasFinished: buildHasFinished
+        )
+        if forTheAlert.isEmpty {
             return
         }
         // Never swap the contents of a dialog that is already up: the title
@@ -672,17 +934,193 @@ struct SectionDetailView: View {
         // But HELD, not dropped. Returning early discarded them — and the
         // failed-deploy path can arrive while the overnight findings are
         // already on screen, so this is reachable rather than theoretical.
-        if healthDialog != nil {
+        // Held behind the preview alert too (#397): the question about
+        // today's class can stay up while an assistant's build finishes.
+        if healthDialog != nil || previewAlertIsUp {
             // Appended, not assigned: three arrivals during one dialog used to
             // lose the middle batch.
             heldHealthFindings.append(
-                (findings: runner.healthFindings, cameFromPublishing: cameFromPublishing)
+                (findings: forTheAlert, cameFromPublishing: cameFromPublishing)
             )
             return
         }
-        healthFindings = runner.healthFindings
+        healthFindings = forTheAlert
         healthFindingsCameFromPublishing = cameFromPublishing
         healthDialog = .findings
+    }
+
+    // MARK: - The links checklist (#379)
+
+    /// The findings that still belong in the alert, after the #333 one has
+    /// gone to the checklist, been held for the build's marker, or stayed.
+    func routeTheLinksFinding(
+        in findings: [SiteHealthFinding], from runner: ScriptRunner,
+        cameFromPublishing: Bool, buildHasFinished: Bool
+    ) -> [SiteHealthFinding] {
+        var forTheAlert: [SiteHealthFinding] = []
+        for finding in findings {
+            if finding.name != LinksChecklistRouting.findingName {
+                forTheAlert.append(finding)
+                continue
+            }
+            let marker: LinksChecklistMarker? = markerForThisSection(in: runner)
+            if let buildId = marker?.buildId, linksChecklistBuildsHandled.contains(buildId) {
+                continue
+            }
+            let offer: LinksChecklistOffer? = LinksChecklistOffer.read(
+                courseDirectory: course.directoryURL, section: sectionNumber
+            )?.offer
+            let route: LinksChecklistRouting.Route = LinksChecklistRouting.route(
+                marker: marker, offer: offer, isKeptForReference: course.isKeptForReference,
+                buildHasFinished: buildHasFinished
+            )
+            switch route {
+            case .alert:
+                // The same finding held earlier goes to the alert once, not
+                // again when it is settled (implementation review, N6).
+                if heldLinksFinding?.finding == finding {
+                    heldLinksFinding = nil
+                }
+                forTheAlert.append(finding)
+            case .waitForTheBuild:
+                heldLinksFinding = (finding: finding, cameFromPublishing: cameFromPublishing)
+            case .checklist:
+                guard let offer, let workspaceURL = workspace.workspaceURL else {
+                    forTheAlert.append(finding)
+                    continue
+                }
+                if let buildId = offer.buildId {
+                    linksChecklistBuildsHandled.insert(buildId)
+                }
+                let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+                    courseDirectory: course.directoryURL, section: sectionNumber
+                )
+                // An offer the teacher has already answered in full is not
+                // asked again (`offeredWhen.onlyWhenSomethingNew`).
+                if !LinksChecklistGate.holdsSomethingNew(offer, answered: answered) {
+                    continue
+                }
+                let model: LinksChecklistSheetModel = LinksChecklistSheetModel(
+                    course: course, sectionNumber: sectionNumber, workspaceURL: workspaceURL,
+                    offer: offer, answered: answered,
+                    occasion: cameFromPublishing ? .afterPublishing : .afterAPreview
+                )
+                if model.rows.isEmpty {
+                    continue
+                }
+                requestLinksChecklist(model)
+            }
+        }
+        return forTheAlert
+    }
+
+    /// The build's last word about this section's offer, if it has said one.
+    func markerForThisSection(in runner: ScriptRunner) -> LinksChecklistMarker? {
+        var found: LinksChecklistMarker?
+        for marker in runner.linksChecklistMarkers where marker.section == sectionNumber {
+            found = marker
+        }
+        return found
+    }
+
+    /// The held finding, now that the build has said whether it wrote an
+    /// offer — or has finished without saying, which means the alert.
+    func settleHeldLinksFinding(from runner: ScriptRunner, buildHasFinished: Bool) {
+        guard let held = heldLinksFinding else {
+            return
+        }
+        heldLinksFinding = nil
+        let forTheAlert: [SiteHealthFinding] = routeTheLinksFinding(
+            in: [held.finding], from: runner,
+            cameFromPublishing: held.cameFromPublishing, buildHasFinished: buildHasFinished
+        )
+        if forTheAlert.isEmpty {
+            return
+        }
+        if healthDialog != nil || previewAlertIsUp {
+            heldHealthFindings.append((findings: forTheAlert, cameFromPublishing: held.cameFromPublishing))
+            return
+        }
+        healthFindings = forTheAlert
+        healthFindingsCameFromPublishing = held.cameFromPublishing
+        healthDialog = .findings
+    }
+
+    /// Show it now, or after the alert in front of it.
+    func requestLinksChecklist(_ model: LinksChecklistSheetModel) {
+        if linksChecklist != nil {
+            return
+        }
+        // Behind the preview alert too (#397): the question about today's
+        // class invites a look at the front page in Obsidian, and coming back
+        // makes this window key, which offers the checklist — a sheet asked
+        // for under an alert.
+        if healthDialog != nil || previewAlertIsUp {
+            pendingLinksChecklist = model
+            return
+        }
+        presentLinksChecklist(model)
+    }
+
+    func presentLinksChecklist(_ model: LinksChecklistSheetModel) {
+        if let buildId = model.offer.buildId {
+            linksChecklistBuildsHandled.insert(buildId)
+        }
+        ActivityTrail.note(
+            .linksChecklistOffered,
+            LinksChecklistPublisher.offeredLine(model: model),
+            course: course.code, section: sectionNumber
+        )
+        linksChecklist = model
+    }
+
+    /// The checklist for a publish this window did not watch, when one is
+    /// waiting: an offer on disk, fresh, holding something the teacher has
+    /// not answered, for a course that is not kept for reference, while
+    /// nothing is publishing the course.
+    func linksChecklistWaiting(occasion: LinksChecklistGate.Occasion) -> LinksChecklistSheetModel? {
+        guard !course.isKeptForReference, let workspaceURL = workspace.workspaceURL else {
+            return nil
+        }
+        if CourseActivity.coursePublishIsRunning(folderPath: workspaceURL.path, courseCode: course.code) {
+            return nil
+        }
+        guard let read = LinksChecklistOffer.read(courseDirectory: course.directoryURL, section: sectionNumber) else {
+            return nil
+        }
+        if let buildId = read.offer.buildId, linksChecklistBuildsHandled.contains(buildId) {
+            return nil
+        }
+        let answered: LinksChecklistAnswered? = LinksChecklistAnswered.read(
+            courseDirectory: course.directoryURL, section: sectionNumber
+        )
+        if !LinksChecklistGate.holdsSomethingNew(read.offer, answered: answered) {
+            return nil
+        }
+        if !LinksChecklistGate.isFresh(
+            writtenAt: read.writtenAt, newestContentChange: BuildFreshness.newestContentDate(course: course)
+        ) {
+            return nil
+        }
+        let model: LinksChecklistSheetModel = LinksChecklistSheetModel(
+            course: course, sectionNumber: sectionNumber, workspaceURL: workspaceURL,
+            offer: read.offer, answered: answered, occasion: occasion
+        )
+        if model.rows.isEmpty {
+            return nil
+        }
+        return model
+    }
+
+    /// Called when the window appears, becomes key, or stops being busy.
+    func offerTheLinksChecklistIfWaiting() {
+        if isBusy || linksChecklist != nil || pendingLinksChecklist != nil || heldLinksFinding != nil {
+            return
+        }
+        guard let model = linksChecklistWaiting(occasion: .onOpening) else {
+            return
+        }
+        requestLinksChecklist(model)
     }
 
     /// Why this section's deploy would not get anywhere, or nil when it
@@ -690,14 +1128,10 @@ struct SectionDetailView: View {
     /// every additional one — so a redundancy target with no valid folder
     /// or credential is caught here rather than discovered halfway
     /// through a run that already published to the others.
-    var deployRefusalReason: String? {
-        return SectionDetailView.deployRefusalReason(
-            configuration: course.configuration,
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
-        )
-    }
-
-    /// The same check, free of the view, so it can be tested.
+    ///
+    /// Static only, and handed the SAVED settings (#335): the instance
+    /// property that read the window's copy was deleted so nothing can reach
+    /// the unsaved edits by it again.
     static func deployRefusalReason(configuration: CourseConfiguration, cloudflareAccountID: String) -> String? {
         return MultiDestinationDeployRunner.refusalReason(
             destinations: configuration.allDeployDestinations,
@@ -716,15 +1150,184 @@ struct SectionDetailView: View {
         )
     }
 
-    var previewRefusalBinding: Binding<Bool> {
-        return Binding(
-            get: { previewRefusal != nil },
-            set: { isPresented in
-                if !isPresented {
-                    previewRefusal = nil
-                }
+    var previewAlertTitle: String {
+        switch previewAlert {
+        case .refusal(let title, _):
+            return title
+        case .todaysClass(let offer):
+            return FrontPageWording.question(class: offer.classTitle)
+        }
+    }
+
+    var previewAlertMessage: String {
+        switch previewAlert {
+        case .refusal(_, let sentence):
+            return sentence
+        case .todaysClass(let offer):
+            return FrontPageWording.because(noun: offer.noun.singular, shown: offer.shownTitle)
+        }
+    }
+
+    /// Puts a refusal in the preview alert — or holds it while the question
+    /// about today's class is up, so the question is not replaced under the
+    /// teacher's pointer.
+    func showPreviewRefusal(title: String, sentence: String) {
+        if previewAlertIsUp, case .todaysClass = previewAlert {
+            heldPreviewRefusal = .refusal(title: title, sentence: sentence)
+            return
+        }
+        previewAlert = .refusal(title: title, sentence: sentence)
+        previewAlertIsUp = true
+    }
+
+    /// Two refusals in one alert, the earlier first. The title is the later
+    /// one's, since it is about the preview just asked for.
+    static func joining(_ earlier: PreviewAlert, then later: PreviewAlert) -> PreviewAlert {
+        guard case .refusal(_, let earlierSentence) = earlier,
+              case .refusal(let laterTitle, let laterSentence) = later else {
+            return later
+        }
+        if earlierSentence == laterSentence {
+            return later
+        }
+        return .refusal(title: laterTitle, sentence: earlierSentence + "\n\n" + laterSentence)
+    }
+
+    /// Runs once the preview alert has gone: the preview the question's
+    /// answer asked for, then whatever waited behind the alert.
+    ///
+    /// The preview starts FIRST, and whatever it has to say wins: a refusal
+    /// from `startPreview()` is shown and the front-page sentence is left to
+    /// the trail. The links checklist waits for both (#379, #397).
+    func afterThePreviewAlert() {
+        if startPreviewWhenTheQuestionHasGone {
+            startPreviewWhenTheQuestionHasGone = false
+            if !previewRunner.isRunning {
+                startPreview()
             }
+        }
+        if previewAlertIsUp, let held = heldPreviewRefusal {
+            // The button's own preview was refused too: both are said, the
+            // earlier first, rather than the held one dropped (implementation
+            // review, note 4).
+            previewAlert = SectionDetailView.joining(held, then: previewAlert)
+        } else if !previewAlertIsUp, let held = heldPreviewRefusal {
+            previewAlert = held
+            previewAlertIsUp = true
+        } else if !previewAlertIsUp, let sentence = frontPageNotChanged {
+            previewAlert = .refusal(title: FrontPageWording.notChangedTitle, sentence: sentence)
+            previewAlertIsUp = true
+        }
+        heldPreviewRefusal = nil
+        frontPageNotChanged = nil
+        if !previewAlertIsUp && healthDialog == nil {
+            showAnythingWaiting()
+        }
+    }
+
+    // MARK: - Today's class on the front page (#397)
+
+    /// The Preview button's action. Asks about today's class when there is
+    /// something to ask; otherwise, and after the answer, previews.
+    ///
+    /// **The one caller of `todaysClassOffer()`.** `startPreview()` is the
+    /// door every other way in uses — the assistant, Start of the Year,
+    /// Course Settings, a repair's rebuild — and a question there would hold
+    /// each of them up on a modal nobody may be watching
+    /// (`TodaysClassOnTheFrontPageTests.testOnlyThePreviewButtonAsks`).
+    func pressPreview() {
+        if frontPageQuestionMayBeAsked(), let offer = todaysClassOffer() {
+            previewAlert = .todaysClass(offer)
+            previewAlertIsUp = true
+            return
+        }
+        startPreview()
+    }
+
+    /// The question for this section today, or nil.
+    func todaysClassOffer() -> TodaysClassOnTheFrontPage.Offer? {
+        return TodaysClassOnTheFrontPage.offer(
+            forSection: sectionNumber, in: course, today: CalendarDay.today()
         )
+    }
+
+    /// Whether the front page may be asked about — and, at Show on Front
+    /// Page, still written. Not when the preview would be refused anyway (the
+    /// teacher is told why, as before, with no question first), and never
+    /// while this section is being deployed or another program is building
+    /// the course: the build writes this same file.
+    func frontPageQuestionMayBeAsked() -> Bool {
+        guard let workspaceURL = workspace.workspaceURL else {
+            return false
+        }
+        let sectionIsDeploying: Bool = SectionDetailView.refusalWhileThisSectionDeploys(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            displayCode: course.displayCode,
+            sectionNumber: sectionNumber
+        ) != nil
+        let anotherProgramIsBuilding: Bool = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: false
+        ) != nil
+        return SectionDetailView.frontPageMayBeAskedAbout(
+            isKeptForReference: course.isKeptForReference,
+            isBeingCopied: workspace.isBeingCopied(course.code),
+            isBusy: isBusy || isPreparingDeploy,
+            sectionIsDeploying: sectionIsDeploying,
+            anotherProgramIsBuilding: anotherProgramIsBuilding
+        )
+    }
+
+    /// The guards of `frontPageQuestionMayBeAsked`, as a rule a test can run.
+    static func frontPageMayBeAskedAbout(
+        isKeptForReference: Bool,
+        isBeingCopied: Bool,
+        isBusy: Bool,
+        sectionIsDeploying: Bool,
+        anotherProgramIsBuilding: Bool
+    ) -> Bool {
+        if isKeptForReference || isBeingCopied || isBusy {
+            return false
+        }
+        if sectionIsDeploying || anotherProgramIsBuilding {
+            return false
+        }
+        return true
+    }
+
+    /// The teacher's answer. Records it — the page written, or Not Today —
+    /// with its trail line, and asks for the preview once the alert has gone.
+    func answerTodaysClass(_ offer: TodaysClassOnTheFrontPage.Offer, show: Bool) {
+        startPreviewWhenTheQuestionHasGone = true
+        if !show {
+            ActivityTrail.note(
+                .frontPageLeftAsItWas,
+                TodaysClassOnTheFrontPage.answerNotToday(offer, courseDirectory: course.directoryURL),
+                course: course.code, section: sectionNumber
+            )
+            return
+        }
+        // Decided again: the section may have become busy while the question
+        // was up (a scheduled deploy, the assistant), and the build writes
+        // this same file (#397 plan review, 4).
+        var outcome: TodaysClassOnTheFrontPage.Outcome = .noLongerOffered
+        if frontPageQuestionMayBeAsked() {
+            outcome = TodaysClassOnTheFrontPage.show(offer, in: course)
+        }
+        let line: (event: ActivityTrail.Event, what: String) = TodaysClassOnTheFrontPage.trailLine(
+            for: outcome, offer: offer
+        )
+        ActivityTrail.note(line.event, line.what, course: course.code, section: sectionNumber)
+        switch outcome {
+        case .shown:
+            refreshEditedMarker()
+        case .alreadyRight:
+            break
+        case .noLongerOffered:
+            frontPageNotChanged = FrontPageWording.noLongerOffered(noun: offer.noun.singular)
+        case .couldNotSave:
+            frontPageNotChanged = FrontPageWording.couldNotSave(shown: offer.shownTitle)
+        }
     }
 
     var consoleArea: some View {
@@ -832,55 +1435,32 @@ struct SectionDetailView: View {
 
     // MARK: - A scheduled publish that stopped
 
-    /// What a teacher sees when an overnight publish did not get through.
+    /// Forget the notice a scheduled run left behind.
     ///
-    /// At the TOP of the section, above the console, because a teacher opening
-    /// a section after a failed overnight publish is looking for why their site
-    /// is out of date — and the console below is about what they are doing now,
-    /// not about what happened while they were asleep.
-    @ViewBuilder
-    func stoppedPublishNotice(_ stopped: ScheduledPublishOutcome.Stopped) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: stopped.kind.needsAttention
-                  ? "exclamationmark.triangle.fill"
-                  : "checkmark.circle.fill")
-                .foregroundStyle(stopped.kind.needsAttention ? .orange : .green)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ScheduledPublishOutcome.sentence(
-                    for: stopped, course: course.code, section: sectionNumber
-                ))
-                .fixedSize(horizontal: false, vertical: true)
-                // The DATE as well as the day: a record can sit for a week
-                // if nobody dismisses it and no later run gets through, and
-                // "Tuesday 6:30 AM" with no date is a teacher wondering
-                // WHICH Tuesday.
-                Text(stopped.when, format: .dateTime.weekday(.wide).day().month().hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            // Dismissing is the mac's own addition. Windows clears this only
-            // when a later scheduled run gets through, which leaves the message
-            // standing after a teacher has already fixed the problem by hand —
-            // and the next run that would clear it could be a week away.
-            Button("Dismiss") {
-                ScheduledPublishOutcome.clear(
-                    inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
-                    course: course.code,
-                    section: sectionNumber
-                )
-                stoppedScheduledPublish = nil
-                // The sidebar's badge is read during a row's render, so it
-                // needs telling that the answer changed — Dismiss happens
-                // here, in a different view with its own state.
-                workspace.stoppedPublishGeneration += 1
-            }
-            .accessibilityIdentifier("dismissStoppedPublish")
+    /// The notice itself is `ScheduledPublishNoticeView` — its own view, so
+    /// that a test can measure it; what stays here is the part that touches
+    /// this view's own state and the workspace.
+    func dismissScheduledPublishNotice() {
+        // The record AND the macOS notification about it (#212), so the two
+        // never disagree about whether it is still news — THIS working
+        // folder's only (#237): the same section's in another folder stays.
+        if let workingFolderURL = workspace.workspaceURL {
+            ScheduledPublishNotice.teacherDismissed(
+                inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
+                course: course.code,
+                section: sectionNumber,
+                folderID: BuildOutputLocation.folderIdentifier(forWorkingFolder: workingFolderURL.path)
+            )
         }
-        .padding(12)
-        .background((stopped.kind.needsAttention ? Color.orange : Color.green).opacity(0.12))
-        .accessibilityIdentifier("stoppedPublishNotice")
+        stoppedScheduledPublish = nil
+        // The sidebar's badge is read during a row's render, so it
+        // needs telling that the answer changed — Dismiss happens
+        // here, in a different view with its own state.
+        //
+        // Said out loud even though `clear` deletes the file and the watcher
+        // would see that: a button must not wait on the filesystem to show what
+        // the teacher just did, and the test suite runs with no watcher started.
+        ScheduledPublishWatcher.shared.noteChanged()
     }
 
     /// Look for a stopped run. READ ONLY — the trail line is written by the
@@ -891,10 +1471,15 @@ struct SectionDetailView: View {
     /// modification date, so the notice showed the morning the teacher opened
     /// it instead of the half six the run stopped at.
     func loadStoppedScheduledPublish() {
+        guard let workingFolderURL = workspace.workspaceURL else {
+            stoppedScheduledPublish = nil
+            return
+        }
         stoppedScheduledPublish = ScheduledPublishOutcome.stopped(
-            inHomeFolder: FileManager.default.homeDirectoryForCurrentUser,
+            inHomeFolder: ScheduledDeploy.homeForScheduledNotes,
             course: course.code,
-            section: sectionNumber
+            section: sectionNumber,
+            workingFolder: workingFolderURL
         )
     }
 
@@ -983,6 +1568,37 @@ struct SectionDetailView: View {
         guard let workspaceURL = workspace.workspaceURL else {
             return
         }
+        // Every way in, not only the button (#351): see its `.disabled`.
+        if workspace.isBeingCopied(course.code) {
+            return
+        }
+        // A preview of this section cannot start while this same section is
+        // being deployed by this copy of the app — from this window, another
+        // window, or the assistant with no window (#381, Russell's decision 4
+        // on #378). Asked HERE, first, before any lease is taken or anything
+        // is stopped or started, because every way into a preview comes
+        // through here: the button (whose `.disabled` is only a convenience),
+        // the in-app assistant, and the restart path. Other programs are
+        // refused by their leases below, and a deploy typed at a command line
+        // by `preview.sh` itself.
+        if let refusal = SectionDetailView.refusalWhileThisSectionDeploys(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            displayCode: course.displayCode,
+            sectionNumber: sectionNumber
+        ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: refusal)
+            return
+        }
+        // One of the moments the teacher ACTS on a reference course, so the
+        // lock is re-asserted here: a folder that came back from a backup, or
+        // from a second Mac, is not locked until somebody asks. Cheap — a
+        // stat per file, measured at ~23 ms on a 1,220-file course — and
+        // quiet unless it actually had to lock something.
+        ReferenceLock.ensureLockedInBackground(course)
         // The folder this preview belongs to, noted at the moment it is
         // decided — which is HERE, not at the appearance. The appearance
         // notes only the key this section registered under, and it can
@@ -992,6 +1608,20 @@ struct SectionDetailView: View {
         // this, so writing it beside the lease is what makes start and
         // stop name one folder.
         folderThisSectionWorksIn = workspaceURL
+        // The BUILD is recorded first — its lease on disk before the
+        // preview's — and that order is load-bearing (#156's review, M2).
+        // The take-then-check below compares other programs' leases against
+        // this window's `build` moment, and they compare against every lease
+        // this window holds, the `preview` included. Written the other way
+        // round, an outside build could land between the two files: this
+        // window would see it as earlier than its build and decline, and the
+        // other program would see this window's preview as earlier than its
+        // build and decline too. Build first, and exactly one goes ahead.
+        previewBuildWait.begin(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber
+        )
         // Each preview runs on its own port, so several windows can show
         // sections side by side without taking each other down.
         let lease: PreviewLeases.Lease
@@ -1002,12 +1632,50 @@ struct SectionDetailView: View {
                 sectionNumber: sectionNumber
             )
         } catch {
-            previewRefusal = error.localizedDescription
+            previewBuildWait.end()
+            showPreviewRefusal(title: "Cannot Preview Yet", sentence: error.localizedDescription)
             return
         }
         previewLease = lease
         previewURL = nil
-        isWaitingForServer = true
+        // ANOTHER program on this Mac — an assistant working from another
+        // app, another copy of Plantoir, a deploy set for later — may be
+        // building or previewing this course (#156). Asked only NOW, after
+        // this window's own build and preview leases are on disk and with
+        // nothing awaited since: only a lease taken before this window's
+        // build counts, so two programs pressing at the same instant cannot
+        // both go ahead. Nothing has been stopped or started yet, so
+        // declining costs the teacher nothing but the sentence.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            previewBuildWait.end()
+            releasePreviewLease()
+            WorkLeaseRegistry.noteDeclined(
+                act: "Preview", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            showPreviewRefusal(
+                title: "Cannot Preview Yet",
+                sentence: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+            )
+            return
+        }
+        // Every window's copy of this course, not only this window's: the
+        // unsaved switches may be in another window's Course Settings.
+        let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
+            || WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        unsavedSettingsNotice = SettingsSaveNotice.whenPreviewStarts(
+            settingsHaveUnsavedChanges: anyWindowHasUnsavedSettings
+        )
+        unsavedSettingsNoticeOwner = unsavedSettingsNotice == nil ? nil : .preview
+        if unsavedSettingsNotice != nil {
+            ActivityTrail.note(
+                .previewStartedWithUnsavedSettings,
+                "started a preview while Course Settings had changes nobody saved — told it uses the saved settings",
+                course: course.code,
+                section: sectionNumber
+            )
+        }
         previewRunner.milestones = TaskMilestones.preview
 
         Task { @MainActor in
@@ -1053,7 +1721,8 @@ struct SectionDetailView: View {
             // quickly and the teacher is now looking at the preview. The
             // findings usually arrived long before this — see the onChange on
             // the body, which is what actually gets them on screen.
-            showHealthFindings(from: previewRunner)
+            showHealthFindings(from: previewRunner, buildHasFinished: true)
+            settleHeldLinksFinding(from: previewRunner, buildHasFinished: true)
         }
     }
 
@@ -1094,7 +1763,7 @@ struct SectionDetailView: View {
         }
         previewRunner.stopByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         // The next preview reuses this section's port, so its address will be
         // identical to the one already loaded. Without this the web view sees
         // a URL it has seen before and shows the pages it already had —
@@ -1114,7 +1783,7 @@ struct SectionDetailView: View {
         }
         previewRunner.cancelByUser()
         previewURL = nil
-        isWaitingForServer = false
+        previewBuildWait.end()
         previewController.forgetLoadedPage()
         releasePreviewLease()
     }
@@ -1137,13 +1806,138 @@ struct SectionDetailView: View {
             PreviewLeases.release(lease)
             previewLease = nil
         }
+        // The notice was about the preview that just ended — unless it is a
+        // deploy's, which a preview ending must not take away (#335, F3).
+        if SectionDetailView.previewEndClearsTheNotice(owner: unsavedSettingsNoticeOwner) {
+            unsavedSettingsNotice = nil
+            unsavedSettingsNoticeOwner = nil
+        }
+    }
+
+    /// Why a preview of this section cannot start now, or nil when nothing in
+    /// this copy of the app is deploying it (GitHub #381).
+    ///
+    /// Static for the reason `refusalForAReferenceCourse` below is: nothing in
+    /// the suite constructs this view, so the rule lives where a test can
+    /// reach it, and `startPreview` asks it first. `displayCode` is what the
+    /// sentence names; `courseCode` is the folder's, which the publish record
+    /// holds.
+    static func refusalWhileThisSectionDeploys(
+        folderPath: String,
+        courseCode: String,
+        displayCode: String,
+        sectionNumber: Int
+    ) -> String? {
+        let isDeploying: Bool = CourseActivity.sectionPublishIsRunning(
+            folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+        )
+        if !isDeploying {
+            return nil
+        }
+        return AssistWording.sectionIsBeingDeployed(course: displayCode, section: String(sectionNumber))
+    }
+
+    /// Why this course is never deployed, or nil when it is an ordinary one.
+    ///
+    /// **A static function rather than three lines inside `deployAndWait`**,
+    /// for the reason `ScheduledDeployCleanup` exists: nothing in the suite
+    /// constructs this view — every reference to it is to a static member — so
+    /// a guard living inside an instance method could be proved only by
+    /// proving something else, and an edit that dropped it would leave the
+    /// suite green. A missed deploy door is a deploy that reports success.
+    ///
+    /// `isAboutTheDestination` so the window raises it as an alert: it is a
+    /// fact about the course rather than something that went wrong while
+    /// running, which is the same distinction the destination refusals make.
+    /// A teacher never normally meets it — the Deploy button is not drawn on a
+    /// reference course at all.
+    static func refusalForAReferenceCourse(_ course: Course) -> AssistSiteWorkResult? {
+        guard course.isKeptForReference else {
+            return nil
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode),
+            isAboutTheDestination: true
+        )
+    }
+
+    /// What a deploy from this window uses (#335): the course as its settings
+    /// file says it is at this moment, where that sends it, why it would be
+    /// refused, and what to say when some window holds unsaved edits.
+    ///
+    /// **Read from the file, never from `windowCourse`'s settings.** The
+    /// launcher's own deploy reads the file for everything but the
+    /// destination, and since #322 the approval card names the saved one — so
+    /// a destination taken from the window's unsaved edits published a site
+    /// half from memory and half from disk, somewhere the card did not name.
+    /// When the file cannot be read the deploy is refused with
+    /// `settingsCouldNotBeReadToDeploy`: a destination has no safe default
+    /// (#323's rule), so the window's copy is never used in its place.
+    static func whatADeployUses(
+        windowCourse: Course,
+        anyCopyUnsaved: Bool,
+        cloudflareAccountID: String
+    ) -> (course: Course?, destinations: [CourseConfiguration.DeployDestination], refusal: String?, notice: String?) {
+        let saved: Course
+        do {
+            saved = try windowCourse.asSavedNow()
+        } catch {
+            return (
+                course: nil,
+                destinations: [],
+                refusal: SpecialNames.settingsCouldNotBeReadToDeploy(course: windowCourse.displayCode),
+                notice: nil
+            )
+        }
+        return (
+            course: saved,
+            destinations: saved.configuration.allDeployDestinations,
+            refusal: SectionDetailView.deployRefusalReason(
+                configuration: saved.configuration, cloudflareAccountID: cloudflareAccountID
+            ),
+            notice: SettingsSaveNotice.whenDeployStarts(settingsHaveUnsavedChanges: anyCopyUnsaved)
+        )
+    }
+
+    /// What a deploy's caller is told (#335): when the assistant pressed the
+    /// button and the deploy used the saved settings over unsaved edits, the
+    /// window's sentence is added to the result it reads out, so the
+    /// conversation says what the window says. The button's own result is
+    /// never changed — the window already shows the sentence.
+    static func whatTheAssistantIsTold(
+        _ result: AssistSiteWorkResult, notice: String?, pressedByTheAssistant: Bool
+    ) -> AssistSiteWorkResult {
+        if !pressedByTheAssistant {
+            return result
+        }
+        return AssistSiteWorkResult(
+            succeeded: result.succeeded,
+            message: SettingsSaveNotice.addingTheNotice(notice, to: result.message),
+            isAboutTheDestination: result.isAboutTheDestination,
+            wasBuiltElsewhere: result.wasBuiltElsewhere
+        )
+    }
+
+    /// The notice's accessibility identifier, by whose sentence it is (#335).
+    var unsavedSettingsNoticeIdentifier: String {
+        if unsavedSettingsNoticeOwner == .deploy {
+            return "deployUsesSavedSettingsNotice"
+        }
+        return "previewUsesSavedSettingsNotice"
+    }
+
+    /// Whether a preview ending takes the unsaved-settings sentence away:
+    /// only when it is the preview's own, or nobody's (#335, F3).
+    static func previewEndClearsTheNotice(owner: UnsavedSettingsNoticeOwner?) -> Bool {
+        return owner != .deploy
     }
 
     /// The Deploy button. The work itself is `deployAndWait()`, so the
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
         Task {
-            let result: AssistSiteWorkResult = await deployAndWait()
+            let result: AssistSiteWorkResult = await deployAndWait(pressedByTheAssistant: false)
             // A refusal reaches the teacher as the alert this window has
             // always shown. The assistant's copy of the same sentence goes
             // into the conversation instead — see `deployAndWait()`.
@@ -1165,7 +1959,22 @@ struct SectionDetailView: View {
     /// answer has to come back to it. Duplicating the deploy for the second
     /// caller is how a Cloudflare course quietly starts deploying to Netlify
     /// from one of the two paths, so there is only ever one.
-    func deployAndWait() async -> AssistSiteWorkResult {
+    ///
+    /// `pressedByTheAssistant` so the conversation says what the window says:
+    /// when the deploy used the saved settings over unsaved edits (#335), the
+    /// same sentence is added to the result the assistant reads out.
+    func deployAndWait(pressedByTheAssistant: Bool) async -> AssistSiteWorkResult {
+        // FIRST — before the busy check, before the destination check, before
+        // any preview is stopped. A course kept for reference is never
+        // deployed, and the teacher meets that as a missing button rather
+        // than as a refusal; this is what catches every other way in.
+        //
+        // `isAboutTheDestination` so the window raises it as an alert: it is
+        // a fact about the course rather than something that went wrong while
+        // running, which is the same distinction the destination refusals make.
+        if let refusal = SectionDetailView.refusalForAReferenceCourse(course) {
+            return refusal
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
@@ -1184,16 +1993,78 @@ struct SectionDetailView: View {
                 )
             )
         }
+        // Every way in, the assistant's included (#351's second review, SF1).
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
 
-        let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
+        // Everything from here reads the settings as SAVED in the file at
+        // this moment (#335), never this window's copy, which may hold Course
+        // Settings edits nobody has saved. Every window's copy is asked about
+        // unsaved edits, not only this one's, as the preview does.
+        let anyWindowHasUnsavedSettings: Bool = course.configuration.hasUnsavedChanges
+            || WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        let uses: (
+            course: Course?, destinations: [CourseConfiguration.DeployDestination], refusal: String?, notice: String?
+        ) = SectionDetailView.whatADeployUses(
+            windowCourse: course,
+            anyCopyUnsaved: anyWindowHasUnsavedSettings,
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+        )
+        guard let saved = uses.course else {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: uses.refusal ?? SpecialNames.settingsCouldNotBeReadToDeploy(course: course.displayCode),
+                isAboutTheDestination: true
+            )
+        }
+        // The saved copy is checked too: `keptForReference` is not a Course
+        // Settings field, so the two cannot differ in practice, and checking
+        // costs nothing.
+        if let refusal = SectionDetailView.refusalForAReferenceCourse(saved) {
+            return refusal
+        }
+        let destinations: [CourseConfiguration.DeployDestination] = uses.destinations
 
         // Whatever is wrong with ANY configured destination is said here,
         // before a build starts: discovering it partway through a
         // redundancy run would waste the teacher's time and let some
         // destinations quietly go out while others never got the chance.
-        if let problem = deployRefusalReason {
+        if let problem = uses.refusal {
             return AssistSiteWorkResult(
                 succeeded: false, message: problem, isAboutTheDestination: true
+            )
+        }
+
+        // Claim the course — `beginPublish`, which puts this window's own
+        // `build` and `publish` leases on disk — and THEN look at the other
+        // programs' leases, with nothing awaited in between (#156). Both
+        // happen BEFORE the preview below is stopped, for two reasons. A
+        // refusal placed any later would end the page the teacher was reading
+        // for nothing. And the stop is `preview.sh --stop`, which finds a
+        // section's processes by working directory and so ends BUILDS as well
+        // as servers: holding the `build` lease through it means no other
+        // program can be told the course is free and start a build that this
+        // stop then kills (the review of #156, M1).
+        //
+        // ONE bracket around the whole sequence of destinations, not one per
+        // destination: from outside this window — Add Section…, and every
+        // other program — the course is "busy publishing" for the whole span.
+        if let holding = WorkLeaseRegistry.claimAPublish(
+            folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: "Deploy", courseCode: course.code, sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+        defer {
+            CourseActivity.endPublish(
+                folderPath: workspaceURL.path,
+                courseCode: course.code,
+                sectionNumber: sectionNumber
             )
         }
 
@@ -1226,6 +2097,27 @@ struct SectionDetailView: View {
             )
         }
 
+        // The unsaved-settings sentence, set AFTER the preview is stopped:
+        // stopping it runs `releasePreviewLease()`, which clears the notice,
+        // so setting it first would have the stop wipe it (#335). It stays
+        // up after this deploy ends — a teacher reading the console must
+        // still see why — and the next preview or deploy replaces it.
+        unsavedSettingsNotice = uses.notice
+        unsavedSettingsNoticeOwner = uses.notice == nil ? nil : .deploy
+        if uses.notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: pressedByTheAssistant
+                    ? "deployed by the assistant through the section window" : "deployed from the section window",
+                saved: saved, windowCourse: course, sectionNumber: sectionNumber
+            )
+        }
+        // What the assistant is told carries the same sentence.
+        func said(_ result: AssistSiteWorkResult) -> AssistSiteWorkResult {
+            return SectionDetailView.whatTheAssistantIsTold(
+                result, notice: uses.notice, pressedByTheAssistant: pressedByTheAssistant
+            )
+        }
+
         // The note `startPreview()` makes, made here for the deploy —
         // AFTER any running preview has been stopped, never before. A
         // preview already running belongs to the folder IT started in, and
@@ -1239,33 +2131,15 @@ struct SectionDetailView: View {
         // already running in this window.
         if deployRunner.isRunning {
             isPreparingDeploy = false
-            return AssistSiteWorkResult(
+            return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.sectionIsBusy(
                     course: course.code, section: String(sectionNumber)
                 )
-            )
+            ))
         }
 
-        let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
-
-        // Let the rest of the app know this course is mid-publish (so,
-        // for example, Add Section… declines until it finishes) — ONE
-        // bracket around the whole sequence of destinations, not one per
-        // destination: from outside this window, the course is "busy
-        // publishing" for the whole span.
-        CourseActivity.beginPublish(
-            folderPath: workspaceURL.path,
-            courseCode: course.code,
-            sectionNumber: sectionNumber
-        )
-        defer {
-            CourseActivity.endPublish(
-                folderPath: workspaceURL.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber
-            )
-        }
+        let needsBuild: Bool = BuildFreshness.needsRebuild(course: saved, sectionNumber: sectionNumber)
 
         // The real progress panel takes over from here — `deployRunner.run()`
         // is about to give `deployRunner.legs` fresh runners of its own and
@@ -1277,7 +2151,7 @@ struct SectionDetailView: View {
         // assistant's headless path, so an alarm set for half six sends
         // the site to the same destinations this button does.
         await deployRunner.run(
-            course: course,
+            course: saved,
             sectionNumber: sectionNumber,
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
@@ -1295,27 +2169,27 @@ struct SectionDetailView: View {
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
-            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
-            return AssistSiteWorkResult(
+            showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
+            return said(AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.couldNotBuildBeforeDeploying(
                     course: course.code, section: String(sectionNumber)
                 )
-            )
+            ))
         }
 
         // What the build said about this course's folders — AFTER the failure
         // paths above, so a deploy that did not publish is not headlined by a
         // folder warning. Taken from the FIRST leg: every destination publishes
         // the same built site, so a second leg only repeats the findings.
-        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true)
+        showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
 
-        return MultiDestinationDeployRunner.result(
+        return said(MultiDestinationDeployRunner.result(
             course: course.code,
             section: String(sectionNumber),
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
-        )
+        ))
     }
 
     /// Opens the page currently shown in the preview (not just the site
@@ -1369,9 +2243,64 @@ struct SectionDetailView: View {
     }
 
     func waitForPreviewServer(port: Int, siteAsItWas: Date?) async {
-        // The launcher announces the real host address — the container's
-        // ports map to a per-folder block, so the port cannot be assumed.
-        var serverURL: URL = URL(string: "http://127.0.0.1:\(port)/")!
+        // The launcher announces the real host address — the builder's
+        // ports map to a per-folder block, so the port cannot be assumed,
+        // and until it has been announced there is NO address: not the
+        // section's port, which is the one inside the builder and wrong for
+        // every working folder after the first (GitHub #235).
+        var serverURL: URL?
+
+        // How long this run has said NOTHING since the builder announced its
+        // server — and nil until it has announced one.
+        //
+        // The distinction is the whole of issue #225. A run that is still
+        // printing is not stalled however long it has been going, and a first
+        // preview legitimately takes minutes; a run that has said its server
+        // is up, and then says nothing and answers nothing, cannot be
+        // explained by a big course or a slow Mac. So the bound is on the
+        // QUIET rather than on the run, and it starts at that line rather
+        // than at the start, where `waitedSeconds` starts.
+        var silence: PreviewReachability.Silence?
+
+        /// How much has been said, and when — which starts the clock at the
+        /// builder's line and restarts it every time more arrives.
+        ///
+        /// `utf8.count` rather than `count`, because the only question here is
+        /// whether MORE has been said than last time and counting graphemes
+        /// to answer it would be waste. Reading `displayText` at all is not
+        /// free: the transcript caches its joined text but throws the cache
+        /// away on every chunk of output, so a noisy run re-joins its lines
+        /// here once a second. Phases 1 and 2 already read it every second for
+        /// their own reasons; this adds that cost to phase 3, on a string of
+        /// at most 4,000 lines, once a second.
+        func noticeWhatTheRunIsSaying() {
+            let saidSoFar: String = previewRunner.transcript.displayText
+            if silence == nil {
+                if saidSoFar.contains(PreviewReachability.theBuilderSaysItsServerStarted) {
+                    silence = PreviewReachability.Silence(
+                        charactersSoFar: saidSoFar.utf8.count, at: Date()
+                    )
+                }
+                return
+            }
+            silence?.note(charactersSoFar: saidSoFar.utf8.count, at: Date())
+        }
+
+        /// How long it has said nothing, once that is longer than anything a
+        /// working preview does — and nil while there is still nothing to
+        /// explain.
+        func silenceThatCannotBeExplained() -> Int? {
+            guard let silence else {
+                return nil
+            }
+            let moment: Date = Date()
+            if !silence.hasGoneQuiet(
+                forSeconds: PreviewReachability.secondsOfSilenceBeforeGivingUp, at: moment
+            ) {
+                return nil
+            }
+            return silence.secondsOfSilence(at: moment)
+        }
 
         // Phase 1: wait for the script to announce ITS server is starting
         // (which happens right after it has freed the port).
@@ -1381,7 +2310,7 @@ struct SectionDetailView: View {
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
                 // The script exited before the server came up: show output.
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1428,7 +2357,7 @@ struct SectionDetailView: View {
         var waitedForBuild: Int = 0
         while waitedSeconds < 600 && waitedForBuild < 120 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
@@ -1437,6 +2366,16 @@ struct SectionDetailView: View {
             }
             if let written = builtIndexWrittenAt(), written != siteAsItWas {
                 buildFinished = true
+                break
+            }
+            // A run that has announced its server and then gone quiet has
+            // nothing left to wait for HERE: whatever it was going to write
+            // has been written. Going on to phase 3 rather than giving up at
+            // this point is deliberate — the site may well be answering, and
+            // that is the case this loop's own bound exists to hand on to
+            // (`buildFinished` stays false, so the one reload still happens).
+            noticeWhatTheRunIsSaying()
+            if silenceThatCannotBeExplained() != nil {
                 break
             }
             try? await Task.sleep(for: .seconds(1))
@@ -1451,18 +2390,50 @@ struct SectionDetailView: View {
         // pointed at an address that is not ready.
         while waitedSeconds < 600 {
             if !previewRunner.isRunning && previewRunner.lastExitCode != nil {
-                isWaitingForServer = false
+                previewBuildWait.end()
                 releasePreviewLease()
                 return
             }
-            var request: URLRequest = URLRequest(url: serverURL)
+            if let announced = previewRunner.previewAddress {
+                serverURL = announced
+            }
+            // Only needed to decide the no-address case, and reading what the
+            // run has said is not free (see `noticeWhatTheRunIsSaying`), so
+            // the ordinary path does not pay for it twice a second.
+            if serverURL == nil {
+                noticeWhatTheRunIsSaying()
+            }
+            let next: PreviewReachability.NextStep = PreviewReachability.nextStep(
+                announced: serverURL,
+                theBuilderSaysItsServerStarted: silence != nil,
+                theTeacherStoppedIt: previewRunner.wasStoppedByUser
+            )
+            let addressToOpen: URL
+            switch next {
+            case .tryTheAddress(let announced):
+                addressToOpen = announced
+            case .keepWaiting:
+                try? await Task.sleep(for: .seconds(1))
+                waitedSeconds += 1
+                continue
+            case .stopBecauseNothingWasAnnounced:
+                stopBecauseNoAddressWasAnnounced()
+                return
+            }
+            // The address the teacher's Mac is asked about — the announced
+            // one, unless this copy of Plantoir has been started with the
+            // debug-only request to pretend it cannot be reached, which is
+            // how the sentence below can be seen on a healthy Mac.
+            var request: URLRequest = URLRequest(
+                url: PreviewReachability.addressToTry(announced: addressToOpen)
+            )
             request.timeoutInterval = 2
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
-                        isWaitingForServer = false
-                        previewURL = serverURL
+                        previewBuildWait.end()
+                        previewURL = addressToOpen
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.
                         //
@@ -1480,7 +2451,7 @@ struct SectionDetailView: View {
                         // is why it does not reintroduce the flicker that made
                         // an unconditional reload-after-load worse than the
                         // problem it addressed.
-                        previewController.showFreshBuild(serverURL)
+                        previewController.showFreshBuild(addressToOpen)
                         // And a second, later reload ONLY when we never saw
                         // the build finish: the bounded Phase 2 wait ran out,
                         // so what was just loaded may itself predate the
@@ -1497,9 +2468,124 @@ struct SectionDetailView: View {
             } catch {
                 // Server not up yet — keep waiting.
             }
+            // It has said its server is up, it has said nothing since, and it
+            // has just failed to answer. That is as much as waiting can find
+            // out, so stop and say which of the two things happened.
+            //
+            // This sits AFTER the attempt above rather than at the top of the
+            // loop, deliberately: a run that arrives here with the clock
+            // already run out — phase 2 breaks out on the same signal — still
+            // gets one real try at the address before anything is decided.
+            noticeWhatTheRunIsSaying()
+            if let seconds = silenceThatCannotBeExplained() {
+                await stopWaitingForThePreview(
+                    portInsideTheBuilder: port, secondsOfSilence: seconds
+                )
+                return
+            }
             try? await Task.sleep(for: .seconds(1))
             waitedSeconds += 1
         }
-        isWaitingForServer = false
+        previewBuildWait.end()
+    }
+
+    /// Ends a preview whose website started without any address for it ever
+    /// being announced — so there is nothing to open, and nothing to ask the
+    /// builder about either.
+    ///
+    /// Ended the way `stopWaitingForThePreview` ends one (read its comment
+    /// for why stopping is right rather than merely giving up), with the
+    /// third sentence, and without its question: that question is about an
+    /// address. Nothing is awaited here, so the run cannot change underneath
+    /// it; the one thing that CAN have happened since the wait last slept —
+    /// the teacher pressing Stop — is ruled out before this is reached
+    /// (`PreviewReachability.nextStep`'s `theTeacherStoppedIt`).
+    func stopBecauseNoAddressWasAnnounced() {
+        ActivityTrail.note(
+            .previewNeverAppeared,
+            PreviewReachability.trailLineWhenNothingWasAnnounced,
+            course: course.code,
+            section: sectionNumber
+        )
+        stopPreview()
+        showPreviewRefusal(
+            title: PreviewReachability.alertTitle,
+            sentence: PreviewReachability.sentence(for: PreviewReachability.verdictWhenNothingWasAnnounced)
+        )
+    }
+
+    /// Ends a preview that announced its website and never showed it, and
+    /// tells the teacher which of the two things happened.
+    ///
+    /// **The builder is asked first, and that order is load-bearing**:
+    /// stopping the preview ends the very server the question is about, so
+    /// asking afterwards would answer "nothing is serving it" every time and
+    /// the teacher would be told their website had failed to build when it
+    /// had not.
+    ///
+    /// **Then the run is STOPPED, the way the Stop Preview button stops it.**
+    /// Three things follow from that and all three are wanted. Nothing is
+    /// left serving a website nobody can see. The section stops reporting
+    /// itself as building — `SectionWindowControllers` reads a running runner
+    /// with no address as `.building`, so a wait that merely gave up would
+    /// have every other window and the assistant saying it was still building
+    /// for ever. And the port goes back through the one path that hands it
+    /// back, rather than being freed under a server that still holds it.
+    func stopWaitingForThePreview(portInsideTheBuilder: Int, secondsOfSilence: Int) async {
+        // Which run this is about, noted before the question rather than
+        // assumed after it — see `isStillTheSameWait`.
+        let theRunThisIsAbout: Date? = previewRunner.startedAt
+
+        var answer: PreviewReachability.Answer = .couldNotFindOut
+        if let folder = folderThisSectionWorksIn {
+            answer = await PreviewReachability.askTheBuilder(
+                PreviewReachability.askTheBuilderCommand(
+                    containerName: FolderContainers.containerName(forFolder: folder.path),
+                    portInsideTheBuilder: portInsideTheBuilder
+                )
+            )
+        }
+        // The teacher may have pressed Stop, or closed the window, while the
+        // question was being asked. Then there is nothing left to say: an
+        // alert about a preview they have already ended, and a trail line
+        // saying it never appeared, would both be about a run that stopped
+        // because they wanted it to.
+        if !PreviewReachability.isStillTheSameWait(
+            startedAt: theRunThisIsAbout,
+            theRunNowStartedAt: previewRunner.startedAt,
+            theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+            theRunIsStillGoing: previewRunner.isRunning
+        ) {
+            // One of those endings is nobody's doing: the SAME run ended on
+            // its own while the question was out. Stop, Cancel, a closed
+            // window and a new run have each ended the wait already; this one
+            // has not, and `waitForPreviewServer` returns straight after us —
+            // so it is ended here, the way the other "the run ended" returns
+            // do, or ⌘Q would go on asking about it (issue #232). Guarded,
+            // not unconditional: when a NEW run has started, the wait belongs
+            // to it.
+            if PreviewReachability.theSameRunEndedByItself(
+                startedAt: theRunThisIsAbout,
+                theRunNowStartedAt: previewRunner.startedAt,
+                theTeacherStoppedIt: previewRunner.wasStoppedByUser,
+                theRunIsStillGoing: previewRunner.isRunning
+            ) {
+                previewBuildWait.end()
+                releasePreviewLease()
+            }
+            return
+        }
+        let verdict: PreviewReachability.Verdict = PreviewReachability.verdict(for: answer)
+        ActivityTrail.note(
+            .previewNeverAppeared,
+            PreviewReachability.trailLine(for: verdict, secondsOfSilence: secondsOfSilence),
+            course: course.code,
+            section: sectionNumber
+        )
+        stopPreview()
+        showPreviewRefusal(
+            title: PreviewReachability.alertTitle,
+            sentence: PreviewReachability.sentence(for: verdict)
+        )
     }
 }

@@ -88,6 +88,9 @@ public static class CourseRestorer
             // ones just replaced, so a build left standing would read as newer
             // and publish what the course used to say.
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            // A restored course no longer holds what a stopped rename of its
+            // word for a unit was part way through (#158, as the mac does).
+            UnitWordRenamer.ClearRenameRecord(destination);
             try { Directory.Delete(staging, recursive: true); } catch { }
         }
     }
@@ -113,7 +116,8 @@ public static class CourseRestorer
     /// an unreadable backup can never leave an emptied section folder behind.
     /// Mirrors the mac's <c>CourseRestorer.restoreSection</c>.</para>
     /// </summary>
-    public static void RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory)
+    /// <returns>How many shared pages kept their current setting because there was nowhere on them to put the backup's back (#308).</returns>
+    public static int RestoreSection(int sectionNumber, BackupItem item, string coursesDirectory)
     {
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
         if (!Directory.Exists(courseDir))
@@ -130,8 +134,9 @@ public static class CourseRestorer
                 throw new RestoreException($"The copy of {item.CourseCode} does not hold a Section {sectionNumber}.");
 
             ReplaceContents(Path.Combine(courseDir, folderName), backedUpSection);
-            RestorePerSectionKeys(sectionNumber, courseDir, payload);
+            int notPutBack = RestorePerSectionKeys(sectionNumber, courseDir, payload);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode, sectionNumber);
+            return notPutBack;
         }
         finally
         {
@@ -181,8 +186,9 @@ public static class CourseRestorer
     /// Every shared page of the course gets this section's per-section keys
     /// back as the backup had them, and nothing else about it changes.
     /// </summary>
-    private static void RestorePerSectionKeys(int sectionNumber, string courseDir, string payload)
+    private static int RestorePerSectionKeys(int sectionNumber, string courseDir, string payload)
     {
+        int notPutBack = 0;
         foreach (string page in SharedMarkdownPages(courseDir))
         {
             string relative = Path.GetRelativePath(courseDir, page);
@@ -196,12 +202,14 @@ public static class CourseRestorer
             }
             catch (IOException) { continue; }
             catch (UnauthorizedAccessException) { continue; }
-            string rewritten = SettingPerSectionKeys(sectionNumber, liveText, backupText);
+            var (rewritten, couldNotBePutBack) = SettingPerSectionKeys(sectionNumber, liveText, backupText);
+            if (couldNotBePutBack) notPutBack++;
             if (rewritten != liveText)
             {
                 try { File.WriteAllText(page, rewritten); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
+        return notPutBack;
     }
 
     /// <summary>The course's Markdown pages outside every section folder and every excluded folder.</summary>
@@ -237,46 +245,55 @@ public static class CourseRestorer
 
     /// <summary>
     /// The live page's text with this section's per-section keys as the
-    /// backup had them. The mac's <c>settingPerSectionKeys</c>, line for line:
-    /// this section's lines are replaced by the backup's (or dropped when the
-    /// backup had none); with none of its own left on the page, the restored
-    /// lines go after the last per-section key so each section's lines stay
-    /// together and in order; a page with no frontmatter at all gets a block
-    /// of its own when the backup had keys for it.
+    /// backup had them — the mac's <c>settingPerSectionKeys</c>, line for
+    /// line, pinned by <c>course-management.json →
+    /// backups.restoringOneSectionsKeys</c> (compared as bytes).
     /// </summary>
-    public static string SettingPerSectionKeys(int sectionNumber, string liveText, string backupText)
+    /// <remarks>
+    /// <para>This section's lines are replaced by the backup's (or dropped when
+    /// the backup had none), each key WITH the lines it owns
+    /// (<see cref="PageVisibilityReader.LinesOwnedByKey"/>, #182): copying key
+    /// LINES only brought a backup's <c>publishForSection1: &gt;-</c> back as
+    /// <c>&gt;-</c> alone — PUBLISHED. With none of its own left on the page,
+    /// the restored lines go after the last line any per-section key OWNS, never
+    /// between another section's key and its value.</para>
+    /// <para>The block is found with the shared finder (#177, decided
+    /// 2026-09-19 and again 2026-09-25: Windows matches the mac), so a restore
+    /// reaches the same pages the build reads — a <c>----</c> fence, a blank
+    /// line before the fence. Rejected: both apps going strict (restore would
+    /// then disagree with hide and show on the same page), and leaving the
+    /// divergence. The old <c>liveText.Contains("\n---")</c> refuse-to-prepend
+    /// guard went with the strict finder, which is what it compensated for.</para>
+    /// <para>When the page has no line of this section and its block has no
+    /// column-0 level for a new key (#186's shape), the page is left byte for
+    /// byte and <c>CouldNotBePutBack</c> is true: the caller counts it, says
+    /// so, and records <c>page settings left as they were</c>.</para>
+    /// </remarks>
+    public static (string Text, bool CouldNotBePutBack) SettingPerSectionKeys(
+        int sectionNumber, string liveText, string backupText)
     {
-        var restoredLines = new List<string>();
-        if (FrontmatterBounds(backupText) is { } backupBlock)
-        {
-            var backupLines = backupText.Split('\n');
-            for (int index = backupBlock.Open + 1; index < backupBlock.Close; index++)
-            {
-                string bare = backupLines[index].TrimEnd('\r');
-                if (SectionAdder.PerSectionKeyNumber(bare) == sectionNumber) restoredLines.Add(bare);
-            }
-        }
+        var backupLines = backupText.Split('\n');
+        var restoredLines = PerSectionLineIndices(sectionNumber, backupText)
+            .Select(index => PageVisibilityReader.TrimCarriageReturn(backupLines[index]))
+            .ToList();
 
-        if (FrontmatterBounds(liveText) is not { } liveBlock)
+        if (PageVisibilityReader.FenceIndices(liveText) is not { } liveBlock)
         {
-            if (restoredLines.Count == 0) return liveText;
-            // A page that HAS a block this parser does not see (one starting
-            // after a blank line) must not be given a second one.
-            if (liveText.Contains("\n---")) return liveText;
-            return "---\n" + string.Join("\n", restoredLines) + "\n---\n" + liveText;
+            if (restoredLines.Count == 0) return (liveText, false);
+            return ("---\n" + string.Join("\n", restoredLines) + "\n---\n" + liveText, false);
         }
 
         var lines = liveText.Split('\n');
-        int lastPerSectionIndex = -1;
-        for (int index = liveBlock.Open + 1; index < liveBlock.Close; index++)
-            if (SectionAdder.PerSectionKeyNumber(lines[index].TrimEnd('\r')) is not null) lastPerSectionIndex = index;
+        var doomed = PerSectionLineIndices(sectionNumber, liveText).ToHashSet();
+        int lastPerSectionIndex = PerSectionLineIndices(null, liveText).DefaultIfEmpty(-1).Max();
 
-        var rebuilt = new List<string> { lines[liveBlock.Open] };
+        // Whatever came before the opening fence (blank lines) is kept: the
+        // mac's settingPerSectionKeys starts at the fence and drops them.
+        var rebuilt = lines.Take(liveBlock.Open + 1).ToList();
         bool placed = false;
         for (int index = liveBlock.Open + 1; index < liveBlock.Close; index++)
         {
-            string bare = lines[index].TrimEnd('\r');
-            if (SectionAdder.PerSectionKeyNumber(bare) == sectionNumber)
+            if (doomed.Contains(index))
             {
                 if (!placed) { rebuilt.AddRange(restoredLines); placed = true; }
                 continue;
@@ -284,42 +301,40 @@ public static class CourseRestorer
             rebuilt.Add(lines[index]);
             if (index == lastPerSectionIndex && !placed) { rebuilt.AddRange(restoredLines); placed = true; }
         }
-        if (!placed && restoredLines.Count > 0) rebuilt.AddRange(restoredLines);
-        for (int index = liveBlock.Close; index < lines.Length; index++) rebuilt.Add(lines[index]);
-        return string.Join("\n", rebuilt);
+        if (!placed && restoredLines.Count > 0)
+        {
+            // A brand-new key: only where the block has a column-0 level for it.
+            if (PageVisibilityReader.PlaceForANewTopLevelKey(lines, liveBlock.Open, liveBlock.Close) is null)
+                return (liveText, true);
+            rebuilt.AddRange(restoredLines);
+        }
+        rebuilt.AddRange(lines.Skip(liveBlock.Close));
+        return (string.Join("\n", rebuilt), false);
     }
 
     /// <summary>
-    /// The line indexes of a page's opening and closing "---", or null when it
-    /// has no frontmatter. Line 1 exactly, "---" terminator — stricter than
-    /// this app's own <c>PageFrontmatter.Block.Parse</c>, so a shared page
-    /// whose block starts after a blank line, or is fenced with "----", is
-    /// left alone by the key restore rather than edited.
-    ///
-    /// <para><b>This was written to MATCH the mac's <c>PageFrontmatter.block</c>
-    /// and no longer does.</b> On 2026-09-18 the mac's fence finder became
-    /// python-frontmatter's own (<c>^-{3,}\s*$</c>, blank lines before the
-    /// opening fence tolerated) because a stricter WRITER prepends a second
-    /// block and turns a teacher's frontmatter into body text — issue #140 —
-    /// and <c>CourseRestorer.swift</c> uses that same finder. So a restore now
-    /// reaches such a page there and not here. Deliberately not changed with
-    /// the reader: nothing in the shared contract covers the restore path, the
-    /// mac's own write-up did not consider it, and which way the two should
-    /// converge is a question for Russell rather than a fault to fix quietly
-    /// from one side. Recorded here so the next reader does not re-derive it,
-    /// and so that nobody "restores parity" by making the wrong one strict.
-    /// (This comment said the two matched, "on purpose", until 2026-09-19.)</para>
-    ///
-    /// <para>This app's <c>Block.Parse</c> also stopped accepting "..." as a
-    /// closing fence on that day, python-frontmatter never having done so.</para>
+    /// The indices of every line of the page's block that is a per-section key
+    /// for <paramref name="sectionNumber"/> (or for any section, when null) or
+    /// a line such a key OWNS, in file order.
     /// </summary>
-    private static (int Open, int Close)? FrontmatterBounds(string text)
+    internal static List<int> PerSectionLineIndices(int? sectionNumber, string pageText)
     {
-        var lines = text.Split('\n');
-        if (lines.Length == 0 || lines[0].TrimEnd('\r') != "---") return null;
-        for (int index = 1; index < lines.Length; index++)
-            if (lines[index].TrimEnd('\r') == "---") return (0, index);
-        return null;
+        var found = new List<int>();
+        if (PageVisibilityReader.FenceIndices(pageText) is not { } block) return found;
+        var lines = pageText.Split('\n');
+        for (int index = block.Open + 1; index < block.Close; index++)
+        {
+            string bare = PageVisibilityReader.TrimCarriageReturn(lines[index]);
+            if (SectionAdder.PerSectionKey(bare) is not { } named) continue;
+            if (sectionNumber is { } wanted && named.Number != wanted) continue;
+            found.Add(index);
+            // Asked of the key's own line as it stands: nothing here is rewritten.
+            string key = named.Key;
+            bool wasEmpty = PageVisibilityReader.ValuePart(key, bare) is { } value
+                && PageVisibilityReader.TrimYamlSpaces(value).Length == 0;
+            found.AddRange(PageVisibilityReader.LinesOwnedByKey(lines, index, block.Close, wasEmpty));
+        }
+        return found;
     }
 
     /// <summary>

@@ -1,12 +1,211 @@
 import AppKit
 import ApplicationServices
+import XCTest
 
 /// Walks the app's own accessibility tree (the one VoiceOver and XCUITest
 /// read) and collects every piece of text it exposes. Because the tree
 /// belongs to this same process, no automation permission is needed.
 enum AccessibilityInspector {
 
+    /// What AppKit says about one of the app's windows, which is all the
+    /// Space check below needs to know about it.
+    struct WindowFacts {
+
+        // MARK: - Stored properties
+
+        /// True for the window the calling test drives — the one its
+        /// `WorkspaceModel` lives in — and false for every other window
+        /// the app has open (the assistant, Settings, About).
+        let isTheTestsWindow: Bool
+        let isVisible: Bool
+        let isOnTheShowingSpace: Bool
+    }
+
+    /// What the window server says about the login session the test host
+    /// runs in, which is all the lock check below needs to know (#315).
+    struct SessionFacts {
+
+        // MARK: - Stored properties
+
+        let isScreenLocked: Bool
+        let isOnTheConsole: Bool
+
+        /// What "we could not tell" is read as: a session that is neither
+        /// locked nor switched away, so an unreadable answer never causes
+        /// a skip.
+        static let unlockedOnTheConsole: SessionFacts = SessionFacts(isScreenLocked: false, isOnTheConsole: true)
+    }
+
+    // MARK: - Stored properties
+
+    /// Set in the session dictionary while the screen is locked, and ABSENT
+    /// (not false) while it is unlocked. Undocumented; measured on
+    /// 2026-09-26, Darwin 25.6.
+    static let screenIsLockedKey: String = "CGSSessionScreenIsLocked"
+
+    /// True (or 1) while this session owns the screen, false (or 0) while
+    /// another account is using it through fast user switching.
+    /// Undocumented; measured on 2026-09-26, Darwin 25.6.
+    static let onConsoleKey: String = "kCGSSessionOnConsoleKey"
+
     // MARK: - Functions
+
+    /// Why a test that reads the window through the accessibility tree
+    /// cannot check anything in this run, or nil when it can (#249, #315).
+    ///
+    /// Measured on 2026-09-25: when the test's window is on a Space that is
+    /// not showing — a full-screen app or another desktop in front on its
+    /// display — macOS leaves it out of the tree, and a walk finds only the
+    /// menu bar. Being in the BACKGROUND does not do this: the suite runs
+    /// with the app inactive every time, and the walk finds everything.
+    /// A locked screen, or another account using the screen, empties the
+    /// tree the same way (#315).
+    ///
+    /// The tree is asked FIRST, so the session and the Space can only ever
+    /// explain a window that is already missing — never cause a skip while
+    /// the window can be read. Only the test's OWN window counts. Another
+    /// window of the app being off the showing Space says nothing about the
+    /// one the test reads, and the test's window being gone altogether is a
+    /// real fault — so both return nil and the test goes on to fail, as
+    /// does a window that is on the showing Space, in an unlocked session,
+    /// and still missing from the tree.
+    ///
+    /// The session is checked before the window's visibility on purpose:
+    /// what AppKit says about visibility on a locked screen is not what the
+    /// skip should rest on, and all the order can mask is a hidden-window
+    /// fault during a locked run, which the next unlocked run catches.
+    static func reasonTheWindowCannotBeRead(
+        windows: [WindowFacts],
+        testsWindowIsInTheTree: Bool,
+        session: SessionFacts
+    ) -> String? {
+        if testsWindowIsInTheTree {
+            return nil
+        }
+        var testsWindow: WindowFacts? = nil
+        for window in windows {
+            if window.isTheTestsWindow {
+                testsWindow = window
+            }
+        }
+        guard let testsWindow else {
+            return nil
+        }
+        if session.isScreenLocked {
+            return "The screen is locked, so macOS leaves this app's windows out of the accessibility tree and this test cannot see the controls it checks. Unlock the Mac and run it again (#315)."
+        }
+        if !session.isOnTheConsole {
+            return "Another account is using the screen (fast user switching), so macOS leaves this session's windows out of the accessibility tree and this test cannot see the controls it checks. Switch back to this account and run it again (#315)."
+        }
+        if !testsWindow.isVisible {
+            return nil
+        }
+        if testsWindow.isOnTheShowingSpace {
+            return nil
+        }
+        return "The test window is on a Space that is not showing (a full-screen app or another desktop is in front on its display), so macOS leaves it out of the accessibility tree and this test cannot see the controls it checks. Show that desktop and run it again (#249)."
+    }
+
+    /// Reads the two session keys above out of a session dictionary. A nil
+    /// dictionary or a missing key reads as unlocked and on the console,
+    /// because "we could not tell" must never cause a skip. Each key is
+    /// accepted as a Bool or as a number: measured in-process, both keys
+    /// arrive as a CFBoolean, while `ioreg` prints OnConsole as 1 or No —
+    /// so a number is accepted too, rather than bet on one spelling.
+    static func sessionFacts(from dictionary: [String: Any]?) -> SessionFacts {
+        guard let dictionary else {
+            return SessionFacts.unlockedOnTheConsole
+        }
+        var isScreenLocked: Bool = false
+        if let lockValue = dictionary[screenIsLockedKey] {
+            if let answer = truthOf(lockValue) {
+                isScreenLocked = answer
+            }
+        }
+        var isOnTheConsole: Bool = true
+        if let consoleValue = dictionary[onConsoleKey] {
+            if let answer = truthOf(consoleValue) {
+                isOnTheConsole = answer
+            }
+        }
+        return SessionFacts(isScreenLocked: isScreenLocked, isOnTheConsole: isOnTheConsole)
+    }
+
+    /// True or false for a value that is a Bool or a number, nil for
+    /// anything else. A Swift Bool and a CFBoolean both bridge to NSNumber,
+    /// so this one test covers all three.
+    static func truthOf(_ value: Any) -> Bool? {
+        if let number = value as? NSNumber {
+            return number.intValue != 0
+        }
+        return nil
+    }
+
+    /// The session the test host is running in, as the window server
+    /// describes it right now.
+    static func currentSessionFacts() -> SessionFacts {
+        let dictionary: [String: Any]? = CGSessionCopyCurrentDictionary() as? [String: Any]
+        return sessionFacts(from: dictionary)
+    }
+
+    /// Skips the calling test, with the reason above, when its window is on
+    /// a Space that is not showing, the screen is locked, or another
+    /// account is using the screen. Call it before EVERY walk of the tree —
+    /// the desktop can change part-way through a test.
+    @MainActor
+    static func skipUnlessTheWindowCanBeRead(_ testsWindow: NSWindow?) throws {
+        var windows: [WindowFacts] = []
+        for window in NSApp.windows {
+            let facts: WindowFacts = WindowFacts(
+                isTheTestsWindow: window === testsWindow,
+                isVisible: window.isVisible,
+                isOnTheShowingSpace: window.isOnActiveSpace
+            )
+            windows.append(facts)
+        }
+        var testsWindowIsInTheTree: Bool = false
+        if let testsWindow {
+            testsWindowIsInTheTree = treeHoldsWindow(matching: testsWindow)
+        }
+        let session: SessionFacts = currentSessionFacts()
+        if let reason = reasonTheWindowCannotBeRead(windows: windows, testsWindowIsInTheTree: testsWindowIsInTheTree, session: session) {
+            throw XCTSkip(reason)
+        }
+    }
+
+    /// True when the tree's list of windows has one with this window's
+    /// frame. The tree measures from the top of the main display, AppKit
+    /// from the bottom, hence the flip.
+    @MainActor
+    static func treeHoldsWindow(matching window: NSWindow) -> Bool {
+        guard let mainDisplay = NSScreen.screens.first else {
+            return false
+        }
+        let appKitFrame: CGRect = window.frame
+        let expectedTop: CGFloat = mainDisplay.frame.height - appKitFrame.origin.y - appKitFrame.height
+
+        let applicationElement: AXUIElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        var windowsValue: CFTypeRef?
+        let windowsResult: AXError = AXUIElementCopyAttributeValue(applicationElement, kAXWindowsAttribute as CFString, &windowsValue)
+        if windowsResult != .success {
+            return false
+        }
+        guard let treeWindows = windowsValue as? [AXUIElement] else {
+            return false
+        }
+        for treeWindow in treeWindows {
+            if let rectangle = frameOf(treeWindow) {
+                let sameLeft: Bool = abs(rectangle.origin.x - appKitFrame.origin.x) < 2
+                let sameTop: Bool = abs(rectangle.origin.y - expectedTop) < 2
+                let sameWidth: Bool = abs(rectangle.width - appKitFrame.width) < 2
+                let sameHeight: Bool = abs(rectangle.height - appKitFrame.height) < 2
+                if sameLeft && sameTop && sameWidth && sameHeight {
+                    return true
+                }
+            }
+        }
+        return false
+    }
 
     /// Every title/value/description string in the app's current UI.
     @MainActor

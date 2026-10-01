@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Scripting;
 
@@ -93,6 +94,16 @@ public static class ActivityTrail
         /// rename on either platform.
         /// </summary>
         FolderProblemNotRepaired,
+        /// <summary>
+        /// A build rewrote some of the teacher's own pages with their class's
+        /// date (#279; the rule is the shared Python's). Carries the course,
+        /// the section, the count and the pages' places in the course folder
+        /// -- never anything written on them. Read from the build's
+        /// PLANTOIR_DATED: line: from the console for a run the app watches
+        /// (ScriptRunner), and from a scheduled publish's record
+        /// (ScheduledHealthFindings).
+        /// </summary>
+        PagesDatedByTheBuild,
         /// <summary>
         /// A teacher put a section back to how it was when an assistant
         /// conversation started. Carries the course, the section and the
@@ -195,6 +206,55 @@ public static class ActivityTrail
         /// has nowhere to look.
         /// </remarks>
         ScheduledPublishFinished,
+        /// <summary>
+        /// A build was declined because ANOTHER program on this computer holds
+        /// the course's build, publish or preview lease (#289, mac #156).
+        /// Carries the course, the section, what was asked for, what the other
+        /// holds and its process id — never anything written on a page.
+        /// </summary>
+        BuildDeclinedCourseBusyElsewhere,
+        /// <summary>
+        /// A publish set for later found the course being built or published
+        /// elsewhere and waited for it (#289). Carries how long, for whom, and
+        /// whether it then went ahead or stood down — a publish that went out
+        /// ten minutes late looks, from outside, exactly like one that misfired.
+        /// </summary>
+        ScheduledPublishWaitedForTheCourse,
+        /// <summary>
+        /// A deploy the teacher set to happen on its own was turned off by
+        /// something other than them asking: the course or the section was
+        /// removed (#239), the day it was set for had gone by, the course was
+        /// still busy after the wait, or it could not deploy the way the course
+        /// is set now. Carries the course, the section and WHICH.
+        /// </summary>
+        ScheduledDeployTurnedOff,
+        /// <summary>
+        /// A publish set for later read the course's settings when it ran
+        /// (#347, mac #323) and found them different from what the teacher was
+        /// told, or stood down over them. Written only when something differs.
+        /// </summary>
+        ScheduledPublishReadTheCoursesSettings,
+        /// <summary>
+        /// Quitting asked first, because a publish or a preview build was under
+        /// way (#231). Carries what, in the words shown, and which button was
+        /// pressed — "I closed it and it would not close" is the Keep Working
+        /// branch and nothing else explains it. Never written when Windows is
+        /// logging off: nothing is asked then.
+        /// </summary>
+        QuitAskedAboutWorkUnderWay,
+        /// <summary>
+        /// A remembered timetable named a date that cannot be a class date —
+        /// the file was written by this app before #144, on a PC whose
+        /// regional format uses another calendar — and was set aside, so the
+        /// assistant asks for the timetable again and rewrites it. Windows
+        /// only (`appliesOn: ["windows"]`): only this app ever wrote such a
+        /// file.
+        /// </summary>
+        RememberedTimetableSetAside,
+        SectionAdded,
+        PageSettingsLeftAsTheyWere,
+        ClassCopyNotMade,
+        WordForAUnitRenamed,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -232,6 +292,7 @@ public static class ActivityTrail
         Event.FolderProblemFound => "folder problem found",
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.FolderProblemNotRepaired => "folder problem not repaired",
+        Event.PagesDatedByTheBuild => "pages dated by the build",
         Event.SectionRestored => "section restored",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",
@@ -242,6 +303,16 @@ public static class ActivityTrail
         Event.ScheduledPublishNeededAnAnswer => "scheduled publish needed an answer",
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
+        Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
+        Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
+        Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
+        Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
+        Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
+        Event.RememberedTimetableSetAside => "remembered timetable set aside",
+        Event.SectionAdded => "section added",
+        Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
+        Event.ClassCopyNotMade => "class copy not made",
+        Event.WordForAUnitRenamed => "word for a unit renamed",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
@@ -269,7 +340,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {safeWhat}";
         Append(entry);
     }
 
@@ -277,7 +348,7 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safeWhat = LogRedactor.Redacting(what);
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · {safeWhat}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · {safeWhat}";
         Append(entry);
     }
 
@@ -285,9 +356,13 @@ public static class ActivityTrail
     {
         DateTime when = moment ?? DateTime.Now;
         string safePrompt = LogRedactor.Redacting(prompt.Trim());
-        string entry = $"{when:yyyy-MM-dd HH:mm:ss} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
+        string entry = $"{DateText.Stamp(when)} · {course}/{section} · asked a question\n{PromptPrefix}{safePrompt}";
         Append(entry);
     }
+
+    /// <summary>The words for `page settings left as they were`, the mac's <c>pageSettingsLeftAsTheyWereLine</c> word for word.</summary>
+    public static string PageSettingsLeftAsTheyWereLine(string act, int pages) =>
+        $"left the settings of {(pages == 1 ? "1 page" : $"{pages} pages")} as they were while {act}: no room at the top for a new setting";
 
     public static void NoteLaunch()
     {
@@ -304,6 +379,37 @@ public static class ActivityTrail
         Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
     }
 
+    /// <summary>
+    /// The one lock every WRITER of the trail takes, across processes: the
+    /// app, <c>plantoir-mcp.exe</c> and a scheduled run are separate
+    /// processes writing one file, and <c>lock</c> covers threads of one.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Measured, #303 (this Windows PC: Intel Core i5-8365U, 4 cores /
+    /// 8 threads, 15.7 GB, NTFS, Windows 11 Pro 25H2 build 26200,
+    /// 2026-09-30).</b> Two processes calling <see cref="Note(Event, string, DateTime?)"/>
+    /// 500 times each, started on the same tick, five rounds: the old
+    /// <c>File.AppendAllText</c> (which opens with <c>FileShare.Read</c>, so the
+    /// second writer's open throws a sharing violation into an empty
+    /// <c>catch</c>) kept <b>4,444 of 5,000</b>; three processes × three lines ×
+    /// 100 bursts, the mac's shape, kept <b>682 of 900</b>. With this mutex:
+    /// every line, both shapes (numbers in documentation/09 → "Two writers at
+    /// once").</para>
+    /// <para><b>REJECTED, measured:</b> <c>FileShare.ReadWrite</c> with one
+    /// <c>Write</c> per line and no lock. The issue's first candidate, on the
+    /// reasoning that an append-mode write lands at end-of-file — but .NET's
+    /// <c>FileMode.Append</c> opens for ordinary write and keeps its OWN
+    /// position, so two writers open at the same end and the second
+    /// overwrites the first: 4,512 of 5,000, and 180 of 270. A retry loop on
+    /// the sharing violation was rejected unmeasured, as the issue says: a
+    /// guessed delay that still drops the line after its last retry.</para>
+    /// <para><c>Local\</c>, not <c>Global\</c>: the trail is per user
+    /// (<c>%LOCALAPPDATA%</c>), and every writer runs in the teacher's own
+    /// session. Tests redirect the PATH, not the lock — one lock for every
+    /// trail file on the machine costs nothing at one line at a time.</para>
+    /// </remarks>
+    private const string WritersMutexName = @"Local\PlantoirActivityTrail";
+
     private static void Append(string line)
     {
         lock (_lock)
@@ -316,7 +422,26 @@ public static class ActivityTrail
                 {
                     Directory.CreateDirectory(dir);
                 }
-                File.AppendAllText(path, line + Environment.NewLine);
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(line + Environment.NewLine);
+
+                using var writers = new System.Threading.Mutex(false, WritersMutexName);
+                bool held = false;
+                try
+                {
+                    try { held = writers.WaitOne(TimeSpan.FromSeconds(5)); }
+                    catch (System.Threading.AbandonedMutexException) { held = true; }   // a writer died holding it: ours now
+
+                    // Written even when the wait timed out: a line that might
+                    // interleave is better than a line certainly lost. Five
+                    // seconds is far beyond one line's append (sub-millisecond).
+                    using var stream = new FileStream(path, FileMode.Append, FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete);
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+                finally
+                {
+                    if (held) writers.ReleaseMutex();
+                }
             }
             catch
             {

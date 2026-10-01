@@ -95,8 +95,8 @@ struct UnitWordRenameSheet: View {
             }
 
             LabeledContent(UnitWordRenameWording.fieldLabel) {
-                TextField(ClassPageTerm.standard, text: $proposedWord, prompt: Text(ClassPageTerm.standard))
-                    .textFieldStyle(.roundedBorder)
+                TextField("", text: $proposedWord, prompt: Text(ClassPageTerm.standard))
+                    .borderedTextField()
                     .accessibilityIdentifier("unitWordRenameField")
                     .disabled(isRenaming)
                     .onChange(of: proposedWord) {
@@ -240,10 +240,11 @@ struct UnitWordRenameSheet: View {
             return
         }
 
-        // 2. The way back, on the main actor: the archiver is.
+        // 2. The way back. The zip itself runs off the main actor, as every
+        //    zip does since #351; the pruning after it comes back here.
         let backupURL: URL
         do {
-            backupURL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
+            backupURL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
             failure = error.localizedDescription
             return

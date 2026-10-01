@@ -1,0 +1,49 @@
+{
+  "course_code" : "ICS3U",
+  "course_name" : "Introduction to Computer Science",
+  "curriculum_folder" : "Curriculum",
+  "excluded_items" : {
+    "per_section" : [
+      "Announcements.md"
+    ],
+    "shared" : [
+      "Tests",
+      "Learning Goals.md"
+    ]
+  },
+  "expandable" : [
+    "Tasks",
+    "Labs"
+  ],
+  "graded_folders" : [
+    "Tasks"
+  ],
+  "hidden" : [
+    "Media",
+    "Concepts",
+    "Learning Goals.md",
+    "Field Trips.md",
+    "All Classes"
+  ],
+  "include_curriculum_coverage" : true,
+  "num_sections" : 1,
+  "per_section_files" : [
+    "index.md"
+  ],
+  "per_section_folders" : [
+    "All Classes",
+    "Tasks",
+    "Labs"
+  ],
+  "section_numbers" : [
+    1
+  ],
+  "shared_files" : [
+    "Field Trips.md"
+  ],
+  "shared_folders" : [
+    "Curriculum",
+    "Tasks",
+    "Concepts"
+  ]
+}

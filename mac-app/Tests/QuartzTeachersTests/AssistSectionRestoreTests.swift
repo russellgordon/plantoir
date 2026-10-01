@@ -16,11 +16,11 @@ final class AssistSectionRestoreTests: XCTestCase {
 
     /// The first promise: a section goes back to how it was.
     @MainActor
-    func testTheSectionsPagesComeBack() throws {
+    func testTheSectionsPagesComeBack() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
 
         // The conversation makes a mess of section 1.
         try "ruined".write(to: fixture.sectionOnePageURL, atomically: true, encoding: .utf8)
@@ -42,12 +42,12 @@ final class AssistSectionRestoreTests: XCTestCase {
     /// is anchored to folder identity: swap the folder and Obsidian shows
     /// stale files until the vault is reopened. Only the CONTENTS may move.
     @MainActor
-    func testTheSectionFolderItselfStaysInPlace() throws {
+    func testTheSectionFolderItselfStaysInPlace() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
         let fileManager: FileManager = FileManager.default
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
         let sectionURL: URL = fixture.courseURL.appendingPathComponent("section1")
         let identityBefore: Any? =
             try fileManager.attributesOfItem(atPath: sectionURL.path)[.systemFileNumber]
@@ -67,11 +67,11 @@ final class AssistSectionRestoreTests: XCTestCase {
     /// Obsidian while they chat about Section 1; a whole-course restore would
     /// throw that away without a word.
     @MainActor
-    func testWorkInAnotherSectionSurvivesUntouched() throws {
+    func testWorkInAnotherSectionSurvivesUntouched() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
 
         // While the conversation about section 1 is going on, the teacher
         // writes tomorrow's class for section 2 in Obsidian.
@@ -94,11 +94,11 @@ final class AssistSectionRestoreTests: XCTestCase {
     /// not the whole of what a conversation could have changed — and the other
     /// sections' keys sit on the very same lines.
     @MainActor
-    func testOnlyThisSectionsKeysComeBackInASharedPage() throws {
+    func testOnlyThisSectionsKeysComeBackInASharedPage() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
 
         // The assistant publishes the shared outline for section 1; the
         // teacher, separately, publishes it for section 2.
@@ -129,17 +129,17 @@ final class AssistSectionRestoreTests: XCTestCase {
     /// A key the conversation ADDED where the page had none is not "left as
     /// it is" — it did not exist when the conversation started, so it goes.
     @MainActor
-    func testAKeyTheConversationAddedIsTakenBackOut() throws {
+    func testAKeyTheConversationAddedIsTakenBackOut() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
 
         let added: String = try String(contentsOf: fixture.plainSharedPageURL, encoding: .utf8)
-        let published: (text: String, changed: Bool) = AssistPageVisibility.setting(
+        let published: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
             published: false, in: added, forSection: 1, isSectionLocal: false
         )
-        XCTAssertTrue(published.changed)
+        XCTAssertEqual(published.outcome, .written)
         try published.text.write(to: fixture.plainSharedPageURL, atomically: true, encoding: .utf8)
 
         try CourseRestorer.restoreSection(1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
@@ -149,6 +149,52 @@ final class AssistSectionRestoreTests: XCTestCase {
                        "A key that was not there when the conversation started must not be left behind")
         XCTAssertEqual(after, SectionRestoreFixture.plainSharedPage,
                        "…and nothing else on the page moves either")
+    }
+
+    /// A shared page with no room for a new key cannot take this section's
+    /// setting back: it is left exactly as it is, the restore returns how
+    /// many such pages there were, and the transcript's sentence says so —
+    /// "back to how it was" would not be true of that page (#182).
+    @MainActor
+    func testAPageWhoseSettingCouldNotBePutBackIsCountedAndSaid() async throws {
+        let fixture: SectionRestoreFixture = try SectionRestoreFixture()
+        defer { fixture.tearDown() }
+
+        let item: BackupItem = try await fixture.backUp()
+        let noRoom: String = "---\n  a: 1\n---\nThe outline every section shares.\n"
+        try noRoom.write(to: fixture.sharedPageURL, atomically: true, encoding: .utf8)
+
+        let notPutBack: Int = try CourseRestorer.restoreSection(
+            1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL
+        )
+        XCTAssertEqual(notPutBack, 1)
+        XCTAssertEqual(try String(contentsOf: fixture.sharedPageURL, encoding: .utf8), noRoom,
+                       "The page is left byte for byte")
+
+        let said: String = AssistSectionRestore.doneMessage(
+            courseCode: "ICS3U", sectionNumber: 1, settingsNotPutBack: notPutBack
+        )
+        XCTAssertTrue(
+            said.hasSuffix(AssistWording.sharedPagesWhoseSettingsCouldNotBePutBack(count: 1, section: "1")),
+            "The restore must say it left a page's setting as it was: \(said)"
+        )
+        XCTAssertEqual(
+            AssistSectionRestore.doneMessage(courseCode: "ICS3U", sectionNumber: 1, settingsNotPutBack: 0),
+            AssistSectionRestore.doneMessage(courseCode: "ICS3U", sectionNumber: 1),
+            "With nothing left undone the message is exactly what it always was"
+        )
+    }
+
+    /// And a restore that could put everything back returns 0.
+    @MainActor
+    func testAnOrdinaryRestoreLeavesNothingUndone() async throws {
+        let fixture: SectionRestoreFixture = try SectionRestoreFixture()
+        defer { fixture.tearDown() }
+        let item: BackupItem = try await fixture.backUp()
+        XCTAssertEqual(
+            try CourseRestorer.restoreSection(1, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL),
+            0
+        )
     }
 
     // MARK: - When there is nothing to go back to
@@ -181,11 +227,11 @@ final class AssistSectionRestoreTests: XCTestCase {
     /// A backup that predates the section has nothing of it to give back, and
     /// says so rather than emptying the folder.
     @MainActor
-    func testASectionMissingFromTheCopyIsRefused() throws {
+    func testASectionMissingFromTheCopyIsRefused() async throws {
         let fixture: SectionRestoreFixture = try SectionRestoreFixture()
         defer { fixture.tearDown() }
 
-        let item: BackupItem = try fixture.backUp()
+        let item: BackupItem = try await fixture.backUp()
 
         XCTAssertThrowsError(
             try CourseRestorer.restoreSection(7, from: item, coursesDirectoryURL: fixture.coursesDirectoryURL)
@@ -327,8 +373,8 @@ struct SectionRestoreFixture {
 
     /// The copy the assistant saves before the first change of a conversation
     /// about section 1.
-    func backUp() throws -> BackupItem {
-        let backupURL: URL = try CourseArchiver.backUpCourse(
+    func backUp() async throws -> BackupItem {
+        let backupURL: URL = try await CourseArchiver.backUpCourse(
             course,
             coursesDirectoryURL: coursesDirectoryURL,
             madeBy: .assistant(sectionNumber: 1)

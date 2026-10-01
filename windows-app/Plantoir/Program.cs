@@ -25,6 +25,26 @@ public static class Program
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "--state-dir") { Plantoir.Core.Models.AppDataRoot.RedirectTo(args[i + 1]); break; }
 
+        // A publish set for later (#347): Task Scheduler starts Plantoir with
+        // no window to run one job and leave. BEFORE WebView2's folder, the
+        // COM wrappers and Application.Start, none of which a run with no
+        // window needs — and a window appearing at half six is not something
+        // a teacher asked for.
+        int run = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.RunArgument);
+        if (run >= 0 && run + 1 < args.Length)
+        {
+            // The task's own name; its job is found from it. A path is taken as is.
+            string named = args[run + 1];
+            string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase)
+                ? named
+                : Plantoir.Core.Assist.TaskScheduling.JobPath(named);
+            int at = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.TokenArgument);
+            string? token = at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+            var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job, taskToken: token);
+            Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
+            return;
+        }
+
         App.LogDiagnostic($"Program.Main starting with {args.Length} args");
         try
         {

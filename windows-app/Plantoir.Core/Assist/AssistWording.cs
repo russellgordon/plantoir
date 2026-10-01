@@ -115,6 +115,28 @@ public static class AssistWording
     public static string CourseIsBusy(string course) =>
         $"{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.";
 
+    /// <summary>
+    /// Added after a sentence saying some destinations were not reached, when
+    /// the others DID go out, so a teacher is not left thinking nothing happened
+    /// (mac #378/#396; Bundle 1 ruling 8 placed it with #400). Its caller is the
+    /// "needs an answer at" sentence #391 brings; until then only the contract
+    /// walker reads it.
+    /// </summary>
+    public static string DeployWentOutTo(string destinations) =>
+        $"It did go out to {destinations}.";
+
+    /// <summary>
+    /// What the WINDOW says when Preview or Deploy is declined because another
+    /// program on this computer is building, publishing or previewing the
+    /// course (#289, mac #156). An assistant is told <see cref="CourseIsBusy"/>
+    /// instead: on Windows both assistants are <c>plantoir-mcp</c>, the process
+    /// talking to the program whose course is busy.
+    /// </summary>
+    public static string CourseIsBeingBuiltElsewhere(string course) =>
+        $"{course} is being previewed or published somewhere else on this computer right now — by an assistant " +
+        "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
+        "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
+
     // MARK: - Previewing
 
     public static string PreviewIsRebuilding(string course, string section) =>
@@ -133,6 +155,42 @@ public static class AssistWording
 
     public static string Undid(string whatHappened) =>
         $"Earlier, you {whatHappened}. Then you asked me to undo that, and I have done so.";
+
+    /// <summary>
+    /// Said after a section restore that left one shared page's setting as it
+    /// was, because its settings have no column-0 place for a new line (#308,
+    /// the mac's #182/#186). Past tense and counted, never named.
+    /// </summary>
+    public static string SharedPageWhoseSettingCouldNotBePutBack(string section) =>
+        SharedPagesWhoseSettingsCouldNotBePutBack(1, section);
+
+    /// <summary>The same, for several pages — the mac's one function, split by key here so the walk finds both.</summary>
+    public static string SharedPagesWhoseSettingsCouldNotBePutBack(int count, string section) => count == 1
+        ? $"One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is."
+        : $"{count} shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.";
+
+    // ---- Already in that state (#346, the mac's #174) ----------------------
+
+    public const string AlreadyPublishedOne = "It's already been published.";
+    public const string AlreadyHiddenOne = "It's already hidden.";
+    public const string AlreadyPublishedSeveral = "They have already been published.";
+    public const string AlreadyHiddenSeveral = "They have already been hidden.";
+    public static string UnitAlreadyPublished(string unitWord, int unit) => $"{unitWord} {unit} has already been published.";
+    public static string UnitAlreadyHidden(string unitWord, int unit) => $"{unitWord} {unit} is already hidden.";
+
+    // ---- Making room (#346, the mac's #185) -------------------------------
+
+    /// <summary>
+    /// Said on the PLAN card when other classes will move — make-room's, and
+    /// the duplicate's since #185 — so a teacher can still say no. Future
+    /// tense: <see cref="ClassChangeWording.OtherClassesMoved"/> is the reply's
+    /// past-tense twin and would be false before anything has moved.
+    /// </summary>
+    public const string MakingRoomCannotBeUndone =
+        "Because other classes move, “Undo that” will not take this back afterwards — the copy made before any of it is in Plantoir's Backups list.";
+
+    /// <summary>The make-room reply's last line. Windows said "…before you deploy it." until #346; it says the mac's now.</summary>
+    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you publish.";
 
     public static string UndidPartly(string whatHappened, int leftAlone)
     {
@@ -272,6 +330,32 @@ public static class AssistWording
         "This section was also set to publish on its own, and Plantoir could not turn that off. " +
         "It may still try to publish, and it has no way to ask what the new website should be " +
         "called — turn it off from the section's menu.";
+
+    // MARK: - Class planning (hoisted 2026-09-30, #157)
+    //
+    // Sentences this app already said inline, word for word as the contract
+    // has them, moved here under their contract key so the walker compares
+    // them. Nothing a teacher reads changed. Dates are handed in already
+    // formatted, exactly as the call sites formatted them before.
+
+    public const string EveryDateIsSpokenFor =
+        "Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.";
+
+    public static string MadeRoom(int added, string unitWord, int unit, int day) =>
+        $"Made room for {added} class{(added == 1 ? "" : "es")} at {unitWord} {unit}, Day {day}.";
+
+    public static string MovedToLaterDays(int moved) => $"Moved to later class days — {moved}:";
+
+    public static string MovesAndBecomesADraft(string page, string day) =>
+        $"“{page}” moves to {day} and becomes a draft because it has no class date.";
+
+    public static string PublishedTheClassOn(string day) => $"Published the class on {day}.";
+
+    public static string ReDatingOntoTheDatesOnFile(string course, string section) =>
+        $"{course} Section {section}: re-dating onto the class dates on file.";
+
+    public static string TheNextWouldFallOn(string day, string dayName) =>
+        $"The next class would fall on {day} ({dayName}).";
 
     // MARK: - Shared fragments
 

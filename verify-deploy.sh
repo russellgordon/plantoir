@@ -218,9 +218,25 @@ if [ -n "$PREVIEW_PORT" ]; then
   CODE=$(curl -s -o "$WORK/preview.html" -w "%{http_code}" --max-time 10 "http://localhost:$PREVIEW_PORT/" 2>/dev/null)
   [ "$CODE" = "200" ] && ok "preview serves its front page (HTTP 200 on :$PREVIEW_PORT)" \
                       || no "preview answered HTTP $CODE"
-  grep -q "ws://localhost" "$WORK/preview.html" \
-    && ok "the preview carries the live-reload client, as a preview should" \
-    || no "the preview has no live-reload client — serve mode may not be running"
+  if grep -q "ws://localhost" "$WORK/preview.html"; then
+    ok "the preview carries the live-reload client, as a preview should"
+    # The only place anything reads a REAL serve-mode page: the client must
+    # still be what contracts/app-rules.json -> buildFreshness.previewBuild
+    # looks for (its tag, then its first statement, #291), or every check
+    # would read a preview's site as production and publish it. Read as one
+    # record in the C locale, exactly as deploy.sh reads it.
+    # The working folder's own copy, the one its launchers were given.
+    PREVIEW_RULE_FILE="$WORKING_FOLDER/.toolchain/contracts/app-rules.json"
+    [ -f "$PREVIEW_RULE_FILE" ] || PREVIEW_RULE_FILE="$(cd "$(dirname "$0")" && pwd)/contracts/app-rules.json"
+    PREVIEW_RULE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["buildFreshness"]["previewBuild"]["signature"]["asABasicRegex"], end="")' "$PREVIEW_RULE_FILE" 2>/dev/null)
+    if [ -n "$PREVIEW_RULE" ] && LC_ALL=C grep -zq -- "$PREVIEW_RULE" "$WORK/preview.html"; then
+      ok "the preview's live-reload client matches the rule in contracts/app-rules.json"
+    else
+      no "the preview's live-reload client no longer matches the rule in contracts/app-rules.json — re-measure it (#291)"
+    fi
+  else
+    no "the preview has no live-reload client — serve mode may not be running"
+  fi
 else
   no "the preview never announced an address"
 fi
@@ -375,6 +391,47 @@ if [ -f "$WORKING_FOLDER/courses/$COURSE/section$SECTION/index.md" ]; then
 else
   skip "no section index.md to remove"
 fi
+
+hdr "A course kept for reference is refused by the REAL launcher, at every destination"
+# The one thing a unit test cannot prove: that the refusal returns BEFORE any
+# network call and before anything reaches a folder. The marker is written by
+# hand, the course is put back exactly as it was afterwards, and no site of any
+# kind is created — that is the whole point.
+#
+# --to-folder is the case that matters most: it publishes host-side with rsync
+# and exits 0 before the container is ever started, so `deploy.py`'s own
+# refusal never runs on that path.
+python3 - "$CONFIG" on <<'PY'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]); d = json.loads(p.read_text())
+d["kept_for_reference"] = True
+p.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+rm -rf "$FOLDER_TARGET"; mkdir -p "$FOLDER_TARGET"
+for _case in "--to-folder $FOLDER_TARGET" "--target netlify" "--target cloudflare"; do
+  : >"$WORK/deploy-reference.log"
+  run_deploy "$WORK/deploy-reference.log" "$COURSE" "$SECTION" $_case
+  _rc=$?
+  [ "$_rc" -eq 1 ] && ok "refused ($_case), exit 1" \
+                   || no "exit $_rc for $_case — expected 1"
+  grep -aq "is kept for reference, so it is never deployed" "$WORK/deploy-reference.log" \
+    && ok "it said why, in the sentence the contract pins ($_case)" \
+    || no "the refusal sentence is missing ($_case)"
+done
+if [ -z "$(find "$FOLDER_TARGET" -type f 2>/dev/null)" ]; then
+  ok "nothing reached the folder destination"
+else
+  no "A REFERENCE COURSE WAS PUBLISHED to the folder destination"
+fi
+python3 - "$CONFIG" <<'PY'
+import json, sys, pathlib
+p = pathlib.Path(sys.argv[1]); d = json.loads(p.read_text())
+d.pop("kept_for_reference", None)
+p.write_text(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+grep -q "kept_for_reference" "$CONFIG" \
+  && no "the marker was left behind on the scratch course" \
+  || ok "the scratch course is back to an ordinary one"
 
 hdr "Result"
 echo "  $PASS passed, $FAIL failed, $SKIP skipped"

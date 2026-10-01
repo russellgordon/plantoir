@@ -68,12 +68,12 @@ final class PreviewStopperTests: XCTestCase {
 
     /// The two silences are different facts and must stay different.
     ///
-    /// "Nothing to stop — no container is running for this folder" means the
+    /// "Nothing to stop — this folder's website builder isn't running" means the
     /// sweep never ran; "Stopped 0" means it ran and found nothing. A line
     /// claiming zero for the first would be a line that is not true.
     func testNothingIsRecordedWhenTheLauncherDidNotSweep() {
         XCTAssertNil(PreviewStopper.countReclaimed(
-            in: "✅ Nothing to stop — no container is running for this folder.\n"))
+            in: "✅ Nothing to stop — this folder's website builder isn't running.\n"))
         XCTAssertNil(PreviewStopper.countReclaimed(in: ""))
         XCTAssertNil(PreviewStopper.countReclaimed(
             in: "⚠️ Cannot stop preview processes: the build recipe is incomplete.\n"))
@@ -97,7 +97,7 @@ final class PreviewStopperTests: XCTestCase {
             "✅ Stopped 1 process(es).\n", courseCode: "ICS3U", sectionNumber: 2
         )
         PreviewStopper.noteWhatWasReclaimed(
-            "✅ Nothing to stop — no container is running for this folder.\n",
+            "✅ Nothing to stop — this folder's website builder isn't running.\n",
             courseCode: "ICS3U", sectionNumber: 2
         )
 
@@ -120,6 +120,43 @@ final class PreviewStopperTests: XCTestCase {
             trailText.contains("process(es)"),
             "the launcher's own wording reached the trail; it says what happened in a "
                 + "teacher's words, not a script's"
+        )
+    }
+
+    // MARK: - Where the launcher looks for its programs
+
+    /// The mirror image of issue #220, and the same one-line fix.
+    ///
+    /// This call site set NO environment at all, so on an app opened from the
+    /// Dock the launcher started from `/usr/bin:/bin:/usr/sbin:/sbin` plus its
+    /// own tools export. On a Mac whose only `docker` is Homebrew's — a
+    /// developer's, or any teacher who installed Docker Desktop —
+    /// `preview.sh --stop` then prints "Nothing to stop", exits 0, and leaves
+    /// a mid-flight build burning CPU inside the container, with nothing
+    /// reaching the trail either because there is no count to read.
+    @MainActor
+    func testTheLauncherIsToldWhereTheProgramsAre() {
+        let home: URL = URL(fileURLWithPath: "/Users/pretend")
+        let command: HelperPrograms.Command = PreviewStopper.stopCommand(
+            courseCode: "ICS3U",
+            sectionNumber: 2,
+            workspaceURL: URL(fileURLWithPath: "/Users/pretend/Desktop/Comm Tech 26:27"),
+            inheriting: ["HOME": "/Users/pretend", "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"],
+            inHomeFolder: home
+        )
+        XCTAssertEqual(command.executablePath, "/bin/bash")
+        XCTAssertEqual(
+            command.arguments,
+            ["/Users/pretend/Desktop/Comm Tech 26:27/preview.sh", "ICS3U", "2", "--stop"]
+        )
+        XCTAssertEqual(
+            command.environment["PATH"]?.components(separatedBy: ":").first,
+            HelperPrograms.binDirectory(inHomeFolder: home)
+        )
+        XCTAssertEqual(command.environment["HOME"], "/Users/pretend")
+        XCTAssertEqual(
+            command.currentDirectoryPath, "/Users/pretend/Desktop/Comm Tech 26:27",
+            "The launcher derives the container's name from the folder it is run in"
         )
     }
 }

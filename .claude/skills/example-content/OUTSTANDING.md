@@ -5,6 +5,13 @@ Every one of them is linter-clean and passes the mechanical checks. All 37
 payloads have now had their independent adversarial reviews and conformance
 passes completed and recorded in `.claude/skills/example-content/reviews/`.
 
+**TAS2O** (2024 curriculum, issue #270, 2026-09-24) is the 38th Ontario
+payload and the newest: adapted from TGJ2O, with Unit 3 replaced by two
+fabrication projects (a laser-cut sign and a 3D-printed camera rig). It is
+linter-clean (36/36, none addressed once) and passes `verify_gs.py`'s
+mechanical checks; its adversarial reviews belong to #270's own review
+rounds, not to the August sweep above.
+
 Read this section as the work queue. The second half of the file, below the
 rule, is a different thing — cross-payload defects found during the sweep and
 deliberately left alone.
@@ -42,6 +49,15 @@ payloads with agents still writing into them.
 ---
 
 # Cross-payload defects found during the sweep, deliberately not fixed
+
+## TGJ2O teaches expectations the Ministry replaced in 2024
+
+Found while planning TAS2O (#270): the Ministry's memo of 29 May 2024 says
+TAS1O/TAS2O replace the 2009 Grades 9–10 Technological Education
+document, and that a board offering a communications focus offers it as
+TGJ2O on TAS2O's expectations. TGJ2O's payload still quotes the 2009
+expectations (its About page carries a "superseded" warning). Moving it
+onto TAS2O's `Curriculum/` is a separate decision, not part of #270.
 
 Both are real, both are outside a Growing Success brief, and both need the
 live ministry document or a payload-wide sweep. A half-done sweep is worse

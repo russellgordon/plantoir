@@ -13,6 +13,16 @@ the shared contracts**, not by reading Swift.
 
 ---
 
+> **Start with [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md)** (added 2026-09-25): the
+> strategy for bringing this app to parity with what the mac ships in v1.4.0 —
+> every issue on the milestone "Windows: parity with mac v1.4.0" placed in one
+> ordered phase, what is inherited free from the shared Python, the traps, and
+> the first week. Read it after `CLAUDE.md` and this brief's section 1
+> reading list, before you work through the open issues one by one. Then come
+> back here for the rules while working. The issues remain the source of
+> truth, and that file is deleted when the milestone closes.
+
+
 ## 0. Outline the plan before implementing
 
 **Read everything in section 1, then stop and write the plan out for Russell.**
@@ -143,10 +153,12 @@ reasons rather than tasks:
   the same courtesy in reverse, not a complaint.
 - **When the handover's issue is milestoned for a LATER release, name the gap
   rather than softening the contract.** `windows-app/Plantoir.Tests/NamedGapLedger.cs`
-  carries one entry per key — the key, the issue, the milestone, the reason —
-  and the two it holds today are the unit-word rename's trail event and
-  sentence, owed under [#158](https://github.com/russellgordon/plantoir/issues/158)
-  at v1.3.0. Everything not in it is asserted as before, and the ledger fails
+  carries one entry per key — the key, the issue, the milestone, the reason.
+  It began (2026-09-18) with two, the unit-word rename's trail event and
+  sentence owed under [#158](https://github.com/russellgordon/plantoir/issues/158);
+  since the parity run's bundle 1 (2026-09-30) it is the parity milestone's
+  burn-down list, holding every debt the suite can name — the table is in
+  `documentation/12-windows-app.md` → "Named gaps". Everything not in it is asserted as before, and the ledger fails
   the moment a ledgered thing starts existing here or stops being in the
   contract, so an entry cannot outlive either. **It is allowed only while an
   open issue milestoned LATER than the release being cut owns the work, and
@@ -154,7 +166,7 @@ reasons rather than tasks:
   one is a defect to fix or a release to hold. Editing the contract to quiet
   your suite (an `appliesOn: ["mac"]` on something this side owes, say) is the
   thing this exists to replace: `contracts/README.md` → "Named gaps" says
-  why, and a green run can therefore mean "green, with two written debts".
+  why, and a green run can therefore mean "green, with the debts the ledger names".
 - **You MAY propose an authored case** (`scenarios`, `nearMisses`,
   `promptHistory`, and the case lists in the other files). Doing so will make
   the **mac** suite fail until they implement it — that is the mechanism

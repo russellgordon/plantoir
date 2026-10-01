@@ -64,10 +64,12 @@ final class ActivityTrailWiringTests: XCTestCase {
 
     // MARK: - Launch fires its events
 
-    /// `noteLaunch` is the call site for three of the contract's events
-    /// (`appOpened`, `machine`, `helpers`). This actually runs it against a
-    /// scratch store and counts the lines, so those events are verified as
-    /// FIRING rather than merely referenced.
+    /// `noteLaunch` and `noteHelpers` are the call sites for three of the
+    /// contract's events (`appOpened`, `machine`, `helpers`). The helpers
+    /// line is its own call since issue #222, because it is written once the
+    /// programs have been asked, a moment after the other two. This runs
+    /// both against a scratch store and counts the lines, so those events are
+    /// verified as FIRING rather than merely referenced.
     func testLaunchWritesItsThreeLines() throws {
         let scratchFolderURL: URL = FileManager.default.temporaryDirectory
             .appendingPathComponent("trail-wiring-\(UUID().uuidString)", isDirectory: true)
@@ -79,6 +81,7 @@ final class ActivityTrailWiringTests: XCTestCase {
         }
 
         ActivityTrail.noteLaunch()
+        ActivityTrail.noteHelpers(ProblemReportEnvironment.helperDescription)
 
         let trailText: String = ActivityTrail.store.activityText(includingPrompts: true)
         var writtenLines: [String] = []

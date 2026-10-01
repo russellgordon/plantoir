@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Core.Assist;
 
@@ -58,8 +59,68 @@ public sealed class TimetableMemory
         Path.Combine(Workspace.CoursesDirectory(workspacePath), courseCode.ToUpperInvariant(),
             ".internal", "timetable", $"section{sectionNumber}.json");
 
-    /// <summary>What was remembered for this section, or null if nothing was.</summary>
-    public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber)
+    /// <summary>
+    /// The earliest class date a remembered timetable can hold and be
+    /// believed. Generous on purpose — a teacher may type last year's dates —
+    /// and still centuries clear of every wrong reading a calendar can
+    /// produce: a Buddhist year read as Gregorian is 2569, a Gregorian year
+    /// read as Buddhist is 1483, and an Umm al-Qura one is 1448.
+    /// </summary>
+    public static readonly DateOnly EarliestBelievable = new(2000, 1, 1);
+
+    /// <summary>
+    /// How far past today a remembered class may fall and be believed. A
+    /// school year is one; three is generous. The nearest wrong reading is
+    /// 543 years out, so any figure between the two works.
+    /// </summary>
+    public const int YearsAheadBelievable = 3;
+
+    /// <summary>
+    /// The first of <paramref name="dates"/> that cannot be a class date —
+    /// before <see cref="EarliestBelievable"/> or more than
+    /// <see cref="YearsAheadBelievable"/> years past <paramref name="today"/> —
+    /// or null when every one of them can. <see cref="Write"/> refuses such a
+    /// list and <see cref="Read"/> disbelieves such a file, so what one
+    /// accepts the other believes: a tool that saved and then read back
+    /// would otherwise find nothing where it had just written.
+    /// </summary>
+    public static DateOnly? Unbelievable(IEnumerable<DateOnly> dates, DateOnly today)
+    {
+        DateOnly ceiling = today.AddYears(YearsAheadBelievable);
+        return dates.Where(date => date < EarliestBelievable || date > ceiling)
+                    .Select(date => (DateOnly?)date)
+                    .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// What was remembered for this section, or null if nothing was — or if
+    /// what was remembered cannot be true.
+    ///
+    /// <para><b>Why a date can be unbelievable.</b> Until #144, <see cref="Write"/>
+    /// rendered each date in the machine's default calendar, so a PC whose
+    /// regional format is Thai wrote <c>2569-09-08</c> for 2026-09-08. This
+    /// reader has always been invariant, and reads that as the Gregorian
+    /// year 2569. Now that the writer is Gregorian too, such a file is still
+    /// on that teacher's disk, and it would still answer "when are my next
+    /// classes?" from five centuries ahead. A memory holding any date before
+    /// <see cref="EarliestBelievable"/> or more than
+    /// <see cref="YearsAheadBelievable"/> years past today is therefore
+    /// treated as no memory at all: the assistant asks for the timetable
+    /// again, and the next <see cref="Write"/> replaces the file with one it
+    /// can read. That is the same shape as <c>ArchiveStamp</c>: a date that
+    /// cannot be true is not allowed to decide anything.</para>
+    /// </summary>
+    /// <param name="today">
+    /// The clock the ceiling is measured against. Passed by tests, which need
+    /// an answer that does not change between one line and the next; the
+    /// app leaves it null.
+    /// </param>
+    /// <param name="recording">
+    /// Whether setting a file aside leaves a line on the trail. On by
+    /// default; a test that only wants the answer turns it off.
+    /// </param>
+    public static TimetableMemory? Read(string workspacePath, string courseCode, int sectionNumber,
+                                        DateOnly? today = null, bool recording = true)
     {
         try
         {
@@ -80,11 +141,20 @@ public sealed class TimetableMemory
             if (unreadable.Count > 0 || dates.Count == 0) return null;
 
             dates.Sort();
+            if (Unbelievable(dates, today ?? DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+            {
+                if (recording)
+                    ActivityTrail.Note(ActivityTrail.Event.RememberedTimetableSetAside,
+                        $"remembered timetable set aside: it names {DateText.Iso(impossible)}, which cannot be a " +
+                        "class date; the assistant will ask for the timetable again",
+                        courseCode.ToUpperInvariant(), sectionNumber);
+                return null;
+            }
             return new TimetableMemory
             {
                 Dates = dates,
                 Source = stored.Source ?? "not recorded",
-                Recorded = DateOnly.TryParse(stored.Recorded, out var when) ? when : default,
+                Recorded = DateText.TryReadDay(stored.Recorded, out var when) ? when : default,
             };
         }
         // A memory that cannot be read is a memory we do not have. Nothing here
@@ -103,6 +173,8 @@ public sealed class TimetableMemory
     {
         var ordered = dates.Distinct().OrderBy(date => date).ToList();
         if (ordered.Count == 0) return false;
+        // What Read would not believe is not written: see Unbelievable.
+        if (Unbelievable(ordered, today) is not null) return false;
 
         try
         {
@@ -111,9 +183,9 @@ public sealed class TimetableMemory
             File.WriteAllText(path, JsonSerializer.Serialize(new Stored
             {
                 Section = sectionNumber,
-                Dates = ordered.Select(date => date.ToString("yyyy-MM-dd")).ToList(),
+                Dates = ordered.Select(date => DateText.Iso(date)).ToList(),
                 Source = source,
-                Recorded = today.ToString("yyyy-MM-dd"),
+                Recorded = DateText.Iso(today),
             }, new JsonSerializerOptions { WriteIndented = true }));
             return true;
         }

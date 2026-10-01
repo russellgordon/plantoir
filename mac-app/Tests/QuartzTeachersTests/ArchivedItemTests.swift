@@ -41,7 +41,12 @@ final class ArchivedItemTests: XCTestCase {
     func testTheDateIsReadFromTheName() {
         let url: URL = URL(fileURLWithPath: "/w/courses/_backups/IZN2O/IZN2O_2026-08-10_143005.zip")
         let item = ArchivedItem.from(fileURL: url, courseCode: "IZN2O")
-        let components = Calendar.current.dateComponents([.year, .month, .day], from: item!.archivedAt)
+        // Read back through a GREGORIAN calendar, not `Calendar.current`. The
+        // stamp is Gregorian by construction (`ArchiveStamp`), so asking the
+        // machine's own calendar what year it is would make this test agree
+        // with itself on a Buddhist Mac — 2026 CE reads as 2569 there — and
+        // that is the one machine it exists to be right about.
+        let components = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: item!.archivedAt)
         XCTAssertEqual(components.year, 2026)
         XCTAssertEqual(components.month, 8)
         XCTAssertEqual(components.day, 10)

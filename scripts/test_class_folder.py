@@ -11,7 +11,9 @@ to "every published page" for any teacher whose folder was not called
 "All Classes".
 
 `build_site` imports `frontmatter`, which lives only inside the container, so
-this CANNOT be run on the host. verify.sh runs it in the image:
+this CANNOT be run on the host. verify.sh runs it in the image, naming the
+file the way the launchers name a folder now; by hand, the shorter form below
+is the same thing:
 
     docker run --rm -v "$(pwd)/scripts/test_class_folder.py:/opt/scripts/test_class_folder.py:ro" \
       quartz-teacher:dev-test python3 /opt/scripts/test_class_folder.py

@@ -194,8 +194,8 @@ public class ToolAnswerTests : IDisposable
             progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 2" });
 
-        Assert.Equal("It's already been published.", again.Summary());
-        Assert.Equal("It's already been published.", again.Detail());
+        Assert.Equal(AssistWording.AlreadyPublishedOne, again.Summary());
+        Assert.Equal(AssistWording.AlreadyPublishedOne, again.Detail());
     }
 
     [Fact]
