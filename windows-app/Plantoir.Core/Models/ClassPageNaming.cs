@@ -53,6 +53,10 @@ public static class ClassPageSchemes
             ? ClassPageScheme.Numbered
             : ClassPageScheme.UnitDay;
 
+    /// <summary>Which of a class/meeting pair a course's TEACHER reads (never the model).</summary>
+    public static string Say(ClassNoun noun, string forAClass, string forAMeeting) =>
+        noun == ClassNoun.Meeting ? forAMeeting : forAClass;
+
     /// <summary>The noun a stored value means.</summary>
     public static ClassNoun NounReading(string? raw) =>
         string.Equals((raw ?? "").Trim(), "meeting", StringComparison.OrdinalIgnoreCase)

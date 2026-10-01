@@ -1695,7 +1695,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private CallToolResult? WholeUnitPlan(string course, int section, string[]? pages, bool publishing)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         if (unit == null) return null;
 
         var result = workspace.PlanWholeUnit(course, section, unit.Value, publishing);
@@ -2106,7 +2106,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 unitWord = workspace.UnitWordForCourse(course);
             }
             catch { /* the unit word is a nicety; the sentence stands without it */ }
-            if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], unitWord);
+            if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         }
         string what = unit is { } number ? $"{unitWord} {number}" : "The pages";
         string reason = error is UnauthorizedAccessException
@@ -2124,7 +2124,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         IProgress<ProgressNotificationValue> progress, CancellationToken cancellation)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         if (unit == null) return null;
 
         var result = await workspace.ApplyWholeUnit(course, section, unit.Value, publishing, preview,

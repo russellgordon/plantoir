@@ -22,6 +22,12 @@ public sealed class InsertPlan
     public required int Unit { get; init; }
     public required int AtDay { get; init; }
 
+    /// <summary>The course's naming — required, so no plan can fall back to "Unit … Day …" (#268).</summary>
+    public required ClassPageNaming Naming { get; init; }
+
+    /// <summary>Where the room is made, named the way the COURSE names a page (<c>insertion.positionInSentences</c>).</summary>
+    public string PositionTitle => Naming.Title(Unit, AtDay);
+
     /// <summary>The blank classes that would be made room for.</summary>
     public required IReadOnlyList<NewClass> Added { get; init; }
 
@@ -50,7 +56,7 @@ public sealed class InsertPlan
         }
 
         string room = Added.Count == 1 ? "one new class" : $"{Added.Count} new classes";
-        lines.Add($"Make room for {room} at Unit {Unit}, Day {AtDay} in {CourseCode} " +
+        lines.Add($"Make room for {room} at {PositionTitle} in {CourseCode} " +
                   $"Section {SectionNumber}.");
         lines.Add("");
 

@@ -19,7 +19,7 @@ namespace Plantoir.Core.Assist;
 /// <para>Where Windows says more than the contract pins, it is named in the
 /// member's own remarks.</para>
 /// </summary>
-public static class ClassChangeWording
+public static partial class ClassChangeWording
 {
     // ---- Duplicating a class ----------------------------------------------
 

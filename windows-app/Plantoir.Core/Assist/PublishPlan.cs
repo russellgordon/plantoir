@@ -244,6 +244,12 @@ public sealed class PublishPlan
     /// back as an unknown page. The mac reached the same answer for the same
     /// reason (<c>AssistPublishPlan.unitNamed(_:term:)</c>).</para>
     /// </summary>
+    public static int? UnitNamed(string raw, ClassPageNaming naming) =>
+        // A numbered course has NO units (#274; class-planning.json → wholeUnit):
+        // "publish Week 1" read as unit 1 published every meeting on the mac
+        // (4 of 4), and "Week 3" was refused. Every title goes to the page path.
+        naming.IsNumbered ? null : UnitNamed(raw, naming.Word);
+
     public static int? UnitNamed(string raw, string? term = null)
     {
         string tidied = raw.Trim().TrimEnd('.', '!').ToLowerInvariant();

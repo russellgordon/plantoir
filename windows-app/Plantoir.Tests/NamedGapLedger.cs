@@ -156,8 +156,6 @@ internal static class NamedGapLedger
         // ---- specialNames.platformWording.keys
 
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
-        Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
-            "class_page_scheme", "front_page_heading", "class_noun"),
         Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "kept_for_reference", "reference_school_year"),
 
