@@ -60,6 +60,11 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         // runs (#347): this one. In a development build the server is not
         // beside the app, so it could not find it on its own.
         if (Environment.ProcessPath is { } app) info.Environment["PLANTOIR_APP_PATH"] = app;
+        // This server answers PLANTOIR'S OWN window, not an outside door: its
+        // list_courses carries no How I Teach line (#340,
+        // howITeachPage.listCoursesLine) — the local assistant neither reads
+        // nor drafts that page.
+        info.Environment[Plantoir.Core.Assist.AssistWorkspace.LocalWindowVariable] = "1";
 
         Process? server;
         try { server = Process.Start(info); }

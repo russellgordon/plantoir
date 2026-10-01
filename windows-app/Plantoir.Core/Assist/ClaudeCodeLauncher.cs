@@ -142,8 +142,9 @@ public static class ClaudeCodeLauncher
         catch { return false; }
 
         string prompt = Greeting(courseCode, courseName);
+        var arguments = Arguments(configPath, prompt);
         string command =
-            $"\"{claude}\" --mcp-config \"{configPath}\" --strict-mcp-config \"{prompt}\"";
+            $"\"{claude}\" {arguments[0]} \"{arguments[1]}\" {arguments[2]} \"{arguments[3]}\"";
 
         // Windows Terminal when it is there, because a teacher will be reading
         // this for a while; the classic console otherwise.
@@ -159,8 +160,19 @@ public static class ClaudeCodeLauncher
             info.Arguments = $"/k {command}";
         }
 
-        try { return Process.Start(info) is not null; }
+        try
+        {
+            if (Process.Start(info) is null) return false;
+        }
         catch { return false; }
+
+        // outsideAgents.agents[claude].trailLine (#210). This door shipped
+        // writing NOTHING on the trail, so a teacher who handed a course to
+        // Claude, watched it change pages and then reported a problem left a
+        // trail with no sign of the session that did the changing.
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AssistantOpened,
+            $"started Claude Code for {courseCode}");
+        return true;
     }
 
     /// <summary>
@@ -169,6 +181,18 @@ public static class ClaudeCodeLauncher
     /// the teacher first — and an assistant that starts by reading is far more
     /// useful than one that starts by asking what to do.
     /// </summary>
+    /// <summary>
+    /// The argv after <c>claude</c>, as <c>outsideAgents.agents[claude].arguments</c>
+    /// states it — what <see cref="Open"/> passes, and what the contract reader
+    /// in <c>CodexLauncherTests</c> compares.
+    /// </summary>
+    internal static IReadOnlyList<string> Arguments(string configPath, string greeting) =>
+        new[] { "--mcp-config", configPath, "--strict-mcp-config", greeting };
+
+    /// <summary><c>outsideAgents.greetingHowITeachSentence</c>.</summary>
+    internal const string HowITeachSentence =
+        "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
+
     internal static string Greeting(string courseCode, string courseName)
     {
         var text = new StringBuilder();
@@ -177,6 +201,13 @@ public static class ClaudeCodeLauncher
             text.Append($" ({courseName})");
         text.Append(" in Plantoir. Use the plantoir tools for anything to do with this course. ");
         text.Append("Start by listing its sections so we both know what's there. ");
+        // app-rules.json → outsideAgents.greetingHowITeachSentence, verbatim
+        // (#340): the LOAD-BEARING channel for the page — measured on the mac,
+        // a tool description saying "call first" was deferred, the greeting
+        // was acted on at once. Only now that the three tools exist: a door
+        // asking for a page with no tool behind it sends the agent to its own
+        // file tools, past every guard and the trail.
+        text.Append(HowITeachSentence + " ");
         text.Append("Before changing anything, use the matching plan tool first and show me what it says, ");
         text.Append("in plain words, and wait for me to agree.");
         return text.ToString().Replace("\"", "'");
