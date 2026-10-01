@@ -292,6 +292,16 @@ public static partial class AssistWording
         ? PageWhoseNewDateCouldNotBeSet(pages[0])
         : $"I couldn’t set the new dates on {NamedFew(pages)}: the settings at the top of them are written in a way I can’t add to. Open them in Obsidian to set the dates there.";
 
+    /// <summary>
+    /// Pages a make-room could not finish writing (#422) — a rename whose new
+    /// name was taken, a save that failed (read-only, open elsewhere). Named by
+    /// the name each page has NOW. Windows' own sentence: the contract has no
+    /// key for it yet (proposed to the mac as <c>pagesAChangeCouldNotFinish</c>).
+    /// </summary>
+    public static string PagesAChangeCouldNotFinish(IReadOnlyList<string> pages) => pages.Count == 1
+        ? $"I couldn’t finish changing “{pages[0]}”, so look it over in Obsidian before you publish."
+        : $"I couldn’t finish changing {NamedFew(pages)}, so look them over in Obsidian before you publish.";
+
     /// <summary>“a”, “a” and “b”, “a”, “b” and “c”, then “a”, “b”, “c” and 2 more.</summary>
     private static string NamedFew(IReadOnlyList<string> pages, int most = 3) =>
         pages.Count <= most

@@ -965,8 +965,7 @@ public sealed partial class AssistWorkspace
         // brings are worked out from its CURRENT state (#308 review N-a — the
         // card could otherwise point the front page at a class that stays
         // hidden; the mac decides the landing page from what is visible).
-        var declinedTitles = new HashSet<string>(cannotBeAddedTo.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
-        var allPlannedPages = named.Concat(linked).Where(p => !declinedTitles.Contains(p.Title)).ToList();
+        var allPlannedPages = WithoutDeclined(named.Concat(linked), cannotBeAddedTo);
         var inherited = InheritedDates(course, section, allPlannedPages, isDraft);
 
         var dateMoves = new List<PlannedDateMove>();
@@ -1009,6 +1008,21 @@ public sealed partial class AssistWorkspace
             StoppedAtClasses = stoppedAt,
             CannotBeAddedTo = cannotBeAddedTo,
         };
+    }
+
+    /// <summary>
+    /// The planned pages less the ones the writer declined, matched by PATH
+    /// (#422): two pages can share a file name — two folders' <c>index.md</c>,
+    /// a shared page and a section page — and matching by title took the
+    /// other one out too, so the front page and the dangling-link warning
+    /// were worked out as if it stayed as it was.
+    /// </summary>
+    internal static List<PlannedPage> WithoutDeclined(IEnumerable<PlannedPage> planned, IEnumerable<PlannedPage> declined)
+    {
+        var declinedPaths = new HashSet<string>(declined.Select(p => PathKey(p.RelativePath)), StringComparer.OrdinalIgnoreCase);
+        return planned.Where(p => !declinedPaths.Contains(PathKey(p.RelativePath))).ToList();
+
+        static string PathKey(string relative) => relative.Replace('\\', '/');
     }
 
     /// <summary>
@@ -3460,24 +3474,48 @@ public sealed partial class AssistWorkspace
         // open, and they are what lets a CALLER that opened its own entry —
         // ApplyDuplicateClass — record the whole of what happened.
 
+        // Every count in the reply is of what was WRITTEN, as the mac's
+        // ClassInsertionPlanner counts (#422): a rename skipped because its
+        // new name is taken, or a write that failed, is not "renamed", and
+        // links are counted only where a page holding them was saved. A write
+        // that did not finish is NAMED (by the page's name at that moment),
+        // never swallowed.
+        var notFinished = new List<string>();
+        int notRenamed = 0, notReDated = 0, linkPagesNotSaved = 0;
+
         // Highest day first, so a rename never lands on a name still in use.
         progress?.Report("Renaming the classes that come after…");
+        var renamed = new List<Rename>();
         foreach (var rename in plan.Renames)
         {
+            if (!File.Exists(rename.FromPath)) continue;   // nothing there to rename
+            bool saved = false;
             try
             {
-                if (!File.Exists(rename.FromPath) || File.Exists(rename.ToPath)) continue;
+                if (File.Exists(rename.ToPath)) throw new IOException("the new name is taken");
                 string text = File.ReadAllText(rename.FromPath);
                 Save(rename.ToPath, PageFrontmatter.SetTitle(text, rename.To));
+                saved = true;
                 _undo?.Touch(rename.FromPath, text);
                 File.Delete(rename.FromPath);
                 _undo?.Wrote(rename.FromPath, null);
+                renamed.Add(rename);
             }
-            catch { }
+            catch
+            {
+                // Saved under the new name but the old file is still there:
+                // the links follow the new name (it exists), and the page is
+                // named so the teacher finds the second copy.
+                if (saved) renamed.Add(rename);
+                notFinished.Add(rename.From);
+                notRenamed++;
+            }
         }
 
         progress?.Report("Following the links that pointed at them…");
-        RewriteLinks(course, section, plan.Renames);
+        var (linksUpdated, linkPagesFailed) = RewriteLinks(course, section, renamed);
+        notFinished.AddRange(linkPagesFailed);
+        linkPagesNotSaved = linkPagesFailed.Count;
 
         progress?.Report("Moving the dates…");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -3488,46 +3526,72 @@ public sealed partial class AssistWorkspace
         // ClassInsertionPlanner counts): a class declined, already on its
         // date, or whose write failed is not "moved".
         int moved = 0;
+        // A rename that did not happen leaves its page under the OLD name — and
+        // the new name may be a page of the teacher's own (that is usually why
+        // it did not happen), which must not be given this class's date.
+        var notRenamedTo = plan.Renames.Where(r => !renamed.Contains(r))
+            .Select(r => r.To).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var move in plan.Moves)
         {
+            string? full = null;
             try
             {
                 // Renamed pages are found under their NEW name by now.
-                string full = Path.Combine(ClassFolder(course, section), move.Title + ".md");
+                full = notRenamedTo.Contains(move.Title)
+                    ? PagePaths.ResolveInside(_folder, move.RelativePath)
+                    : Path.Combine(ClassFolder(course, section), move.Title + ".md");
                 if (!File.Exists(full)) full = PagePaths.ResolveInside(_folder, move.RelativePath);
                 if (!File.Exists(full)) continue;
 
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
                 string key = sectionLocal ? "created" : "createdSection" + section;
                 var edit = PageFrontmatter.SetCreated(File.ReadAllText(full), key, move.To, tail);
-                if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(move.Title);
+                // By the name the page has NOW: renamed if its rename went through.
+                if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(Path.GetFileNameWithoutExtension(full));
                 if (edit.Changed)
                 {
                     Save(full, edit.Text);
                     moved++;
                 }
             }
-            catch { }
+            catch
+            {
+                notFinished.Add(full is not null && File.Exists(full) ? Path.GetFileNameWithoutExtension(full) : move.Title);
+                notReDated++;
+            }
         }
         NoteSettingsLeftAsTheyWere("making room for a class", undated.Count, course.Code, section);
 
         progress?.Report("Adding the new classes…");
         Directory.CreateDirectory(ClassFolder(course, section));
+        int notAdded = 0;
         foreach (var added in plan.Added)
         {
             string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
-            if (File.Exists(path)) continue;
+            // Still taken: the class whose rename did not happen is there.
+            // Not overwritten, and named rather than counted as made.
+            if (File.Exists(path)) { notFinished.Add(added.Title); notAdded++; continue; }
             Save(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
             created.Add(path);
         }
 
+        int unfinishedPages = notFinished.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        if (unfinishedPages > 0)
+            ActivityTrail.Note(ActivityTrail.Event.MakingRoomDidNotFinishEveryPage,
+                $"making room for a class did not finish {(unfinishedPages == 1 ? "1 page" : $"{unfinishedPages} pages")}: " +
+                $"{notRenamed} not renamed, {notReDated} not re-dated, {linkPagesNotSaved} with links not updated, " +
+                $"{notAdded} new not added",
+                course.Code, section);
+
         string said =
-            AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle) +
-            $" Renamed {plan.Renames.Count}, moved {moved} onto " +
-            $"later class days, and updated {plan.LinksToRewrite} link" +
-            $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
+            (created.Count > 0 ? AssistWording.MadeRoom(created.Count, plan.PositionTitle) + " " : "") +
+            $"Renamed {renamed.Count}, moved {moved} onto " +
+            $"later class days, and updated {linksUpdated} link" +
+            $"{(linksUpdated == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
         if (undated.Count > 0) said += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
+        if (notFinished.Count > 0)
+            said += " " + AssistWording.PagesAChangeCouldNotFinish(notFinished.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
@@ -3722,10 +3786,16 @@ public sealed partial class AssistWorkspace
     /// vault switched to Markdown links has bigger problems than this — but it
     /// is a real gap and belongs written down rather than discovered.
     /// </summary>
-    private void RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames)
+    /// <returns>How many links were rewritten on pages that were SAVED (the
+    /// shared rewriter's own count, as the plan counts them), and the names of
+    /// the pages whose rewritten links could not be saved (#422).</returns>
+    private (int Links, List<string> NotSaved) RewriteLinks(Course course, int section, IReadOnlyList<Rename> renames)
     {
-        if (renames.Count == 0) return;
+        var notSaved = new List<string>();
+        if (renames.Count == 0) return (0, notSaved);
         var byName = renames.ToDictionary(r => r.From, r => r.To, StringComparer.OrdinalIgnoreCase);
+        var oldNames = byName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int links = 0;
 
         foreach (string relative in Pages(course, section))
         {
@@ -3743,9 +3813,16 @@ public sealed partial class AssistWorkspace
             // escaping backslash and a link inside code or a comment (#318,
             // #339) — the one shared rewriter.
             string updated = WikiLinks.Rewriting(text, byName);
+            if (updated == text) continue;
 
-            if (updated != text) Save(full, updated);
+            try
+            {
+                Save(full, updated);
+                links += WikiLinks.CountLinksTo(oldNames, text);
+            }
+            catch { notSaved.Add(Path.GetFileNameWithoutExtension(full)); }
         }
+        return (links, notSaved);
     }
 
     // ---- Laying down a unit that has not been written yet ------------------

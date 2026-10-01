@@ -895,6 +895,34 @@ separately from the reader:
   reply's "moved N onto later class days" counts only classes actually
   written, as the mac's `ClassInsertionPlanner` does (a declined class, one
   already on its date and a failed write are not "moved"; review F1).
+  **Since 2026-10-01 every count in that reply is of what was WRITTEN**
+  (#422, bundle 10): "Renamed N" counts renames that happened (a rename
+  whose new name is taken — a page the teacher made after the plan was
+  shown — is not one, and the chain of renames below it fails with it,
+  which is the "highest day first" rule refusing to land on a name in use);
+  links are rewritten only for renames that happened and "updated N links"
+  counts them on pages that were SAVED; a class whose rename did not happen
+  is re-dated at its OLD path, never under the new name (which may be the
+  teacher's own page); a blank class whose name is still taken is not
+  written and not counted in "Made room for N" (the sentence is left out
+  when none was); and every page a write did not finish — a rename, a
+  date, a page of links, a blank class — is NAMED with Windows' own
+  sentence `AssistWording.PagesAChangeCouldNotFinish` (no contract key
+  yet; proposed to the mac as `pagesAChangeCouldNotFinish`), and the trail
+  records `making room did not finish every page` with counts by kind
+  (`appliesOn: ["windows"]` until the mac records it). The bare `catch { }`
+  that swallowed a failed date write is gone. And `PlanPublish` now leaves a
+  declined page out of the pages the front page and dates are worked out
+  from by PATH (`AssistWorkspace.WithoutDeclined`), not by file name, so a
+  second `index.md` is not taken out with it (fix review note 3). Measured
+  honestly: through `PlanPublish` today the collision is not reachable end
+  to end, because the planner keeps one page per file name upstream (its
+  `chosen` and `pagesByTitle` are keyed by title), so the test pins
+  `WithoutDeclined` itself. Rejected: keying the whole planner on paths —
+  `linksFrom`, `referrers` and the walk are title-keyed throughout, and
+  that is a larger change than #422 asks for. Left as the product question
+  #422 records (Russell, 2026-10-01: leave it): a declined class's linked
+  material is still published by the walk and keeps its own date.
   **Getting a section ready for the start of the year and the links
   checklist's Publish name them too since 2026-10-01** (#421, bundle 10 —
   the two callers bundle 9 found still dropping the outcome). Start of year

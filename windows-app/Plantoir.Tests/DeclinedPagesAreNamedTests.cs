@@ -269,7 +269,84 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
             var result = workspace.ApplyInsertClasses(plan);
 
             Assert.Contains($"moved {plan.Moves.Count - 2} onto later class days", result.Message);
+            // #422: the write that FAILED is named, not swallowed.
+            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 2, Day 1" }), result.Message);
+            Assert.Contains("making room for a class did not finish 1 page: 0 not renamed, 1 not re-dated", TrailText);
         }
         finally { File.SetAttributes(locked, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// #422: "Renamed N" counts the renames that HAPPENED. A teacher's page
+    /// made under a new name after the plan was shown blocks the rename onto
+    /// it (and so the chain below it); nothing is overwritten, the teacher's
+    /// page is not given a class's date, and every page left unfinished is
+    /// named — the blank class that could not be added among them.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheRenamesThatHappenedAndNamesTheRest()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        Class("Unit 1, Day 3", "2026-09-12");
+
+        var workspace = Open();
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+        Assert.Equal(2, plan.Renames.Count);
+        string teachers = "---\ntitle: Unit 1, Day 4\npublish: false\n---\nMy own page.\n";
+        File.WriteAllText(ClassPath("Unit 1, Day 4"), teachers);   // made after the plan was shown
+
+        var result = workspace.ApplyInsertClasses(plan);
+
+        Assert.Equal(teachers, File.ReadAllText(ClassPath("Unit 1, Day 4")));
+        Assert.StartsWith("Renamed 0, moved", result.Message);
+        Assert.Contains("updated 0 links", result.Message);
+        Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 1, Day 3", "Unit 1, Day 2" }), result.Message);
+        Assert.Contains("making room for a class did not finish 2 pages: 2 not renamed, 0 not re-dated, 0 with links not updated, 1 new not added",
+            TrailText);
+    }
+
+    /// <summary>
+    /// #422: "updated N links" counts links on pages that were SAVED, and a
+    /// page whose rewritten links could not be saved is named.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheLinksItSavedAndNamesThePageItCouldNot()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        Class("Unit 1, Day 3", "2026-09-12");
+        string notes = Path.Combine(_folder, "courses", "ICS3U", "section1", "Notes.md");
+        File.WriteAllText(notes, "---\npublish: true\n---\nSee [[Unit 1, Day 3]].\n");
+        File.SetAttributes(notes, FileAttributes.ReadOnly);
+        try
+        {
+            var workspace = Open();
+            var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+            Assert.Equal(1, plan.LinksToRewrite);
+
+            var result = workspace.ApplyInsertClasses(plan);
+
+            Assert.Contains("Renamed 2,", result.Message);
+            Assert.Contains("updated 0 links", result.Message);
+            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Notes" }), result.Message);
+        }
+        finally { File.SetAttributes(notes, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// #422 (bundle 9 fix review, note 3): a declined page is matched to the
+    /// planned pages by PATH. Two folders' <c>index.md</c> share a title; taking
+    /// one out must not take the other with it.
+    /// </summary>
+    [Fact]
+    public void ADeclinedPageIsMatchedByPathNotByItsFileName()
+    {
+        var concepts = new PlannedPage("index", "courses/ICS3U/Concepts/index.md", "publishForSection1", true, false, false);
+        var labs = new PlannedPage("index", "courses/ICS3U/Labs/index.md", "publishForSection1", true, false, true);
+
+        var left = AssistWorkspace.WithoutDeclined(new[] { concepts, labs }, new[] { concepts });
+
+        Assert.Equal(new[] { labs }, left);
     }
 }
