@@ -224,10 +224,14 @@ public static class ScheduledRun
     public enum Ending { Deployed, StoodDown, NoLongerStands, JobUnreadable }
 
     /// <summary>Run the job at <paramref name="jobPath"/> now.</summary>
-    public static Ending Execute(string jobPath, World? world = null)
+    public static Ending Execute(string jobPath, World? world = null, string? taskToken = null)
     {
         world ??= new World();
         if (ReadJob(jobPath) is not { } job) return Ending.JobUnreadable;
+        // Ruling 8: the task was set with another job than this one (a crash
+        // between writing a new job and replacing the task). Do nothing, and
+        // leave the task alone.
+        if (!string.IsNullOrEmpty(taskToken) && taskToken != job.Token) return Ending.NoLongerStands;
 
         var course = ReadCourse(job.WorkingFolder, job.CourseCode);
 
