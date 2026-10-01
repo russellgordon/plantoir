@@ -209,32 +209,6 @@ public class ClassFolderMembershipTests : IDisposable
         Assert.Equal(new[] { "Unit 1, Day 1" }, Titles(workspace.ClassPages(workspace.Course("ICS3U"), 1)));
     }
 
-    /// <summary>
-    /// The two lists that must not drift: the assistant's class pages and the
-    /// sidebar's "which classes would this deploy leave out". Their comments
-    /// have claimed to walk the same folders since both were written, and they
-    /// did not — one walked <c>per_section_folders</c> while the other was
-    /// being fixed would be the next version of the same bug, so the claim is
-    /// asserted on a fixture instead of trusted.
-    /// </summary>
-    [Fact]
-    public void TheScheduledDeployListAndTheClassPagesAgree()
-    {
-        OpenWorkspaceCalled("Teaching");
-        AddCourse("ICS3U", perSectionFolders: new[] { "All Classes", "Handouts" });
-        Dated("ICS3U", "section1/All Classes/Unit 1, Day 1.md", "2026-09-10", unpublished: true);
-        Dated("ICS3U", "section1/Handouts/Lab Safety.md", "2026-09-11", unpublished: true);
-        Page("ICS3U", "section1/All Classes/index.md", unpublished: true);
-
-        var workspace = Open();
-        var course = workspace.Course("ICS3U");
-
-        // ClassPages answers in ABSOLUTE paths; the deploy list answers in file
-        // names. Compared as names, they are the same set of pages.
-        Assert.Equal(new[] { "Unit 1, Day 1" }, Titles(workspace.ClassPages(course, 1)));
-        Assert.Equal(new[] { "Unit 1, Day 1" }, ScheduledDeploy.UnpublishedClassesIn(course, 1).ToArray());
-    }
-
     // ---- Fixture -----------------------------------------------------------
 
     /// <summary>

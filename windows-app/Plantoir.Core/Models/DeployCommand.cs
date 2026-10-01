@@ -109,6 +109,29 @@ public static class DeployCommand
         return "Netlify";
     }
 
+    /// <summary>
+    /// A destination by TYPE, in the words an approval card and list_courses
+    /// use: "Netlify", "Cloudflare Pages", "a folder on this computer" — never a
+    /// path, which is machinery on those surfaces and blank for a folder not
+    /// chosen yet (<c>scheduledDeployRefusals.planOpening.cardNaming</c>).
+    /// </summary>
+    public static string CardWords(CourseConfiguration.DeployDestination destination) => destination.Type switch
+    {
+        "local_folder" => "a folder on this computer",
+        "cloudflare_pages" => "Cloudflare Pages",
+        _ => "Netlify",
+    };
+
+    /// <summary>
+    /// Every destination a course deploys to, by TYPE, primary first then each
+    /// additional in the order saved, joined "A", "A and B", "A, B and C" (#400,
+    /// #404). Built from <see cref="CourseConfiguration.AllDeployDestinations"/>,
+    /// the list every deploy walks.
+    /// </summary>
+    public static string EveryDestinationByType(CourseConfiguration configuration) =>
+        Plantoir.Core.Scripting.MultiDestinationDeployRunner.JoinedWithAnd(
+            configuration.AllDeployDestinations.Select(CardWords).ToList());
+
     /// <summary>Where this course's PRIMARY destination deploys to, in the teacher's words.</summary>
     public static string DestinationDescription(CourseConfiguration configuration) =>
         DestinationDescription(new CourseConfiguration.DeployDestination(configuration.DeployTarget, configuration.DeployFolderPath));

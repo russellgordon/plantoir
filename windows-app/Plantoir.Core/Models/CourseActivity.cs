@@ -40,6 +40,36 @@ public static class CourseActivity
         }
     }
 
+    // ---- Preview BUILDS, for the quit question (#231, mac #232) ------------
+
+    private static readonly List<PublishRecord> _previewBuilds = new();
+
+    /// <summary>
+    /// Record a preview being BUILT — from the press until its page first
+    /// answers, or the run ends. Not the port lease: that is held for as long
+    /// as the preview is OPEN, and an open preview is not work that can be lost.
+    /// A publish's own build is not recorded here; the publish already is.
+    /// </summary>
+    public static IDisposable BeginPreviewBuild(string folderPath, string courseCode, int sectionNumber)
+    {
+        var record = new PublishRecord(folderPath, courseCode, sectionNumber);
+        lock (_gate) _previewBuilds.Add(record);
+        return new Token(() => { lock (_gate) _previewBuilds.Remove(record); });
+    }
+
+    private sealed class Token(Action end) : IDisposable
+    {
+        private Action? _end = end;
+        public void Dispose() { _end?.Invoke(); _end = null; }
+    }
+
+    /// <summary>What this app has under way right now, for the quit question.</summary>
+    public static QuitConfirmation.UnderWay UnderWay()
+    {
+        lock (_gate)
+            return new QuitConfirmation.UnderWay(_publishes.Count, PreviewLeases.Active.Count(), _previewBuilds.Count, 0);
+    }
+
     public static bool IsPreviewing(string folderPath, string courseCode) =>
         PreviewLeases.Active.Any(l => l.FolderPath == folderPath && l.CourseCode == courseCode);
 
@@ -86,7 +116,7 @@ public static class CourseActivity
 
     public static void Reset()
     {
-        lock (_gate) _publishes.Clear();
+        lock (_gate) { _publishes.Clear(); _previewBuilds.Clear(); }
         PreviewLeases.Reset();
     }
 }

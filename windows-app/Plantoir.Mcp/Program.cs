@@ -61,7 +61,13 @@ IDisposable? lease = workspace.LockedCourse is { } locked
     ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, locked,
         Plantoir.Core.Assist.WorkLease.Assisting)
     : null;
-AppDomain.CurrentDomain.ProcessExit += (_, _) => lease?.Dispose();
+// Its own work stops BEFORE any lease goes (#289): a build this server started
+// must not keep writing the section's folder after the course reads as free.
+AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+{
+    LauncherRunner.StopEverythingItStarted();
+    lease?.Dispose();
+};
 
 var builder = Host.CreateApplicationBuilder();
 
@@ -76,5 +82,9 @@ builder.Services.AddMcpServer(options =>
     .WithToolsFromAssembly();
 
 try { await builder.Build().RunAsync(); }
-finally { lease?.Dispose(); }
+finally
+{
+    LauncherRunner.StopEverythingItStarted();
+    lease?.Dispose();
+}
 return 0;
