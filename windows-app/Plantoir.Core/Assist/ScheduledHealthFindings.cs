@@ -116,6 +116,13 @@ public static class ScheduledHealthFindings
                                dated.TrailSentence, dated.Course, dated.Section, writtenAt);
         }
 
+        // The build's PLANTOIR_KEPT_OFF: line (#340), when the wrapper's scan keeps it.
+        foreach (var keptOff in HowITeachKeptOffReport.ReportsIn(lines))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.HowITeachPageKeptOff,
+                               keptOff.TrailSentence, keptOff.Course, keptOff.Section, writtenAt);
+        }
+
         // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395), appended by the
         // wrapper's Cloudflare leg: an overnight publish is exactly the one
         // nobody watched remake the project, and its address may have changed.

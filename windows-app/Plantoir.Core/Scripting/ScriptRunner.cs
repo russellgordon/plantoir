@@ -580,7 +580,8 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         // only when it cannot become a finding.
         if (_unscannedHealthOutput.Length > 8000 &&
             !_unscannedHealthOutput.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal) &&
-            !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput))
+            !Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(_unscannedHealthOutput) &&
+            !Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(_unscannedHealthOutput))
             _unscannedHealthOutput = "";
     }
 
@@ -593,6 +594,15 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         {
             ActivityTrail.Note(ActivityTrail.Event.PagesDatedByTheBuild,
                                dated.TrailSentence, dated.Course, dated.Section);
+            return;
+        }
+
+        // The build's PLANTOIR_KEPT_OFF: line (#340): a How I Teach page the
+        // course's settings had listed is now kept off the site.
+        if (Plantoir.Core.Models.HowITeachKeptOffReport.Parse(line) is { } keptOff)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.HowITeachPageKeptOff,
+                               keptOff.TrailSentence, keptOff.Course, keptOff.Section);
             return;
         }
 

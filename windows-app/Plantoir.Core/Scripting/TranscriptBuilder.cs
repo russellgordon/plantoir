@@ -84,7 +84,9 @@ public sealed class TranscriptBuilder
         // reason: a JSON line a teacher would otherwise read, with the build's
         // plain sentence printed beside it. The report is read from the RAW
         // text by ScriptRunner before this builder sees it.
-        || Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(line);
+        || Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(line)
+        // PLANTOIR_KEPT_OFF: (#340, howITeachPage.keptOffMarker), the same way.
+        || Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(line);
 
     /// <summary>Monotonic counter bumped on every append — cheap change detection.</summary>
     public long Version => _version;

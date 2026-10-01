@@ -3651,6 +3651,10 @@ pair (#209) and the `prepare_for_start_of_year` pair (#96) are not in
 opened. Both servers therefore declare 37 names, and five on each side are the
 other's — equal counts, different sets (re-counted 2026-09-27 against
 `assist-cases.json` → `toolSchemas.mcp` and the `[McpServerTool]` names).
+**Updated 2026-09-30 (Windows #340):** `plantoir-mcp.exe` now serves the three
+How I Teach tools too, so it declares **40** names: the mac's 37 less the
+start-of-year pair (still owed, #355), plus Windows' five. The two sets differ
+by five one way and two the other.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
@@ -5999,6 +6003,51 @@ the page was read THROUGH THE TOOL or with the agent's own file tools. A
 shortfall on B is recorded on #209 and flagged, not tuned away (steer with
 code, not descriptions), and does not block the merge. Results: not yet run
 (Russell's list, `ready/209.md`).
+
+### On Windows (#340, 2026-09-30)
+
+`plantoir-mcp.exe` serves the three tools with the contract's schemas, in
+`PlantoirTools.cs` → "The How I Teach page"; the disk half is
+`AssistWorkspace.HowITeach.cs`, and the page rules (name folding, settings
+block, mark, words) are `Plantoir.Core/Models/HowITeachPage.cs`, a close port of
+the mac's `HowITeachPage.swift` so the two cannot disagree about the same
+bytes. `HowITeachTests` deserialises `nameCases`, `markCases` and
+`emptyPageIsNotWritten.cases` rather than retyping them. What is worth knowing
+before changing it:
+
+- **The BOM.** `File.ReadAllText` drops a leading byte-order mark exactly as
+  Foundation does, so the page is read as bytes and decoded with a strict
+  `UTF8Encoding`, which KEEPS U+FEFF; writing that string back with a
+  no-BOM encoder emits the mark again. The undo entry's "after" is the file as
+  `ReadAllText` reads it back (BOM gone), or `UndoHistory` would see the page
+  as edited since and leave it alone; "before" keeps the BOM.
+- **The listing skip is at each listing, never in the walk.** `Pages()` (so
+  `list_pages` and curriculum targets), `Page()` (by title) and
+  `PlanPublish`'s page list leave the page out; asked for by name, `Page()`
+  refuses and `PlanPublish` adds `howITeachIsNeverPublished` to its problems
+  rather than "no page is called that". `PagePaths.MarkdownPages` and the
+  link rewriting are untouched (`notListedAsAPage.notNarrowed`).
+- **`list_courses`' line goes to an outside door only.** The in-app window
+  reaches `list_courses` through a fixed phrasing over the SAME server binary,
+  so the window's `McpClient` sets `PLANTOIR_LOCAL_WINDOW=1` and the server
+  leaves the line out. Rejected: keying it on `--course` (both the window and
+  the Claude door pass it), and stripping it in `AssistAgent` (the window would
+  then have to know a sentence it never says).
+- **A backup that cannot be made does not stop the save** — the mac's choice,
+  with "with no backup, because one could not be made" on the trail. Every other
+  Windows write refuses instead; this one follows the mac because the page is
+  never on the site and the undo entry still holds the previous text.
+- **No reference-course gate yet**: Windows has no courses kept for reference
+  (#241). When it does, the PLAN must refuse one, as the mac's does, or it
+  promises what the write will refuse.
+- **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
+  from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
+  scan now keeps the line), and hidden from the console a teacher reads
+  (`TranscriptBuilder`), as `PLANTOIR_DATED:` is.
+- **The Claude door's greeting** carries `greetingHowITeachSentence` verbatim,
+  straight after "Start by listing its sections…" — added in the same piece as
+  the tools, never before them, for the reason the issue gives.
+- Not done here: Course Settings' row (#360) and MCP `instructions` (mac only).
 
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
 
