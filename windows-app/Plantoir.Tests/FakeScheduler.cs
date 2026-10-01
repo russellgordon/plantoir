@@ -25,6 +25,12 @@ internal sealed class FakeScheduler : IDisposable
     /// <summary>Every /Create, as its arguments.</summary>
     public List<IReadOnlyList<string>> Created { get; } = new();
 
+    /// <summary>The task definition each /Create /XML carried, read at the moment of the call.</summary>
+    public List<string> CreatedXml { get; } = new();
+
+    /// <summary>What the task's job file said at the moment each /Create was called.</summary>
+    public List<string?> JobAtCreate { get; } = new();
+
     public bool DeletingFails { get; set; }
     public bool CreatingFails { get; set; }
 
@@ -74,6 +80,10 @@ internal sealed class FakeScheduler : IDisposable
         if (arguments.Contains("/Create"))
         {
             Created.Add(arguments);
+            int xml = arguments.ToList().IndexOf("/XML");
+            if (xml >= 0) CreatedXml.Add(File.ReadAllText(arguments[xml + 1]));
+            string job = TaskScheduling.JobPath(name);
+            JobAtCreate.Add(File.Exists(job) ? File.ReadAllText(job) : null);
             if (CreatingFails) return (1, "ERROR: Access is denied.");
             Tasks[name] = "10/1/2026 6:30:00 AM";
             return (0, "SUCCESS");

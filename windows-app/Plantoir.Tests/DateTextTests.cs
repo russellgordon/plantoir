@@ -341,8 +341,6 @@ public class DateTextTests
     /// </summary>
     private static readonly (string File, string Contains, string Why)[] DeliberatelyCultural =
     [
-        ("TaskScheduling.cs", "when.ToString(format)",
-            "schtasks.exe accepts a date only in the machine's own short format; DateFormats is walked until it takes one."),
         ("TaskScheduling.cs", "DateTime.TryParse(fields[1], out var when)",
             "parses schtasks' Next Run Time column (/Query /FO CSV), which Windows wrote in the machine's culture."),
         // The three below are fixed on origin/issue/159-settle-the-day-once

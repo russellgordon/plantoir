@@ -56,7 +56,7 @@ public static class ScheduledRun
     /// <summary>What a task hands the run: which folder, course and section, for when, and what the teacher was told.</summary>
     /// <param name="Promised">Where the teacher was told it would go, as destination descriptions — NEVER read to decide where it goes.</param>
     public sealed record Job(string TaskName, string WorkingFolder, string CourseCode, int Section,
-                             DateTimeOffset? ScheduledFor, IReadOnlyList<string> Promised);
+                             DateTimeOffset? ScheduledFor, IReadOnlyList<string> Promised, string Token = "");
 
     public static string WriteJob(Job job) => new JsonObject
     {
@@ -66,6 +66,7 @@ public static class ScheduledRun
         ["course"] = job.CourseCode,
         ["section"] = job.Section,
         ["scheduledFor"] = job.ScheduledFor?.UtcDateTime.ToString("O"),
+        ["token"] = job.Token,
         ["promised"] = new JsonArray(job.Promised.Select(p => (JsonNode?)JsonValue.Create(p)).ToArray()),
     }.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
@@ -86,7 +87,8 @@ public static class ScheduledRun
             DateTimeOffset? scheduledFor = DateTimeOffset.TryParse(stored, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var when) ? when : null;
             var promised = (o["promised"] as JsonArray)?.Select(p => p?.GetValue<string>() ?? "")
                                .Where(p => p.Length > 0).ToList() ?? new List<string>();
-            return new Job(name, folder, course, section, scheduledFor, promised);
+            string token = o["token"]?.GetValue<string>() ?? "";
+            return new Job(name, folder, course, section, scheduledFor, promised, token);
         }
         catch { return null; }
     }
@@ -336,7 +338,9 @@ public static class ScheduledRun
     /// </summary>
     private static void ClearIfStillMine(Job job, string jobPath)
     {
-        if (ReadJob(jobPath) is { } now && now.ScheduledFor != job.ScheduledFor) return;
+        // By the token each setting writes, not by the moment: a re-set for
+        // the SAME minute is still a different deploy (ruling 3).
+        if (ReadJob(jobPath) is { } now && !IsTheSameSetting(now, job)) return;
         TaskScheduling.Cancel(new TaskScheduling.ScheduledTask(job.TaskName, job.WorkingFolder, job.CourseCode, job.Section, null));
     }
 
@@ -348,7 +352,10 @@ public static class ScheduledRun
     private static bool StillStands(Job job, string jobPath) =>
         TaskScheduling.Exists(job.TaskName)
         && ReadJob(jobPath) is { } now
-        && now.ScheduledFor == job.ScheduledFor;
+        && IsTheSameSetting(now, job);
+
+    private static bool IsTheSameSetting(Job a, Job b) =>
+        a.Token.Length > 0 || b.Token.Length > 0 ? a.Token == b.Token : a.ScheduledFor == b.ScheduledFor;
 
     private static void NoteTheSettings(Job job, Course? course, Decision decision, bool wentAhead)
     {
