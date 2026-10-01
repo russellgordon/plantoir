@@ -75,6 +75,18 @@ public class ContractTests
         Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
         Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
 
+        // #352 (mac #197) and #203 / #342 (mac #173 / #201): methods, so the
+        // value walk below cannot see them; rendered here with the
+        // contract's own placeholders and literal titles.
+        Assert.Equal(wording["everyPageIsNotAPageToPublish"]!.ToString(), AssistWording.EveryPageIsNotAPageToPublish("{example}"));
+        Assert.Equal(wording["everyPageIsNotAPageToHide"]!.ToString(), AssistWording.EveryPageIsNotAPageToHide("{example}"));
+        Assert.Equal(wording["noPageCalled"]!.ToString(), AssistWording.NoPageCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["noPagesCalled"]!.ToString(), AssistWording.NoPagesCalled("{course}", "{section}", "{pages}"));
+        Assert.Equal(wording["linkedClassWasLeftAlone"]!.ToString(), AssistWording.LinkedClassWasLeftAlone(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["linkedClassesWereLeftAlone"]!.ToString(),
+                     AssistWording.LinkedClassesWereLeftAlone(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+        Assert.Equal(wording["linkedClassStaysVisible"]!.ToString(), AssistWording.LinkedClassStaysVisible("Unit 2, Day 4"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();

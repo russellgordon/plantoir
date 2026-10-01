@@ -206,6 +206,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// <summary>How many of each kind to name before summarising.</summary>
     private const int MostListed = 15;
 
+    /// <summary>How many links into hidden pages check_section names before counting the rest — the build's number.</summary>
+    private const int HiddenLinksNamed = 10;
+
     [McpServerTool(Name = "check_section", Title = "Check what students would see",
                    ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what do students see right now?\", \"what would students see in this section right now?\", " +
@@ -253,10 +256,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var lines = new List<string>();
                 string word = dangling.Count == 1 ? "link" : "links";
                 lines.Add($"{dangling.Count} {word} would take a student to a page that isn’t there:");
-                foreach (var link in dangling.Take(MostListed))
+                // Ten named and the rest counted, as the build's own
+                // linksIntoHiddenPages finding does (#359 / mac #333:
+                // siteHealth.linksIntoHiddenPages, expectDetailNames).
+                foreach (var link in dangling.Take(HiddenLinksNamed))
                     lines.Add($"• {workspace.Relative(link.From)}  →  {Path.GetFileNameWithoutExtension(link.To)}  (hidden)");
-                if (dangling.Count > MostListed)
-                    lines.Add($"…and {dangling.Count - MostListed} more.");
+                if (dangling.Count > HiddenLinksNamed)
+                    lines.Add($"…and {dangling.Count - HiddenLinksNamed} more.");
                 lines.Add("Either publish the page each one points at, or take the link off the page that points at it.");
                 paragraphs.Add(string.Join("\n", lines));
             }

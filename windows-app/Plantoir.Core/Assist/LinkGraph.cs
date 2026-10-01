@@ -59,7 +59,7 @@ public sealed class LinkGraph
         {
             string text;
             try { text = File.ReadAllText(page); } catch { continue; }
-            foreach (var resolution in WikiLinks.Resolve(WikiLinks.Parse(text), byName, courseDirectory, page))
+            foreach (var resolution in WikiLinks.Resolve(WikiLinks.PageLinks(text), byName, courseDirectory, page))
             {
                 if (resolution.Outcome != LinkOutcome.Resolved) continue;
                 string target = Path.GetFullPath(resolution.Path!);
@@ -161,7 +161,8 @@ public sealed class LinkGraph
     /// <para>Per shared-rules.json → followingLinks, landing pages (index.md),
     /// curriculum pages and Key Links / its targets are excluded too. Note
     /// that list answers a DIFFERENT question — what unpublishing must never
-    /// sweep up — and a class page is very much swept. The two exclusions
+    /// sweep up. Since #342 (mac #201) unpublishing does not sweep a class
+    /// either, but as a STOP in the walk, not an entry in that list. The two exclusions
     /// happen to be applied in one place; do not merge them.</para>
     /// </summary>
     /// <param name="keyLinksTargets">Pages this section's Key Links points at.</param>

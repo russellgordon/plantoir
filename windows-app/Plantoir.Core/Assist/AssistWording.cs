@@ -401,6 +401,28 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - The walk stops at a class page (#203 / #342, mac #173 / #201)
+
+    /// <summary>
+    /// One linked class a PUBLISH stopped at, said on the plan and in the
+    /// reply, and only about a class students cannot certainly see already:
+    /// "publish it when you get to that class" is false about a published one.
+    /// </summary>
+    public static string LinkedClassWasLeftAlone(IReadOnlyList<string> classes) =>
+        $"{PublishPlan.Listing(classes)} is a class of its own, so it stays as it is \u2014 publish it when you get to that class.";
+
+    /// <summary>Several linked classes a publish stopped at. Two keys for one function: one rendering cannot show both branches.</summary>
+    public static string LinkedClassesWereLeftAlone(IReadOnlyList<string> classes) =>
+        $"{PublishPlan.Listing(classes)} are classes of their own, so they stay as they are \u2014 publish each one when you get to it.";
+
+    /// <summary>
+    /// A linked class an UNPUBLISH left visible, under "N linked page(s) stay
+    /// visible:". Only for a class students can see; a hidden linked class is
+    /// not mentioned.
+    /// </summary>
+    public static string LinkedClassStaysVisible(string page) =>
+        $"\u201c{page}\u201d stays visible, because it is a class of its own.";
+
     // MARK: - A page list that names no page (#352 / mac #197)
 
     /// <summary>
