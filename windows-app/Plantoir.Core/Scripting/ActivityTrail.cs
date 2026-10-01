@@ -105,6 +105,25 @@ public static class ActivityTrail
         /// </summary>
         PagesDatedByTheBuild,
         /// <summary>
+        /// An outside assistant read a course's How I Teach page (#340, mac
+        /// #209): the course and the word count, or that there was none or it
+        /// was empty -- never a word of it.
+        /// </summary>
+        HowITeachPageRead,
+        /// <summary>
+        /// An outside assistant saved a course's How I Teach page: created or
+        /// replaced, the word counts, and the backup made first. Never the
+        /// words -- the question it answers is "did I write this, or did an
+        /// assistant?".
+        /// </summary>
+        HowITeachPageWritten,
+        /// <summary>
+        /// A build dropped a How I Teach page the course's settings had listed
+        /// for the site (the build's PLANTOIR_KEPT_OFF: line), so a page
+        /// earlier builds published is now kept back. The pages' places only.
+        /// </summary>
+        HowITeachPageKeptOff,
+        /// <summary>
         /// A teacher put a section back to how it was when an assistant
         /// conversation started. Carries the course, the section and the
         /// backup's file name -- never a page. The one line that explains a
@@ -323,6 +342,9 @@ public static class ActivityTrail
         Event.FolderProblemRepaired => "folder problem repaired",
         Event.FolderProblemNotRepaired => "folder problem not repaired",
         Event.PagesDatedByTheBuild => "pages dated by the build",
+        Event.HowITeachPageRead => "How I Teach page read",
+        Event.HowITeachPageWritten => "How I Teach page written",
+        Event.HowITeachPageKeptOff => "How I Teach page kept off the website",
         Event.SectionRestored => "section restored",
         Event.AssistantEngineSaid => "assistant engine said",
         Event.ItemExcluded => "item excluded",

@@ -75,6 +75,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // EVERY destination by type (#404, mac #403) — it used to name the
             // primary alone, and a folder with no path chosen yet as Netlify.
             text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
+            // To an outside door only (#340, howITeachPage.listCoursesLine).
+            if (workspace.HowITeachListingLine(course) is { } howITeach) text.AppendLine(howITeach);
         }
         return text.ToString().TrimEnd();
     }
@@ -1827,6 +1829,52 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         => GuardedResult(() => AssistWording.BackedUpCourse(
             workspace.Course(course).Code,
             System.IO.Path.GetFileName(workspace.BackUp(course, section))));
+
+    // ---- The How I Teach page (#340, mac #209), MCP only -----------------
+    //
+    // The local model is never shown these: a small router drafting a
+    // teacher's pedagogy is the wrong job for it, and a prompt change would
+    // owe a routing re-measurement (howITeachPage.tools.surface).
+
+    [McpServerTool(Name = "read_how_i_teach", Title = "Read the How I Teach page", ReadOnly = true, Destructive = false)]
+    [Description("Read the teacher's How I Teach page for a course: their own account of how the course is taught. " +
+                 "Read it before drafting or revising any page in the course, and keep to it. If there is none yet, " +
+                 "it says how to offer to draft one. Changes nothing.")]
+    public CallToolResult ReadHowITeach(
+        [Description("The course code, for example ICS3U.")] string course)
+        => GuardedResult(() => workspace.ReadHowITeach(course));
+
+    [McpServerTool(Name = "plan_write_how_i_teach", Title = "Plan saving the How I Teach page",
+                   ReadOnly = true, Destructive = false)]
+    [Description("Shows where the teacher's How I Teach page would be saved and whether it replaces one they " +
+                 "already have, changing nothing. Use it before write_how_i_teach, and show the teacher the whole text.")]
+    public CallToolResult PlanWriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        // MARKED, so the window would offer Go if anything ever gated on it.
+        => Guarded(() => Proposing(workspace.PlanWriteHowITeach(course, text, replacing)));
+
+    [McpServerTool(Name = "write_how_i_teach", Title = "Save the How I Teach page", Destructive = false, Idempotent = false)]
+    [Description("Save the teacher's How I Teach page for a course, once they have read the whole text and agreed. " +
+                 "Call plan_write_how_i_teach FIRST. The course is backed up first, and the page is never put on the website.")]
+    public CallToolResult WriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        => Guarded(() =>
+        {
+            var result = workspace.WriteHowITeach(course, text, replacing);
+            return Answering(result.Message,
+                result.BackupPath is null ? result.Message : result.Message + "\n\n" + AssistWorkspace.BackedUpNote);
+        });
+
+    private const string HowITeachTextHelp =
+        "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- settings block at the top.";
+
+    private const string HowITeachReplacingHelp =
+        "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach gave for it, passed " +
+        "only after the teacher agreed to replace their page. Leave empty for a new page.";
 
     // ---- Shared ----------------------------------------------------------
 

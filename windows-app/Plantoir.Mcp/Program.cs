@@ -45,7 +45,10 @@ try
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
-    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory());
+    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory())
+    {
+        ServesTheLocalWindow = Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable) == "1",
+    };
 }
 catch (Exception error)
 {

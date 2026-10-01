@@ -401,6 +401,59 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - The How I Teach page (#340, mac #209)
+
+    public static string HowITeachAlreadyWritten(string course) =>
+        $"Nothing was saved: {course} already has a How I Teach page, and a teacher's own page is never replaced without their agreement. Use plan_write_how_i_teach, show the teacher what it says, and pass the mark it gives as replacing only if they agree to replace their page.";
+
+    public static string HowITeachBriefing(string course) =>
+        $"These courses have a How I Teach page — the teacher's own account of how the course is taught. Read it with read_how_i_teach before drafting or revising anything in that course, and keep to it:\n  {course}";
+
+    public const string HowITeachCarriesNoSettings =
+        "Nothing was saved: pass the page's words only, without a --- settings block at the top. Plantoir writes the page's settings itself.";
+
+    public static string HowITeachChangedSincePlanned(string course) =>
+        $"Nothing was saved: the How I Teach page for {course} is not the one that was planned — it has changed since, or that is not its mark. Plan again with plan_write_how_i_teach and show the teacher before replacing it.";
+
+    public static string HowITeachCutShort(string course, string path) =>
+        $"The How I Teach page for {course} is longer than one answer can carry, so it stops here. The rest is in {path} — read it with your own tools.";
+
+    public const string HowITeachDraftingBrief =
+        "If you offer to draft it: offer first, and draft only if the teacher says yes. Before drafting, read the course's own pages with the plantoir tools — the section's landing page, class pages from at least two different units, and a few of its warm-ups, tasks and discussions where there are any; if a course kept for reference has the same code, read that too. Write in the teacher's own first person. Say what the pages SHOW — how a class is shaped, whether ideas are explored before they are named, how practice and feedback work, the kinds of page that keep coming back and what each is for, and how the pages speak to students — and never invent what they do not show. Aim for 200 to 500 words. Show the teacher the whole draft and change it until they agree. Then save it with plan_write_how_i_teach and write_how_i_teach, never with your own file tools, so it is kept off the website, backed up first and can be undone.";
+
+    public static string HowITeachEmpty(string course) =>
+        $"{course}’s How I Teach page has been started but has nothing written in it yet, so there is nothing to keep to. The teacher can write it in Obsidian, or you can offer to draft one; saving a draft fills the empty page, and needs no replacing mark.";
+
+    public static string HowITeachIsNeverPublished(string course) =>
+        $"The How I Teach page for {course} is never put on the website — it is for you and your assistant. To share something like it with students, make a page with a different name.";
+
+    public const string HowITeachListedAsNotWritten =
+        "  How I Teach page: not written yet";
+
+    public const string HowITeachListedAsWritten =
+        "  How I Teach page: yes";
+
+    public static string HowITeachMissing(string course) =>
+        $"{course} has no How I Teach page yet. It would be a page named exactly “How I Teach”, at the top of the {course} course folder beside its other pages — only a page with exactly that name, in exactly that place, is kept off the website. The teacher can write it there in Obsidian, or you can offer to draft one.";
+
+    public const string HowITeachNeedsWords =
+        "Nothing was saved: the page's text is empty. Pass the words of the page as text.";
+
+    public static string HowITeachPlanCreates(string course, string path) =>
+        $"This would save a new How I Teach page for {course} at {path}, set so it is never put on the website. Show the teacher the whole text and wait for them to agree before calling write_how_i_teach.";
+
+    public static string HowITeachPlanReplaces(string course, string path, string words, string changed, string mark) =>
+        $"{course} already has a How I Teach page, at {path} ({words} words, last changed {changed}). Saving would REPLACE what it says; any settings at its top are kept. Show the teacher the whole new text, tell them it replaces the page they have, and only if they agree call write_how_i_teach with replacing: “{mark}”.";
+
+    public static string HowITeachRead(string course, string text) =>
+        $"Here is the How I Teach page for {course}: the teacher's own account of how this course is taught. Keep to it in anything you draft or revise for {course}. It is never put on the website.\n\n{text}";
+
+    public static string HowITeachSaved(string course) =>
+        $"Saved the How I Teach page for {course}. It’s in the course folder beside your other pages, so you can change it in Obsidian any time. It’s never put on your website.";
+
+    public const string HowITeachTooLong =
+        "Nothing was saved: that is longer than a How I Teach page can be (8000 characters). Make it shorter and show the teacher again.";
+
     // MARK: - Shared fragments
 
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";

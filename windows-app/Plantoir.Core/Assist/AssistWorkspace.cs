@@ -30,7 +30,7 @@ namespace Plantoir.Core.Assist;
 /// declines what it has no tool for, which is why "delete the Unit 1 folder"
 /// was harmless in testing; that property is worth keeping by construction.
 /// </summary>
-public sealed class AssistWorkspace
+public sealed partial class AssistWorkspace
 {
     private readonly string _folder;
     private readonly ILauncherRunner _launcher;
@@ -221,6 +221,7 @@ public sealed class AssistWorkspace
     /// <summary>Every page of a section, as paths relative to the working folder.</summary>
     public List<string> Pages(Course course, int sectionNumber) =>
         PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .Where(page => ListsAsAPage(course, page))   // never the How I Teach page (#340)
             .Select(Relative).ToList();
 
     /// <summary>
@@ -428,8 +429,14 @@ public sealed class AssistWorkspace
             if (File.Exists(direct)) return direct;
         }
 
+        // Asked for by name, the How I Teach page is never published or
+        // hidden — it is never on the site (#340, howITeachPage.notListedAsAPage).
+        if (HowITeachPage.IsItsTitle(wanted))
+            throw new AssistRefusal(AssistWording.HowITeachIsNeverPublished(course.Code));
+
         string bare = wanted.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? wanted[..^3] : wanted;
         var matches = PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .Where(p => ListsAsAPage(course, p))
             .Where(p => string.Equals(System.IO.Path.GetFileNameWithoutExtension(p), bare,
                                       StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -488,8 +495,10 @@ public sealed class AssistWorkspace
             ? ProtectedFromHiding(course, section)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Read all markdown pages in the section
-        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section);
+        // Read all markdown pages in the section — never the How I Teach
+        // page, which no publish can put on the site (#340).
+        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section)
+            .Where(page => ListsAsAPage(course, page)).ToList();
         var pagesList = new List<PlannedPage>();
         var pagesByTitle = new Dictionary<string, PlannedPage>(StringComparer.OrdinalIgnoreCase);
 
@@ -546,6 +555,11 @@ public sealed class AssistWorkspace
         {
             string wanted = title.Trim();
             if (wanted.Length == 0) continue;
+            if (HowITeachPage.IsItsTitle(wanted))
+            {
+                problems.Add(AssistWording.HowITeachIsNeverPublished(course.Code));
+                continue;
+            }
 
             // Expand a whole unit if the title is like "Unit 4" - in the
             // course's OWN word, so "publish Module 4" is understood at all.

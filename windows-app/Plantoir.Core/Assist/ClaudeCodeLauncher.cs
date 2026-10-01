@@ -169,6 +169,10 @@ public static class ClaudeCodeLauncher
     /// the teacher first — and an assistant that starts by reading is far more
     /// useful than one that starts by asking what to do.
     /// </summary>
+    /// <summary><c>outsideAgents.greetingHowITeachSentence</c>.</summary>
+    internal const string HowITeachSentence =
+        "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
+
     internal static string Greeting(string courseCode, string courseName)
     {
         var text = new StringBuilder();
@@ -177,6 +181,13 @@ public static class ClaudeCodeLauncher
             text.Append($" ({courseName})");
         text.Append(" in Plantoir. Use the plantoir tools for anything to do with this course. ");
         text.Append("Start by listing its sections so we both know what's there. ");
+        // app-rules.json → outsideAgents.greetingHowITeachSentence, verbatim
+        // (#340): the LOAD-BEARING channel for the page — measured on the mac,
+        // a tool description saying "call first" was deferred, the greeting
+        // was acted on at once. Only now that the three tools exist: a door
+        // asking for a page with no tool behind it sends the agent to its own
+        // file tools, past every guard and the trail.
+        text.Append(HowITeachSentence + " ");
         text.Append("Before changing anything, use the matching plan tool first and show me what it says, ");
         text.Append("in plain words, and wait for me to agree.");
         return text.ToString().Replace("\"", "'");
