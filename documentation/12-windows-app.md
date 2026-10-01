@@ -909,10 +909,13 @@ folder and then Netlify again in Course Settings left Revert on
 every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
 
 Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
-29–32 s; its first preview served 52 s after Preview was pressed; publishing a
-one-section course to a folder 1 m 52 s – 3 m 3 s per test (build included);
-the end-to-end set of 13 tests 17 m 40 s – 20 m 33 s; the whole suite of 40,
-43 m 38 s.
+29–32 s; its first preview served 52–61 s after Preview was pressed;
+publishing a one-section course to a folder 1 m 52 s – 3 m 3 s per test (build
+included); the end-to-end set of 13 tests 16 m 47 s – 20 m 33 s; the whole
+suite of 40, 43 m 38 s – 48 m 43 s. After the harness lessons above, the whole
+suite ran 40 of 40 and the end-to-end set 13 of 13 twice more in a row, with no
+launcher left running, no new folder under the real builds root and the real
+trail untouched.
 
 ### Never start the app with its output redirected
 
