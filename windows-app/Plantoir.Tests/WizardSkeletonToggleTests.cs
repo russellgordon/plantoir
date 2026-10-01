@@ -43,9 +43,7 @@ public class WizardSkeletonToggleTests
         var cases = Toggle["cases"]!.AsArray();
         Assert.True(cases.Count >= 17, $"wizard.skeletonToggle lost cases: {cases.Count} (17 when this was written)");
 
-        // TEMPORARY (#169 commit): the five example-content cases need #250's
-        // takingExampleContent flag and run from the next commit.
-        var failures = cases.Where(c => c!["given"]!["takesExampleContent"] is null).SelectMany(c => Run(c!)).ToList();
+        var failures = cases.SelectMany(c => Run(c!)).ToList();
         Assert.True(failures.Count == 0, string.Join("\n", failures));
     }
 
@@ -128,7 +126,7 @@ public class WizardSkeletonToggleTests
         void Adopt(string forCode)
         {
             if (!toggleOn) return;
-            var adopted = SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, forCode,
+            var adopted = SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, forCode, taking,
                 lists.SharedFolders, WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
             if (adopted is null) return;
             snapshot = WizardStructure.Adopting(adopted);
@@ -170,7 +168,7 @@ public class WizardSkeletonToggleTests
 
         if (c["expectSavedUseSkeleton"] is JsonNode saved)
         {
-            bool written = SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, code) && toggleOn;
+            bool written = SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, code, taking) && toggleOn;
             if (written != saved.GetValue<bool>())
                 problems.Add($"{name}: use_skeleton expected {saved}, would be written {written}");
         }

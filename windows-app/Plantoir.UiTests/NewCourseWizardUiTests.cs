@@ -213,6 +213,100 @@ public class NewCourseWizardUiTests
                     $"{FreshCode} was made on disk but never appeared in the course list");
     }
 
+    // ---- 4. Declining the ready-made pages (GitHub issues #250, #349) -------
+
+    /// <summary>The wizard's half of shared-rules.json, read rather than retyped.</summary>
+    private static JsonNode WizardContract =>
+        JsonNode.Parse(File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "contracts", "shared-rules.json")))!["wizard"]!;
+
+    /// <summary>
+    /// ICS4U has ready-made pages. Turning them DOWN must offer the subject's
+    /// skeleton — the toggle every one of the 38 payload codes hid until #250
+    /// — rendered with its label and the caption written for a DECLINED
+    /// payload (the other caption's "There is no ready-made course for this
+    /// code" would be false one question after offering one).
+    /// </summary>
+    [UiFact]
+    public void ADeclinedPayloadOffersTheSubjectsSkeleton()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        OpenWizard(app);
+        PutCodeIn(app, "ICS4U");
+        TurnOff(app, "prepopulateToggle", "the pre-populate toggle");
+
+        app.Find("skeletonToggle", "the skeleton toggle offered once the ready-made pages are declined");
+        // computer-science reads "a computer studies": no proper noun, a consonant sound.
+        Assert.Equal("Start from a computer studies skeleton",
+            app.Find("skeletonToggleLabel", "the skeleton toggle's label").Name);
+        Assert.Equal(WizardContract["skeletonToggleCaptionWhenExampleContentIsDeclined"]!.ToString(),
+            app.Find("skeletonToggleCaptionWhenExampleContentIsDeclined", "the declined-payload caption").Name);
+    }
+
+    /// <summary>
+    /// Declining the ready-made pages AND the skeleton: the course starts
+    /// empty, and the note says so WITHOUT "isn't available for this course
+    /// code yet" — found by its own automation id, which is why it has one.
+    /// </summary>
+    [UiFact]
+    public void TheNoStartingContentNoteIsRendered()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        OpenWizard(app);
+        PutCodeIn(app, "ICS4U");
+        TurnOff(app, "prepopulateToggle", "the pre-populate toggle");
+        TurnOff(app, "skeletonToggle", "the skeleton toggle");
+
+        Assert.Equal(WizardContract["noStartingContentNote"]!.ToString(),
+            app.Find("noStartingContentNote", "the note for a course starting with nothing at all").Name);
+        Assert.Null(app.FindOrNull("noExampleContentNote", TimeSpan.FromSeconds(1)));
+    }
+
+    /// <summary>
+    /// MCMPR11 — British Columbia's one payload — falls to the GENERAL family,
+    /// whose own label "This Course" rendered "Start from a this course
+    /// skeleton". It reads its own sentence.
+    /// </summary>
+    [UiFact]
+    public void AGeneralFamilyCodeReadsItsOwnLabel()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        OpenWizard(app);
+        PutCodeIn(app, "MCMPR11");
+        TurnOff(app, "prepopulateToggle", "the pre-populate toggle");
+
+        Assert.Equal(WizardContract["skeletonToggleLabelForAGeneralSkeleton"]!.ToString(),
+            app.Find("skeletonToggleLabel", "the skeleton toggle's label").Name);
+    }
+
+    /// <summary>
+    /// #349: the article follows the SOUND and English keeps its capital.
+    /// ENG1D has no ready-made pages, so the toggle is there from the start;
+    /// the expected sentence is the contract's own case for the english family.
+    /// </summary>
+    [UiFact]
+    public void TheArticleFollowsTheSound()
+    {
+        using var app = new DrivenApp(CourseFixtures.WriteBoth);
+        OpenWizard(app);
+        PutCodeIn(app, "ENG1D");
+
+        string expected = WizardContract["skeletonToggleLabelSubject"]!["cases"]!.AsArray()
+            .Single(c => c!["family"]!.ToString() == "english")!["expect"]!.ToString();
+        Assert.Equal(expected, app.Find("skeletonToggleLabel", "the skeleton toggle's label").Name);
+    }
+
+    /// <summary>Turn a toggle off through its Toggle pattern, and wait for it to report off.</summary>
+    private static void TurnOff(DrivenApp app, string automationId, string describedAs)
+    {
+        var toggle = app.Find(automationId, describedAs);
+        var pattern = toggle.Patterns.Toggle.Pattern;
+        if (pattern.ToggleState.Value == ToggleState.On) pattern.Toggle();
+        Assert.True(Retry.WhileFalse(() => pattern.ToggleState.Value == ToggleState.Off,
+                                     TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    $"{describedAs} never turned off");
+    }
+
     // ---- Driving the wizard -----------------------------------------------
 
     /// <summary>Press the button in the course list and wait for the wizard.</summary>
