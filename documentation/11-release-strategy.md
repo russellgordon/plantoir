@@ -146,7 +146,7 @@ still holds, with the names it finally took:
   deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
   earlier — the last release without an updater — have no updater, and install the first release that carries one by hand.
 
-### Updating itself on Windows (#337) — designed, partly built
+### Updating itself on Windows (#337) — built; waiting for a feed, a key and a release
 
 **Built (bundle 8, 2026-10-01), all tested from the contract:**
 `Plantoir.Core/Assist/AppUpdates.cs` — the install gate
@@ -157,11 +157,27 @@ the wording (`UpdateWording`, every sentence pinned and walked against
 `app updated` on the trail at the first launch of a new version (always "by
 hand" until the engine exists). `installer.iss` reads two new parameters.
 
-**Not built:** the engine that fetches the feed and downloads the installer,
-the offer dialog, the menu item, the other seven update trail events (held in
-`NamedGapLedger` under #337), `website/updates/windows.xml`, the key, and the
-RELEASING steps. No release exists to feed, and NetSparkle's API was not
-verified against a restored package, so wiring it blind was rejected.
+**The engine** (`Plantoir.Core/Assist/AppUpdater.cs`, NetSparkleUpdater 3.1.0
+core, API checked against the restored package): no UI factory; our own
+dialogs (`Plantoir/Services/UpdatePrompts.cs`) with `UpdateWording`; the
+daily check plus File ▸ Check for Updates…; Install downloads, then asks
+`EvaluateForInstall` with a FRESH snapshot, and a held install goes ahead by
+itself fifteen seconds after the work ends; the quit path calls `AtQuit`.
+All eight update trail events have call sites. **The feed is read from ONE
+place, `AppUpdates.ConfiguredFeed`, and it is EMPTY**, as is
+`AppUpdates.PublicKey`: while it is, no `SparkleUpdater` is constructed,
+nothing is fetched and the menu item is hidden
+(`AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork`). A Debug build
+constructs nothing at all. The verifier is Ed25519 in `SecurityMode.Strict`,
+which refuses an unsigned feed or download (pinned by
+`TheVerifierRequiresEd25519AndRefusesAnUnsignedFeed`).
+
+**What is not done is only this: no feed, no key, no release.** The first
+release that ships it sets `ConfiguredFeed` to `Feed` and `PublicKey` to the
+key's public half, publishes `website/updates/windows.xml` and its
+`.signature`, and adds the RELEASING steps (proposed in the bundle-8 ready
+note). Measured nowhere yet: a real download, a real silent install, a real
+reopen.
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|

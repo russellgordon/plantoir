@@ -21,6 +21,18 @@ public static class AppUpdates
     /// <summary><c>appUpdates.feed.windows</c>. One key and one feed per platform.</summary>
     public const string Feed = "https://plantoir.app/updates/windows.xml";
 
+    /// <summary>
+    /// THE one place the engine reads its feed from, and EMPTY until a release
+    /// sets it to <see cref="Feed"/> (with <see cref="PublicKey"/>): no feed,
+    /// no key and no release exist yet, so nothing is checked. Set by the
+    /// release flow, never by a setting a teacher can reach (the contract
+    /// rejects a user-settable feed).
+    /// </summary>
+    public const string ConfiguredFeed = "";
+
+    /// <summary>The Ed25519 public key (base64) the feed and download must be signed with. Empty until the key exists.</summary>
+    public const string PublicKey = "";
+
     /// <summary>A development build has no feed at all (decision 5): nothing is constructed, no menu item shows.</summary>
     public static string? FeedFor(bool developmentBuild) => developmentBuild ? null : Feed;
 

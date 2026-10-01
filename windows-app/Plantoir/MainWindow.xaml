@@ -53,6 +53,8 @@
                 <MenuFlyoutItem x:Name="ReloadCoursesItem" Text="Reload Courses" Click="ReloadCourses_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+R" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="SettingsItem" Text="Settings…" Click="Settings_Click" KeyboardAcceleratorTextOverride="Ctrl+," />
+                <MenuFlyoutItem x:Name="CheckForUpdatesItem" Click="CheckForUpdates_Click" Visibility="Collapsed"
+                                AutomationProperties.AutomationId="fileCheckForUpdates" />
             </MenuBarItem>
             <!-- Acts on whichever section's preview is currently shown in
                  DetailHost, matching mac's Preview menu; the accelerator
