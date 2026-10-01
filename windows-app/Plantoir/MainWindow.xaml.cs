@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
 
         Picker.Attach(this);
         Sidebar.Attach(this);
+        ShowUpdateMenuItemIfActive();
 
         Activated += (_, args) =>
         {
@@ -1281,6 +1282,18 @@ public sealed partial class MainWindow : Window
         if (Services.DialogGate.IsOpen(Content?.XamlRoot)) return;   // #191: never under a dialog
         OpenWorkingFolder_Click(sender, null!);
         args.Handled = true;
+    }
+
+    /// <summary>Check for Updates… (#337): shown only when the engine has a feed to read.</summary>
+    private void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.Updater is { } updater) _ = updater.CheckAsync(teacherAsked: true);
+    }
+
+    private void ShowUpdateMenuItemIfActive()
+    {
+        CheckForUpdatesItem.Text = Plantoir.Core.Assist.UpdateWording.MenuItem;
+        CheckForUpdatesItem.Visibility = App.Updater?.IsActive == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void NewWindowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)

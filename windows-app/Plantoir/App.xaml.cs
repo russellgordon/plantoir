@@ -14,6 +14,14 @@ public partial class App : Application
     public static AppSettings Settings { get; private set; } = null!;
     private static readonly List<MainWindow> _windows = new();
 
+    /// <summary>
+    /// The update engine (#337), or null in a development build (no feed at
+    /// all, decision 5). Constructed in a Release build, but INACTIVE — it
+    /// fetches nothing and shows no menu item — while AppUpdates.ConfiguredFeed
+    /// is empty, which it is until a release sets it.
+    /// </summary>
+    public static Plantoir.Core.Assist.AppUpdater? Updater { get; private set; }
+
     /// <summary>The windows open now, as a copy (a handler may open or close one).</summary>
     public static IReadOnlyList<MainWindow> OpenWindows => _windows.ToList();
 
@@ -133,6 +141,26 @@ public partial class App : Application
             }
         }
         catch (Exception ex) { LogDiagnostic($"app updated: {ex.Message}"); }
+
+#if DEBUG
+        const bool developmentBuild = true;
+#else
+        const bool developmentBuild = false;
+#endif
+        if (Plantoir.Core.Assist.AppUpdates.FeedFor(developmentBuild) is not null)
+        {
+            Updater = new Plantoir.Core.Assist.AppUpdater(
+                Plantoir.Core.Assist.AppUpdates.ConfiguredFeed, Plantoir.Core.Assist.AppUpdates.PublicKey,
+                new Services.UpdatePrompts(), Services.UpdatePrompts.Snapshot,
+                Plantoir.Core.Assist.MachineWork.RunningAssistantServers,
+                Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion,
+                Plantoir.Core.Assist.AppUpdates.IsPerUserInstall(AppContext.BaseDirectory,
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
+                Settings.SkippedUpdateVersion,
+                skipped => { Settings.SkippedUpdateVersion = skipped; try { Settings.Save(); } catch { } },
+                _ => QuitConfirmation.WhatIsUnderWay(CourseActivity.UnderWay()));
+            Updater.Start();
+        }
 
         // Name every builds folder this app can name, then sweep the ones
         // whose working folder is gone. Once per process, here, never per
@@ -322,9 +350,31 @@ public partial class App : Application
         Settings.Save();
     }
 
+    /// <summary>The update engine's exit: the installer is already started.</summary>
+    public static void QuitForUpdate()
+    {
+        _installerStarted = true;
+        QuitTime();
+    }
+
+    private static bool _installerStarted;
+
     private static void QuitTime()
     {
         LogDiagnostic("QuitTime called");
+        // atQuit (#337): never refuses; a prepared update is set aside when
+        // work is under way, or installed as Plantoir quits without reopening.
+        try
+        {
+            if (!_installerStarted && Updater is { } updater)
+            {
+                var underWay = CourseActivity.UnderWay();
+                bool working = underWay.Publishes > 0 || underWay.PreviewsBeingBuilt > 0;
+                if (updater.AtQuit(working, QuitConfirmation.WhatIsUnderWay(underWay)) is { } install)
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(install.Path, install.Arguments) { UseShellExecute = false });
+            }
+        }
+        catch (Exception ex) { LogDiagnostic($"update at quit: {ex.Message}"); }
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());

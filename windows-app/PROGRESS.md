@@ -209,8 +209,10 @@ Branch `issue/bundle8-windows-ui`. Manual: doc 12 → "Bundle 8"; doc 11 →
   never closes a busy Plantoir; sweeps only the killed pid's leases;
   `ConPtyProcess.Start` zeroes its std handles (measured: leak reproduced, then
   gone).
-- **Updates** (#337), PART: the rules, gates, wording, installer flags and `app
-  updated`. The engine, dialog, menu item and seven events are owed.
+- **Updates** (#337): the rules, gates, wording, installer flags, the
+  NetSparkle engine with our own dialogs, Check for Updates…, and all eight
+  trail events. Inactive by design: the feed and key are empty until the
+  first release that ships it.
 
 ## Parity run, bundle 6a: course creation and the smaller course pieces (2026-09-30)
 
