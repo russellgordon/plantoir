@@ -1145,18 +1145,19 @@ What replaces the old container concepts:
   sentence); a process table that cannot be read lets the preview THROUGH
   (the opposite of the remake's rule, and why is in
   [03](03-launcher-scripts.md) → "A section being deployed cannot be
-  previewed (#381)"); and never a remembered process id. Until it is done the
-  cases are a named gap against the `windows` issue opened with #381.
+  previewed (#381)"); and never a remembered process id. Built in bundle 4
+  (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
+  window's `CourseActivity.IsPublishingSection` — see "Preview and publish
+  mechanics that match the mac (bundle 4)" above.
 - **Concurrent previews are still isolated by port, exactly as before.**
-  `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
-  base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket — six blocks, where the mac launchers walk forty since GitHub
-  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
-  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
-  when it cannot"; whether its probe sees ANOTHER signed-in account's
-  listeners is the open question the mac answered for itself in #310 — the
-  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
-  app watches for. What changed is only what is listening on that port: a
+  `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
+  8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
+  `contracts/app-rules.json` → `previewPorts.hostBlockCases`, and 03 → "How a
+  folder finds its ports, and when it cannot"). Natively a block is the site
+  port and its websocket (+1000). Whose listeners the probe sees (#319) was
+  measured in bundle 4: SYSTEM and NETWORK SERVICE listeners yes; a second
+  signed-in account was NOT measured (03 → "preview.ps1's own port walk…").
+  It prints the exact "Preview will be available at:" line the app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
   entry below), not a container's forwarded port.
@@ -1209,11 +1210,10 @@ as history, not as what Windows does today.
   "teaching-quartz-$WORKDIR_ID"` variable is still assigned in each script,
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
-- **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
-  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
-  `build_site.py`'s own native re-probe already walks forty blocks from the
-  port it is given): base..base+3 for the preview
+- **Port blocks**: `preview.ps1` walks forty blocks (8081 … 8471, since
+  bundle 4 / #286, matching the mac's walk from GitHub #280 and
+  `build_site.py`'s own native re-probe, which also binds `127.0.0.1` since
+  #319): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
