@@ -154,16 +154,12 @@ internal static class NamedGapLedger
             "update installing", "update set aside", "update stopped", "app updated"),
         Owed(ActivityTrailEvents, 360, "Course Settings has no How I Teach row yet (mac #329)",
             "How I Teach page started"),
-        Owed(ActivityTrailEvents, 345, "one coverage map per curriculum folder is not built here yet (mac #128)",
-            "curriculum maps built"),
         Owed(ActivityTrailEvents, 360, "the assistant's own backup of a course is not recorded yet (mac #351)",
             "assistant backed up a course"),
 
         // ---- specialNames.platformWording.keys
 
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
-        Owed(CourseConfigKeys, 345, "one coverage map per declared curriculum folder is not built here yet (mac #128)",
-            "curriculum_folders"),
         Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
             "class_page_scheme", "front_page_heading", "class_noun"),
         Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",

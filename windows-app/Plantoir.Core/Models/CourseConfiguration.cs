@@ -588,6 +588,31 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// Every curriculum folder this course DECLARES, in order (#345, the mac's
+    /// #128): <c>curriculum_folders</c>, then the legacy
+    /// <c>curriculum_folder</c> when it is not already there. Written as BOTH
+    /// keys — the list, and the legacy key naming the list's first (primary)
+    /// folder, because an older Plantoir on another machine reads only that
+    /// one and would otherwise lose the map. An empty list removes both.
+    /// </summary>
+    public List<string> CurriculumFolders
+    {
+        get => CurriculumFolderRule.Declared(_values["curriculum_folders"], _values["curriculum_folder"]);
+        set
+        {
+            var names = CurriculumFolderRule.Declared(new JArray(value ?? new List<string>()), null);
+            if (names.Count == 0)
+            {
+                _values.Remove("curriculum_folders");
+                _values.Remove("curriculum_folder");
+                return;
+            }
+            _values["curriculum_folders"] = new JArray(names);
+            _values["curriculum_folder"] = names[0];
+        }
+    }
+
+    /// <summary>
     /// Which per-section folder holds this course's class pages, or empty when
     /// the course never recorded one.
     ///
@@ -638,7 +663,7 @@ public sealed class CourseConfiguration
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>
     public string? ResolvedCurriculumFolder =>
-        CurriculumFolderRule.Resolve(CurriculumFolder, SharedFolders);
+        CurriculumFolderRule.Resolve(CurriculumFolders, SharedFolders, null).Resolved.FirstOrDefault();
 
     /// <summary>
     /// The folders whose contents count for marks, or <b>null</b> when the key

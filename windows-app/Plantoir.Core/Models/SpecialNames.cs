@@ -101,6 +101,17 @@ public static class SpecialNames
     public const string RemoveCurriculumFolderMessage =
         "This folder holds your curriculum expectations. Removing it means expectations will not be available if you later enable curriculum coverage.";
 
+    /// <summary>
+    /// Asked, not refused, when the coverage map is on and the course has
+    /// ANOTHER curriculum folder with a map (#345, the mac's #128). It does not
+    /// promise that another map stays: on the default LCS course (College Board
+    /// empty) that sentence was false in both directions.
+    /// </summary>
+    public static string RemoveCurriculumFolderWithItsMapTitle(string name) => $"Remove “{name}”?";
+
+    public const string RemoveCurriculumFolderWithItsMapMessage =
+        "This folder holds curriculum expectations with a coverage map of their own. Removing it takes that map off your website.";
+
     // ---- The switch labels these sentences name -------------------------
 
     /// <summary>

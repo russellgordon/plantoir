@@ -945,21 +945,44 @@ public sealed class NewCourseDialog : ContentDialog
     /// `include_curriculum_pages` likewise, so the rule and the file cannot
     /// disagree about what is on.</para>
     /// </summary>
+    /// <summary>
+    /// The wizard's curriculum folders: the payload's declared folder (and any
+    /// the teacher ticked), counted as holding pages while the curriculum pages
+    /// are being installed.
+    /// </summary>
+    private CurriculumFolderRule.Resolution WizardCurriculum()
+    {
+        string? declared = ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode);
+        var withPages = CurriculumPagesOffered && _includeCurriculum && declared is not null
+            ? new[] { declared } : Array.Empty<string>();
+        return CurriculumFolderRule.Resolve(WizardCurriculumNames(), _sharedFolders, withPages);
+    }
+
+    /// <summary>The names the wizard's course will declare: the payload's folder, then whatever the teacher ticked.</summary>
+    private List<string> WizardCurriculumNames()
+    {
+        string? declared = ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode);
+        var names = (_curriculumFoldersChosen ?? new List<string>()).ToList();
+        if (declared is not null && !names.Contains(declared, StringComparer.OrdinalIgnoreCase)) names.Insert(0, declared);
+        return names;
+    }
+
+    /// <summary>The curriculum folders the teacher ticked in the wizard, or null when they never touched the list.</summary>
+    private List<string>? _curriculumFoldersChosen;
+
     private ProtectionContext WizardProtection() => new(
         InWizard: true,
         CurriculumCoverageEnabled: CourseConfiguration.NewCourseCoverageEnabled(
             CurriculumPagesOffered, _includeCurriculum, _includeCurriculumCoverage),
         CurriculumPagesEnabled: CurriculumPagesOffered && _includeCurriculum,
         Jurisdiction: JurisdictionForCode(),
-        // null, not the payload's or skeleton's declared `curriculum_folder`:
-        // this app has no ExampleContentCatalog.CurriculumFolder or
-        // SkeletonCatalog equivalent to ask, so the resolver falls back to the
-        // "alphabetically first name containing curriculum" branch. A skeleton
-        // family whose folder is called something else — "Expectations" — is
-        // protected on the mac and NOT protected here. A KNOWN GAP, written
-        // down in documentation/12-windows-app.md rather than left for somebody to rediscover;
-        // it protects too little, never the wrong folder.
-        ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
+        // #345: the payload's DECLARED folder, not null — the wizard has no
+        // disk, so it counts that folder as holding pages while they are being
+        // installed (curriculumFoldersResolution), and protects it by name
+        // (curriculumFolderProtection's DeclaredPayloadFolder).
+        ResolvedCurriculumFolder: WizardCurriculum().Resolved.FirstOrDefault(),
+        ResolvedCurriculumFolders: WizardCurriculum().Resolved,
+        DeclaredPayloadFolder: ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode),
         GradedFolders: CurrentGradedFolders(),
         PerSectionFolders: _perSectionFolders,
         ResolvedClassFolder: ClassFolderRule.Name(null, _perSectionFolders));
@@ -1041,6 +1064,32 @@ public sealed class NewCourseDialog : ContentDialog
             (name, reason) => RecordWizardRemovalBlocked("the marks list", name, reason)));
         // Below the list, for the reason in GradedFolderRule.Caption.
         _marksArea.Children.Add(FormBuilders.ExampleCaption(GradedFolderRule.Caption));
+
+        // Curriculum folders (#345, specialNames.curriculumFoldersOffer): only
+        // with two or more candidates — an LCS course from scratch has Ontario
+        // AND College Board — and nothing ticked for the teacher until they
+        // tick it, since the wizard has no pages yet. The key is written only
+        // when they touched the list (_curriculumFoldersChosen).
+        var names = WizardCurriculumNames();
+        var offered = CurriculumFoldersOffer.Offered(_sharedFolders, names);
+        if (offered.Count > 0)
+        {
+            List<string> Ticked() => CurriculumFoldersOffer.Ticked(_sharedFolders, WizardCurriculumNames(), WizardCurriculum().Mapped);
+            var list = FormBuilders.MembershipToggleList(CurriculumFoldersOffer.Label, offered, Ticked,
+                v => _curriculumFoldersChosen = v.ToList(),
+                RebuildFolderEditors,
+                name =>
+                {
+                    var ticked = Ticked();
+                    return ticked.Count == 1 && ticked.Contains(name, StringComparer.OrdinalIgnoreCase)
+                        ? ItemProtection.Blocked(CurriculumFoldersOffer.LastStaysTicked)
+                        : ItemProtection.Ordinary;
+                },
+                (name, reason) => RecordWizardRemovalBlocked("the curriculum folders", name, reason));
+            AutomationProperties.SetAutomationId(list, "curriculumFoldersList");
+            _marksArea.Children.Add(list);
+            _marksArea.Children.Add(FormBuilders.ExampleCaption(CurriculumFoldersOffer.Caption));
+        }
     }
 
     // ---- Validation and auto-fill ---------------------------------------
@@ -1373,6 +1422,19 @@ public sealed class NewCourseDialog : ContentDialog
         // The marks pool, written for EVERY new course before setup runs (#317)
         // — absent only when a payload's manifest could not be read.
         if (answers.Keys["graded_folders"] is { } pool) result["graded_folders"] = pool;
+
+        // The curriculum folders the teacher ticked (#345) — only when they
+        // touched the list, and only those the course will have; both keys,
+        // the legacy one naming the primary (CourseConfiguration.CurriculumFolders).
+        if (_curriculumFoldersChosen is { } chosen && !StructureComesFromExampleContent)
+        {
+            var kept = chosen.Where(name => _sharedFolders.Contains(name, StringComparer.OrdinalIgnoreCase)).ToList();
+            if (kept.Count > 0)
+            {
+                result["curriculum_folders"] = new JArray(kept);
+                result["curriculum_folder"] = kept[0];
+            }
+        }
 
         // Pruned once more, defensively, at the point this actually gets
         // written — so the file on disk is correct even in a hypothetical
