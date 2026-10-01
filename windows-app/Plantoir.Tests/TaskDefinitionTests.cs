@@ -37,29 +37,58 @@ public class TaskDefinitionTests : IDisposable
     }
 
     /// <summary>
-    /// The definition, registered with the REAL Task Scheduler under a probe
-    /// name and read back — what Windows keeps, not what was sent. Deleted after.
+    /// Through <see cref="TaskScheduling.Schedule"/> itself (ruling 7), against
+    /// the REAL Task Scheduler, read back — what Windows keeps, not what was
+    /// sent. The job folder is a test folder; the course is a probe
+    /// (PARITYPROBE) in a temp working folder; the task is cancelled after.
     /// </summary>
     [Fact]
-    public void TheRegisteredTaskKeepsTheThreeSettings()
+    public void TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken()
     {
         if (!OperatingSystem.IsWindows()) return;
-        string name = "PlantoirParityProbe-" + Guid.NewGuid().ToString("N")[..8];
-        string xmlPath = Path.Combine(_root, "task.xml");
-        File.WriteAllText(xmlPath, TaskScheduling.TaskXml(@"C:\Windows\System32\cmd.exe", name, DateTime.Now.AddDays(1)),
-            System.Text.Encoding.Unicode);
+        string folder = FakeScheduler.WorkingFolderWith(_root, "probe", "PARITYPROBE", "{}");
+        TaskScheduling.ScheduledDirectoryForTests = Path.Combine(_root, "jobs");
+        TaskScheduling.RunnerExecutableForTests = @"C:\Windows\System32\cmd.exe";
+        string name = TaskScheduling.NameFor("PARITYPROBE", 1, folder);
         try
         {
-            var (created, said) = Schtasks("/Create", "/F", "/TN", name, "/XML", xmlPath);
-            Assert.True(created == 0, said);
+            Assert.Null(TaskScheduling.Schedule(folder, "PARITYPROBE", 1, DateTime.Now.AddDays(1), [new("netlify", "")]));
             var (_, back) = Schtasks("/Query", "/TN", name, "/XML");
             HasTheThreeSettings(back);
+            string token = ScheduledRun.ReadJob(TaskScheduling.JobPath(name))!.Token;
+            Assert.Contains($"{TaskScheduling.TokenArgument} {token}", back);
         }
         finally
         {
             Schtasks("/Delete", "/F", "/TN", name);
+            TaskScheduling.ScheduledDirectoryForTests = null;
+            TaskScheduling.RunnerExecutableForTests = null;
+            TaskScheduling.ForgetTheList();
             Assert.NotEqual(0, Schtasks("/Query", "/TN", name).Exit);
         }
+    }
+
+    [Fact]
+    public void ARunWhoseTaskCarriesAnotherTokenDoesNothingAndLeavesTheTask()
+    {
+        using var scheduler = new FakeScheduler(_root);
+        string folder = FakeScheduler.WorkingFolderWith(_root, "crash", "ICS3U",
+            """{ "course_code": "ICS3U", "section_numbers": [1], "deploy_target": "netlify" }""");
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, DateTime.Now, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+        var ran = new List<string>();
+        var world = new ScheduledRun.World
+        {
+            Now = () => DateTimeOffset.Now, Sleep = _ => { }, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = script => { ran.Add(script); return 0; },
+        };
+        // The OLD task (another token) finding the NEW job after a crash.
+        Assert.Equal(ScheduledRun.Ending.NoLongerStands,
+            ScheduledRun.Execute(TaskScheduling.JobPath(name), world, taskToken: "an-older-setting"));
+        Assert.Empty(ran);
+        Assert.Contains(name, scheduler.Tasks.Keys);
+        Assert.Empty(scheduler.Deleted);
     }
 
     [Fact]

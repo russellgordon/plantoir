@@ -2428,9 +2428,10 @@ and this piece had two of those:
   can decide its own line then.
 
 **What is deliberately left in the machine's culture**, so nobody "fixes"
-it: `TaskScheduling.Schedule` formats the date for `schtasks.exe` and walks
-`DateFormats` until it takes one, and `TaskScheduling.NextRun` parses the
-`Next Run Time:` row that Windows wrote in its own culture — that program
+it: `TaskScheduling.All` parses the `Next Run Time` column of `schtasks /Query
+/FO CSV` that Windows wrote in its own culture (since bundle 3 `Schedule`
+registers from XML with an invariant StartBoundary, so no date format is
+guessed any more) — that program
 accepts nothing else. `BackupItem.Subtitle` and `ArchivedItem.Subtitle` show
 a month by name to the teacher and say `CurrentCulture` out loud. Sentences
 of the shape `dddd d MMMM, h:mm tt` (no year) are read by a person in their
