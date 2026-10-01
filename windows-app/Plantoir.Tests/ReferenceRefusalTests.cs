@@ -189,6 +189,33 @@ public class ReferenceRefusalTests : IDisposable
             Assert.Null(ReferenceWriteGate.Refusal(allowed, Arguments("""{"course":"ICS3U-2025","section":1}"""), workspace));
     }
 
+    /// <summary>Ruling 4: a settings file that is there and cannot be read is REFUSED (fail safe), never let through.</summary>
+    [Fact]
+    public void TheGateRefusesWhenTheSettingsCannotBeRead()
+    {
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher());
+        string settings = Path.Combine(_folder, "courses", "ICS3U-2025", "course_config.json");
+        var me = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var deny = new System.Security.AccessControl.FileSystemAccessRule(me,
+            System.Security.AccessControl.FileSystemRights.ReadData, System.Security.AccessControl.AccessControlType.Deny);
+        var security = new FileInfo(settings).GetAccessControl();
+        security.AddAccessRule(deny);
+        new FileInfo(settings).SetAccessControl(security);
+        try
+        {
+            Assert.Equal("Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read.",
+                ReferenceWriteGate.Refusal("publish_pages", Arguments("""{"course":"ICS3U-2025","section":1}"""), workspace));
+            Assert.Null(ReferenceWriteGate.Refusal("read_page", Arguments("""{"course":"ICS3U-2025","section":1}"""), workspace));
+        }
+        finally
+        {
+            var undo = new FileInfo(settings).GetAccessControl();
+            undo.RemoveAccessRuleSpecific(deny);
+            new FileInfo(settings).SetAccessControl(undo);
+        }
+        Assert.Null(ReferenceWriteGate.Refusal("publish_pages", Arguments("""{"course":"NOSUCH","section":1}"""), workspace));
+    }
+
     [Fact]
     public void TheGateIsChosenByEachToolsOwnReadOnlyFlag()
     {
