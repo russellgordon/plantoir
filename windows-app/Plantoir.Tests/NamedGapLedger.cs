@@ -175,19 +175,6 @@ internal static class NamedGapLedger
         // inline elsewhere; the walker cannot see those, and hoisting them
         // into AssistWording under their key is #157's remaining half. The
         // rest belong to features this app does not have yet.
-        Owed(AssistWordingKeys, 274, "this app has no clubs yet, so it has no meeting-worded sentences (mac #267)",
-            "addedTheNextPageForAMeeting", "allScheduledDatesHaveConcludedForAMeeting", "datesForTheNextPageForAMeeting",
-            "datesNotGivenYetForAMeeting", "datesToDuplicateForAMeeting", "datesToFindADaysPageForAMeeting",
-            "datesToReDateForAMeeting", "datesToReplaceForAMeeting", "everyDateIsSpokenForForAMeeting",
-            "linkedClassesWereLeftAloneForAMeeting", "linkedClassStaysVisibleForAMeeting", "linkedClassWasLeftAloneForAMeeting",
-            "madeRoomForAMeeting", "makingRoomCannotBeUndoneForAMeeting", "mayIAskForYourDatesForAMeeting",
-            "movedToLaterDaysForAMeeting", "movesAndBecomesADraftForAMeeting", "movesToTheFirstDayForAMeeting",
-            "otherClassesWouldMoveAndLinksFollowForAMeeting", "otherClassesWouldMoveKeepingTheirNamesForAMeeting",
-            "pagesAcrossTheDatesForAMeeting", "pagesRunFromForAMeeting", "pagesWithNoDayOfTheirOwnForAMeeting",
-            "publishedTheClassOnForAMeeting", "reDatedForAMeeting", "reDatedOnlyPagesTheyUseForAMeeting",
-            "reDatingOntoTheDatesOnFileForAMeeting", "sharingTheLastDayForAMeeting", "spareDatesAfterTheseForAMeeting",
-            "theNextWouldFallOnForAMeeting", "theSemesterBeginsForAMeeting", "wouldAddPagesForAMeeting",
-            "wouldMakeRoomForAMeeting", "yourNextUpcomingForAMeeting"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
         Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
@@ -203,12 +190,6 @@ internal static class NamedGapLedger
         // hoisted into AssistWording (so no entry); the rest go to the issue
         // whose body names the key, and the two no issue names stay on #157
         // with that said plainly (listed for Russell).
-        Owed(AssistWordingKeys, 274,
-            "not said on Windows; #274 carries the class/meeting pair of sentences this key belongs to",
-            "addedTheNextPage", "allScheduledDatesHaveConcluded", "datesForTheNextPage", "datesToDuplicate",
-            "datesToFindADaysPage", "datesToReDate", "datesToReplace", "movesToTheFirstDay", "pagesAcrossTheDates",
-            "pagesRunFrom", "pagesWithNoDayOfTheirOwn", "sharingTheLastDay", "spareDatesAfterThese",
-            "theSemesterBegins", "wouldAddPages", "wouldMakeRoom", "yourNextUpcoming"),
         Owed(AssistWordingKeys, 157,
             "not said on Windows; no open issue names it (listed in QUESTIONS-FOR-RUSSELL.md)",
             "noCoursesYet", "whatPublishingMeans"),

@@ -1,3 +1,4 @@
+using Plantoir.Core.Models;
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -61,7 +62,10 @@ public sealed class DuplicateClassPlan
     public bool MovesOtherClasses => Insertion.Renames.Count > 0 || Insertion.Moves.Count > 0;
 
     /// <summary>The card a teacher agrees to before anything is written.</summary>
-    public string Describe()
+    public string Describe() => Describe(ClassNoun.Class);
+
+    /// <summary>The card in a course's own noun: the meeting form is the TEACHER's only (#274).</summary>
+    public string Describe(ClassNoun noun)
     {
         var lines = new List<string>
         {
@@ -72,10 +76,13 @@ public sealed class DuplicateClassPlan
         if (MovesOtherClasses)
         {
             lines.Add("");
-            lines.Add(ClassChangeWording.OtherClassesWouldMove(OtherClassesMoving, Insertion.Renames.Count));
+            lines.Add(noun == ClassNoun.Meeting
+                ? ClassChangeWording.OtherClassesWouldMoveForAMeeting(OtherClassesMoving, Insertion.Renames.Count)
+                : ClassChangeWording.OtherClassesWouldMove(OtherClassesMoving, Insertion.Renames.Count));
             // #346 (the mac's #185): the card says the undo will not help on
             // EXACTLY the condition that withholds it, before Go.
-            lines.Add(AssistWording.MakingRoomCannotBeUndone);
+            lines.Add(ClassPageSchemes.Say(noun, AssistWording.MakingRoomCannotBeUndone,
+                                           AssistWording.MakingRoomCannotBeUndoneForAMeeting));
         }
 
         return string.Join("\n", lines);
