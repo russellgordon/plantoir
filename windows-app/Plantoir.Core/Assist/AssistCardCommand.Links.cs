@@ -116,6 +116,13 @@ public sealed partial record AssistCardCommand
         return new LinksQuestionMatch(title);
     }
 
+    /// <summary>
+    /// Whether this card is the links family. The window's agent answers that
+    /// family through <see cref="LinksQuestion"/> only, and skips this card.
+    /// </summary>
+    public bool IsALinksQuestion =>
+        ToolName == "read_page" && Arguments.TryGetValue("answer", out var answer) && answer == "links";
+
     /// <summary>The family as a card: <c>read_page</c> with <c>answer: "links"</c>, an argument in no schema the model is shown.</summary>
     private static AssistCardCommand? LinksCard(string message)
     {
