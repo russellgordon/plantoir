@@ -35,6 +35,21 @@ $WranglerVersion = "4.80.0"
 $QuartzTag       = "v4.5.0"
 $EmojiFontTag    = "v2.047"
 
+# SHA-256 of each fixed download (#356, after the mac's #312 pinned its
+# helpers). A version pin says WHICH file is asked for; a hash says the file
+# that arrived is that one. Measured 2026-10-01 on the build PC (i5-8365U,
+# Windows 11 26200): the Node hash equals nodejs.org's own SHASUMS256.txt for
+# v20.18.1; the Python zip's python.exe and python311.dll are byte-identical
+# to the runtime that has shipped; the font equals the shipped font. Change a
+# version above and its hash must change with it, or the fetch refuses.
+# get-pip.py is NOT hashed, deliberately: bootstrap.pypa.io serves one moving
+# file with no versioned URL, so a hash would break the build on pip's next
+# release while protecting nothing the package pins below do not - those are
+# exact versions, fetched by pip from PyPI over TLS.
+$NodeZipSha256   = "56e5aacdeee7168871721b75819ccacf2367de8761b78eaceacdecd41e04ca03"
+$PythonZipSha256 = "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
+$EmojiFontSha256 = "39ee3c587e10e89669b9ff32703261d10d5f9c4dd5ad147b6b5a1c5200591817"
+
 $VendorDir  = $PSScriptRoot
 $RepoRoot   = (Resolve-Path (Join-Path $VendorDir "..\..")).Path
 $Runtime    = Join-Path $VendorDir "runtime"
@@ -50,16 +65,23 @@ New-Item -ItemType Directory -Force $Runtime | Out-Null
 $Temp = Join-Path ([IO.Path]::GetTempPath()) ("plantoir-runtime-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $Temp | Out-Null
 
-function Fetch([string]$Url, [string]$To) {
+function Fetch([string]$Url, [string]$To, [string]$Sha256 = "") {
     Write-Host "Fetching $Url" -ForegroundColor Cyan
     & curl.exe -fL --retry 3 -o $To $Url
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $To)) { throw "Failed to download $Url" }
+    if ($Sha256) {
+        $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $To).Hash.ToLowerInvariant()
+        if ($got -ne $Sha256.ToLowerInvariant()) {
+            Remove-Item -LiteralPath $To -Force -ErrorAction SilentlyContinue
+            throw "Refused $Url : its SHA-256 is $got, the pin is $Sha256"
+        }
+    }
 }
 
 try {
     # ---- Node.js (portable zip - the whole point is that nothing installs) ----
     $nodeZip = Join-Path $Temp "node.zip"
-    Fetch "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip" $nodeZip
+    Fetch "https://nodejs.org/dist/v$NodeVersion/node-v$NodeVersion-win-x64.zip" $nodeZip $NodeZipSha256
     Expand-Archive $nodeZip -DestinationPath $Temp -Force
     Move-Item (Join-Path $Temp "node-v$NodeVersion-win-x64") (Join-Path $Runtime "node")
     $nodeDir = Join-Path $Runtime "node"
@@ -68,7 +90,7 @@ try {
 
     # ---- Python (embeddable package + pip bootstrap) -------------------------
     $pyZip = Join-Path $Temp "python.zip"
-    Fetch "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-embed-amd64.zip" $pyZip
+    Fetch "https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-embed-amd64.zip" $pyZip $PythonZipSha256
     $pyDir = Join-Path $Runtime "python"
     Expand-Archive $pyZip -DestinationPath $pyDir -Force
     # The embeddable package ships with `import site` disabled; pip and
@@ -173,7 +195,7 @@ try {
     # ---- Colour emoji font for the social sharing cards ----------------------
     $fontsDir = Join-Path $Runtime "fonts"
     New-Item -ItemType Directory -Force $fontsDir | Out-Null
-    Fetch "https://github.com/googlefonts/noto-emoji/raw/$EmojiFontTag/fonts/NotoColorEmoji.ttf" (Join-Path $fontsDir "NotoColorEmoji.ttf")
+    Fetch "https://github.com/googlefonts/noto-emoji/raw/$EmojiFontTag/fonts/NotoColorEmoji.ttf" (Join-Path $fontsDir "NotoColorEmoji.ttf") $EmojiFontSha256
 
     # ---- Manifest ------------------------------------------------------------
     @{
