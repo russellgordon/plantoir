@@ -168,11 +168,17 @@ public partial class App : Application
         // Windows has no system restoration: the remembered list is the
         // mechanism. Replay it when the preference asks; otherwise one
         // window, which shows the picker when no folder is remembered.
+        // The rule is LastWorkingFolder.FoldersToOpen (#320): the remembered
+        // windows when they come back, otherwise ONE window on the last
+        // working folder — kept even when it cannot be reached, so the window
+        // can say which folder and why.
         var remembered = Settings.RestoreWindowsOnLaunch ? Settings.RememberedWindows.ToList()
                                                          : new List<RememberedWindow>();
+        var folders = LastWorkingFolder.FoldersToOpen(
+            Settings.RestoreWindowsOnLaunch, remembered.Select(entry => entry.Path).ToList(), Settings.WorkspacePath);
         if (remembered.Count == 0)
         {
-            OpenWindow(Settings.WorkspacePath, null);
+            OpenWindow(folders[0], null);
             return;
         }
         foreach (var entry in remembered)

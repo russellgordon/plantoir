@@ -28,6 +28,15 @@ namespace Plantoir.Core.Models;
 /// <para>Pinned by <c>contracts/shared-rules.json</c> -&gt;
 /// <c>gradedFolders.choices</c>.</para>
 /// </summary>
+/// <summary>
+/// One folder the checklist's walk found, with where it was found: the
+/// course-level folder it sits under (itself, at the top), and the folders on
+/// its path that sit directly inside a section folder. A name found in two
+/// places is two of these, so removing one place leaves the other found
+/// (<c>shared-rules.json</c> → <c>gradedFolders.floor</c>, GitHub issue #348).
+/// </summary>
+public sealed record WalkedFolder(string Name, string CourseLevelFolder, IReadOnlyList<string> SectionLevelFolders);
+
 public static class GradedFolderChoices
 {
     /// <summary>
@@ -118,12 +127,36 @@ public static class GradedFolderChoices
         IReadOnlyList<string>? excludedShared = null,
         IReadOnlyList<string>? excludedPerSection = null)
     {
-        var found = new List<string>();
+        return NamesIn(WalkedFolders(courseDirectory, excludedShared, excludedPerSection));
+    }
+
+    /// <summary>The distinct names of a walk, in the order the walk first met them.</summary>
+    public static List<string> NamesIn(IEnumerable<WalkedFolder> walked)
+    {
+        var names = new List<string>();
+        foreach (var folder in walked)
+            if (!names.Contains(folder.Name, StringComparer.Ordinal)) names.Add(folder.Name);
+        return names;
+    }
+
+    /// <summary>
+    /// The same walk, keeping EVERY occurrence of a name with where it was
+    /// found. Course Settings takes it ONCE per drawing of the page and shares
+    /// it between the checklist and the three lists, and afresh for the row a
+    /// teacher acts on — the marks floor depends on the disk, and a folder
+    /// deleted in Explorer while Settings is open must count as gone.
+    /// </summary>
+    public static List<WalkedFolder> WalkedFolders(
+        string? courseDirectory,
+        IReadOnlyList<string>? excludedShared = null,
+        IReadOnlyList<string>? excludedPerSection = null)
+    {
+        var found = new List<WalkedFolder>();
         if (string.IsNullOrWhiteSpace(courseDirectory)) return found;
         if (!Directory.Exists(courseDirectory)) return found;
 
         Walk(courseDirectory, 1, CourseConfiguration.SharedScope, found,
-             excludedShared, excludedPerSection);
+             excludedShared, excludedPerSection, courseLevel: null, sectionLevel: Array.Empty<string>(), parentIsSection: false);
         return found;
     }
 
@@ -174,9 +207,10 @@ public static class GradedFolderChoices
     /// a section folder, and nothing anywhere deeper.
     /// </param>
     private static void Walk(string directory, int depth, string? scopeOfChildren,
-                             List<string> found,
+                             List<WalkedFolder> found,
                              IReadOnlyList<string>? excludedShared,
-                             IReadOnlyList<string>? excludedPerSection)
+                             IReadOnlyList<string>? excludedPerSection,
+                             string? courseLevel, IReadOnlyList<string> sectionLevel, bool parentIsSection)
     {
         if (depth > MaxDepth) return;
 
@@ -240,11 +274,13 @@ public static class GradedFolderChoices
                 && Excluded(scope, name, excludedShared, excludedPerSection)) continue;
 
             bool isSection = IsSectionFolder(name);
-            if (!isSection && !found.Contains(name, StringComparer.Ordinal)) found.Add(name);
+            string topLevel = courseLevel ?? name;
+            var onPath = parentIsSection ? sectionLevel.Append(name).ToList() : sectionLevel;
+            if (!isSection) found.Add(new WalkedFolder(name, topLevel, onPath));
 
             Walk(child.FullName, depth + 1,
                  isSection ? CourseConfiguration.PerSectionScope : null,
-                 found, excludedShared, excludedPerSection);
+                 found, excludedShared, excludedPerSection, topLevel, onPath, isSection);
         }
     }
 

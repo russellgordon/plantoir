@@ -491,6 +491,34 @@ public static class AssistWording
             ? string.Concat(quoted)
             : string.Join(", ", quoted.Take(quoted.Count - 1)) + " or " + quoted[^1];
     }
+    // MARK: - The assistant's copy of a course (#360, mac #351)
+
+    /// <summary>Said while the conversation's first copy of the course is being zipped.</summary>
+    public static string BackingUpFirst(string course) =>
+        $"Saving a copy of {course} first, so this can be undone — a course with lots of pictures can take a minute.";
+
+    /// <summary>Another program is zipping a copy of the course, so a build or deploy waits.</summary>
+    public static string CourseIsBeingCopied(string course) =>
+        $"A copy of {course} is being saved in Plantoir. Wait for that to finish, then ask again.";
+
+    /// <summary>The plan no longer fits once the copy was saved, so nothing was changed.</summary>
+    public static string ChangedWhileSavingACopy(string course, string section) =>
+        $"Nothing was changed: {course} Section {section} changed while a copy of it was being saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh.";
+
+    // MARK: - Getting a section ready for the start of the year (#355, mac #96)
+
+    /// <summary>The fresh backup for the act could not be made, so nothing was written.</summary>
+    public static string StartOfYearNeedsABackup(string course) =>
+        $"Nothing was changed. Plantoir could not save a copy of {course} first, and this change is too large to make without one.";
+
+    /// <summary>The write was called without the plan's code; the plan follows.</summary>
+    public static string StartOfYearNeedsItsPlan(string course, string section) =>
+        $"Nothing was changed. Getting {course} Section {section} ready for the start of the year needs the code from its plan. Show the teacher the plan below, and when they agree, call prepare_for_start_of_year again with its code.";
+
+    /// <summary>The code no longer fits the section as it stands; the current plan follows.</summary>
+    public static string StartOfYearPlanHasChanged(string course, string section) =>
+        $"Nothing was changed. {course} Section {section} is not what that plan described any more, so its code no longer fits. Show the teacher the plan below, which is how things stand now, and pass its code when they agree.";
+
     // MARK: - The How I Teach page (#340, mac #209)
 
     public static string HowITeachAlreadyWritten(string course) =>

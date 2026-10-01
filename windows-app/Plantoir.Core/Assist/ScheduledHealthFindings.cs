@@ -116,6 +116,14 @@ public static class ScheduledHealthFindings
                                dated.TrailSentence, dated.Course, dated.Section, writtenAt);
         }
 
+        // The build's PLANTOIR_MAPS: line (#345): the build nobody watched is
+        // the one "my second map is missing" will be asked about.
+        foreach (var maps in CoverageMapsBuilt.ReportsIn(lines))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.CurriculumMapsBuilt,
+                               maps.TrailSentence, maps.Course, maps.Section, writtenAt);
+        }
+
         // The build's PLANTOIR_KEPT_OFF: line (#340), when the wrapper's scan keeps it.
         foreach (var keptOff in HowITeachKeptOffReport.ReportsIn(lines))
         {
