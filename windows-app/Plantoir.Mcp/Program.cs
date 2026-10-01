@@ -19,6 +19,9 @@ for (int i = 0; i < args.Length; i++)
     if ((args[i] == "--folder" || args[i] == "-f") && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--folder=", StringComparison.Ordinal)) folder = args[i]["--folder=".Length..];
     else if ((args[i] == "--course" || args[i] == "-c") && i + 1 < args.Length) course = args[++i];
+    // outsideAgents.serverArguments: `--mcp-stdio <folder>`, the shape the
+    // contract gives every door, and the one the Codex door passes (#210).
+    else if (args[i] == "--mcp-stdio" && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--course=", StringComparison.Ordinal)) course = args[i]["--course=".Length..];
 }
 

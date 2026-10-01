@@ -142,8 +142,9 @@ public static class ClaudeCodeLauncher
         catch { return false; }
 
         string prompt = Greeting(courseCode, courseName);
+        var arguments = Arguments(configPath, prompt);
         string command =
-            $"\"{claude}\" --mcp-config \"{configPath}\" --strict-mcp-config \"{prompt}\"";
+            $"\"{claude}\" {arguments[0]} \"{arguments[1]}\" {arguments[2]} \"{arguments[3]}\"";
 
         // Windows Terminal when it is there, because a teacher will be reading
         // this for a while; the classic console otherwise.
@@ -159,8 +160,19 @@ public static class ClaudeCodeLauncher
             info.Arguments = $"/k {command}";
         }
 
-        try { return Process.Start(info) is not null; }
+        try
+        {
+            if (Process.Start(info) is null) return false;
+        }
         catch { return false; }
+
+        // outsideAgents.agents[claude].trailLine (#210). This door shipped
+        // writing NOTHING on the trail, so a teacher who handed a course to
+        // Claude, watched it change pages and then reported a problem left a
+        // trail with no sign of the session that did the changing.
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AssistantOpened,
+            $"started Claude Code for {courseCode}");
+        return true;
     }
 
     /// <summary>
@@ -169,6 +181,14 @@ public static class ClaudeCodeLauncher
     /// the teacher first — and an assistant that starts by reading is far more
     /// useful than one that starts by asking what to do.
     /// </summary>
+    /// <summary>
+    /// The argv after <c>claude</c>, as <c>outsideAgents.agents[claude].arguments</c>
+    /// states it — what <see cref="Open"/> passes, and what the contract reader
+    /// in <c>CodexLauncherTests</c> compares.
+    /// </summary>
+    internal static IReadOnlyList<string> Arguments(string configPath, string greeting) =>
+        new[] { "--mcp-config", configPath, "--strict-mcp-config", greeting };
+
     /// <summary><c>outsideAgents.greetingHowITeachSentence</c>.</summary>
     internal const string HowITeachSentence =
         "Then read my How I Teach page for this course, and keep to it in anything you write for me.";
