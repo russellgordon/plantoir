@@ -116,6 +116,9 @@ public class ContractTests
             Assert.Equal(wording[key]!.ToString(), forAClass);
             Assert.Equal(wording[key + "ForAMeeting"]!.ToString(), forAMeeting);
         }
+        // #392 (mac #379).
+        Assert.Equal(wording["linksIntoHiddenPagesWillBeOffered"]!.ToString(),
+                     AssistWording.LinksIntoHiddenPagesWillBeOffered("{course}", "{section}"));
         Pair("addedTheNextPage", AssistWording.AddedTheNextPage, AssistWording.AddedTheNextPageForAMeeting);
         Pair("allScheduledDatesHaveConcluded",
              AssistWording.AllScheduledDatesHaveConcluded(12, "{course}", "{section}", "Tuesday", "2026-12-15"),
