@@ -60,6 +60,32 @@ public class HideAndEchoContractTests : IDisposable
         Assert.True(wrongly.Count == 0, "matched in code, and the contract refuses: " + string.Join(" | ", wrongly));
     }
 
+    /// <summary>
+    /// The same rows through the AGENT, not only the matcher (fix round,
+    /// ruling 1): the matcher test was green while the agent's own older regex
+    /// answered "publish unit 4, day 3" in code. Every refused row must reach
+    /// the model, and nothing may run before it does.
+    /// </summary>
+    [Fact]
+    public async Task EveryRefusedSpellingReachesTheModelThroughTheAgent()
+    {
+        var wrongly = new List<string>();
+        foreach (var row in Cases("hideIsUnpublish")["refused"]!.AsArray())
+        {
+            string input = row!["input"]!.ToString();
+            var model = new WindowBindingContractTests.ScriptedModel();
+            model.Then(new JsonObject { ["content"] = "Which page do you mean?" });
+            var tools = new WindowBindingContractTests.RecordingTools();
+            var agent = new AssistAgent(model, tools,
+                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+            await agent.Say(input, CancellationToken.None);
+            if (model.Asked.Count != 1 || tools.Calls.Count != 0 || agent.IsAwaitingApproval)
+                wrongly.Add(input);
+        }
+        Assert.True(wrongly.Count == 0, "answered in code by the agent, and the contract sends it to the model: " +
+                                       string.Join(" | ", wrongly));
+    }
+
     // ---- echoedRequest ----------------------------------------------------
 
     [Fact]

@@ -209,6 +209,40 @@ public class CutOffAnswerTests : IDisposable
         Assert.Equal(1, call.Arguments["section"]!.GetValue<int>());
     }
 
+    /// <summary>
+    /// An empty add_next_class RUNS, as on the mac: its unit and days only
+    /// extend a write with a default (fix round, ruling 2).
+    /// </summary>
+    [Fact]
+    public async Task AnEmptyAddNextClassRunsAsOnTheMac()
+    {
+        var schemas = new JsonArray(new JsonObject
+        {
+            ["type"] = "function",
+            ["function"] = new JsonObject
+            {
+                ["name"] = "add_next_class",
+                ["parameters"] = new JsonObject
+                {
+                    ["properties"] = new JsonObject
+                    {
+                        ["course"] = new JsonObject(), ["section"] = new JsonObject(),
+                        ["unit"] = new JsonObject(), ["days"] = new JsonObject(),
+                    },
+                    ["required"] = new JsonArray("course", "section"),
+                },
+            },
+        });
+        var model = new WindowBindingContractTests.ScriptedModel();
+        model.Then(Calling("add_next_class", "{}"), "tool_calls");
+        var tools = new WindowBindingContractTests.RecordingTools();
+        var agent = new AssistAgent(model, tools, schemas, "ICS3U", 1) { ConfirmationMode = () => false };
+
+        await agent.Say(Request, CancellationToken.None);
+
+        Assert.Equal("add_next_class", Assert.Single(tools.Calls).Name);
+    }
+
     [Fact]
     public void TheEngineSaysWhyItStoppedAndThatReachesTheAgent()
     {
