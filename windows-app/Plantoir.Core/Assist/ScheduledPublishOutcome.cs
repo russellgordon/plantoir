@@ -311,7 +311,7 @@ public static class ScheduledPublishOutcome
         {
             if (!File.Exists(path)) return null;
             writtenAt = File.GetLastWriteTime(path);
-            text = File.ReadAllText(path);
+            text = ReadSharing(path);
         }
         catch
         {
@@ -343,6 +343,29 @@ public static class ScheduledPublishOutcome
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Read a record without refusing to share it (#417).
+    /// </summary>
+    /// <remarks>
+    /// <c>File.ReadAllText</c> opens with <c>FileShare.Read</c>, which DENIES
+    /// sharing with any handle that can write. For a moment after a record lands
+    /// something else on the machine has it open with write access (measured,
+    /// not named: <c>IOException … being used by another process</c> on 21 of
+    /// 1,400 first-event reads, 35 runs of the watcher test under load, i5-8365U,
+    /// 16 GB, Windows 11 26200), so the read failed and the watcher's FIRST event
+    /// — the one #218 exists to deliver — said nothing until the window was next
+    /// activated. Sharing ReadWrite|Delete reads the same bytes and does not
+    /// collide with that holder. A retry with a pause was rejected: it is a
+    /// guessed interval for something the open mode removes.
+    /// </remarks>
+    private static string ReadSharing(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     /// <summary>

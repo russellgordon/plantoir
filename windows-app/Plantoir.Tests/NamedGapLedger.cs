@@ -127,7 +127,7 @@ internal static class NamedGapLedger
     private static IEnumerable<Entry> Owed(string area, int issue, string reason, params string[] keys) =>
         keys.Select(key => new Entry(area, key, issue, Parity, reason));
 
-    private static readonly Entry[] Entries = new[]
+    private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
         // ---- activityTrail.mustRecord: events this app does not declare yet.
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
@@ -145,22 +145,11 @@ internal static class NamedGapLedger
         // ---- app-rules.json → modelTiers.requirements
 
         // ---- assist-wording.json → wording: sentences with no same-named
-        // member here. Some are said by this app today in words built
-        // inline elsewhere; the walker cannot see those, and hoisting them
-        // into AssistWording under their key is #157's remaining half. The
-        // rest belong to features this app does not have yet.
-        Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
-            "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
-            "pagesWhoseSettingsCannotBeAddedToNamingSeveral"),
-        // The class-worded sentences below were ledgered to #157 on the first
-        // pass as "said inline today"; a review (2026-09-30) found that false
-        // for most. Re-done key by key: seven WERE said word for word and are
-        // hoisted into AssistWording (so no entry); the rest go to the issue
-        // whose body names the key, and the two no issue names stay on #157
-        // with that said plainly (listed for Russell).
-        Owed(AssistWordingKeys, 157,
-            "not said on Windows; no open issue names it (listed in QUESTIONS-FOR-RUSSELL.md)",
-            "noCoursesYet", "whatPublishingMeans"),
+        // member here, each held open by the issue that owns the feature
+        // that says it.
+        // Empty since 2026-10-01: #157's two keys (noCoursesYet,
+        // whatPublishingMeans) and #308's four (the pages a plan, a re-date
+        // and a make-room name when the writer declines them) are said here.
     }.SelectMany(group => group).ToArray();
 
     /// <summary>

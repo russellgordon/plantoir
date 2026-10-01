@@ -61,6 +61,10 @@ public sealed class DrivenApp : IDisposable
     public Window Window { get; } = null!;
     public string WorkspacePath { get; }
 
+    /// <summary>The folder this run's <c>--state-dir</c> points at — where the
+    /// app keeps its settings, trail and any test-run record (#191).</summary>
+    public string StateDirectory { get; }
+
     /// <summary>How long to wait for the interface to catch up. Generous: a
     /// cold first launch loads the Windows App SDK, and a machine under load
     /// is slow rather than broken.</summary>
@@ -124,6 +128,7 @@ public sealed class DrivenApp : IDisposable
                              $"plantoir-ui-{run}-{Guid.NewGuid().ToString("N")[..8]}");
         WorkspacePath = Path.Combine(_root, "workspace");
         string stateDir = Path.Combine(_root, "state");
+        StateDirectory = stateDir;
         Directory.CreateDirectory(WorkspacePath);
         Directory.CreateDirectory(stateDir);
 

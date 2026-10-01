@@ -1150,7 +1150,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (Services.DialogGate.IsOpen(Content?.XamlRoot)) return;   // #191: never under a dialog
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "F2")) return;   // #191: never under a dialog
         var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
         if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
         RenameSelectedCourse();
@@ -1279,7 +1279,7 @@ public sealed partial class MainWindow : Window
 
     private void OpenWorkingFolderAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (Services.DialogGate.IsOpen(Content?.XamlRoot)) return;   // #191: never under a dialog
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+O")) return;   // #191: never under a dialog
         OpenWorkingFolder_Click(sender, null!);
         args.Handled = true;
     }
@@ -1298,14 +1298,14 @@ public sealed partial class MainWindow : Window
 
     private void NewWindowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (Services.DialogGate.IsOpen(Content?.XamlRoot)) return;   // #191: never under a dialog
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+N")) return;   // #191: never under a dialog
         App.OpenNewWindow();
         args.Handled = true;
     }
 
     private void ReloadCoursesAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (Services.DialogGate.IsOpen(Content?.XamlRoot)) return;   // #191: never under a dialog
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+Shift+R")) return;   // #191: never under a dialog
         Workspace.Reload();
         ApplyState();
         args.Handled = true;

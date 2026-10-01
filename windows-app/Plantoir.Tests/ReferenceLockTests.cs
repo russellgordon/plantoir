@@ -238,6 +238,16 @@ public class ReferenceLockTests : IDisposable
     /// Bundle-6 ruling 1, the honest limit: <c>robocopy /SEC</c> and
     /// <c>/COPYALL</c> carry the lock — and then stall retrying on it. Nothing
     /// in this repository may copy security that way.
+    /// <para>
+    /// It reads the files git TRACKS (<c>git ls-files</c>), never a walk of the
+    /// folder (#419): a walk met the gitignored <c>courses/</c> tree, whose old
+    /// <c>.merged_output</c> held a WSL symlink (reparse tag 0xa000001d) Windows
+    /// cannot open, and threw — a red about a teacher's leftover folder, not about this
+    /// repository's code. What is not tracked is not "in this repository", and a
+    /// build output or a working folder is never where a copy command is written.
+    /// A tracked path that is missing from the working tree, or is itself a
+    /// reparse point, is skipped rather than followed.
+    /// </para>
     /// </summary>
     [Fact]
     public void NoRobocopyInThisRepositoryCopiesSecurity()
@@ -246,13 +256,10 @@ public class ReferenceLockTests : IDisposable
         string root = ContractLoader.RepositoryRoot;
         var offenders = new List<string>();
         int robocopyCalls = 0;
-        foreach (string file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+        foreach (string file in TrackedFiles(root)
                      .Where(f => f.EndsWith(".ps1") || f.EndsWith(".bat") || f.EndsWith(".cmd") || f.EndsWith(".py")
                                  || f.EndsWith(".sh") || (f.EndsWith(".cs") && !f.EndsWith("ReferenceLockTests.cs")))
-                     .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
-                                 && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                                 && !f.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}")
-                                 && !f.Contains($"{Path.DirectorySeparatorChar}courses{Path.DirectorySeparatorChar}")))
+                     .Where(f => File.Exists(f) && !File.GetAttributes(f).HasFlag(FileAttributes.ReparsePoint)))
         {
             foreach (string line in File.ReadLines(file).Where(l => l.Contains("robocopy", StringComparison.OrdinalIgnoreCase)
                                                                     && !l.TrimStart().StartsWith("#")
@@ -264,6 +271,30 @@ public class ReferenceLockTests : IDisposable
         }
         Assert.True(robocopyCalls >= 1, "found no robocopy call at all - the scan is looking in the wrong place");
         Assert.True(offenders.Count == 0, "robocopy carrying security would copy a reference course's lock: " + string.Join("; ", offenders));
+    }
+
+    /// <summary>
+    /// Every file git tracks (staged included), as full paths. A missing git
+    /// FAILS rather than skips: a scan that read nothing would be green for the
+    /// wrong reason, and the "found no robocopy call" assertion is the second net.
+    /// </summary>
+    private static List<string> TrackedFiles(string root)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+        };
+        foreach (string argument in new[] { "-C", root, "ls-files", "-z", "--cached" }) start.ArgumentList.Add(argument);
+        using var git = Process.Start(start) ?? throw new InvalidOperationException("git did not start");
+        var errors = git.StandardError.ReadToEndAsync();
+        string listing = git.StandardOutput.ReadToEnd();
+        git.WaitForExit();
+        if (git.ExitCode != 0) throw new InvalidOperationException("git ls-files failed: " + errors.Result);
+        return listing.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+            .Select(relative => Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)))
+            .ToList();
     }
 
     /// <summary>

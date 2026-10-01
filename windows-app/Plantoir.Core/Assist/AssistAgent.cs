@@ -202,7 +202,8 @@ public sealed class AssistAgent
 
             var copy = tool.DeepClone();
             if (copy["function"]?["description"]?.GetValue<string>() is { } description)
-                copy["function"]!["description"] = Briefly(description).Replace(ExampleCourse, courseCode);
+                copy["function"]!["description"] =
+                    (StillShortened.Contains(name) ? Briefly(description) : description).Replace(ExampleCourse, courseCode);
             MakeExamplesReal(copy["function"]?["parameters"], courseCode);
             HideCardOnlyArguments(copy["function"]?["parameters"], name);
             kept.Add(copy);
@@ -260,7 +261,25 @@ public sealed class AssistAgent
     }
 
     /// <summary>
-    /// The part of a tool description a ROUTER needs, and no more.
+    /// The tools whose description the local model still reads SHORTENED
+    /// (#352, 2026-10-01). Every other tool is shown its description as served,
+    /// which since #352 is the contract's one description per tool
+    /// (assist-cases.json → toolDescriptions) — measured before and after on
+    /// this PC's tier with no regression and no polarity inversion
+    /// (research/ai-assist/windows-description-convergence-results.txt).
+    /// These two keep their Windows text, shortened, because the contract's
+    /// sentences promise behaviour Windows does not have yet (includeLinked
+    /// defaults to false here); they move when that behaviour does (#420, and
+    /// recorded as contracts/assist-cases.json → toolDescriptions.measuredDepartures).
+    /// </summary>
+    internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
+    {
+        "publish_pages", "unpublish_pages",
+    };
+
+    /// <summary>
+    /// The part of a tool description a ROUTER needs, and no more. Since #352
+    /// applied only to <see cref="StillShortened"/>.
     ///
     /// The descriptions are written for Claude Code, and most of their length
     /// is instruction: plan before you write, tell the teacher what it said,

@@ -179,6 +179,20 @@ public class ContractTests
         Assert.Equal(wording["deployRefusedForAReferenceCourse"]!.ToString(),
                      AssistWording.DeployRefusedForAReferenceCourse("{course}"));
 
+        // #308 (mac #186): the pages the writer declined, named — rendered with
+        // the generator's own example titles (one; five, of which three are named).
+        var five = new[] { "Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6", "Unit 2, Day 7", "Unit 2, Day 8" };
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedTo"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToNamingSeveral(five));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedTo(five));
+        Assert.Equal(wording["pageWhoseNewDateCouldNotBeSet"]!.ToString(),
+                     AssistWording.PageWhoseNewDateCouldNotBeSet("Unit 2, Day 4"));
+        Assert.Equal(wording["pagesWhoseNewDatesCouldNotBeSet"]!.ToString(),
+                     AssistWording.PagesWhoseNewDatesCouldNotBeSet(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();

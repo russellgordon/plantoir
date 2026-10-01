@@ -1616,7 +1616,7 @@ public class AssistWorkspaceTests : IDisposable
         var tools = new Plantoir.Mcp.PlantoirTools(workspace);
 
         string first = tools.ExplainPublishing("ICS3U", 1);
-        Assert.Contains("built into your site", first);
+        Assert.Equal(AssistWording.WhatPublishingMeans, first);
 
         string second = tools.ExplainPublishing("ICS3U", 1);
         Assert.Equal(AssistWording.PublishingAlreadyExplained("ICS3U", "1"), second);
@@ -1624,40 +1624,54 @@ public class AssistWorkspaceTests : IDisposable
         Assert.DoesNotContain("Don’t repeat", second);
     }
 
+    /// <summary>
+    /// #157: the first answer is the contract's <c>whatPublishingMeans</c>,
+    /// for every destination — the mac's sentence names none, so the answer
+    /// cannot promise a place the deploy does not go. (This app used to say
+    /// its own three paragraphs, <c>Briefing.Words</c>, naming the destination.)
+    /// </summary>
     [Fact]
-    public void TheBriefingSeparatesPublishingFromDeploying()
+    public void ExplainingPublishingSaysTheContractsSentenceWhereverTheCourseDeploys()
     {
-        string words = Briefing.Words("ICS3U", 1, "Netlify");
+        string directory = Path.Combine(_folder, "courses", "TEJ2O");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "course_config.json"),
+            """
+            {
+              "course_code": "TEJ2O",
+              "course_name": "Technology",
+              "deploy_target": "local_folder",
+              "deploy_folder_path": "C:\\Sites\\tej2o",
+              "num_sections": 1,
+              "section_numbers": [1]
+            }
+            """);
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+        Assert.Equal(AssistWording.WhatPublishingMeans, tools.ExplainPublishing("TEJ2O", 1));
+        Assert.Equal(AssistWording.WhatPublishingMeans, tools.ExplainPublishing("ICS3U", 1));
+    }
 
-        // Publishing is explained by WHERE THE PAGE APPEARS — the teacher's own
-        // preview — because that is what it actually does.
-        Assert.Contains("built into your site", words);
-        Assert.Contains("shows up in your preview", words);
-
-        // And never by who may edit it. An earlier wording said unpublished
-        // pages "stay yours to edit", which is true of every page and so
-        // implied, wrongly, that publishing one gives it away.
-        Assert.Contains("stays yours to edit", words);
-        Assert.DoesNotContain("Unpublished pages stay in your folder", words);
-
-        // Deploying is the only thing students ever see, and the briefing must
-        // describe what the assistant ACTUALLY does. It said "I never do it",
-        // which was true until deploy_section went back into the local tool
-        // set — a promise the tools no longer kept, and worse than the jargon
-        // this exists to explain.
-        Assert.Contains("Deploying", words);
-        Assert.Contains("Netlify", words);
-        Assert.DoesNotContain("I never do it", words);
-        Assert.Contains("only if you ask me to", words);
-        Assert.Contains("never deploy without being asked", words);
-        Assert.Contains("Nothing reaches students until you say so", words);
+    /// <summary>#157: an empty working folder is answered with <c>noCoursesYet</c>, which says what to do next.</summary>
+    [Fact]
+    public void ListingCoursesInAnEmptyFolderSaysTheContractsSentence()
+    {
+        string empty = Directory.CreateTempSubdirectory("plantoir-empty").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(empty, "courses"));
+            File.WriteAllText(Path.Combine(empty, "preview.ps1"), "");
+            var tools = new Plantoir.Mcp.PlantoirTools(new AssistWorkspace(empty, new FakeLauncher()));
+            Assert.Equal(AssistWording.NoCoursesYet, tools.ListCourses());
+        }
+        finally { try { Directory.Delete(empty, true); } catch { } }
     }
 
     [Fact]
-    public void TheBriefingNamesWhereThisCourseActuallyDeploys()
+    public void TheDestinationIsNamedRatherThanDescribed()
     {
         // Not "the folder you publish into", which describes rather than names
         // and tells a teacher with two courses going to two places nothing.
+        // (DestinationOf still names what an approval-card plan says.)
         string directory = Path.Combine(_folder, "courses", "TEJ2O");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, "course_config.json"),
@@ -1674,11 +1688,6 @@ public class AssistWorkspaceTests : IDisposable
 
         string toFolder = AssistWorkspace.DestinationOf(Open().Course("TEJ2O"));
         Assert.Equal(@"C:\Sites\tej2o", toFolder);
-        Assert.Contains(@"C:\Sites\tej2o", Briefing.Words("TEJ2O", 1, toFolder));
-
-        // And the other two destinations say their own names.
-        Assert.Contains("Cloudflare Pages", Briefing.Words("ICS3U", 1, "Cloudflare Pages"));
-        Assert.Contains("Netlify", Briefing.Words("ICS3U", 1, "Netlify"));
     }
 
     [Fact]

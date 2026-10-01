@@ -1,0 +1,93 @@
+#352 (the #114 half) on WINDOWS: one description per tool - PRE-REGISTRATION.
+Written and committed 2026-10-01 BEFORE the first model request of this
+measurement, and before any description text in windows-app/ moved. The
+results go in windows-description-convergence-results.txt beside this file;
+nothing below is edited after the first request (a later correction is an
+appended, dated note).
+
+WHAT IS DECIDED BY IT
+  Whether Windows' tool descriptions converge on contracts/assist-cases.json
+  -> toolDescriptions.descriptions (Russell, 2026-09-09 and 2026-09-26), and
+  NarrowToLocal stops shortening them through Briefly().
+
+BEHAVIOUR FIRST (#352 step 1), checked by reading the code before measuring
+  publish_pages: the pinned text says the linked pages come "by themselves -
+    there is nothing to ask for and no way to leave them out". Windows'
+    publish_pages takes includeLinked (default FALSE; AssistCardCommand sends
+    false; only two code-matched phrasings send true). Not true here.
+  unpublish_pages: the pinned text says pages ONLY they link to go with them
+    and a page another class still links to stays put. Windows sweeps linked
+    pages only when includeLinked is true. Not true by default here.
+  => Both texts WAIT for the behaviour (a new windows issue, bundle 9). They
+     are left at their BEFORE text in the AFTER arm, and do not move whatever
+     this measures.
+
+CONDITIONS
+  This Windows PC: Lenovo, Intel Core i5-8365U (4 cores / 8 threads),
+  16 GB, Samsung 980 NVMe, Intel UHD 620, Windows 11 Pro build 26200.
+  llama-server.exe build 10435 (commit 9e40df63b), from windows-app/Vendor/llama,
+  started with LocalModel.BuildArguments' flags for the SMALL tier:
+    --ctx-size 8192 --threads 4 --reasoning off --reasoning-budget 0 --jinja
+    --parallel 1 --n-gpu-layers 999   (Vulkan; the app falls back to CPU with
+    --device none if Vulkan fails - the results file says which ran)
+    --host 127.0.0.1 --port 8099
+  Weights: qwen2.5-1.5b-instruct-q4_k_m.gguf (the smaller assistant, the tier
+  this PC's app chooses). The larger tier is NOT measured: its weights are
+  not on this PC and this PC's app does not pick it.
+
+ARMS (13-tool local surface; identical except descriptions)
+  BEFORE  plantoir-mcp (this branch, no description changed) tools/list via
+          dump-tools.ps1, narrowed by narrow-tools.py: Briefly() of Windows'
+          own descriptions. before.json sha256 22128e15...; with the EXC2O
+          example rewrite (teachers-say), before-EXC2O.json sha256 29532645...
+  AFTER   the same narrowed schemas with each description replaced by the
+          pinned contract text in full (windows-description-arms.py),
+          except publish_pages and unpublish_pages (behaviour first, above).
+          after.json sha256 f594bda0...; after-EXC2O.json sha256 727b7094...
+          Descriptions that differ BEFORE->AFTER: check_section,
+          add_next_class, read_remembered_timetable (the other eight are
+          already byte-equal to the contract text after Briefly()).
+
+SUITES (each arm, 10 trials, greedy)
+  S1  trimmed-surface-suite.py ARM 10 --date-appended --real-course
+      --course EXC2O --prompt shipped --app-body        (29 probes)
+  S2  teachers-say-suite.py 8099 10 ARM-EXC2O.json      (25 probes)
+  S3  the course spread: S1 again with --course ICS3U (two courses). The
+      date spread #352 asks for (three dates) is NOT run: both harnesses read
+      the real clock, and a date spread needs a harness change this session
+      will not make before measuring. Recorded as not done.
+
+SCORING
+  A call cut off at the cap (truncated arguments, or finish_reason 'length')
+  counts as a MISS whatever tool it names - the suites score it by name, and
+  the app refuses it (wording.answerWasCutOff). Recounted from each run's
+  per-trial rows.
+  "The changed tools' probes" = every probe whose acceptable answer includes
+  check_section, add_next_class or read_remembered_timetable, plus every
+  probe whose BEFORE or AFTER answer names one of them.
+
+PASS CRITERIA (bundle 9 ruling P2 binds, and is stricter than #352's per-tool veto)
+  The descriptions MOVE only if ALL of these hold, across S1, S2 and S3:
+   (a) no polarity inversion in AFTER that BEFORE lacks;
+   (b) no changed tool loses 3 or more trials net across its probes;
+   (c) neither suite's model-seen total falls by more than 5 points;
+   (d) no new cut-offs in AFTER.
+  If any fails: NO description moves (not only the failing tool's), and #352
+  closes with this measurement as the reason. If the measurement cannot be
+  completed: nothing moves and #352 stays open.
+  If all hold: Windows' served descriptions become the contract text for
+  every shared tool except publish_pages and unpublish_pages; NarrowToLocal
+  stops calling Briefly(); narrow-tools.py and NarrowToolsMirrorTests follow.
+
+NOTE ADDED 2026-10-01 08:13 EDT (bundle 9 fix round, review finding F4; director's ruling).
+Appended, not edited in place. Written BEFORE any result of this measurement
+was read: the runs started 07:46 and no suite output had been opened when this
+was written (only the server log's request count and per-request timing were
+looked at, to estimate duration; no routing outcome was seen).
+  - The heading's claim that ruling P2 is "stricter than #352's per-tool veto"
+    is withdrawn as written: criterion (a) as registered was WEAKER than P2.
+    P2 binds: ANY polarity inversion in the AFTER arm blocks the move, whether
+    or not the BEFORE arm has it too.
+  - Criterion (c)'s "5 points" means PERCENTAGE POINTS of probes passed (the
+    suite's model-seen total as a percentage of its trials), not trials.
+  - (b) and (d) are unchanged.
