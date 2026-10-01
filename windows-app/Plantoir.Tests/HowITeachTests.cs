@@ -217,7 +217,7 @@ public class HowITeachTests : IDisposable
     {
         File.WriteAllText(PagePath, "Mine.\n");
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "how i teach" }, includeLinked: false, draft: false);
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "how i teach" }, draft: false);
         Assert.Contains(AssistWording.HowITeachIsNeverPublished("ICS3U"), plan.Problems);
         Assert.Empty(plan.UnknownNames);
         Assert.Equal(AssistWording.HowITeachIsNeverPublished("ICS3U"),

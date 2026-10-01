@@ -978,7 +978,9 @@ public sealed class AssistAgent
         {
             string tool = withLinks.Groups["verb"].Value.StartsWith("un", StringComparison.OrdinalIgnoreCase)
                 ? "unpublish_pages" : "publish_pages";
-            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value, includeLinked: true),
+            // "…and everything it links to" is what every publish does since
+            // #420; the phrasing is still answered, with the same call.
+            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value),
                                     cancellation);
         }
         // The old "publish|unpublish Unit N, Day M" shape lived here and was
@@ -988,7 +990,7 @@ public sealed class AssistAgent
         // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
-                                    PageArguments(planned.Groups["title"].Value, includeLinked: true),
+                                    PageArguments(planned.Groups["title"].Value),
                                     cancellation);
         if (scheduled.Success)
         {
@@ -1011,11 +1013,10 @@ public sealed class AssistAgent
         return null;
     }
 
-    private JsonObject PageArguments(string title, bool includeLinked) => new()
+    private JsonObject PageArguments(string title) => new()
     {
         ["course"] = _courseCode,
         ["section"] = _section,
-        ["includeLinked"] = includeLinked,
         ["pages"] = new JsonArray(JsonValue.Create(TidyTitle(title))),
     };
 

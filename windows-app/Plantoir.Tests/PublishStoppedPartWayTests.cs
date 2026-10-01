@@ -52,7 +52,7 @@ public class PublishStoppedPartWayTests : IDisposable
         // Another program holds the page: reading or writing it fails.
         using (new FileStream(Page("Unit 1, Day 2"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            var answer = await tools.PublishPages("ICS3U", 1, false, progress, default,
+            var answer = await tools.PublishPages("ICS3U", 1, progress, default,
                                                   new[] { asked }, preview: false);
             string said = answer.Summary();
             Assert.Contains(expected, said);
