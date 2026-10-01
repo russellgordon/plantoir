@@ -1033,6 +1033,8 @@ public sealed partial class SidebarPane : UserControl
     {
         if (Workspace.WorkspacePath is not { } folder) return;
         await CopyAPageDialog.ShowAsync(course, Workspace.Courses, folder, ShowDialogSafelyAsync);
+        // The dialog acted on the folder it was handed; only redraw this one if it still shows it.
+        if (TheFolderMovedUnderThisConfirmation(folder)) return;
         Workspace.Reload();
         _window.ApplyState();
     }
