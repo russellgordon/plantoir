@@ -18,6 +18,8 @@ public static class CourseRestorer
             if (course is null)
                 throw new RestoreException(
                     $"{item.CourseCode} is not in Courses & Clubs. Restore the course first, then restore this section into it.");
+            if (ReferenceCourse.IsKeptForReference(course))
+                throw new RestoreException(ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(course)));
             string sectionDir = course.SectionDirectory(section);
             if (Directory.Exists(sectionDir))
                 throw new RestoreException(
@@ -37,6 +39,7 @@ public static class CourseRestorer
                     $"{item.CourseCode} is already in Courses & Clubs. Remove it first if you want the archived copy back.");
             Extract(item.FilePath, item.CourseCode, coursesDirectory);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            LockAgainIfKeptForReference(courseDir);
         }
         // A restored thing is no longer archived (failure to delete is not fatal).
         try { File.Delete(item.FilePath); } catch { }
@@ -61,6 +64,7 @@ public static class CourseRestorer
         {
             Extract(item.FilePath, item.CourseCode, coursesDirectory);
             CourseArchiver.DiscardBuilds(coursesDirectory, item.CourseCode);
+            LockAgainIfKeptForReference(destination);
             return;
         }
 
@@ -69,6 +73,12 @@ public static class CourseRestorer
         try
         {
             string payload = Unpack(item.FilePath, item.CourseCode, staging);
+
+            // A reference course is locked (#241): unlock what is about to be
+            // written over, and lock again below — asked of the settings AFTER
+            // the restore, so a backup made before the course was kept for
+            // reference restores a course that is not one.
+            ReferenceLock.Unlock(destination);
 
             // Out with the current contents (hidden files included — the
             // backup carries its own .obsidian), in with the backup's.
@@ -91,6 +101,7 @@ public static class CourseRestorer
             // A restored course no longer holds what a stopped rename of its
             // word for a unit was part way through (#158, as the mac does).
             UnitWordRenamer.ClearRenameRecord(destination);
+            LockAgainIfKeptForReference(destination);
             try { Directory.Delete(staging, recursive: true); } catch { }
         }
     }
@@ -122,6 +133,8 @@ public static class CourseRestorer
         string courseDir = Path.Combine(coursesDirectory, item.CourseCode);
         if (!Directory.Exists(courseDir))
             throw new RestoreException($"{item.CourseCode} is not in Courses & Clubs, so there is nowhere to put Section {sectionNumber} back.");
+        if (ReadsAsKeptForReference(courseDir) is { } shown)
+            throw new RestoreException(ReferenceCourse.StaysAsItIs(shown));
 
         string staging = Path.Combine(Path.GetTempPath(), "restore-" + Guid.NewGuid());
         Directory.CreateDirectory(staging);
@@ -152,6 +165,27 @@ public static class CourseRestorer
     /// with an emptied section — the one outcome this method exists to
     /// prevent. (The mac's <c>moveItem</c> copies across volumes itself.)
     /// </summary>
+    /// <summary>The code a teacher reads, when the course at <paramref name="courseDir"/> is kept for reference; otherwise null.</summary>
+    private static string? ReadsAsKeptForReference(string courseDir)
+    {
+        try
+        {
+            var configuration = CourseConfiguration.Load(Path.Combine(courseDir, "course_config.json"));
+            var course = new Course(Path.GetFileName(courseDir), courseDir, configuration);
+            return ReferenceCourse.IsKeptForReference(course) ? ReferenceCourse.ShownCode(course) : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// A zip carries no lock, so a restored reference course arrives thawed;
+    /// the MARKER, which travels in the settings, is what puts it back.
+    /// </summary>
+    private static void LockAgainIfKeptForReference(string courseDir)
+    {
+        if (ReadsAsKeptForReference(courseDir) is not null) ReferenceLock.Lock(courseDir);
+    }
+
     private static void ReplaceContents(string live, string backedUp)
     {
         Directory.CreateDirectory(live);

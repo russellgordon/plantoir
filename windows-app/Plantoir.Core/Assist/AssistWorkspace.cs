@@ -213,6 +213,22 @@ public sealed partial class AssistWorkspace
                 : AssistWording.AskedAboutACourseThatIsNotHere(_lockedCourse, wanted));
         }
 
+        // A bare code names the LIVE course; with no live one, a code that
+        // only reference courses SHOW is refused with the candidates named
+        // (#241): the two deliberately show the same code, so a guess would
+        // look right every time and be wrong half of it.
+        var candidates = courses
+            .Where(c => ReferenceCourse.IsKeptForReference(c)
+                        && string.Equals(ReferenceCourse.ShownCode(c), wanted, StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.Code).OrderBy(name => name, StringComparer.Ordinal).ToList();
+        if (candidates.Count > 0)
+        {
+            string asked = CourseCodeValidator.Normalize(wanted);
+            throw new AssistRefusal(candidates.Count == 1
+                ? $"No course you are teaching is called {asked}. {candidates[0]} is kept for reference and shows that code — name it as {candidates[0]}."
+                : $"No course you are teaching is called {asked}. These are kept for reference and show that code: {string.Join(", ", candidates)}. Name the one you mean.");
+        }
+
         string known = courses.Count == 0
             ? "This working folder has no courses yet."
             : "The courses here are " + Humanize(courses.Select(c => c.Code)) + ".";
@@ -1337,6 +1353,10 @@ public sealed partial class AssistWorkspace
                                            CancellationToken cancellation = default)
     {
         var course = Course(courseCode);
+        // A course kept for reference is never deployed (#241, door 3, the
+        // headless deploy): first, before anything else is asked or started.
+        if (ReferenceCourse.IsKeptForReference(course))
+            throw new AssistRefusal(AssistWording.DeployRefusedForAReferenceCourse(ReferenceCourse.ShownCode(course)));
         int section = Section(course, sectionNumber);
         RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's deploy");
 

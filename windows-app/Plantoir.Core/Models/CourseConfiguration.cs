@@ -36,7 +36,7 @@ public sealed class CourseConfiguration
         // settings file saved there made its course vanish from the sidebar,
         // and a reference course read as ordinary (markerAgreement, "a
         // byte-order mark at the head of the file").
-        string text = Encoding.UTF8.GetString(data).TrimStart('﻿');
+        string text = Encoding.UTF8.GetString(data).TrimStart('\uFEFF');
         var token = JToken.Parse(text);
         if (token is not JObject obj)
             throw new InvalidDataException("course_config.json does not hold a JSON object.");

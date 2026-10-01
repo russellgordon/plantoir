@@ -70,6 +70,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         foreach (var course in courses)
         {
             var configuration = course.Configuration;
+            if (ReferenceCourse.IsKeptForReference(course))
+            {
+                // The local window is told NOTHING about a reference course
+                // (#241): "what courses do i have?" is matched in code and its
+                // answer is shown to the teacher. An outside session is told on
+                // purpose — reading last year's material is the point — with
+                // the name it must address it by, the code a teacher reads, and
+                // the year.
+                if (workspace.ServesTheLocalWindow) continue;
+                text.AppendLine($"{course.Code} — {configuration.CourseName}");
+                text.AppendLine($"  course code: {ReferenceCourse.ShownCode(course)}");
+                text.AppendLine("  kept for reference — never deployed");
+                string year = SchoolYear.Name(SchoolYear.Read(configuration.StoredReferenceSchoolYear, Today()), "none");
+                text.AppendLine($"  school year: {year}");
+                text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
+                continue;
+            }
             text.AppendLine($"{course.Code} — {configuration.CourseName}");
             text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
             // EVERY destination by type (#404, mac #403) — it used to name the

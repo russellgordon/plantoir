@@ -21,6 +21,27 @@ public static class ReferenceCourse
     public static bool IsKeptForReference(Course course) => course.Configuration.KeptForReference;
 
     /// <summary>
+    /// The code a teacher reads when the course at <paramref name="courseDirectory"/>
+    /// is kept for reference AS SAVED NOW, else null. What a deploy door asks
+    /// at the press: the window's copy may be older than a marker written by
+    /// hand or by another window. A settings file that cannot be read reads as
+    /// ordinary here — the launcher's own "cannot tell" refusal is the backstop.
+    /// </summary>
+    public static string? KeptOnDisk(string courseDirectory)
+    {
+        try
+        {
+            var configuration = CourseConfiguration.Load(Path.Combine(courseDirectory, "course_config.json"));
+            var course = new Course(Path.GetFileName(courseDirectory), courseDirectory, configuration);
+            return IsKeptForReference(course) ? ShownCode(course) : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>A deploy refused at a door because the course is kept for reference; its message is the contract's sentence.</summary>
+    public sealed class Refused(string shownCode) : InvalidOperationException(RefusalSentence(shownCode));
+
+    /// <summary>
     /// The code a TEACHER reads. For a reference course that is
     /// <c>course_code</c> (ICS3U) while its folder is ICS3U-2025 — the folder is
     /// identity, the code is what is shown (<c>referenceCourses.identity</c>).
