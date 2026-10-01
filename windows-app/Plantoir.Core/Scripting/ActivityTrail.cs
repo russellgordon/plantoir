@@ -482,6 +482,13 @@ public static class ActivityTrail
         /// "my backups vanished".
         /// </summary>
         BackupsDeleted,
+        /// <summary>
+        /// The scheduled-publish toast (#324 / mac #212, #306): posted or could
+        /// not be sent, and what a CLICK on it did — the section shown, in which
+        /// window, or only Plantoir brought forward and why. Never the toast's
+        /// text, never the working folder's path.
+        /// </summary>
+        ScheduledPublishNotification,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -578,6 +585,7 @@ public static class ActivityTrail
         Event.CourseImportForReferenceStopped => "course import for reference stopped",
         Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
         Event.BackupsDeleted => "backups deleted",
+        Event.ScheduledPublishNotification => "scheduled publish notification",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

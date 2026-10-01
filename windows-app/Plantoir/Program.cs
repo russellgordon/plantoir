@@ -35,6 +35,12 @@ public static class Program
         if (Plantoir.Core.Assist.TaskScheduling.ScheduledRunFrom(args) is var (job, token))
         {
             var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job, taskToken: token);
+            // One toast for the section, whatever happened (#324).
+            if (ending is not Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable)
+            {
+                try { Plantoir.Services.ScheduledPublishNotifier.PostFor(job); }
+                catch (Exception error) { App.LogDiagnostic("scheduled toast: " + error.Message); }
+            }
             Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
             return;
         }

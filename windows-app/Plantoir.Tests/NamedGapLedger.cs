@@ -137,8 +137,6 @@ internal static class NamedGapLedger
             "settings save held back"),
         Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
             "put today's class on the front page", "left the front page as it was"),
-        Owed(ActivityTrailEvents, 324, "clicking a scheduled-publish toast is not recorded yet (mac #306)",
-            "scheduled publish notification"),
         Owed(ActivityTrailEvents, 337, "this app does not find or install its own updates yet (mac #204)",
             "update found", "update check found nothing new", "update answered", "update held while work is under way",
             "update installing", "update set aside", "update stopped", "app updated"),
