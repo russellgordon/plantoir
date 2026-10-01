@@ -85,7 +85,17 @@ builder.Services.AddSingleton(workspace);
 builder.Services.AddMcpServer(options =>
         options.ServerInfo = new Implementation { Name = "plantoir", Version = "0.1.0" })
     .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly()
+    // Nothing writes to a course kept for reference (#241), asked BEFORE the
+    // tool is dispatched: ReferenceWriteGate.
+    .WithRequestFilters(filters => filters.AddCallToolFilter(next => async (context, cancellation) =>
+    {
+        var arguments = context.Params?.Arguments is { } given
+            ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
+        if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
+            return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
+        return await next(context, cancellation);
+    }));
 
 try { await builder.Build().RunAsync(); }
 finally

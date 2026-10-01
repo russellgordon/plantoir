@@ -3605,6 +3605,8 @@ call, the confirmation's extra sentence and the "Could not remove" alert.
 
 ## A reference course, and what FROZEN means on disk
 
+> **On Windows (bundle 6b, 2026-10-01):** NTFS has no `uchg`, so the lock is DENY entries on every content file plus a delete-child deny on each folder holding one — measured to refuse write, rename-over, rename and delete, and NOT carried by any ordinary copy; the read-only attribute was rejected because it travels into the build and publishes hidden pages. Unlock matches the entry's SHAPE, whoever it names. `robocopy /SEC` and `/COPYALL` are the one copy that carries it (and stall on it). Everything Windows does differently, with its numbers, is in `12-windows-app.md` → "Courses kept for reference on Windows".
+
 A reference course is last year's course — or a course full of example content
 — kept in this year's sidebar to be read, and never deployed. The rules both
 apps share are
@@ -3901,6 +3903,8 @@ deployable one, and a deploy that reports success is the worst direction this
 feature can fail in.
 
 ### Importing last year's folder
+
+> **On Windows:** a stream copy with a bytes progress bar and Stop (NTFS has no clone: 507 MB end to end in 5.2–5.6 s on an NVMe, 90–97 MB/s), every reparse point left behind rather than copied as a link, and the staging folder made with `CreateDirectoryW` so the create is exclusive. See `12-windows-app.md` → "The import".
 
 The second way a reference course is made, and the one a teacher reaches for
 first: **File ▸ Import Courses for Reference…**, point at the folder last
@@ -5453,6 +5457,62 @@ teacher meets in the first ten seconds.
 - **A file beside a page rather than in `Media` is left behind**, and listed.
   Measured: two PDFs and one `.html` across the real courses, and the only
   pages linking them are class pages, which are never copyable.
+
+### On Windows (#247, #258's half, #384): what differs, and what was measured
+
+The Windows port is `Plantoir.Core/Models/CoursePageCopy.cs` (the plan and the
+copy), `CopyPageFrontmatter.cs` (the four steps and the guard) and
+`CopyPageWording.cs` (every `copyingAPageBetweenCourses.wording` key, compared
+with the contract by `CopyAPageFrontmatterTests`), drawn by
+`Plantoir/Views/CopyAPageDialog.cs`. The rules are the contract's and all 32
+`cases`, 9 `frontmatterCases` and 36 `builderAgreement.cases` run on Windows.
+Four things are different in HOW, and each was measured rather than assumed
+(i5-8365U, 16 GB, Samsung 980 NVMe, NTFS, Windows 11 build 26200, Python 3.14,
+python-frontmatter/PyYAML as `scripts/` pins them):
+
+- **NTFS does not refuse an accent twin.** `FileMode.CreateNew` refuses a name
+  differing only by CASE (an `IOException` with HResult `0x80070050`,
+  `ERROR_FILE_EXISTS`, which is the ordinary "already here" skip) — but a name
+  differing only by NFC/NFD spelling is created as a SECOND file
+  (`CopyAPageNamesTests.NtfsDoesNotRefuseAnAccentTwinButDoesRefuseACaseTwin`).
+  On the mac `O_EXCL` refuses both. So on Windows the name index — NFC, then
+  `ToUpperInvariant`, ordinal, `.md` dropped, over the whole destination — is
+  the ONLY guard against a twin, and it is updated after EACH successful write
+  (bundle-6 ruling 5): two incoming pictures that are twins of each other both
+  plan as new, and the index written after the first is what makes the second a
+  skip (`TwoAccentTwinPicturesInOneRunMakeOneFileAndOneSkip`; with the per-write
+  update removed the test finds two files). Writes keep the SOURCE's exact
+  UTF-16 name: .NET's listing and `Path.Combine` leave an NFD name as stored.
+- **Every write is a stream copy into `FileMode.CreateNew`.** No `File.Copy`
+  (it carries the read-only attribute) and never a `File.Exists` check before a
+  write. A page that appears between the plan and the write is caught by the
+  exclusive create (`ALateCollisionIsASkipNotAnOverwrite`, with a racing
+  creator injected right before the write). Nothing written carries a lock or a
+  read-only bit, and `ReferenceLock.Clear` runs on each file before the read-back
+  anyway (`CopyAPageClearsTheLockTests` locks the source with design A and a
+  read-only bit first).
+- **There is no YAML library in this app**, so the guard is a narrow whitelist
+  language (`CopyPageFrontmatter.BuilderAgrees`) that REFUSES anchors, aliases,
+  tags, block scalars, flow mappings, directives, indented fences, a lone CR,
+  tabs, control characters and digit-led values PyYAML resolves but cannot
+  construct — "certified" is true by construction for what it accepts. That the
+  restriction is SOUND is fuzz-backed, not proven: `CopyAPageFuzzTests` composes
+  generated sources in C# and asks ONE Python pool, which imports
+  `scripts/build_site.py` and runs the real `process_frontmatter` for sections
+  1–4, whether each certified page is hidden. 5,000 sources (the default, ~30 s):
+  2,017 certified, 2,983 refused, **0 certified and not hidden**. **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0. The cause is not known.** The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net. The discrepancy is tracked as an open `windows` issue ("Copy a Page fuzz: reproduce or explain the 856"). Every one of the 12,128 pages Plantoir ships
+  (`support/example_content` + `support/skeletons`) is certified: **0 false
+  refusals**. With the guard widened to admit `&`/`*` values (an anchor or
+  alias), the same fuzz finds 5 published pages — the oracle has teeth.
+- **The scroll region (#384)** is one `ScrollViewer` with `MaxHeight` 380 epx on
+  the checklist and 320 on the result, around the rows AND every per-page
+  sentence; `CopyAPageDialogUiTests.CheckListAndSentencesScrollAsOne` asserts a
+  minimum height as well as the ceiling, with eleven rows and seventy sentences
+  at the window's smallest height.
+
+`draftSectionTwo` and `createdForSectionTwo` (#258's half) are stripped by
+exact name with the plain pair, before the guard is asked; the import of the
+2024-25 layout itself was decided NO for Windows.
 
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 

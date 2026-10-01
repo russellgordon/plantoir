@@ -1932,6 +1932,8 @@ change Windows shares.
 
 ## A course kept for reference is never deployed — fifteen doors, one rule
 
+> **Windows' chokepoints for each door**, and the test that holds each, are tabled in `12-windows-app.md` → "The fifteen doors on Windows". Door 12 (the folder publish) is `deploy.ps1`'s host-side check, and every `markerAgreement` row is run against the REAL `deploy.ps1` by `ReferenceMarkerAgreementTests`.
+
 A REFERENCE COURSE is last year's course, or a course full of example content,
 kept in this year's sidebar to be read. It may be previewed; it is never
 deployed. The keys are in

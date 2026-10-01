@@ -642,6 +642,23 @@ public static partial class AssistWording
         $"Open {otherCourse}'s section in Plantoir and ask me there.";
 
     /// <summary>
+    /// The model named a course KEPT FOR REFERENCE (#241). The local assistant
+    /// is never offered on one, so the #180 sentence's "open that course and
+    /// ask me there" would be advice nobody can follow; this says what the
+    /// course is instead.
+    /// </summary>
+    public static string AskedAboutAReferenceCourse(string course, string otherCourse) =>
+        $"{otherCourse} is kept for reference, so I can't work in it. This window is for {course}.";
+
+    /// <summary>
+    /// A deploy of a course kept for reference, refused at the door before
+    /// anything is stopped, built or uploaded (#241). The same words as
+    /// <c>referenceCourses.refusal.sentence</c>.
+    /// </summary>
+    public static string DeployRefusedForAReferenceCourse(string course) =>
+        $"{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.";
+
+    /// <summary>
     /// The model named a code that is no course in this working folder — a
     /// typo, or one it invented. Deliberately gives no "open it" advice:
     /// there is nothing to open.

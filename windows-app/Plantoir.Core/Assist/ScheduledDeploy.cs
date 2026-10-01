@@ -131,6 +131,12 @@ public sealed class ScheduledDeploy
 
     public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now, string cloudflareAccountID = "")
     {
+        // FIRST, whatever time was asked for (#241, door "the Schedule
+        // Deploy… sheet"): a course kept for reference is refused before
+        // "that time has already passed", which would invite another time.
+        if (Models.ReferenceCourse.IsKeptForReference(course))
+            return Models.ReferenceCourse.RefusalSentence(Models.ReferenceCourse.ShownCode(course));
+
         if (when <= now)
             return $"{when:dddd d MMMM, h:mm tt} has already passed. Pick a time still to come.";
 
@@ -156,10 +162,9 @@ public sealed class ScheduledDeploy
     /// </summary>
     public static Refusal? RefusalOf(Models.Course course, int sectionNumber, string cloudflareAccountID)
     {
-        // A course kept for reference is never deployed (#241's marker; this
-        // app keeps none for reference yet, but a folder can arrive with one).
-        if (course.Configuration.Values["kept_for_reference"] is Newtonsoft.Json.Linq.JValue { Type: Newtonsoft.Json.Linq.JTokenType.Boolean } kept
-            && kept.ToObject<bool>())
+        // A course kept for reference is never deployed (#241): the MARKER,
+        // read strictly, and never whether its pages are locked.
+        if (Models.ReferenceCourse.IsKeptForReference(course))
             return new Refusal("keptForReference");
 
         // The PRIMARY destination — unchanged order from before a course could
@@ -209,7 +214,7 @@ public sealed class ScheduledDeploy
         refusal.Key switch
         {
             "keptForReference" =>
-                $"{course.Code} is kept for reference, and a course kept for reference is never deployed.",
+                Models.ReferenceCourse.RefusalSentence(Models.ReferenceCourse.ShownCode(course)),
             "deployFolderNeedsAttention" =>
                 $"{course.Code} deploys to a folder, and that folder needs attention first: " +
                 Models.CourseConfiguration.DeployFolderProblem(course.Configuration.DeployFolderPath),

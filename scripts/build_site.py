@@ -3126,9 +3126,7 @@ def _date_pages_from_their_classes(content_root: Path, section_number: int = 1,
                 # read-only page arrives read-only; it is the build's own file,
                 # and a build not running as root (the Windows app's native
                 # build, the tests) could not date it otherwise.
-                mode = stat_module.S_IMODE(os.stat(fp).st_mode)
-                if not mode & stat_module.S_IWUSR:
-                    os.chmod(fp, mode | stat_module.S_IWUSR)
+                _writable(fp)
                 with open(fp, "w", encoding="utf-8") as f:
                     f.write(frontmatter.dumps(post))
                 changed_here = True
@@ -3494,9 +3492,7 @@ def _hide_a_page_whose_settings_cannot_be_read(file_path: Path, error: Exception
         seen_text = None
     body = _body_after_the_settings(file_path)
     try:
-        mode = stat_module.S_IMODE(os.stat(file_path).st_mode)
-        if not mode & stat_module.S_IWUSR:
-            os.chmod(file_path, mode | stat_module.S_IWUSR)
+        _writable(file_path)
         with open(file_path, "w", encoding="utf-8", newline="") as handle:
             if body and not body.startswith(("\n", "\r")):
                 body = "\n" + body
@@ -3603,6 +3599,27 @@ def _front_page_line(content_root: Path) -> int | None:
     return None
 
 
+def _writable(path) -> None:
+    """Makes the BUILD's own copy of a page writable before the build writes it.
+
+    `shutil.copy2` carries a page's read-only bit into the build tree (on
+    Windows the attribute, on the mac the mode). The build then cannot rewrite
+    the copy's frontmatter - where `draft: true` becomes `publish: false` - so
+    the copy keeps `draft: true` with no `publish` key and the site PUBLISHES
+    a page the teacher hid. Reachable on Windows, where the native build runs
+    as the teacher in a host folder rather than as root in a container (#241;
+    test_build_keeps_a_readonly_hidden_page_hidden.py). Only ever called on
+    the build's copy: the teacher's page is never touched by this. A no-op
+    where the copy is already writable, and it never raises.
+    """
+    try:
+        mode = stat_module.S_IMODE(os.stat(path).st_mode)
+        if not mode & stat_module.S_IWUSR:
+            os.chmod(path, mode | stat_module.S_IWUSR)
+    except OSError:
+        pass
+
+
 def process_frontmatter(file_path: Path, section_number: int):
     if file_path.suffix.lower() != ".md":
         return
@@ -3651,6 +3668,7 @@ def process_frontmatter(file_path: Path, section_number: int):
     # The new logic runs after all files are copied, syncing curriculum files
     # to the section's latest 'created' value only when newer.
 
+    _writable(file_path)
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(frontmatter.dumps(post))
@@ -3694,6 +3712,7 @@ def rewrite_section_wikilinks(md_path: Path):
 
     new_text = pattern.sub(_repl, text)
     if count > 0 and new_text != text:
+        _writable(md_path)
         try:
             md_path.write_text(new_text, encoding="utf-8")
             print(f"🔗 Rewrote {count} section-path wikilink(s) in: {md_path}")

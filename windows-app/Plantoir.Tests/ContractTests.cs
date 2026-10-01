@@ -169,6 +169,12 @@ public class ContractTests
         Pair("yourNextUpcoming", AssistWording.YourNextUpcoming(3, "{course}", "{section}"),
              AssistWording.YourNextUpcomingForAMeeting(3, "{course}", "{section}"));
 
+        // #241: a course kept for reference.
+        Assert.Equal(wording["askedAboutAReferenceCourse"]!.ToString(),
+                     AssistWording.AskedAboutAReferenceCourse("{course}", "{otherCourse}"));
+        Assert.Equal(wording["deployRefusedForAReferenceCourse"]!.ToString(),
+                     AssistWording.DeployRefusedForAReferenceCourse("{course}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
