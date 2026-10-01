@@ -42,4 +42,51 @@ public static class WizardWording
     /// in this app.
     /// </summary>
     public const string CreateCourseButton = "Create Course";
+
+    // ---- Starting Content (GitHub issue #250; wizard.whenTheNoteIsShown and
+    // wizard.whereTheStartingContentSentencesAreRendered say which is shown
+    // where). Pinned by WizardWordingTests and, rendered, by the [UiFact]s in
+    // NewCourseWizardUiTests.
+
+    /// <summary>A course starting empty for a code with no ready-made pages, or whose skeleton was turned down.</summary>
+    public const string NoExampleContentNote =
+        "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.";
+
+    /// <summary>
+    /// The same sentence without its first clause, for a code whose ready-made
+    /// pages AND skeleton were both declined: "isn't available" is false to
+    /// somebody who was offered it one question ago.
+    /// </summary>
+    public const string NoStartingContentNote =
+        "This course will start with empty folders ready for your own pages.";
+
+    /// <summary>The skeleton toggle's label; {article} and {subject} are filled by <see cref="SkeletonToggleLabel"/>.</summary>
+    public const string SkeletonToggleLabelTemplate = "Start from {article} {subject} skeleton";
+
+    /// <summary>The GENERAL family's label, outright: its own label "This Course" was written for the skeleton's pages.</summary>
+    public const string SkeletonToggleLabelForAGeneralSkeleton = "Start from a general course skeleton";
+
+    /// <summary>Under the skeleton toggle, for a code with no ready-made pages.</summary>
+    public const string SkeletonToggleCaption =
+        "There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where.";
+
+    /// <summary>Under the skeleton toggle, for a code whose ready-made pages were declined.</summary>
+    public const string SkeletonToggleCaptionWhenExampleContentIsDeclined =
+        "There is also a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where.";
+
+    /// <summary>Stands in for the structure editor while the example content chooses the folders.</summary>
+    public const string StructureFromExampleNote =
+        "The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to start from the subject’s own structure instead, and change it however you like.";
+
+    /// <summary>
+    /// "Start from a computer studies skeleton": the template with the
+    /// family's label filled in. The general family reads
+    /// <see cref="SkeletonToggleLabelForAGeneralSkeleton"/> outright.
+    /// </summary>
+    public static string SkeletonToggleLabel(string familyName, string label)
+    {
+        if (familyName == Catalogs.SkeletonCatalog.GeneralFamilyName) return SkeletonToggleLabelForAGeneralSkeleton;
+        string subject = label.ToLowerInvariant();
+        return SkeletonToggleLabelTemplate.Replace("{article}", "a").Replace("{subject}", subject);
+    }
 }

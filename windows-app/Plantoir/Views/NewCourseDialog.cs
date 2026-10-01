@@ -171,7 +171,7 @@ public sealed class NewCourseDialog : ContentDialog
     /// none — or when there is example content, which always wins.
     /// </summary>
     private SkeletonCatalog.Family? SkeletonForCode() =>
-        SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, NormalizedCode)
+        SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent)
             ? SkeletonCatalog.GetFamily(SkeletonsRoot, NormalizedCode)
             : null;
 
@@ -180,13 +180,23 @@ public sealed class NewCourseDialog : ContentDialog
     /// folders and files — the pages were written for one exact layout, and
     /// a hand-edited structure would strand their links.
     /// </summary>
-    private bool StructureComesFromExampleContent =>
-        _prepopulate && ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+    private bool StructureComesFromExampleContent => TakingExampleContent;
+
+    /// <summary>
+    /// Whether the teacher is TAKING the ready-made pages: they exist for the
+    /// typed code and the pre-populate toggle is on. The question #250 is
+    /// about — "does example content exist?" was asked where this belongs.
+    /// </summary>
+    private bool TakingExampleContent =>
+        NewCourseAnswers.TakesExampleContent(ExampleContentRoot, NormalizedCode, _prepopulate);
 
     public NewCourseDialog(MainWindow window)
     {
         _window = window;
-        _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current));
+        _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current))
+        {
+            SkeletonsRoot = SkeletonsRoot,
+        };
         _nameCatalog = CourseNameCatalogs.Shared;
         _codeBox.ItemTemplate = BuildCodeSuggestionTemplate();
         // AutoSuggestBox does NOT write the chosen row's text into Text by
@@ -229,8 +239,7 @@ public sealed class NewCourseDialog : ContentDialog
         };
         _gradeWarningSlot = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         _structureCaption = FormBuilders.ExampleCaption("Defaults are fine for most courses");
-        _structureLockedNote = FormBuilders.ExampleCaption(
-            "The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to choose your own structure.");
+        _structureLockedNote = FormBuilders.ExampleCaption(WizardWording.StructureFromExampleNote);
         _structureLockedNote.Visibility = Visibility.Collapsed;
         AutomationProperties.SetAutomationId(_structureLockedNote, "structureFromExampleNote");
         _shortRow = FormBuilders.LabeledRow("Short label beside emoji (≤ 12 characters)", _shortBox);
@@ -615,14 +624,20 @@ public sealed class NewCourseDialog : ContentDialog
     // ---- Starting content and structure ----------------------------------
 
     /// <summary>
-    /// The Starting Content section follows the typed course code: the two
-    /// toggles when a bundled payload exists for it, a quiet note when none
-    /// does yet. Rebuilt on every code change; toggle values survive.
+    /// The Starting Content section follows the typed course code, in three
+    /// blocks that are SIBLINGS rather than branches of one if (#250): the
+    /// ready-made pages toggle when a payload exists for the code; the
+    /// subject's skeleton whenever one is OFFERED — which, since #250, includes
+    /// a code whose ready-made pages were just turned down; and the curriculum
+    /// toggles below the skeleton toggle (#252), because a declined payload
+    /// keeps its curriculum when the skeleton is kept. Rebuilt on every code
+    /// change; toggle values survive in the fields.
     /// </summary>
     private void RefreshStartingContent()
     {
         _startingContentBody.Children.Clear();
-        if (ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode))
+        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+        if (hasContent)
         {
             var prepopToggle = new ToggleSwitch { IsOn = _prepopulate, OnContent = "", OffContent = "" };
             AutomationProperties.SetAutomationId(prepopToggle, "prepopulateToggle");
@@ -631,123 +646,66 @@ public sealed class NewCourseDialog : ContentDialog
                 "Working pages written for this course — keep, edit, or delete them as you build your own site. The example content also chooses the course's folders and files, so they fit the pages."));
             _startingContentBody.Children.Add(prepopRow);
 
-            ToggleSwitch? curriculumToggle = null;
-            ToggleSwitch? coverageToggle = null;
-            ToggleSwitch? coverageNotesToggle = null;
-
-            if (ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode))
-            {
-                curriculumToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCurriculum,
-                    IsEnabled = _prepopulate,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(curriculumToggle, "curriculumToggle");
-                // Named by SpecialNames.CurriculumFolderBlockedByCurriculumPages,
-                // so the label has to be built the same way the sentence is -
-                // and it is per-province, because a BC teacher told to turn off
-                // "Include Ontario curriculum pages" has no such switch.
-                var curriculumRow = FormBuilders.LabeledRow(
-                    SpecialNames.CurriculumPagesSwitchLabel(JurisdictionForCode()), curriculumToggle);
-                curriculumRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Every expectation as its own page, so lessons and tasks can link to exactly what they address"));
-                _startingContentBody.Children.Add(curriculumRow);
-
-                coverageToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCurriculumCoverage,
-                    IsEnabled = _prepopulate && _includeCurriculum,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(coverageToggle, "curriculumCoverageToggle");
-                // Named by SpecialNames.CurriculumFolderBlockedByCoverageMap and
-                // LastGradedFolderBlockedWizard - see the note in CourseSettingsView.
-                var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInWizard, coverageToggle);
-                coverageRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Generates a page showing which specific and overall expectations are addressed"));
-                _startingContentBody.Children.Add(coverageRow);
-
-                coverageNotesToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCoverageNotes,
-                    IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(coverageNotesToggle, "curriculumCoverageNotesToggle");
-                var coverageNotesRow = FormBuilders.LabeledRow("Include explanations on Curriculum Coverage page", coverageNotesToggle);
-                coverageNotesRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Shows “What counts” and “Reading it honestly” sections on the page"));
-                _startingContentBody.Children.Add(coverageNotesRow);
-
-                curriculumToggle.Toggled += (_, _) =>
-                {
-                    _includeCurriculum = curriculumToggle.IsOn;
-                    RebuildFolderEditors();
-                    if (coverageToggle is not null)
-                    {
-                        coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
-                        if (!_includeCurriculum) coverageToggle.IsOn = false;
-                    }
-                    if (coverageNotesToggle is not null)
-                    {
-                        coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
-                        if (!_includeCurriculum) coverageNotesToggle.IsOn = false;
-                    }
-                };
-
-                coverageToggle.Toggled += (_, _) =>
-                {
-                    _includeCurriculumCoverage = coverageToggle.IsOn;
-                    // Named by two of the blocked sentences, so the rows have
-                    // to be redrawn against the new answer.
-                    RebuildFolderEditors();
-                    if (coverageNotesToggle is not null)
-                    {
-                        coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
-                        if (!_includeCurriculumCoverage) coverageNotesToggle.IsOn = false;
-                    }
-                };
-
-                coverageNotesToggle.Toggled += (_, _) =>
-                {
-                    _includeCoverageNotes = coverageNotesToggle.IsOn;
-                };
-            }
-
+            // The example-content toggle moves the editor exactly as the
+            // skeleton toggle does, in both directions: OFF adopts the
+            // skeleton it has just revealed, ON restores (wizard.skeletonToggle
+            // → declineExampleContent / takeExampleContent). The way back is
+            // not optional — without it a teacher who declines and then changes
+            // their mind gets a different file from the one they would have got.
             prepopToggle.Toggled += (_, _) =>
             {
+                if (prepopToggle.IsOn == _prepopulate) return;
                 _prepopulate = prepopToggle.IsOn;
+                if (_prepopulate) RestoreGenericStructure();
+                else AdoptSkeletonStructure();
+                RefreshSkeletonBlock();
+                RefreshCurriculumBlock();
                 RebuildFolderEditors();
-                if (curriculumToggle is not null) curriculumToggle.IsEnabled = _prepopulate;
-                if (coverageToggle is not null) coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
-                if (coverageNotesToggle is not null) coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
                 RefreshStructureArea();
             };
         }
-        else if (SkeletonForCode() is { } skeleton)
+        _startingContentBody.Children.Add(_skeletonBlock);
+        _startingContentBody.Children.Add(_curriculumBlock);
+        RefreshSkeletonBlock();
+        RefreshCurriculumBlock();
+    }
+
+    private readonly StackPanel _skeletonBlock = new() { Spacing = 6 };
+    private readonly StackPanel _curriculumBlock = new() { Spacing = 6 };
+
+    /// <summary>
+    /// The skeleton toggle, shown whenever a skeleton is OFFERED
+    /// (<see cref="SkeletonCatalog.HasSkeleton"/> with whether the teacher is
+    /// taking the ready-made pages), and the note for a course starting empty.
+    /// </summary>
+    private void RefreshSkeletonBlock()
+    {
+        _skeletonBlock.Children.Clear();
+        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+        if (TakingExampleContent) return;
+
+        if (SkeletonForCode() is { } skeleton)
         {
-            // The mac's two sentences, verbatim: one question, one wording,
-            // on both platforms. The toggle survives a code change the same
-            // way the pre-populate toggle does — the field keeps the answer
-            // and the control is rebuilt from it.
             var skeletonToggle = new ToggleSwitch { IsOn = _startsFromSkeleton, OnContent = "", OffContent = "" };
             AutomationProperties.SetAutomationId(skeletonToggle, "skeletonToggle");
-            var skeletonRow = FormBuilders.LabeledRow(
-                $"Start from a {skeleton.Label.ToLowerInvariant()} skeleton", skeletonToggle);
-            skeletonRow.Children.Add(FormBuilders.ExampleCaption(
-                "There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where."));
-            _startingContentBody.Children.Add(skeletonRow);
+            var skeletonRow = FormBuilders.LabeledRow(SkeletonToggleLabel(skeleton), skeletonToggle);
+            AutomationProperties.SetAutomationId(skeletonRow.Children[0], "skeletonToggleLabel");
+            // The caption's opening clause ("There is no ready-made course for
+            // this code") is false for a code whose pages were declined one
+            // question ago, so that code reads its own sentence.
+            var caption = FormBuilders.ExampleCaption(hasContent
+                ? WizardWording.SkeletonToggleCaptionWhenExampleContentIsDeclined
+                : WizardWording.SkeletonToggleCaption);
+            AutomationProperties.SetAutomationId(caption, hasContent
+                ? "skeletonToggleCaptionWhenExampleContentIsDeclined"
+                : "skeletonToggleCaption");
+            skeletonRow.Children.Add(caption);
+            _skeletonBlock.Children.Add(skeletonRow);
 
-            // With the toggle off the teacher is in exactly the situation the
-            // no-content note describes, so it says so — the same sentence,
-            // not a third one.
-            var offNote = NoExampleContentNote();
+            // With the toggle off the course starts empty, and says so.
+            var offNote = CourseStartingEmptyNote(hasContent);
             offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
-            _startingContentBody.Children.Add(offNote);
+            _skeletonBlock.Children.Add(offNote);
 
             skeletonToggle.Toggled += (_, _) =>
             {
@@ -756,20 +714,127 @@ public sealed class NewCourseDialog : ContentDialog
                 offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
                 if (_startsFromSkeleton) AdoptSkeletonStructure();
                 else RestoreGenericStructure();
+                RefreshCurriculumBlock();
             };
         }
         else
         {
-            _startingContentBody.Children.Add(NoExampleContentNote());
+            _skeletonBlock.Children.Add(CourseStartingEmptyNote(hasContent));
         }
     }
 
-    private static TextBlock NoExampleContentNote()
+    /// <summary>
+    /// "Start from a … skeleton" for a family. The GENERAL family reads its
+    /// own sentence outright, since its label ("This Course") was written for
+    /// the skeleton's pages and rendered "Start from a this course skeleton".
+    /// </summary>
+    private static string SkeletonToggleLabel(SkeletonCatalog.Family skeleton) =>
+        WizardWording.SkeletonToggleLabel(skeleton.Name, skeleton.Label);
+
+    /// <summary>
+    /// The note for a course that will start with empty folders: THREE
+    /// situations, TWO sentences (<c>wizard.whenTheNoteIsShown</c>). A code
+    /// with ready-made pages that were declined, and whose skeleton was then
+    /// declined too, reads <see cref="WizardWording.NoStartingContentNote"/> —
+    /// "isn't available for this course code yet" is false to somebody who was
+    /// offered it one question ago — under its OWN automation id, so a UI test
+    /// can say which sentence a teacher is reading.
+    /// </summary>
+    private static TextBlock CourseStartingEmptyNote(bool readyMadePagesWereDeclined)
     {
-        var note = FormBuilders.ExampleCaption(
-            "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.");
-        AutomationProperties.SetAutomationId(note, "noExampleContentNote");
+        var note = FormBuilders.ExampleCaption(readyMadePagesWereDeclined
+            ? WizardWording.NoStartingContentNote
+            : WizardWording.NoExampleContentNote);
+        AutomationProperties.SetAutomationId(note, readyMadePagesWereDeclined
+            ? "noStartingContentNote"
+            : "noExampleContentNote");
         return note;
+    }
+
+    /// <summary>
+    /// Whether the curriculum pages are on offer for this course: the payload
+    /// declares a curriculum folder AND the teacher is taking it.
+    /// </summary>
+    private bool CurriculumPagesOffered =>
+        TakingExampleContent && ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode);
+
+    /// <summary>
+    /// The three curriculum toggles, for a code whose payload declares a
+    /// curriculum folder. They sit BELOW the skeleton toggle (#252).
+    /// </summary>
+    private void RefreshCurriculumBlock()
+    {
+        _curriculumBlock.Children.Clear();
+        if (!ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode)) return;
+        bool offered = CurriculumPagesOffered;
+
+        var curriculumToggle = new ToggleSwitch
+        {
+            IsOn = _includeCurriculum,
+            IsEnabled = offered,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(curriculumToggle, "curriculumToggle");
+        // Named by SpecialNames.CurriculumFolderBlockedByCurriculumPages,
+        // so the label has to be built the same way the sentence is -
+        // and it is per-province, because a BC teacher told to turn off
+        // the Ontario switch has no such switch.
+        var curriculumRow = FormBuilders.LabeledRow(
+            SpecialNames.CurriculumPagesSwitchLabel(JurisdictionForCode()), curriculumToggle);
+        curriculumRow.Children.Add(FormBuilders.ExampleCaption(
+            "Every expectation as its own page, so lessons and tasks can link to exactly what they address"));
+        _curriculumBlock.Children.Add(curriculumRow);
+
+        var coverageToggle = new ToggleSwitch
+        {
+            IsOn = _includeCurriculumCoverage,
+            IsEnabled = offered && _includeCurriculum,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(coverageToggle, "curriculumCoverageToggle");
+        // Named by SpecialNames.CurriculumFolderBlockedByCoverageMap and
+        // LastGradedFolderBlockedWizard - see the note in CourseSettingsView.
+        var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInWizard, coverageToggle);
+        coverageRow.Children.Add(FormBuilders.ExampleCaption(
+            "Generates a page showing which specific and overall expectations are addressed"));
+        _curriculumBlock.Children.Add(coverageRow);
+
+        var coverageNotesToggle = new ToggleSwitch
+        {
+            IsOn = _includeCoverageNotes,
+            IsEnabled = offered && _includeCurriculum && _includeCurriculumCoverage,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(coverageNotesToggle, "curriculumCoverageNotesToggle");
+        var coverageNotesRow = FormBuilders.LabeledRow("Include explanations on Curriculum Coverage page", coverageNotesToggle);
+        coverageNotesRow.Children.Add(FormBuilders.ExampleCaption(
+            "Shows “What counts” and “Reading it honestly” sections on the page"));
+        _curriculumBlock.Children.Add(coverageNotesRow);
+
+        curriculumToggle.Toggled += (_, _) =>
+        {
+            _includeCurriculum = curriculumToggle.IsOn;
+            RebuildFolderEditors();
+            coverageToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum;
+            if (!_includeCurriculum) coverageToggle.IsOn = false;
+            coverageNotesToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum && _includeCurriculumCoverage;
+            if (!_includeCurriculum) coverageNotesToggle.IsOn = false;
+        };
+
+        coverageToggle.Toggled += (_, _) =>
+        {
+            _includeCurriculumCoverage = coverageToggle.IsOn;
+            // Named by two of the blocked sentences, so the rows have
+            // to be redrawn against the new answer.
+            RebuildFolderEditors();
+            coverageNotesToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum && _includeCurriculumCoverage;
+            if (!_includeCurriculumCoverage) coverageNotesToggle.IsOn = false;
+        };
+
+        coverageNotesToggle.Toggled += (_, _) => _includeCoverageNotes = coverageNotesToggle.IsOn;
     }
 
     /// <summary>
@@ -793,7 +858,7 @@ public sealed class NewCourseDialog : ContentDialog
         // and then corrected a typo must not be handed it back.
         if (!_startsFromSkeleton) return;
         var skeleton = SkeletonCatalog.StructureToAdopt(
-            ExampleContentRoot, SkeletonsRoot, NormalizedCode, _sharedFolders,
+            ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent, _sharedFolders,
             WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
         if (skeleton is null) return;
         _adopted = WizardStructure.Adopting(skeleton);
@@ -1253,49 +1318,14 @@ public sealed class NewCourseDialog : ContentDialog
             ? LocaleCatalog.Codes[_localeBox.SelectedIndex]
             : WizardDefaults.DefaultLocale;
 
-        // Adopt once more, here, whether or not the code box's TextChanged
-        // ever ran — it does not for a programmatic Text on an untemplated
-        // box (AutoCreate, and StageForCapture's own comment). A config that
-        // disagreed with the pages about to be installed would leave empty
-        // folders beside them. The guard is StructureToAdopt's own, so a list
-        // the teacher edited is still theirs. Mirrors the mac's
-        // buildConfiguration.
-        if (_startsFromSkeleton
-            && SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, code, _sharedFolders,
-                                                WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders) is { } lateAdopted)
-        {
-            ApplyLists(WizardStructure.Adopting(lateAdopted));
-        }
-
-        // The skeleton decides its own sidebar, whatever the teacher has
-        // since done to the folder list — mirrors the mac. The lists written
-        // are the editor's: adoption already put the skeleton's folders there,
-        // and a list the teacher edited since is theirs.
-        var skeletonInUse = _startsFromSkeleton ? SkeletonForCode() : null;
-        List<string> hidden;
-        List<string> expandable;
-        if (skeletonInUse is not null)
-        {
-            var plan = SkeletonCatalog.Sidebar(skeletonInUse, _sharedFolders, _sharedFiles, _perSectionFolders, _perSectionFiles);
-            hidden = plan.Hidden.ToList();
-            expandable = plan.Expandable.ToList();
-        }
-        else
-        {
-            var allItems = _sharedFolders.Concat(_sharedFiles).Concat(_perSectionFolders).Concat(_perSectionFiles).ToHashSet();
-            hidden = WizardDefaults.HiddenItems
-                .Where(i => allItems.Contains(i)
-                            || string.Equals(i, "Media", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            var expandableSource = _sharedFolders.Concat(_perSectionFolders).ToHashSet();
-            expandable = WizardDefaults.ExpandableItems.Where(expandableSource.Contains).ToList();
-        }
-
-        // The real wizard reads these as its defaults, exactly like every
-        // other answer here. False when no content exists for the code, so a
-        // stale true can never mean anything.
-        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, code);
-        bool includesCurriculum = ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, code);
+        // The starting-content keys, the lists and the marks pool are decided
+        // in Core (NewCourseAnswers), where a test can pin them — the goldens
+        // in Plantoir.Tests/Goldens are what a teacher TAKING the ready-made
+        // pages must still get (#250). The lists come back as they stand after
+        // the last-moment adoption, which the editor then shows too.
+        var answers = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, new NewCourseAnswers.Choices(
+            code, _prepopulate, _startsFromSkeleton, _includeCurriculum, CurrentLists()));
+        ApplyLists(answers.Lists);
 
         var result = new JObject
         {
@@ -1306,21 +1336,19 @@ public sealed class NewCourseDialog : ContentDialog
             ["emojis"] = PerSection(_ => _emoji),
             ["num_sections"] = sections.Count,
             ["section_numbers"] = new JArray(sections),
-            ["shared_folders"] = new JArray(_sharedFolders),
-            ["shared_files"] = new JArray(_sharedFiles),
-            ["per_section_folders"] = new JArray(_perSectionFolders),
-            ["per_section_files"] = new JArray(_perSectionFiles),
-            ["hidden"] = new JArray(hidden),
-            ["expandable"] = new JArray(expandable),
+            ["shared_folders"] = answers.Keys["shared_folders"],
+            ["shared_files"] = answers.Keys["shared_files"],
+            ["per_section_folders"] = answers.Keys["per_section_folders"],
+            ["per_section_files"] = answers.Keys["per_section_files"],
+            ["hidden"] = answers.Keys["hidden"],
+            ["expandable"] = answers.Keys["expandable"],
             ["expandOnFolderClick"] = _expandOnFolderClick,
             ["footer_html"] = _footerHtml,
             ["show_reading_time"] = _showReadingTime,
             ["show_grade_in_title"] = PerSection(_ => _showsGrade),
-            ["prepopulate_example_content"] = hasContent && _prepopulate,
-            // The same capabilityExists && teacherSaidYes shape as the two
-            // above — contracts/file-formats.json -> wizardAnswerKeys.
-            ["use_skeleton"] = SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, code) && _startsFromSkeleton,
-            ["include_curriculum_pages"] = hasContent && _prepopulate && includesCurriculum && _includeCurriculum,
+            ["prepopulate_example_content"] = answers.Keys["prepopulate_example_content"],
+            ["use_skeleton"] = answers.Keys["use_skeleton"],
+            ["include_curriculum_pages"] = answers.Keys["include_curriculum_pages"],
             ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
 
             ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(_includeCurriculumCoverage, _includeCoverageNotes)),
@@ -1343,34 +1371,9 @@ public sealed class NewCourseDialog : ContentDialog
             ["class_folder"] = ClassFolderRule.Name(null, _perSectionFolders),
         };
 
-        // The marks pool is written for EVERY new course, before setup runs,
-        // because setup keeps a saved answer and reads a saved file WITHOUT
-        // the key as a course that was never asked — it derives the pool from
-        // the manifest only when there is no saved file at all, which only a
-        // command-line run has (#317, the mac's #292; contract
-        // shared-rules.json -> gradedFolders.newCourse). The comment that
-        // stood here said setup would take a payload's pool from its
-        // manifest; it did not, so every payload course made here had none.
-        //
-        // Two sources, never mixed. A course the teacher shaped gets the
-        // pool the teacher chose, reconciled exactly against its folders. A
-        // course taking ready-made pages gets the MANIFEST's pool, read the
-        // way the command line reads it — never the wizard's own list, which
-        // for such a course was built from the wizard's DEFAULT folders in
-        // editors the teacher never saw, and never the subject skeleton's.
-        // An unreadable manifest leaves the key absent, as before. (This app
-        // has no clubs yet; when #274 brings them, a club must be kept on the
-        // first branch — it takes no ready-made pages.)
-        if (!StructureComesFromExampleContent)
-        {
-            result["graded_folders"] = new JArray(
-                GradedFolderRule.Reconciled(CurrentGradedFolders(),
-                    _sharedFolders.Concat(_perSectionFolders)));
-        }
-        else if (ExampleContentCatalog.MarksPool(ExampleContentRoot, NormalizedCode) is { } manifestPool)
-        {
-            result["graded_folders"] = new JArray(manifestPool);
-        }
+        // The marks pool, written for EVERY new course before setup runs (#317)
+        // — absent only when a payload's manifest could not be read.
+        if (answers.Keys["graded_folders"] is { } pool) result["graded_folders"] = pool;
 
         // Pruned once more, defensively, at the point this actually gets
         // written — so the file on disk is correct even in a hypothetical

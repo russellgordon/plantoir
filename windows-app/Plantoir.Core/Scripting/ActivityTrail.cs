@@ -87,6 +87,16 @@ public static class ActivityTrail
         /// </summary>
         FolderCreated,
         /// <summary>
+        /// A course was made — by the New Course wizard (written BEFORE the
+        /// launcher starts, so a creation that fails part-way still says what
+        /// was asked for) or by Add Example Course (written AFTER, from the
+        /// code the run reported). Carries the code and which of the three
+        /// starting points it began from; never the name the teacher typed.
+        /// Before this a creation left only "started setup.ps1" with empty
+        /// arguments, which is how mac #248 stayed invisible for five weeks.
+        /// </summary>
+        CourseCreated,
+        /// <summary>
         /// A working folder was recognised as kept in sync by a cloud service.
         /// Carries the service's name — never the folder's path, which is a
         /// teacher's own filing and is redacted from the trail anyway.
@@ -360,6 +370,7 @@ public static class ActivityTrail
         Event.SectionProcessesReclaimed => "section processes reclaimed",
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
+        Event.CourseCreated => "course created",
         Event.SyncedFolderNoticed => "synced folder noticed",
         Event.SyncedFolderAccepted => "synced folder accepted",
         Event.FolderProblemFound => "folder problem found",

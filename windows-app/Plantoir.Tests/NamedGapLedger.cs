@@ -137,8 +137,6 @@ internal static class NamedGapLedger
             "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
             "settings save held back"),
-        Owed(ActivityTrailEvents, 250, "the New Course wizard does not record the course it made yet (mac #248/#251/#267)",
-            "course created"),
         Owed(ActivityTrailEvents, 350, "a tool the model was not offered is not refused here yet (mac #327)",
             "assistant named a tool it was not offered"),
         Owed(ActivityTrailEvents, 352, "a page list naming no page is not refused in code here yet (mac #197)",
@@ -192,9 +190,6 @@ internal static class NamedGapLedger
             "a club's front page, numbered pages"),
 
         // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
-        Owed(GradedFoldersNewCourseCases, 250,
-            "declining a payload does not give the subject's skeleton and its pool here yet (mac #248)",
-            "a declined payload keeping its skeleton takes the SKELETON's pool"),
         Owed(GradedFoldersNewCourseCases, 274, "this app has no clubs yet (mac #267)",
             "a club typed with a payload code is not given the payload's pool"),
 
