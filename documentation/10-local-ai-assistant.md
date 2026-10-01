@@ -1798,7 +1798,8 @@ things Windows did not have before and has now:
 **Not done: #114's half (one description per tool).** It requires a
 pre-registered BEFORE/AFTER routing measurement on this PC's tier before any
 description moves, and this piece of work ran no model. The descriptions and
-`Briefly()` are unchanged; the work stays on #352.
+`Briefly()` were unchanged then; the work stayed on #352, and landed in parity
+bundle 9 (2026-10-01) — see "On Windows: measured, and moved (#352)" below.
 
 ### Step 4 — The app presses its own buttons
 
@@ -3710,6 +3711,57 @@ form quoted above, before and after regenerating the contracts:
 (`sha256(json.dumps(x, sort_keys=True, ensure_ascii=False))`). The hash that
 will move is Windows' — its narrowed local surface and its MCP descriptions —
 and that is theirs to measure.
+
+#### On Windows: measured, and moved (#352, 2026-10-01)
+
+**Behaviour first, and it was NOT the same.** Windows' `publish_pages` and
+`unpublish_pages` take `includeLinked`, default FALSE, and the local model is
+shown it; card phrasings send `false`. So the pinned `publish_pages` sentence
+("the linked pages come by themselves — there is nothing to ask for and no way
+to leave them out") and `unpublish_pages`' sweep promise are untrue there.
+Those two descriptions did NOT move: they keep Windows' text, and the local
+model still reads them through `Briefly()` (`AssistAgent.StillShortened`,
+mirrored as `STILL_SHORTENED` in `narrow-tools.py` and pinned by
+`NarrowToolsMirrorTests`). The behaviour is a new `windows` issue (bundle 9);
+the hold lifts when it lands, and `EveryDescriptionIsTheContractsOwn` fails
+the day either one matches the contract, so the hold cannot outlive its reason.
+
+**The measurement**, pre-registered before the first request
+(`research/ai-assist/windows-description-convergence-preregistration.txt`,
+with a dated note binding ruling P2: ANY polarity inversion in AFTER blocks)
+and recorded in `windows-description-convergence-results.txt`: this PC
+(i5-8365U, 16 GB, Intel UHD 620, Windows 11 26200), llama.cpp b10435, the
+smaller assistant (qwen2.5-1.5b q4_k_m) with the app's own flags; BEFORE = the
+live narrowed surface, AFTER = the same schemas with the contract text in full
+(`windows-description-arms.py`). Only three local descriptions differ
+(`check_section`, `add_next_class`, `read_remembered_timetable`); the other
+eight already equalled the contract after `Briefly()`. Ten greedy trials:
+trimmed-surface EXC2O, model-seen 160→161/220; teachers-say 210→220/250
+(`ctl cancel_scheduled` 0→10); trimmed-surface ICS3U 150→160/220
+(`schedule a deploy` 0→10). 0 polarity inversions and 0 cut-offs in every arm;
+no changed tool lost a trial. "card: undo" went 10→0, and it is answered in
+code before any model reads it. Not measured: the larger tier, other dates,
+and what Claude Code does with the new text.
+
+**What moved.** `PlantoirTools` serves the contract's text for every shared
+tool but those two (26 descriptions changed); `NarrowToLocal` stops
+shortening them; the shipped local surface was re-dumped after the change and
+is byte-identical to the measured AFTER arm. The procedure the old Windows
+bodies carried for Claude Code (plan first and read it out; look at the
+preview before deploying; a scheduled deploy needs the computer awake; send
+the WHOLE timetable; `matching`; `publish:` vs `publishForSectionN:` vs
+`draft:`; what undo can and cannot reach; back up before editing files
+directly) moved, as decided, into the MCP `instructions` field —
+`Plantoir.Mcp/McpInstructions.cs`, set as `ServerInstructions` — which the
+local router never reads. check_section's fourth phrasing went with the rest,
+and `TheTriggerPhrasingsAreTheContractsOwn` became
+`EveryDescriptionIsTheContractsOwn` (full text, both directions of the hold)
+plus `TheLocalModelReadsTheContractsDescriptionsUnshortened`.
+**Rejected:** keeping `Briefly()` for every tool and trimming the contract
+text (the mac's arm C lost 40 control trials on teachers-say); moving
+`publish_pages`/`unpublish_pages` too because their routing would not have
+moved (the sentence would lie to Claude Code); dropping the procedural
+sentences outright (nothing would tell Claude Code to plan first).
 
 ### The two MCP surfaces are not the same product
 
