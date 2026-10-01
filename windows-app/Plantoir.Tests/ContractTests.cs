@@ -40,6 +40,8 @@ public class ContractTests
         Assert.Equal(wording["deployDidNotFinish"]!.ToString(), AssistWording.DeployDidNotFinish("{course}", "{section}"));
         Assert.Equal(wording["sectionIsBusy"]!.ToString(), AssistWording.SectionIsBusy("{course}", "{section}"));
         Assert.Equal(wording["courseIsBusy"]!.ToString(), AssistWording.CourseIsBusy("{course}"));
+        Assert.Equal(wording["courseIsBeingBuiltElsewhere"]!.ToString(), AssistWording.CourseIsBeingBuiltElsewhere("{course}"));
+        Assert.Equal(wording["deployWentOutTo"]!.ToString(), AssistWording.DeployWentOutTo("{destinations}"));
 
         Assert.Equal(wording["previewIsRebuilding"]!.ToString(), AssistWording.PreviewIsRebuilding("{course}", "{section}"));
         Assert.Equal(wording["builtWithNoWindowOpen"]!.ToString(), AssistWording.BuiltWithNoWindowOpen("{course}", "{section}"));
@@ -131,10 +133,10 @@ public class ContractTests
     {
         ["DeployedToMultipleDestinations"] =
             "this app's own sentence for a deploy to more than one destination; the mac says " +
-            "wording.deployed and adds wording.deployWentOutTo, owed on #400",
+            "wording.deployed; the multi-destination sentences are the same on both apps but not generated into the contract",
         ["DeployPartiallySucceeded"] =
             "this app's own sentence for a deploy that reached some destinations; the mac's shape is " +
-            "wording.deployWentOutTo, owed on #400",
+            "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
         ["DeployToMultipleDestinationsDidNotFinish"] =
             "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
     };

@@ -109,7 +109,7 @@ public class PagesDatedByTheBuildTests
         try
         {
             File.WriteAllLines(
-                Path.Combine(folder, TaskScheduling.HealthRecordName("ICS4U", 1)),
+                Path.Combine(folder, TaskScheduling.OldHealthRecordName("ICS4U", 1)),
                 new[] { Marker["examples"]![0]!.ToString() });
 
             var findings = ScheduledHealthFindings.TakeFrom(folder, "ICS4U", 1);

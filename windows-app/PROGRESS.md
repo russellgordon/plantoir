@@ -204,6 +204,42 @@ overnight remake leaves no line yet). Measurements and reasons:
 the mac (bundle 4)" and `documentation/03-launcher-scripts.md` →
 "preview.ps1's own port walk…".
 
+## Parity run, bundle 3: the trail, leases, scheduled deploys and quit (2026-09-30)
+
+Branch `issue/bundle3-trail-leases`. The scheduled deploy is Plantoir now, not a
+baked PowerShell script, and every rule decided at its moment lives there.
+
+- **The trail keeps every line** (#303): a named mutex round each append.
+  Measured two processes × 500 lines: 4,444 of 5,000 kept before, 5,000 after;
+  the share-flag fix alone kept 4,512 and was rejected.
+- **Leases both ways, take-then-check** (#289): another program's build,
+  publish OR preview declines a build (never a write); Deploy claims before it
+  stops the preview; `plantoir-mcp` stops its own launcher before leaving.
+  `workLeases.declining` (29), `.liveness` (17 of 19), `workLease.bodyCases` (7).
+- **A scheduled task runs `Plantoir.exe --run-scheduled-deploy "<name>"`**
+  (#347): the lateness window (#239), a ten-minute wait for the course (#289),
+  whether it still stands, the settings as they are now, then the wrapper.
+  Verified end to end through the real Task Scheduler on this PC. Old tasks
+  drain. `theDestination` (11 of 12), `howLateIsTooLate` (10),
+  `storedValueCases` (7), `savingSettings.scheduledDeploys` (5).
+- **One task per section per working folder** (#309), found by the folder its
+  job names; records filed under the folder id.
+- **Removing a course turns its deploys off FIRST** (#239), asked of the
+  scheduler, this folder only; the contract's sentences.
+- **A failed build is `buildDidNotFinish`** (#297); `whichKind` (6) through the
+  real wrapper.
+- **The notice arrives while the section is open** (#218): one app-wide
+  watcher; records moved in whole (40 of 40 readable at the first event,
+  against 18–21 of 40 written in place).
+- **Quitting asks** before leaving a publish or preview build (#231), never on
+  a log-off; the WSL release is hardened (leases, a launcher scan, docker must
+  answer, System32 paths). Both `appliesOn: ["mac"]` keys deleted.
+- **Every destination named** (#400, #404); the unpublished-classes note gone.
+
+Not built: #324 (clicking the toast — the toast itself, #212's Windows half, is
+first). Manuals: doc 07 → "On Windows since bundle 3"; doc 09 → "On Windows
+since bundle 3 (#289)" and "(#231)"; doc 09 → "On Windows: a sharing violation".
+
 ## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
 
 Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's

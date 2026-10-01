@@ -73,13 +73,6 @@ public static class AssistWording
         $"{course} Section {section} was not deployed to {destinations}: it needs one answer there that can only be " +
         "given from its window in Plantoir. Deploy it once from there; after that it can be deployed from here.";
 
-    /// <summary>
-    /// wording.deployWentOutTo, word for word. INTERNAL on purpose: the public
-    /// member of that name is #400's to add (it replaces this app's own
-    /// multi-destination sentences), and NamedGapLedger holds the key open
-    /// against #400 until then.
-    /// </summary>
-    internal static string WentOutTo(string destinations) => $"It did go out to {destinations}.";
 
     public static string PreviewBuildNeedsAnAnswer(string course, string section) =>
         $"The preview for {course} Section {section} needs one answer before it can be built from here. Build it " +
@@ -165,6 +158,28 @@ public static class AssistWording
 
     public static string CourseIsBusy(string course) =>
         $"{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.";
+
+    /// <summary>
+    /// Added after a sentence saying some destinations were not reached, when
+    /// the others DID go out, so a teacher is not left thinking nothing happened
+    /// (mac #378/#396; Bundle 1 ruling 8 placed it with #400). Its caller is the
+    /// "needs an answer at" sentence #391 brings; until then only the contract
+    /// walker reads it.
+    /// </summary>
+    public static string DeployWentOutTo(string destinations) =>
+        $"It did go out to {destinations}.";
+
+    /// <summary>
+    /// What the WINDOW says when Preview or Deploy is declined because another
+    /// program on this computer is building, publishing or previewing the
+    /// course (#289, mac #156). An assistant is told <see cref="CourseIsBusy"/>
+    /// instead: on Windows both assistants are <c>plantoir-mcp</c>, the process
+    /// talking to the program whose course is busy.
+    /// </summary>
+    public static string CourseIsBeingBuiltElsewhere(string course) =>
+        $"{course} is being previewed or published somewhere else on this computer right now — by an assistant " +
+        "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
+        "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
 
     // MARK: - Previewing
 
