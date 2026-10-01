@@ -148,6 +148,15 @@ try {
     if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -Pattern 'CQ4T-OMIT-ANCHOR' -Quiet)) {
         throw "quartz.layout.ts is missing the CQ4T-OMIT-ANCHOR marker - hidden pages would publish"
     }
+    # And the sidebar's hide rule must be v2 from birth (#272 / mac #265):
+    # a top-level item by its stored name, not a page's title at any depth.
+    # build_site.ensure_sidebar_hide_rule_current repairs an old one on every
+    # build, but the bundle should never need it. -SimpleMatch and
+    # -CaseSensitive: the marker is a literal, and Select-String ignores case
+    # by default.
+    if (-not (Select-String -Path "$quartzDir\quartz.layout.ts" -SimpleMatch -CaseSensitive -Pattern 'CQ4T-HIDE-RULE: v2' -Quiet)) {
+        throw "quartz.layout.ts is missing the CQ4T-HIDE-RULE: v2 marker - the sidebar's hide switches would not match the site"
+    }
     Remove-Item Env:\PLANTOIR_QUARTZ_DIR
     Remove-Item Env:\PLANTOIR_SUPPORT_DIR
     Remove-Item Env:\PLANTOIR_CONTRACTS_DIR

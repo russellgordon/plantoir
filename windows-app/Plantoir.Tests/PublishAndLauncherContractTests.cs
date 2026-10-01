@@ -210,6 +210,9 @@ public class PublishAndLauncherContractTests
             // a scheduled deploy takes. Both of the latter are answered by
             // named tests rather than by an outcome.
             if (entry!["when"] is null) continue;
+            // "the stamp is written" records WHAT goes in it (fingerprintRule,
+            // #358), answered by FingerprintRuleTests.ANewStampRecordsTheCurrentRule.
+            if (entry["alsoRecords"] is not null) continue;
 
             string when = entry["when"]!.ToString();
             if (!outcomes.TryGetValue(when, out var outcome)) { unanswered.Add(when); continue; }

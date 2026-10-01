@@ -890,6 +890,8 @@ public sealed partial class SectionDetailView : UserControl
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+            // FIRST, before any lease is released or taken (#386).
+            if (await RefusedWhileThisSectionDeploys(workspacePath)) return;
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 
@@ -924,8 +926,9 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
-            await WaitForPreviewServer(_lease.Port);
+            await WaitForPreviewServer();
         }
         catch (Exception ex)
         {
@@ -1012,6 +1015,33 @@ public sealed partial class SectionDetailView : UserControl
     }
 
     /// <summary>
+    /// A preview of a section cannot start while THIS copy of the app is
+    /// deploying that same section — from this window or another (#386 / mac
+    /// #381, <c>shared-rules.json → previewWhileItsSectionDeploys</c>, layer
+    /// <c>window</c>). Asked FIRST on every way into a preview (the button,
+    /// the assistant and the restart path), from the in-process publish record
+    /// every Deploy writes. The disabled button was the only thing in the way
+    /// before, and it covered only this window's own Deploy. Another
+    /// program's deploy is refused by its work lease, course-wide; a command
+    /// line's by preview.ps1 reading the process table.
+    /// </summary>
+    private async Task<bool> RefusedWhileThisSectionDeploys(string workspacePath)
+    {
+        if (!CourseActivity.IsPublishingSection(workspacePath, _course.Code, _sectionNumber)) return false;
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                           "declined Preview \u00b7 this section is being deployed by this copy of Plantoir",
+                           _course.Code, _sectionNumber);
+        var dialog = new ContentDialog
+        {
+            Title = "Cannot Preview Yet",
+            Content = AssistWording.SectionIsBeingDeployed(_course.Code, _sectionNumber.ToString()),
+            CloseButtonText = "OK",
+        };
+        await ShowDialogSafelyAsync(dialog);
+        return true;
+    }
+
+    /// <summary>
     /// Take-then-check (#289): called right AFTER this view has taken its own
     /// build lease, with nothing awaited in between. Counts only leases taken
     /// before <paramref name="claim"/>, so of two programs that race exactly
@@ -1029,11 +1059,35 @@ public sealed partial class SectionDetailView : UserControl
         return true;
     }
 
+    /// <summary>
+    /// The sentence that says an act used the SAVED settings (#272, #357),
+    /// shown where the section's notices appear. It stays until closed: a
+    /// preview's end must not clear a deploy's sentence (the mac's review F3).
+    /// </summary>
+    private void ShowSettingsNotice(string sentence)
+    {
+        SettingsNotice.Message = sentence;
+        SettingsNotice.IsOpen = true;
+    }
+
+    /// <summary>previewUsesSavedSettings, when ANY window on the folder holds unsaved edits (#272).</summary>
+    private void SayIfThePreviewUsesSavedSettings()
+    {
+        if (!Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath)) return;
+        ShowSettingsNotice(SavedSettings.PreviewUsesSavedSettings);
+        ActivityTrail.Note(ActivityTrail.Event.PreviewStartedWithUnsavedSettings,
+            "preview started while Course Settings held unsaved changes; it uses the saved settings",
+            _course.Code, _sectionNumber);
+    }
+
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             if (_previewRunner.IsRunning) { StopPreview(); return; }
+            // FIRST, before any lease is taken or anything stopped (#386).
+            if (_window.Workspace.WorkspacePath is { } deployingFolder &&
+                await RefusedWhileThisSectionDeploys(deployingFolder)) return;
             if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet")) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Decided here, so the stop that follows names the same folder.
@@ -1085,8 +1139,9 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
-            await WaitForPreviewServer(_lease.Port);
+            await WaitForPreviewServer();
         }
         catch (Exception ex)
         {
@@ -1095,75 +1150,114 @@ public sealed partial class SectionDetailView : UserControl
     }
 
     /// <summary>
-    /// Phase 1: never trust the port until THIS run announces its launch —
-    /// a stale server from a previous preview answers first. Phase 2: poll
-    /// until HTTP 200. Ten minutes total, because a first-ever build pulls
-    /// the image and installs dependencies.
+    /// Wait for THIS run's preview to answer, and give up honestly when it
+    /// cannot (#233 / mac #225, #278 / mac #235). The rules are
+    /// <see cref="PreviewReachability.NextStep"/>'s; this loop only acts:
+    ///
+    /// <para>The address is the one the launcher ANNOUNCED — never a port
+    /// guessed from the lease (the old start value was the port inside the
+    /// builder, wrong for every folder after the first). Nothing is polled
+    /// until "Launching Quartz preview" is printed, because a stale server
+    /// from a previous preview can answer first.</para>
+    ///
+    /// <para>The QUIET is bounded, not the run: a first build takes minutes on
+    /// this PC too. When the wait gives up, the run is STOPPED the way the
+    /// Stop button stops it — so nothing serves a site nobody can see, the
+    /// section stops saying it is building, and the port goes back — then the
+    /// trail gets <c>preview did not appear</c> and the teacher gets the
+    /// contract's sentence. A preview the teacher stopped meanwhile gets
+    /// neither.</para>
     /// </summary>
-    private async Task WaitForPreviewServer(int containerPort)
+    private async Task WaitForPreviewServer()
     {
         _serverWait?.Cancel();
         var cancel = new CancellationTokenSource();
         _serverWait = cancel;
-        Uri serverUrl = new($"http://127.0.0.1:{containerPort}/");
-        const int budgetSeconds = 600;
-        int elapsed = 0;
+        DateTime? serverStartedAt = null;
+        bool launched = false;
+        Exception? lastAttempt = null;
 
         try
         {
-            while (elapsed < budgetSeconds)
-            {
-                if (cancel.IsCancellationRequested) return;
-                if (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null)
-                {
-                    AbandonWait();
-                    return;
-                }
-                if (_previewRunner.PreviewAddress is { } announced) serverUrl = announced;
-                if (_previewRunner.Transcript.DisplayText.Contains("Launching Quartz preview")) break;
-                await Task.Delay(1000);
-                elapsed++;
-            }
-
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            while (elapsed < budgetSeconds)
+            while (true)
             {
                 if (cancel.IsCancellationRequested) return;
-                if (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null)
+                bool runIsOver = _previewRunner.WasStoppedByUser ||
+                                 (!_previewRunner.IsRunning && _previewRunner.LastExitCode is not null);
+                string shown = _previewRunner.Transcript.DisplayText;
+                if (serverStartedAt is null && shown.Contains(PreviewReachability.ServerStartedLine, StringComparison.Ordinal))
+                    serverStartedAt = DateTime.UtcNow;
+                launched = launched || shown.Contains("Launching Quartz preview", StringComparison.Ordinal);
+                Uri? announced = _previewRunner.PreviewAddress;
+
+                var step = PreviewReachability.NextStep(runIsOver, announced, serverStartedAt,
+                                                        _previewRunner.LastOutputAt, DateTime.UtcNow);
+                switch (step)
                 {
-                    AbandonWait();
-                    return;
-                }
-                try
-                {
-                    var response = await client.GetAsync(serverUrl);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        // The site is up, so the build is over: the assistant
-                        // may build again from here on, while this preview
-                        // stays on screen for the teacher to read.
-                        _isWaitingForServer = false;
-                        ReleaseBuildClaim();
-                        _previewUrl = serverUrl;
-                        LoadIfNeeded(serverUrl);
-                        RefreshChrome();
+                    case PreviewReachability.Step.LeaveIt:
+                        if (!_previewRunner.WasStoppedByUser) AbandonWait();
                         return;
-                    }
+                    case PreviewReachability.Step.GiveUpNoAddress:
+                    case PreviewReachability.Step.GiveUpSilence:
+                        await GiveUpOnThePreview(cancel, step, PreviewReachability.VerdictFrom(lastAttempt), serverStartedAt);
+                        return;
+                    case PreviewReachability.Step.TryTheAddress when launched && announced is not null:
+                        try
+                        {
+                            var response = await client.GetAsync(announced);
+                            if (cancel.IsCancellationRequested) return;
+                            if (response.IsSuccessStatusCode)
+                            {
+                                // The site is up, so the build is over: the assistant
+                                // may build again from here on, while this preview
+                                // stays on screen for the teacher to read.
+                                _isWaitingForServer = false;
+                                ReleaseBuildClaim();
+                                _previewUrl = announced;
+                                LoadIfNeeded(announced);
+                                RefreshChrome();
+                                return;
+                            }
+                            lastAttempt = null;
+                        }
+                        catch (Exception attempt) { lastAttempt = attempt; }
+                        break;
                 }
-                catch { }
                 await Task.Delay(1000);
-                elapsed++;
             }
-            // The server never answered. The build is over either way, so the
-            // claim must not outlive it.
-            _isWaitingForServer = false;
-            ReleaseBuildClaim();
-            RefreshChrome();
         }
         finally
         {
             if (_serverWait == cancel) _serverWait = null;
         }
+    }
+
+    /// <summary>
+    /// The honest ending: stop the run, record why, tell the teacher — in
+    /// that order, and only while this wait is still the current one.
+    /// Stopping first means the alert never sits over a run still serving.
+    /// </summary>
+    private async Task GiveUpOnThePreview(CancellationTokenSource thisWait, PreviewReachability.Step why,
+                                          PreviewReachability.Verdict verdict, DateTime? serverStartedAt)
+    {
+        // The teacher can press Stop while this wait was deciding; a preview
+        // they ended themselves is not one that "did not appear".
+        if (thisWait.IsCancellationRequested || _previewRunner.WasStoppedByUser) return;
+        if (why == PreviewReachability.Step.GiveUpNoAddress) verdict = PreviewReachability.Verdict.PlantoirCouldNotTell;
+        DateTime quietSince = serverStartedAt is { } started && started > _previewRunner.LastOutputAt
+            ? started : _previewRunner.LastOutputAt;
+        int quietSeconds = (int)Math.Max(0, (DateTime.UtcNow - quietSince).TotalSeconds);
+        ActivityTrail.Note(ActivityTrail.Event.PreviewDidNotAppear,
+                           PreviewReachability.TrailLine(why, verdict, quietSeconds), _course.Code, _sectionNumber);
+        await StopPreviewAsync();
+        var dialog = new ContentDialog
+        {
+            Title = PreviewReachability.AlertTitle,
+            Content = PreviewReachability.Sentence(verdict),
+            CloseButtonText = "OK",
+        };
+        await ShowDialogSafelyAsync(dialog);
     }
 
     /// <summary>Interface updates must never yank the teacher back from a page they navigated to.</summary>
@@ -1364,7 +1458,31 @@ public sealed partial class SectionDetailView : UserControl
                 return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
-            var destinations = _course.Configuration.AllDeployDestinations;
+            // The SAVED settings, read at the press (#357 / mac #335): the
+            // launcher, the approval card and the scheduled run all read the
+            // file, so a deploy from the window's unsaved copy was half from
+            // each. Unreadable: refuse; the window's copy is never the fallback.
+            if (SavedSettings.Read(_course) is not { } saved)
+            {
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "This section can't be deployed yet",
+                    Content = SavedSettings.CouldNotBeReadToDeploy(_course.Code),
+                    CloseButtonText = "OK",
+                });
+                return SavedSettings.CouldNotBeReadToDeploy(_course.Code);
+            }
+            string? savedNotice = null;
+            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
+            {
+                savedNotice = SavedSettings.DeployUsesSavedSettings;
+                ShowSettingsNotice(savedNotice);
+                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
+                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
+                    _course.Code, _sectionNumber);
+            }
+
+            var destinations = saved.Configuration.AllDeployDestinations;
             string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
 
             // Refuses up front, against EVERY configured destination, rather
@@ -1450,7 +1568,7 @@ public sealed partial class SectionDetailView : UserControl
             // <course>\.merged_output, which Windows stopped writing to when
             // builds moved out of the working folder.
             bool needsBuild = BuildFreshness.NeedsRebuild(
-                _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
+                saved, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
             // included — and comes off them on every exit path: the normal
@@ -1490,7 +1608,7 @@ public sealed partial class SectionDetailView : UserControl
             // also resolves each leg's own milestones and custom domain.
             // For the overwhelming majority of courses (one destination)
             // this behaves exactly as a single deploy always did.
-            await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
+            await _deployRunner.RunAsync(saved, _sectionNumber, destinations, cloudflareAccount,
                 workspacePath, needsBuild);
             // The single place that decides which sentence a teacher (or the
             // assistant, relaying it) hears — success, all-destinations,
@@ -1498,6 +1616,8 @@ public sealed partial class SectionDetailView : UserControl
             // happened, not from having reached this line.
             outcomeMessage = MultiDestinationDeployRunner.Result(
                 _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
+            // Added to what the assistant says, too (#357): it pressed this button.
+            if (savedNotice is not null) outcomeMessage += " " + savedNotice;
             EndPublishActivity();
 
             // What the build said about this course's folders, taken from the
