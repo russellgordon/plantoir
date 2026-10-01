@@ -697,9 +697,15 @@ the suite could name, so that a red run means something again:
 | `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
 | `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
 | `courseConfigKeys` | 7 keys `CourseConfiguration.cs` does not name (#345, #274, #239, #241) | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
-| `modelTiers.requirements` | 3 requirements no test here answers (#196, #262) | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
+| `modelTiers.requirements` | none since parity bundle 5a (2026-09-30), which answered #196's and #262's three; the area stays so the next mac requirement can be held by name | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
 | `sectionIndexPointer.dateCases` | the club front-page case (#274) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
 | `gradedFolders.newCourse.cases` | the declined-skeleton case (#250), the club case (#274) | `GradedFoldersNewCourseContractTests` |
+
+Bundle 5a (2026-09-30) paid five of those events (`assistant was asked about
+another course`, `assistant answer was cut off`, `assistant repeated the request
+back`, `scheduled deploy replaced`, `scheduled deploy could not be set`) and
+eleven wording keys (#180, #196, #262, #217, #260, #261, #281, #288); the counts
+in the table are the ones bundle 1 took, and the ledger file is the live list.
 
 The event-to-issue mapping was made from each event's own `#` references in
 the contract, matched to the open `windows` issue that names that mac piece;
