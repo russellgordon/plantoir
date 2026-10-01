@@ -491,6 +491,16 @@ public static class AssistWording
             ? string.Concat(quoted)
             : string.Join(", ", quoted.Take(quoted.Count - 1)) + " or " + quoted[^1];
     }
+    // MARK: - The assistant's copy of a course (#360, mac #351)
+
+    /// <summary>Said while the conversation's first copy of the course is being zipped.</summary>
+    public static string BackingUpFirst(string course) =>
+        $"Saving a copy of {course} first, so this can be undone — a course with lots of pictures can take a minute.";
+
+    /// <summary>The plan no longer fits once the copy was saved, so nothing was changed.</summary>
+    public static string ChangedWhileSavingACopy(string course, string section) =>
+        $"Nothing was changed: {course} Section {section} changed while a copy of it was being saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh.";
+
     // MARK: - Getting a section ready for the start of the year (#355, mac #96)
 
     /// <summary>The fresh backup for the act could not be made, so nothing was written.</summary>

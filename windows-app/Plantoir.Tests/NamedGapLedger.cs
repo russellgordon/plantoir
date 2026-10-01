@@ -152,10 +152,6 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 337, "this app does not find or install its own updates yet (mac #204)",
             "update found", "update check found nothing new", "update answered", "update held while work is under way",
             "update installing", "update set aside", "update stopped", "app updated"),
-        Owed(ActivityTrailEvents, 360, "Course Settings has no How I Teach row yet (mac #329)",
-            "How I Teach page started"),
-        Owed(ActivityTrailEvents, 360, "the assistant's own backup of a course is not recorded yet (mac #351)",
-            "assistant backed up a course"),
 
         // ---- specialNames.platformWording.keys
 
@@ -198,8 +194,9 @@ internal static class NamedGapLedger
             "linksIntoHiddenPagesWillBeOffered"),
         Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "askedAboutAReferenceCourse", "deployRefusedForAReferenceCourse"),
-        Owed(AssistWordingKeys, 360, "the assistant's own backup of a course is not built as the mac's is yet (mac #351)",
-            "backingUpFirst", "changedWhileSavingACopy", "courseIsBeingCopied"),
+        Owed(AssistWordingKeys, 360,
+            "a course is not yet counted busy while the assistant's copy of it is zipped — Windows zips inside plantoir-mcp, off the app's UI thread, so Preview and Deploy stay live meanwhile (mac #351)",
+            "courseIsBeingCopied"),
         Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
             "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",

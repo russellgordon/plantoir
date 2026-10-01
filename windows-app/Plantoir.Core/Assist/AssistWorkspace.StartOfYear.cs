@@ -146,13 +146,23 @@ public sealed partial class AssistWorkspace
         string backup;
         try
         {
-            backup = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                backupMaker ?? new BackupMaker.Assistant(section));
+            // The teacher's own copy from the app's Go; the assistant's goes
+            // through the one door that leaves its trail line (#360).
+            backup = backupMaker is not null
+                ? CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder), backupMaker)
+                : AssistantBackup(course, section);
         }
         catch
         {
             return NotDone("backupFailed", AssistWording.StartOfYearNeedsABackup(course.Code));
         }
+
+        // The copy can take a while: the plan must still be the one shown,
+        // and still be makeable (a first class renamed or deleted meanwhile).
+        var afterCopy = PlanStartOfYear(courseCode, sectionNumber);
+        if (afterCopy.Plan.First is null || afterCopy.Plan.NothingToDo
+            || !string.Equals(afterCopy.Code, proposal.Code, StringComparison.OrdinalIgnoreCase))
+            return NotDone("changedSinceShown", AssistWording.ChangedWhileSavingACopy(course.Code, section.ToString()));
 
         var written = new Dictionary<string, (string Before, string After)>(StringComparer.OrdinalIgnoreCase);
         using var recording = UndoHistory.Record(_undo,
