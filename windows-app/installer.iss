@@ -49,19 +49,66 @@ Name: "{autodesktop}\Plantoir"; Filename: "{app}\Plantoir.exe"; Tasks: desktopic
 
 [Run]
 Filename: "{app}\Plantoir.exe"; Description: "{cm:LaunchProgram,Plantoir}"; Flags: nowait postinstall skipifsilent
+; Plantoir's own update (#337, bundle-8 ruling 1): the in-app Install passes
+; /RELAUNCH=1, so "Install and Reopen" is true of a /VERYSILENT install that
+; skipifsilent above would otherwise never reopen. The at-quit install does not
+; pass it, and nothing else does.
+Filename: "{app}\Plantoir.exe"; Flags: nowait; Check: WantsRelaunch
 
 [Code]
 // Terminate background helper processes before updating files. CloseApplications
 // only catches processes the Restart Manager can see holding our files; these
 // two are windowless console helpers, so kill them explicitly at ssInstall,
 // the step that fires just before file copying begins.
+//
+// NOT on Plantoir's own update (/PLANTOIRUPDATE=1, #337 bundle-8 rulings 2 and
+// 8): the app refuses to start that install while ANY plantoir-mcp runs (one
+// may be publishing in a folder the app has never opened), and passes
+// /NOCLOSEAPPLICATIONS so Restart Manager does not close plantoir-mcp or a
+// scheduled run either -- CloseApplicationsFilter below still names them for a
+// hand-run install. InitializeSetup also refuses an update while plantoir-mcp
+// runs, for one started after the app's last check. Residual risk, UNEXERCISED:
+// a file still in use at copy time leaves the update to fail under /NORESTART.
+// A hand-run installer keeps the kill and the closing.
+function IsUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:PLANTOIRUPDATE|0}') = '1';
+end;
+
+function InitializeSetup: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := True;
+  if IsUpdate then
+  begin
+    // find.exe exits 0 when the name is in tasklist's output: a plantoir-mcp is running.
+    if Exec(ExpandConstant('{cmd}'), '/C tasklist /FI "IMAGENAME eq plantoir-mcp.exe" | find /I "plantoir-mcp.exe"',
+            '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+    begin
+      Result := False;
+      // Ruling 12: the app has already quit, so reopen it and let it say why.
+      if ExpandConstant('{param:RETURNTO|}') <> '' then
+        Exec(ExpandConstant('{param:RETURNTO|}'), '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode);
+    end;
+  end;
+end;
+
+function WantsRelaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
   if CurStep = ssInstall then
   begin
-    Exec('taskkill.exe', '/F /IM plantoir-mcp.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill.exe', '/F /IM llama-server.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if not IsUpdate then
+    begin
+      Exec('taskkill.exe', '/F /IM plantoir-mcp.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec('taskkill.exe', '/F /IM llama-server.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
   end;
 end;

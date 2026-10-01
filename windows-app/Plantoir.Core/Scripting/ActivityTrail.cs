@@ -485,6 +485,43 @@ public static class ActivityTrail
         /// is the only answer to "where did this come from?".
         /// </summary>
         PagesCopiedFromAnotherCourse,
+        /// <summary>
+        /// Several backups (or one) were deleted from All Backups (#283 / mac
+        /// #242): the course codes, how many, what they took together when every
+        /// size is known, each deleted file's NAME, and any kept because an open
+        /// assistant conversation can restore from it or that could not be
+        /// deleted. A teacher's backups are never pruned, so a backup that has
+        /// gone was deleted by somebody — and this line is the only answer to
+        /// "my backups vanished".
+        /// </summary>
+        BackupsDeleted,
+        /// <summary>
+        /// The scheduled-publish toast (#324 / mac #212, #306): posted or could
+        /// not be sent, and what a CLICK on it did — the section shown, in which
+        /// window, or only Plantoir brought forward and why. Never the toast's
+        /// text, never the working folder's path.
+        /// </summary>
+        ScheduledPublishNotification,
+        /// <summary>
+        /// The first launch whose version differs from the last launch's (#337 /
+        /// mac #204): from which version to which, and how — by its own updater
+        /// or by hand. "It broke after the update" needs to know WHEN.
+        /// </summary>
+        AppUpdated,
+        /// <summary>#337: a new version found (once per version per launch): found, running, who asked, important.</summary>
+        UpdateFound,
+        /// <summary>#337: Check for Updates… found nothing new (only when the teacher asked).</summary>
+        UpdateCheckFoundNothingNew,
+        /// <summary>#337: the teacher's answer to the offer: install, skip this version, not now.</summary>
+        UpdateAnswered,
+        /// <summary>#337: the install waited, naming the work in the teacher's words, and the version waiting.</summary>
+        UpdateHeldWhileWorkIsUnderWay,
+        /// <summary>#337: from which version to which, and when — the last line the old version writes.</summary>
+        UpdateInstalling,
+        /// <summary>#337: a quit with work under way set the prepared update aside.</summary>
+        UpdateSetAside,
+        /// <summary>#337: the update stopped, in a plain category with the detail in brackets; the daily check's at most once per launch.</summary>
+        UpdateStopped,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -583,6 +620,16 @@ public static class ActivityTrail
         Event.UnfinishedImportForReferenceTidiedAway => "unfinished import for reference tidied away",
         Event.CourseImportForReferenceStopped => "course import for reference stopped",
         Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
+        Event.BackupsDeleted => "backups deleted",
+        Event.ScheduledPublishNotification => "scheduled publish notification",
+        Event.AppUpdated => "app updated",
+        Event.UpdateFound => "update found",
+        Event.UpdateCheckFoundNothingNew => "update check found nothing new",
+        Event.UpdateAnswered => "update answered",
+        Event.UpdateHeldWhileWorkIsUnderWay => "update held while work is under way",
+        Event.UpdateInstalling => "update installing",
+        Event.UpdateSetAside => "update set aside",
+        Event.UpdateStopped => "update stopped",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

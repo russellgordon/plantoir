@@ -41,6 +41,15 @@ public sealed class AppSettings
 
     public string? WorkspacePath { get; set; }
 
+    /// <summary>The version the last launch was, so the first launch of a new one writes `app updated` (#337).</summary>
+    public string? LastLaunchedVersion { get; set; }
+
+    /// <summary>The version the teacher chose Skip This Version for (#337).</summary>
+    public string? SkippedUpdateVersion { get; set; }
+
+    /// <summary>When the daily update check last ran, UTC (#337: the wall clock, not process time).</summary>
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
     /// <summary>
     /// The teacher's Cloudflare account, asked for once and remembered for
     /// every course. It belongs here rather than in a course's settings for

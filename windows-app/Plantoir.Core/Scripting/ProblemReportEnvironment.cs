@@ -13,6 +13,16 @@ namespace Plantoir.Core.Scripting;
 /// </summary>
 public static class ProblemReportEnvironment
 {
+    /// <summary>"1.2 (3)": the version as the trail and `app updated` write it.</summary>
+    public static string AppVersion
+    {
+        get
+        {
+            var ver = (Assembly.GetEntryAssembly() ?? typeof(ProblemReportEnvironment).Assembly).GetName().Version;
+            return ver is not null ? $"{ver.Major}.{ver.Minor} ({ver.Build})" : "1.0 (1)";
+        }
+    }
+
     public static string AppDescription
     {
         get

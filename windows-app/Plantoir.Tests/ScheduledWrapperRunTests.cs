@@ -120,6 +120,8 @@ public class ScheduledWrapperRunTests : IDisposable
             UseShellExecute = false,
             WorkingDirectory = work,
         };
+        // #179: the wrapper's $healthDir and $pendingDir follow this in the CHILD only.
+        info.Environment[TaskScheduling.TestStateDirVariable] = AppDataRoot.Current;
         // The wrapper is RUN, so it writes wherever it was told to write — and
         // WriteWrapperScript bakes AppDataRoot's real path in, which in a test
         // process is the teacher's own %LOCALAPPDATA%\Plantoir. Before the
@@ -292,5 +294,42 @@ public class ScheduledWrapperRunTests : IDisposable
             ? Directory.GetFiles(dir, _lastTaskName + "*")
             : Array.Empty<string>());
         ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+    }
+
+    // ---- #179: the wrapper's run-time folders stay out of the real state ---
+
+    /// <summary>What a TEACHER's wrapper runs when the test variable is absent:
+    /// the same LOCALAPPDATA folder as before #179.</summary>
+    [Fact]
+    public void WithoutTheTestVariableTheWrapperWritesWhereItAlwaysDid()
+    {
+        string expression = TaskScheduling.StateDirExpression(Path.Combine("scheduled", "folder-problems"));
+        Assert.Contains("else { Join-Path $env:LOCALAPPDATA 'Plantoir" + Path.DirectorySeparatorChar + "scheduled" + Path.DirectorySeparatorChar + "folder-problems' }", expression);
+        Assert.Contains("$env:TEMP", expression);
+    }
+
+    /// <summary>Run for real with the variable set: the run's folder-problem
+    /// record lands in this test's scratch folder, and the teacher's real
+    /// scheduled\folder-problems gains nothing named after this task.</summary>
+    [Fact]
+    public void ARunUnderTheSuiteLeavesTheRealFolderProblemsFolderAlone()
+    {
+        if (!PowerShellIsAvailable) return;
+        string real = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled", "folder-problems");
+
+        string record = TaskScheduling.HealthRecordName("ICS3U", 1, WorkFolder());
+        var before = Directory.Exists(real) ? Directory.GetFiles(real).ToHashSet(StringComparer.OrdinalIgnoreCase) : new HashSet<string>();
+
+        RunWrapper(LauncherStub);
+
+        string[] leaked = (Directory.Exists(real) ? Directory.GetFiles(real) : Array.Empty<string>())
+            .Where(f => !before.Contains(f))
+            .Where(f => Path.GetFileName(f).Contains(record, StringComparison.OrdinalIgnoreCase)
+                     || Path.GetFileName(f).StartsWith(_lastTaskName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Assert.True(leaked.Length == 0, "The wrapper wrote into the teacher's real folder: " + string.Join(", ", leaked));
+        Assert.True(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()).Count > 0,
+            "The run left no finding where the app (redirected) reads it, so this test proved nothing.");
     }
 }

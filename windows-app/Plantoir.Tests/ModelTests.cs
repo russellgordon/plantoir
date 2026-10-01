@@ -389,6 +389,29 @@ public class CourseBackupTests
         Assert.Null(ArchivedItem.From(wizard, "ICS3U"));
     }
 
+    /// <summary>#187: two backups inside one second both get a name the
+    /// readers parse (the second waits for the next second), so both list and
+    /// both count toward pruning.</summary>
+    [Fact]
+    public void Archive_SameSecondTwice_BothListAndPrune()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            var course = MakeCourse(coursesDir, "ICS3U");
+            string first = CourseArchiver.BackUpCourse(course, coursesDir);
+            string second = CourseArchiver.BackUpCourse(course, coursesDir);
+            var a = BackupItem.From(first, "ICS3U");
+            var b = BackupItem.From(second, "ICS3U");
+            Assert.NotNull(a);
+            Assert.True(b is not null, $"The second backup's name is not one the readers parse: {Path.GetFileName(second)}");
+            Assert.NotEqual(first, second);
+            Assert.NotEqual(a!.BackedUpAt, b!.BackedUpAt);
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
     [Fact]
     public void BackingUpTouchesNothingAndSkipsTheRebuildableBulk()
     {

@@ -133,13 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",
-            "backups deleted"),
-        Owed(ActivityTrailEvents, 324, "clicking a scheduled-publish toast is not recorded yet (mac #306)",
-            "scheduled publish notification"),
-        Owed(ActivityTrailEvents, 337, "this app does not find or install its own updates yet (mac #204)",
-            "update found", "update check found nothing new", "update answered", "update held while work is under way",
-            "update installing", "update set aside", "update stopped", "app updated"),
 
         // ---- specialNames.platformWording.keys
 
@@ -156,8 +149,6 @@ internal static class NamedGapLedger
         // inline elsewhere; the walker cannot see those, and hoisting them
         // into AssistWording under their key is #157's remaining half. The
         // rest belong to features this app does not have yet.
-        Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
-            "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
             "pageWhoseNewDateCouldNotBeSet", "pagesWhoseNewDatesCouldNotBeSet", "pagesWhoseSettingsCannotBeAddedTo",
             "pagesWhoseSettingsCannotBeAddedToNamingSeveral"),

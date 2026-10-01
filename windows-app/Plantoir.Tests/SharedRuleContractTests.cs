@@ -352,9 +352,10 @@ public sealed class SharedRuleContractTests : IDisposable
             Directory.CreateDirectory(working);
             string root = BuildOutputLocation.BuildsRootFor(working);
 
-            string expectedPrefix = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Plantoir", "builds");
+            // Under the suite AppDataRoot is redirected (#285), so the builds
+            // hang off ITS root; that root is %LOCALAPPDATA%\Plantoir in a real run
+            // (AppDataRoot.Current's own default, pinned by AppDataRedirectTests).
+            string expectedPrefix = Plantoir.Core.Models.AppDataRoot.Combine("builds");
             Assert.StartsWith(expectedPrefix, root, StringComparison.OrdinalIgnoreCase);
 
             // …\builds\{folder id} — one segment, and the same one for the same

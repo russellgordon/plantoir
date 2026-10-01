@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Plantoir.Core;
@@ -407,6 +408,22 @@ public class ContractTests
 
             var backup = BackupItem.From(filePath, courseCode);
             var archive = ArchivedItem.From(filePath, courseCode);
+
+            // #161: the moment each name stands for, taken apart field by
+            // field against the GREGORIAN calendar. Never re-formatted with our
+            // own writer: a round trip through the same code stays green while
+            // both halves are wrong (a Buddhist-calendar year reads back fine).
+            if (c["moment"]?.ToString() is string moment && kind is "backup" or "archive")
+            {
+                DateTime expected = DateTime.ParseExact(moment, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                DateTime actual = kind == "backup" ? backup!.BackedUpAt : archive!.ArchivedAt;
+                var gregorian = new GregorianCalendar();
+                Assert.True(
+                    gregorian.GetYear(actual) == expected.Year && gregorian.GetMonth(actual) == expected.Month
+                    && gregorian.GetDayOfMonth(actual) == expected.Day && actual.Hour == expected.Hour
+                    && actual.Minute == expected.Minute && actual.Second == expected.Second,
+                    $"{name} read as {actual:O}, the contract says {moment}.");
+            }
 
             switch (kind)
             {

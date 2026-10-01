@@ -384,7 +384,7 @@ up. At the app's minimum window of 900 with a 228-point sidebar the column is
 671, so it collapses there by five points — a genuine lack of room rather than
 a limit, and a separate question if it ever matters.
 
-**Windows** carries the same limit: `MaxWidth="520"` on the `BreadcrumbBar`
+**Windows** carried the same limit until bundle 8 (#302, 2026-10-01, which dropped it): `MaxWidth="520"` on the `BreadcrumbBar`
 in its picker's empty-folder offer, where it ellipsises the leftmost crumbs at
 520 whatever the window's width. Its picker shows no bar for a synced folder
 (that notice lives in its main window), so there the empty-folder offer is
@@ -5828,6 +5828,9 @@ pruner" above for why.
   reading`) would treat as "not a backup", making a mac-made zip VANISH from a
   Windows list until they ship the same reader. Its own small piece, Windows
   first or together.
+
+
+**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant (plantoir-mcp, which records no zip) may restore from held by its live `assist` lease: the newest assistant backup of that course is kept. [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
 ## Notifications: the one permission, and where it is asked (#212)
 

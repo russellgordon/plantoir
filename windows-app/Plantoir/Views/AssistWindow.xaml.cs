@@ -82,7 +82,7 @@ public sealed partial class AssistWindow : Window
         // Closed handler is the one thing the rest of this app avoids
         // (App.OpenWindow drops a closing window before remembering the rest).
         AppWindow.Changed += (sender, args) => { if (args.DidPositionChange) _lastPosition = sender.Position; };
-        Closed += (_, _) => { RememberPlacement(); Shutdown(); };
+        Closed += (_, _) => { RememberPlacement(); _backupHold?.Dispose(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
         // and a dialog needs a XamlRoot, which does not exist until the
@@ -177,6 +177,7 @@ public sealed partial class AssistWindow : Window
     /// what a restore puts back.
     /// </summary>
     private string? _conversationBackupPath;
+    private IDisposable? _backupHold;
 
     private void ShowRestoreBanner()
     {
@@ -568,6 +569,9 @@ public sealed partial class AssistWindow : Window
             OnConversationBackup = path => DispatcherQueue.TryEnqueue(() =>
             {
                 _conversationBackupPath = path;
+                // Held while this window is open, so All Backups keeps it (#283).
+                _backupHold?.Dispose();
+                _backupHold = HeldBackups.HoldWhileOpen(path);
                 ShowRestoreBanner();
             }),
             // Every destination, by type, in the saved order (#400): the card

@@ -137,6 +137,28 @@ public static class WorkLease
         Others(workspacePath).Any(other => other.Pid != Environment.ProcessId && other.Alive && other.HasName
                                            && other.Kind is Building or Publishing);
 
+    /// <summary>
+    /// The courses ANOTHER live program (a <c>plantoir-mcp</c> session, a
+    /// second Plantoir) holds an <c>assist</c> lease on — so a backup delete
+    /// keeps what that conversation may restore from (#283).
+    /// </summary>
+    public static IEnumerable<string> CoursesAssistedByAnotherProgram(string workspacePath) =>
+        Others(workspacePath)
+            .Where(other => other.Pid != Environment.ProcessId && other.Alive && other.HasName && other.Kind == Assisting)
+            .Select(other => other.Course)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>
+    /// Every live lease in this working folder held by ANOTHER process, of
+    /// any kind — what the update gate (#337) and the UI-test runner's busy
+    /// check (#155) read.
+    /// </summary>
+    public static IReadOnlyList<Other> LiveLeasesOfOthers(string workspacePath) =>
+        Others(workspacePath)
+            .Where(other => other.Pid != Environment.ProcessId && other.Alive && other.HasName)
+            .ToList();
+
     public static bool IsHeld(string workspacePath, string courseCode, string kind) =>
         HeldBy(workspacePath, courseCode).Contains(kind);
 
