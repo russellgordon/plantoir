@@ -50,7 +50,15 @@ import os
 import re
 import sys
 
-import how_i_teach
+# Windows runs this under the bundled EMBEDDABLE Python, whose ._pth file
+# replaces sys.path wholesale (python311._pth) - the script's own folder is
+# not on it, so `import how_i_teach` failed there with ModuleNotFoundError
+# and every scheduled publish recorded no fingerprint (#358, found by
+# SectionFingerprintPythonParityTests). The same line build_site.py and
+# deploy.py carry; harmless where the folder is already on the path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import how_i_teach  # noqa: E402
 
 # The rules this file can compute, and the one it computes when not told.
 KNOWN_RULES = (1, 2)

@@ -321,14 +321,17 @@ public sealed class FolderRenameApplyTests : IDisposable
         config.Write(path);
         Assert.False(config.HasUnsavedChanges);
 
-        // Write does NOT read-compare-write: what is on disk is what this
-        // object serialised, whatever another writer put there meanwhile.
+        // Since #272 (mac #265, shared-rules.json -> savingSettings) Write
+        // DOES merge per top-level key: a key another writer added meanwhile,
+        // which this object never touched, is KEPT. This test used to pin the
+        // blind whole-file write, which is exactly the two-window failure.
         var onDisk = JObject.Parse(File.ReadAllText(path));
         onDisk["unit_word"] = "Module";
         File.WriteAllText(path, onDisk.ToString());
         config.CourseName = "Computing";
         config.Write(path);
-        Assert.Null(JObject.Parse(File.ReadAllText(path))["unit_word"]);
+        Assert.Equal("Module", JObject.Parse(File.ReadAllText(path))["unit_word"]!.ToString());
+        Assert.Equal("Computing", config.CourseName);
 
         config.CourseName = "Never saved";
         Assert.True(config.HasUnsavedChanges);

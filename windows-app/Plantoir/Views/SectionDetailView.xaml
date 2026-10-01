@@ -104,7 +104,14 @@
              up, which is how the first version of this could lose the only
              record of an overnight failure. Never covers the toolbar; the
              preview keeps the row below. -->
-        <InfoBar x:Name="ScheduledPublishNotice" Grid.Row="1" Margin="12,8,12,0"
+        <!-- The saved-settings sentences (#272, #357): a deploy, a preview or
+             Course Settings' Save used the settings as last SAVED. Its own bar,
+             so closing it never touches the scheduled-publish record above. -->
+        <StackPanel Grid.Row="1">
+        <InfoBar x:Name="SettingsNotice" Margin="12,8,12,0"
+                 IsOpen="False" IsClosable="True" Severity="Informational"
+                 AutomationProperties.AutomationId="settingsNotice" />
+        <InfoBar x:Name="ScheduledPublishNotice" Margin="12,8,12,0"
                  IsOpen="False" IsClosable="True" Closed="ScheduledPublishNotice_Closed"
                  AutomationProperties.AutomationId="scheduledPublishNotice">
             <InfoBar.ActionButton>
@@ -112,6 +119,7 @@
                         AutomationProperties.AutomationId="scheduledPublishNoticeDismiss" />
             </InfoBar.ActionButton>
         </InfoBar>
+        </StackPanel>
 
         <!-- Base layer stays MOUNTED under the full-bleed web view — the
              console never inherits a departing web view's geometry. -->

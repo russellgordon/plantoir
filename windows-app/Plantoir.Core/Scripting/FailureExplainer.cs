@@ -8,7 +8,9 @@ namespace Plantoir.Core.Scripting;
 public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
-        SetupExplanation(output)
+        SectionIsBeingDeployedExplanation(output)
+        ?? FolderCopyExplanation(output)
+        ?? SetupExplanation(output)
         ?? VaultLinkExplanation(output)
         ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
@@ -36,6 +38,37 @@ public static class FailureExplainer
     private static string? VaultLinkExplanation(string output) =>
         output.Contains("untrusted mount point")
             ? "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again."
+            : null;
+
+    /// <summary>
+    /// preview.ps1 refused because this very section is being deployed (#386,
+    /// shared-rules.json -> previewWhileItsSectionDeploys.failureExplanationCases):
+    /// the launcher's first line, LIFTED with its cross taken off - never
+    /// reworded, so one refusal is said one way.
+    /// </summary>
+    private static string? SectionIsBeingDeployedExplanation(string output)
+    {
+        const string sign = "is being deployed right now, so it cannot be previewed until that has finished.";
+        foreach (string raw in output.Split('\n'))
+        {
+            string line = raw.Trim();
+            if (!line.EndsWith(sign, StringComparison.Ordinal)) continue;
+            return line.TrimStart('❌', ' ');
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A folder publish whose copy did not finish (#304, mac #227): deploy.sh's
+    /// cross line, and deploy.ps1's own robocopy-failure line, both mean the
+    /// folder is not up to date. Matched on the launcher's words; the copy's
+    /// error number means nothing to a teacher.
+    /// </summary>
+    private static string? FolderCopyExplanation(string output) =>
+        output.Contains("Not every page could be copied into the publishing folder", StringComparison.Ordinal)
+            ? "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try " +
+              "publishing again; if the same thing happens, one of your pages may not open or the folder may " +
+              "not be taking new files."
             : null;
 
     private static string? SetupExplanation(string output)

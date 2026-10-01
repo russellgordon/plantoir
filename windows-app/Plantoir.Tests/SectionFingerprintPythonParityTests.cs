@@ -48,7 +48,8 @@ public class SectionFingerprintPythonParityTests
         return (pythonExe, script);
     }
 
-    private static string RunPython(string pythonExe, string script, string courseDirectory, int sectionNumber, IReadOnlyList<string> excluded)
+    private static string RunPython(string pythonExe, string script, string courseDirectory, int sectionNumber, IReadOnlyList<string> excluded,
+                                    int rule = SectionPublishState.CurrentRule)
     {
         var info = new ProcessStartInfo
         {
@@ -58,6 +59,8 @@ public class SectionFingerprintPythonParityTests
             RedirectStandardError = true,
         };
         info.ArgumentList.Add(script);
+        info.ArgumentList.Add("--rule");            // before the positional arguments: the only place it is read
+        info.ArgumentList.Add(rule.ToString());
         info.ArgumentList.Add(courseDirectory);
         info.ArgumentList.Add(sectionNumber.ToString());
         foreach (string path in excluded) info.ArgumentList.Add(path);
@@ -73,6 +76,29 @@ public class SectionFingerprintPythonParityTests
     private static string NewCourseDirectory()
     {
         return Directory.CreateTempSubdirectory("section-fingerprint-parity-tests").FullName;
+    }
+
+    /// <summary>
+    /// #358: both rules, with the How I Teach page at the two reserved places
+    /// and inside a folder (where it counts), C# against the wrapper's Python.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void TheHowITeachPage_MatchesAcrossImplementationsUnderEachRule(int rule)
+    {
+        if (PythonAndScript() is not { } found) return;
+        var (pythonExe, script) = found;
+        string courseDir = NewCourseDirectory();
+        Directory.CreateDirectory(Path.Combine(courseDir, "section1"));
+        Directory.CreateDirectory(Path.Combine(courseDir, "Unit 1"));
+        File.WriteAllText(Path.Combine(courseDir, "How I Teach.md"), "# how");
+        File.WriteAllText(Path.Combine(courseDir, "section1", "how i teach.md"), "# how");
+        File.WriteAllText(Path.Combine(courseDir, "Unit 1", "How I Teach.md"), "# an ordinary page");
+        File.WriteAllText(Path.Combine(courseDir, "section1", "class1.md"), "# Class 1");
+
+        string csharp = SectionPublishState.Fingerprint(courseDir, 1, rule: rule);
+        Assert.Equal(csharp, RunPython(pythonExe, script, courseDir, 1, Array.Empty<string>(), rule));
     }
 
     [Fact]

@@ -985,7 +985,7 @@ public sealed partial class CourseSettingsView : UserControl
 
     private void Revert_Click(object sender, RoutedEventArgs e)
     {
-        Config.DiscardChanges();
+        Config.RevertToFile(_course.ConfigFilePath);
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;
@@ -1002,12 +1002,21 @@ public sealed partial class CourseSettingsView : UserControl
             try { before = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath)).AllDeployDestinations; }
             catch { before = Config.AllDeployDestinations; }
 
-            Config.Write(_course.ConfigFilePath);
+            var report = Config.Write(_course.ConfigFilePath);
+            // Every OTHER window's copy of this course with nothing unsaved
+            // reads the file again (#272 / mac #265); one with unsaved changes
+            // is left alone, and its own Save merges.
+            Plantoir.ViewModels.WorkspaceViewModel.OtherCopiesReread(_course.ConfigFilePath, Config);
+            BuildForm();
             RefreshDirtyState();
             // The mac's wording, so the two trails read the same. Declared
             // when the trail was built and emitted by nobody until 2026-09-07.
+            // Since #272 it also says what it kept or replaced from elsewhere.
+            string fromElsewhere =
+                (report.KeptFromElsewhere.Count > 0 ? "; kept from elsewhere: " + string.Join(", ", report.KeptFromElsewhere) : "") +
+                (report.ReplacedChangesFromElsewhere.Count > 0 ? "; replaced a change made elsewhere to: " + string.Join(", ", report.ReplacedChangesFromElsewhere) : "");
             ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
-                "saved the settings for " + _course.Code);
+                "saved the settings for " + _course.Code + fromElsewhere);
 
             IReadOnlyList<string> aboutScheduled = Array.Empty<string>();
             string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
@@ -1023,9 +1032,29 @@ public sealed partial class CourseSettingsView : UserControl
                 catch { aboutScheduled = Array.Empty<string>(); }
             }
 
-            SaveStatus.Text = aboutScheduled.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", aboutScheduled);
+            // specialNames.settingsSaveReplacedSidebarChange comes FIRST among
+            // the after-Save sentences (#272): the last Save wins for the whole
+            // list, but said.
+            var afterSave = new List<string>();
+            if (report.ReplacedChangesFromElsewhere.Contains("hidden")) afterSave.Add(CourseConfiguration.SaveReplacedSidebarChange);
+            // A Save never reaches a running preview or publish (#272): say
+            // which, and offer Preview Again for a preview. A publish wins
+            // over a preview: it is the one that sends the old settings out.
+            PreviewAgainButton.Visibility = Visibility.Collapsed;
+            if (workingFolder is not null && CourseActivity.IsPublishing(workingFolder, _course.Code))
+            {
+                afterSave.Add(SavedSettings.SavedWhilePublishing);
+            }
+            else if (OpenPreviewsOfThisCourse().Count > 0)
+            {
+                afterSave.Add(SavedSettings.SavedWhilePreviewing);
+                PreviewAgainButton.IsEnabled = true;
+                PreviewAgainButton.Visibility = Visibility.Visible;
+            }
+            afterSave.AddRange(aboutScheduled);
+            SaveStatus.Text = afterSave.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", afterSave);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
-            if (aboutScheduled.Count > 0) return;   // a sentence about a scheduled deploy stays until the next Save
+            if (afterSave.Count > 0) return;   // none of these sentences fades; they stay until the next Save
             await Task.Delay(3000);
             SaveStatus.Text = "";
         }
@@ -1041,6 +1070,52 @@ public sealed partial class CourseSettingsView : UserControl
                 "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+        }
+    }
+
+    /// <summary>This course's previews open anywhere in this app, for this working folder.</summary>
+    private List<PreviewLeases.Lease> OpenPreviewsOfThisCourse()
+    {
+        string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
+        return PreviewLeases.Active
+            .Where(lease => workingFolder is not null && WorkingFolder.IsTheSame(lease.FolderPath, workingFolder) &&
+                            string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Preview Again (#272 / mac #265): stop and start every open preview of
+    /// this course, in whichever window shows it, so it bakes in what was just
+    /// saved. Removes only the preview sentence; a replaced-sidebar sentence
+    /// stays. When none is open any more the button stays, disabled, with
+    /// settingsPreviewAgainNothingOpen.
+    /// </summary>
+    private async void PreviewAgain_Click(object sender, RoutedEventArgs e)
+    {
+        var open = OpenPreviewsOfThisCourse();
+        if (open.Count == 0)
+        {
+            PreviewAgainButton.IsEnabled = false;
+            SaveStatus.Text = SaveStatus.Text.Replace(SavedSettings.SavedWhilePreviewing, SavedSettings.PreviewAgainNothingOpen);
+            ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+                "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
+            return;
+        }
+        SaveStatus.Text = SaveStatus.Text.Replace(" " + SavedSettings.SavedWhilePreviewing, "")
+                                         .Replace(SavedSettings.SavedWhilePreviewing, "");
+        PreviewAgainButton.Visibility = Visibility.Collapsed;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+            "Preview Again pressed in Course Settings for " + _course.Code + ": rebuilt section(s) " +
+            string.Join(", ", open.Select(lease => lease.SectionNumber).Distinct().OrderBy(n => n)));
+        foreach (var lease in open)
+        {
+            if (App.WindowFor(lease.FolderPath) is not { } main) continue;
+            try
+            {
+                await main.StopPreviewForAsync(lease.FolderPath, lease.CourseCode, lease.SectionNumber);
+                main.ShowPreviewFor(lease.CourseCode, lease.SectionNumber);
+            }
+            catch (Exception error) { App.LogDiagnostic($"PreviewAgain_Click: {error}"); }
         }
     }
 

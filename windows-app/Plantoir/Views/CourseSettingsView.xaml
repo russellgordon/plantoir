@@ -52,8 +52,13 @@
                  values simply go back to the last save. -->
             <Button x:Name="RevertButton" Content="Revert" IsEnabled="False" Click="Revert_Click"
                     AutomationProperties.AutomationId="revertButton" />
-            <TextBlock x:Name="SaveStatus" Grid.Column="2" VerticalAlignment="Center" FontSize="13"
+            <TextBlock x:Name="SaveStatus" Grid.Column="1" VerticalAlignment="Center" FontSize="13" TextWrapping="Wrap"
                        AutomationProperties.AutomationId="savedConfirmation" />
+            <!-- #272: rebuilds every open preview of this course after a Save.
+                 Shown beside settingsSavedWhilePreviewing; disabled with
+                 settingsPreviewAgainNothingOpen once those previews stopped. -->
+            <Button x:Name="PreviewAgainButton" Grid.Column="2" Content="Preview Again" Visibility="Collapsed"
+                    Click="PreviewAgain_Click" AutomationProperties.AutomationId="previewAgainButton" />
             <Button x:Name="SaveButton" Grid.Column="3" Content="Save" IsEnabled="False" Click="Save_Click"
                     Style="{StaticResource AccentButtonStyle}"
                     AutomationProperties.AutomationId="saveButton">

@@ -46,7 +46,9 @@ support files ──────┘                        │                  
    the Colima container on a bind mount is stamped by the host's clock, the
    same clock as the teacher's Save. Readers: `BuildFreshness.needsRebuild`
    and the scheduled publish's shell (both compare with the EARLIER of the two
-   times); Windows' `BuildFreshness` owes the same. The reasoning and what was
+   times); Windows' `BuildFreshness.NeedsRebuild` makes the same choice since
+   #272 (2026-09-30; its scheduled wrapper builds unconditionally, so it has no
+   second reader). The reasoning and what was
    rejected: [09 → "Two windows, one course"](09-mac-app.md#two-windows-one-course);
    the rule: `contracts/app-rules.json` → `buildFreshness.buildStartedMarker`.
 

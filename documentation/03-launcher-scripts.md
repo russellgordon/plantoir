@@ -2261,6 +2261,47 @@ all XNU compares).
 - Finally runs `deploy.py` inside the container
   (see [Deployment](07-deployment.md)).
 
+## preview.ps1's own port walk, its refusal while the section deploys, and whose listeners it sees (Windows, bundle 4)
+
+What `preview.ps1` does natively, where there is no workspace (#286, #386, #319;
+2026-09-30). The rules are the shared ones above; this is the Windows mechanism
+and what was measured.
+
+- **Forty blocks.** `Find-FreePreviewPort` walks `hostBlockCount` steps of
+  `hostBlockStep` from the port asked for over ONE read of
+  `Get-NetTCPConnection -State Listen`; a block is the site port and its
+  websocket (+1000), because the native path binds one pair, not a published
+  block of four. None free: the two `whenNoBlockIsFree` lines with "restart this
+  PC" (proposed as `sentenceOnWindows`, not reworded locally), exit 1, and the
+  launcher trail line written by `Write-TrailLine` — the same file, stamp and
+  named mutex (`Local\PlantoirActivityTrail`) as the app's writer. Exercised:
+  40 loopback listeners held, exit 1 in 2.0 s.
+- **A section being deployed.** On a serving run, after the arguments are
+  checked and before anything changes, `Test-SectionIsBeingDeployed` reads
+  `Win32_Process` once. A deploy is `deploy.ps1` as the PROGRAM (the path after
+  `-File`), its own arguments beginning with the course read whole, then exactly
+  this section, not `--reset-token`/`--logout`/`--help`, in this folder when its
+  path names one (a relative path names none and still counts); or the Task
+  Scheduler wrapper named `SafeName(TaskScheduling.NameFor(C, S)) + ".ps1"` —
+  built the app's way, so `labelCodeCases` (the mac's launchd label) are not run
+  here (#401's note). A task name carries no folder, so a scheduled deploy of
+  the same course and section in ANOTHER folder also refuses (the mac's pre-#237
+  limit; the launcherCase for it is skipped by name). A table that cannot be
+  read, or that does not list `$PID`, lets the preview through. The cross is
+  `[char]::ConvertFromUtf32(0x274C)`: the file has no BOM, so no non-ASCII may
+  appear in its strings. The launcherCases are TRANSLATED row by row into the
+  Windows shape of the same evidence by `windows-app/test_launcher_rules.ps1`.
+- **Whose listeners the walk sees (#319), measured on Windows 11 25H2 build
+  26200:** `Get-NetTCPConnection` lists every owner's listeners — svchost as
+  NETWORK SERVICE on 135 (0.0.0.0 and ::), System on 445 — and a wildcard bind
+  beside them fails (10048, 13). But a wildcard bind SUCCEEDED beside a
+  `127.0.0.1:8471` listener of this account — which is how the native Quartz
+  binds — so `build_site.py`'s re-probe could call a taken port free; it now
+  binds both the wildcard and `127.0.0.1` (the loopback bind fails there, 10048).
+  NOT measured: a second interactive account's listener (this PC has one account
+  and one was not created for the test) and a `wslrelay.exe` one (none running).
+  Rejected: trusting either probe alone.
+
 ## A note on line endings
 
 The repository stores every file with LF endings. At image-build time,
