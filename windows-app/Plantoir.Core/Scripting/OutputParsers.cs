@@ -12,9 +12,12 @@ public static class OutputParsers
     /// the container publishes IPv4 only). The LAST announcement wins. The
     /// host port is a probed per-folder block, so it is never assumed.
     /// </summary>
+    /// <summary>The launcher's announcement marker — app-rules.json → previewPorts.announcedAddress.marker.</summary>
+    public const string PreviewAnnouncementMarker = "Preview will be available at: ";
+
     public static Uri? PreviewAddress(string text)
     {
-        const string marker = "Preview will be available at: ";
+        const string marker = PreviewAnnouncementMarker;
         Uri? found = null;
         foreach (string line in text.Split('\n'))
         {

@@ -89,7 +89,9 @@ public class ScheduledWrapperRunTests : IDisposable
     /// <summary>The working folder a run is given — its records are filed under its id (#309).</summary>
     private string WorkFolder(string? name = null) => Path.Combine(_root, name ?? "work with spaces");
 
-    private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null)
+    private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null,
+                                                     string deployBody = "Write-Host 'DEPLOY RAN'\nexit 0",
+                                                     string destinationType = "local_folder")
     {
         // "work with spaces" by DEFAULT, deliberately. Every fixture here used
         // a space-free temp path at first, and that hid a real defect: the
@@ -100,14 +102,14 @@ public class ScheduledWrapperRunTests : IDisposable
         string work = Path.Combine(_root, workFolderName ?? "work with spaces");
         Directory.CreateDirectory(work);
         File.WriteAllText(Path.Combine(work, "preview.ps1"), launcherBody);
-        File.WriteAllText(Path.Combine(work, "deploy.ps1"), "Write-Host 'DEPLOY RAN'\nexit 0");
+        File.WriteAllText(Path.Combine(work, "deploy.ps1"), deployBody);
 
         _lastTaskName = $"Plantoir-wraprun-{Guid.NewGuid():N}";
         string? script = TaskScheduling.WriteWrapperScript(
             _lastTaskName, work, Path.Combine(work, "deploy.ps1"),
             "ICS3U", 1, Path.Combine(work, "courses", "ICS3U"),
             Array.Empty<string>(),
-            new[] { new CourseConfiguration.DeployDestination("local_folder", _root) },
+            new[] { new CourseConfiguration.DeployDestination(destinationType, _root) },
             "");
         Assert.NotNull(script);
 
@@ -189,6 +191,48 @@ public class ScheduledWrapperRunTests : IDisposable
 
         Assert.Equal(1, exitCode);
         Assert.DoesNotContain("DEPLOY RAN", output);
+    }
+
+    /// <summary>
+    /// #395: an overnight Cloudflare publish whose project had to be made
+    /// again leaves 'cloudflare project made again' on the trail, read from
+    /// the captured deploy leg into the section's record. The exit code still
+    /// decides the outcome (the leg runs captured, not plainly).
+    /// </summary>
+    [Fact]
+    public void ACloudflareProjectRemadeOvernightReachesTheTrail()
+    {
+        if (!PowerShellIsAvailable) return;
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+        string trail = Path.Combine(_root, "trail.txt");
+        Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var (exitCode, output) = RunWrapper("Write-Host 'Static build complete.'\nexit 0",
+                deployBody: "Write-Host 'Made the project again.'\n" +
+                            "Write-Host 'PLANTOIR_CLOUDFLARE_REMADE: ICS3U/1 ics3u-s1-2026 ics3u-s1-2026-x7.pages.dev'\n" +
+                            "Write-Host 'DEPLOY RAN'\nexit 0",
+                destinationType: "cloudflare_pages");
+            Assert.Equal(0, exitCode);
+            ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+            Assert.Contains("ICS3U/1 \u00b7 the Cloudflare project ics3u-s1-2026 was not in this Cloudflare account, so it was made again; " +
+                            "the website is now at ics3u-s1-2026-x7.pages.dev", File.ReadAllText(trail));
+        }
+        finally { Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+    }
+
+    [Fact]
+    public void ACloudflareLegThatFailsIsStillRecordedAsAFailure()
+    {
+        if (!PowerShellIsAvailable) return;
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+        RunWrapper("Write-Host 'Static build complete.'\nexit 0",
+            deployBody: "Write-Host 'nope'\nexit 1", destinationType: "cloudflare_pages");
+
+        var outcome = ScheduledPublishOutcome.ReadFrom(_root, "ICS3U", 1, WorkFolder());
+        Assert.NotNull(outcome);
+        Assert.Equal(ScheduledPublishOutcome.Kind.DidNotFinish, outcome!.Outcome);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
     }
 
     [Fact]

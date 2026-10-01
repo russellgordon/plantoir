@@ -23,6 +23,31 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private static readonly List<WorkspaceViewModel> _windowModels = new();
+
+    /// <summary>
+    /// After a Save of one course's settings: every OTHER window's copy of
+    /// that course (the same file) with nothing unsaved reads it again
+    /// (#272 / mac #265, <c>savingSettings.rule</c>).
+    /// </summary>
+    public static bool AnyCopyHasUnsavedChanges(string configPath) =>
+        _windowModels.ToList().SelectMany(model => model.Courses).Any(course =>
+            string.Equals(Path.GetFullPath(course.ConfigFilePath), Path.GetFullPath(configPath),
+                          StringComparison.OrdinalIgnoreCase) &&
+            course.Configuration.HasUnsavedChanges);
+
+    public static void OtherCopiesReread(string configPath, CourseConfiguration saved)
+    {
+        foreach (var model in _windowModels.ToList())
+        {
+            foreach (var course in model.Courses)
+            {
+                if (ReferenceEquals(course.Configuration, saved)) continue;
+                if (!string.Equals(Path.GetFullPath(course.ConfigFilePath), Path.GetFullPath(configPath),
+                                   StringComparison.OrdinalIgnoreCase)) continue;
+                course.Configuration.RereadIfNothingUnsaved(course.ConfigFilePath);
+            }
+        }
+    }
     private static string? _mostRecentKeyFolderPath;
     public static bool IsTerminating { get; set; }
 

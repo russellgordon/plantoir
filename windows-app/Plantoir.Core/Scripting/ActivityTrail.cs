@@ -211,6 +211,8 @@ public static class ActivityTrail
         /// the course's build, publish or preview lease (#289, mac #156).
         /// Carries the course, the section, what was asked for, what the other
         /// holds and its process id — never anything written on a page.
+        /// Also (#386, mac #381): a PREVIEW refused because this copy of the
+        /// app was deploying that same section (lineWhenItsSectionIsBeingDeployed).
         /// </summary>
         BuildDeclinedCourseBusyElsewhere,
         /// <summary>
@@ -243,6 +245,20 @@ public static class ActivityTrail
         /// </summary>
         QuitAskedAboutWorkUnderWay,
         /// <summary>
+        /// A deploy, or setting one, read the SAVED settings while some window
+        /// held unsaved Course Settings edits (#357 / mac #335). Carries the
+        /// act, the destination KINDS used and whether the unsaved edits named
+        /// a different kind — never a path or a site name.
+        /// </summary>
+        DeployUsedTheSavedSettings,
+        /// <summary>A preview started while Course Settings held unsaved edits in any window (#272 / mac #265).</summary>
+        PreviewStartedWithUnsavedSettings,
+        /// <summary>
+        /// Course Settings' Preview Again rebuilt the open previews of the
+        /// course (#272): which sections, or that none was still open.
+        /// </summary>
+        PreviewAgainAfterSettingsSaved,
+        /// <summary>
         /// A remembered timetable named a date that cannot be a class date —
         /// the file was written by this app before #144, on a PC whose
         /// regional format uses another calendar — and was set aside, so the
@@ -255,6 +271,20 @@ public static class ActivityTrail
         PageSettingsLeftAsTheyWere,
         ClassCopyNotMade,
         WordForAUnitRenamed,
+        /// <summary>
+        /// A preview never appeared (#233 / mac #225, #278 / mac #235): its
+        /// server started and it then said nothing for the contract's 45 s,
+        /// or no address was ever announced — or, from preview.ps1, every
+        /// address was taken (#286). Carries the course, the section, how long
+        /// it was quiet and which of the things was true.
+        /// </summary>
+        PreviewDidNotAppear,
+        /// <summary>
+        /// deploy.py made a section's Cloudflare Pages project again because it
+        /// was gone from the account (#395). Carries the project and the
+        /// address the site answers at now — the address can change.
+        /// </summary>
+        CloudflareProjectMadeAgain,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -308,11 +338,16 @@ public static class ActivityTrail
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
         Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
+        Event.DeployUsedTheSavedSettings => "deploy used the saved settings",
+        Event.PreviewStartedWithUnsavedSettings => "preview started with unsaved settings",
+        Event.PreviewAgainAfterSettingsSaved => "preview again after settings saved",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
         Event.ClassCopyNotMade => "class copy not made",
         Event.WordForAUnitRenamed => "word for a unit renamed",
+        Event.PreviewDidNotAppear => "preview did not appear",
+        Event.CloudflareProjectMadeAgain => "cloudflare project made again",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

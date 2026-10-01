@@ -510,6 +510,20 @@ public sealed class AssistAgent
     public Func<bool>? SectionIsBusy { get; set; }
 
     /// <summary>
+    /// Whether THIS copy of the app is deploying this very section (#386 /
+    /// mac #381, layer <c>assistant</c>): asked before the assistant opens a
+    /// preview, so the conversation never says the preview is on its way
+    /// while the window refuses it. Answered with
+    /// <see cref="AssistWording.SectionIsBeingDeployed"/>.
+    /// </summary>
+    public Func<bool>? SectionIsBeingDeployed { get; set; }
+
+    private bool ThisSectionIsBeingDeployed() => SectionIsBeingDeployed?.Invoke() == true;
+
+    private string SectionIsBeingDeployedSentence =>
+        AssistWording.SectionIsBeingDeployed(_courseCode, _section.ToString());
+
+    /// <summary>
     /// Whether this section's preview is on screen right now, asked of the
     /// window. It decides what a page edit must do about the preview: the
     /// served site is a COPY, merged at build time, so a running preview
@@ -648,8 +662,10 @@ public sealed class AssistAgent
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
             {
-                ShowPreviewInApp.Invoke();
-                const string said = "The preview is opening in Plantoir's main window — the build shows its progress there.";
+                string said = ThisSectionIsBeingDeployed()
+                    ? SectionIsBeingDeployedSentence
+                    : "The preview is opening in Plantoir's main window — the build shows its progress there.";
+                if (!ThisSectionIsBeingDeployed()) ShowPreviewInApp.Invoke();
                 _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
                 _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said });
                 return new List<Line> { new("assistant", said) };
@@ -903,8 +919,11 @@ public sealed class AssistAgent
     {
         if (ShowPreviewInApp is null || !PreviewCommands.Contains(Plainly(text))) return null;
 
-        ShowPreviewInApp.Invoke();
-        const string said = "The preview is opening in Plantoir's main window — the build shows its progress there.";
+        bool deploying = ThisSectionIsBeingDeployed();
+        if (!deploying) ShowPreviewInApp.Invoke();
+        string said = deploying
+            ? SectionIsBeingDeployedSentence
+            : "The preview is opening in Plantoir's main window — the build shows its progress there.";
         // The exchange still goes in the transcript the model sees, so a
         // follow-up question knows the preview is already on screen.
         _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
@@ -1119,6 +1138,13 @@ public sealed class AssistAgent
         // after reading one of these, a small model restates it, and the
         // teacher saw the same sentence twice. There is nothing next: the
         // main window has the work.
+        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ThisSectionIsBeingDeployed())
+        {
+            // Before a window is opened, a preview stopped or a no-window
+            // rebuild run (#386): the same publish record the window asks.
+            _handedToApp = true;
+            return Answer(call, SectionIsBeingDeployedSentence);
+        }
         if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
         {
             ShowPreviewInApp.Invoke();
@@ -1197,7 +1223,8 @@ public sealed class AssistAgent
         {
             _handedToApp = true;
         }
-        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null)
+        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null &&
+            !ThisSectionIsBeingDeployed())
         {
             ShowPreviewInApp.Invoke();
         }

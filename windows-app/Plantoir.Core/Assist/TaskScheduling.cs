@@ -93,6 +93,23 @@ public static class TaskScheduling
     /// </summary>
     public const string TokenArgument = "--token";
 
+    /// <summary>
+    /// What a scheduled run's command line asks for: the job to run (a task
+    /// name, or a job path taken as is) and the task's token, or null when the
+    /// line is not a scheduled run. Program.Main's parsing, here so it is
+    /// tested (bundle 4 fix review M1).
+    /// </summary>
+    public static (string JobPath, string? Token)? ScheduledRunFrom(IReadOnlyList<string> args)
+    {
+        int run = args.ToList().IndexOf(RunArgument);
+        if (run < 0 || run + 1 >= args.Count) return null;
+        string named = args[run + 1];
+        string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase) ? named : JobPath(named);
+        int at = args.ToList().IndexOf(TokenArgument);
+        string? token = at >= 0 && at + 1 < args.Count ? args[at + 1] : null;
+        return (job, token);
+    }
+
     // ---- Names --------------------------------------------------------------
 
     /// <summary>
@@ -513,7 +530,11 @@ public static class TaskScheduling
                 $"    $scriptsDir = if (Test-Path $toolchainScripts) {{ $toolchainScripts }} else {{ Join-Path {PsQuote(workingFolder)} 'scripts' }}",
                 "    $fpScript = Join-Path $scriptsDir 'section_fingerprint.py'",
                 "    if ((Test-Path $pythonExe) -and (Test-Path $fpScript)) {",
-                $"      $fpArgs = @({PsQuote(courseDirectory)}, {section}{(excludedArray.Length > 0 ? ", " + excludedArray : "")})",
+                // --rule BEFORE the positional arguments (the only place the
+                // script reads it), and the rule goes into the sentinel so the
+                // app records the stamp under the rule the value was taken
+                // under (#358 / mac #330).
+                $"      $fpArgs = @('--rule', '{SectionPublishState.CurrentRule}', {PsQuote(courseDirectory)}, {section}{(excludedArray.Length > 0 ? ", " + excludedArray : "")})",
                 "      $fpOutput = & $pythonExe $fpScript @fpArgs 2>$null",
                 "      if ($LASTEXITCODE -eq 0 -and $fpOutput) { $fingerprint = ([string]$fpOutput).Trim() }",
                 "    }",
@@ -680,7 +701,41 @@ public static class TaskScheduling
                     courseCode, section, destination, cloudflareAccountID, unattended: true);
                 string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
 
-                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
+                if (destination.Type == "cloudflare_pages")
+                {
+                    // CAPTURED, the build leg's way (#395): deploy.py prints
+                    // PLANTOIR_CLOUDFLARE_REMADE: when it had to make the
+                    // section's Cloudflare project again, and with the app
+                    // closed nothing else would read it. Start-Process with
+                    // OS-level redirection, never a pipeline (see the build
+                    // leg's comment: a 5.1 pipeline turns a stderr line into a
+                    // terminating error). The marker lines are APPENDED to the
+                    // section's record, which ScheduledHealthFindings reads into
+                    // the trail's 'cloudflare project made again'. Only this
+                    // destination can print the marker, so the others run as
+                    // before. If the capture cannot be set up, the leg runs plainly.
+                    string commandLineArgs = string.Join(" ", arguments.Select(a => "\"" + a + "\""));
+                    lines.Add("if ($healthDir) {");
+                    lines.Add($"  $deployLog = Join-Path $healthDir ({PsQuote(SafeName(taskName))} + '-deploy-' + [Guid]::NewGuid().ToString('N') + '.log')");
+                    lines.Add($"  $deployArgs = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"' + {PsQuote(launcherPath)} + '\" ' + {PsQuote(commandLineArgs)}");
+                    lines.Add("  $legProc = Start-Process -FilePath 'powershell.exe' -ArgumentList $deployArgs -Wait -PassThru -NoNewWindow -RedirectStandardOutput $deployLog -RedirectStandardError ($deployLog + '.err')");
+                    lines.Add("  $legExit = $legProc.ExitCode");
+                    lines.Add("  try {");
+                    lines.Add($"    $remadeRecord = Join-Path $healthDir {PsQuote(HealthRecordName(courseCode, section, workingFolder))}");
+                    lines.Add($"    $remade = @(Select-String -LiteralPath @($deployLog, ($deployLog + '.err')) -SimpleMatch {PsQuote(CloudflareProjectRemade.Marker)} -Encoding UTF8 -ErrorAction SilentlyContinue | ForEach-Object {{ $_.Line }})");
+                    lines.Add("    if ($remade.Count -gt 0) { Add-Content -LiteralPath $remadeRecord -Value $remade -Encoding utf8 }");
+                    lines.Add("  } catch { }");
+                    lines.Add("  Remove-Item -LiteralPath $deployLog, ($deployLog + '.err') -Force -ErrorAction SilentlyContinue");
+                    lines.Add("} else {");
+                    lines.Add($"  & {PsQuote(launcherPath)} {quotedArgs}");
+                    lines.Add("  $legExit = $LASTEXITCODE");
+                    lines.Add("}");
+                }
+                else
+                {
+                    lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
+                    lines.Add("$legExit = $LASTEXITCODE");
+                }
 
                 // Exit 3 is deploy.py's NEEDS_AN_ANSWER and means that alone.
                 // Tested BEFORE the general non-zero branch, because it is also
@@ -704,13 +759,13 @@ public static class TaskScheduling
                 string failure = PsQuote(
                     ScheduledPublishOutcome.Word(ScheduledPublishOutcome.Kind.DidNotFinish));
 
-                lines.Add("if ($LASTEXITCODE -eq 3) {");
+                lines.Add("if ($legExit -eq 3) {");
                 lines.Add("  $allSucceeded = $false");
                 lines.Add("  if (-not $alreadyRecorded) {");
                 lines.Add("    $alreadyRecorded = $true");
                 lines.Add($"    Write-Outcome {question} {name}");
                 lines.Add("  }");
-                lines.Add("} elseif ($LASTEXITCODE -ne 0) {");
+                lines.Add("} elseif ($legExit -ne 0) {");
                 lines.Add("  $allSucceeded = $false");
                 lines.Add("  if (-not $alreadyRecorded) {");
                 lines.Add("    $alreadyRecorded = $true");
@@ -754,6 +809,7 @@ public static class TaskScheduling
                 $"    sectionNumber = {section}",
                 $"    courseDirectory = {PsQuote(courseDirectory)}",
                 "    fingerprint = $fingerprint",
+                $"    fingerprintRule = {SectionPublishState.CurrentRule}",
                 $"    destinationTypes = @({destinationTypesArray})",
                 "    destinationNames = $destinationNames",
                 "    completedAtUtc = (Get-Date).ToUniversalTime().ToString('o')",

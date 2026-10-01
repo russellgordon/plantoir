@@ -377,7 +377,14 @@ writes the real client at the end of the body (case 12).
 - *Editing `deploy.ps1` from the mac*: its last mac-written port was true for
   every site of two or more pages ("A third detail", above), and there is no
   `pwsh` on this Mac, so it would ship unrun PowerShell on the publishing path.
-  Windows owes it on #272 and keeps the old (safe-direction) fault until then.
+  Windows did it itself on #272 (2026-09-30): `Test-CarriesLiveReload` reads
+  each page whole as bytes (ISO-8859-1, one to one) and matches the tag, the
+  explicit byte class `[ \t\n\x0B\f\r]*` and the client case-sensitively,
+  with `-Force` so hidden folders count and an unreadable page passed over
+  rather than thrown on under `$ErrorActionPreference = 'Stop'`.
+  `windows-app/test_launcher_rules.ps1` runs all 15 cases against it; measured
+  on an i5-8365U (Windows 11 build 26200): 32–35 ms warm for a preview build,
+  78–86 ms for a clean 299-page section read whole.
 - *A new activity-trail event* ("rebuilt because the site was a preview's"):
   the piece narrows WHEN an existing behaviour fires, and what a teacher sees
   change — the folder publish succeeds, Publish skips a needless build — is
@@ -754,6 +761,18 @@ to be served over HTTP.
 GitHub issue [#227](https://github.com/russellgordon/plantoir/issues/227),
 2026-09-25. Two holes, both of which ended in "Published" over a folder that
 was empty, stale, or somewhere else entirely.
+
+**The path rule, on both platforms:** the app refuses any partial path; a
+launcher given one on a command line takes a plain relative name from the
+working folder. That INCLUDES `..` — `..\..\x` (or `../../x`) publishes
+OUTSIDE the working folder, on purpose and the same on both: a teacher may
+already publish to any absolute folder they choose, so escaping the working
+folder is not a new power, and refusing `..` on one platform alone would be
+the drift this rule exists to prevent. Windows' `deploy.ps1`
+(`Resolve-PublishFolder`, since bundle 4) additionally REFUSES a
+drive-relative (`C:foo`) or root-relative (`\out`) path, which .NET would
+otherwise resolve against the process's directory; the mac has no such
+shapes.
 
 **A relative `--to-folder` was handed to rsync as it was typed, and rsync reads
 a colon before the first `/` as a REMOTE computer.** Measured on macOS 26.6 with

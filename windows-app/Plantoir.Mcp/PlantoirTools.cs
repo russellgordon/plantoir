@@ -1211,11 +1211,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             }
 
             var result = workspace.ApplyReDate(plan);
-            int moved = plan.Moves.Count > 0 ? plan.Moves.Count : plan.Changing.Count();
-            int classCount = plan.ClassCount > 0 ? plan.ClassCount : plan.Dates.Count;
-            int materials = moved - classCount;
-            string summary = $"Re-dated {classCount} {(classCount == 1 ? "class" : "classes")}" +
-                             $" and {materials} {(materials == 1 ? "page" : "pages")} they use.";
+            // The counts ApplyReDate made from what it WROTE (#357 / mac #343):
+            // its first paragraph. Never recomputed here from the plan.
+            string summary = result.Message.Split("\n\n")[0];
             string detail = summary +
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";

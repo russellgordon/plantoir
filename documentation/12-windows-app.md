@@ -17,6 +17,90 @@ happens. This page is not a status report and should not be read as one.
 
 ---
 
+## Preview and publish mechanics that match the mac (bundle 4, 2026-09-30)
+
+One place for what changed on the preview and publish path in bundle 4, so a
+reader of the code finds the reasons. Hardware for every number: Intel Core
+i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
+
+- **The address (#278).** `ScriptRunner.CapturePreviewAddress` reads COMPLETE
+  lines only: the unfinished tail waits for the next piece, colour codes come out
+  per line, the carry is flushed when the run ends, and nothing is read back off
+  the end of the transcript. Chunk-wise parsing (the old code) takes the wrong
+  port when a piece ends after `:8`, `:81` or `:810` — the must-fail reproduced
+  `:810`. The wait never starts from the lease's port.
+- **The wait (#233).** `PreviewReachability.NextStep` decides each tick; the
+  view only acts. The run is never bounded (a first build here: server line at
+  43.6 s); the QUIET after `Started a Quartz server` is (45 s, restarted by
+  output). Server line to site answering, measured: 0.60 s first build, 0.40 s
+  and 0.38 s warm. No announced address when the server starts: give up at once.
+  Giving up stops the run the Stop way (so the trail's `task finished` line says
+  "stopped by the teacher" right after the `preview did not appear` line that
+  explains it — accepted rather than adding a third stop path), then the alert.
+  Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
+  anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
+  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+- **A typed publish folder (#304, review L1).** `deploy.ps1`'s
+  `Resolve-PublishFolder` takes a plain relative name from the working folder
+  (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
+  drive-relative (`C:foo`) or root-relative (`\out`) one: `IsPathRooted`
+  calls both rooted and `GetFullPath` then resolves them against the PROCESS
+  directory (verified: `C:\Windows\foo` with that working directory).
+  Rejected: refusing every relative name as the app does — the command line
+  and deploy.sh accept one, and #304 asked for it resolved once.
+- **Freshness (#272).** `.build-started` beside `public\` is written natively,
+  so one clock stamps it and the Save. `BuiltForPreview` reads bytes; the
+  `SearchOption.AllDirectories` overload does not skip Hidden items (a default
+  `EnumerationOptions` does — the must-fail proved it once the test gave the
+  dot folder the Hidden attribute, which NTFS does not do by itself). A
+  folder under `public\` that cannot be LISTED answers "rebuild" (review L2):
+  its pages were never looked at, and the throw used to escape NeedsRebuild
+  and fail the Deploy. Case-sensitivity is pinned by a proposed 16th case
+  (the tag in capitals).
+- **Two windows (#272).** Measured by reading and then by test before writing:
+  Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
+  loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
+  window's Save exactly as on the mac. `Write` now merges per top-level key and
+  returns what it kept or replaced; `WorkspaceViewModel.OtherCopiesReread`
+  re-reads every other unchanged copy; Revert reads the file. After a Save,
+  Course Settings says `settingsSaveReplacedSidebarChange` first, then
+  `settingsSavedWhilePublishing` or `settingsSavedWhilePreviewing` with a
+  Preview Again button (stops and restarts every open preview of the course,
+  in whichever window; `settingsPreviewAgainNothingOpen` and the button
+  disabled once none is open); a preview started with unsaved edits in ANY
+  window says `previewUsesSavedSettings`. Events: `preview started with
+  unsaved settings`, `preview again after settings saved`.
+- **The acts read the saved file (#357 / mac #335).** `SavedSettings.Read` at
+  the Deploy press (and the assistant pressing it) and in the schedule sheet
+  (on open and again at the press); unreadable refuses with
+  `settingsCouldNotBeReadToDeploy`, never the window's copy. Unsaved edits
+  anywhere: `deployUsesSavedSettings` / `schedulingUsesSavedSettings` and
+  `deploy used the saved settings` (kinds only). The section's notices have
+  their own InfoBar, never cleared by a preview's end (the mac's F3 trap).
+- **Overnight Cloudflare remake (#395).** The wrapper runs a Cloudflare leg
+  captured (Start-Process redirection, as the build leg) and appends any
+  `PLANTOIR_CLOUDFLARE_REMADE:` line to the section's record; the app writes
+  `cloudflare project made again` when it reads it. Every leg's exit is
+  `$legExit`.
+- **Windowless work (#391, #386).** `AssistWorkspace` runs every leg
+  `--non-interactive`; `LaunchOutcome.ExitCode` 3 becomes the contract's
+  sentences. The window refuses a preview while `CourseActivity.IsPublishingSection`
+  (this process's own Deploys, any window); the in-app assistant asks the same
+  record. On Windows the in-app assistant's DEPLOY runs in plantoir-mcp.exe, a
+  separate process, so it is the work leases (#289) that refuse a window's
+  preview of it — not the in-process record — and the contract's window case for
+  that deployer is skipped by name in `PreviewWhileDeployingTests`.
+- **The '— Edited' rule 2 (#358).** C#, the wrapper (`--rule 2`, and the rule
+  written into its sentinel so an old wrapper's value is recorded as rule 1) and
+  the stamp moved together. Found on the way: `section_fingerprint.py` could not
+  import `how_i_teach` under the bundled EMBEDDABLE Python (its `._pth` replaces
+  `sys.path`), so every scheduled publish recorded no fingerprint; it now adds
+  its own folder, as `build_site.py` does.
+- **One folder, one id (#307).** A case variant gives the same id (`3566e628`
+  both ways) and compares equal; NTFS does not normalise Unicode, so an NFD
+  spelling of an NFC-named folder is another (nonexistent) folder — ids
+  `b7e56301` / `bbdbaf32` — and there is no second spelling to disagree about.
+
 ## The solution
 
 | Project | Role |
@@ -1073,18 +1157,19 @@ What replaces the old container concepts:
   sentence); a process table that cannot be read lets the preview THROUGH
   (the opposite of the remake's rule, and why is in
   [03](03-launcher-scripts.md) → "A section being deployed cannot be
-  previewed (#381)"); and never a remembered process id. Until it is done the
-  cases are a named gap against the `windows` issue opened with #381.
+  previewed (#381)"); and never a remembered process id. Built in bundle 4
+  (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
+  window's `CourseActivity.IsPublishingSection` — see "Preview and publish
+  mechanics that match the mac (bundle 4)" above.
 - **Concurrent previews are still isolated by port, exactly as before.**
-  `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
-  base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket — six blocks, where the mac launchers walk forty since GitHub
-  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
-  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
-  when it cannot"; whether its probe sees ANOTHER signed-in account's
-  listeners is the open question the mac answered for itself in #310 — the
-  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
-  app watches for. What changed is only what is listening on that port: a
+  `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
+  8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
+  `contracts/app-rules.json` → `previewPorts.hostBlockCases`, and 03 → "How a
+  folder finds its ports, and when it cannot"). Natively a block is the site
+  port and its websocket (+1000). Whose listeners the probe sees (#319) was
+  measured in bundle 4: SYSTEM and NETWORK SERVICE listeners yes; a second
+  signed-in account was NOT measured (03 → "preview.ps1's own port walk…").
+  It prints the exact "Preview will be available at:" line the app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
   entry below), not a container's forwarded port.
@@ -1137,11 +1222,10 @@ as history, not as what Windows does today.
   "teaching-quartz-$WORKDIR_ID"` variable is still assigned in each script,
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
-- **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
-  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
-  `build_site.py`'s own native re-probe already walks forty blocks from the
-  port it is given): base..base+3 for the preview
+- **Port blocks**: `preview.ps1` walks forty blocks (8081 … 8471, since
+  bundle 4 / #286, matching the mac's walk from GitHub #280 and
+  `build_site.py`'s own native re-probe, which also binds `127.0.0.1` since
+  #319): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded

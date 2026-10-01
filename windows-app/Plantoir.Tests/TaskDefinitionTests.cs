@@ -91,6 +91,62 @@ public class TaskDefinitionTests : IDisposable
         Assert.Empty(scheduler.Deleted);
     }
 
+    /// <summary>
+    /// The MATCHING-token path (bundle 4 fix review M1, ruling 9): Schedule()
+    /// registers the task, the command line is read back out of the task's own
+    /// XML and parsed as Program.Main parses it, and the run carrying the job's
+    /// OWN token deploys and clears the one-shot task. A mutant that refuses
+    /// every token-carrying run used to survive.
+    /// </summary>
+    [Fact]
+    public void ARunCarryingItsJobsOwnTokenDeploysAndClearsTheTask()
+    {
+        using var scheduler = new FakeScheduler(_root);
+        string folder = FakeScheduler.WorkingFolderWith(_root, "own", "ICS3U",
+            """{ "course_code": "ICS3U", "section_numbers": [1], "deploy_target": "netlify" }""");
+        string marker = Path.Combine(folder, "courses", "ICS3U", ".netlify_sites", "section1.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker)!);
+        File.WriteAllText(marker, """{ "site_id": "x", "site_name": "ics3u-s1" }""");
+        Assert.Null(TaskScheduling.Schedule(folder, "ICS3U", 1, DateTime.Now, [new("netlify", "")]));
+        string name = TaskScheduling.NameFor("ICS3U", 1, folder);
+
+        // The task's Arguments, as registered, split the way a command line is.
+        var arguments = System.Text.RegularExpressions.Regex.Match(scheduler.CreatedXml.Last(), "<Arguments>(.*?)</Arguments>").Groups[1].Value
+            .Replace("&quot;", "\"").Replace("&amp;", "&");
+        var argv = System.Text.RegularExpressions.Regex.Matches(arguments, "\"([^\"]*)\"|(\\S+)")
+            .Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value).ToArray();
+        var parsed = TaskScheduling.ScheduledRunFrom(argv);
+        Assert.NotNull(parsed);
+        Assert.Equal(TaskScheduling.JobPath(name), parsed!.Value.JobPath);
+        Assert.Equal(ScheduledRun.ReadJob(TaskScheduling.JobPath(name))!.Token, parsed.Value.Token);
+
+        var ran = new List<string>();
+        var world = new ScheduledRun.World
+        {
+            Now = () => DateTimeOffset.Now, Sleep = _ => { }, CloudflareAccountID = () => "",
+            OutcomeDirectory = Path.Combine(_root, "outcomes"),
+            RunWrapper = script => { ran.Add(script); return 0; },
+        };
+        Assert.Equal(ScheduledRun.Ending.Deployed,
+            ScheduledRun.Execute(parsed.Value.JobPath, world, taskToken: parsed.Value.Token));
+        Assert.Single(ran);
+        Assert.DoesNotContain(name, scheduler.Tasks.Keys);   // one-shot: cleared after it ran
+    }
+
+    [Fact]
+    public void TheScheduledRunsCommandLineIsParsedAsTheTaskWritesIt()
+    {
+        Assert.Null(TaskScheduling.ScheduledRunFrom(new[] { "--state-dir", "x" }));
+        Assert.Null(TaskScheduling.ScheduledRunFrom(new[] { TaskScheduling.RunArgument }));
+        var noToken = TaskScheduling.ScheduledRunFrom(new[] { TaskScheduling.RunArgument, "Plantoir deploy ICS3U section 1" })!.Value;
+        Assert.Equal(TaskScheduling.JobPath("Plantoir deploy ICS3U section 1"), noToken.JobPath);
+        Assert.Null(noToken.Token);
+        var withToken = TaskScheduling.ScheduledRunFrom(new[] { TaskScheduling.RunArgument, @"C:\x\a.job.json", TaskScheduling.TokenArgument, "abc123" })!.Value;
+        Assert.Equal(@"C:\x\a.job.json", withToken.JobPath);
+        Assert.Equal("abc123", withToken.Token);
+        Assert.Null(TaskScheduling.ScheduledRunFrom(new[] { TaskScheduling.RunArgument, "n", TaskScheduling.TokenArgument })!.Value.Token);
+    }
+
     [Fact]
     public void TheJobIsInPlaceBeforeTheTaskIsReplaced()
     {

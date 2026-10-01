@@ -116,6 +116,15 @@ public static class ScheduledHealthFindings
                                dated.TrailSentence, dated.Course, dated.Section, writtenAt);
         }
 
+        // deploy.py's PLANTOIR_CLOUDFLARE_REMADE: (#395), appended by the
+        // wrapper's Cloudflare leg: an overnight publish is exactly the one
+        // nobody watched remake the project, and its address may have changed.
+        foreach (var remade in CloudflareProjectRemade.ReportsIn(lines))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.CloudflareProjectMadeAgain,
+                               remade.TrailSentence, remade.Course, remade.Section, writtenAt);
+        }
+
         var findings = SiteHealthFinding.FindingsIn(lines);
         foreach (var finding in findings)
         {
