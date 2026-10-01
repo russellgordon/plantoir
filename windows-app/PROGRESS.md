@@ -185,6 +185,27 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 6a: course creation and the smaller course pieces (2026-09-30)
+
+Issues #169, #250, #252, #349 (the wizard's skeleton: declining the ready-made
+pages offers the subject's skeleton and keeps its curriculum, the toggle
+restores both ways, "an English skeleton"), #348 (the marks floor counts
+folders on disk; Revert records the exclusions it put back), #316 (an
+unreadable trail in a problem report), #320 (reopening the last working
+folder, or saying why not), #355 + #389 (Get Ready for the Start of the Year:
+the rule, the MCP pair, the section menu sheet and its undo; check_section's
+third group), #345 (one coverage map per curriculum folder: the code rule,
+plural resolution from the disk, protection, checkboxes, the rename, the
+folders help, `curriculum maps built`) and #360 (the How I Teach row; every
+assistant zip on the trail). The Starting Content decisions moved into Core
+(`WizardStructure`, `NewCourseAnswers`) with six goldens from the old rule.
+Ledger entries deleted: ten trail events, three wording keys from #355 plus
+two from #360, `curriculum_folders`, and the declined-skeleton newCourse case.
+Still open from these issues, said in `documentation/12-windows-app.md`: the
+start-of-year Go does not stop and restart the preview, the club case waits for
+#274, and
+`courseIsBeingCopied` (the course is not counted busy while `plantoir-mcp`
+zips it).
 ## Parity run, bundle 6b: reference courses, importing, Copy a Page (2026-10-01)
 
 - **#241 / #298 — courses kept for reference.** Marker read strictly, school

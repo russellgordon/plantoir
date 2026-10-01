@@ -859,7 +859,7 @@ public sealed partial class SectionDetailView : UserControl
                 WorkLease.DeclineTrailLine("Preview after a repair", other), _course.Code, _sectionNumber);
             return new SiteHealthRepair.Outcome(
                 "Cannot Preview Yet",
-                AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+                WorkLease.DeclinedInTheWindow(_course.Code, other.Kind),
                 false);
         }
 
@@ -1045,7 +1045,7 @@ public sealed partial class SectionDetailView : UserControl
                 App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
                 return;
             }
-            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "the assistant's rebuild")) return;
+            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "the assistant's rebuild") is not null) return;
             _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
@@ -1129,22 +1129,23 @@ public sealed partial class SectionDetailView : UserControl
     /// those programs, since it now writes leases too. This first look is
     /// the quick answer; the guarantee is <see cref="DeclinedAfterTaking"/>.
     /// </remarks>
-    private async Task<bool> AnotherProgramStandsInTheWay(string asked, string title)
+    private async Task<string?> AnotherProgramStandsInTheWay(string asked, string title)
     {
-        if (_window.Workspace.WorkspacePath is not { } folder) return false;
-        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim: null) is not { } other) return false;
+        if (_window.Workspace.WorkspacePath is not { } folder) return null;
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim: null) is not { } other) return null;
 
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), _course.Code, _sectionNumber);
+        string sentence = WorkLease.DeclinedInTheWindow(_course.Code, other.Kind);
         var dialog = new ContentDialog
         {
             Title = title,
-            Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+            Content = sentence,
             CloseButtonText = "OK",
         };
         await ShowDialogSafelyAsync(dialog);
         RefreshChrome();
-        return true;
+        return sentence;
     }
 
     /// <summary>
@@ -1182,14 +1183,14 @@ public sealed partial class SectionDetailView : UserControl
     /// the trail says why; the caller says the sentence (or, for the
     /// assistant's restart, nothing — its tool answer already went).
     /// </summary>
-    private bool DeclinedAfterTaking(string folder, WorkLease.Claim claim, string asked)
+    private string? DeclinedAfterTaking(string folder, WorkLease.Claim claim, string asked)
     {
-        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim) is not { } other) return false;
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim) is not { } other) return null;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), _course.Code, _sectionNumber);
         ReleaseLease();
         RefreshChrome();
-        return true;
+        return other.Kind;
     }
 
     /// <summary>
@@ -1221,7 +1222,7 @@ public sealed partial class SectionDetailView : UserControl
             // FIRST, before any lease is taken or anything stopped (#386).
             if (_window.Workspace.WorkspacePath is { } deployingFolder &&
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
-            if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet")) return;
+            if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet") is not null) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
@@ -1249,12 +1250,12 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(dialog);
                 return;
             }
-            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "Preview"))
+            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "Preview") is { } declinedBy)
             {
                 await ShowDialogSafelyAsync(new ContentDialog
                 {
                     Title = "Cannot Preview Yet",
-                    Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+                    Content = WorkLease.DeclinedInTheWindow(_course.Code, declinedBy),
                     CloseButtonText = "OK",
                 });
                 return;
@@ -1602,8 +1603,8 @@ public sealed partial class SectionDetailView : UserControl
                 });
                 return AssistWording.DeployRefusedForAReferenceCourse(kept);
             }
-            if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet"))
-                return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
+            if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet") is { } declined)
+                return declined;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
             // The SAVED settings, read at the press (#357 / mac #335): the
@@ -1679,10 +1680,10 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(new ContentDialog
                 {
                     Title = "Cannot Deploy Yet",
-                    Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+                    Content = WorkLease.DeclinedInTheWindow(_course.Code, other.Kind),
                     CloseButtonText = "OK",
                 });
-                return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
+                return WorkLease.DeclinedInTheWindow(_course.Code, other.Kind);
             }
 
             // Stop any running or building preview before deploying, and
@@ -1723,6 +1724,9 @@ public sealed partial class SectionDetailView : UserControl
             // end and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
+            // The section's next deploy ends the app's undo of getting it ready
+            // for the start of the year (#355, startOfYear.undo.app).
+            Plantoir.Core.Assist.StartOfYearSessionUndo.End(workspacePath, _course.Code, _sectionNumber);
             // Handed over to the fields EndPublishActivity releases. A deploy
             // builds and then uploads, and both end together, so the build
             // claim can simply run its whole length.
