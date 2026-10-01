@@ -893,8 +893,8 @@ public sealed class AssistAgent
             ActivityTrail.Note(
                 ActivityTrail.Event.AssistantMatchedAFixedPhrase,
                 "matched in code, not sent to the model — ran " + match.ToolName +
-                " " + WithArguments(match.Arguments.Keys) +
-                (moment is null ? "" : " for " + moment),
+                (moment is null ? "" : " for " + moment) +
+                " " + WithArguments(match.Arguments.Keys),
                 _courseCode,
                 _section);
 
