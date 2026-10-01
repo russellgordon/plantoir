@@ -59,7 +59,7 @@ public static class TaskScheduling
     /// as possible after a start that was missed (the lateness window then
     /// decides whether it is still worth doing).
     /// </summary>
-    internal static string TaskXml(string runner, string taskName, DateTime when)
+    internal static string TaskXml(string runner, string taskName, DateTime when, string token = "")
     {
         static string X(string v) => System.Security.SecurityElement.Escape(v);
         string user = $"{Environment.UserDomainName}\\{Environment.UserName}";
@@ -77,13 +77,21 @@ public static class TaskScheduling
                 <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>
                 <Enabled>true</Enabled>
               </Settings>
-              <Actions Context="Author"><Exec><Command>{X(runner)}</Command><Arguments>{X($"{RunArgument} \"{taskName}\"")}</Arguments></Exec></Actions>
+              <Actions Context="Author"><Exec><Command>{X(runner)}</Command><Arguments>{X($"{RunArgument} \"{taskName}\"" + (token.Length > 0 ? $" {TokenArgument} {token}" : ""))}</Arguments></Exec></Actions>
             </Task>
             """;
     }
 
     /// <summary>What the task passes Plantoir to say "run this scheduled deploy now".</summary>
     public const string RunArgument = "--run-scheduled-deploy";
+
+    /// <summary>
+    /// The setting's token, carried by the task beside its name (ruling 8): a
+    /// run whose task token is not the job's does nothing and leaves the task,
+    /// so a crash between writing a new job and replacing the task cannot run
+    /// the OLD task on the NEW job.
+    /// </summary>
+    public const string TokenArgument = "--token";
 
     // ---- Names --------------------------------------------------------------
 
@@ -142,6 +150,7 @@ public static class TaskScheduling
         // job is kept aside so a refusal can put it back exactly.
         string jobPath = JobPath(taskName);
         string kept = jobPath + ".kept";
+        string token = Guid.NewGuid().ToString("N");
         try
         {
             Directory.CreateDirectory(ScheduledScriptsDirectory());
@@ -149,7 +158,7 @@ public static class TaskScheduling
             var job = new ScheduledRun.Job(taskName, workingFolder, courseCode, section,
                 new DateTimeOffset(when).ToUniversalTime(),
                 promised.Select(DeployCommand.DestinationDescription).ToList(),
-                Guid.NewGuid().ToString("N"));
+                token);
             File.WriteAllText(jobPath, ScheduledRun.WriteJob(job));
         }
         catch (Exception error)
@@ -168,7 +177,7 @@ public static class TaskScheduling
         var (exitCode, output) = (1, "");
         try
         {
-            File.WriteAllText(xmlPath, TaskXml(runner, taskName, when), System.Text.Encoding.Unicode);
+            File.WriteAllText(xmlPath, TaskXml(runner, taskName, when, token), System.Text.Encoding.Unicode);
             (exitCode, output) = Run(["/Create", "/F", "/TN", taskName, "/XML", xmlPath]);
         }
         catch (Exception error) { output = error.Message; }
