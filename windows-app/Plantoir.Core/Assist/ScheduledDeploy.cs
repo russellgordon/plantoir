@@ -93,9 +93,12 @@ public sealed class ScheduledDeploy
     /// while the same check refuses.
     /// </summary>
     /// <remarks>
-    /// Names EVERY destination, joined "A and B". The mac's #396 refinement —
-    /// naming the one destination that CAUSED the refusal — needs Problem to
-    /// say which destination it refused for, and is not done here yet.
+    /// Since #396 the destination is the one that CAUSED the refusal — a
+    /// course that also deploys to Cloudflare Pages, refused over the Account
+    /// ID, is "deploying to Cloudflare Pages", where it used to name the
+    /// primary whatever the cause. A refusal that is not about a destination
+    /// (a time already passed, a course kept for reference) names every
+    /// destination by kind, joined "A and B".
     /// </remarks>
     public static void NoteRefusedAtTheAct(AssistWorkspace workspace, string courseCode, int sectionNumber,
                                            DateTime moment, string refusal)
@@ -106,7 +109,8 @@ public sealed class ScheduledDeploy
         {
             var course = workspace.Course(courseCode);
             code = course.Code;
-            kinds = Models.DeployCommand.EveryDestinationByType(course.Configuration);
+            kinds = CausingDestination(RefusalOf(course, sectionNumber, AssistWorkspace.CurrentCloudflareAccountId()))
+                    ?? Models.DeployCommand.EveryDestinationByType(course.Configuration);
         }
         catch (Exception) { kinds = "its destination"; }
         int stop = refusal.IndexOf(". ", StringComparison.Ordinal);
@@ -115,6 +119,15 @@ public sealed class ScheduledDeploy
             $"could not set a scheduled deploy for {DateText.Stamp(moment)}, deploying to {kinds}: {first}",
             code, sectionNumber);
     }
+
+    /// <summary>The destination, by kind, a refusal was ABOUT (#396), or null when it is about none.</summary>
+    internal static string? CausingDestination(Refusal? refusal) => refusal?.Key switch
+    {
+        "deployFolderNeedsAttention" or "additionalDeployFolderNeedsAttention" => "a folder on this computer",
+        "cloudflareAccountMissing" or "additionalCloudflareAccountMissing" => "Cloudflare Pages",
+        "neverDeployed" or "additionalDestinationNeverDeployed" => refusal.Destination,
+        _ => null,
+    };
 
     public static string? Problem(Models.Course course, int sectionNumber, DateTime when, DateTime now, string cloudflareAccountID = "")
     {
