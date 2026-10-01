@@ -85,6 +85,26 @@ public sealed class ClubNounTests : IDisposable
                         TeacherCopy(tools.PlanAddNextClass("ICS3U", 1, duplicate: "Week 1")));
     }
 
+    /// <summary>
+    /// A club's shelf (#274): every card but "Cancel scheduled deploy" is
+    /// matched IN CODE in a Week club, in either noun — so the shelf promises
+    /// nothing a model was never measured on — and no card names a unit or a
+    /// page title the model would have to route.
+    /// </summary>
+    [Theory]
+    [InlineData(ClassNoun.Meeting)]
+    [InlineData(ClassNoun.Class)]
+    public void AClubsShelfOffersOnlyWhatIsMatchedInCode(ClassNoun noun)
+    {
+        var groups = AssistPromptShelf.GroupsFor(new ClassPageNaming("Week", ClassPageScheme.Numbered), noun);
+        foreach (string card in groups.SelectMany(g => g.Phrasings).Where(c => c != "Cancel scheduled deploy"))
+        {
+            Assert.True(AssistCardCommand.Matching(card, "Week") is not null, $"“{card}” on a club's shelf is not matched in code.");
+            Assert.DoesNotContain("Unit", card);
+        }
+        Assert.Same(AssistPromptShelf.Groups, AssistPromptShelf.GroupsFor(ClassPageNaming.Standard, ClassNoun.Class));
+    }
+
     /// <summary>A refusal is one string for both audiences, in the ordinary wording.</summary>
     [Fact]
     public void ARefusalKeepsTheOrdinaryWording()

@@ -26,7 +26,8 @@ public sealed class AssistPromptShelfView : UserControl
     private readonly AppSettings? _settings;
     private readonly HashSet<string> _openGroups;
 
-    public AssistPromptShelfView(Action<string> choose, AppSettings? settings = null)
+    public AssistPromptShelfView(Action<string> choose, AppSettings? settings = null,
+        IReadOnlyList<(string Title, IReadOnlyList<string> Phrasings)>? groups = null)
     {
         _choose = choose;
         _settings = settings ?? App.Settings;
@@ -46,7 +47,7 @@ public sealed class AssistPromptShelfView : UserControl
 
         var groupsContainer = new StackPanel { Spacing = 2 };
 
-        foreach (var (title, phrasings) in AssistPromptShelf.Groups)
+        foreach (var (title, phrasings) in groups ?? AssistPromptShelf.Groups)
         {
             groupsContainer.Children.Add(BuildGroup(title, phrasings));
         }
