@@ -152,6 +152,9 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     /// </summary>
     public void ChooseWorkspace(string path)
     {
+        // Choosing another folder replaces the remembered one and takes the
+        // sentence away (reopeningTheLastWorkingFolder.memoryCases).
+        NotReopenedSentence = null;
         Settings.WorkspacePath = path;
         Settings.Save();
         Plantoir.Core.Scripting.ActivityTrail.Note(
@@ -173,7 +176,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     /// window must not write "working folder opened" twice, and it has left no
     /// folder to give back.</para>
     /// </summary>
-    public void AdoptRestoredPath(string path)
+    public void AdoptRestoredPath(string path, bool windowsOwn)
     {
         App.LogDiagnostic($"AdoptRestoredPath called with '{path}'");
         if (string.IsNullOrEmpty(path) || !Directory.Exists(path)
@@ -182,9 +185,47 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
             App.LogDiagnostic($"AdoptRestoredPath early return: empty/not exists/already path");
             return;
         }
+        // "reopened", not "opened" (#320): the APP chose this folder, and a
+        // report of "Plantoir opened the wrong folder" turns on telling the two
+        // apart. Reopening it also makes it the last working folder again.
         Plantoir.Core.Scripting.ActivityTrail.Note(
-            Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderOpened,
-            $"working folder opened — {path}");
+            Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderReopened,
+            $"working folder reopened — {LastWorkingFolder.WhichFolder(windowsOwn)}, {path}");
+        NotReopenedSentence = null;
+        AdoptFolder(path);
+    }
+
+    /// <summary>
+    /// A window opened BESIDE another (Ctrl+N) takes the key window's folder.
+    /// Neither a choice nor a reopen, so it writes nothing on the trail
+    /// (<c>activityTrail.mustRecord</c> → <c>working folder reopened</c>).
+    /// </summary>
+    public void AdoptInheritedPath(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)
+            || WorkingFolder.IsTheSame(path, WorkspacePath)) return;
+        AdoptFolder(path);
+    }
+
+    /// <summary>
+    /// The remembered folder could not be reopened: the picker shows one
+    /// sentence naming it and why, the trail says so, and the folder stays
+    /// remembered (nothing here touches <c>Settings.WorkspacePath</c>).
+    /// </summary>
+    public void NoteNotReopened(string reason, string path, bool windowsOwn)
+    {
+        NotReopenedSentence = LastWorkingFolder.Sentence(reason, path);
+        Plantoir.Core.Scripting.ActivityTrail.Note(
+            Plantoir.Core.Scripting.ActivityTrail.Event.WorkingFolderNotReopened,
+            $"working folder not reopened ({reason}) — {LastWorkingFolder.WhichFolder(windowsOwn)}, {path}");
+        Notify(nameof(NotReopenedSentence));
+    }
+
+    /// <summary>The picker's sentence about a folder that could not be reopened, or null.</summary>
+    public string? NotReopenedSentence { get; private set; }
+
+    private void AdoptFolder(string path)
+    {
         App.LogDiagnostic("AdoptRestoredPath calling PointAtFolder()");
         PointAtFolder(path);
         MarkBuildsFolder();
@@ -244,12 +285,21 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         var others = _windowModels.Where(m => m != this && m.WorkspacePath is not null)
                                   .Select(m => m.WorkspacePath!).ToList();
         string? inherited = Workspace.FolderForNewWindow(others, _mostRecentKeyFolderPath);
-        if (inherited is not null) AdoptRestoredPath(inherited);
+        if (inherited is not null) AdoptInheritedPath(inherited);
     }
 
     public void NoteBecameKey()
     {
-        if (_state.FolderPath is not null) _mostRecentKeyFolderPath = _state.FolderPath;
+        if (_state.FolderPath is null) return;
+        _mostRecentKeyFolderPath = _state.FolderPath;
+        // "Last" means last IN FRONT, not last chosen (#320): the folder of the
+        // window most recently in front is the one the next launch reopens. A
+        // window with no folder never writes it.
+        if (!WorkingFolder.IsTheSame(Settings.WorkspacePath, _state.FolderPath))
+        {
+            Settings.WorkspacePath = _state.FolderPath;
+            Settings.Save();
+        }
     }
 
     public void UnregisterWindow()

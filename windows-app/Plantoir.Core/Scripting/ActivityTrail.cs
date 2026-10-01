@@ -117,6 +117,20 @@ public static class ActivityTrail
         /// </summary>
         CourseCreated,
         /// <summary>
+        /// The APP reopened a working folder at launch rather than the teacher
+        /// choosing one (#320). Carries the path (redacted) and which it was —
+        /// the window's own folder or the last working folder. A window opened
+        /// beside another (Ctrl+N) inherits a folder and writes nothing.
+        /// </summary>
+        WorkingFolderReopened,
+        /// <summary>
+        /// A remembered working folder could not be reopened, so the window shows
+        /// the picker with a sentence. Carries the reason key, which folder it
+        /// was, and the path (redacted): the drive gets plugged back in and the
+        /// permission granted, so they cannot be looked for afterwards.
+        /// </summary>
+        WorkingFolderNotReopened,
+        /// <summary>
         /// Course Settings' Revert took back unsaved exclusion changes. Carries
         /// the course and HOW MANY — never the names, which the click lines
         /// beside it already carry. Russell, 2026-09-06: <c>item excluded</c>
@@ -424,6 +438,8 @@ public static class ActivityTrail
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
         Event.CourseCreated => "course created",
+        Event.WorkingFolderReopened => "working folder reopened",
+        Event.WorkingFolderNotReopened => "working folder not reopened",
         Event.ExclusionsReverted => "exclusions reverted",
         Event.SyncedFolderNoticed => "synced folder noticed",
         Event.SyncedFolderAccepted => "synced folder accepted",

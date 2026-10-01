@@ -39,6 +39,10 @@ public sealed partial class WorkspacePickerView : UserControl
             _ = LoadCrumbIconsAsync(crumbs);
         }
 
+        NotReopenedText.Text = workspace.NotReopenedSentence ?? "";
+        NotReopenedText.Visibility = workspace.NotReopenedSentence is null || offerInitialize
+            ? Visibility.Collapsed : Visibility.Visible;
+
         ProblemText.Text = workspace.WorkspaceProblem ?? "";
         ProblemText.Visibility = workspace.WorkspaceProblem is null ? Visibility.Collapsed : Visibility.Visible;
         // WorkspaceState.Unrecognized deliberately shows the choosing state
