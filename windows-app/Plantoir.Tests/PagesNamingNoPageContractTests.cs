@@ -48,21 +48,13 @@ public class PagesNamingNoPageContractTests : IDisposable
     /// </summary>
     private static bool NeedsANumberedCourse(JsonNode c) => c["course"]!.ToString() == "numbered";
 
-    [Fact]
-    public void OnlyTheNumberedCasesWaitForClubs()
-    {
-        int waiting = Contract["cases"]!.AsArray().Count(c => NeedsANumberedCourse(c!));
-        Assert.True(waiting <= 2, $"{waiting} pagesNamingNoPage cases now need a numbered course; #274 owns them.");
-    }
-
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task Case_MatchesContract(string name)
     {
         var c = Contract["cases"]!.AsArray().First(x => x!["name"]!.ToString() == name)!;
-        if (NeedsANumberedCourse(c)) return;   // #274
-
-        AddCourse(c["pages"]!.AsArray());
+        // A numbered case (#274 landed) runs in a course of that scheme.
+        AddCourse(c["pages"]!.AsArray(), NeedsANumberedCourse(c) ? c["pageWord"]!.ToString() : null);
         var before = Snapshot();
         var wording = ContractLoader.LoadJson("assist-wording.json")!["wording"]!;
 
@@ -140,13 +132,15 @@ public class PagesNamingNoPageContractTests : IDisposable
 
     // ---- The fixture ------------------------------------------------------
 
-    private void AddCourse(JsonArray pages)
+    private void AddCourse(JsonArray pages, string? numberedWord = null)
     {
         string directory = Path.Combine(_folder, "courses", Course);
         Directory.CreateDirectory(directory);
+        string scheme = numberedWord is null ? "" : $"\"class_page_scheme\": \"numbered\", \"unit_word\": \"{numberedWord}\",";
         File.WriteAllText(Path.Combine(directory, "course_config.json"),
             $$"""
             {
+              {{scheme}}
               "course_code": "{{Course}}",
               "course_name": "A course",
               "deploy_target": "netlify",

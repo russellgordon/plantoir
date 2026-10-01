@@ -563,3 +563,27 @@ cloud session":
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,
   `--auto-wizard`, `--auto-createcourse CODE [SECTIONS]`,
   `--auto-addsection CODE`.
+
+## Parity run, bundle 7: clubs, Course Settings, today's class (2026-10-01)
+
+- **#274 — clubs.** `ClassPageNaming` on every class-planning path with no
+  default; numbered next page after the latest date, make room keeping gaps,
+  no whole-unit path, numbered refusals before the dates are asked for; the 60
+  class/meeting sentences in the teacher's copy only (`_meta`), the model's
+  copy byte-identical (`ClubNounTests`); the meeting card phrasings and the
+  numbered make-room family; a club's shelf; "This is a club" in the wizard;
+  Course Settings' locked rows and the disabled Rename…; `course created` says
+  a club; the front-page pointer found by the class it names (`writtenAs`).
+- **#390** — the panel's words follow the box. **#387** — `SettingsSaveState`,
+  `settings save held back`, legacy per-section seeding, "Language and region",
+  "Standard colours", the label-word scan. **#269** — the lists are tables
+  (+/−, Delete) and Hide/Expandable one table. **#406** — Preview offers today's
+  class (42 cases), Not Today, two trail events.
+- **#392 / #399 remainders** — published-before pages keep their date in the
+  assistant's publish; `linksIntoHiddenPagesWillBeOffered` only when the build
+  made the checklist; the two laid-out naming cases run.
+- Ledger entries deleted: every one owned by #274, #387, #392 and #406
+  (3 config keys, 51 wording keys + 1, 3 trail events, 2 case lists).
+  [UiFact]s written and UNPROVEN (desktop locked): `ClubSettingsUiTests`,
+  `CourseSettingsSaveUiTests`, `ListTablesUiTests`, `MarksPoolRemovalUiTests`
+  (updated).

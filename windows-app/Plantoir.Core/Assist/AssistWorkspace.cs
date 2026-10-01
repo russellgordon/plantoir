@@ -521,7 +521,15 @@ public sealed partial class AssistWorkspace
         var titles = PagePaths.MarkdownPages(course.DirectoryPath, section)
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .ToList();
-        var units = titles
+        // A numbered course has no units (#274): its FIRST class page instead,
+        // built from the course's own word — "Publish Week 1".
+        var naming = course.Configuration.Naming;
+        if (naming.IsNumbered)
+        {
+            var numbers = titles.Select(title => naming.Parse(title)?.Day).OfType<int>().ToList();
+            if (numbers.Count > 0) return $"{verb} {naming.Title(1, numbers.Min())}";
+        }
+        var units = naming.IsNumbered ? new List<int>() : titles
             .Select(title => System.Text.RegularExpressions.Regex.Match(title,
                 "^" + System.Text.RegularExpressions.Regex.Escape(unitWord) + @" (\d+), ",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase))
