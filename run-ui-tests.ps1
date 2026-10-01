@@ -37,12 +37,15 @@
     remembered windows and window positions are not read or written.
 
     The exception worth knowing: the LAUNCHERS compute the builds root
-    themselves. ONE test runs one — NewCourseWizardUiTests presses the wizard's
-    Create button, which runs setup.ps1 — and it is safe only because
-    setup_course.py never resolves merged_output_root, so PLANTOIR_BUILD_ROOT
-    is set and the folder it names is never made. Nothing enforces that. Do not
-    write a test that previews or schedules without reading "The flags the app
-    answers" in documentation/12-windows-app.md first.
+    themselves. Since bundle 11 (2026-10-01) the end-to-end tests run them on
+    purpose - the wizard's Create (setup.ps1), Preview (preview.ps1) and
+    Deploy to a folder (deploy.ps1) - and preview and deploy build into the
+    REAL %LOCALAPPDATA%\Plantoir\builds\<id of the test's temp working folder>.
+    DrivenApp's Dispose stops each serve with the launcher's own --stop, ends
+    anything still naming the run's folders, and deletes that builds folder,
+    failed test or not. No test schedules a deploy: that would register a real
+    Task Scheduler task. Read "Driving the real interface" in
+    documentation/12-windows-app.md before writing one that runs a launcher.
 
     WHEN ONE FAILS
     ==============

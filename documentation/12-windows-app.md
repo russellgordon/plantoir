@@ -477,17 +477,28 @@ spaces.
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
 builds root from `$env:LOCALAPPDATA` themselves, and `TaskScheduling` bakes the
-same into the wrapper script it registers. So a redirected run that PREVIEWED
-would look for its build where the launcher did not put it, and one that
-SCHEDULED a deploy would register a REAL Task Scheduler task whose sentinels
-land in the teacher's real pending folder. Neither is done by any test, and a
-test that drives Preview is the obvious next thing somebody writes — this is
-the paragraph they will have read first. `plantoir-mcp.exe` resolves its own
-paths too.
+same into the wrapper script it registers. So a redirected run that PREVIEWS
+builds into the REAL `%LOCALAPPDATA%\Plantoir\builds\<folder id>` while the
+app's own idea of that folder is under the state directory (so
+`BuildFreshness` always says "build", harmlessly), and one that SCHEDULED a
+deploy would register a REAL Task Scheduler task whose sentinels land in the
+real pending folder. **No test schedules a deploy.** `plantoir-mcp.exe`
+resolves its own paths too.
 
-**One launcher IS run from a test now**, and the reasons that is safe are
-narrower than they look. `NewCourseWizardUiTests` presses the wizard's Create
-button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
+**Previewing and publishing from a test ARE done, since bundle 11
+(2026-10-01).** Until then this paragraph said neither was, and that a test
+which drove Preview "would NOT be safe". Russell lifted that rule — "I don't
+care if you have real build folders. We need to test this. End to end." —
+because course import, reference courses, Copy a Page, preview and publishing
+had never been proven through the window, and this PC holds no teacher's real
+work. What remains is hygiene, and it is `DrivenApp.Dispose`'s job, so it runs
+when a test fails as well: see "Driving the real interface" → "A test that
+runs a launcher".
+
+**`setup.ps1` was the first launcher run from a test**, and the reasons it
+was safe even before that ruling are narrower than they look.
+`NewCourseWizardUiTests` presses the wizard's Create button, which runs
+`setup.ps1`. **Two guards, neither enforced by anything:**
 
 1. `setup.ps1` sets `PLANTOIR_BUILD_ROOT` to the real
    `%LOCALAPPDATA%\Plantoir\builds\<id>` like every other launcher — but
@@ -501,8 +512,13 @@ button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
    the shared runtime.
 
 Checked rather than assumed, 2026-09-07: after a create there was no new folder
-under the real builds root and the real breadcrumb trail was untouched. Check
-both again before a test runs a different launcher.
+under the real builds root and the real breadcrumb trail was untouched. The
+preview and deploy launchers DO make a folder under the real builds root (it is
+deleted afterwards, see below), and they write to the REAL trail
+(`%LOCALAPPDATA%\Plantoir\Logs\activity.txt`) only on their refusals — "the
+preview stopped before building…", "every address … was taken" — which no
+end-to-end test provokes; bundle 11 measured the trail's size before and after
+its runs (the ready note has the numbers).
 
 Two things about it are worth more than the flag itself.
 
@@ -814,6 +830,42 @@ caught by the same match because `setup.ps1` runs it as `python.exe -u
 <workspace>\.toolchain\scripts\setup_course.py` — the script path is inside
 the temporary folder, so it is on the command line even though the folder is
 otherwise only python's working directory.
+
+### A test that runs a launcher (bundle 11, 2026-10-01)
+
+Until bundle 11 the suite drove no Preview and no Deploy, so course import,
+courses kept for reference, Copy a Page, preview and publishing had never been
+proven through the window. Russell lifted the rule against it — "I don't care
+if you have real build folders. We need to test this. End to end." — and five
+classes now run the real launchers:
+
+| Class | What it drives | What it reads back |
+|---|---|---|
+| `WizardToPreviewUiTests` | the wizard's Create, a line added to the front page, Preview, Stop | the SERVED front page over HTTP (the marker line), the window's own web view text, the build in the real builds root, the address going quiet after Stop |
+| `ImportForReferenceUiTests` | File › Import Courses for Reference…, the Windows folder picker, the sheet, Import; the open folder and an empty folder | the done screen's contract sentences, the row under Reference Courses › 2025–26, the copied config's marker and year, the page LOCKED on disk, `.merged_output` left behind, the source untouched |
+| `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
+| `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
+| `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+
+**What a test that runs a launcher owes, and where it is done.** The launchers
+build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
+working folder>` (`DrivenApp.RealBuildsRoot`) whatever `--state-dir` says. So
+`DrivenApp.Dispose` — which runs when a test FAILS too — after killing the app:
+runs `preview.ps1 CODE N --stop` for every section the test declared with
+`WillServe` (the launcher's own sweep, by the directories the build and serve
+work in); ends any process whose command line still names the run's
+temporary folder or that builds folder (a deploy's launcher, its python);
+deletes that builds folder; and unlocks the working folder's courses so a
+reference course the app locked can be deleted with it. (Before bundle 11 the
+reference tests' temporary folders outlived their runs for exactly that
+reason.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
+launchers would build under the state folder — it would have stopped the
+tests exercising the real path the ruling asked for, and node and npm resolve
+caches from the same variable.
+
+**Still never done from a test:** scheduling a deploy (it registers a REAL
+Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
+real globally unique site — `verify-deploy.ps1` owns those).
 
 ### Never start the app with its output redirected
 
@@ -2797,8 +2849,10 @@ The fix is structural, and two notes rather than one:
 right all along; only the folder-keyed sweep beside it had to change.
 
 **It is gated by a source scan, and the shape of the scan matters.** No
-`SectionDetailView` mounts in a unit test, and CLAUDE.md forbids a `[UiFact]`
-that drives Preview, so `SectionDetailTeardownSourceTests` reads the file and
+`SectionDetailView` mounts in a unit test, and when this was written CLAUDE.md
+forbade a `[UiFact]` that drives Preview (lifted in bundle 11, 2026-10-01; a
+UI test still does not switch a window's working folder under a running preview,
+which is what this guards), so `SectionDetailTeardownSourceTests` reads the file and
 asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
