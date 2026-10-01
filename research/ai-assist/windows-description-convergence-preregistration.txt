@@ -78,3 +78,16 @@ PASS CRITERIA (bundle 9 ruling P2 binds, and is stricter than #352's per-tool ve
   If all hold: Windows' served descriptions become the contract text for
   every shared tool except publish_pages and unpublish_pages; NarrowToLocal
   stops calling Briefly(); narrow-tools.py and NarrowToolsMirrorTests follow.
+
+NOTE ADDED 2026-10-01 08:13 EDT (bundle 9 fix round, review finding F4; director's ruling).
+Appended, not edited in place. Written BEFORE any result of this measurement
+was read: the runs started 07:46 and no suite output had been opened when this
+was written (only the server log's request count and per-request timing were
+looked at, to estimate duration; no routing outcome was seen).
+  - The heading's claim that ruling P2 is "stricter than #352's per-tool veto"
+    is withdrawn as written: criterion (a) as registered was WEAKER than P2.
+    P2 binds: ANY polarity inversion in the AFTER arm blocks the move, whether
+    or not the BEFORE arm has it too.
+  - Criterion (c)'s "5 points" means PERCENTAGE POINTS of probes passed (the
+    suite's model-seen total as a percentage of its trials), not trials.
+  - (b) and (d) are unchanged.
