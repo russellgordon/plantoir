@@ -258,6 +258,19 @@ public static class ActivityTrail
         /// </summary>
         ScheduledDeployTurnedOff,
         /// <summary>
+        /// A new scheduled deploy replaced one already set for the section
+        /// (#261). Carries course, section, the old moment and the new one —
+        /// written where the task is written, from a reading taken before the
+        /// old one was removed, and only once the new one was accepted.
+        /// </summary>
+        ScheduledDeployReplaced,
+        /// <summary>
+        /// A scheduled deploy could not be set (#261). Carries course, section,
+        /// the moment asked for and, when one was already set, whether it
+        /// still stands.
+        /// </summary>
+        ScheduledDeployCouldNotBeSet,
+        /// <summary>
         /// A publish set for later read the course's settings when it ran
         /// (#347, mac #323) and found them different from what the teacher was
         /// told, or stood down over them. Written only when something differs.
@@ -366,6 +379,8 @@ public static class ActivityTrail
         Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
         Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
+        Event.ScheduledDeployReplaced => "scheduled deploy replaced",
+        Event.ScheduledDeployCouldNotBeSet => "scheduled deploy could not be set",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
         Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
         Event.DeployUsedTheSavedSettings => "deploy used the saved settings",

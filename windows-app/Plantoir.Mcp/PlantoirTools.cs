@@ -388,6 +388,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // deploy RUNS now (#347), from the course's settings and the app's
             // own; what is written here is only what the teacher was told.
             var scheduledCourse = workspace.Course(plan.CourseCode);
+            DateTime? replaced = TaskScheduling.MomentItWouldReplace(
+                workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment, DateTime.Now);
             if (TaskScheduling.Schedule(workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment,
                                         scheduledCourse.Configuration.AllDeployDestinations) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
@@ -396,7 +398,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // teacher agreed to, before this ran. Repeating it afterwards is
             // the assistant explaining itself to somebody who just read it.
             string summary = $"Scheduled: {plan.CourseCode} Section {plan.SectionNumber} deploys to " +
-                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}.";
+                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}." +
+                             (replaced is { } was ? " " + AssistWording.ScheduleReplaces($"{was:dddd d MMMM, h:mm tt}") : "");
             return Answering(summary, summary + "\n\n" +
                              "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
                              "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");

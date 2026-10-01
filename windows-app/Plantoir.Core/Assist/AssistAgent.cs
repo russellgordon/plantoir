@@ -622,6 +622,14 @@ public sealed class AssistAgent
     /// </summary>
     public Action<string>? OnConversationBackup { get; set; }
 
+    /// <summary>
+    /// Given the moment a scheduled card asks for, when the deploy it would
+    /// REPLACE is set for — or null when there is none to mention (#261).
+    /// The window answers it from <c>TaskScheduling.MomentItWouldReplace</c>,
+    /// which reads by task name across the whole computer.
+    /// </summary>
+    public Func<DateTime, DateTime?>? ScheduleDeployItWouldReplace { get; set; }
+
     /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
     public Func<string>? DestinationProvider { get; set; }
 
@@ -955,9 +963,15 @@ public sealed class AssistAgent
             ? parsed.ToString("dddd d MMMM, h:mm tt")
             : when;
         string destination = DestinationProvider?.Invoke() ?? "the web";
+        // #261: scheduling a section that already has one REPLACES it, and
+        // until now nothing said so before or after.
+        string replaces = ScheduleDeployItWouldReplace?.Invoke(ScheduledDeploy.ReadTheMoment(when) ?? DateTime.MinValue)
+            is { } was
+            ? " " + AssistWording.ScheduleReplaces(was.ToString("dddd d MMMM, h:mm tt"))
+            : "";
         return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
                "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
-               "Plantoir cannot wake it up.";
+               "Plantoir cannot wake it up." + replaces;
     }
 
     /// <summary>A tool call's arguments, which arrive as a JSON string.</summary>
