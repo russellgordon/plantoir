@@ -13,6 +13,19 @@ public static class ActivityTrail
         Helpers,
         WorkingFolderOpened,
         SettingsSaved,
+
+        /// <summary>
+        /// Course Settings held Save back because the unsaved edit moves where
+        /// the course publishes to a destination with a problem (#387, mac
+        /// #373). Carries the course and which check; once per visit.
+        /// </summary>
+        SettingsSaveHeldBack,
+
+        /// <summary>Show on Front Page rewrote the section's class line (#406, mac #397). File names only.</summary>
+        PutTodaysClassOnTheFrontPage,
+
+        /// <summary>The question was answered and the front page was NOT changed — which answer, and why (#406).</summary>
+        LeftTheFrontPageAsItWas,
         SettingsCouldNotBeSaved,
         TaskStarted,
         TaskFinished,
@@ -518,6 +531,9 @@ public static class ActivityTrail
         Event.Helpers => "helpers described",
         Event.WorkingFolderOpened => "working folder opened",
         Event.SettingsSaved => "settings saved",
+        Event.SettingsSaveHeldBack => "settings save held back",
+        Event.PutTodaysClassOnTheFrontPage => "put today's class on the front page",
+        Event.LeftTheFrontPageAsItWas => "left the front page as it was",
         Event.SettingsCouldNotBeSaved => "settings could not be saved",
         Event.TaskStarted => "task started",
         Event.TaskFinished => "task finished",

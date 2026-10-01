@@ -23,8 +23,17 @@ public class ClassPlanningContractTests
             // made before 2026-09-01 says. Read with a default rather than
             // treated as a new shape, or every pre-existing case breaks.
             string? term = c["term"]?.ToString();
+            var naming = NamingOf(c, "term");
 
-            var parsed = UnitDay.Parse(title, term);
+            if (naming.IsNumbered)
+            {
+                // A runner asserts the NUMBER, never a unit (#274).
+                int? expectNumber = c["expectNumber"]?.GetValue<int>();
+                Assert.Equal(expectNumber, naming.Parse(title)?.Day);
+                continue;
+            }
+
+            var parsed = naming.Parse(title);
             if (expectUnit is null)
             {
                 Assert.Null(parsed);
@@ -48,7 +57,51 @@ public class ClassPlanningContractTests
 
         var actual = NextClassPlanner.NumberedClasses(input);
         Assert.Equal(expected, actual);
+
+        var scheme = numberedOrder["numberedScheme"]!;
+        var naming = NamingOf(scheme, "word");
+        Assert.True(naming.IsNumbered);
+        Assert.Equal(scheme["expectOrder"]!.AsArray().Select(x => x!.ToString()).ToList(),
+                     NextClassPlanner.NumberedClasses(scheme["input"]!.AsArray().Select(x => x!.ToString()), naming));
     }
+
+    /// <summary>The course's naming a case describes: <c>scheme</c> plus its word key.</summary>
+    internal static ClassPageNaming NamingOf(JsonNode c, string wordKey) =>
+        new(c[wordKey]?.ToString(),
+            ClassPageSchemes.Reading(c["scheme"]?.ToString()));
+
+    /// <summary>A course_config.json for the scratch course, numbered when the case says so.</summary>
+    internal static string ConfigFor(ClassPageNaming naming) =>
+        naming.IsNumbered
+            ? $$"""
+              {
+                "course_code": "ICS3U",
+                "course_name": "Introduction to Computer Science",
+                "section_numbers": [1],
+                "num_sections": 1,
+                "per_section_folders": ["All Classes"],
+                "per_section_files": [],
+                "class_page_scheme": "numbered",
+                "unit_word": "{{naming.Word}}",
+                "class_noun": "meeting"
+              }
+              """
+            : """
+              {
+                "course_code": "ICS3U",
+                "course_name": "Introduction to Computer Science",
+                "section_numbers": [1],
+                "num_sections": 1,
+                "per_section_folders": ["All Classes"],
+                "per_section_files": []
+              }
+              """;
+
+    /// <summary>A page, with a <c>created</c> only when the case gives a date.</summary>
+    internal static string PageText(string title, string? date) =>
+        date is null
+            ? $"---\ntitle: {title}\npublish: true\n---\n\n{title}\n"
+            : $"---\ntitle: {title}\npublish: true\ncreated: {date}T07:00:00.000-0400\n---\n\n{title}\n";
 
     [Fact]
     public void NextClass_MatchesContract()
@@ -59,14 +112,54 @@ public class ClassPlanningContractTests
         foreach (var c in cases)
         {
             if (c is null) continue;
-            var existing = c["existing"]!.AsArray().Select(x => x!.ToString()).ToList();
-            int expectUnit = c["expectUnit"]!.GetValue<int>();
-            int expectDay = c["expectDay"]!.GetValue<int>();
+            var naming = NamingOf(c, "word");
 
-            var next = NextClassPlanner.NextUnitAndDay(existing);
-            Assert.Equal(expectUnit, next.Unit);
-            Assert.Equal(expectDay, next.Day);
+            if (c["existingClasses"] is JsonArray dated)
+            {
+                // The DATED form: through the real planner, title AND date.
+                string folder = Directory.CreateTempSubdirectory("contract-next").FullName;
+                try
+                {
+                    var workspace = ScratchCourse(folder, naming, dated,
+                        c["timetable"]!.AsArray().Select(x => DateOnly.Parse(x!.ToString())).ToList());
+                    var plan = workspace.PlanAddNextClass("ICS3U", 1);
+                    Assert.Equal(naming.Title(1, c["expectNumber"]!.GetValue<int>()), plan.Classes.Single().Title);
+                    Assert.Equal(DateOnly.Parse(c["expectDate"]!.ToString()), plan.Classes.Single().Date);
+                }
+                finally { try { Directory.Delete(folder, recursive: true); } catch { } }
+                continue;
+            }
+
+            var existing = c["existing"]!.AsArray().Select(x => x!.ToString()).ToList();
+            var next = NextClassPlanner.NextUnitAndDay(existing, naming);
+            if (naming.IsNumbered)
+            {
+                Assert.Equal(c["expectNumber"]!.GetValue<int>(), next.Day);
+                continue;
+            }
+            Assert.Equal(c["expectUnit"]!.GetValue<int>(), next.Unit);
+            Assert.Equal(c["expectDay"]!.GetValue<int>(), next.Day);
         }
+    }
+
+    /// <summary>A scratch working folder holding ICS3U Section 1 with these classes and this timetable.</summary>
+    internal static AssistWorkspace ScratchCourse(string folder, ClassPageNaming naming, JsonArray existingClasses,
+                                                  IReadOnlyList<DateOnly>? timetable)
+    {
+        File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
+        string courseDir = Path.Combine(folder, "courses", "ICS3U");
+        string classesDir = Path.Combine(courseDir, "section1", "All Classes");
+        Directory.CreateDirectory(classesDir);
+        File.WriteAllText(Path.Combine(courseDir, "course_config.json"), ConfigFor(naming));
+        if (timetable is not null)
+            TimetableMemory.Write(folder, "ICS3U", 1, timetable.ToList(), "contract test", new DateOnly(2026, 9, 1));
+        foreach (var ex in existingClasses)
+        {
+            string title = ex!["title"]!.ToString();
+            File.WriteAllText(Path.Combine(classesDir, title + ".md"), PageText(title, ex["date"]?.ToString()));
+        }
+        return new AssistWorkspace(folder, new FakeLauncher());
     }
 
     [Fact]
@@ -106,8 +199,10 @@ public class ClassPlanningContractTests
         {
             if (c is null) continue;
             string name = c["name"]!.ToString();
-            int unit = c["insertAtUnit"]!.GetValue<int>();
-            int day = c["insertAtDay"]!.GetValue<int>();
+            var naming = NamingOf(c, "word");
+            // A numbered case names ONE number; this planner holds it as unit 1.
+            int unit = naming.IsNumbered ? 1 : c["insertAtUnit"]!.GetValue<int>();
+            int day = naming.IsNumbered ? c["insertAtNumber"]!.GetValue<int>() : c["insertAtDay"]!.GetValue<int>();
             int count = c["count"]!.GetValue<int>();
             var timetable = c["timetable"]!.AsArray().Select(x => DateOnly.Parse(x!.ToString())).ToList();
             var expectRenames = c["expectRenamesInOrder"]!.AsArray().Select(x => x!.ToString()).ToList();
@@ -115,41 +210,29 @@ public class ClassPlanningContractTests
             string folder = Directory.CreateTempSubdirectory("contract-insert").FullName;
             try
             {
-                File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
-                File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
-                string courseDir = Path.Combine(folder, "courses", "ICS3U");
-                string classesDir = Path.Combine(courseDir, "section1", "All Classes");
-                Directory.CreateDirectory(classesDir);
-
-                string configJson = """
-                {
-                  "course_code": "ICS3U",
-                  "course_name": "Introduction to Computer Science",
-                  "section_numbers": [1],
-                  "num_sections": 1,
-                  "per_section_folders": ["All Classes"],
-                  "per_section_files": []
-                }
-                """;
-                File.WriteAllText(Path.Combine(courseDir, "course_config.json"), configJson);
-
-                TimetableMemory.Write(folder, "ICS3U", 1, timetable, "contract test", new DateOnly(2026, 9, 1));
-
-                var existingClasses = c["existingClasses"]!.AsArray();
-                foreach (var ex in existingClasses)
-                {
-                    string title = ex!["title"]!.ToString();
-                    string date = ex["date"]!.ToString();
-                    File.WriteAllText(
-                        Path.Combine(classesDir, title + ".md"),
-                        $"---\ntitle: {title}\npublish: true\ncreated: {date}T07:00:00.000-0400\n---\n\n{title}\n");
-                }
-
-                var workspace = new AssistWorkspace(folder, new FakeLauncher());
+                var workspace = ScratchCourse(folder, naming, c["existingClasses"]!.AsArray(), timetable);
                 var plan = workspace.PlanInsertClasses("ICS3U", 1, unit, day, count);
 
                 var actualRenames = plan.Renames.Select(r => $"{r.From} → {r.To}").ToList();
                 Assert.Equal(expectRenames, actualRenames);
+
+                if (c["expectAddedOn"] is JsonObject addedOn)
+                    foreach (var (title, date) in addedOn)
+                        Assert.Equal(DateOnly.Parse(date!.ToString()), plan.Added.Single(a => a.Title == title).Date);
+
+                if (c["expectMovedTo"] is JsonObject movedTo)
+                    foreach (var (title, date) in movedTo)
+                        Assert.True(plan.Moves.Any(m => m.Title == title && m.To == DateOnly.Parse(date!.ToString())),
+                            $"“{name}”: {title} should move to {date}; moves were " +
+                            string.Join(", ", plan.Moves.Select(m => $"{m.Title} → {DateText.Iso(m.To)}")));
+
+                if (c["expectNotMoved"] is JsonArray notMoved)
+                    foreach (var title in notMoved)
+                        Assert.DoesNotContain(plan.Moves, m => m.Title == title!.ToString());
+
+                if (c["expectNoMoves"]?.GetValue<bool>() == true)
+                    Assert.True(plan.Moves.Count == 0, $"“{name}”: expected no moves, got " +
+                        string.Join(", ", plan.Moves.Select(m => $"{m.Title} → {DateText.Iso(m.To)}")));
 
                 if (c["expectDateMoves"] is JsonArray expectedDateMoves)
                 {
@@ -201,34 +284,8 @@ public class ClassPlanningContractTests
             string folder = Directory.CreateTempSubdirectory("contract-duplicate").FullName;
             try
             {
-                File.WriteAllText(Path.Combine(folder, "preview.ps1"), "# marker");
-                File.WriteAllText(Path.Combine(folder, "deploy.ps1"), "# marker");
-                string courseDir = Path.Combine(folder, "courses", "ICS3U");
-                string classesDir = Path.Combine(courseDir, "section1", "All Classes");
-                Directory.CreateDirectory(classesDir);
-                File.WriteAllText(Path.Combine(courseDir, "course_config.json"),
-                    """
-                    {
-                      "course_code": "ICS3U",
-                      "course_name": "Introduction to Computer Science",
-                      "section_numbers": [1],
-                      "num_sections": 1,
-                      "per_section_folders": ["All Classes"],
-                      "per_section_files": []
-                    }
-                    """);
-
-                TimetableMemory.Write(folder, "ICS3U", 1, timetable, "contract test", new DateOnly(2026, 9, 1));
-
-                foreach (var existing in c["existingClasses"]!.AsArray())
-                {
-                    string title = existing!["title"]!.ToString();
-                    File.WriteAllText(Path.Combine(classesDir, title + ".md"),
-                        $"---\ntitle: {title}\npublish: true\n" +
-                        $"created: {existing["date"]}T07:00:00.000-0400\n---\n\n{title}\n");
-                }
-
-                var workspace = new AssistWorkspace(folder, new FakeLauncher());
+                string classesDir = Path.Combine(folder, "courses", "ICS3U", "section1", "All Classes");
+                var workspace = ScratchCourse(folder, NamingOf(c, "word"), c["existingClasses"]!.AsArray(), timetable);
                 var plan = workspace.PlanDuplicateClass("ICS3U", 1, c["duplicate"]!.ToString());
 
                 Assert.Equal(c["expectNewTitle"]!.ToString(), plan.NewTitle);
@@ -236,6 +293,9 @@ public class ClassPlanningContractTests
                 Assert.Equal(expectRenames, plan.Insertion.Renames.Select(r => $"{r.From} → {r.To}").ToList());
 
                 bool undoOffered = c["expectUndoOffered"]!.GetValue<bool>();
+                // undoRule.planWarns (#185 / #346): on the card exactly when the undo is withheld.
+                Assert.True(undoOffered != plan.Describe().Contains(AssistWording.MakingRoomCannotBeUndone),
+                    $"“{name}”: the plan's undo warning disagrees with expectUndoOffered {undoOffered}.");
                 Assert.True(undoOffered != plan.MovesOtherClasses,
                     $"“{name}”: the contract says undo is " + (undoOffered ? "offered" : "withheld")
                     + $" and this app would {(plan.MovesOtherClasses ? "withhold" : "offer")} it — "
@@ -293,6 +353,7 @@ public class ClassPlanningContractTests
             foreach (var c in cases)
             {
                 if (c is null) continue;
+                if (c["scheme"] is not null) continue;   // the numbered cases run below, in a club
                 int unit = c["insertAtUnit"]!.GetValue<int>();
                 int day = c["insertAtDay"]!.GetValue<int>();
                 int count = c["count"]!.GetValue<int>();
@@ -304,6 +365,136 @@ public class ClassPlanningContractTests
         {
             try { Directory.Delete(folder, recursive: true); } catch { }
         }
+    }
+
+    /// <summary>
+    /// The numbered refusals (#274): numbers start at 1, and a numbered course
+    /// refuses "start a new unit" and "add days to Unit 1" with
+    /// <c>noUnitsInANumberedCourse</c> BEFORE the dates are asked for — so the
+    /// scratch club has NO timetable, and the refusal must still be that one.
+    /// </summary>
+    [Fact]
+    public void Refusals_InANumberedCourse_MatchContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        var cases = doc["refusals"]!["cases"]!.AsArray().Where(c => c?["scheme"] is not null).ToList();
+        Assert.Equal(3, cases.Count);
+
+        foreach (var c in cases)
+        {
+            string folder = Directory.CreateTempSubdirectory("contract-refuse-numbered").FullName;
+            try
+            {
+                var naming = NamingOf(c!, "word");
+                var week1 = new JsonArray(new JsonObject { ["title"] = naming.Title(1, 1), ["date"] = "2026-09-08" });
+                string expected = c!["expectProblem"]!.ToString();
+                var workspace = ScratchCourse(folder, naming, week1,
+                    expected == "noUnitsInANumberedCourse" ? null : new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 10) });
+
+                AssistRefusal refusal = c["startANewUnit"]?.GetValue<bool>() == true
+                    ? Assert.Throws<AssistRefusal>(() => workspace.PlanAddNextClass("ICS3U", 1, "next"))
+                    : c["addDaysToUnit"] is { } toUnit
+                        ? Assert.Throws<AssistRefusal>(() => workspace.PlanAddNextClass(
+                            "ICS3U", 1, toUnit.ToString(), c["count"]!.GetValue<int>()))
+                        : Assert.Throws<AssistRefusal>(() => workspace.PlanInsertClasses(
+                            "ICS3U", 1, 1, c["insertAtNumber"]!.GetValue<int>(), c["count"]!.GetValue<int>()));
+
+                if (expected == "noUnitsInANumberedCourse")
+                    Assert.Equal(NextClassPlanner.NoUnitsInANumberedCourse("ICS3U", naming.Word), refusal.Message);
+            }
+            finally { try { Directory.Delete(folder, recursive: true); } catch { } }
+        }
+    }
+
+    /// <summary>
+    /// <c>wholeUnit</c> (#274): which request names a WHOLE unit. The critical
+    /// case is "Week 1" in a numbered course → null, or "publish Week 1"
+    /// publishes every meeting.
+    /// </summary>
+    [Fact]
+    public void WholeUnit_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        var cases = doc["wholeUnit"]!["cases"]!.AsArray();
+        Assert.Equal(8, cases.Count);
+        foreach (var c in cases)
+        {
+            var naming = NamingOf(c!, "term");
+            int? expect = c!["expectUnit"]?.GetValue<int>();
+            Assert.True(expect == PublishPlan.UnitNamed(c["title"]!.ToString(), naming),
+                $"wholeUnit “{c["title"]}” ({naming.Scheme}, {naming.Word}): expected {expect?.ToString() ?? "null"}.");
+        }
+    }
+
+    /// <summary><c>insertion.numberedPosition</c>: the frozen unit/atDay read into one number.</summary>
+    [Fact]
+    public void NumberedPosition_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        foreach (var c in doc["insertion"]!["numberedPosition"]!["cases"]!.AsArray())
+        {
+            int? unit = c!["unit"]?.GetValue<int>();
+            int? atDay = c["atDay"]?.GetValue<int>();
+            Assert.Equal(c["expect"]?.GetValue<int>(), AssistWorkspace.NumberedPosition(unit, atDay));
+        }
+    }
+
+    /// <summary>
+    /// <c>insertion.positionInSentences</c> (#268): the make-room plan and reply
+    /// name the position the way the course names a page, through the real
+    /// plan's <c>PositionTitle</c> and the two sentences built from it.
+    /// </summary>
+    [Fact]
+    public void PositionInSentences_MatchesContract()
+    {
+        var doc = ContractLoader.LoadJson("class-planning.json");
+        foreach (var c in doc["insertion"]!["positionInSentences"]!["cases"]!.AsArray())
+        {
+            var naming = NamingOf(c!, "term");
+            var plan = new InsertPlan
+            {
+                CourseCode = "ICS3U", SectionNumber = 1, Naming = naming,
+                Unit = c!["unit"]!.GetValue<int>(), AtDay = c["atDay"]!.GetValue<int>(),
+                Added = new[] { new NewClass("x", "x.md", new DateOnly(2026, 9, 8), 1) },
+                Renames = Array.Empty<Rename>(), Moves = Array.Empty<DateMove>(), LinksToRewrite = 0,
+                Problems = Array.Empty<string>(),
+            };
+            string position = c["position"]!.ToString();
+            Assert.Equal(position, plan.PositionTitle);
+            Assert.Contains($" at {position} in ICS3U Section 1.", plan.Describe());
+            Assert.Contains($" at {position}.", AssistWording.MadeRoom(1, plan.PositionTitle));
+        }
+    }
+
+    /// <summary>
+    /// <c>sectionIndexPointer.cases</c> (#274 item 8, #406): which line of a
+    /// front page is repointed, found by the CLASS PAGE it names and written in
+    /// the form the teacher wrote (<c>writtenAs</c>). <c>expectBodyOnWindows</c>
+    /// wins where present (this app inserts under the course's heading when no
+    /// line transcludes a class); <c>null</c> means the page is left as it is.
+    /// </summary>
+    [Fact]
+    public void TheFrontPageIsRepointedAsTheContractSays()
+    {
+        var cases = ContractLoader.LoadJson("class-planning.json")["sectionIndexPointer"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 27, $"sectionIndexPointer.cases lost cases: {cases.Count}");
+        var failures = new List<string>();
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            string body = c["indexBody"]!.ToString();
+            string pointAt = c["pointAt"]!.ToString();
+            var pointer = new SectionIndex.Pointer(
+                c["classTitles"]!.AsArray().Select(t => t!.ToString()).ToList(), pointAt,
+                c["pointAtPath"]?.ToString() ?? $"section1/All Classes/{pointAt}.md",
+                c["frontPageHeading"]?.ToString());
+            JsonNode? expectNode = c.AsObject().ContainsKey("expectBodyOnWindows") ? c["expectBodyOnWindows"] : c["expectBody"];
+            string? expect = expectNode?.ToString();
+            string? actual = SectionIndex.Repointed(body, pointer);
+            if (actual != expect)
+                failures.Add($"{name}:\n  expected {(expect is null ? "unchanged" : System.Text.Json.JsonSerializer.Serialize(expect))}\n  got      {(actual is null ? "unchanged" : System.Text.Json.JsonSerializer.Serialize(actual))}");
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
     }
 
     [Fact]

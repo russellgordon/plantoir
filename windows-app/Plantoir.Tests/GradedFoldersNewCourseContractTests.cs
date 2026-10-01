@@ -77,8 +77,6 @@ public class GradedFoldersNewCourseContractTests
     {
         bool taken = c["exampleContent"]?.ToString() == "taken";
         bool club = c["club"]?.GetValue<bool>() ?? false;
-        if (club)
-            return new List<string> { "not runnable here yet: this app has no clubs" };
         bool startsFromSkeleton = c["startsFromSkeleton"]?.GetValue<bool>() ?? true;
         List<string>? wizardPool = c["wizardGradedFolders"]?.AsArray().Select(n => n!.ToString()).ToList();
 
@@ -98,8 +96,8 @@ public class GradedFoldersNewCourseContractTests
             // from (#250), so a DECLINED payload is run too, not only a taken one.
             var keys = NewCourseAnswers.Decide(ExampleContentRoot,
                 Path.Combine(ContractLoader.RepositoryRoot, "support", "skeletons"),
-                new NewCourseAnswers.Choices(code, taken, startsFromSkeleton, true,
-                    WizardStructure.Defaults(false) with { GradedFolders = wizardPool })).Keys;
+                NewCourseAnswers.ForAClub(new NewCourseAnswers.Choices(code, taken, startsFromSkeleton, true,
+                    WizardStructure.Defaults(false) with { GradedFolders = wizardPool }), club)).Keys;
             if (keys["graded_folders"] is not JArray written) { problems.Add($"{code}: no graded_folders would be written"); continue; }
             var pool = written.Select(t => t.ToString()).ToList();
 

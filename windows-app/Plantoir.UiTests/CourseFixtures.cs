@@ -50,6 +50,27 @@ public static class CourseFixtures
         });
     }
 
+    /// <summary>A club made since #267 (#274): numbered "Week" pages in "All Meetings".</summary>
+    public const string Club = "CODING";
+
+    /// <summary>The two courses above plus a club that RECORDED all three locked settings.</summary>
+    public static void WriteBothAndAClub(string coursesDir)
+    {
+        WriteBoth(coursesDir);
+        Write(coursesDir, Club, new JsonObject
+        {
+            ["course_code"] = Club,
+            ["course_name"] = "Coding Club",
+            ["shared_folders"] = new JsonArray("Concepts"),
+            ["per_section_folders"] = new JsonArray("All Meetings"),
+            ["class_folder"] = "All Meetings",
+            ["unit_word"] = "Week",
+            ["class_page_scheme"] = "numbered",
+            ["front_page_heading"] = "Most Recent Meeting",
+            ["class_noun"] = "meeting",
+        });
+    }
+
     private static void Write(string coursesDir, string code, JsonObject config)
     {
         config["num_sections"] = 1;

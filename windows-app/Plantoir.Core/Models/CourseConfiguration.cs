@@ -295,6 +295,13 @@ public sealed class CourseConfiguration
 
     public JObject Values => _values;
 
+    /// <summary>The settings as this copy last read or wrote them, or null when unknown.</summary>
+    public JObject? LastReadOrWritten()
+    {
+        try { return _lastSavedData.Length == 0 ? null : ParseObject(_lastSavedData); }
+        catch { return null; }
+    }
+
     // ---- Flat keys ------------------------------------------------------
 
     public string CourseCode => StringValue("course_code");
@@ -718,6 +725,45 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// The raw <c>class_page_scheme</c> (#274, mac #267), or null when absent.
+    /// Written by the wizard for a CLUB only and never switchable afterwards.
+    /// </summary>
+    public string? ClassPageSchemeRaw
+    {
+        get => _values["class_page_scheme"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_page_scheme"); else _values["class_page_scheme"] = value; }
+    }
+
+    /// <summary>
+    /// The heading a section's front page was CREATED with, or null when the
+    /// course never recorded one. Read only at creation and by the front-page
+    /// pointer's insert fallback; never shown as "Most Recent Class" for a
+    /// course that did not record it (<c>settingsRows.shownWhen</c>, #376).
+    /// </summary>
+    public string? FrontPageHeading
+    {
+        get => _values["front_page_heading"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("front_page_heading"); else _values["front_page_heading"] = value; }
+    }
+
+    /// <summary>The raw <c>class_noun</c>, or null when absent.</summary>
+    public string? ClassNounRaw
+    {
+        get => _values["class_noun"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_noun"); else _values["class_noun"] = value; }
+    }
+
+    /// <summary>What the assistant calls a class page to THIS course's teacher.</summary>
+    public ClassNoun ClassNoun => ClassPageSchemes.NounReading(ClassNounRaw);
+
+    /// <summary>
+    /// How this course names its class pages — word and scheme together. Every
+    /// path that parses or WRITES a class-page title reads this, never the
+    /// word alone (<see cref="ClassPageNaming"/>).
+    /// </summary>
+    public ClassPageNaming Naming => new(UnitWord, ClassPageSchemes.Reading(ClassPageSchemeRaw));
+
+    /// <summary>
     /// The folder this app protects as the curriculum folder, or null.
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>
@@ -1037,8 +1083,16 @@ public sealed class CourseConfiguration
 
     public void SetShowsGradeInTitle(int section, bool value)
     {
-        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean })
+        // The legacy course-wide Bool is replaced by the per-section map
+        // SEEDED with it for every section (#387, mac #373 perSectionEditCases):
+        // an EMPTY map let section 1 silently read the default, true, so
+        // toggling section 2 turned section 1's grade back on.
+        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["show_grade_in_title"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("show_grade_in_title", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("show_grade_in_title", "sections", SectionKey(section), value);
     }
 
@@ -1051,8 +1105,14 @@ public sealed class CourseConfiguration
 
     public void SetIncludesCurriculumCoverage(int section, bool value)
     {
-        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean })
+        // Seeded with the legacy value for every section, for the reason
+        // SetShowsGradeInTitle gives.
+        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["include_curriculum_coverage"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("include_curriculum_coverage", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("include_curriculum_coverage", "sections", SectionKey(section), value);
         if (!value)
         {

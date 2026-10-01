@@ -143,6 +143,50 @@ public class FollowingLinksContractTests : IDisposable
                 Assert.Equal(date!.ToString(), DateOf(File.ReadAllText(written[title])));
     }
 
+    // ---- class-planning.json → datingPagesAClassBrings.publishedBeforeIsRecorded (#392)
+
+    public static IEnumerable<object[]> PublishedBeforeCases() =>
+        ContractLoader.LoadJson("class-planning.json")!["datingPagesAClassBrings"]!["publishedBeforeIsRecorded"]!["cases"]!
+            .AsArray().Select(c => new object[] { c!["name"]!.ToString() });
+
+    /// <summary>
+    /// The reachStopsAtAClassPage shape plus <c>publishedBefore</c>, the pages
+    /// the section's published-pages record lists, run through the assistant's
+    /// publish — the half the mac asked Windows for.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(PublishedBeforeCases))]
+    public async Task PublishedBefore_MatchesContract(string name)
+    {
+        var c = ContractLoader.LoadJson("class-planning.json")!["datingPagesAClassBrings"]!["publishedBeforeIsRecorded"]!
+            ["cases"]!.AsArray().First(x => x!["name"]!.ToString() == name)!;
+        var pages = new JsonArray();
+        foreach (var cls in c["classes"]!.AsArray())
+            pages.Add(Page(cls!["title"]!.ToString(), true, false,
+                           cls["links"]!.AsArray().Select(l => l!.ToString()).ToArray(), cls["date"]!.ToString()));
+        foreach (var page in c["pages"]!.AsArray())
+            pages.Add(Page(page!["title"]!.ToString(), false, page["visible"]!.GetValue<bool>(),
+                           Array.Empty<string>(), page["date"]!.ToString()));
+        var written = Lay(pages);
+
+        string record = Path.Combine(_folder, "courses", Course, ".publish_state", "section1.published-pages");
+        Directory.CreateDirectory(record);
+        var places = new JsonArray(Titles(c, "publishedBefore").Select(t => (JsonNode)JsonValue.Create("section1/" + t)!).ToArray());
+        File.WriteAllText(Path.Combine(record, "20260201T070000Z-netlify.json"),
+            new JsonObject { ["version"] = "1", ["course"] = Course, ["section"] = 1, ["buildId"] = "b", ["places"] = places }.ToJsonString());
+
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+        string[] named = c["publish"]!.AsArray().Select(n => n!.ToString()).ToArray();
+        await tools.PublishPages(Course, 1, true, new Progress<ProgressNotificationValue>(_ => { }), default,
+                                 named, preview: false);
+
+        foreach (var title in Titles(c, "expectNoMove"))
+            Assert.Equal(DateOf(Bodies[title]), DateOf(File.ReadAllText(written[title])));
+        if (c["expectMoves"] is JsonObject moves)
+            foreach (var (title, date) in moves)
+                Assert.Equal(date!.ToString(), DateOf(File.ReadAllText(written[title])));
+    }
+
     // ---- The fixture ------------------------------------------------------
 
     private readonly Dictionary<string, string> Bodies = new();
