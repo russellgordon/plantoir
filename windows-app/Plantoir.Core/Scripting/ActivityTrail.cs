@@ -364,6 +364,15 @@ public static class ActivityTrail
         /// address the site answers at now — the address can change.
         /// </summary>
         CloudflareProjectMadeAgain,
+        /// <summary>
+        /// Copy a Page from This Course… finished (#247 / mac #207): ONE line at
+        /// the end of a copy, in every outcome — the course the pages came from
+        /// by folder name, the course and folder they landed in, the counts, and
+        /// the backup's file name. Never a page's title or a picture's name: on
+        /// disk a copied page looks exactly like one the teacher typed, and this
+        /// is the only answer to "where did this come from?".
+        /// </summary>
+        PagesCopiedFromAnotherCourse,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -440,6 +449,7 @@ public static class ActivityTrail
         Event.WordForAUnitRenamed => "word for a unit renamed",
         Event.PreviewDidNotAppear => "preview did not appear",
         Event.CloudflareProjectMadeAgain => "cloudflare project made again",
+        Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
