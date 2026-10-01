@@ -267,7 +267,20 @@ public sealed partial class SectionDetailView : UserControl
                     ReleaseTheHeldLinksFinding();
             }
         };
-        Preview.NavigationCompleted += (_, _) => RefreshChrome();
+        Preview.NavigationCompleted += (_, args) =>
+        {
+            // For a test run ONLY (--state-dir): what the preview pane actually
+            // loaded, readable through UI Automation, so the UI suite can tell
+            // the teacher's page from a blank one, an error page or another
+            // folder's port (bundle 11, V2). Never in a teacher's run: a screen
+            // reader would read an address aloud. On Open in Browser, not on the
+            // WebView2: the web view's automation peer hands its properties to
+            // Chromium, and an ItemStatus set on it was measured EMPTY.
+            if (AppDataRoot.IsRedirected)
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetItemStatus(BrowserButton,
+                    $"{(args.IsSuccess ? "loaded" : "failed")} {args.HttpStatusCode} {Preview.Source}");
+            RefreshChrome();
+        };
         _window.Activated += OnWindowActivated;
         // Anything last night's scheduled deploy found. It ran with the app
         // closed, so this is the first moment there is anywhere to say it.

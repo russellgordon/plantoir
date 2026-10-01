@@ -511,8 +511,8 @@ real `setup_course.py`, exit 0 with a full course scaffolded, using the same
 
 **Since bundle 11 (2026-10-01) through the real window, by `[UiFact]`s that run
 the real launchers** (opt-in, `run-ui-tests.ps1`): the wizard's Create then
-Preview, with the served front page read back over HTTP and from the web view
-and Stop silencing the address (`WizardToPreviewUiTests`); Import Courses for
+Preview, with the served front page read back over HTTP, the preview pane
+shown to have loaded that same address (status 200), and Stop silencing it (`WizardToPreviewUiTests`); Import Courses for
 Reference… through the Windows folder picker, the course shelved by year and
 locked on disk (`ImportForReferenceUiTests`); a course kept for reference —
 summary, no Deploy, pages locked, Keep a Copy and its refusal

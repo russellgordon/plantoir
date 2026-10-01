@@ -97,11 +97,8 @@ public class AllBackupsUiTests
             && group.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value != ExpandCollapseState.Expanded)
             group.Patterns.ExpandCollapse.Pattern.Expand();
         Assert.NotNull(app.FindOrNull("backup-" + Names[2], TimeSpan.FromSeconds(8)));
-        Assert.True(Retry.WhileTrue(
-            () => app.FindOrNull("backup-" + Names[0], TimeSpan.FromMilliseconds(200)) is not null
-                  || app.FindOrNull("backup-" + Names[1], TimeSpan.FromMilliseconds(200)) is not null,
-            TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(300)).Success,
-            "The two deleted backups are still listed in the sidebar.");
+        app.AssertAbsent("backup-" + Names[0], "the first deleted backup's sidebar row", TimeSpan.FromSeconds(15));
+        app.AssertAbsent("backup-" + Names[1], "the second deleted backup's sidebar row", TimeSpan.FromSeconds(15));
         Assert.NotNull(app.FindOrNull("backup-" + Names[2], TimeSpan.FromSeconds(3)));
     }
 }

@@ -67,6 +67,6 @@ public class CourseSettingsSaveUiTests
 
         Assert.True(Retry.WhileFalse(() => app.Find("savedConfirmation", "the note beside Save").Name.StartsWith("Saved"),
                                      TimeSpan.FromSeconds(3)).Result);
-        Assert.Null(app.FindOrNull("previewAgainButton", TimeSpan.FromSeconds(1)));
+        app.AssertAbsent("previewAgainButton", "Preview Again", TimeSpan.FromSeconds(1));
     }
 }

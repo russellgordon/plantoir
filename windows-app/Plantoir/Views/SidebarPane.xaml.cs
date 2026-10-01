@@ -470,8 +470,8 @@ public sealed partial class SidebarPane : UserControl
 
     /// <summary>"Delete 2 Backups…" — the one button, carrying the count. With
     /// nothing selected it is greyed and says "Delete Backups…", never "Delete 0
-    /// Backups…", which offers to delete nothing (bundle 11, ruling U9; no shared
-    /// rule existed, so it is proposed to the mac in the bundle's draft).</summary>
+    /// Backups…", which offers to delete nothing — the mac's own wording
+    /// (<c>AllBackupsView.deleteButtonTitle</c>); bundle 11, rulings U9 and V4.</summary>
     internal static string DeleteBackupsLabel(int count) =>
         count == 0 ? "Delete Backups…" : count == 1 ? "Delete 1 Backup…" : $"Delete {count} Backups…";
 
