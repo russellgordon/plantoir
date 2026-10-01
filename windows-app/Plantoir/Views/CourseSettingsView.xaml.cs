@@ -995,14 +995,37 @@ public sealed partial class CourseSettingsView : UserControl
     {
         try
         {
+            // Where the course deployed BEFORE this Save, off disk (#347): a
+            // scheduled deploy goes where the course deploys when it RUNS, so a
+            // Save that moves or breaks one is said now, while somebody is awake.
+            IReadOnlyList<CourseConfiguration.DeployDestination> before;
+            try { before = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath)).AllDeployDestinations; }
+            catch { before = Config.AllDeployDestinations; }
+
             Config.Write(_course.ConfigFilePath);
             RefreshDirtyState();
             // The mac's wording, so the two trails read the same. Declared
             // when the trail was built and emitted by nobody until 2026-09-07.
             ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
                 "saved the settings for " + _course.Code);
-            SaveStatus.Text = "Saved ✓";
+
+            IReadOnlyList<string> aboutScheduled = Array.Empty<string>();
+            string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
+            if (workingFolder is not null)
+            {
+                try
+                {
+                    aboutScheduled = Plantoir.Core.Assist.ScheduledRun.WhatASaveSays(
+                        Plantoir.Core.Assist.ScheduledRun.StillToCome(workingFolder, _course.Code),
+                        new Course(_course.Code, _course.DirectoryPath, Config), before,
+                        AppSettings.Load().CloudflareAccountId);
+                }
+                catch { aboutScheduled = Array.Empty<string>(); }
+            }
+
+            SaveStatus.Text = aboutScheduled.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", aboutScheduled);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            if (aboutScheduled.Count > 0) return;   // a sentence about a scheduled deploy stays until the next Save
             await Task.Delay(3000);
             SaveStatus.Text = "";
         }

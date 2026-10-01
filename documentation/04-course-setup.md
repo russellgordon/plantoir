@@ -1594,7 +1594,9 @@ list of classes a scheduled deploy says students cannot see yet.
 `UnpublishedClassesIn`'s comment claimed it "walks the same folders
 `AssistWorkspace.ClassPages` walks", which was false between the two of them;
 a test now pins them together on one fixture, because a comment claiming
-agreement is exactly what stops anybody checking.
+agreement is exactly what stops anybody checking. (That pin went with
+`UnpublishedClassesIn` itself on 2026-09-30, when #400 took the unpublished
+list out of scheduling and left the helper with no caller.)
 
 **The path reached above the section.** `Relative()` is relative to the WORKING
 folder, so the segments handed to the rule still included `courses`, the course

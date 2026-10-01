@@ -234,6 +234,10 @@ problem — **nobody answers a question at 6 a.m.**
 
   It records **four outcomes**, not one: a question went unanswered, the BUILD
   asked a question, it did not finish for some other reason, and it WORKED.
+  (Eight since 2026-09-30, bundle 3: a build that failed outright is
+  `buildDidNotFinish`, naming no destination, and a run that stood down is
+  `tooLateToRun`, `courseWasBusy` or `couldNotRunAsSetNow` — the run is
+  Plantoir itself now; see 07-deployment → "On Windows since bundle 3".)
   The last is there for the same reason as the failures read backwards — a
   scheduled publish that leaves no trace cannot be told from one that never
   happened, so the trail could answer *"why did my site not update?"* and
@@ -922,8 +926,9 @@ as work happens:
   [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
   for what each door launches, what was measured and what was rejected.
 - **Window and state restoration**, archived courses, problem reporting, and
-  the `WorkLease` protocol that keeps two windows from building the same
-  section at once.
+  the `WorkLease` protocol that keeps two programs from building the same
+  course at once — since bundle 3 the mac's rules both ways, take-then-check
+  (09-mac-app → "On Windows since bundle 3 (#289)").
 - **What is built and what is missing.** Outstanding work is in [GitHub
   issues](https://github.com/russellgordon/plantoir/issues) labelled `windows`;
   the rest of this folder carries the reasoning behind past decisions.
@@ -2339,9 +2344,10 @@ and this piece had two of those:
   can decide its own line then.
 
 **What is deliberately left in the machine's culture**, so nobody "fixes"
-it: `TaskScheduling.Schedule` formats the date for `schtasks.exe` and walks
-`DateFormats` until it takes one, and `TaskScheduling.NextRun` parses the
-`Next Run Time:` row that Windows wrote in its own culture — that program
+it: `TaskScheduling.All` parses the `Next Run Time` column of `schtasks /Query
+/FO CSV` that Windows wrote in its own culture (since bundle 3 `Schedule`
+registers from XML with an invariant StartBoundary, so no date format is
+guessed any more) — that program
 accepts nothing else. `BackupItem.Subtitle` and `ArchivedItem.Subtitle` show
 a month by name to the teacher and say `CurrentCulture` out loud. Sentences
 of the shape `dddd d MMMM, h:mm tt` (no year) are read by a person in their

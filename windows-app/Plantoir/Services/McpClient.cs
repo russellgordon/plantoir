@@ -56,6 +56,10 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         };
         foreach (string argument in new[] { "--folder", workspacePath, "--course", courseCode })
             info.ArgumentList.Add(argument);
+        // Which Plantoir a deploy the server schedules should start when it
+        // runs (#347): this one. In a development build the server is not
+        // beside the app, so it could not find it on its own.
+        if (Environment.ProcessPath is { } app) info.Environment["PLANTOIR_APP_PATH"] = app;
 
         Process? server;
         try { server = Process.Start(info); }
