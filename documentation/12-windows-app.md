@@ -3519,3 +3519,44 @@ Rejected: a counter every `ShowAsync` call site increments — right only while
 all of them remember. **Whether WinUI delivers the keys under a dialog at all
 was NOT measured** (locked desktop); `AcceleratorUnderDialogUiTests` is that
 measurement. The guard costs nothing if they do not fire.
+
+**How the measurement is made, with the guard in place (bundle 9,
+2026-10-01).** The handlers ask `DialogGate.Holds(root, "<key>")` — `IsOpen`
+plus a record: in a run whose state is redirected (`--state-dir`, which only
+the UI tests pass) every key it holds is appended to
+`accelerators-held-under-a-dialog.txt` in that state folder. The UiFact puts
+the Back Up Now confirmation on screen, presses all four keys (Ctrl+O last,
+because a failed guard would open the native picker over everything), and
+reports per key "DELIVERED under the dialog (the guard held it)" or "not
+delivered (the dialog kept it)" — in the test output and in
+`%TEMP%\plantoir-191-measurement.txt` — while ASSERTING the behaviour either
+way: no rename dialog, no new top-level window, the confirmation still up.
+**Rejected:** removing the guard for one run to see whether the keys act (a
+test that must be edited to measure is not one Russell can run from the
+script), an automation property carrying a count (a screen reader would
+announce it), and a trail line (a teacher-visible record of a key that did
+nothing, with a contract entry and a mac issue for a measurement aid). A
+teacher's run never redirects, so it never writes the file. Unproven until
+`run-ui-tests.ps1` runs on an unlocked desktop.
+
+### A wrapping panel squeezed narrow (#214, the mac's #211)
+
+Read, not measured: `TaskProgressView.xaml`'s Done panel and the section's
+`ScheduledPublishNotice` (an `InfoBar`) are wrapping `TextBlock`s in Auto rows
+and StackPanels, with no construct that makes a text's height rigid — so
+nothing was changed (bundle 9 ruling P1: change layout only if the XAML shows
+an unbounded height by reading). WinUI measures a wrapping `TextBlock` at the
+width its column ACTUALLY has, not at the near-zero width SwiftUI's
+`NavigationSplitView` PROPOSED while measuring the mac's; but a teacher can
+still squeeze the window until the content column is narrow (the sidebar
+column keeps `MinWidth="180"`), and how tall the notice gets then is exactly
+what reading cannot settle. `PanelHeightUnderSqueezeUiTests` is
+the measurement: it writes a scheduled-publish SUCCESS record naming a long
+folder path and Netlify into the run's own state folder, opens the section,
+squeezes the window to 500 px and reports the notice's height against the
+window's (`%TEMP%\plantoir-214-measurement.txt`), asserting the notice stays
+inside it. The folder publish's Done panel is NOT measured by it, and
+deliberately: putting it on screen needs a real publish, which builds into the
+teacher's real builds folder because `--state-dir` redirects only what the app
+resolves (see "Driving the real interface"). Same construct, so the notice's
+number stands for both until a measurement says otherwise.
