@@ -466,6 +466,51 @@ public sealed class AssistWorkspace
     ///   dissolves it. That shape — a shared page reachable from several
     ///   classes — is the normal shape of a course, not an edge case.
     /// </summary>
+    /// <summary>
+    /// Words that mean every page and name none (#352 / mac #197): a closed
+    /// list, held equal to <c>assist-cases.json</c> -> <c>pagesNamingNoPage.everyPageWords</c>.
+    /// </summary>
+    internal static readonly string[] EveryPageWords =
+        { "all", "everything", "all pages", "every page", "all of them", "all of those", "*" };
+
+    private static bool IsAnEveryPageWord(string name) =>
+        EveryPageWords.Contains(name.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+
+    private static bool SectionHasAPageCalled(Course course, int section, string name) =>
+        PagePaths.MarkdownPages(course.DirectoryPath, section)
+                 .Any(path => string.Equals(Path.GetFileNameWithoutExtension(path), name.Trim(),
+                                            StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Something the teacher can type next: "Publish" or "Hide" and the
+    /// LOWEST unit that has class pages, in the course's own word; failing
+    /// that, the first page.
+    /// </summary>
+    private static string ExampleOfWhichPages(Course course, int section, bool hiding)
+    {
+        string verb = hiding ? "Hide" : "Publish";
+        string unitWord = course.Configuration.UnitWord;
+        var titles = PagePaths.MarkdownPages(course.DirectoryPath, section)
+            .Select(path => Path.GetFileNameWithoutExtension(path))
+            .ToList();
+        var units = titles
+            .Select(title => System.Text.RegularExpressions.Regex.Match(title,
+                "^" + System.Text.RegularExpressions.Regex.Escape(unitWord) + @" (\d+), ",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            .Where(match => match.Success)
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+        if (units.Count > 0) return $"{verb} {unitWord} {units.Min()}";
+        string? first = titles.OrderBy(title => title, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        return first is null ? verb : $"{verb} {first}";
+    }
+
+    /// <summary>The trail line for #197: the act and the word or HOW MANY, never the names.</summary>
+    private static void NoteNamedNoPage(string course, int section, string what) =>
+        Plantoir.Core.Scripting.ActivityTrail.Note(
+            Plantoir.Core.Scripting.ActivityTrail.Event.AssistantNamedNoPage,
+            "the assistant named no page it could find: " + what + "; nothing was changed", course, section);
+
     public PublishPlan PlanPublish(
         string courseCode, int sectionNumber, IReadOnlyList<string> pageTitles,
         bool includeLinked, bool draft = false, bool publishes = true,
@@ -474,8 +519,39 @@ public sealed class AssistWorkspace
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
 
+        // A list that is NOTHING BUT words meaning every page names no page
+        // (#352 / mac #197). Asked of the section FIRST: a page really titled
+        // "All" is a page, whatever it is called.
+        var givenNames = pageTitles.Select(title => title.Trim()).Where(title => title.Length > 0).ToList();
+        if (givenNames.Count > 0 && givenNames.All(IsAnEveryPageWord) &&
+            !givenNames.Any(name => SectionHasAPageCalled(course, section, name)))
+        {
+            if (onOrAfter is null && before is null)
+            {
+                NoteNamedNoPage(course.Code, section,
+                    $"the list was only the word \u201c{givenNames[0].ToLowerInvariant()}\u201d");
+                string example = ExampleOfWhichPages(course, section, hiding: draft);
+                throw new AssistRefusal(draft
+                    ? AssistWording.EveryPageIsNotAPageToHide(example)
+                    : AssistWording.EveryPageIsNotAPageToPublish(example));
+            }
+            pageTitles = Array.Empty<string>();
+            givenNames.Clear();
+        }
+
         if (pageTitles.Count == 0 && onOrAfter is null && before is null)
             throw new AssistRefusal("No page was named, and no dates were given to choose classes by.");
+
+        // An OPEN-ENDED publish (every class from a day to the end of the
+        // course) is refused. The mac's rule, and why it is code rather than
+        // a sentence in a tool description is in doc 10: a typo'd "publsh
+        // tomorows class" chose exactly this 10 times in 10, which would have
+        // put the rest of the term in front of students. An open-ended
+        // UNPUBLISH is allowed: it hides work rather than exposing it.
+        if (!draft && pageTitles.Count == 0 && onOrAfter is { } openFrom && before is null)
+            throw new AssistRefusal(
+                $"Nothing was published: every class from {DateText.Iso(openFrom)} to the end of the course is " +
+                "more than one request should put in front of students. Name the pages, or give an end date too.");
         if (onOrAfter is { } from && before is { } until && until <= from)
             throw new AssistRefusal(
                 $"No class can be on or after {DateText.Iso(from)} and also before {DateText.Iso(until)}.");
@@ -604,6 +680,20 @@ public sealed class AssistWorkspace
                     unknownNames.Add(wanted);
                 }
             }
+        }
+
+        // Every name given matched nothing: not a stray word in a mixed list,
+        // but the whole list (#352 / mac #197). This used to fall through to
+        // "Nothing needed changing.", success about a request that did
+        // nothing. A unit that expanded to no pages, or a page that is never
+        // hidden, is not an unknown name and keeps its own answer.
+        if (givenNames.Count > 0 && named.Count == 0 && unknownNames.Count == givenNames.Count)
+        {
+            NoteNamedNoPage(course.Code, section,
+                unknownNames.Count == 1 ? "1 name matched no page" : $"{unknownNames.Count} names matched no page");
+            throw new AssistRefusal(unknownNames.Count == 1
+                ? AssistWording.NoPageCalled(course.Code, section.ToString(), unknownNames[0])
+                : AssistWording.NoPagesCalled(course.Code, section.ToString(), AssistWording.ListingEither(unknownNames)));
         }
 
         // Dates choose classes IN CODE. A teacher's "every class from the 15th

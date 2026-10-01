@@ -31,6 +31,13 @@ public static class ActivityTrail
         /// teacher's sentence and never the argument values.
         /// </summary>
         AssistantNamedAToolItWasNotOffered,
+        /// <summary>
+        /// A publish or hide named no page the section has (only words
+        /// meaning every page, or names that all matched nothing) and was
+        /// refused (#352 / mac #197). Carries the word or HOW MANY names
+        /// missed; never the names themselves.
+        /// </summary>
+        AssistantNamedNoPage,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -313,6 +320,7 @@ public static class ActivityTrail
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
         Event.AssistantNamedAToolItWasNotOffered => "assistant named a tool it was not offered",
+        Event.AssistantNamedNoPage => "assistant named no page it could find",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",
