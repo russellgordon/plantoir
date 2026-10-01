@@ -203,6 +203,22 @@ schedule replaces, read by task name). New test classes:
 The reasoning is in `documentation/10-local-ai-assistant.md` → "The Windows
 half of the assistant chain".
 
+## Parity run, bundle 5b: the assistant, the rest (2026-09-30)
+
+Branch `issue/bundle5b-assistant-rest` (with bundle 5a merged in). Done: #350
+(a tool the model was not offered is refused), #352's #197 half (a page list
+naming no page; whole-unit openings; an open-ended publish refusal Windows never
+had), #344 (settings read at the call; the schedule card read the window's
+snapshot), #165 (a partial publish answers), #164 (argument names on the
+trail), #203/#342 (the walk stops at a class both ways, and says so), #359
+(Markdown-style links; check_section names ten), #305 ("What does X link to?"
+in code, transcript only), #340 (How I Teach tools), #210 (Codex door; start-up
+not measured, Codex not installed). Partly: #114 (needs a routing
+measurement), #392/#399/#405 (the links checklist's LOGIC, record and release
+are done and contract-tested; the WinUI sheet, the menu item and when it is
+shown are not built). Manuals: doc 10's "On Windows" sections; doc 12 → "The
+links checklist on Windows".
+
 ## Parity run, bundle 4: preview and publish mechanics (2026-09-30)
 
 Branch `issue/bundle4-preview-publish`. Done: #278 (address read by whole
