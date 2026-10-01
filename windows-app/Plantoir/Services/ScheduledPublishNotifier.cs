@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.Windows.AppLifecycle;
 using Microsoft.Windows.AppNotifications;
 using Plantoir.Core.Assist;
@@ -146,13 +144,5 @@ public static class ScheduledPublishNotifier
             window.Workspace.Selection = new SidebarSelection.SectionItem(target.CourseCode, target.Section));
 
     /// <summary>A dialog in front of the window is the teacher's work: leave its selection alone.</summary>
-    private static bool IsBusy(MainWindow window)
-    {
-        try
-        {
-            if (window.Content?.XamlRoot is not { } root) return false;
-            return VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(p => p.Child is ContentDialog);
-        }
-        catch (Exception) { return false; }
-    }
+    private static bool IsBusy(MainWindow window) => DialogGate.IsOpen(window.Content?.XamlRoot);
 }
