@@ -44,7 +44,7 @@ public class ClubSettingsUiTests
 
         // Not "clubLockedRows" (a panel, never in the tree, so it passed
         // vacuously): the rows themselves, and the caption.
-        Assert.Null(app.FindOrNull("clubLockedRow_noun", TimeSpan.FromSeconds(2)));
+        app.AssertAbsent("clubLockedRow_noun", "a club's noun row");
         Assert.DoesNotContain(SettingsRows()["lockedCaption"]!.ToString(), DrivenApp.TextsUnder(app.Window));
         Assert.True(app.Find("renameUnitWordButton", "Rename…").IsEnabled);
     }

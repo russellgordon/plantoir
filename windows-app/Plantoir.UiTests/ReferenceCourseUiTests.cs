@@ -68,13 +68,13 @@ public class ReferenceCourseUiTests
         var said = DrivenApp.TextsUnder(summary);
         Assert.Contains(NeverDeployed(), said);
         Assert.Contains(EndToEnd.ReferenceWording["pagesAreLocked"]!.ToString(), said);   // it says so
-        Assert.Null(app.FindOrNull("courseSettingsForm", TimeSpan.FromSeconds(2)));      // the form is not drawn
+        app.AssertAbsent("courseSettingsForm", "the Course Settings form");             // the form is not drawn
 
         app.SelectSection(Folder, 1, shownCode: "ICS3U");
         // "deployButton", the id the XAML sets — before bundle 11 this looked
         // for "DeployButton", which matches nothing, so "absent" passed whether
         // or not the button was drawn.
-        Assert.Null(app.FindOrNull("deployButton", TimeSpan.FromSeconds(2)));            // ABSENT, not disabled
+        app.AssertAbsent("deployButton", "the Deploy button on a reference course");     // ABSENT, not disabled
         Assert.Contains(NeverDeployed(), DrivenApp.TextsUnder(app.Window));
 
         // And the live course of the same code still has its button.

@@ -841,7 +841,7 @@ classes now run the real launchers:
 
 | Class | What it drives | What it reads back |
 |---|---|---|
-| `WizardToPreviewUiTests` | the wizard's Create, a line added to the front page, Preview, Stop | the SERVED front page over HTTP (the marker line), the window's own web view text, the build in the real builds root, the address going quiet after Stop |
+| `WizardToPreviewUiTests` | the wizard's Create, a line added to the front page, Preview, Stop | the SERVED front page over HTTP (the marker line), the address the window's preview pane LOADED (equal to it, status 200), the build in the real builds root, the address going quiet after Stop; the pane's page text is reported, not asserted |
 | `ImportForReferenceUiTests` | File › Import Courses for Reference…, the Windows folder picker, the sheet, Import; the open folder and an empty folder | the done screen's contract sentences, the row under Reference Courses › 2025–26, the copied config's marker and year, the page LOCKED on disk, `.merged_output` left behind, the source untouched |
 | `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
 | `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
@@ -888,14 +888,24 @@ these is now written into the harness rather than left to be rediscovered:
   `LargeIncrement` walk reaches the bottom.
 - **An empty `TextBlock` has no Name** (`PropertyNotSupportedException`), and a
   UIA query can time out (`COMException 0x80131505`) while the app draws a
-  dialog — both mean "nothing yet", not a fault.
+  dialog — both mean "nothing yet", not a fault, for something AWAITED
+  (`FindOrNull`). Never for an absence: a negative check built on
+  `FindOrNull` passed whenever every query timed out, so negative checks use
+  `DrivenApp.AssertAbsent`, which says "absent" only when the tree ANSWERED
+  empty and fails when it never answers (`AssertAbsentRuleTests`, plain facts
+  that run without a desktop; the timeout case is the must-fail).
 - **Click a control only once it has a clickable point**; a dialog opened
   straight after another closed is still arriving (`NoClickablePointException`).
 - **WebView2's page text** arrives through UIA lazily, sometimes as Text and
-  sometimes as another element's name — and in 2 of 7 runs not at all for
-  120 s, focused or not (0 named elements under the view). That is Chromium's
-  accessibility tree, not the app's, so `WizardToPreviewUiTests` REPORTS it
-  and asserts what the app controls: the served page over HTTP carries the
+  sometimes as another element's name — and in 3 of 8 runs it did not arrive
+  in time (once 0 named elements for 120 s, focused or not). That is Chromium's
+  accessibility tree, not the app's, so `WizardToPreviewUiTests` REPORTS it.
+  What it ASSERTS is the address the preview pane loaded: in a `--state-dir`
+  run the app writes "loaded 200 <address>" into Open in Browser's ItemStatus
+  on every completed navigation (the WebView2's own peer drops an ItemStatus
+  set on it — measured empty), and the test compares it with the address it
+  read the page from (must-fail: a wrong port in it turns the test red). It
+  also asserts the served page over HTTP carries the
   teacher's line, and the web view is on screen with a size.
 - **A closing dialog's smoke layer** leaves the sidebar with no clickable
   point for a moment; `PressRowMenuItem` waits for one.
@@ -3674,11 +3684,12 @@ the measurement: it writes a scheduled-publish SUCCESS record naming a long
 folder path and Netlify into the run's own state folder, opens the section,
 squeezes the window to 500 px and reports the notice's height against the
 window's (`%TEMP%\plantoir-214-measurement.txt`), asserting the notice stays
-inside it. The folder publish's Done panel is NOT measured by it, and
-deliberately: putting it on screen needs a real publish, which builds into the
-teacher's real builds folder because `--state-dir` redirects only what the app
-resolves (see "Driving the real interface"). Same construct, so the notice's
-number stands for both until a measurement says otherwise.
+inside it. Until bundle 11 the folder publish's Done panel was left
+unmeasured because putting it on screen needs a real publish; tests may run one
+since then (see "A test that runs a launcher"), so a second fact,
+`TheFolderPublishsDonePanelStaysInsideASqueezedWindow`, publishes a course to a
+folder with a long path, squeezes the window the same way and measures every
+part of the Done panel against it (`%TEMP%\plantoir-214-donepanel.txt`).
 
 **Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
 "window 900x737; notice 631x157 (top 135 below the window's top)". The

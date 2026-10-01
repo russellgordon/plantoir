@@ -98,14 +98,11 @@ public class WizardToPreviewUiTests
                 return seen.Any(n => n.Contains(marker, StringComparison.Ordinal));
             }
             catch { return false; }
-        }, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(1)).Result;
-        // REPORTED, not asserted. Measured over seven runs (bundle 11): the
-        // page's words came through UI Automation in five; in two the web view
-        // exposed ZERO named elements for 120 s, focused or not. That is
-        // Chromium's accessibility tree, which this app does not build, so an
-        // assertion on it fails for a reason no change here could fix. What IS
-        // asserted is what the app controls: the view is ON SCREEN with a size,
-        // over a server that answered with this course's page (above).
+        }, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1)).Result;
+        // The page TEXT is REPORTED, not asserted. Over eight runs (bundle 11)
+        // its words failed to come through UI Automation in three — once the
+        // view exposed ZERO named elements for 120 s, focused or not. That is
+        // Chromium's accessibility tree, which this app does not build.
         _output.WriteLine(shown
             ? $"the web view's text showed the marker {(nudged ? "after it was given the focus" : "without being focused")}"
             : $"the web view exposed {seen.Count} named elements and not the marker (Chromium's tree; see the comment)");
@@ -113,6 +110,27 @@ public class WizardToPreviewUiTests
         Assert.False(shownView.IsOffscreen, "the preview's web view is not on screen");
         Assert.True(shownView.BoundingRectangle.Width > 200 && shownView.BoundingRectangle.Height > 200,
                     $"the preview's web view is drawn at {shownView.BoundingRectangle}");
+
+        // What IS asserted (V2): the address the preview pane NAVIGATED to,
+        // and that the load succeeded with 200, is the one the test read this
+        // course's page from. The app publishes it for --state-dir runs only,
+        // as Open in Browser's ItemStatus ("loaded 200 http://…"; the web view's own peer drops it), on every completed
+        // navigation. A blank view, an error page or another folder's port
+        // goes red here.
+        var servedAt = new Uri(url!);
+        string status = "";
+        bool sameAddress = Retry.WhileFalse(() =>
+        {
+            try { status = app.Find("openInBrowserButton", "Open in Browser").Properties.ItemStatus.ValueOrDefault ?? ""; }
+            catch { status = ""; }
+            string[] parts = status.Split(' ', 3);
+            return parts.Length == 3 && parts[0] == "loaded" && parts[1] == "200"
+                   && Uri.TryCreate(parts[2], UriKind.Absolute, out var shownAt)
+                   && shownAt.Port == servedAt.Port && shownAt.AbsolutePath == servedAt.AbsolutePath
+                   && (shownAt.Host is "127.0.0.1" or "localhost");
+        }, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500)).Result;
+        Assert.True(sameAddress, $"the preview pane did not load {url}: it reported \"{status}\"");
+        _output.WriteLine($"the preview pane reported \"{status}\"");
 
         // And the build is where the launchers keep it: the real builds root, not the working folder.
         string builtIndex = Path.Combine(app.RealBuildsRoot, Code, "section1", "public", "index.html");

@@ -119,7 +119,7 @@ public class ImportForReferenceUiTests
         EndToEnd.ChooseInFolderPicker(app, empty);
         ExpectRefusal(app, EndToEnd.Say(wording["noCoursesThere"]!, ("folder", "nothing here")));
 
-        Assert.Null(app.FindOrNull("referenceGroup", TimeSpan.FromSeconds(1)));   // nothing was shelved
+        app.AssertAbsent("referenceGroup", "the Reference Courses group", TimeSpan.FromSeconds(1));   // nothing was shelved
     }
 
     private static void ExpectRefusal(DrivenApp app, string sentence)

@@ -201,8 +201,7 @@ public class NewCourseWizardUiTests
         // This does lean on the ContentDialog template dropping a button whose
         // text is empty rather than showing a blank one — true today, and the
         // thing to suspect first if this line ever fails on its own.
-        Assert.True(app.FindOrNull("CloseButton", TimeSpan.FromSeconds(2)) is null,
-                    "Cancel was still offered after the course had been made");
+        app.AssertAbsent("CloseButton", "Cancel, after the course had been made");
 
         create.AsButton().Invoke();
 
@@ -259,7 +258,7 @@ public class NewCourseWizardUiTests
 
         Assert.Equal(WizardContract["noStartingContentNote"]!.ToString(),
             app.Find("noStartingContentNote", "the note for a course starting with nothing at all").Name);
-        Assert.Null(app.FindOrNull("noExampleContentNote", TimeSpan.FromSeconds(1)));
+        app.AssertAbsent("noExampleContentNote", "the no-example-content note", TimeSpan.FromSeconds(1));
     }
 
     /// <summary>

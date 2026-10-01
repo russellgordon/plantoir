@@ -235,6 +235,45 @@ public sealed class DrivenApp : IDisposable
                         within ?? TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200)).Result;
 
     /// <summary>
+    /// "There is no such element", said only when the tree ANSWERED (bundle 11,
+    /// V1). <see cref="FindOrNull"/> treats a timed-out query as "not yet",
+    /// which is right for something awaited and wrong for an absence: with
+    /// every query timing out, a negative check built on it passed whatever
+    /// the screen showed. This one waits <paramref name="within"/> for an
+    /// answering query to come back empty; an element still found then fails
+    /// it, and so does a tree that never answers in that time plus 30 s.
+    /// </summary>
+    public void AssertAbsent(string automationId, string describedAs, TimeSpan? within = null) =>
+        AssertAbsentWith(() => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)),
+                         automationId, describedAs, within ?? TimeSpan.FromSeconds(2));
+
+    /// <summary>The rule of <see cref="AssertAbsent"/>, with the query handed in so a plain test can pin it.</summary>
+    internal static void AssertAbsentWith(Func<AutomationElement?> query, string automationId, string describedAs,
+                                          TimeSpan within, TimeSpan? noAnswerGrace = null)
+    {
+        var start = DateTime.UtcNow;
+        var giveUp = start + within + (noAnswerGrace ?? TimeSpan.FromSeconds(30));
+        string lastError = "";
+        while (true)
+        {
+            try
+            {
+                if (query() is null) return;   // the tree answered: nothing there
+                if (DateTime.UtcNow - start >= within)
+                    throw new Xunit.Sdk.XunitException($"{describedAs} is there (automation id '{automationId}') and should not be.");
+            }
+            catch (System.Runtime.InteropServices.COMException error)
+            {
+                lastError = error.Message;
+                if (DateTime.UtcNow >= giveUp)
+                    throw new Xunit.Sdk.XunitException(
+                        $"Could not tell whether {describedAs} is absent: UI Automation did not answer ({lastError}).");
+            }
+            Thread.Sleep(200);
+        }
+    }
+
+    /// <summary>
     /// One look. A UI Automation query that TIMES OUT (COMException 0x80131505,
     /// seen once in bundle 11's fourth run while the app was busy drawing a
     /// dialog) counts as "not yet" and is asked again by the caller's retry,
