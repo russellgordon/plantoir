@@ -252,6 +252,15 @@ public class AssistSurfaceContractTests
             // narrowed schema, and NarrowToolsMirrorTests pins that the
             // measurement script strips it too.
             "add_next_class.duplicate", "plan_add_next_class.duplicate",
+
+            // "What does Unit 2, Day 3 link to?" (#305 / mac #167): the same
+            // binder reason. The mac keeps `answer: "links"` out of every
+            // schema because its card and runner share a process; here the
+            // window reaches read_page over JSON-RPC, so the three keys the
+            // links phrasing fills are DECLARED, and AssistAgent's
+            // CardOnlyArguments takes them out of the local model's schema
+            // (mirrored in narrow-tools.py, pinned by NarrowToolsMirrorTests).
+            "read_page.answer", "read_page.asTyped", "read_page.onlyIfFound",
         }.Where(e => tools.Contains(e[..e.IndexOf('.')])).ToList();
 
         // Exact set in both directions over the two halves together (#122's

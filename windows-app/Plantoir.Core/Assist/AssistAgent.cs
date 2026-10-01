@@ -877,7 +877,13 @@ public sealed class AssistAgent
     {
         if (await LinksQuestion(text, cancellation) is { } answered) return answered;
 
-        if (AssistCardCommand.Matching(text) is { } match)
+        // The links family is answered ONLY by LinksQuestion above, which reads
+        // the window. When that declined — another section, a title that is
+        // this window's own place, "the quiz" with no such page — the sentence
+        // belongs to the model; Matching's window-free reading of the same
+        // sentence must not run it as a card, or the answer (and a tool call)
+        // lands in the model's conversation (review finding, 2026-09-30).
+        if (AssistCardCommand.Matching(text) is { } match && !match.IsALinksQuestion)
         {
             var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
             // "deploy at 6:30 am" carries a time of day, never a date: the

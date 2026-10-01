@@ -230,6 +230,32 @@ public class LinksQuestionContractTests : IDisposable
         Assert.Contains("ran read_page with", File.ReadAllText(_trail));
     }
 
+    /// <summary>
+    /// When the window-aware reading declines, the sentence goes to the model
+    /// as an ordinary turn — never run as a card by the window-free reading,
+    /// which would put a read_page call into the conversation.
+    /// </summary>
+    [Theory]
+    [InlineData("What does the quiz link to?")]
+    [InlineData("What does ICS3U link to?")]
+    [InlineData("What does Unit 2, Day 3 in section 2 link to?")]
+    public void DeclinedByTheWindowGoesToTheModelAndRunsNoCard(string sentence)
+    {
+        var workspace = Section();
+        var model = new ScriptModel().Says("I can look that up.");
+        var agent = new AssistAgent(model, new ToolsOver(new PlantoirTools(workspace)), new JsonArray(),
+                                    WindowCourse, WindowSection)
+        {
+            IsACourseCode = code => Codes.Value.Contains(code),
+        };
+
+        agent.Say(sentence, CancellationToken.None).GetAwaiter().GetResult();
+
+        string sent = Assert.Single(model.Asked).ToJsonString();
+        Assert.DoesNotContain("read_page", sent);
+        Assert.DoesNotContain("links", sent.Replace("link to", ""));
+    }
+
     [Fact]
     public void AnotherCourseSaysSoAndReadsNothing()
     {
