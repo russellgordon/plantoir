@@ -1571,13 +1571,14 @@ entries above rather than in this table. Re-derive it; do not subtract.
 
 **And the exemptions inside lists that ARE run**, because "run" is not the
 whole answer for a list a named key has been lifted out of:
-`windows-app/Plantoir.Tests/NamedGapLedger.cs` holds 6 keys as of 2026-10-01
-(the end of the overnight parity run): 4 on
+`windows-app/Plantoir.Tests/NamedGapLedger.cs` is **EMPTY** since 2026-10-01
+(parity bundle 9). It held 6 keys at the end of the overnight run: 4 on
 [#308](https://github.com/russellgordon/plantoir/issues/308) (the caller-side
 wording that names declined pages) and 2 on
 [#157](https://github.com/russellgordon/plantoir/issues/157) (`noCoursesYet`,
-`whatPublishingMeans`). Both issues are open, and no entry is owned by a closed
-issue. Every entry fails the moment the gap closes or the requirement is
+`whatPublishingMeans`); all six are said now, and each entry was deleted in
+the commit that turned it green. The mechanism stays: a future entry may name
+only an open issue, and fails the moment the gap closes or the requirement is
 withdrawn. The two exemption sets in `FileFormatContractTests`
 — `knowinglyAbsent` for `wizardAnswerKeys` and `knowinglyNotFollowed` for
 `writingRules` — are **both empty today**, kept so the next knowing divergence
