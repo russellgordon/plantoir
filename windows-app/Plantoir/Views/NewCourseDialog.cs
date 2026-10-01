@@ -752,11 +752,12 @@ public sealed class NewCourseDialog : ContentDialog
     }
 
     /// <summary>
-    /// Whether the curriculum pages are on offer for this course: the payload
-    /// declares a curriculum folder AND the teacher is taking it.
+    /// Whether the curriculum pages are on offer for this course
+    /// (<see cref="CourseConfiguration.CurriculumPagesOffered"/>, #252): taking
+    /// the ready-made pages, or declining them and keeping the skeleton.
     /// </summary>
-    private bool CurriculumPagesOffered =>
-        TakingExampleContent && ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode);
+    private bool CurriculumPagesOffered => CourseConfiguration.CurriculumPagesOffered(
+        ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent, _startsFromSkeleton);
 
     /// <summary>
     /// The three curriculum toggles, for a code whose payload declares a
@@ -946,17 +947,9 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private ProtectionContext WizardProtection() => new(
         InWizard: true,
-        CurriculumCoverageEnabled: CourseConfiguration.CurriculumCoverageEnabled(
-            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
-            _prepopulate,
-            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
-            _includeCurriculum,
-            _includeCurriculumCoverage),
-        CurriculumPagesEnabled: CourseConfiguration.CurriculumPagesEnabled(
-            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
-            _prepopulate,
-            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
-            _includeCurriculum),
+        CurriculumCoverageEnabled: CourseConfiguration.NewCourseCoverageEnabled(
+            CurriculumPagesOffered, _includeCurriculum, _includeCurriculumCoverage),
+        CurriculumPagesEnabled: CurriculumPagesOffered && _includeCurriculum,
         Jurisdiction: JurisdictionForCode(),
         // null, not the payload's or skeleton's declared `curriculum_folder`:
         // this app has no ExampleContentCatalog.CurriculumFolder or
@@ -1326,6 +1319,9 @@ public sealed class NewCourseDialog : ContentDialog
         var answers = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, new NewCourseAnswers.Choices(
             code, _prepopulate, _startsFromSkeleton, _includeCurriculum, CurrentLists()));
         ApplyLists(answers.Lists);
+        // Offered-and-kept is exactly what include_curriculum_pages says.
+        bool coverageEnabled = CourseConfiguration.NewCourseCoverageEnabled(
+            answers.Keys["include_curriculum_pages"]!.Value<bool>(), true, _includeCurriculumCoverage);
 
         var result = new JObject
         {
@@ -1349,9 +1345,12 @@ public sealed class NewCourseDialog : ContentDialog
             ["prepopulate_example_content"] = answers.Keys["prepopulate_example_content"],
             ["use_skeleton"] = answers.Keys["use_skeleton"],
             ["include_curriculum_pages"] = answers.Keys["include_curriculum_pages"],
-            ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
-
-            ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(_includeCurriculumCoverage, _includeCoverageNotes)),
+            // The coverage map is drawn from the curriculum pages, so it is on
+            // only where they are offered and kept (#252, the mac's
+            // curriculumCoverageEnabled): before this a course with no pages
+            // to draw from was written with the map ON.
+            ["include_curriculum_coverage"] = PerSection(_ => coverageEnabled),
+            ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(coverageEnabled, _includeCoverageNotes)),
             ["use_lcs_terminology"] = _useLcs,
             ["deploy_target"] = _deployTarget,
             ["deploy_folder_path"] = _deployFolderPath,
