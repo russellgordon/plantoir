@@ -3132,22 +3132,32 @@ first version passed the job's path; in the deep folder the probe ran from,
 refused it outright (*"Value for '/TR' option cannot be more than 261
 character(s)"*). A name is a few dozen characters wherever the working folder is.
 
-**Does Task Scheduler run a missed `/SC ONCE` start late? (#239's CHECK.)**
-Not as this app creates tasks. `schtasks /Create /SC ONCE` writes no
-`<StartWhenAvailable>` (read back with `/Query /XML`: the element is absent,
-so it is false), and a task whose moment passes while the PC is off or asleep
-is simply not run. Two simulations on this PC, fifteen minutes each, ran
-NEITHER a task with the flag nor one without: one registered with its start
-two minutes in the past, one disabled across its moment and re-enabled a minute
-after. A real sleep across the moment was not measured — it would have
-suspended the machine the run was on. So `tooLateToRun` is a guard here rather
-than an everyday outcome (a teacher can tick the setting by hand in Task
-Scheduler), and its ten cases run anyway because the check costs nothing.
-**Found on the way, not changed:** the same XML says
-`DisallowStartIfOnBatteries` and `StopIfGoingOnBatteries` are TRUE, so a laptop
-on battery at the moment does not run the deploy at all — which the sheet
-already warns about ("plugged in, if it is a laptop"). Left for Russell
-(QUESTIONS-FOR-RUSSELL.md) rather than decided here.
+**The task's settings, and whether a missed start runs late (#239's CHECK; fix round, ruling 1).**
+At first the task was made with `schtasks /Create /SC ONCE`, which writes no
+`<StartWhenAvailable>` and sets `DisallowStartIfOnBatteries` and
+`StopIfGoingOnBatteries` TRUE (read back with `/Query /XML`): a laptop on battery
+at the moment never published, and left no record. Since the bundle 3 fix round
+the task is registered from XML (`TaskScheduling.TaskXml`, through `/Create
+/XML`) with the battery gate off, not stopped by unplugging, and
+`StartWhenAvailable` true, its StartBoundary written in one invariant form (no
+locale date format is guessed). `TaskDefinitionTests` schedules through
+`Schedule()` and reads the registered task back from the real Task Scheduler.
+
+**Measured** (this PC, on mains, flag read back true, 2026-09-30 20:07–20:22):
+a task registered with its start two minutes already past did NOT run within
+15 minutes (Last Result 267011) — a start already past when the task was
+registered is not treated as missed. Two earlier simulations (before the fix)
+agreed. **Not measured:** a start missed while the PC is asleep or off; that
+such a start runs once Windows is available again is Microsoft's documented
+behaviour for `StartWhenAvailable`, unmeasured here (it would have suspended the
+machine the run was on). If it holds, the lateness window decides whether the
+late run is still worth doing, so `tooLateToRun` has a real path; its ten cases
+run either way.
+
+**A crash between writing the job and replacing the task** (the fix round's
+order, job first): the task's arguments carry the setting's TOKEN as well as its
+name, and a run whose task token differs from the job's does nothing and leaves
+the task alone — so an old task cannot run on a new job's settings.
 
 **One task per section per working folder** (#309, mac #237):
 `Plantoir deploy <CODE> section <N> <folder id>`, the id being
