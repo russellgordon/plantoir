@@ -133,8 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
-            "settings save held back"),
         Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
             "put today's class on the front page", "left the front page as it was"),
         Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",

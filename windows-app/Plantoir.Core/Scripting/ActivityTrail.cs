@@ -13,6 +13,13 @@ public static class ActivityTrail
         Helpers,
         WorkingFolderOpened,
         SettingsSaved,
+
+        /// <summary>
+        /// Course Settings held Save back because the unsaved edit moves where
+        /// the course publishes to a destination with a problem (#387, mac
+        /// #373). Carries the course and which check; once per visit.
+        /// </summary>
+        SettingsSaveHeldBack,
         SettingsCouldNotBeSaved,
         TaskStarted,
         TaskFinished,
@@ -481,6 +488,7 @@ public static class ActivityTrail
         Event.Helpers => "helpers described",
         Event.WorkingFolderOpened => "working folder opened",
         Event.SettingsSaved => "settings saved",
+        Event.SettingsSaveHeldBack => "settings save held back",
         Event.SettingsCouldNotBeSaved => "settings could not be saved",
         Event.TaskStarted => "task started",
         Event.TaskFinished => "task finished",

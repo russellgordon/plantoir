@@ -295,6 +295,13 @@ public sealed class CourseConfiguration
 
     public JObject Values => _values;
 
+    /// <summary>The settings as this copy last read or wrote them, or null when unknown.</summary>
+    public JObject? LastReadOrWritten()
+    {
+        try { return _lastSavedData.Length == 0 ? null : ParseObject(_lastSavedData); }
+        catch { return null; }
+    }
+
     // ---- Flat keys ------------------------------------------------------
 
     public string CourseCode => StringValue("course_code");
@@ -1076,8 +1083,16 @@ public sealed class CourseConfiguration
 
     public void SetShowsGradeInTitle(int section, bool value)
     {
-        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean })
+        // The legacy course-wide Bool is replaced by the per-section map
+        // SEEDED with it for every section (#387, mac #373 perSectionEditCases):
+        // an EMPTY map let section 1 silently read the default, true, so
+        // toggling section 2 turned section 1's grade back on.
+        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["show_grade_in_title"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("show_grade_in_title", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("show_grade_in_title", "sections", SectionKey(section), value);
     }
 
@@ -1090,8 +1105,14 @@ public sealed class CourseConfiguration
 
     public void SetIncludesCurriculumCoverage(int section, bool value)
     {
-        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean })
+        // Seeded with the legacy value for every section, for the reason
+        // SetShowsGradeInTitle gives.
+        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["include_curriculum_coverage"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("include_curriculum_coverage", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("include_curriculum_coverage", "sections", SectionKey(section), value);
         if (!value)
         {

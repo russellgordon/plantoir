@@ -477,7 +477,7 @@ public sealed class NewCourseDialog : ContentDialog
 
         foreach (string code in LocaleCatalog.Codes) _localeBox.Items.Add(LocaleCatalog.DisplayName(code));
         _localeBox.SelectedIndex = LocaleCatalog.Codes.ToList().IndexOf(WizardDefaults.DefaultLocale);
-        form.Children.Add(FormBuilders.LabeledRow("Language / region", _localeBox));
+        form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.LocaleLabel, _localeBox));
 
         // -------- Starting Content (offered per course code) --------
         form.Children.Add(FormBuilders.SectionHeaderWithCaption("Starting Content", null));
