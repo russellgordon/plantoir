@@ -3053,7 +3053,7 @@ from one course into another", and its "On Windows" subsection has the numbers.
   `_get_excluded_note_config` (which re-reads the contracts on every call) and
   nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
   PC — every file open pays for Defender — and 30 s across the pool. Set
-  `PLANTOIR_FUZZ_N` to go bigger; one PLANTOIR_FUZZ_N=1000000 run took 1 h 20 min here and found **856 pages certified and not hidden** (of 401,096 certified) — an OPEN defect, see doc 09; set PLANTOIR_FUZZ_DUMP to a path to write the failing pages out.
+  `PLANTOIR_FUZZ_N` to go bigger; one PLANTOIR_FUZZ_N=1000000 run took 1 h 20 min here and found **856 pages certified and not hidden** (of 401,096 certified) — an OPEN defect, see doc 09; set PLANTOIR_FUZZ_DUMP to a path to write the failing pages out, and PLANTOIR_FUZZ_SKIP to re-run only the tail of the seeded sequence (a 400,000 run was clean, so the tail is where to look).
 - **The dialog** is a `ContentDialog` whose primary button cancels its own
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
