@@ -891,9 +891,10 @@ separately from the reader:
   included; the undo label leaves plan-time declines out; and the trail
   records `page settings left as they were` with the act ("publishing
   pages", "hiding pages", "re-dating classes", "making room for a class")
-  and the count. Pinned by `DeclinedPagesAreNamedTests`. One honest limit:
-  the make-room reply's "moved N onto later class days" still counts a class
-  it could not date; the sentence after it names that class. The first two are not reached by the fixed reader or writer at all
+  and the count. Pinned by `DeclinedPagesAreNamedTests`. The make-room
+  reply's "moved N onto later class days" counts only classes actually
+  written, as the mac's `ClassInsertionPlanner` does (a declined class, one
+  already on its date and a failed write are not "moved"; review F1). The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**

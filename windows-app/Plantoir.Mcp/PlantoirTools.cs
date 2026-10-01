@@ -63,7 +63,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Call this first when the teacher mentions a course but you are not certain of its exact code.")]
     public string ListCourses()
     {
-        var courses = workspace.Courses();
+        // The local window is told nothing about a course kept for reference
+        // (#241), so filter FIRST and then ask whether anything is left: a
+        // folder holding only reference courses would otherwise answer the
+        // teacher with an empty string (bundle 9 review F2; the mac filters
+        // first too).
+        var courses = workspace.Courses()
+            .Where(course => !(workspace.ServesTheLocalWindow && ReferenceCourse.IsKeptForReference(course)))
+            .ToList();
         if (courses.Count == 0) return AssistWording.NoCoursesYet;
 
         var text = new StringBuilder();

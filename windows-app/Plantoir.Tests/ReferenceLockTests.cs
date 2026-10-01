@@ -241,8 +241,8 @@ public class ReferenceLockTests : IDisposable
     /// <para>
     /// It reads the files git TRACKS (<c>git ls-files</c>), never a walk of the
     /// folder (#419): a walk met the gitignored <c>courses/</c> tree, whose old
-    /// <c>.merged_output</c> junction pointed at a folder that no longer existed,
-    /// and threw — a red about a teacher's leftover folder, not about this
+    /// <c>.merged_output</c> held a WSL symlink (reparse tag 0xa000001d) Windows
+    /// cannot open, and threw — a red about a teacher's leftover folder, not about this
     /// repository's code. What is not tracked is not "in this repository", and a
     /// build output or a working folder is never where a copy command is written.
     /// A tracked path that is missing from the working tree, or is itself a
