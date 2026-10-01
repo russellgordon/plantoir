@@ -81,10 +81,51 @@ $repo = $PSScriptRoot
 
 $running = Get-Process -Name Plantoir -ErrorAction SilentlyContinue
 if ($running) {
+    # #155: never close a BUSY copy. The rule is MachineWork's (Plantoir.Core),
+    # and DrivenApp applies it in full before every test; this is the coarse
+    # half the script can see without a second copy of the liveness rule: a
+    # lease named for a process that is running right now (so it is live by
+    # construction), in a folder the REAL settings name, or any running
+    # plantoir-mcp at all (it may be publishing anywhere).
+    $mcp = @(Get-Process -Name plantoir-mcp -ErrorAction SilentlyContinue)
+    if ($mcp.Count -gt 0) {
+        Write-Host "An outside assistant's Plantoir server is running (pid $($mcp.Id -join ', ')); it may be publishing." -ForegroundColor Red
+        Write-Host "Not closing Plantoir; run again when it finishes." -ForegroundColor Red
+        exit 2
+    }
+    $livePids = @($running.Id)
+    $settingsFile = Join-Path $env:LOCALAPPDATA 'Plantoir\settings.json'
+    $folders = @()
+    if (Test-Path $settingsFile) {
+        try {
+            $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
+            if ($settings.WorkspacePath) { $folders += $settings.WorkspacePath }
+            foreach ($w in @($settings.RememberedWindows)) { if ($w.Path) { $folders += $w.Path } }
+        } catch { }
+    }
+    foreach ($folder in ($folders | Select-Object -Unique)) {
+        $activity = Join-Path $folder 'courses\.internal\activity'
+        if (-not (Test-Path $activity)) { continue }
+        foreach ($lease in Get-ChildItem $activity -Filter '*.lease' -ErrorAction SilentlyContinue) {
+            $parts = $lease.Name.Split('.')
+            if ($parts.Count -ge 4 -and $parts[-2] -match '^\d+$' -and ($livePids -contains [int]$parts[-2])) {
+                Write-Host "Plantoir is $($parts[-3])-ing $($parts[0..($parts.Count - 4)] -join '.') (pid $($parts[-2]))." -ForegroundColor Red
+                Write-Host "Not closing it; run again when it finishes." -ForegroundColor Red
+                exit 2
+            }
+        }
+    }
     Write-Host "Closing your running Plantoir (pid $($running.Id -join ', ')) - two copies" -ForegroundColor Yellow
     Write-Host "would fight over the foreground. It is not reopened afterwards." -ForegroundColor Yellow
     $running | Stop-Process -Force
     Start-Sleep -Milliseconds 800
+    # The leases the kill orphaned: the killed pids' own, never *.lease.
+    foreach ($folder in ($folders | Select-Object -Unique)) {
+        foreach ($killed in $livePids) {
+            Get-ChildItem (Join-Path $folder 'courses\.internal\activity') -Filter "*.$killed.lease" -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "Removed the lease it left: $($_.Name)"; Remove-Item $_.FullName -ErrorAction SilentlyContinue }
+        }
+    }
 }
 
 # The tests drive the x64 Debug build - the same binary the "PT - Dev"
