@@ -173,6 +173,42 @@ public class CutOffAnswerTests : IDisposable
         Assert.Contains("the things I mentioned", _model.Asked[^1].ToJsonString());
     }
 
+    // ---- #262: a finished reply that wrote NOTHING ---------------------------
+
+    /// <summary>An empty publish has nothing to act on: refused, with its own sentence.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("{}")]
+    public async Task AnEmptyCallToAWriteThatNeedsMoreRunsNothing(string arguments)
+    {
+        _model.Then(Calling("publish_pages", arguments), "tool_calls");
+
+        var lines = await Say();
+
+        Assert.Empty(_tools.Calls);
+        Assert.Equal(AssistWording.AnswerLeftOutWhatItWasFor, Assert.Single(lines).Text);
+        Assert.Contains("wrote nothing for publish pages — nothing was run from it", Trail());
+    }
+
+    /// <summary>
+    /// An empty call to a tool the window supplies in full RUNS — and the
+    /// window's course and section are what it runs with.
+    /// </summary>
+    [Fact]
+    public async Task AnEmptyCallTheWindowSuppliesRunsAsThisWindow()
+    {
+        _model.Then(Calling("check_section", ""), "tool_calls");
+        _model.Then(new JsonObject { ["content"] = "All visible." });
+
+        await Say();
+
+        var call = Assert.Single(_tools.Calls);
+        Assert.Equal("check_section", call.Name);
+        Assert.Equal("ICS3U", call.Arguments["course"]!.ToString());
+        Assert.Equal(1, call.Arguments["section"]!.GetValue<int>());
+    }
+
     [Fact]
     public void TheEngineSaysWhyItStoppedAndThatReachesTheAgent()
     {
