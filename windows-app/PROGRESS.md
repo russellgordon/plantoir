@@ -185,6 +185,33 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 8: test hygiene, backups, the toast, updates (2026-10-01)
+
+Branch `issue/bundle8-windows-ui`. Manual: doc 12 → "Bundle 8"; doc 11 →
+"Updating itself on Windows".
+
+- **The unit suite keeps out of the teacher's state** (#285, #179): a
+  module-initializer redirect, a per-file source tripwire (Plantoir, Core,
+  Mcp; PowerShell-in-strings too), a guard that throws on a real schtasks
+  registration, and the wrapper's two run-time folders behind a TEMP-only test
+  variable.
+- **Backups** (#283, #187, #161): sizes (logical), All Backups with Extended
+  selection and one counted button, held backups kept (this app's open
+  conversations; an outside assistant's newest via its `assist` lease); a
+  same-second backup waits for the next second; zipNames moments read against
+  the Gregorian calendar. #101 confirmed by test, no change.
+- **The scheduled-publish toast** (#324): posted by the run, a click decided
+  from the contract's `onClick` cases. Unproven on a real click.
+- **Accelerators** (#191): guarded under a ContentDialog; NOT measured.
+  **#302**: the picker path bar's 520 limit dropped; not checked by eye.
+  **#214**: not measured.
+- **The UI-test runner** (#155): startup.log says when stdio is redirected;
+  never closes a busy Plantoir; sweeps only the killed pid's leases;
+  `ConPtyProcess.Start` zeroes its std handles (measured: leak reproduced, then
+  gone).
+- **Updates** (#337), PART: the rules, gates, wording, installer flags and `app
+  updated`. The engine, dialog, menu item and seven events are owed.
+
 ## Parity run, bundle 6a: course creation and the smaller course pieces (2026-09-30)
 
 Issues #169, #250, #252, #349 (the wizard's skeleton: declining the ready-made
@@ -308,7 +335,7 @@ baked PowerShell script, and every rule decided at its moment lives there.
 - **Every destination named** (#400, #404); the unpublished-classes note gone.
 
 Not built: #324 (clicking the toast — the toast itself, #212's Windows half, is
-first). Manuals: doc 07 → "On Windows since bundle 3"; doc 09 → "On Windows
+first; both built minimally in bundle 8). Manuals: doc 07 → "On Windows since bundle 3"; doc 09 → "On Windows
 since bundle 3 (#289)" and "(#231)"; doc 09 → "On Windows: a sharing violation".
 
 ## Parity run, bundle 2: frontmatter and page writers (2026-09-30)

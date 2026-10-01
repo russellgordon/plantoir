@@ -840,9 +840,39 @@ Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
 this section said the opposite — that any console broke it — which is why the
 experiment above is written down rather than the conclusion alone.
 `Plantoir.UiTests` is the case that meets it in practice, and `DrivenApp`
-launches with `UseShellExecute = true` for exactly this reason. Whether
-`ConPtyProcess.Start` should defend itself is
-[issue #89](https://github.com/russellgordon/plantoir/issues/89).
+launches with `UseShellExecute = true` for exactly this reason. Whether `ConPtyProcess.Start` should defend itself was
+[issue #89](https://github.com/russellgordon/plantoir/issues/89), and it now does:
+
+**Since bundle 8 (#155), `ConPtyProcess.Start` defends itself.** It zeroes
+this process's three std handles around `CreateProcessW`, under one
+process-wide lock (`s_stdHandleGate`), and puts them back in `finally`.
+Measured 2026-10-01 on this machine (Windows 11 Pro build 26200, 8 logical
+CPUs), from the `dotnet test` host, whose stdout and stderr are pipes:
+`ConPtyRedirectedParentTests` started `cmd.exe /c echo PTY-OK`. **Before**:
+the child exited and the transcript held only ConPTY's two mode sequences
+(`ESC[?9001h ESC[?1004h`), no `PTY-OK`, within 10 s. **After**: `PTY-OK`
+arrives; both tests together took 118 ms. Rejected: `FreeConsole` (it detaches
+the whole process) and the per-instance `_ptyGate` (it would not serialise two
+Starts). The cost: while the lock is held, another thread writing to
+`Console` loses that output — the GUI app writes none. Launching harnesses
+with ShellExecute is still the better habit, and `DrivenApp` keeps doing it.
+
+The app also says so now: when it starts with stdout, stderr or stdin
+redirected to a pipe or a file, `startup.log` gets one line
+(`StdioState.Describe`), after the `--state-dir` redirect so it lands in the
+run's own log. It is for a developer; it is not a trail event.
+
+**The UI-test runner will not close a busy Plantoir.** Busy is
+`MachineWork.WhyBusy` (Plantoir.Core, shared with the updater): any live lease
+of another process, of any kind, in a working folder the REAL settings name
+(read from the unredirected path, never through `AppDataRoot`), or any running
+`plantoir-mcp` at all. `DrivenApp` applies it in full and throws "… Not
+closing it; run again when it finishes."; `run-ui-tests.ps1` applies the half
+it can see without a second copy of the liveness rule — a lease named for a
+process that is running right now, or any `plantoir-mcp` — and exits 2. After
+a kill, only `*.<killed pid>.lease` is swept, never `*.lease`. Known limit: a
+folder opened only through an outside assistant or under `--state-dir` is not
+a known folder.
 
 ### The new-site dialog: a hand-driven check
 
@@ -2254,7 +2284,8 @@ is readable by neither parser, so such a zip is invisible to both sidebar lists
 and to pruning; for a whole-course archive, `ArchiveAndRemoveCourse` then
 deletes the course folder and the only copy never appears in Archives. The mac
 has no collision retry at all, so it is Windows-only and no `zipNames` case
-covers the form.
+covers the form. **Fixed in bundle 8**: the retry now waits for the next
+second instead of adding `-N` (below, "Same-second backups wait for the next second").
 
 ### The check that found the one still open — and how it was closed
 
@@ -3211,3 +3242,129 @@ from one course into another", and its "On Windows" subsection has the numbers.
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
   `AutoSuggestionBoxTextChangeReason.UserInput`, so nothing opens on focus.
+
+## Bundle 8: test hygiene, backups, the toast, accelerators, updates (2026-10-01)
+
+Windows-only pieces of the parity run, on `issue/bundle8-windows-ui`. Each
+says what was measured and what was rejected; the update design is in
+[`11-release-strategy.md`](11-release-strategy.md) → "Updating itself on
+Windows".
+
+### The unit suite keeps its state in a scratch folder (#285, #179)
+
+`Plantoir.Tests/TestAppDataRedirect.cs` is a `[ModuleInitializer]`: before any
+test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
+models, builds and scheduled-publish state a test touches land there, not in
+the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
+suites do not share a settings file. `AppDataRedirectTests` pins it.
+
+Two things the redirect cannot see, and what covers each:
+
+- **Code that computes a per-user folder for itself.**
+  `RealStateTripwireTests` scans `Plantoir`, `Plantoir.Core` and
+  `Plantoir.Mcp` for `Environment.GetFolderPath(`, `SpecialFolder.`,
+  `GetEnvironmentVariable("LOCALAPPDATA"|"APPDATA"|"USERPROFILE")`,
+  `ExpandEnvironmentVariables`, and — because #179's leak was PowerShell text
+  inside a C# string — `$env:LOCALAPPDATA`, `$env:APPDATA`, `%LOCALAPPDATA%`,
+  `%APPDATA%`. Comment lines are skipped. Every hit outside `AppDataRoot.cs`
+  must be on an allow-list counted per file and per occurrence, each with its
+  reason, and an allowance larger than what the scan finds fails too, so the
+  list cannot rot into a blanket pass.
+- **A real Task Scheduler registration.** The initializer also sets
+  `TaskScheduling.RealSchtasksGuardForTests`, which throws on any real
+  `schtasks.exe` call other than `/Query`. It caught one on its first run:
+  `TaskDefinitionTests.TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken`
+  registers a real probe task ON PURPOSE (ruling 7 of an earlier bundle) and
+  now lifts the guard for itself, by name.
+
+**The scheduled wrapper (#179).** `$healthDir` and `$pendingDir` resolve
+`$env:LOCALAPPDATA` at RUN time, so a test that ran the wrapper wrote into the
+teacher's real `scheduled\folder-problems`. Both now come from
+`TaskScheduling.StateDirExpression`: `PLANTOIR_TEST_WRAPPER_STATE_DIR` when it
+is set AND inside `$env:TEMP`, else exactly the old path. The name is chosen
+not to read like `--state-dir` (which moves the app's state; this moves only
+two folders of a child script), and the TEMP condition means a variable left
+set system-wide cannot send a teacher's 6 a.m. records somewhere the app
+never looks. The suite sets it only on the CHILD `powershell.exe`, to the
+redirected `AppDataRoot.Current`, so the app-side reader and the wrapper agree.
+Rejected: baking the paths at write time — cheaper, but a teacher's wrapper is
+then only right while the baked path stays right.
+`ScheduledWrapperRunTests.ARunUnderTheSuiteLeavesTheRealFolderProblemsFolderAlone`
+runs the wrapper for real and compares the real folder before and after; with
+the override disabled it went red naming the file it leaked (that one file was
+deleted). Two orphans from 2026-09-09 (`Plantoir-wraprun-a093729a…`) were left
+on Russell's machine for him to remove.
+
+### Same-second backups wait for the next second (#187)
+
+Two backups stamped in one second used to get `…_221530-2.zip`, a name
+neither reader parses: invisible in the Backups list, uncounted by pruning,
+and invisible on the mac reading the same folder. `CourseArchiver.Archive` now
+waits for the next second (at most three tries) and stamps again. Rejected:
+teaching both readers a `-N` suffix (the mac's reader would hide a zip Windows
+wrote until it learned it too), and a millisecond stamp (it changes the frozen
+`zipNames` format). `ContractTests.CourseManagement_ZipNames` also takes each
+case's `moment` apart field by field against `GregorianCalendar` (#161 part 2);
+re-formatting with our own writer would stay green while both halves were
+wrong.
+
+### Backups: what they take, and deleting several (#283)
+
+The mac's design (09 → "Backups: what they take") in WinUI terms. What
+differs, and why:
+
+- **All Backups is a dialog**, opened from the Backups group's context menu,
+  not a sidebar row with its own pane. A `ListView` with
+  `SelectionMode="Extended"` (Ctrl- and Shift-click) and columns course /
+  when / who / size; the dialog's one primary button carries the count
+  ("Delete 2 Backups…") and is disabled at zero. The confirmation is a second
+  dialog, because WinUI shows one `ContentDialog` at a time.
+- **The total is on the group's tooltip**, and each backup's size on its own
+  row's tooltip (`SidebarRow.Tooltip` became a notifying property for this).
+- **Sizes are `FileInfo.Length`** — the end of file, never the allocation —
+  measured off the UI thread and applied only if no newer measurement began
+  (`MeasurementGeneration`). The contract's sparse case is made with
+  `FSCTL_SET_SPARSE` then `SetLength(467 MB)`; counted by allocation
+  (`GetCompressedFileSizeW`) it read 0 bytes, which is the must-fail. It needs
+  NTFS and FAILS, naming why, anywhere else rather than skipping.
+- **An unreadable size is left out of the total**, shown as
+  `backupSizeCouldNotBeReadShort`, and counted in a sentence beside the total.
+- **What is held** (`HeldBackups`): each open assistant window holds the zip
+  its conversation made, from the moment it exists until the window closes.
+  An outside assistant (`plantoir-mcp`) leaves no record of which zip it made,
+  so while another process holds a live `assist` lease on a course, the
+  NEWEST assistant-made backup of that course is held too — it can hold one
+  too many, never let the one it made go (bundle-8 ruling 4). The hold is read
+  again at the moment of deleting.
+- **After a delete**, every other window on the same folder re-reads its
+  Backups list only (`WorkspaceViewModel.ReloadBackupsOnly`), not its courses.
+
+Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
+`AllBackupsUiTests` compiles and has never run (the desktop was locked).
+
+### The scheduled-publish toast (#324)
+
+#212's Windows half had not been built, so the toast is built minimally:
+the scheduled run (Plantoir.exe started by Task Scheduler with no window)
+posts ONE toast when it finishes, whatever happened, whose text is the
+section's own sentence (`ScheduledPublishOutcome.Sentence`) — no new words.
+Its launch argument is `section=<CODE>/<n>&folder=<escaped path>`, the tag is
+the section-per-folder record name, so a later run replaces it. A click is
+decided by `ScheduledPublishToast.Decide`, played from the 14 non-mac
+`onClick` cases; `App.OnLaunched` registers `NotificationInvoked` (a click
+while running, marshalled to the UI thread) and reads
+`AppInstance.GetActivatedEventArgs()` for a click that started Plantoir.
+Approximations, said plainly: an inactive app has no key window, so "front to
+back" is newest window first; "the section is still in the folder" is
+`courses\<CODE>\section<n>` existing. The announcing cases (`notification.announcing`)
+are still #212's. Unproven on a real click.
+
+### Accelerators under a dialog (#191)
+
+Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 now return at once while a
+`ContentDialog` is open (`Services/DialogGate`: the open popups whose child
+IS a ContentDialog, so a context menu or tooltip does not block Ctrl+O).
+Rejected: a counter every `ShowAsync` call site increments — right only while
+all of them remember. **Whether WinUI delivers the keys under a dialog at all
+was NOT measured** (locked desktop); `AcceleratorUnderDialogUiTests` is that
+measurement. The guard costs nothing if they do not fire.
