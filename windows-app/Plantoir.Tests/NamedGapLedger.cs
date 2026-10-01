@@ -139,8 +139,6 @@ internal static class NamedGapLedger
             "settings save held back"),
         Owed(ActivityTrailEvents, 250, "the New Course wizard does not record the course it made yet (mac #248/#251/#267)",
             "course created"),
-        Owed(ActivityTrailEvents, 196, "a cut-off model reply is not detected here yet (mac #198)",
-            "assistant answer was cut off"),
         Owed(ActivityTrailEvents, 217, "an echoed reply is not refused here yet (mac #215)",
             "assistant repeated the request back"),
         Owed(ActivityTrailEvents, 350, "a tool the model was not offered is not refused here yet (mac #327)",
@@ -205,8 +203,6 @@ internal static class NamedGapLedger
             "a club typed with a payload code is not given the payload's pool"),
 
         // ---- app-rules.json → modelTiers.requirements
-        Owed(ModelTierRequirements, 196, "a cut-off model reply is not detected here yet (mac #198)",
-            "A reply the engine stopped part way runs no tool and says so"),
         Owed(ModelTierRequirements, 262, "a finished reply that wrote nothing is not checked against the window here yet",
             "A finished reply that wrote nothing runs a tool only when the window supplies everything that tool needs"),
 
@@ -241,8 +237,6 @@ internal static class NamedGapLedger
             "linkedPageIsADraft", "linkedPageIsMissing", "pageCouldNotBeRead", "pageLinksTo", "pageLinksToNothing"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
-        Owed(AssistWordingKeys, 196, "a cut-off model reply is not detected here yet (mac #198)",
-            "answerWasCutOff"),
         Owed(AssistWordingKeys, 262, "a finished reply that wrote nothing is not checked against the window here yet",
             "answerLeftOutWhatItWasFor"),
         Owed(AssistWordingKeys, 217, "an echoed reply is not refused here yet (mac #215)",

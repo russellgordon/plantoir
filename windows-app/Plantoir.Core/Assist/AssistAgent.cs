@@ -17,7 +17,37 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public interface IChatModel
 {
-    Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation);
+    /// <summary>
+    /// One reply, and WHY the engine stopped writing it — or null when the
+    /// engine could not be reached or timed out.
+    /// </summary>
+    Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation);
+}
+
+/// <summary>
+/// What the model wrote, and the engine's <c>finish_reason</c> for stopping.
+/// </summary>
+/// <remarks>
+/// <para><b>The reason is the only signal that tells a finished answer from a
+/// fragment</b> (#196). Every request carries <c>max_tokens</c> 512, so a reply
+/// can be stopped part way — and llama.cpp closes the arguments object before
+/// the tool-call wrapper, so for a token or two a stopped call PARSES
+/// perfectly (measured on the mac: cut at 28 tokens, <c>deploy_section
+/// {course, section}</c>). <c>undo_last_change</c> takes no arguments at all,
+/// so any parse check would pass a stopped call to it. Until 2026-09-30
+/// <c>LocalModel.Ask</c> returned <c>choices[0].message</c> and dropped the
+/// rest, so this app acted on a stopped reply as if it were finished.</para>
+///
+/// <para>A null <see cref="FinishReason"/> means the engine did not say, which
+/// is read as finished — the scripted test models build replies that way.</para>
+/// </remarks>
+public sealed record ModelReply(JsonObject Message, string? FinishReason = null)
+{
+    /// <summary>The engine stopped because it reached the cap, not because the answer was done.</summary>
+    public bool WasCutOff => string.Equals(FinishReason, "length", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A finished reply from a message alone; null stays null.</summary>
+    public static implicit operator ModelReply?(JsonObject? message) => message is null ? null : new ModelReply(message);
 }
 
 /// <summary>
@@ -1193,6 +1223,35 @@ public sealed class AssistAgent
     }
 
     /// <summary>
+    /// Refuse a reply that cannot be acted on: run nothing, say so, record
+    /// why, and take the turn back out of what the model is sent — so the
+    /// shorter retry the sentence asks for is not sent with the request that
+    /// ran away still in front of it (#196).
+    /// </summary>
+    private List<Line> NothingRanFromIt(List<Line> lines, string said, string trailLine)
+    {
+        ActivityTrail.Note(ActivityTrail.Event.AssistantAnswerWasCutOff, trailLine, _courseCode, _section);
+        WindTheTurnBack();
+        lines.Add(new Line("assistant", said));
+        return lines;
+    }
+
+    private static string Spaced(string tool) => tool.Replace('_', ' ');
+
+    /// <summary>
+    /// Whether a tool call's arguments can be read at all. An empty string and
+    /// an empty object ARE readable — <c>undo_last_change</c> genuinely takes
+    /// nothing — and whether an empty call may RUN is a separate question.
+    /// </summary>
+    internal static bool ArgumentsAreReadable(JsonObject call)
+    {
+        if (call["function"]?["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return true;
+        if (string.IsNullOrWhiteSpace(json)) return true;
+        try { return JsonNode.Parse(json) is JsonObject; }
+        catch (System.Text.Json.JsonException) { return false; }
+    }
+
+    /// <summary>
     /// How many messages the conversation held when this turn began - the
     /// mark <see cref="WindTheTurnBack"/> returns to.
     /// </summary>
@@ -1283,6 +1342,9 @@ public sealed class AssistAgent
         var answer = await RunTool(call, lines, cancellation);
         lines.Add(new Line("tools", answer.Summary));
         if (TurnEnded(lines)) return lines;
+        // A lap after an approved call begins at its result: winding back
+        // past it would erase a call that has already run.
+        _turnBeganAt = _messages.Count;
         return lines.Concat(await Run(cancellation)).ToList();
     }
 
@@ -1337,18 +1399,43 @@ public sealed class AssistAgent
 
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
-            var reply = await _model.Ask(_messages, _schemas, cancellation);
-            if (reply is null)
+            var modelAnswer = await _model.Ask(_messages, _schemas, cancellation);
+            if (modelAnswer?.Message is not { } reply)
             {
+                // An ENGINE failure, and deliberately not wound back: the
+                // sentence is usually not the cause, and the context is worth
+                // keeping for the next turn (#196).
                 ActivityTrail.Note(ActivityTrail.Event.AssistantCouldNotAnswer,
                     "the assistant did not answer", _courseCode, _section);
                 lines.Add(new Line("assistant", "The assistant didn’t answer. Try again in a moment."));
                 return lines;
             }
-            _messages.Add(reply.DeepClone()!);
 
             var calls = reply["tool_calls"] as JsonArray;
             bool acting = calls is { Count: > 0 };
+            string begun = (acting ? calls![0]?["function"]?["name"]?.ToString() : null) ?? "";
+
+            // ABOVE the tool-call branch, and whether or not a tool was named
+            // (#196). A reply cut before the tool name was written arrives
+            // with NO tool call and a raw fragment in its content, which the
+            // branch below would show to the teacher; one cut a token after
+            // its arguments closed parses perfectly. The finish reason is the
+            // only signal that tells either from a finished answer.
+            if (modelAnswer.WasCutOff)
+            {
+                return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff, begun.Length > 0
+                    ? $"the assistant's answer was cut off part way through {Spaced(begun)} — nothing was run from it"
+                    : "the assistant's answer was cut off part way — nothing was run from it");
+            }
+            if (acting && calls![0] is JsonObject chosen && !ArgumentsAreReadable(chosen))
+            {
+                // A finished answer whose arguments are not JSON: the model
+                // wrote bad JSON of its own accord. Same sentence, its own
+                // line — whoever reads a report needs to tell the two apart.
+                return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff,
+                    $"the assistant finished answering but what it wrote for {Spaced(begun)} could not be read — nothing was run from it");
+            }
+            _messages.Add(reply.DeepClone()!);
 
             // Content alongside a tool call is almost always the request
             // parroted back — measured as "Unpublishing Unit 4, Day 5

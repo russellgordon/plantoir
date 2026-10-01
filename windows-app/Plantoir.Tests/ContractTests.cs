@@ -1056,8 +1056,8 @@ public class ContractTests
 
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
-            Task.FromResult<JsonObject?>(null);
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<ModelReply?>(null);
     }
 
     private sealed class DummyTools : IToolServer
