@@ -51,6 +51,7 @@ try
     workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory())
     {
         ServesTheLocalWindow = Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable) == "1",
+        RecordsHeldBackups = true,
     };
 }
 catch (Exception error)
@@ -72,6 +73,7 @@ IDisposable? lease = workspace.LockedCourse is { } locked
 AppDomain.CurrentDomain.ProcessExit += (_, _) =>
 {
     LauncherRunner.StopEverythingItStarted();
+    Plantoir.Core.Models.HeldBackups.ForgetRecords(workspace.FolderPath);
     lease?.Dispose();
 };
 
@@ -101,6 +103,7 @@ try { await builder.Build().RunAsync(); }
 finally
 {
     LauncherRunner.StopEverythingItStarted();
+    Plantoir.Core.Models.HeldBackups.ForgetRecords(workspace.FolderPath);
     lease?.Dispose();
 }
 return 0;

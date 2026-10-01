@@ -109,7 +109,7 @@ public class BackupsContractTests : IDisposable
             var holds = c["heldByAnOpenConversation"]!.AsArray()
                 .Select(x => HeldBackups.HoldWhileOpen(items[x!.ToString()].FilePath)).ToList();
 
-            var held = HeldBackups.For(Path.GetDirectoryName(courses)!, items.Values, _ => Array.Empty<string>());
+            var held = HeldBackups.For(Path.GetDirectoryName(courses)!, items.Values, _ => Array.Empty<int>());
             var outcome = BackupDeleter.Delete(c["delete"]!.AsArray().Select(x => items[x!.ToString()]), held);
             holds.ForEach(h => h.Dispose());
 
@@ -214,16 +214,45 @@ public class BackupDeleterTests
         Assert.Equal(b, outcome.Failed[0].Item);
     }
 
+    /// <summary>
+    /// Ruling 9: an outside assistant's hold is the zip ON ITS RECORD, counted
+    /// only while that pid holds a live assist lease — not "the newest
+    /// assistant backup", which released its zip whenever the app's own
+    /// assistant had made a later one. A FAKE pid stands for plantoir-mcp.
+    /// </summary>
     [Fact]
-    public void ABackupAnotherProgramsConversationMayRestoreFromIsHeld()
+    public void TheBackupOnAnotherProgramsRecordIsHeldAndOnlyWhileItLives()
     {
-        var older = Item("ICS3U_backup_2026-08-01_120000_assistant-section2.zip");
-        var newer = Item("ICS3U_backup_2026-09-02_120000_assistant-section2.zip");
-        var teacher = Item("ICS3U_backup_2026-09-05_120000.zip");
-        var held = HeldBackups.For("C:\\x", new[] { older, newer, teacher }, _ => new[] { "ICS3U" });
-        Assert.Contains(Path.GetFullPath(newer.FilePath), held);
-        Assert.DoesNotContain(Path.GetFullPath(older.FilePath), held);
-        Assert.DoesNotContain(Path.GetFullPath(teacher.FilePath), held);
+        string work = Path.Combine(Path.GetTempPath(), $"plantoir-heldrecord-{Guid.NewGuid():N}");
+        try
+        {
+            string theirs = Path.Combine(work, "courses", "_backups", "ICS3U", "ICS3U_backup_2026-08-01_120000_assistant-section2.zip");
+            string later = Path.Combine(work, "courses", "_backups", "ICS3U", "ICS3U_backup_2026-09-02_120000_assistant-section2.zip");
+            string record = HeldBackups.RecordFor(work, "ICS3U", 424242);
+            Directory.CreateDirectory(Path.GetDirectoryName(record)!);
+            File.WriteAllText(record, theirs);
+            var backups = new[] { BackupItem.From(theirs, "ICS3U")!, BackupItem.From(later, "ICS3U")! };
+
+            var held = HeldBackups.For(work, backups, _ => new[] { 424242 });
+            Assert.Contains(Path.GetFullPath(theirs), held);
+            Assert.DoesNotContain(Path.GetFullPath(later), held);
+
+            Assert.Empty(HeldBackups.For(work, backups, _ => Array.Empty<int>()));   // the session is gone
+        }
+        finally { try { Directory.Delete(work, true); } catch { } }
+    }
+
+    [Fact]
+    public void HoldsAreCountedSoOneOfTwoClosingKeepsTheHold()
+    {
+        HeldBackups.Reset();
+        string zip = Path.Combine(Path.GetTempPath(), "ICS3U_backup_2026-09-02_120000_assistant-section2.zip");
+        var first = HeldBackups.HoldWhileOpen(zip);
+        var second = HeldBackups.HoldWhileOpen(zip);
+        first.Dispose();
+        Assert.Contains(Path.GetFullPath(zip), HeldBackups.InThisApp());
+        second.Dispose();
+        Assert.DoesNotContain(Path.GetFullPath(zip), HeldBackups.InThisApp());
     }
 
     [Fact]

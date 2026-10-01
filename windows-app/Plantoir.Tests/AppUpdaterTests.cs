@@ -119,6 +119,31 @@ public class AppUpdaterTests
         Assert.Contains("held " + UpdateWording.AssistantElsewhereWork, prompts.Shown);
     }
 
+    /// <summary>Ruling 7: a quit is decided by the install gate, so an update held for a running plantoir-mcp (FAKE pid) is set aside, never installed on the way out.</summary>
+    [Fact]
+    public void AQuitWhileAnAssistantServerRunsSetsTheHeldUpdateAside()
+    {
+        string installer = Path.Combine(Path.GetTempPath(), $"PlantoirSetup-{Guid.NewGuid():N}.exe");
+        File.WriteAllText(installer, "x");
+        using var updater = Make("https://example.invalid/windows.xml", new FakePrompts(), new FakeReader(),
+                                 servers: () => new[] { 424242 });
+        updater.PreparedForTests(installer, "9.9.0");
+        Assert.Null(updater.AtQuitGated());
+        Assert.False(File.Exists(installer));
+    }
+
+    [Fact]
+    public void TheDailyCheckFollowsTheWallClock()
+    {
+        DateTime? last = null;
+        using var updater = Make("https://example.invalid/windows.xml", new FakePrompts(), new FakeReader())
+            .RememberingDailyChecksIn(() => last, when => last = when);
+        var now = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
+        Assert.True(updater.DailyCheckIsDue(now));
+        Assert.False(updater.DailyCheckIsDue(now.AddHours(23)));
+        Assert.True(updater.DailyCheckIsDue(now.AddHours(24)));
+    }
+
     [Fact]
     public void AQuitWithWorkUnderWaySetsTheUpdateAside()
     {

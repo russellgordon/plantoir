@@ -119,10 +119,12 @@ public static class AppUpdates
     /// by the in-app Install path (ruling 1): installer.iss's [Run] entry is
     /// <c>skipifsilent</c>, so without it a silent install never reopens, and
     /// "Plantoir will close and open again by itself" would be false. The
-    /// at-quit install never passes it.
+    /// at-quit install never passes it. <c>/NOCLOSEAPPLICATIONS</c> (ruling 8):
+    /// Restart Manager must not close plantoir-mcp or a scheduled run on the
+    /// update path; the app quits itself first.
     /// </summary>
     public static string InstallerArguments(bool relaunch) =>
-        "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PLANTOIRUPDATE=1" + (relaunch ? " /RELAUNCH=1" : "");
+        "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1" + (relaunch ? " /RELAUNCH=1" : "");
 
     /// <summary>
     /// Whether this copy may update itself (ruling 3). installer.iss allows an

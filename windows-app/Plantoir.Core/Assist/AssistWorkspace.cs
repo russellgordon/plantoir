@@ -139,6 +139,9 @@ public sealed partial class AssistWorkspace
         string made = AssistantBackup(course, sectionNumber);
         _conversationBackups[course.Code] = made;
         ConversationBackupPath = made;
+        // An outside assistant's conversation says which zip it may restore
+        // from, so a delete in the app keeps it (#283, ruling 9).
+        if (RecordsHeldBackups) HeldBackups.Record(_folder, course.Code, made);
         return made;
     }
 
@@ -173,6 +176,9 @@ public sealed partial class AssistWorkspace
     }
 
     public string FolderPath => _folder;
+
+    /// <summary>Set by plantoir-mcp: write the conversation's backup to a held-backup record (#283).</summary>
+    public bool RecordsHeldBackups { get; set; }
 
     /// <summary>What this session has changed, or null when nothing tracks it.</summary>
     public UndoHistory? History => _undo;
