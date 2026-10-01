@@ -377,6 +377,13 @@ public sealed class AssistAgent
     private const int MostStepsPerTurn = 6;
 
     private readonly string _courseCode;
+
+    /// <summary>
+    /// The window's course's page word when that course is NUMBERED (a club's
+    /// "Week"), else null — so the numbered make-room phrasing matches only
+    /// there (#274). Set by the window, which has the course.
+    /// </summary>
+    public string? NumberedPageWord { get; init; }
     private readonly int _section;
 
     public AssistAgent(IChatModel model, IToolServer tools, JsonArray schemas, string courseCode, int section)
@@ -883,7 +890,7 @@ public sealed class AssistAgent
         // belongs to the model; Matching's window-free reading of the same
         // sentence must not run it as a card, or the answer (and a tool call)
         // lands in the model's conversation (review finding, 2026-09-30).
-        if (AssistCardCommand.Matching(text) is { } match && !match.IsALinksQuestion)
+        if (AssistCardCommand.Matching(text, NumberedPageWord) is { } match && !match.IsALinksQuestion)
         {
             var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
             // "deploy at 6:30 am" carries a time of day, never a date: the

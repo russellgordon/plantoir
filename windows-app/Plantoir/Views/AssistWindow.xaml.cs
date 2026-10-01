@@ -487,6 +487,9 @@ public sealed partial class AssistWindow : Window
 
         _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
         {
+            // A club's "make room for one meeting at Week 5" matches only in
+            // a numbered course, on its own page word (#274).
+            NumberedPageWord = _course.Configuration.Naming is { IsNumbered: true } naming ? naming.Word : null,
             // The full surface, so a tool the model names but was not shown
             // is refused rather than run (#350 / mac #327).
             ServedTools = served

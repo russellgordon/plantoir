@@ -56,6 +56,27 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
             ["publish sunday's class"] = ("publish_class_on", new() { ["when"] = "sunday" }),
             ["what pages are in this section?"] = ("list_pages", new()),
             ["add the next class page"] = ("add_next_class", new()),
+            // A club's own words (#274, mac #267): the same tools, the
+            // course's noun. Fixed shapes, so they match in any course — the
+            // sentence names nothing a Unit/Day course would read differently.
+            ["publish tomorrow's meeting"] = ("publish_class_on", new() { ["when"] = "tomorrow" }),
+            ["publish monday's meeting"] = ("publish_class_on", new() { ["when"] = "monday" }),
+            ["publish tuesday's meeting"] = ("publish_class_on", new() { ["when"] = "tuesday" }),
+            ["publish wednesday's meeting"] = ("publish_class_on", new() { ["when"] = "wednesday" }),
+            ["publish thursday's meeting"] = ("publish_class_on", new() { ["when"] = "thursday" }),
+            ["publish friday's meeting"] = ("publish_class_on", new() { ["when"] = "friday" }),
+            ["publish saturday's meeting"] = ("publish_class_on", new() { ["when"] = "saturday" }),
+            ["publish sunday's meeting"] = ("publish_class_on", new() { ["when"] = "sunday" }),
+            ["add the next meeting page"] = ("add_next_class", new()),
+            ["when are my next meetings?"] = ("read_remembered_timetable", new()),
+            ["when are my next meetings"] = ("read_remembered_timetable", new()),
+            ["when is my next meeting?"] = ("read_remembered_timetable", new()),
+            ["when is my next meeting"] = ("read_remembered_timetable", new()),
+            ["i have a revised list of meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["i have a new list of meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["change my meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["re-date my meetings"] = ("re_date_classes", new()),
+            ["redate my meetings"] = ("re_date_classes", new()),
             ["start a new unit for the next class"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["start a new unit"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["when are my next classes?"] = ("read_remembered_timetable", new()),
@@ -101,7 +122,15 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12,
     };
 
-    public static AssistCardCommand? Matching(string message)
+    public static AssistCardCommand? Matching(string message) => Matching(message, null);
+
+    /// <param name="numberedPageWord">
+    /// The window's course's page word when that course is NUMBERED ("Week"),
+    /// else null. Only the numbered make-room family reads it (#274): it
+    /// matches ONLY in such a course, on that word or a bare number, so
+    /// "at period 3" reaches the model everywhere.
+    /// </param>
+    public static AssistCardCommand? Matching(string message, string? numberedPageWord)
     {
         string tidied = message.Trim(TrimChars).ToLowerInvariant();
         if (string.IsNullOrEmpty(tidied)) return null;
@@ -118,6 +147,7 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
         if (MakeRoom(tidied) is { } room) return room;
+        if (numberedPageWord is not null && MakeRoomNumbered(tidied, numberedPageWord) is { } numbered) return numbered;
         if (DeployAtATime(tidied) is { } scheduled) return scheduled;
         if (LinksCard(message) is { } links) return links;
         return DuplicateClass(tidied, message);
@@ -179,6 +209,42 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         {
             ["unit"] = unit.ToString(CultureInfo.InvariantCulture),
             ["atDay"] = day.ToString(CultureInfo.InvariantCulture),
+            ["howMany"] = howMany.ToString(CultureInfo.InvariantCulture),
+        });
+    }
+
+    /// <summary>
+    /// "make room for one meeting at Week 5" in a NUMBERED course (#274, mac
+    /// #267): <c>make room for &lt;count&gt; class|classes|meeting|meetings at
+    /// [&lt;word&gt;] &lt;number&gt;</c>, where the word must be the course's own
+    /// page word, case-folded. The first mac version took any single word, and
+    /// "at period 3", "at block 2" and "at section 2" were all planned in a
+    /// club as a page — renaming pages the teacher's links point at. The count
+    /// and noun must agree, as in the Unit/Day frame.
+    /// </summary>
+    private static AssistCardCommand? MakeRoomNumbered(string tidied, string pageWord)
+    {
+        const string opening = "make room for ";
+        if (!tidied.StartsWith(opening, StringComparison.Ordinal)) return null;
+        string[] words = tidied[opening.Length..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length is not (4 or 5) || words[2] != "at") return null;
+        if (words.Length == 5 && words[3] != pageWord.Trim().ToLowerInvariant()) return null;
+
+        bool singular = words[1] is "class" or "meeting";
+        if (!singular && words[1] is not ("classes" or "meetings")) return null;
+
+        int howMany;
+        if (words[0] == "a") howMany = 1;
+        else if (SpelledNumbers.TryGetValue(words[0], out int spelled)) howMany = spelled;
+        else if (!int.TryParse(words[0], NumberStyles.None, CultureInfo.InvariantCulture, out howMany)) return null;
+        if (howMany <= 0 || (howMany == 1) != singular) return null;
+
+        if (!int.TryParse(words[^1], NumberStyles.None, CultureInfo.InvariantCulture, out int number) || number <= 0)
+            return null;
+
+        return new AssistCardCommand("make_room_for_classes", new Dictionary<string, string>
+        {
+            ["unit"] = number.ToString(CultureInfo.InvariantCulture),
             ["howMany"] = howMany.ToString(CultureInfo.InvariantCulture),
         });
     }
@@ -308,7 +374,7 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
 
         string typed = original.Trim(TrimChars);
         string body = tidied[opening.Length..];
-        string[] endings = { " as my next class", " as the next class", " as my next lesson" };
+        string[] endings = { " as my next class", " as the next class", " as my next lesson", " as my next meeting" };
 
         foreach (string ending in endings)
         {
