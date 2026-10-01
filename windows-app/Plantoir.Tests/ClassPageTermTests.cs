@@ -124,7 +124,7 @@ public class ClassPageTermTests
         Assert.Equal(4, PublishPlan.UnitNamed("Module 4", "Module"));
         Assert.Equal(4, PublishPlan.UnitNamed("Unit 4", "Module"));
         Assert.Equal(4, PublishPlan.UnitNamed("module 4.", "Module"));
-        Assert.Equal(4, PublishPlan.UnitNamed("Unit 4", null));
+        Assert.Equal(4, PublishPlan.UnitNamed("Unit 4", (string?)null));
     }
 
     [Fact]

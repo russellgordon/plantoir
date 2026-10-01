@@ -1782,7 +1782,8 @@ extra word on purpose — a matched card binds THIS window's course. Numbers in
 
 The rule is in `AssistWorkspace.PlanPublish`, which both the window's model and
 `plantoir-mcp` pass through, run by `PagesNamingNoPageContractTests` (every
-case but the two that need a numbered course, which wait for #274). Two
+case; the numbered one since parity bundle 7, #274, whose example names the
+course's first page, "Publish Week 1"). Two
 things Windows did not have before and has now:
 
 - **The open-ended publish refusal.** Windows never refused "every class from a
@@ -4521,10 +4522,10 @@ generated file for no gain, and Windows owes the key under its current name in
 `DuplicateClassPlan.Describe()` adds `AssistWording.MakingRoomCannotBeUndone`
 when `MovesOtherClasses`, asserted both ways in `DuplicateClassTests`
 (`APlanThatMovesOtherClassesWarnsTheUndoWillNotHelp`, and its absence on the
-last-class plan). `Duplication_MatchesContract` does NOT read
-`undoRule.planWarns` yet: that runner stops at its first case ("Week 1", a
-club's numbered page, #274), so an assertion added there could not be seen to
-pass; it goes in with #274. The trap: `OtherClassesMoved` is the past tense and must not go
+last-class plan). Since parity bundle 7 (#274) `Duplication_MatchesContract`
+runs every case, the numbered ones in a numbered course, and reads
+`undoRule.planWarns` too: the warning is on the plan exactly when the undo is
+withheld. The trap: `OtherClassesMoved` is the past tense and must not go
 on a plan.
 
 #### Three things the duplicate did that nothing was watching
@@ -6661,7 +6662,10 @@ with no class on it was re-dated to the newest class on every assistant publish
 It now returns nil before the date step when no class embed was found — one
 `Bool`, nothing else moves. Windows already behaved this way
 (`AssistWorkspace.ApplyIndexChange` returns before dating when
-`SectionIndex.WithMostRecent` finds nothing). Pinned by
+`SectionIndex.PointedAndDated` finds nothing to point — since parity bundle 7
+the pointer is `SectionIndex.Repointed`, which finds the line by the class page
+it names, as the mac's does, and still inserts under the course's heading when
+no line names a class). Pinned by
 `sectionIndexPointer.dateCases`, run through the pointer WITH the class's date
 by `testTheFrontPagesDateFollowsTheClassItShows` — two failures on the old
 pointer, by copy-and-restore. The same cases are run by the build, which dates

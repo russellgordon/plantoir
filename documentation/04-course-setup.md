@@ -658,6 +658,20 @@ locked. Russell's `CODING` fixture — pages already named "Week N" in
 `All Meetings`, no `class_page_scheme` — therefore stays exactly as it is: no
 planner sees its pages as class pages, as before #267.
 
+**On Windows (parity bundle 7, #274, 2026-10-01).** The wizard writes the same
+keys from `ClubFill` and `ClubFill.ClubKeys` (Core), and gives `setup.ps1` a
+configuration the shared `ClubStart` already handles — the Python is inherited
+unchanged. Two Windows seams a reader may need: the club's choices go through
+`NewCourseAnswers.ForAClub`, which turns off example content, skeleton and
+curriculum pages whatever the toggles held (so `gradedFolders.newCourse`'s club
+case runs through the same function the dialog calls); and `class_folder` is
+written from the club row's own field rather than `ClassFolderRule.Name`, whose
+guess would never find "All Meetings". Windows' front-page pointer INSERTS a
+class line under the course's heading where none names a class (the mac's
+never does), so on Windows a club front page emptied by hand gets
+`![[Week N]]` back on the next assistant publish — the contract's
+`expectBodyOnWindows`, stated there rather than settled.
+
 ## Which of a course's folders the build treats specially
 
 Most of a course folder is the teacher's to arrange however they like. A

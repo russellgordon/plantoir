@@ -93,8 +93,15 @@ public class AssistCardCommandTests
             // rather than a unit. Rendering one entry's reason for all five
             // would be the retyping this file exists to catch.
             string because = p["becauseNotThis"]?.ToString() ?? "";
+            // A family that matches only in a numbered course (#274) is given
+            // that course's word for the example AND the near miss, and must
+            // match NOTHING without it.
+            string? word = p["inANumberedCourseWhosePagesAre"]?.ToString();
+            if (word is not null)
+                Assert.True(AssistCardCommand.Matching(example) is null,
+                    $"\"{example}\" matched with no course: this family must match only in a numbered course.");
 
-            var matched = AssistCardCommand.Matching(example);
+            var matched = AssistCardCommand.Matching(example, word);
             Assert.True(matched is not null,
                 $"\"{example}\" is a parsed shape in the contract and matches nothing here, so a " +
                 $"teacher who types it has it routed by the model instead of reaching {expectedTool}. " +
@@ -102,7 +109,7 @@ public class AssistCardCommandTests
             Assert.True(expectedTool == matched!.ToolName,
                 $"\"{example}\" must reach {expectedTool} and reaches {matched.ToolName}.");
 
-            var nearMiss = AssistCardCommand.Matching(notThis);
+            var nearMiss = AssistCardCommand.Matching(notThis, word);
             Assert.True(nearMiss is null,
                 $"\"{notThis}\" is the near miss the contract pairs with \"{example}\" and this app " +
                 $"MATCHED it, sending it to {nearMiss?.ToolName}. The contract's own reason it must " +
@@ -121,7 +128,8 @@ public class AssistCardCommandTests
             if (nm is null) continue;
             string phrasing = nm.ToString();
 
-            var matched = AssistCardCommand.Matching(phrasing);
+            // Walked twice (#274): with no course, and in a "Week" club.
+            var matched = AssistCardCommand.Matching(phrasing) ?? AssistCardCommand.Matching(phrasing, "Week");
             Assert.True(matched is null,
                 $"\"{phrasing}\" is a near miss the contract says must NOT match, and this app sent " +
                 $"it to {matched?.ToolName}. These are the sentences a widened pattern swallows: " +

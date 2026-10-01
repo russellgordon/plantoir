@@ -27,6 +27,14 @@ public static class NewCourseAnswers
         bool IncludeCurriculum,
         WizardStructure.Lists Lists);
 
+    /// <summary>
+    /// A club takes no ready-made pages, no skeleton and no curriculum pages
+    /// (#274, mac #267): all three answered "no", whatever the toggles held —
+    /// so a club typed with a payload code keeps the wizard's own marks pool.
+    /// </summary>
+    public static Choices ForAClub(Choices choices, bool isClub) =>
+        isClub ? choices with { Prepopulate = false, StartsFromSkeleton = false, IncludeCurriculum = false } : choices;
+
     /// <summary>The keys written, and the lists as they stand after the last-moment adoption.</summary>
     public sealed record Result(JObject Keys, WizardStructure.Lists Lists);
 

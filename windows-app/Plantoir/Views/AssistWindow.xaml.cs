@@ -487,6 +487,9 @@ public sealed partial class AssistWindow : Window
 
         _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
         {
+            // A club's "make room for one meeting at Week 5" matches only in
+            // a numbered course, on its own page word (#274).
+            NumberedPageWord = _course.Configuration.Naming is { IsNumbered: true } naming ? naming.Word : null,
             // The full surface, so a tool the model names but was not shown
             // is refused rather than run (#350 / mac #327).
             ServedTools = served
@@ -582,7 +585,9 @@ public sealed partial class AssistWindow : Window
             ShowRecalled(phrasing);
             _history.StopBrowsing();
             Input.Focus(FocusState.Programmatic);
-        });
+        },
+        // A club's own shelf, in its own noun (#274).
+        groups: AssistPromptShelf.GroupsFor(_course.Configuration.Naming, _course.Configuration.ClassNoun));
         PromptShelfHost.Content = shelf;
         PromptShelfArea.Visibility = Visibility.Visible;
 

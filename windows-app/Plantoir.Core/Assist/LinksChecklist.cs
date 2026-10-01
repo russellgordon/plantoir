@@ -271,6 +271,33 @@ public static class LinksChecklist
         return moved;
     }
 
+    /// <summary>
+    /// Every place the section's published-pages record holds — the union of
+    /// every fragment's <c>places</c> (<c>file-formats.json</c> →
+    /// <c>publishedPagesRecord</c>), in composed form. A page listed here has
+    /// been on a site students could reach, and KEEPS its date when a class
+    /// brings it again (<c>datingPagesAClassBrings.publishedBeforeIsRecorded</c>,
+    /// Russell's decision 4 on #379). The build's own reader is
+    /// <c>build_site.py</c>'s; this is the assistant's publish's.
+    /// </summary>
+    public static HashSet<string> PublishedPlaces(string courseDirectory, int section)
+    {
+        var places = new HashSet<string>(StringComparer.Ordinal);
+        string folder = Path.Combine(courseDirectory, ".publish_state", $"section{section}.published-pages");
+        if (!Directory.Exists(folder)) return places;
+        foreach (string fragment in Directory.GetFiles(folder, "*.json"))
+        {
+            try
+            {
+                if (JsonNode.Parse(File.ReadAllText(fragment))?["places"] is JsonArray list)
+                    foreach (var place in list)
+                        if (place is not null) places.Add(Key(place.ToString()));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { }
+        }
+        return places;
+    }
+
     /// <summary>The undo's other half, for a caller that is not undoing through <see cref="UndoHistory"/>.</summary>
     public static void PutPublishedPagesBack(string courseDirectory, int section, string released)
     {

@@ -43,6 +43,55 @@ public static class WizardWording
     /// </summary>
     public const string CreateCourseButton = "Create Course";
 
+    // ---- "This is a club" (#274, mac #267; shared-rules.json → wizard.clubToggle).
+    // Pinned by ClubWizardTests against the contract, never retyped there.
+
+    public const string ClubToggleLabel = "This is a club";
+
+    public const string ClubToggleCaption =
+        "A club meets rather than holds classes: its pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting. The words below can be changed now, but not once the club is made.";
+
+    /// <summary>The Starting Content note while the club box is ticked.</summary>
+    public const string ClubStartingContentNote =
+        "A club starts with empty folders and one page for its first meeting — no ready-made pages, no subject skeleton and no curriculum coverage page. The coverage page can be turned on later in Course Settings.";
+
+    public const string ClubClassFolderRow = "Folder for meeting pages";
+    public const string ClubFrontPageHeadingRow = "Front page heading";
+    public const string ClubPageWordRow = "Pages are named";
+    public const string ClubNounRow = "The assistant calls a page a";
+
+    /// <summary><c>rows.pageWordCaption</c> with the word filled in.</summary>
+    public static string ClubPageWordCaption(string word) => $"Pages will be named “{word} 1”, “{word} 2” and so on.";
+
+    /// <summary>
+    /// The panel's words, which FOLLOW THE TICK BOX (#390, mac #368) — never
+    /// ClubCodeRule: a teacher can untick it for a club-shaped code, and the
+    /// words must describe what will actually be made.
+    /// </summary>
+    public sealed record PanelWords(
+        string CreateButton, string NamingHeading, string NamingCaption, string CreatingTitle,
+        string CodeLabel, string NameLabel, string SectionMarkerCaption, string GradeCaption,
+        string StructureCaption, string GradedFolderCaption, string DefaultSiteName);
+
+    public static PanelWords ForACourse { get; } = new(
+        CreateCourseButton, "Units",
+        "Chosen once, when the course is made — the pages are named this way as they are written",
+        "Creating your course", "Course code", "Course name",
+        "e.g. “S1” appears beside the course code", "e.g. “Grade 12” before the course name",
+        "Defaults are fine for most courses", GradedFolderRule.Caption, "Course Website");
+
+    public static PanelWords ForAClub { get; } = new(
+        "Create Club", "Meetings",
+        "Chosen once, when the club is made — the pages are named this way as they are written",
+        "Creating your club", "Club code", "Club name",
+        "e.g. “S1” appears beside the club code", "e.g. “Grade 12” before the club name",
+        "Defaults are fine for most clubs",
+        "Tick the folders holding work that counts for marks. A club starts without a curriculum coverage map, so these matter only if the coverage page is turned on later in Course Settings.",
+        "Club Website");
+
+    /// <summary>The words for what the box says will be made.</summary>
+    public static PanelWords Panel(bool isClub) => isClub ? ForAClub : ForACourse;
+
     // ---- Starting Content (GitHub issue #250; wizard.whenTheNoteIsShown and
     // wizard.whereTheStartingContentSentencesAreRendered say which is shown
     // where). Pinned by WizardWordingTests and, rendered, by the [UiFact]s in

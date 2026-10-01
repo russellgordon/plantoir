@@ -106,10 +106,10 @@ public class MarksPoolRemovalUiTests
         string configPath = Path.Combine(app.WorkspacePath, "courses", Code, "course_config.json");
         Assert.DoesNotContain("graded_folders", File.ReadAllText(configPath));   // the fixture, proved
 
-        // The row's own button, found by the id FormBuilders gives it. A
-        // BLOCKED row carries a different button entirely, so finding this one
-        // is itself the assertion that the floor let the removal through.
-        app.Find("remove:Tasks", "the remove button on the shared folder Tasks").AsButton().Invoke();
+        // Since #269 the list is a table: select the row, then press − at its
+        // lower left (the ids FormBuilders.StringListEditor gives them).
+        app.Find("row:Shared folders (all sections):Tasks", "the shared folder Tasks").AsListBoxItem().Select();
+        app.Find("remove:Shared folders (all sections)", "− under the shared folders").AsButton().Invoke();
 
         // Removing a folder that counts for marks asks first, and the
         // confirmation's own promise is what the rule under test is keeping.
