@@ -14,9 +14,8 @@ namespace Plantoir.Tests;
 /// a view cannot be pinned, so this is the honest limit: it proves the pool the
 /// dialog is handed, not that the dialog's branch is taken. Every
 /// <c>manifestCases</c> entry runs; every <c>cases</c> entry that applies to
-/// Windows and takes example content runs against the real payload. The two
-/// that need features this app does not have yet (a declined payload keeping
-/// its skeleton, #250; a club, #274) are held open by name in
+/// Windows and takes example content runs against the real payload. The one
+/// that needs a feature this app does not have yet (a club, #274) is held open by name in
 /// <see cref="NamedGapLedger"/>.</para>
 /// </summary>
 public class GradedFoldersNewCourseContractTests
@@ -78,8 +77,10 @@ public class GradedFoldersNewCourseContractTests
     {
         bool taken = c["exampleContent"]?.ToString() == "taken";
         bool club = c["club"]?.GetValue<bool>() ?? false;
-        if (!taken || club)
-            return new List<string> { "not runnable here yet: this app only writes a payload's pool for a course TAKING example content, and has no clubs" };
+        if (club)
+            return new List<string> { "not runnable here yet: this app has no clubs" };
+        bool startsFromSkeleton = c["startsFromSkeleton"]?.GetValue<bool>() ?? true;
+        List<string>? wizardPool = c["wizardGradedFolders"]?.AsArray().Select(n => n!.ToString()).ToList();
 
         var codes = c["everyPayload"]?.GetValue<bool>() == true
             ? Directory.GetDirectories(ExampleContentRoot)
@@ -93,8 +94,14 @@ public class GradedFoldersNewCourseContractTests
         var problems = new List<string>();
         foreach (string code in codes)
         {
-            var pool = ExampleContentCatalog.MarksPool(ExampleContentRoot, code);
-            if (pool is null) { problems.Add($"{code}: the manifest could not be read"); continue; }
+            // Through the function NewCourseDialog.BuildConfiguration writes
+            // from (#250), so a DECLINED payload is run too, not only a taken one.
+            var keys = NewCourseAnswers.Decide(ExampleContentRoot,
+                Path.Combine(ContractLoader.RepositoryRoot, "support", "skeletons"),
+                new NewCourseAnswers.Choices(code, taken, startsFromSkeleton, true,
+                    WizardStructure.Defaults(false) with { GradedFolders = wizardPool })).Keys;
+            if (keys["graded_folders"] is not JArray written) { problems.Add($"{code}: no graded_folders would be written"); continue; }
+            var pool = written.Select(t => t.ToString()).ToList();
 
             List<string> expect;
             if (c["expect"] is JsonValue symbol && symbol.ToString() == "manifest")

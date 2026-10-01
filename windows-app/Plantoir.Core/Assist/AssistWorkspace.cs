@@ -112,7 +112,17 @@ public sealed partial class AssistWorkspace
     /// assistant chat about Section N"). Per-change undo is
     /// <see cref="UndoHistory"/>'s promise and is unchanged.</para>
     /// </summary>
-    private string BackUpOnceForThisConversation(Course course, int sectionNumber)
+    private string BackUpOnceForThisConversation(Course course, int sectionNumber, IProgress<string>? progress = null)
+    {
+        // One copy in flight per course: a second write arriving while the
+        // first is zipping waits for it and reuses it rather than zipping again.
+        lock (_conversationBackups)
+        {
+            return BackUpOnceForThisConversationHeld(course, sectionNumber, progress);
+        }
+    }
+
+    private string BackUpOnceForThisConversationHeld(Course course, int sectionNumber, IProgress<string>? progress)
     {
         // The recorded copy is reused even if it has since gone — deleted from
         // the Backups list, or pruned by five later conversations. Taking a
@@ -125,8 +135,8 @@ public sealed partial class AssistWorkspace
             ConversationBackupPath = existing;
             return existing;
         }
-        string made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                                  new BackupMaker.Assistant(sectionNumber));
+        progress?.Report(AssistWording.BackingUpFirst(course.Code));
+        string made = AssistantBackup(course, sectionNumber);
         _conversationBackups[course.Code] = made;
         ConversationBackupPath = made;
         return made;
@@ -1528,7 +1538,7 @@ public sealed partial class AssistWorkspace
         if (plan.Publishes) RefuseIfPlantoirIsBuilding(course);
 
         string backup;
-        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber); }
+        try { backup = BackUpOnceForThisConversation(course, plan.SectionNumber, progress); }
         catch (Exception error)
         {
             // No backup, no edits. This is the one step that has no fallback.
@@ -1928,7 +1938,7 @@ public sealed partial class AssistWorkspace
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+        throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, other.Kind));
     }
 
     /// <summary>
@@ -1940,20 +1950,30 @@ public sealed partial class AssistWorkspace
     /// back, the trail says why, and the caller is refused with the sentence an
     /// assistant working from outside is told (<c>wording.courseIsBusy</c>).
     /// </summary>
-    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked) =>
-        ClaimTheBuildUnlessDeclined(course, section, asked)
-            ?? throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked)
+    {
+        var (held, declinedBy) = ClaimTheBuild(course, section, asked);
+        return held ?? throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, declinedBy!));
+    }
 
     /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
-    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked)
+    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked) =>
+        ClaimTheBuild(course, section, asked).Held;
+
+    /// <summary>
+    /// The claim, or the KIND of lease that declined it — returned with the
+    /// result rather than kept in a field, so two calls cannot read each
+    /// other's answer (bundle 6a ruling 5).
+    /// </summary>
+    private (WorkLease.Held? Held, string? DeclinedBy) ClaimTheBuild(Course course, int section, string asked)
     {
         var claim = WorkLease.Take(_folder, course.Code, WorkLease.Building);
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
-            return claim;
+            return (claim, null);
         claim.Dispose();
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        return null;
+        return (null, other.Kind);
     }
 
 
@@ -2634,8 +2654,44 @@ public sealed partial class AssistWorkspace
     {
         var course = Course(courseCode);
         int number = Section(course, sectionNumber);
-        return Relative(CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
-                                                    new BackupMaker.Assistant(number)));
+        return Relative(AssistantBackup(course, number));
+    }
+
+    /// <summary>
+    /// The one door every assistant zip goes through — the conversation's first
+    /// copy, back_up_course, and getting a section ready — so each REAL zip
+    /// leaves one <c>assistant backed up a course</c> line with its file name,
+    /// size and time (#360, mac #351): "the window hung after I approved" and
+    /// "where did this zip come from" were unanswerable before it. A failed
+    /// copy is never remembered, and says why.
+    /// </summary>
+    private string AssistantBackup(Course course, int sectionNumber)
+    {
+        // The course is BUSY while it is zipped (#360, mac #351): Plantoir's
+        // own Preview and Deploy, a scheduled publish and any other assistant
+        // see this lease and stand off, as they do on the mac.
+        using var copying = WorkLease.Take(_folder, course.Code, WorkLease.Copying);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        string made;
+        try
+        {
+            made = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory(_folder),
+                                               new BackupMaker.Assistant(sectionNumber));
+        }
+        catch (Exception error)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantBackedUpACourse,
+                $"assistant could not back up the course: {error.Message}", course.Code, sectionNumber);
+            throw;
+        }
+        double megabytes = 0;
+        try { megabytes = new FileInfo(made).Length / (1024.0 * 1024.0); } catch { }
+        ActivityTrail.Note(ActivityTrail.Event.AssistantBackedUpACourse,
+            $"assistant backed up the course as {Path.GetFileName(made)} " +
+            $"({megabytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} MB, " +
+            $"{clock.Elapsed.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s)",
+            course.Code, sectionNumber);
+        return made;
     }
 
     // ---- Helpers ---------------------------------------------------------

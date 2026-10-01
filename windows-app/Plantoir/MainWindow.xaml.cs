@@ -173,12 +173,21 @@ public sealed partial class MainWindow : Window
         Workspace.ExpandedCourseCodes = WindowMemoryCodec.ParseExpandedCourses(frame?.ExpandedCourses);
         Workspace.IsShowingArchived = frame?.ShowsArchived ?? false;
         Workspace.IsShowingBackups = frame?.ShowsBackups ?? false;
-        if (folderPath is not null && Directory.Exists(folderPath))
+        if (folderPath is not null)
         {
-            App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
-            Workspace.AdoptRestoredPath(folderPath);
-            App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
-            ShowSyncNoticeIfNeeded();
+            // Reopened, or the picker with one sentence saying why not (#320).
+            bool windowsOwn = frame is not null;
+            if (LastWorkingFolder.WhyItCannotBeReopened(folderPath) is { } reason)
+            {
+                Workspace.NoteNotReopened(reason, folderPath, windowsOwn);
+            }
+            else
+            {
+                App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
+                Workspace.AdoptRestoredPath(folderPath, windowsOwn);
+                App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+                ShowSyncNoticeIfNeeded();
+            }
         }
         App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();

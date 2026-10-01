@@ -133,14 +133,8 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 320, "reopening the last working folder does not record either outcome yet (mac #311)",
-            "working folder reopened", "working folder not reopened"),
         Owed(ActivityTrailEvents, 387, "Course Settings does not hold a save back yet (mac #373)",
             "settings save held back"),
-        Owed(ActivityTrailEvents, 250, "the New Course wizard does not record the course it made yet (mac #248/#251/#267)",
-            "course created"),
-        Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
-            "exclusions reverted"),
         Owed(ActivityTrailEvents, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "course kept for reference", "course could not be kept for reference",
             "reference course school year changed", "reference course pages locked again"),
@@ -158,20 +152,10 @@ internal static class NamedGapLedger
         Owed(ActivityTrailEvents, 337, "this app does not find or install its own updates yet (mac #204)",
             "update found", "update check found nothing new", "update answered", "update held while work is under way",
             "update installing", "update set aside", "update stopped", "app updated"),
-        Owed(ActivityTrailEvents, 360, "Course Settings has no How I Teach row yet (mac #329)",
-            "How I Teach page started"),
-        Owed(ActivityTrailEvents, 345, "one coverage map per curriculum folder is not built here yet (mac #128)",
-            "curriculum maps built"),
-        Owed(ActivityTrailEvents, 360, "the assistant's own backup of a course is not recorded yet (mac #351)",
-            "assistant backed up a course"),
-        Owed(ActivityTrailEvents, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
-            "section made ready for the start of the year", "start of the year change undone", "start of the year not done"),
 
         // ---- specialNames.platformWording.keys
 
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
-        Owed(CourseConfigKeys, 345, "one coverage map per declared curriculum folder is not built here yet (mac #128)",
-            "curriculum_folders"),
         Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
             "class_page_scheme", "front_page_heading", "class_noun"),
         Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
@@ -183,9 +167,6 @@ internal static class NamedGapLedger
             "a club's front page, numbered pages"),
 
         // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
-        Owed(GradedFoldersNewCourseCases, 250,
-            "declining a payload does not give the subject's skeleton and its pool here yet (mac #248)",
-            "a declined payload keeping its skeleton takes the SKELETON's pool"),
         Owed(GradedFoldersNewCourseCases, 274, "this app has no clubs yet (mac #267)",
             "a club typed with a payload code is not given the payload's pool"),
 
@@ -209,14 +190,10 @@ internal static class NamedGapLedger
             "reDatingOntoTheDatesOnFileForAMeeting", "sharingTheLastDayForAMeeting", "spareDatesAfterTheseForAMeeting",
             "theNextWouldFallOnForAMeeting", "theSemesterBeginsForAMeeting", "wouldAddPagesForAMeeting",
             "wouldMakeRoomForAMeeting", "yourNextUpcomingForAMeeting"),
-        Owed(AssistWordingKeys, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
-            "startOfYearNeedsABackup", "startOfYearNeedsItsPlan", "startOfYearPlanHasChanged"),
         Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
             "linksIntoHiddenPagesWillBeOffered"),
         Owed(AssistWordingKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
             "askedAboutAReferenceCourse", "deployRefusedForAReferenceCourse"),
-        Owed(AssistWordingKeys, 360, "the assistant's own backup of a course is not built as the mac's is yet (mac #351)",
-            "backingUpFirst", "changedWhileSavingACopy", "courseIsBeingCopied"),
         Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
             "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",

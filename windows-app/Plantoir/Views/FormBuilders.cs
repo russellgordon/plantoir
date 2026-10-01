@@ -182,8 +182,13 @@ public static class FormBuilders
                                               Action<string>? onAdded = null,
                                               Func<string, ItemProtection>? protectionFor = null,
                                               Action<string, string>? onRemovalBlocked = null,
-                                              Action<string>? onRenameRequested = null)
+                                              Action<string>? onRenameRequested = null,
+                                              Func<string, ItemProtection>? protectionWhenActedOn = null)
     {
+        // The answer at the CLICK may need fresher facts than the drawing had
+        // (Course Settings walks the disk again, #348); without one, the
+        // drawing's own rule is asked again.
+        protectionWhenActedOn ??= protectionFor;
         var panel = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
         var rows = new StackPanel { Spacing = 2 };
@@ -218,7 +223,7 @@ public static class FormBuilders
                     // and acting on it would empty the marks pool while the
                     // coverage map is on -- exactly the state the floor exists
                     // to forbid. The redraw is the cosmetics; this is the guard.
-                    var now = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+                    var now = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
                     if (now.IsBlocked)
                     {
                         onRemovalBlocked?.Invoke(item, now.Reason);
@@ -254,18 +259,17 @@ public static class FormBuilders
                     };
                     ToolTipService.SetToolTip(remove, $"Remove {display}");
                     AutomationProperties.SetAutomationId(remove, "remove:" + display);
-                    if (protection.AsksFirst)
+                    // Whether to ASK is decided at the click too, not from the
+                    // drawing: the marks confirmation follows the disk (#348),
+                    // and a row drawn before a folder was deleted in Explorer
+                    // would otherwise ask, or not ask, about the wrong thing.
+                    remove.Click += async (_, _) =>
                     {
-                        remove.Click += async (_, _) =>
-                        {
-                            if (await ConfirmRemoval(panel.XamlRoot, protection.Title, protection.Message))
-                                DoRemove();
-                        };
-                    }
-                    else
-                    {
-                        remove.Click += (_, _) => DoRemove();
-                    }
+                        var now = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
+                        if (now.AsksFirst && !await ConfirmRemoval(panel.XamlRoot, now.Title, now.Message))
+                            return;
+                        DoRemove();
+                    };
                     trailing = remove;
                 }
 
@@ -362,8 +366,10 @@ public static class FormBuilders
                                                   Func<List<string>> get, Action<List<string>> set,
                                                   Action changed,
                                                   Func<string, ItemProtection>? protectionFor = null,
-                                                  Action<string, string>? onRemovalBlocked = null)
+                                                  Action<string, string>? onRemovalBlocked = null,
+                                                  Func<string, ItemProtection>? protectionWhenActedOn = null)
     {
+        protectionWhenActedOn ??= protectionFor;
         var panel = new StackPanel { Spacing = 4, Margin = new Thickness(0, 8, 0, 0) };
         panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 13 });
         if (allItems.Count == 0)
@@ -429,7 +435,7 @@ public static class FormBuilders
             };
             check.Unchecked += (_, _) =>
             {
-                var protection = protectionFor?.Invoke(item) ?? ItemProtection.Ordinary;
+                var protection = protectionWhenActedOn?.Invoke(item) ?? ItemProtection.Ordinary;
                 if (protection.IsBlocked)
                 {
                     puttingItBack = true;

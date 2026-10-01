@@ -641,6 +641,15 @@ public sealed partial class SidebarPane : UserControl
             menu.Items.Add(MenuItem(Plantoir.Core.Assist.LinksChecklistWording.MenuItem, Glyphs.Star,
                                      () => _ = OpenLinksChecklist(course, number)));
 
+        // Get Ready for the Start of the Year (#355, mac #96), and its undo
+        // BESIDE it — never in its place — while one is held for this section.
+        menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.MenuItem, "\uE787",
+                                 () => _ = OpenStartOfYear(course, number)));
+        if (Workspace.WorkspacePath is { } undoIn
+            && Plantoir.Core.Assist.StartOfYearSessionUndo.For(undoIn, course.Code, number) is not null)
+            menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.UndoMenuItem, "\uE7A7",
+                                     () => _ = UndoStartOfYear(course, number)));
+
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
@@ -1245,6 +1254,36 @@ public sealed partial class SidebarPane : UserControl
         {
             Title = Plantoir.Core.Assist.LinksChecklistWording.MenuItem.TrimEnd('\u2026'),
             Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = "OK",
+        });
+    }
+
+    /// <summary>"Get Ready for the Start of the Year…": the sheet, Go, and what happened.</summary>
+    private async Task OpenStartOfYear(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        string? said = await StartOfYearDialog.OfferAsync(folder, course, section, ShowDialogSafelyAsync,
+                                                          () => TheFolderMovedUnderThisConfirmation(folder));
+        await SayAfterStartOfYear(said);
+    }
+
+    /// <summary>"Undo Getting Ready for the Start of the Year…".</summary>
+    private async Task UndoStartOfYear(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        string? said = await StartOfYearDialog.UndoAsync(folder, course, section, ShowDialogSafelyAsync,
+                                                         () => TheFolderMovedUnderThisConfirmation(folder));
+        await SayAfterStartOfYear(said);
+    }
+
+    private async Task SayAfterStartOfYear(string? said)
+    {
+        if (said is null) return;
+        // folder-check: not needed — an OK that tells what already happened, and acts on nothing.
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = Plantoir.Core.Assist.StartOfYearWording.MenuItem.TrimEnd('\u2026'),
+            Content = new ScrollViewer { Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap }, MaxHeight = 480 },
             CloseButtonText = "OK",
         });
     }

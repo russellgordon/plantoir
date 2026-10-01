@@ -156,33 +156,54 @@ public static class SkeletonCatalog
     }
 
     /// <summary>
-    /// True when a skeleton would be offered for this code — which is only
-    /// when there is no example content, since example content is better.
+    /// True when a skeleton is OFFERED for this code: a family exists for its
+    /// prefix AND the teacher is not taking the example content written for
+    /// it (<c>shared-rules.json</c> → <c>wizard.skeletonToggle.rule</c>).
     /// </summary>
-    public static bool HasSkeleton(string exampleContentRoot, string skeletonsRoot, string code)
+    /// <remarks>
+    /// <para>One question, in one function, because three surfaces ask it —
+    /// the toggle's visibility, what the structure editor adopts, and
+    /// <c>use_skeleton</c>. Until GitHub issue #250 this asked whether example
+    /// content EXISTED rather than whether the teacher was TAKING it, so for
+    /// every code with ready-made pages a teacher who said "no thanks" got
+    /// empty folders instead of the subject's skeleton (mac #248, measured
+    /// there: ICS4U 18 pages against 47).</para>
+    ///
+    /// <para><paramref name="takingExampleContent"/> has NO default on purpose:
+    /// a call site that has not been made to think about the example toggle
+    /// fails to compile, which is what stopped the mac missing one. A code with
+    /// no ready-made pages cannot be "taking" them, so a stale true there
+    /// changes nothing.</para>
+    /// </remarks>
+    public static bool HasSkeleton(string exampleContentRoot, string skeletonsRoot, string code, bool takingExampleContent)
     {
-        if (ExampleContentCatalog.HasContent(exampleContentRoot, code)) return false;
+        if (takingExampleContent && ExampleContentCatalog.HasContent(exampleContentRoot, code)) return false;
         return GetFamily(skeletonsRoot, code) != null;
     }
 
     /// <summary>
-    /// The structure a course of this code should adopt, or null when nothing should change.
+    /// The structure a course of this code should adopt, or null when nothing
+    /// should change. Asks <see cref="HasSkeleton"/> rather than asking again.
     /// </summary>
     public static Family? StructureToAdopt(
         string exampleContentRoot,
         string skeletonsRoot,
         string code,
+        bool takingExampleContent,
         IReadOnlyList<string> currentSharedFolders,
         IReadOnlyList<string> defaultSharedFolders,
         IReadOnlyList<string> lcsSharedFolders)
     {
-        if (ExampleContentCatalog.HasContent(exampleContentRoot, code)) return null;
+        if (!HasSkeleton(exampleContentRoot, skeletonsRoot, code, takingExampleContent)) return null;
         var candidate = GetFamily(skeletonsRoot, code);
         if (candidate is null) return null;
         if (candidate.SharedFolders.SequenceEqual(currentSharedFolders)) return null;
         if (!IsOffered(skeletonsRoot, currentSharedFolders, defaultSharedFolders, lcsSharedFolders)) return null;
         return candidate;
     }
+
+    /// <summary>The family every code with no prefix of its own falls to (families.json → default).</summary>
+    public const string GeneralFamilyName = "general";
 
     /// <summary>
     /// True when a folder list is still one the app offered, rather than one the teacher has edited.

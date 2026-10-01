@@ -741,7 +741,7 @@ public static class TaskScheduling
                 "    # PLANTOIR_DATED: too (#279): the pages this build rewrote with their",
                 "    # class's date, which the app names on the trail when it reads this;",
                 "    # and PLANTOIR_KEPT_OFF: (#340), a How I Teach page kept off the site.",
-                "    $markers = @(Select-String -LiteralPath $scanned -SimpleMatch 'PLANTOIR_HEALTH:','PLANTOIR_DATED:','PLANTOIR_KEPT_OFF:' -Encoding UTF8 | ForEach-Object { $_.Line })",
+                "    $markers = @(Select-String -LiteralPath $scanned -SimpleMatch 'PLANTOIR_HEALTH:','PLANTOIR_DATED:','PLANTOIR_KEPT_OFF:','PLANTOIR_MAPS:' -Encoding UTF8 | ForEach-Object { $_.Line })",
                 "    if ($markers.Count -gt 0) {",
                 "      Set-Content -LiteralPath $healthFile -Value $markers -Encoding utf8",
                 "    } else {",
