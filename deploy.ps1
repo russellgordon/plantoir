@@ -318,6 +318,22 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   }
 }
 
+# Where a --to-folder value publishes, resolved ONCE against the working
+# folder (#304), or $null when it cannot be told. A plain relative name
+# ("out site", "Sites\x") is taken from the working folder, as deploy.sh
+# takes it. A DRIVE-relative ("C:foo") or ROOT-relative ("\out") path is
+# refused: [IO.Path]::IsPathRooted calls both rooted, and GetFullPath then
+# resolves them against the PROCESS directory, which is the hole the review
+# of bundle 4 found (L1). Fully qualified means a drive and a separator, or
+# a UNC path - the test the app's DeployFolderProblem makes.
+function Resolve-PublishFolder([string]$Asked, [string]$WorkingFolder) {
+  $p = $Asked.Trim()
+  if ($p.Length -eq 0) { return $null }
+  if ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^[\\/][\\/]') { return [IO.Path]::GetFullPath($p) }
+  if ($p -match '^[A-Za-z]:' -or $p -match '^[\\/]') { return $null }
+  return [IO.Path]::GetFullPath((Join-Path -Path $WorkingFolder -ChildPath $p))
+}
+
 function Test-CarriesLiveReload([string]$root) {
   # Does any page under $root still carry the preview's live-reload client?
   #
@@ -345,13 +361,43 @@ function Test-CarriesLiveReload([string]$root) {
   # whole tree, which is the answer this needs. The bug is entirely in the
   # PowerShell port of that check.
   #
-  # Testing for a MatchInfo instead of a Boolean is the fix: -List stops at
-  # the first match in each file, Select-Object -First 1 stops at the first
-  # file, and $null -ne is an unambiguous test whatever the pipeline count.
+  # The fix then was to test for one MatchInfo instead of a Boolean array.
+  # Since #272 the function returns ONE scalar from a loop that writes
+  # nothing to the pipeline, which keeps the same property: one answer for
+  # the whole tree, whatever the page count.
+  #
+  # WHAT IS LOOKED FOR (#272, from mac #291 and #136): the client's script TAG,
+  # then any run of POSIX-space bytes (space, tab, LF, VT, FF, CR - never .NET's
+  # Unicode \s), then its first statement - contracts/app-rules.json ->
+  # buildFreshness.previewBuild.signature. The bare address matched any page
+  # that MENTIONS it (a networking lesson), so a folder publish of such a
+  # course refused every time. Quartz writes the tag and the client on
+  # DIFFERENT lines, so Select-String (line by line, and case-INsensitive by
+  # default) cannot see it: each page is read WHOLE, as bytes, and matched
+  # case-sensitively. Bytes are widened one to one (ISO-8859-1), so a byte
+  # that is not UTF-8 anywhere before the client changes nothing (case 15).
+  # Every *.html page, hidden (dot) folders included (-Force), front page
+  # first; a page that cannot be opened is PASSED OVER, as every other reader
+  # does - under this script's $ErrorActionPreference = 'Stop' an unguarded
+  # read would throw and fail the publish instead.
   if (-not (Test-Path -LiteralPath $root)) { return $false }
-  $hit = Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.html -ErrorAction SilentlyContinue |
-         Select-String -Pattern "ws://localhost:" -List | Select-Object -First 1
-  return ($null -ne $hit)
+  $signature = [regex]::new(
+    [regex]::Escape('<script type="application/javascript">') + '[ \t\n\x0B\f\r]*' +
+    [regex]::Escape("const socket = new WebSocket('ws://localhost:"),
+    [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+  $latin1 = [Text.Encoding]::GetEncoding(28591)
+  $pages = @()
+  $front = Join-Path $root 'index.html'
+  if (Test-Path -LiteralPath $front -PathType Leaf) { $pages += $front }
+  $pages += @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -clike '*.html' -and $_.FullName -ne $front } |
+              ForEach-Object { $_.FullName })
+  foreach ($page in $pages) {
+    $text = $null
+    try { $text = $latin1.GetString([IO.File]::ReadAllBytes($page)) } catch { continue }
+    if ($signature.IsMatch($text)) { return $true }
+  }
+  return $false
 }
 
 # ======================
@@ -436,8 +482,22 @@ if (-not $builtFound) {
 # Each section lands in its own subfolder so sections never overwrite
 # one another. Netlify is not involved.
 if ($TO_FOLDER) {
-  $targetDir = Join-Path -Path ($TO_FOLDER.TrimEnd('\','/')) -ChildPath ("section{0}" -f $SECTION_NUM)
-  New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+  # Resolved ONCE, against THIS working folder, before anything uses it
+  # (#304 / mac #227). The app refuses a partial path outright; a command
+  # line can still hand one over, and one-argument GetFullPath (like robocopy,
+  # a native program) resolves against the PROCESS directory, which
+  # Set-Location does not change - so a relative path could be created in one
+  # folder and copied into another. The two-argument GetFullPath does not
+  # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
+  $folderAsked = Resolve-PublishFolder $TO_FOLDER $ScriptDir
+  if (-not $folderAsked) {
+    Write-Host "That publishing folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
+    Write-Host "   Give the folder's full location, then try again. Nothing was published."
+    exit 1
+  }
+  $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
+  # Not New-Item -Path, which reads [ and ] in a folder name as wildcards.
+  $null = [IO.Directory]::CreateDirectory($targetDir)
   # A PREVIEW build must never reach a published site. Serve mode bakes a
   # live-reload client into every page, and on a published site that script
   # makes a student's browser ask permission to access other apps and
@@ -519,7 +579,12 @@ if ($TO_FOLDER) {
   # below 8 all mean success.
   robocopy $PUBLIC_DIR_HOST $targetDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
   if ($LASTEXITCODE -ge 8) {
-    Write-Host ("Publishing to the folder failed (robocopy exit {0})." -f $LASTEXITCODE)
+    # deploy.sh's own words for the same failure (#304), so the app's one
+    # explanation lifts both; the copy's number stays for whoever reads on.
+    $copyExit = $LASTEXITCODE
+    Write-Host ("{0} Not every page could be copied into the publishing folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
+    Write-Host ("   Folder: {0}" -f $targetDir)
+    Write-Host ("   (copy error {0})" -f $copyExit)
     exit 1
   }
   $global:LASTEXITCODE = 0

@@ -592,8 +592,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
         string script = File.ReadAllText(
             GenerateWrapper(new CourseConfiguration.DeployDestination("netlify", "")));
 
-        Assert.Contains("if ($LASTEXITCODE -eq 3) {", script);
-        Assert.Contains("} elseif ($LASTEXITCODE -ne 0) {", script);
+        Assert.Contains("if ($legExit -eq 3) {", script);   // #395: a leg's exit is saved as $legExit (a captured Cloudflare leg has no $LASTEXITCODE)
+        Assert.Contains("} elseif ($legExit -ne 0) {", script);
         Assert.Contains("if ($buildExit -eq 3) {", script);
         Assert.Contains("} elseif ($buildExit -ne 0) {", script);
     }

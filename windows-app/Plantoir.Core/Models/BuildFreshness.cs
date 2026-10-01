@@ -31,19 +31,114 @@ public static class BuildFreshness
         // A preview's build is never deploy-fresh: serve mode bakes a
         // live-reload client pointed at ws://localhost into every page, and
         // publishing that makes browsers ask to "access other apps and
-        // services on this device" on the live site.
-        if (BuiltForPreview(builtIndex)) return true;
+        // services on this device" on the live site. ANY page, not only the
+        // front one (#272 / mac #136): the built tree is replaced file by
+        // file, so a clean front page in front of a preview's pages is real.
+        string publicDir = Path.GetDirectoryName(builtIndex)!;
+        if (BuiltForPreview(publicDir)) return true;
+
+        // The sixth rule (#272 / mac #265): compare with the START of the
+        // build that made the site, not with when it finished. A build reads
+        // the settings and pages when it starts and writes index.html minutes
+        // later, so a Save made while a publish was building is OLDER than
+        // index.html — compared with index.html alone the next Publish
+        // resent the old site and said it had succeeded. The EARLIER of the
+        // marker and index.html: an earlier time only ever costs a rebuild
+        // that was not needed. No marker (a site built before it existed):
+        // index.html, as before. build_site.py writes it natively here, so
+        // one clock stamps both it and the teacher's Save.
+        string marker = Path.Combine(Path.GetDirectoryName(publicDir)!, BuildStartedMarker);
+        try
+        {
+            if (File.Exists(marker))
+            {
+                DateTime started = File.GetLastWriteTimeUtc(marker);
+                if (started < builtDate) builtDate = started;
+            }
+        }
+        catch { /* unreadable marker: index.html's time, as before */ }
 
         DateTime? contentDate = NewestContentDate(course.DirectoryPath);
         if (contentDate is null) return false;   // nothing readable: nothing to rebuild for
         return contentDate > builtDate;
     }
 
-    /// <summary>True when the built page carries the preview server's live-reload client.</summary>
-    internal static bool BuiltForPreview(string builtIndexPath)
+    /// <summary><c>app-rules.json → buildFreshness.buildStartedMarker.file</c>, beside <c>public\</c>.</summary>
+    public const string BuildStartedMarker = ".build-started";
+
+    // app-rules.json -> buildFreshness.previewBuild.signature: the client's
+    // script TAG, any run of the `between` bytes (POSIX [[:space:]] in the C
+    // locale: space, tab, LF, VT, FF, CR — never .NET's Unicode whitespace),
+    // then its first statement. As BYTES, ordinal: a page that merely
+    // MENTIONS ws://localhost: (a networking lesson) is not a preview's (#291).
+    private static readonly byte[] ScriptTag = System.Text.Encoding.ASCII.GetBytes("<script type=\"application/javascript\">");
+    private static readonly byte[] Client = System.Text.Encoding.ASCII.GetBytes("const socket = new WebSocket('ws://localhost:");
+    private static bool IsBetweenByte(byte b) => b is (byte)' ' or (byte)'\t' or (byte)'\n' or 0x0B or 0x0C or (byte)'\r';
+
+    /// <summary>
+    /// True when ANY page of the built site carries the preview server's
+    /// live-reload client — <c>previewBuild</c>, the rule every checker reads.
+    /// <c>index.html</c> first (unreadable or missing: rebuild, the safe
+    /// direction), then every file ending <c>.html</c> under
+    /// <paramref name="publicDir"/>, hidden (dot) folders included — the
+    /// <c>SearchOption</c> overload does not skip Hidden or System items the way
+    /// a default <c>EnumerationOptions</c> would. A page that cannot be opened
+    /// is PASSED OVER, as every other reader does.
+    /// </summary>
+    internal static bool BuiltForPreview(string publicDir)
     {
-        try { return File.ReadAllText(builtIndexPath).Contains("ws://localhost:", StringComparison.Ordinal); }
-        catch { return true; }   // unreadable: rebuild rather than trust it
+        string index = Path.Combine(publicDir, "index.html");
+        try
+        {
+            if (CarriesTheClient(File.ReadAllBytes(index))) return true;
+        }
+        catch { return true; }   // the built index cannot be read: rebuild rather than trust it
+
+        // A page that cannot be OPENED is passed over (the contract's
+        // `unreadable` cases). A FOLDER that cannot be listed is different:
+        // the enumeration throws from inside the loop (MoveNext), and the
+        // pages beneath it were never looked at, so nobody can say they are
+        // not a preview's. That answers "rebuild" — the safe direction, as an
+        // unreadable front page does — rather than escaping NeedsRebuild and
+        // failing the Deploy with an error (bundle 4 review L2).
+        try
+        {
+            foreach (string page in Directory.EnumerateFiles(publicDir, "*.html", SearchOption.AllDirectories))
+            {
+                if (!page.EndsWith(".html", StringComparison.Ordinal)) continue;
+                if (string.Equals(page, index, StringComparison.OrdinalIgnoreCase)) continue;
+                byte[] bytes;
+                try { bytes = File.ReadAllBytes(page); }
+                catch { continue; }
+                if (CarriesTheClient(bytes)) return true;
+            }
+        }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Every occurrence of the tag is tried, and the bytes after it must be
+    /// only <c>between</c> bytes and then the client — "the tag is present AND
+    /// the client is present" fails case 10, a production page holding the
+    /// same tag for Quartz's own inline script.
+    /// </summary>
+    internal static bool CarriesTheClient(ReadOnlySpan<byte> page)
+    {
+        int from = 0;
+        while (from < page.Length)
+        {
+            int at = page[from..].IndexOf(ScriptTag);
+            if (at < 0) return false;
+            int cursor = from + at + ScriptTag.Length;
+            while (cursor < page.Length && IsBetweenByte(page[cursor])) cursor++;
+            if (page[cursor..].StartsWith(Client)) return true;
+            from = from + at + 1;
+        }
+        return false;
     }
 
     /// <summary>

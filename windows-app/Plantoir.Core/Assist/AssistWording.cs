@@ -35,8 +35,52 @@ public static class AssistWording
 
     // MARK: - Deploying
 
+    // ---- A re-date's reply (#357 / mac #343; class-planning.json ->
+    // reDatingASection.reportedCounts). The contract stores the sentences
+    // with example numbers; the counts are the classes and the pages they
+    // use whose dates were WRITTEN.
+
+    public static string ReDated(int classes, int pages) =>
+        $"Re-dated {classes} {(classes == 1 ? "class" : "classes")} and {pages} {(pages == 1 ? "page" : "pages")} they use.";
+
+    public static string ReDatedOnlyPagesTheyUse(int pages) =>
+        $"Every class was already on its day, so only the {pages} {(pages == 1 ? "page" : "pages")} they use " +
+        $"{(pages == 1 ? "was" : "were")} re-dated.";
+
+    public static string EveryPageIsAlreadyOnItsDay(string course, string section) =>
+        $"Every page in {course} Section {section} is already on the day it should be.";
+
+    /// <summary>Which of the three a re-date that wrote these counts says.</summary>
+    internal static string ReDatedSummary(string course, string section, int classes, int pages) =>
+        classes > 0 ? ReDated(classes, pages)
+        : pages > 0 ? ReDatedOnlyPagesTheyUse(pages)
+        : EveryPageIsAlreadyOnItsDay(course, section);
+
     public static string Deployed(string course, string section) =>
         $"{course} Section {section} is deployed. Students can reach it now.";
+
+    // ---- A windowless deploy or rebuild that met a question (#391 / mac #378)
+    // The launchers run --non-interactive with nobody at a window, so a
+    // question (a site name, the surname, a token) is refused with exit 3
+    // rather than waiting for ever on a terminal nobody reads.
+
+    public static string DeployNeedsAnAnswer(string course, string section) =>
+        $"{course} Section {section} needs one answer before it can be deployed from here, so nothing was sent to " +
+        "students. Deploy it once from its window in Plantoir, where the question can be answered; after that it can " +
+        "be deployed from here.";
+
+    public static string DeployNeedsAnAnswerAt(string course, string section, string destinations) =>
+        $"{course} Section {section} was not deployed to {destinations}: it needs one answer there that can only be " +
+        "given from its window in Plantoir. Deploy it once from there; after that it can be deployed from here.";
+
+
+    public static string PreviewBuildNeedsAnAnswer(string course, string section) =>
+        $"The preview for {course} Section {section} needs one answer before it can be built from here. Build it " +
+        "once from its window in Plantoir, where the question can be answered.";
+
+    /// <summary>#386 / mac #381: a preview of a section this app is deploying.</summary>
+    public static string SectionIsBeingDeployed(string course, string section) =>
+        $"{course} Section {section} is being deployed right now. Preview it once the deploy has finished.";
 
     public static string CouldNotBuildBeforeDeploying(string course, string section) =>
         $"{course} Section {section} could not be built, so nothing was sent to students. {WhereTheOutputIs}";

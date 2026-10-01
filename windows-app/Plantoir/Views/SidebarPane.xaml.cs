@@ -660,10 +660,18 @@ public sealed partial class SidebarPane : UserControl
     /// at that moment is stated in the dialog rather than discovered at
     /// 6:31, either way.
     /// </summary>
-    private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
+    private async void AskWhenToDeploy(Course windowCourse, int number, DateTime? existing)
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // The sheet works from the SAVED settings (#357 / mac #335): what it
+        // shows, what it refuses and what it sets. Unreadable: refuse.
+        if (SavedSettings.Read(windowCourse) is not { } course)
+        {
+            await ShowError("That couldn't be scheduled", SavedSettings.CouldNotBeReadToDeploy(windowCourse.Code));
+            return;
+        }
+        bool unsavedSomewhere = Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(windowCourse.ConfigFilePath);
         var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
         bool isChange = existing is not null;
 
@@ -694,6 +702,8 @@ public sealed partial class SidebarPane : UserControl
             // Names EVERY destination (#400); nothing about unpublished classes.
             Text = ScheduledDeploy.DialogOpening(course, number),
         });
+        if (unsavedSomewhere)
+            body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = SavedSettings.SchedulingUsesSavedSettings });
         body.Children.Add(day);
         body.Children.Add(time);
         body.Children.Add(warning);
@@ -734,6 +744,11 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
+        if (SavedSettings.Read(windowCourse) is { } savedAtThePress) course = savedAtThePress;   // again at the press
+        if (unsavedSomewhere)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.DeployUsedTheSavedSettings,
+                SavedSettings.DeployUsedTheSavedSettingsLine("set a deploy for a moment", course, windowCourse),
+                course.Code, number);
         // Where it goes and the Account ID are read when it RUNS (#347); the
         // destinations handed over here are only what the teacher was told.
         if (TaskScheduling.Schedule(folder, course.Code, number, when,

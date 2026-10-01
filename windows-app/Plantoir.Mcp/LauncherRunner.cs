@@ -159,6 +159,16 @@ public sealed class LauncherRunner : ILauncherRunner
             // (CLAUDE.md rule 1). The human sentence it carries is reported
             // properly, by the caller, out of Findings — and site_health.py
             // prints its own sentence separately besides.
+            // #395: deploy.py's PLANTOIR_CLOUDFLARE_REMADE: from a deploy this
+            // server ran - the same trail line the app writes from its own runs.
+            if (Plantoir.Core.Models.CloudflareProjectRemade.Parse(line) is { } remade)
+            {
+                Plantoir.Core.Scripting.ActivityTrail.Note(
+                    Plantoir.Core.Scripting.ActivityTrail.Event.CloudflareProjectMadeAgain,
+                    remade.TrailSentence, remade.Course, remade.Section);
+                return;
+            }
+
             if (Plantoir.Core.Models.SiteHealthFinding.Parse(line) is { } finding)
             {
                 lock (gate)
@@ -221,8 +231,8 @@ public sealed class LauncherRunner : ILauncherRunner
         }
 
         return process.ExitCode == 0
-            ? new LaunchOutcome(true, transcript, found)
-            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found);
+            ? new LaunchOutcome(true, transcript, found, 0)
+            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found, process.ExitCode);
     }
 
     /// <summary>

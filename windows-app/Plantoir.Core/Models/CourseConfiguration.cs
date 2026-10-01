@@ -70,23 +70,130 @@ public sealed class CourseConfiguration
         _ => node.DeepClone(),
     };
 
-    public void Write(string path)
+    /// <summary><c>shared-rules.json → specialNames.settingsSaveReplacedSidebarChange.message</c>.</summary>
+    public const string SaveReplacedSidebarChange =
+        "Which items the sidebar hides had also been changed somewhere else since this window read them \u2014 most " +
+        "likely in another Plantoir window. This save replaced that change with the switches shown here.";
+
+    /// <summary>What a Save kept from elsewhere and what it replaced (<c>savingSettings.cases</c>).</summary>
+    public sealed record SaveReport(IReadOnlyList<string> KeptFromElsewhere, IReadOnlyList<string> ReplacedChangesFromElsewhere);
+
+    /// <summary>
+    /// Every writer of course_config.json saves through here (Course Settings,
+    /// Add Section, archive, restore, rename), so the rule lives in ONE place
+    /// (#272 / mac #265, <c>shared-rules.json → savingSettings</c>): a Save
+    /// writes only the TOP-LEVEL keys this copy changed since it last read or
+    /// wrote the file, and keeps the file's value — including being gone — for
+    /// every other key.
+    ///
+    /// <para>MEASURED here before it was written (2026-09-30): a WinUI window
+    /// DOES hold its own copy. Ctrl+N opens a second window on the same
+    /// working folder (<c>Workspace.FolderForNewWindow</c>), each window's
+    /// <c>WorkspaceViewModel</c> loads its own <see cref="Course"/> list, and
+    /// each course its own <see cref="CourseConfiguration"/>; the old Write
+    /// serialised the whole object, so window B's Save put back the hides
+    /// window A had just saved — the mac's reported failure, reproduced by
+    /// <c>TwoWindowSettingsTests.TheOldWholeFileWriteLostTheOtherWindowsHides</c>.</para>
+    /// </summary>
+    public SaveReport Write(string path)
     {
-        byte[] data = SerializedBytes();
+        JObject? onDisk = null;
+        try { if (File.Exists(path)) onDisk = ParseObject(File.ReadAllBytes(path)); }
+        catch { onDisk = null; }   // unreadable: this copy is the only truth left
+        JObject? lastRead = null;
+        try { if (_lastSavedData.Length > 0) lastRead = ParseObject(_lastSavedData); } catch { lastRead = null; }
+
+        var (written, kept, replaced) = onDisk is null || lastRead is null
+            ? ((JObject)_values.DeepClone(), new List<string>(), new List<string>())
+            : Merged(lastRead, onDisk, _values);
+        byte[] data = Serialize(written);
         string temp = path + ".tmp";
         File.WriteAllBytes(temp, data);
         File.Move(temp, path, overwrite: true);
+        _values = written;
         _lastSavedData = data;
+        return new SaveReport(kept, replaced);
+    }
+
+    /// <summary>
+    /// The per-key merge: <paramref name="lastRead"/> is what this copy last
+    /// read or wrote, <paramref name="onDisk"/> the file now, <paramref name="mine"/>
+    /// this copy. A key this copy changed is written as this copy has it (the
+    /// Save being made wins, whole list — said, not merged); every other key
+    /// follows the file.
+    /// </summary>
+    public static (JObject Written, List<string> KeptFromElsewhere, List<string> Replaced) Merged(
+        JObject lastRead, JObject onDisk, JObject mine)
+    {
+        var written = (JObject)onDisk.DeepClone();
+        var kept = new List<string>();
+        var replaced = new List<string>();
+        var keys = lastRead.Properties().Select(p => p.Name)
+            .Concat(mine.Properties().Select(p => p.Name))
+            .Concat(onDisk.Properties().Select(p => p.Name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(k => k, StringComparer.Ordinal);
+        foreach (string key in keys)
+        {
+            JToken? before = lastRead[key], now = onDisk[key], ours = mine[key];
+            bool iChanged = !JToken.DeepEquals(before, ours);
+            bool elsewhereChanged = !JToken.DeepEquals(before, now);
+            if (iChanged)
+            {
+                if (ours is null) written.Remove(key); else written[key] = ours.DeepClone();
+                if (elsewhereChanged && !JToken.DeepEquals(now, ours)) replaced.Add(key);
+            }
+            else if (elsewhereChanged)
+            {
+                kept.Add(key);
+            }
+        }
+        return (written, kept, replaced);
+    }
+
+    /// <summary>
+    /// Revert reads the FILE (#272 / mac #265, 3a), not this copy's
+    /// remembered last save: with two windows, B reverting to its own old copy
+    /// showed A's saved hides as gone and "nothing unsaved", and B's next hide
+    /// then wrote them away. Falls back to the remembered copy only when the
+    /// file cannot be read.
+    /// </summary>
+    public void RevertToFile(string path)
+    {
+        try
+        {
+            byte[] data = File.ReadAllBytes(path);
+            _values = ParseObject(data);
+            _lastSavedData = data;
+        }
+        catch { DiscardChanges(); }
+    }
+
+    /// <summary>
+    /// After ANOTHER copy saved this course: read the file again, unless this
+    /// copy holds unsaved changes — those are left alone, and its own Save
+    /// follows the merge rule. True when it re-read.
+    /// </summary>
+    public bool RereadIfNothingUnsaved(string path)
+    {
+        if (HasUnsavedChanges) return false;
+        try
+        {
+            byte[] data = File.ReadAllBytes(path);
+            _values = ParseObject(data);
+            _lastSavedData = data;
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>
     /// Writes ONE change to the file on disk from a fresh read, leaving every
     /// other unsaved edit in this object unsaved — the recorder a folder
     /// rename uses, because the folder has really moved and a Cancel that
-    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
-    /// as it is: making it read-compare-write would change what
-    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
-    /// and Cancel in Course Settings would stop doing what it says.
+    /// appeared to undo it would be a lie. <see cref="Write"/> writes this
+    /// object's WHOLE set of changes (merged per key since #272); this writes
+    /// one change and leaves the rest of this object's edits unsaved.
     ///
     /// <para>Read, change, and write only if nothing else wrote in between. A
     /// build's own <c>preflight_update_course_config</c> writes this same
@@ -369,6 +476,13 @@ public sealed class CourseConfiguration
     {
         string path = rawPath.Trim();
         if (path.Length == 0) return "Choose the folder this course deploys into.";
+        // #304 (mac #227): a partial path is refused BEFORE the folder is looked
+        // for. Directory.Exists would resolve it against THIS app's current
+        // folder while deploy.ps1 publishes from the working folder - checked
+        // in one place and published into another. IsPathFullyQualified also
+        // refuses drive-relative "C:out" and root-relative "\out".
+        if (!Path.IsPathFullyQualified(path))
+            return "That isn’t a full folder location — use Choose… to pick the folder.";
         if (File.Exists(path)) return "That’s a file — deploying needs a folder.";
         if (!Directory.Exists(path)) return "That folder doesn’t exist — use Choose… to pick or create one.";
         try
