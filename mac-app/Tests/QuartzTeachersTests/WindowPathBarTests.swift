@@ -16,6 +16,7 @@ final class WindowPathBarTests: XCTestCase {
         workspace.chooseWorkspace(at: folderURL)
         try await Task.sleep(for: .milliseconds(500))
 
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         XCTAssertNotNil(AccessibilityInspector.frame(forIdentifier: "windowPathBar"),
                         "The path bar is not in the accessibility tree")
 
@@ -25,6 +26,7 @@ final class WindowPathBarTests: XCTestCase {
         XCTAssertGreaterThan(WindowChrome.pathBarHeight, WindowChrome.footerHeight,
                              "The path bar sits flush to the window edge, so it must be the taller of the two")
 
+        try AccessibilityInspector.skipUnlessTheWindowCanBeRead(workspace.window)
         let labels: [String] = AccessibilityInspector.collectAllLabels()
         var mentionsTheFolder: Bool = false
         var carriesItsLabel: Bool = false

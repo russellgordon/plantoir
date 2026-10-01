@@ -273,7 +273,25 @@ new_working_folder
 make_course ICS3U
 link_course_build_output ICS3U >/dev/null
 check "so an abandoned one can be recognised later" \
-  "$(pwd -P)" "$(cat "$BUILDS/working-folder.txt" 2>/dev/null)"
+  "$(/bin/pwd -P)" "$(cat "$BUILDS/working-folder.txt" 2>/dev/null)"
+
+# GitHub #189: the marker is the disk's own spelling of the folder, however
+# the folder was reached — /bin/pwd rather than bash's own `pwd -P`, which
+# keeps the case it was handed. The launchers also move into that spelling
+# before they get here; this checks the block's own half.
+echo
+echo "The builds folder's note names the folder the way the disk spells it"
+new_working_folder
+make_course ICS3U
+DISK_SPELLING="$(/bin/pwd -P)"
+WRONG_CASE="$(dirname "$WORKING_FOLDER")/$(basename "$WORKING_FOLDER" | tr '[:lower:]' '[:upper:]')"
+if cd "$WRONG_CASE" 2>/dev/null; then
+  link_course_build_output ICS3U >/dev/null
+  check "reached in the wrong case, it still names the disk's spelling" \
+    "$DISK_SPELLING" "$(cat "$BUILDS/working-folder.txt" 2>/dev/null)"
+else
+  echo "  (skipped: this disk tells upper and lower case apart, so there is no wrong-case spelling to reach)"
+fi
 
 echo
 if [ "$FAILURES" -eq 0 ]; then

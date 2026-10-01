@@ -73,7 +73,8 @@ struct AssistWindowView: View {
         ))
         _storedHistory = AppStorage(
             wrappedValue: "",
-            "AssistPromptHistory-\(courseCode)-\(sectionNumber)"
+            "AssistPromptHistory-\(courseCode)-\(sectionNumber)",
+            store: PlantoirDefaults.shared
         )
     }
 
@@ -109,7 +110,11 @@ struct AssistWindowView: View {
                 // shape, not usually the actual page. A card that fired
                 // immediately would make the shelf a row of buttons a teacher
                 // learns not to touch.
-                AssistPromptShelfView { phrasing in
+                AssistPromptShelfView(
+                    groups: AssistPromptShelfView.groups(
+                        naming: session.classPageNaming, noun: session.classNoun
+                    )
+                ) { phrasing in
                     show(phrasing)
                     history.stopBrowsing()
                     isComposerFocused = true
@@ -293,7 +298,19 @@ struct AssistWindowView: View {
     private var conversation: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                // A plain VStack, NOT lazy (#351). The lazy stack went into a
+                // placement loop after Approve that never ended: one-second
+                // samples showed the main thread 98% inside SwiftUI placing it
+                // (`LazySubviewPlacements`, the `ForEach` over the transcript),
+                // nothing else on the main actor ran — the copy the approved
+                // change waited for was made in two seconds and its result never
+                // read — and XCUITest reported "main thread busy for 30.0s".
+                // Measured on the rollover UI test, 2026-09-26: lazy, 0 runs in
+                // 6 passed with the animated scroll and 2 in 7 without it; plain,
+                // 8 in 8, the question 1.05–1.07 s after Approve. A conversation
+                // is dozens of lines, not thousands, so laziness bought nothing.
+                // `AssistConversationStackTests` holds this file to it.
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(transcriptLines.enumerated()), id: \.element.id) { position, line in
                         switch line {
                         case .said(let entry):
@@ -315,6 +332,22 @@ struct AssistWindowView: View {
                     if session.agent?.isBusy == true, session.agent?.pendingApproval == nil {
                         AssistTypingIndicator()
                     }
+                    // What the wait is, when it is a copy of the course being
+                    // saved before a change (#351): the one wait long enough
+                    // to read as a hang — a course full of pictures takes a
+                    // minute — so it is named rather than left to the dots.
+                    if let backingUp = session.agent?.courseBeingBackedUp {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(AssistWording.backingUpFirst(course: backingUp))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("assistBackingUpLine")
+                    }
                     if let approval = session.agent?.pendingApproval,
                        let agent = session.agent {
                         AssistApprovalView(isDeploy: agent.pendingIsDeploy) {
@@ -328,11 +361,11 @@ struct AssistWindowView: View {
                     if let offer = SectionSchedulePrompt.shared.offer,
                        offer.courseCode == session.courseCode,
                        offer.sectionNumber == session.sectionNumber {
-                        AssistDatesOfferView(reason: offer.reason) {
+                        AssistDatesOfferView(reason: offer.reason, noun: session.classNoun) {
                             SectionSchedulePrompt.shared.acceptOffer()
                         } decline: {
                             SectionSchedulePrompt.shared.declineOffer()
-                            session.agent?.noteDatesDeclined()
+                            session.agent?.noteDatesDeclined(noun: session.classNoun)
                         }
                     }
                     if let agent = session.agent, agent.planMode.shouldOfferToStop {
@@ -360,7 +393,10 @@ struct AssistWindowView: View {
     private var composer: some View {
         HStack(spacing: 6) {
             TextField("Ask about this section…", text: $typing, axis: .vertical)
+                // .plain inside the Messages-shaped rounded border this
+                // composer strokes itself — listed in TextFieldStyleScanTests.
                 .textFieldStyle(.plain)
+                .accessibilityIdentifier("assistComposerField")
                 .lineLimit(1...4)
                 .onSubmit {
                     // Ignored while the assistant is mid-run: it does one
@@ -777,6 +813,10 @@ private struct AssistDatesOfferView: View {
     // MARK: - Stored properties
 
     let reason: String
+
+    /// What the course calls one of its pages (#267).
+    let noun: ClassNoun
+
     let accept: () -> Void
     let decline: () -> Void
 
@@ -784,7 +824,7 @@ private struct AssistDatesOfferView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(AssistWording.mayIAskForYourDates, systemImage: "calendar")
+            Label(AssistWording.mayIAskForYourDates(for: noun), systemImage: "calendar")
                 .font(.headline)
             if !reason.isEmpty {
                 Text(reason)

@@ -148,7 +148,7 @@ struct SectionSettingsView: View {
                                 ),
                                 text: customDomainBinding(forDestinationType: destination.type)
                             )
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .autocorrectionDisabled()
                             .accessibilityIdentifier("customDomainField-section\(sectionNumber)-\(destination.type)")
                             if let problem = customDomainProblem(forDestinationType: destination.type) {

@@ -391,7 +391,11 @@ check whether the claim is TRUE).
   (`support/skeletons/`, `families.json`) serves BC codes through the same
   generic 3-letter-prefix mechanism as Ontario codes — nothing BC-specific
   is needed there either, and a new payload retires its skeleton exactly as
-  for Ontario.
+  for Ontario — which is to say, only for a teacher who TAKES the payload.
+  Decline it and the course starts from the family skeleton (#248). Worth
+  knowing here in particular: MCMPR11's prefix is in no map entry, so it
+  falls to the DEFAULT `general` family, and its skeleton is the one a
+  BC teacher who says no thanks actually gets.
 
 ## Everything from the Ontario skill that still applies, unchanged
 

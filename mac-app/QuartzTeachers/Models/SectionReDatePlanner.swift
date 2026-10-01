@@ -182,7 +182,18 @@ enum SectionReDatePlanner {
             let day: CalendarDay = SectionReDatePlanner.date(
                 at: index, from: remembered.dates
             )
-            for page in graph.linkedPages(from: [classPage]) {
+            // The reach stops at a class page (issue #173), so material
+            // reachable only THROUGH another class is claimed by the class
+            // that actually brings it rather than by whichever earlier class
+            // could see it through that one. Class pages themselves are
+            // unaffected: step 1 above dates every numbered class by position.
+            for page in graph.reachFollowingLinks(from: [classPage]).pages {
+                // `isClassPage` is kept on purpose although it can no longer
+                // fire — every class is in `spokenFor` from step 1, and since
+                // #173 the reach does not hand one back either. This is where
+                // the rule is NAMED, and a rule upheld only by the absence of
+                // a page is one a later reader deletes without knowing they
+                // have. Same reasoning as `dateMovesFollowingClasses`.
                 if spokenFor.contains(page.lowercasedTitle) || page.isClassPage || page.isFolderIndex {
                     continue
                 }
@@ -227,32 +238,65 @@ enum SectionReDatePlanner {
         return dates[dates.count - 1]
     }
 
-    /// Carry it out. Returns the change record so it can be undone.
+    /// Carry it out. Returns the change record so it can be undone, the
+    /// titles of the pages the writer DECLINED — their settings have no place
+    /// a new date line can go (#186) — so the reply can name them rather than
+    /// count them, and how many classes and pages they use actually had a
+    /// new date WRITTEN (#343).
+    ///
+    /// **The two counts come from what was written, each from its own kind.**
+    /// The reply used to say `moves.count - classCount` pages, but
+    /// `classCount` counts every numbered class while `moves` holds only the
+    /// pages whose date changes — so a section with some classes already on
+    /// their days was told "Re-dated 14 classes and -4 pages they use". A
+    /// page left on its day, or declined, is counted nowhere.
     static func apply(_ plan: SectionReDatePlan, forSection sectionNumber: Int, in course: Course)
-        throws -> AssistChange {
+        throws -> (change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int) {
         let tail: String = ClassPages.siblingTimeAndOffset(
             from: ClassPages.list(forSection: sectionNumber, in: course),
             forSection: sectionNumber
         )
 
         var saved: [AssistSavedFile] = []
+        var leftAlone: [String] = []
+        var classesReDated: Int = 0
+        var pagesTheyUseReDated: Int = 0
         for move in plan.moves {
             let before: String = try String(contentsOf: move.fileURL, encoding: .utf8)
-            var after: String = PageFrontmatter.settingCreated(
+            let dated: (text: String, outcome: FrontmatterWriteOutcome) = PageFrontmatter.settingCreated(
                 in: before,
                 key: PageFrontmatter.createdKey(
                     forSection: sectionNumber, isSectionLocal: move.isSectionLocal
                 ),
                 to: move.to,
                 fallbackTail: tail
-            ).text
+            )
+            var after: String = dated.text
+            // Only the DATE is reported (#186's review, B3): the sentence is
+            // about a new date. A hide declined on a page whose date WAS
+            // written needs a block whose first line is indented with a
+            // column-0 `created:` below it — a block the build cannot read at
+            // all, which the build already hides and names (#246).
+            let declined: Bool = dated.outcome == .noRoomForAKey
             if move.unpublishes {
-                after = AssistPageVisibility.setting(
+                let hidden: (text: String, outcome: FrontmatterWriteOutcome) = AssistPageVisibility.setting(
                     published: false,
                     in: after,
                     forSection: sectionNumber,
                     isSectionLocal: move.isSectionLocal
-                ).text
+                )
+                after = hidden.text
+            }
+            if declined {
+                leftAlone.append(move.fileURL.deletingPathExtension().lastPathComponent)
+            }
+            if dated.outcome == .written {
+                switch move.reason {
+                case .aClass:
+                    classesReDated += 1
+                case .broughtBy, .yearRound:
+                    pagesTheyUseReDated += 1
+                }
             }
             if after == before {
                 continue
@@ -265,13 +309,24 @@ enum SectionReDatePlanner {
             saved.append(repointed)
         }
 
-        return AssistChange(
-            whatHappened: "re-dated \(plan.classCount) "
-                        + "\(plan.classCount == 1 ? "class" : "classes") and what they use",
+        // The undo line names what MOVED (#343), not every class in the section.
+        let whatHappened: String
+        if classesReDated == 0 {
+            whatHappened = "re-dated what the classes use"
+        } else {
+            whatHappened = "re-dated \(classesReDated) "
+                         + "\(classesReDated == 1 ? "class" : "classes") and what they use"
+        }
+        let change: AssistChange = AssistChange(
+            whatHappened: whatHappened,
             courseCode: course.code,
             sectionNumber: sectionNumber,
             rebuildsThePreview: true,
             files: saved
+        )
+        return (
+            change: change, leftAlone: leftAlone,
+            classesReDated: classesReDated, pagesTheyUseReDated: pagesTheyUseReDated
         )
     }
 }
@@ -303,9 +358,15 @@ struct SectionReDatePlan {
 
     /// The plan in words. Same shape as every other plan here: one sentence
     /// per page, no arrows, no markdown.
-    func describe(mostListed: Int = 15) -> String {
+    ///
+    /// `noun` is what the course calls one of its pages (#267). The model is
+    /// always given the `.class` form; a club's CARD says "meeting" — see
+    /// `AssistToolOutcome.planned(_:plan:card:)`.
+    func describe(mostListed: Int = 15, noun: ClassNoun = .class) -> String {
         var lines: [String] = []
-        lines.append("\(courseCode) Section \(sectionNumber): re-dating onto the class dates on file.")
+        lines.append(AssistWording.reDatingOntoTheDatesOnFile(
+            course: courseCode, section: "\(sectionNumber)", noun: noun
+        ))
         lines.append("")
 
         if changesNothing {
@@ -313,19 +374,20 @@ struct SectionReDatePlan {
             return lines.joined(separator: "\n")
         }
 
-        lines.append("\(classCount) \(classCount == 1 ? "class runs" : "classes run") from "
-                     + "\(firstDay.text) (\(firstDay.weekdayName)) to "
-                     + "\(lastDay.text) (\(lastDay.weekdayName)).")
+        lines.append(AssistWording.pagesRunFrom(
+            count: classCount,
+            first: "\(firstDay.text) (\(firstDay.weekdayName))",
+            last: "\(lastDay.text) (\(lastDay.weekdayName))",
+            noun: noun
+        ))
         if spareDates > 0 {
             lines.append("\(spareDates) recorded \(spareDates == 1 ? "date is" : "dates are") "
                          + "left over at the end.")
         }
         if overflowing > 0 {
-            lines.append("\(overflowing) \(overflowing == 1 ? "class has" : "classes have") no day "
-                         + "of \(overflowing == 1 ? "its" : "their") own this year, so "
-                         + "\(overflowing == 1 ? "it goes" : "they all go") on "
-                         + "\(lastDay.text) with the last one as \(overflowing == 1 ? "a draft" : "drafts"). Move, publish or delete "
-                         + "\(overflowing == 1 ? "it" : "them") when you have decided what to do.")
+            lines.append(AssistWording.pagesWithNoDayOfTheirOwn(
+                count: overflowing, lastDay: lastDay.text, noun: noun
+            ))
         }
         lines.append("")
 
@@ -340,15 +402,18 @@ struct SectionReDatePlan {
             switch move.reason {
             case .aClass:
                 if move.unpublishes {
-                    lines.append("“\(move.title)” moves to \(move.to.text) and becomes a draft because it has no class date.")
+                    lines.append(AssistWording.movesAndBecomesADraft(
+                        page: move.title, to: move.to.text, noun: noun
+                    ))
                 } else {
                     lines.append("“\(move.title)” moves to \(move.to.text).")
                 }
             case .broughtBy(let classTitle):
                 lines.append("“\(move.title)” moves to \(move.to.text), with “\(classTitle)”.")
             case .yearRound:
-                lines.append("“\(move.title)” moves to \(move.to.text), the first day of class, "
-                             + "because Key Links points at it.")
+                lines.append(AssistWording.movesToTheFirstDay(
+                    page: move.title, to: move.to.text, noun: noun
+                ))
             }
             listed += 1
         }

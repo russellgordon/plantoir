@@ -165,7 +165,7 @@ struct SectionScheduleSheet: View {
 
     var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("When does \(course.code) section \(sectionNumber) meet?")
+            Text("When does \(course.displayCode) section \(sectionNumber) meet?")
                 .font(.title2)
                 .accessibilityIdentifier("sectionScheduleTitle")
 
@@ -244,7 +244,7 @@ struct SectionScheduleSheet: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 TextField("https://docs.google.com/spreadsheets/d/…/edit", text: $googleSheetLink)
-                    .textFieldStyle(.roundedBorder)
+                    .borderedTextField()
                     .accessibilityIdentifier("sectionScheduleGoogleSheetField")
 
                 // Said plainly, and before the button is pressed. Everything
@@ -275,7 +275,7 @@ struct SectionScheduleSheet: View {
     var sourceField: some View {
         VStack(alignment: .leading, spacing: 4) {
             TextField("Where these came from", text: $source)
-                .textFieldStyle(.roundedBorder)
+                .borderedTextField()
                 .accessibilityIdentifier("sectionScheduleSourceField")
             Text("In your own words — “timetable.xlsx, block H”. This is what you will read months from now when you wonder where these dates came from.")
                 .font(.caption)
@@ -644,7 +644,7 @@ struct SectionSchedulePromptModifier: ViewModifier {
         if request.courseCode != courseCode || request.sectionNumber != sectionNumber {
             return nil
         }
-        if request.workingFolder.path != workingFolder.path {
+        if !FolderIdentity.isSameFolder(request.workingFolder.path, workingFolder.path) {
             return nil
         }
         return request

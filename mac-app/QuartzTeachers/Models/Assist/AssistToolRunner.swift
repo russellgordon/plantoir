@@ -48,6 +48,23 @@ final class AssistToolRunner {
 
     // MARK: - Stored properties
 
+    /// Which client this runner is answering.
+    ///
+    /// The tools are one surface with two clients, and this is the ONE thing
+    /// that differs beyond the length of the list: a reference course is not
+    /// shown to the local model at all (decision d), while a Claude or Codex
+    /// session is told about it on purpose, because reading one is the point
+    /// of keeping it. `list_courses` is the only tool that asks.
+    ///
+    /// Defaults to `.local`, so the only caller that has to say anything is
+    /// the MCP server.
+    nonisolated enum Surface: Sendable {
+        case local
+        case mcp
+    }
+
+    private let surface: Surface
+
     /// Where the courses are.
     private let workspace: WorkspaceModel
 
@@ -103,11 +120,48 @@ final class AssistToolRunner {
     /// the conversation changes something.
     private(set) var conversationBackupURL: URL?
 
+    /// The course whose copy is being saved RIGHT NOW, for the line the
+    /// window shows under its three dots (#351) — nil the rest of the time,
+    /// including after a copy that failed.
+    ///
+    /// A course full of pictures takes real time to zip (9.7 s for Russell's
+    /// ICS4U), and a wait with nothing on screen but dots reads as a hang.
+    private(set) var courseBeingBackedUp: String?
+
+    /// The copy under way for each course, so that a second write arriving
+    /// while the first is still zipping waits for THAT copy rather than
+    /// making another (#351).
+    ///
+    /// New with #351: while the zip held the main thread, nothing else could
+    /// run until it finished. Off the main actor, an outside assistant's
+    /// second call can arrive at the await — and without this, one
+    /// conversation would make two near-identical zips of the same course.
+    /// A copy that FAILED is never remembered: the next write tries again.
+    @ObservationIgnored private var backupsInFlight: [String: Task<URL?, Never>] = [:]
+
+    /// How a course is copied. `CourseArchiver.backUpCourse` in the app; a
+    /// test replaces it with one it can hold part-way, to see what the
+    /// window is shown while a copy is being saved.
+    @ObservationIgnored var backUpACourse: @MainActor (Course, URL, BackupMaker) async throws -> URL = {
+        course, coursesDirectoryURL, maker in
+        return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: maker)
+    }
+
     // MARK: - Computed properties
 
     /// Whether this conversation has saved a copy to go back to yet.
     var hasConversationBackup: Bool {
         return conversationBackupURL != nil
+    }
+
+    /// Every backup this conversation has made, one per course it changed —
+    /// the ones a delete must leave alone while the window is open (#242).
+    var backupsThisConversationMade: [URL] {
+        var made: [URL] = []
+        for (_, backupURL) in conversationBackups {
+            made.append(backupURL)
+        }
+        return made
     }
 
     /// The day a relative word is counted from, read afresh every time it is
@@ -128,6 +182,28 @@ final class AssistToolRunner {
         return readToday()
     }
 
+    /// The courses in the working folder, each with its settings AS SAVED
+    /// NOW — read from disk at the moment it is asked for (GitHub #322).
+    ///
+    /// The ONLY way this file reads the course list, and a source test holds
+    /// it to that. The runner's model is made once, when the assistant's
+    /// window opens or the outside-assistant server starts, and a Save in
+    /// Course Settings never reaches it; reading at the call is what stops a
+    /// destination changed to a folder being refused as "never deployed to
+    /// Netlify", the approval card naming the old destination, and an outside
+    /// assistant's deploy going, silently, to where the course USED to deploy.
+    /// Structural rather than one call at the top of `run`: there are six
+    /// public ways in, and a seventh added later would be a stale reader
+    /// nobody noticed. Each reading costs one directory listing and one small
+    /// JSON file per course (measured in docs 10), at human pace. A runner is
+    /// never built over a window's model — `init` asserts it — because the
+    /// reading leaves a window's copy alone, and such a runner would miss
+    /// every write made outside this process.
+    private var coursesAsSavedNow: [Course] {
+        workspace.readCoursesAsSavedNow()
+        return workspace.courses
+    }
+
     /// The tools, as the LOCAL model sees them.
     ///
     /// Thirteen of the twenty-two that exist. A small local model routes worse
@@ -135,7 +211,10 @@ final class AssistToolRunner {
     /// list: the seven `plan_` twins, which plan mode calls in code, and two
     /// more — `remember_timetable`, whose dates must come from a teacher rather
     /// than from a model, and `re_date_classes`, whose phrasings are matched in
-    /// code. All of them still run when they are called.
+    /// code. All of them still run when they are called by CODE — plan mode,
+    /// a matched phrasing, or Claude Code over MCP. A model in a section
+    /// window that names one of them is refused (#327,
+    /// `AssistAgent.sayTheModelNamedAToolItWasNotOffered`).
     var definitions: [AssistToolDefinition] {
         return AssistToolRunner.localTools
     }
@@ -154,7 +233,16 @@ final class AssistToolRunner {
          siteWork: AssistSiteWork? = nil,
          today: @escaping () -> CalendarDay = { return CalendarDay.today() },
          launchControl: LaunchControlRunning = LaunchControl(),
-         openMainWindow: (@MainActor () -> Void)? = nil) {
+         openMainWindow: (@MainActor () -> Void)? = nil,
+         surface: Surface = .local) {
+        // Never over a window's model (#322 review, L3): the per-call read
+        // refuses one, to keep its unsaved edits, so a runner built over it
+        // would quietly miss every write made outside this process.
+        assert(
+            !WorkspaceModel.isShownInAWindow(workspace),
+            "AssistToolRunner is built over its own WorkspaceModel, never a window's"
+        )
+        self.surface = surface
         self.workspace = workspace
         self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
         self.readToday = today
@@ -177,6 +265,37 @@ final class AssistToolRunner {
         return nil
     }
 
+    /// The code of the course this working folder holds under this name — as
+    /// the FOLDER spells it — or nil when it holds none.
+    ///
+    /// **A READING, not a guard.** It refuses nothing, changes nothing and is
+    /// asked by nobody here: the one caller is `AssistAgent`, which has to
+    /// choose between two sentences — one that ends "open that course in
+    /// Plantoir" and one that says there is no such course to open. The rule
+    /// about which courses a window may act on lives in the AGENT and must
+    /// stay there, because this runner also answers Claude Code over
+    /// `--mcp-stdio`, where the course genuinely is the caller's to choose.
+    /// Deleting this in the belief that it is the guard would take away the
+    /// question and leave the guard where it is.
+    ///
+    /// It hands back the CODE rather than a yes or no because the sentence it
+    /// feeds is read by a teacher looking at their sidebar: a model that
+    /// answered `mcv4u` should not produce "Open mcv4u's section in Plantoir",
+    /// naming something that appears nowhere on screen. The same courtesy the
+    /// window's own code already gets on the approval card.
+    ///
+    /// Compared the way `locate` compares — `whitespacesAndNewlines`, because
+    /// `text(_:in:)` trims those before `locate` sees the value — and for that
+    /// reason: two answers to "is this the same course" is one more than a
+    /// working folder can afford.
+    func knownCourseCode(matching code: String) -> String? {
+        let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == wanted {
+            return candidate.code
+        }
+        return nil
+    }
+
     /// What pressing the button would do, for the two acts that ask for one.
     ///
     /// Said in the teacher's terms and naming the real destination: "publishes
@@ -186,11 +305,6 @@ final class AssistToolRunner {
         let arguments: [String: Any] = call.argumentValues
         let code: String = text("course", in: arguments)
         let number: Int = number("section", in: arguments) ?? 0
-
-        var destination: String = "the web"
-        for course in workspace.courses where course.code.lowercased() == code.lowercased() {
-            destination = AssistToolRunner.destination(of: course)
-        }
 
         switch call.function.name {
         case "deploy_section":
@@ -210,25 +324,156 @@ final class AssistToolRunner {
             // named by the question that follows this, and the section is on
             // the window's own title bar.
             //
-            // `code`, `number` and `destination` are deliberately unused here.
-            // Leave them: `schedule_deploy` below needs all three, and the one
-            // thing this text must never become is a description of a tool.
+            // `code` and `number` are deliberately unused here. Leave them:
+            // `schedule_deploy` below needs both, and the one thing this text
+            // must never become is a description of a tool.
             return AssistWording.deployApproval
         case "schedule_deploy":
+            // EVERY place the deploy goes, by type (#396) — the card said
+            // only the primary until then, and a course that deploys to
+            // Netlify and Cloudflare Pages read "to Netlify".
+            var destination: String = "the web"
+            for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
+                destination = AssistToolRunner.everyDestination(of: course)
+            }
             let raw: String = text("when", in: arguments)
             let when: String = AssistToolRunner.moment(named: raw)
                 .map { moment in ScheduledDeploy.dayAndTimeText(moment) } ?? raw
-            return "Set this Mac to deploy \(code) Section \(number) to \(destination) at \(when). "
+            let card: String = "Set this Mac to deploy \(code) Section \(number) to \(destination) at \(when). "
                  + "It has to be on and awake then — plugged in if it is a laptop, lid open. "
                  + "Plantoir cannot wake it up."
+            // The deploy this one would replace, if there is one (issue #195).
+            // The card is the only moment before anything is written, so it is
+            // the only place the teacher can still change their mind about it.
+            guard let newMoment = AssistToolRunner.moment(named: raw) else {
+                return card
+            }
+            var filedCode: String = code
+            for course in coursesAsSavedNow where course.code.lowercased() == code.lowercased() {
+                filedCode = course.code
+            }
+            // This working folder's deploy only (#237): another folder's of
+            // the same section is left standing, so it is not "replaced".
+            guard let workingFolderURL = workspace.workspaceURL,
+                  let replacing = ScheduledDeploy.momentBeingReplaced(
+                      courseCode: filedCode, sectionNumber: number, by: newMoment,
+                      inWorkingFolder: workingFolderURL
+                  ) else {
+                return card
+            }
+            return card + " " + AssistWording.scheduleReplaces(
+                moment: ScheduledDeploy.dayAndTimeText(replacing)
+            )
         default:
             return "Run \(call.function.name)."
         }
     }
 
+    /// Tools that may still be run on a course kept for reference, although
+    /// they are not read-only.
+    ///
+    /// Three of them, each for its own reason, and all three are contract DATA
+    /// (`shared-rules.json` → `referenceCourses.refusal.toolsStillAllowed`)
+    /// rather than a judgement made here — a test asserts that the
+    /// non-`readOnly` tools minus these three are exactly the set the gate
+    /// refuses, so adding a tool fails the suite rather than opening a hole.
+    ///
+    /// * `rebuild_preview` — a reference course may be previewed; that is how
+    ///   a teacher reads last year's pages with their images and links. It
+    ///   writes into the build tree, never into the course.
+    /// * `back_up_course` — it reads the course and writes a zip OUTSIDE it.
+    /// * `cancel_scheduled_deploy` — **gate by direction.** This is the act
+    ///   that STOPS a deploy, and refusing it would strand an alarm set before
+    ///   the course was marked, with no way to turn it off from the app.
+    static let toolsAllowedOnAReferenceCourse: Set<String> = [
+        "rebuild_preview",
+        "back_up_course",
+        "cancel_scheduled_deploy",
+    ]
+
+    /// The two tools that put a site on the web, so the write gate can say
+    /// which of the two refusals applies.
+    ///
+    /// Their `plan_` twins are read-only and so never meet the gate; they are
+    /// refused in `scheduleRequest` instead, with the same deploy sentence, so
+    /// a plan never describes a deploy that cannot happen.
+    static let toolsThatDeploy: Set<String> = ["deploy_section", "schedule_deploy"]
+
+    /// Whether this call would write to a course that is kept for reference.
+    ///
+    /// Gated on the tool's OWN `readOnly` flag, never on a hand-kept list of
+    /// names — the same reasoning the window binding uses for gating on the
+    /// schema, and for the same reason: a list somewhere else is a list
+    /// somebody forgets on the day they add a tool.
+    ///
+    /// **Never gated on "is this the course the session greeted".** There is
+    /// no such binding over MCP — a session is scoped to the working folder —
+    /// and inventing one here in order to except it would take away the
+    /// capability a reference course exists for, which is being READ by a
+    /// Claude or Codex session working in the live course.
+    private func courseKeptForReference(namedIn call: AssistToolCall) -> Course? {
+        guard let tool = definition(named: call.function.name) else {
+            return nil
+        }
+        if tool.readOnly {
+            return nil
+        }
+        if AssistToolRunner.toolsAllowedOnAReferenceCourse.contains(tool.name) {
+            return nil
+        }
+        var code: String = AssistToolRunner.text("course", in: call.argumentValues)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.isEmpty {
+            // **A write tool that names no course is gated by the course it
+            // would actually TOUCH.** Exactly one exists — `undo_last_change`
+            // declares no parameters at all — and what it would touch is the
+            // change waiting in this conversation's history, which knows its
+            // own course. Reading the argument and giving up when it is empty
+            // was fail-OPEN on the argument, and the test that "proved"
+            // otherwise passed a `course` the schema does not have.
+            //
+            // Nothing else may join it quietly: a test asserts that
+            // `undo_last_change` is the ONLY non-read-only tool without a
+            // `course` parameter, so a future one fails the suite rather than
+            // slipping past this.
+            guard let pending = history.nextToUndo else {
+                return nil
+            }
+            code = pending.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if code.isEmpty {
+            return nil
+        }
+        for candidate in coursesAsSavedNow
+        where candidate.code.lowercased() == code.lowercased() && candidate.isKeptForReference {
+            return candidate
+        }
+        return nil
+    }
+
     /// Run one tool.
     func run(call: AssistToolCall) async -> AssistToolOutcome {
         let arguments: [String: Any] = call.argumentValues
+
+        // Nothing writes to a course kept for reference, whichever client is
+        // calling. First, before the tool is dispatched at all: a refusal that
+        // arrives after the work has started is not a refusal.
+        if let reference = courseKeptForReference(namedIn: call) {
+            // Two sentences, chosen by what was ASKED FOR rather than by what
+            // was refused. "It is never deployed" answers a question nobody
+            // asked of "add a class to ICS3U", and "it stays as it is" leaves
+            // a teacher who asked for a deploy wondering whether deploying it
+            // later would work.
+            if AssistToolRunner.toolsThatDeploy.contains(call.function.name) {
+                return AssistToolOutcome.refused(
+                    AssistWording.deployRefusedForAReferenceCourse(course: reference.displayCode)
+                )
+            }
+            return AssistToolOutcome.refused(
+                AssistToolRefusal.keptForReference(reference.displayCode).message
+            )
+        }
+
         switch call.function.name {
         case "list_pages":
             return listPages(arguments)
@@ -265,7 +510,7 @@ final class AssistToolRunner {
         case "plan_remember_timetable":
             return planRememberTimetable(arguments)
         case "remember_timetable":
-            return rememberTimetable(arguments)
+            return await rememberTimetable(arguments)
         case "plan_add_next_class":
             return planAddNextClass(arguments)
         case "plan_re_date_classes":
@@ -273,19 +518,19 @@ final class AssistToolRunner {
         case "re_date_classes":
             return await reDateClasses(arguments)
         case "add_next_class":
-            return addNextClass(arguments)
+            return await addNextClass(arguments)
         case "explain_publishing":
             return explainPublishing(arguments)
         case "back_up_course":
-            return backUpCourse(arguments)
+            return await backUpCourse(arguments)
         case "plan_make_room_for_classes":
             return planMakeRoomForClasses(arguments)
         case "make_room_for_classes":
-            return makeRoomForClasses(arguments)
+            return await makeRoomForClasses(arguments)
         case "plan_add_classes":
             return planAddNextClass(addClassesArguments(from: arguments))
         case "add_classes":
-            return addNextClass(addClassesArguments(from: arguments))
+            return await addNextClass(addClassesArguments(from: arguments))
         case "list_courses":
             return listCourses()
         case "list_curriculum_expectations":
@@ -293,7 +538,17 @@ final class AssistToolRunner {
         case "plan_curriculum_mentions":
             return planCurriculumMentions(arguments)
         case "add_curriculum_mentions":
-            return addCurriculumMentions(arguments)
+            return await addCurriculumMentions(arguments)
+        case "read_how_i_teach":
+            return readHowITeach(arguments)
+        case "plan_write_how_i_teach":
+            return planWriteHowITeach(arguments)
+        case "write_how_i_teach":
+            return await writeHowITeach(arguments)
+        case "plan_prepare_for_start_of_year":
+            return planPrepareForStartOfYear(arguments)
+        case "prepare_for_start_of_year":
+            return await prepareForStartOfYear(arguments)
         default:
             return AssistToolOutcome.couldNotRead(
                 "There is no tool called “\(call.function.name)”."
@@ -311,7 +566,7 @@ final class AssistToolRunner {
 
         let filter: String = text("matching", in: arguments).trimmingCharacters(in: .whitespaces)
         var paths: [String] = []
-        for pageURL in ClassPages.pagesOfSection(located.sectionNumber, in: located.course) {
+        for pageURL in ClassPages.pagesTheAssistantLists(forSection: located.sectionNumber, in: located.course) {
             let path: String = AssistSectionGraph.relativePath(
                 of: pageURL, workspaceURL: workspace.workspaceURL
             )
@@ -356,6 +611,14 @@ final class AssistToolRunner {
             forSection: located.sectionNumber, in: located.course,
             workspaceURL: workspace.workspaceURL
         )
+        // "What does Unit 2, Day 3 link to?", matched in code (#167). The
+        // argument is in no schema; without it, this function is what it was.
+        if text("answer", in: arguments) == AssistCardCommand.linksAnswer {
+            return linksOnAPage(
+                titled: title, asTyped: text(AssistCardCommand.linksAsTypedArgument, in: arguments),
+                in: graph, located: located
+            )
+        }
         guard let page = graph.page(titled: title) else {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.noSuchPage(
                 title, located.course.code, located.sectionNumber
@@ -379,6 +642,154 @@ final class AssistToolRunner {
         )
     }
 
+    /// The answer to "what does <page> link to?", given in full, in code, and
+    /// the end of the turn (#167).
+    ///
+    /// Every link is listed once, in the order the page has them, by the name
+    /// a teacher sees for the page it reaches; a link to a page students
+    /// cannot see is marked a draft, and a link that reaches NO page is marked
+    /// as leading nowhere. **What "leads nowhere" means is stated here once:**
+    /// a wiki-link whose target is neither a page of this section (by file
+    /// name, whatever the capitals, or a folder with a landing page) nor any
+    /// FILE of that name, whatever the capitals, in the course's folder — a
+    /// folder with no landing page is not a page and leads nowhere. No extension rule is
+    /// involved — "Lab 1.2" is a page and "diagram.png" a picture because of
+    /// what is on disk, not because of how they are spelt — and a link to a
+    /// picture or a handout that exists is not listed at all, since it is not
+    /// a page. Links written as examples inside code are not links
+    /// (`AssistSectionGraph.linksAsWritten`, which since #313 reads through
+    /// the one mask every reader shares, `WikiLinkRewriter.linkMatches` — its
+    /// old stripper dropped 22 real links on four ICS4U pages).
+    ///
+    /// **The turn ends here** (`AssistToolOutcome.answered`), in every branch.
+    /// The model was never asked; handing back would give it a tool result with
+    /// no question in front of it. The `detail` names the page all the same, so
+    /// a follow-up turn about "it" has something to refer to.
+    ///
+    /// `asTyped` is "the Water Cycle page" when the card stripped it to
+    /// "Water Cycle": only when THAT finds nothing are the phrase's other
+    /// readings tried ("The Water Cycle", "Scratch Page"), and only when none
+    /// of them finds anything is the teacher told no page is called that
+    /// (fix review F1).
+    private func linksOnAPage(titled title: String,
+                              asTyped: String,
+                              in graph: AssistSectionGraph,
+                              located: Located) -> AssistToolOutcome {
+        let course: String = located.course.code
+        let section: String = "\(located.sectionNumber)"
+        var candidates: [AssistSectionPage] = graph.pagesATeacherMayMean(title)
+        if candidates.isEmpty && !asTyped.isEmpty {
+            for alternative in AssistCardCommand.linksTitleAlternatives(asTyped: asTyped) where candidates.isEmpty {
+                candidates = graph.pagesATeacherMayMean(alternative)
+            }
+        }
+        if candidates.isEmpty {
+            let sentence: String = AssistWording.noPageCalled(page: title, course: course, section: section)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+        if candidates.count > 1 {
+            var lines: [String] = [
+                AssistWording.morePagesThanOneAreCalled(page: title, course: course, section: section),
+            ]
+            for candidate in candidates {
+                lines.append("• " + candidate.relativePath)
+            }
+            let answer: String = lines.joined(separator: "\n")
+            return AssistToolOutcome.answered(answer, detail: answer)
+        }
+        let page: AssistSectionPage = candidates[0]
+        guard let body = try? String(contentsOf: page.fileURL, encoding: .utf8) else {
+            let sentence: String = AssistWording.pageCouldNotBeRead(page: page.displayTitle)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+
+        var lines: [String] = []
+        var listedPages: Set<String> = []
+        var filesInTheCourse: Set<String>? = nil
+        for target in AssistSectionGraph.linksAsWritten(in: body) {
+            if let linked = graph.pageALinkLeadsTo(target) {
+                let identity: String = linked.fileURL.standardizedFileURL.path
+                if linked.fileURL == page.fileURL || listedPages.contains(identity) {
+                    continue
+                }
+                listedPages.insert(identity)
+                if linked.isVisibleToStudents {
+                    lines.append("• " + linked.displayTitle)
+                } else {
+                    lines.append("• " + linked.displayTitle + " — " + AssistWording.linkedPageIsADraft)
+                }
+                continue
+            }
+            // Not a page. A picture or a handout that is there is not a page
+            // either, and is not listed; anything else leads nowhere.
+            if filesInTheCourse == nil {
+                filesInTheCourse = AssistToolRunner.fileNames(under: located.course.directoryURL)
+            }
+            var named: String = target
+            if let lastSlash = target.lastIndex(of: "/") {
+                named = String(target[target.index(after: lastSlash)...])
+            }
+            if filesInTheCourse?.contains(named.lowercased()) == true {
+                continue
+            }
+            lines.append("• " + target + " — " + AssistWording.linkedPageIsMissing)
+        }
+
+        if lines.isEmpty {
+            let sentence: String = AssistWording.pageLinksToNothing(page: page.displayTitle)
+            return AssistToolOutcome.answered(sentence, detail: sentence)
+        }
+        let answer: String = AssistWording.pageLinksTo(page: page.displayTitle) + "\n"
+            + lines.joined(separator: "\n")
+        return AssistToolOutcome.answered(answer, detail: page.relativePath + "\n\n" + answer)
+    }
+
+    /// Whether this section has a page a teacher may mean by `title` — asked by
+    /// `AssistAgent` before answering "What does The Water Cycle link to?" in
+    /// code, since the matcher cannot see the pages (fix review F2).
+    func sectionHasAPage(called title: String, course code: String, section number: Int) -> Bool {
+        var course: Course? = nil
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
+            course = candidate
+        }
+        guard let course else {
+            return false
+        }
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: number, in: course, workspaceURL: workspace.workspaceURL
+        )
+        return !graph.pagesATeacherMayMean(title).isEmpty
+    }
+
+    /// Every FILE name under a folder, lower-cased — what a link that is not a
+    /// page is checked against before it is called one that leads nowhere.
+    ///
+    /// Files only, never folders: "[[Unit 3]]" written for a folder with no
+    /// landing page reaches nothing on the site, so it must be marked, not
+    /// dropped as though it were a picture (the implementation review's R2).
+    /// Compared without regard to case, as the site resolves a link.
+    private static func fileNames(under folder: URL) -> Set<String> {
+        var names: Set<String> = []
+        guard let enumerator = FileManager.default.enumerator(
+            at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+        ) else {
+            return names
+        }
+        while let entry = enumerator.nextObject() as? URL {
+            let name: String = entry.lastPathComponent
+            if name == "node_modules" {
+                enumerator.skipDescendants()
+                continue
+            }
+            let values: URLResourceValues? = try? entry.resourceValues(forKeys: [.isDirectoryKey])
+            if values?.isDirectory == true {
+                continue
+            }
+            names.insert(name.lowercased())
+        }
+        return names
+    }
+
     private func checkSection(_ arguments: [String: Any]) -> AssistToolOutcome {
         let found: Result<Located, AssistToolRefusal> = locate(arguments)
         guard case .success(let located) = found else {
@@ -390,7 +801,14 @@ final class AssistToolRunner {
             workspaceURL: workspace.workspaceURL
         )
         let dangling: [AssistSectionLink] = graph.linksIntoHiddenPages()
-        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo()
+        // Curriculum pages and Key Links (with what it lists) are left out of
+        // groups 2 and 3, as Windows has always left them out of group 2
+        // (`shared-rules.json` → `sectionCheck`, #96).
+        let neverInTheAudit: Set<String> = AssistSectionGraph.pagesNeverInTheAudit(
+            of: graph, in: located.course
+        )
+        let orphans: [AssistSectionPage] = graph.visiblePagesNothingLinksTo(leavingOut: neverInTheAudit)
+        let missed: [AssistSectionPage] = graph.visiblePagesLinkedButMissed(leavingOut: neverInTheAudit)
 
         let visible: Int = graph.visiblePageCount
         let pageWord: String = visible == 1 ? "page" : "pages"
@@ -440,6 +858,31 @@ final class AssistToolRunner {
             paragraphs.append(lines.joined(separator: "\n"))
         }
 
+        // The third group (#96), silent when empty for the same reason: a
+        // page a class students cannot see links to, and no class they CAN
+        // see links to, is a page a bulk change should have taken down with
+        // those classes and did not. Its being empty is what proves "Get
+        // Ready for the Start of the Year" — or anything else — finished.
+        if !missed.isEmpty {
+            var lines: [String] = []
+            let word: String = missed.count == 1 ? "page is" : "pages are"
+            lines.append("\(missed.count) visible \(word) linked only from classes students cannot see "
+                         + "yet, and from no class they can. Students can still open these through the "
+                         + "site's explorer:")
+            var listed: Int = 0
+            for page in missed {
+                if listed == AssistToolRunner.mostListed {
+                    lines.append("…and \(missed.count - listed) more.")
+                    break
+                }
+                lines.append("• " + page.relativePath)
+                listed += 1
+            }
+            lines.append("Put each one into draft until the class that uses it is published, or link "
+                         + "it from a class students can already see.")
+            paragraphs.append(lines.joined(separator: "\n"))
+        }
+
         // What the preview is doing decides which of three things is worth
         // saying — and for one of them, that nothing is.
         //
@@ -483,7 +926,8 @@ final class AssistToolRunner {
         case .success(let planned):
             return AssistToolOutcome.planned(
                 "Worked out what publishing the class on \(planned.day.text) would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -498,8 +942,7 @@ final class AssistToolRunner {
                hasNoTimetable(forSection: number, in: course) {
                 askForTheTimetable(
                     courseCode: code, sectionNumber: number,
-                    because: "Finding the class taught on a given day needs to know which days "
-                           + "this section meets."
+                    because: AssistWording.datesToFindADaysPage(noun: course.configuration.classNoun)
                 )
             }
             return AssistToolOutcome.refused(refusal.message)
@@ -508,7 +951,11 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published the class on \(planned.day.text)."
+                summary: { written in
+                    return AssistWording.publishedTheClassOn(
+                        planned.day.text, noun: planned.located.course.configuration.classNoun
+                    )
+                }
             )
         }
     }
@@ -576,7 +1023,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what publishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -593,8 +1041,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Published \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Published \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -612,7 +1061,8 @@ final class AssistToolRunner {
             }
             return AssistToolOutcome.planned(
                 "Worked out what unpublishing those pages would do.",
-                plan: planned.plan.describe()
+                plan: planned.plan.describe(),
+                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
             )
         }
     }
@@ -629,8 +1079,9 @@ final class AssistToolRunner {
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
-                summary: "Unpublished \(planned.plan.changes.count) "
-                       + "\(planned.plan.changes.count == 1 ? "page" : "pages")."
+                summary: { written in
+                    return "Unpublished \(written) \(written == 1 ? "page" : "pages")."
+                }
             )
         }
     }
@@ -672,7 +1123,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -707,9 +1160,10 @@ final class AssistToolRunner {
         }
         if moving.isEmpty {
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -717,7 +1171,7 @@ final class AssistToolRunner {
         let becoming: String = publishing ? "visible" : "hidden"
         var lines: [String] = []
         lines.append("\(located.course.code) Section \(located.sectionNumber): "
-                     + "\(publishing ? "publishing" : "unpublishing") Unit \(unit).")
+                     + "\(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit).")
         lines.append("")
         lines.append("\(moving.count) \(word) would become \(becoming), "
                      + "\(publishing ? "starting at" : "starting from") "
@@ -729,7 +1183,7 @@ final class AssistToolRunner {
         }
 
         return AssistToolOutcome.planned(
-            "Worked out what \(publishing ? "publishing" : "unpublishing") Unit \(unit) would do.",
+            "Worked out what \(publishing ? "publishing" : "unpublishing") \(unitWord) \(unit) would do.",
             plan: lines.joined(separator: "\n")
         )
     }
@@ -776,7 +1230,9 @@ final class AssistToolRunner {
             return nil
         }
         let unitWord: String = located.course.configuration.unitWord
-        guard let unit = AssistPublishPlanner.unitNamed(titles[0], term: unitWord) else {
+        guard let unit = AssistPublishPlanner.unitNamed(
+            titles[0], naming: located.course.configuration.classPageNaming
+        ) else {
             return nil
         }
 
@@ -795,7 +1251,7 @@ final class AssistToolRunner {
             pages.reverse()
         }
 
-        let backedUp: Bool = backUpOnceForThisConversation(
+        let backedUp: Bool = await backUpOnceForThisConversation(
             located.course, forSection: located.sectionNumber
         )
         _ = await stopThePreviewBeforeWriting(
@@ -804,6 +1260,9 @@ final class AssistToolRunner {
 
         var touched: [AssistSavedFile] = []
         var changedAnything: Bool = false
+        // Pages the writer declined, at plan time or at the write (#186). A
+        // unit whose every page was declined is NOT "already hidden".
+        var leftAlone: [String] = []
         for summary in pages {
             let graph: AssistSectionGraph = AssistSectionGraph.read(
                 forSection: located.sectionNumber, in: located.course,
@@ -821,15 +1280,23 @@ final class AssistToolRunner {
                     titles: [summary.title], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
+            for page in plan.noRoomForAKey where !leftAlone.contains(page.displayTitle) {
+                leftAlone.append(page.displayTitle)
+            }
             if plan.changesNothing {
                 continue
             }
             do {
-                let change: AssistChange = try AssistPublishPlanner.apply(
+                let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
                     plan, forSection: located.sectionNumber, in: located.course
                 )
-                touched = AssistToolRunner.merging(touched, with: change.files)
-                changedAnything = true
+                for title in applied.leftAlone where !leftAlone.contains(title) {
+                    leftAlone.append(title)
+                }
+                if !applied.change.files.isEmpty {
+                    touched = AssistToolRunner.merging(touched, with: applied.change.files)
+                    changedAnything = true
+                }
             } catch {
                 return AssistToolOutcome.refused(
                     "\(located.course.configuration.unitWord) \(unit) was only partly "
@@ -840,11 +1307,21 @@ final class AssistToolRunner {
         }
 
         let done: String = publishing ? "published" : "unpublished"
+        AssistToolRunner.notePagesLeftAsTheyWere(
+            leftAlone.count, act: publishing ? "publishing pages" : "hiding pages",
+            course: located.course.code, section: located.sectionNumber
+        )
+        let aboutTheLeftAlone: String = leftAlone.isEmpty
+            ? "" : AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
         if !changedAnything {
+            if !leftAlone.isEmpty {
+                return AssistToolOutcome.wrote(aboutTheLeftAlone, detail: aboutTheLeftAlone)
+            }
             let unitWord: String = located.course.configuration.unitWord
-            let already: String = publishing
-                ? "\(unitWord) \(unit) has already been published."
-                : "\(unitWord) \(unit) is already hidden."
+            var already: String = AssistWording.unitAlreadyHidden(unitWord: unitWord, unit: unit)
+            if publishing {
+                already = AssistWording.unitAlreadyPublished(unitWord: unitWord, unit: unit)
+            }
             return AssistToolOutcome.wrote(already, detail: already)
         }
 
@@ -856,7 +1333,11 @@ final class AssistToolRunner {
             files: touched
         ))
 
-        var detail: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
+        var said: String = "\(located.course.configuration.unitWord) \(unit) was \(done)."
+        if !aboutTheLeftAlone.isEmpty {
+            said += " " + aboutTheLeftAlone
+        }
+        var detail: String = said
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -864,8 +1345,21 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber
         ))
 
-        return AssistToolOutcome.wrote(
-            "\(located.course.configuration.unitWord) \(unit) was \(done).", detail: detail
+        return AssistToolOutcome.wrote(said, detail: detail)
+    }
+
+    /// The trail line for pages whose settings were left as they were
+    /// because there was no place a new line could go (#186). A count and the
+    /// act, never the pages; nothing at all when the count is 0.
+    static func notePagesLeftAsTheyWere(_ count: Int, act: String, course: String, section: Int) {
+        if count <= 0 {
+            return
+        }
+        ActivityTrail.note(
+            .pageSettingsLeftAsTheyWere,
+            ActivityTrail.pageSettingsLeftAsTheyWereLine(act: act, pages: count),
+            course: course,
+            section: section
         )
     }
 
@@ -902,7 +1396,29 @@ final class AssistToolRunner {
             return .failure(refusal(from: found))
         }
 
-        let titles: [String] = names("pages", in: arguments)
+        // The graph is read FIRST, because whether "all" is a word or a page
+        // is a fact about the section (#197): one that really has a page
+        // called "All" gets that page.
+        let graph: AssistSectionGraph = AssistSectionGraph.read(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL
+        )
+        let classPages: [ClassPageSummary] = ClassPages.list(
+            forSection: located.sectionNumber, in: located.course
+        )
+
+        let named: [String] = names("pages", in: arguments)
+        let everyPageWord: String? = AssistToolRunner.everyPageWordOnly(in: named, graph: graph)
+        // A list that is NOTHING BUT such words names no page, and the rules
+        // below for "no page named" decide what it means: dates given are the
+        // range, `onOrAfter` alone on a publish is the open-ended refusal, and
+        // nothing at all is `askedForEveryPage`. A word beside a real name is
+        // left as a name that matches nothing, so the page that WAS named
+        // still moves.
+        var titles: [String] = named
+        if everyPageWord != nil {
+            titles = []
+        }
         let onOrAfterText: String = text("onOrAfter", in: arguments)
         let beforeText: String = text("before", in: arguments)
 
@@ -911,7 +1427,9 @@ final class AssistToolRunner {
 
         // Dates are only evaluated when no specific pages were named. If pages
         // were named, date boundaries are ignored so dateline leakage from the
-        // prompt cannot accidentally sweep other classes.
+        // prompt cannot accidentally sweep other classes. A list that was only
+        // an every-page word counts as none named (#197), so a range given
+        // with "all" is the range.
         if titles.isEmpty {
             if !onOrAfterText.isEmpty {
                 guard let day = CalendarDay(text: onOrAfterText) else {
@@ -928,6 +1446,17 @@ final class AssistToolRunner {
         }
 
         if titles.isEmpty && onOrAfter == nil && before == nil {
+            if let word = everyPageWord,
+               let example = AssistToolRunner.exampleOfWhichPages(
+                publishing: publishing, graph: graph, classPages: classPages,
+                naming: located.course.configuration.classPageNaming
+               ) {
+                AssistToolRunner.noteNamedNoPage(
+                    publishing: publishing, everyPageWord: word, unknownCount: 0,
+                    course: located.course.code, section: located.sectionNumber
+                )
+                return .failure(.askedForEveryPage(publishing: publishing, example: example))
+            }
             return .failure(.nothingNamed)
         }
 
@@ -955,17 +1484,21 @@ final class AssistToolRunner {
             return .failure(.openEndedPublish(from))
         }
 
-        let graph: AssistSectionGraph = AssistSectionGraph.read(
-            forSection: located.sectionNumber, in: located.course,
-            workspaceURL: workspace.workspaceURL
-        )
-        let classPages: [ClassPageSummary] = ClassPages.list(
-            forSection: located.sectionNumber, in: located.course
-        )
+        // The How I Teach page is never on the website (#209), so the graph
+        // leaves it out — and a request for it by name is answered in plain
+        // words rather than with "no page is called that", which would be
+        // untrue. Only when no ORDINARY page has the title: one inside a
+        // folder is a page like any other, and publishing it works.
+        for title in titles where HowITeachPage.isItsTitle(title) && graph.page(titled: title) == nil {
+            if HowITeachPage.isThere(forSection: located.sectionNumber, in: located.course) {
+                return .failure(.howITeachIsNeverPublished(located.course.code))
+            }
+        }
 
         // How far each verb reaches is the planner's rule, not an argument.
-        // Publishing always takes the pages it links to; unpublishing takes
-        // only the pages nothing else needs.
+        // Publishing takes the pages it links to and stops where a link lands
+        // on another class (#173); unpublishing takes only the pages nothing
+        // else needs, and stops at another class, as publishing does (#201).
         let plan: AssistPublishPlan
         if publishing {
             plan = AssistPublishPlanner.planPublishing(
@@ -982,7 +1515,130 @@ final class AssistToolRunner {
                 forSection: located.sectionNumber, in: located.course
             )
         }
+
+        // Names were given and NONE of them is a page (#197). This used to be
+        // a plan that changes nothing: "Nothing needed changing." on a write,
+        // and a Go/Cancel card over nothing in plan mode — both reporting
+        // success about a request that found nothing at all. A list where
+        // SOME names were found is left alone: the found pages move.
+        if !titles.isEmpty && plan.namedPages.isEmpty && !plan.unknownNames.isEmpty {
+            AssistToolRunner.noteNamedNoPage(
+                publishing: publishing, everyPageWord: nil, unknownCount: plan.unknownNames.count,
+                course: located.course.code, section: located.sectionNumber
+            )
+            return .failure(.noPageByThatName(
+                names: plan.unknownNames, course: located.course.code, section: located.sectionNumber
+            ))
+        }
         return .success(PlannedPages(located: located, plan: plan))
+    }
+
+    // MARK: - A page list that names no page (#197)
+
+    /// The words that mean "every page" rather than naming one, as the
+    /// contract lists them (`assist-cases.json` → `pagesNamingNoPage` →
+    /// `everyPageWords`, and a test holds the two equal). Compared trimmed
+    /// and case-folded.
+    ///
+    /// A CLOSED list on purpose. Reading "all of those" as the pages the last
+    /// listing returned, or as the whole section, is a guess this app does not
+    /// make on the direction that reaches students; the word is read as "no
+    /// page named" and the ordinary rules decide.
+    static let everyPageWords: Set<String> = [
+        "all", "everything", "all pages", "every page", "all of them", "all of those", "*",
+    ]
+
+    /// The every-page word a page list consists of, or nil when the list
+    /// names anything else — or is empty.
+    ///
+    /// Asked AFTER the graph: an entry that is a page in this section is a
+    /// page, whatever it is called, so a section with a page titled "All"
+    /// publishes that page.
+    static func everyPageWordOnly(in names: [String], graph: AssistSectionGraph) -> String? {
+        if names.isEmpty {
+            return nil
+        }
+        var first: String? = nil
+        for name in names {
+            if graph.page(titled: name) != nil {
+                return nil
+            }
+            let folded: String = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !AssistToolRunner.everyPageWords.contains(folded) {
+                return nil
+            }
+            if first == nil {
+                first = folded
+            }
+        }
+        return first
+    }
+
+    /// Something a teacher can type next when they have been told which
+    /// pages are needed — "Publish Unit 3", "Hide Week 1" — or nil for a
+    /// section with no pages at all.
+    ///
+    /// The lowest unit that has class pages, because in a Unit course
+    /// "Publish Unit 3" and "Hide Unit 3" are both read in CODE (the
+    /// whole-unit frames), so following the advice never reaches the model.
+    /// The frames are term-blind, so a Module or numbered course's example
+    /// is read by the model instead. A numbered course has no
+    /// units, so its first class page is named instead; a section with no
+    /// class pages names its first page. Built through `ClassPageNaming`,
+    /// never typed as "Unit", so a Module course says "Module 3" (#268).
+    static func exampleOfWhichPages(
+        publishing: Bool,
+        graph: AssistSectionGraph,
+        classPages: [ClassPageSummary],
+        naming: ClassPageNaming
+    ) -> String? {
+        let verb: String = publishing ? "Publish" : "Hide"
+        var lowestUnit: Int? = nil
+        var firstNumbered: (number: Int, title: String)? = nil
+        for summary in classPages {
+            guard let numbers = summary.unitAndDay else {
+                continue
+            }
+            if naming.isNumbered {
+                if firstNumbered == nil || numbers.day < (firstNumbered?.number ?? 0) {
+                    firstNumbered = (number: numbers.day, title: summary.title)
+                }
+                continue
+            }
+            if lowestUnit == nil || numbers.unit < (lowestUnit ?? 0) {
+                lowestUnit = numbers.unit
+            }
+        }
+        if let unit = lowestUnit, let unitName = naming.unitName(unit) {
+            return "\(verb) \(unitName)"
+        }
+        if let numbered = firstNumbered {
+            return "\(verb) \(numbered.title)"
+        }
+        if let firstClass = classPages.first {
+            return "\(verb) \(firstClass.title)"
+        }
+        for page in graph.pages where !page.isFolderIndex {
+            return "\(verb) \(page.displayTitle)"
+        }
+        return nil
+    }
+
+    /// The trail line for a publish or a hide that named no page (#197):
+    /// the act, and either the every-page word (one of the contract's closed
+    /// list, so no teacher content) or HOW MANY names matched nothing —
+    /// never the names, which are page titles the model wrote.
+    static func noteNamedNoPage(publishing: Bool, everyPageWord: String?, unknownCount: Int,
+                                course: String, section: Int) {
+        ActivityTrail.note(
+            .assistantNamedNoPage,
+            ActivityTrail.namedNoPageLine(
+                act: publishing ? "publishing pages" : "hiding pages",
+                everyPageWord: everyPageWord, unknownCount: unknownCount
+            ),
+            course: course,
+            section: section
+        )
     }
 
     // MARK: - Backing up, once per conversation
@@ -994,26 +1650,115 @@ final class AssistToolRunner {
     /// the same conversation reuses it rather than saving a near-identical one.
     /// The copy is named for the assistant and the section it was made for, so
     /// a teacher reading the Backups list knows what it was for.
+    ///
+    /// **Async, and the zip is off the main actor** (#351): it used to hold
+    /// the window for up to two minutes after the teacher approved a change.
+    /// A second call for the same course while the first copy is still being
+    /// saved waits for that copy (`backupsInFlight`); a copy that failed is
+    /// not remembered, so the write says nothing about a backup and the next
+    /// one tries again.
     private func backUpOnceForThisConversation(
         _ course: Course,
         forSection sectionNumber: Int
-    ) -> Bool {
-        if conversationBackups[course.code] != nil {
+    ) async -> Bool {
+        let code: String = course.code
+        if conversationBackups[code] != nil {
             return true
+        }
+        if let underWay = backupsInFlight[code] {
+            let sharedURL: URL? = await underWay.value
+            return sharedURL != nil
         }
         guard let coursesDirectoryURL = workspace.coursesDirectoryURL else {
             return false
         }
-        guard let backupURL = try? CourseArchiver.backUpCourse(
-            course,
-            coursesDirectoryURL: coursesDirectoryURL,
-            madeBy: .assistant(sectionNumber: sectionNumber)
-        ) else {
+        let saving: Task<URL?, Never> = Task { @MainActor in
+            return try? await self.savingACopy(
+                of: course, forSection: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+            )
+        }
+        backupsInFlight[code] = saving
+        let savedURL: URL? = await saving.value
+        backupsInFlight[code] = nil
+        guard let backupURL = savedURL else {
             return false
         }
-        conversationBackups[course.code] = backupURL
-        conversationBackupURL = backupURL
+        // Another door (start of the year) may have saved one while this was
+        // zipping; the first copy stays the conversation's way back.
+        if conversationBackups[code] == nil {
+            conversationBackups[code] = backupURL
+            conversationBackupURL = backupURL
+        }
         return true
+    }
+
+    /// Saves one copy of a course for the assistant, with the window's line
+    /// showing while it runs and one line on the trail when it is done.
+    ///
+    /// The ONE place an assistant backup is made — the once-per-conversation
+    /// copy and the `back_up_course` tool both come here — so the progress
+    /// line and the trail line cannot differ between them. `defer` clears the
+    /// line on every way out, a failure included: a line left saying "saving
+    /// a copy" after the copy failed would be a claim that is false.
+    private func savingACopy(
+        of course: Course,
+        forSection sectionNumber: Int,
+        coursesDirectoryURL: URL
+    ) async throws -> URL {
+        let code: String = course.code
+        courseBeingBackedUp = code
+        defer {
+            if courseBeingBackedUp == code {
+                courseBeingBackedUp = nil
+            }
+        }
+        let started: Date = Date()
+        do {
+            let backupURL: URL = try await backUpACourse(
+                course, coursesDirectoryURL, .assistant(sectionNumber: sectionNumber)
+            )
+            let bytes: Int64 = AssistToolRunner.sizeOnDisk(of: backupURL)
+            ActivityTrail.note(
+                .assistantBackedUpACourse,
+                ActivityTrail.assistantBackedUpLine(
+                    fileName: backupURL.lastPathComponent,
+                    bytes: bytes,
+                    seconds: Date().timeIntervalSince(started)
+                ),
+                course: code,
+                section: sectionNumber
+            )
+            return backupURL
+        } catch {
+            ActivityTrail.note(
+                .assistantBackedUpACourse,
+                ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription),
+                course: code,
+                section: sectionNumber
+            )
+            throw error
+        }
+    }
+
+    /// What a write says when the section changed while its copy was being
+    /// saved (#351): the copy is off the main actor now and can take a minute,
+    /// so the plan the write was about to carry out is worked out again after
+    /// it, and a plan that no longer matches is refused rather than applied.
+    /// The rule: documentation/10 → "The gap between a plan and its write".
+    private static func changedWhileSavingACopy(_ located: Located) -> AssistToolOutcome {
+        let said: String = AssistWording.changedWhileSavingACopy(
+            course: located.course.code, section: String(located.sectionNumber)
+        )
+        return AssistToolOutcome.refused(said)
+    }
+
+    /// A file's size in bytes, or 0 when it cannot be read.
+    private static func sizeOnDisk(of fileURL: URL) -> Int64 {
+        let attributes: [FileAttributeKey: Any]? = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+        if let size = attributes?[.size] as? NSNumber {
+            return size.int64Value
+        }
+        return 0
     }
 
     /// What the teacher is told about that copy. The same sentence whether the
@@ -1026,11 +1771,17 @@ final class AssistToolRunner {
     // MARK: - Writing pages
 
     /// Back the course up, write the change, remember it, rebuild the preview.
+    ///
+    /// `summary` is given how many pages' visibility was actually WRITTEN,
+    /// not how many the plan listed: a page declined at the write — edited in
+    /// Obsidian between the card and Go — is not counted as done (#186's
+    /// review, B1). When every page the teacher NAMED was declined, the
+    /// caller's sentence (which is about them) is not said at all.
     private func carryOut(
         _ plan: AssistPublishPlan,
         forSection sectionNumber: Int,
         in course: Course,
-        summary: String
+        summary: (Int) -> String
     ) async -> AssistToolOutcome {
         if plan.changesNothing {
             // Four words, when four words are the whole answer. A teacher who
@@ -1039,6 +1790,16 @@ final class AssistToolRunner {
             // changed because nothing needed to be.
             if let already = plan.nothingToDoSentence {
                 return AssistToolOutcome.wrote(already, detail: already)
+            }
+            // Nothing could be written because every page that needed it was
+            // declined: say THAT, not "nothing needed changing" (#186).
+            if !plan.noRoomForAKey.isEmpty {
+                let declined: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.noRoomForAKey)
+                AssistToolRunner.notePagesLeftAsTheyWere(
+                    plan.noRoomForAKey.count, act: plan.publishes ? "publishing pages" : "hiding pages",
+                    course: course.code, section: sectionNumber
+                )
+                return AssistToolOutcome.wrote(declined, detail: plan.describe())
             }
             return AssistToolOutcome.wrote(
                 "Nothing needed changing.",
@@ -1049,7 +1810,7 @@ final class AssistToolRunner {
         // Before anything is touched — but only the first time in a
         // conversation. The undo history covers the rest of it; the backup
         // outlives the conversation.
-        let backedUp: Bool = backUpOnceForThisConversation(course, forSection: sectionNumber)
+        let backedUp: Bool = await backUpOnceForThisConversation(course, forSection: sectionNumber)
 
         // Stop → write → start, and the stop is HERE rather than beside the
         // start for a reason. A preview left serving while the pages beneath
@@ -1058,8 +1819,13 @@ final class AssistToolRunner {
         _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
 
         let change: AssistChange
+        var leftAlone: [String] = []
         do {
-            change = try AssistPublishPlanner.apply(plan, forSection: sectionNumber, in: course)
+            let applied: (change: AssistChange, leftAlone: [String]) = try AssistPublishPlanner.apply(
+                plan, forSection: sectionNumber, in: course
+            )
+            change = applied.change
+            leftAlone = applied.leftAlone
         } catch {
             return AssistToolOutcome.refused(
                 "Nothing was changed: \(error.localizedDescription)"
@@ -1067,7 +1833,29 @@ final class AssistToolRunner {
         }
         history.record(change)
 
+        // The plan's declined pages are already on the card (`describe`);
+        // one declined only at the write — edited in Obsidian since the card
+        // was read — is said here, because the card promised it (#186).
+        var declinedNow: [String] = []
+        for title in leftAlone {
+            var onTheCard: Bool = false
+            for page in plan.noRoomForAKey where page.displayTitle == title {
+                onTheCard = true
+            }
+            if !onTheCard {
+                declinedNow.append(title)
+            }
+        }
+        AssistToolRunner.notePagesLeftAsTheyWere(
+            plan.noRoomForAKey.count + declinedNow.count,
+            act: plan.publishes ? "publishing pages" : "hiding pages",
+            course: course.code, section: sectionNumber
+        )
+
         var detail: String = plan.describe() + "\n\nDone: \(change.description)."
+        if !declinedNow.isEmpty {
+            detail += "\n\n" + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declinedNow)
+        }
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
@@ -1079,7 +1867,50 @@ final class AssistToolRunner {
         detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
                 + "of students — deploying does that, and only when they ask."
 
-        return AssistToolOutcome.wrote(summary, detail: detail)
+        return AssistToolOutcome.wrote(
+            AssistToolRunner.whatWasDone(
+                plan, declinedNow: declinedNow, summary: summary
+            ),
+            detail: detail
+        )
+    }
+
+    /// The transcript line after a publish or unpublish: the caller's sentence
+    /// about what was WRITTEN, then every page the writer declined — on the
+    /// card or at the write — named (#186). Built from the outcome, never
+    /// from the plan's count, so a declined page cannot be reported as done.
+    static func whatWasDone(
+        _ plan: AssistPublishPlan,
+        declinedNow: [String],
+        summary: (Int) -> String
+    ) -> String {
+        var declined: [String] = []
+        for page in plan.noRoomForAKey {
+            declined.append(page.displayTitle)
+        }
+        for title in declinedNow where !declined.contains(title) {
+            declined.append(title)
+        }
+        var written: Int = 0
+        for change in plan.changes where !declinedNow.contains(change.page.displayTitle) {
+            written += 1
+        }
+        var everyNamedPageDeclined: Bool = !plan.namedPages.isEmpty
+        for page in plan.namedPages where !declined.contains(page.displayTitle) {
+            everyNamedPageDeclined = false
+        }
+        var said: String = ""
+        if !everyNamedPageDeclined {
+            said = summary(written)
+        } else if written > 0 {
+            said = (plan.publishes ? "Published" : "Unpublished")
+                + " \(written) \(written == 1 ? "page" : "pages")."
+        }
+        if !declined.isEmpty {
+            let sentence: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declined)
+            said = said.isEmpty ? sentence : said + " " + sentence
+        }
+        return said
     }
 
     // MARK: - Preview, undo, deploy
@@ -1093,6 +1924,34 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber
         )
         return AssistToolOutcome.wrote(message, detail: message)
+    }
+
+    /// What another program on this Mac holds that stands in the way of
+    /// building this course — the EARLY look, before anything is stopped
+    /// (#156). Nil when the way is clear or there is no working folder.
+    private func whatBlocksABuild(of course: Course) -> WorkLeaseFiles.Holding? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folder.path, courseCode: course.code, afterTaking: false
+        )
+    }
+
+    /// What is said when another program is in the way (#156).
+    ///
+    /// An assistant working from another app is told `courseIsBusy`: it is
+    /// talking to the program whose course is busy, and that sentence tells
+    /// it to wait and ask again, which is what it can do. The teacher, in the
+    /// app, is told `courseIsBeingBuiltElsewhere`, which says where the other
+    /// work might be — somewhere they cannot see from this window.
+    func builtElsewhereSentence(for course: Course) -> String {
+        switch surface {
+        case .mcp:
+            return AssistWording.courseIsBusy(course: course.code)
+        case .local:
+            return AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
+        }
     }
 
     /// The window this section is open in, if one is on screen.
@@ -1145,6 +2004,11 @@ final class AssistToolRunner {
             // model is whichever one appears in `windowModels` that was not
             // here before, not (yet) one we can find by folder path.
             let alreadyOpen: [ObjectIdentifier] = WorkspaceModel.windowModels.map { ObjectIdentifier($0) }
+            // Tell the new window which folder it is for BEFORE it decides:
+            // with no other window open it would otherwise reopen the last
+            // working folder, write a reopen the teacher never saw, and be
+            // moved a moment later (#311 review M1).
+            WorkspaceModel.folderForNextNewWindow = folder.path
             openMainWindow()
             var freshModel: WorkspaceModel?
             for _ in 0..<maxAttempts {
@@ -1174,6 +2038,9 @@ final class AssistToolRunner {
                 freshModel.adoptRestoredPath(folder.path)
                 target = freshModel
             }
+            // Served or not, the request is over: a window that never came
+            // must not hand this folder to the next one the teacher opens.
+            WorkspaceModel.folderForNextNewWindow = nil
         }
 
         guard let target else {
@@ -1193,10 +2060,16 @@ final class AssistToolRunner {
         return sectionWindow(for: course, sectionNumber: sectionNumber) != nil
     }
 
-    /// An already-open window's model working in this folder, if one exists.
+    /// An already-open window's model working in this folder, if one exists
+    /// — however either of them spells the folder (`FolderIdentity`, #189).
     static func openWindowModel(forFolderPath path: String) -> WorkspaceModel? {
-        for model in WorkspaceModel.windowModels where model.workspaceURL?.path == path {
-            return model
+        for model in WorkspaceModel.windowModels {
+            guard let openPath = model.workspaceURL?.path else {
+                continue
+            }
+            if FolderIdentity.isSameFolder(openPath, path) {
+                return model
+            }
         }
         return nil
     }
@@ -1211,6 +2084,15 @@ final class AssistToolRunner {
         for course: Course, sectionNumber: Int
     ) async -> Bool {
         guard let window = sectionWindow(for: course, sectionNumber: sectionNumber) else {
+            return false
+        }
+        // Another program is building or previewing this course (#156), so
+        // the restart after the write would be declined — and a preview
+        // stopped now would then stay down. The write itself never conflicts
+        // with a build (Markdown is not what a build clears), so it goes
+        // ahead and the teacher's preview is left up; the note after the
+        // write says why it was not refreshed.
+        if whatBlocksABuild(of: course) != nil {
             return false
         }
         if !window.isPreviewRunning() {
@@ -1248,6 +2130,41 @@ final class AssistToolRunner {
     private func bringThePreviewUpToDate(
         for course: Course, sectionNumber: Int
     ) async -> String {
+        // Before anything is stopped (#351's second review, SF1): while a copy
+        // of the course is being zipped the window's own Preview refuses, so
+        // stopping a running preview first would end it and start nothing.
+        if let folder = workspace.workspaceURL,
+           CourseActivity.courseIsBeingCopied(folderPath: folder.path, courseCode: course.code) {
+            return AssistWording.courseIsBeingCopied(course: course.code)
+        }
+        // A preview of a section cannot start while this copy of Plantoir is
+        // deploying that same section (#381). Asked here, before a window is
+        // opened, a preview stopped or a no-window rebuild run, for the same
+        // reason as the copy check above: the window's own Preview refuses, so
+        // going on would stop the teacher's preview, start nothing, and tell
+        // the conversation a preview is on its way (#381's review, S1). Covers
+        // both paths below — the window's and the `--build-only` rebuild's.
+        if let folder = workspace.workspaceURL,
+           CourseActivity.sectionPublishIsRunning(
+               folderPath: folder.path, courseCode: course.code, sectionNumber: sectionNumber
+           ) {
+            WorkLeaseRegistry.noteDeclinedWhileItsSectionDeploys(
+                courseCode: course.code, sectionNumber: sectionNumber
+            )
+            return AssistWording.sectionIsBeingDeployed(
+                course: course.code, section: String(sectionNumber)
+            )
+        }
+        // FIRST, before a window is opened or a preview stopped (#156): a
+        // build another program is running, or a preview it is showing, is
+        // not this conversation's to end.
+        if let holding = whatBlocksABuild(of: course) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return builtElsewhereSentence(for: course)
+        }
         if sectionWindow(for: course, sectionNumber: sectionNumber) == nil {
             _ = await revealSectionOnScreen(course: course, sectionNumber: sectionNumber)
         }
@@ -1275,6 +2192,9 @@ final class AssistToolRunner {
             course: course, sectionNumber: sectionNumber
         )
         if !rebuild.succeeded {
+            if rebuild.wasBuiltElsewhere {
+                return builtElsewhereSentence(for: course)
+            }
             return rebuild.message
         }
         return AssistWording.builtWithNoWindowOpen(
@@ -1327,6 +2247,20 @@ final class AssistToolRunner {
         // (b) Put the files back.
         let result: AssistUndoResult = history.undo()
 
+        // Getting a section ready for the start of the year is one act with
+        // its own line, and so is taking it back (#96).
+        if pending.kind == .startOfYear {
+            ActivityTrail.note(
+                .startOfTheYearChangeUndone,
+                ActivityTrail.startOfYearUndoneLine(
+                    source: startOfYearSource,
+                    putBack: result.restored.count,
+                    leftAsTheyAre: result.skipped.count
+                ),
+                course: pending.courseCode, section: pending.sectionNumber
+            )
+        }
+
         if result.restored.isEmpty && result.skipped.isEmpty {
             return AssistToolOutcome.refused(result.description)
         }
@@ -1369,6 +2303,229 @@ final class AssistToolRunner {
         return AssistToolOutcome.wrote(summary, detail: detail)
     }
 
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// Why the plan could not be made: the sentence, and the trail's reason.
+    private struct StartOfYearRefusal: Error {
+        let message: String
+        let reason: String
+    }
+
+    /// Where this runner's start-of-year acts are recorded as coming from.
+    private var startOfYearSource: String {
+        switch surface {
+        case .mcp:
+            return "mcp"
+        case .local:
+            return "assistant"
+        }
+    }
+
+    /// The plan, worked out afresh from disk.
+    private func startOfYearPlan(
+        _ arguments: [String: Any]
+    ) -> Result<(located: Located, plan: StartOfYearPlan), StartOfYearRefusal> {
+        let found: Result<Located, AssistToolRefusal> = locate(arguments)
+        guard case .success(let located) = found else {
+            return .failure(StartOfYearRefusal(message: refusal(from: found).message, reason: "noSuchSection"))
+        }
+        var scheduled: Date? = nil
+        if let folder = workspace.workspaceURL {
+            scheduled = ScheduledDeploy.nextRun(
+                courseCode: located.course.code, sectionNumber: located.sectionNumber,
+                inWorkingFolder: folder
+            )
+        }
+        let planned: Result<StartOfYearPlan, StartOfYearProblem> = StartOfYearPlanner.plan(
+            forSection: located.sectionNumber, in: located.course,
+            workspaceURL: workspace.workspaceURL, today: today, scheduledDeploy: scheduled
+        )
+        switch planned {
+        case .failure(let problem):
+            return .failure(StartOfYearRefusal(message: problem.sentence, reason: problem.trailReason))
+        case .success(let plan):
+            return .success((located, plan))
+        }
+    }
+
+    /// What getting the section ready would do. Changes nothing.
+    private func planPrepareForStartOfYear(_ arguments: [String: Any]) -> AssistToolOutcome {
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            return AssistToolOutcome.couldNotRead(problem.message)
+        case .success(let found):
+            if found.plan.changesNothing {
+                let nothing: String = StartOfYearWording.nothingToDo(
+                    first: found.plan.firstClass.displayTitle, nouns: found.plan.noun.plural
+                )
+                return AssistToolOutcome.wrote(nothing, detail: found.plan.describe())
+            }
+            return AssistToolOutcome.planned(
+                "Worked out what getting \(found.located.course.code) Section "
+                    + "\(found.located.sectionNumber) ready for the start of the year would do.",
+                plan: found.plan.describe()
+            )
+        }
+    }
+
+    /// Carry the plan out — only when the code given is the code of the plan
+    /// as it stands NOW, and only with a fresh backup of the course.
+    ///
+    /// **A fresh backup for this act, and a refusal without one** (the plan
+    /// review's M2). `carryOut` goes ahead when its once-per-conversation
+    /// backup fails, and that backup may predate earlier changes in the
+    /// conversation; this is the largest single write the app makes, and the
+    /// app's own button refuses without one, so this refuses too. It is
+    /// `.assistant`'s — the file-name form is unchanged.
+    private func prepareForStartOfYear(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        let source: String = startOfYearSource
+        let found: (located: Located, plan: StartOfYearPlan)
+        switch startOfYearPlan(arguments) {
+        case .failure(let problem):
+            if problem.reason == "noFirstClass", case .success(let located) = locate(arguments) {
+                ActivityTrail.note(
+                    .startOfTheYearNotDone,
+                    ActivityTrail.startOfYearNotDoneLine(source: source, reason: problem.reason),
+                    course: located.course.code, section: located.sectionNumber
+                )
+            }
+            return AssistToolOutcome.refused(problem.message)
+        case .success(let planned):
+            found = planned
+        }
+        let course: Course = found.located.course
+        let sectionNumber: Int = found.located.sectionNumber
+        let plan: StartOfYearPlan = found.plan
+        let code: String = text("planCode", in: arguments).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if code.isEmpty || code.lowercased() != plan.fingerprint {
+            let reason: String = code.isEmpty ? "missingPlanCode" : "changedSinceShown"
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: reason),
+                course: course.code, section: sectionNumber
+            )
+            let said: String = code.isEmpty
+                ? AssistWording.startOfYearNeedsItsPlan(course: course.code, section: String(sectionNumber))
+                : AssistWording.startOfYearPlanHasChanged(course: course.code, section: String(sectionNumber))
+            return AssistToolOutcome(
+                summary: said, detail: said + "\n\n" + plan.describe(), shouldContinue: false
+            )
+        }
+
+        if plan.changesNothing {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "nothingToDo"),
+                course: course.code, section: sectionNumber
+            )
+            let nothing: String = StartOfYearWording.nothingToDo(
+                first: plan.firstClass.displayTitle, nouns: plan.noun.plural
+            )
+            return AssistToolOutcome.wrote(nothing, detail: nothing)
+        }
+
+        // A copy of its OWN, always, through the assistant's one door
+        // (`savingACopy`, #351): off the main actor, with the window's line
+        // while it runs and "assistant backed up a course" on the trail.
+        var savedCopy: URL? = nil
+        if let coursesDirectoryURL = workspace.coursesDirectoryURL {
+            savedCopy = try? await savingACopy(
+                of: course, forSection: sectionNumber, coursesDirectoryURL: coursesDirectoryURL
+            )
+        }
+        guard let backupURL = savedCopy else {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "backupFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.startOfYearNeedsABackup(course: course.code))
+        }
+        // The conversation's way back, if it had none yet: the Restore banner
+        // offers the copy from before this conversation changed anything.
+        if conversationBackups[course.code] == nil {
+            conversationBackups[course.code] = backupURL
+            conversationBackupURL = backupURL
+        }
+
+        // The copy can take a minute, and the teacher can edit in Obsidian
+        // meanwhile: held again to the plan the call was given (the rule in
+        // documentation/10 → "The gap between a plan and its write").
+        // A re-plan that FAILS refuses too (#351's second review, SF2): a
+        // first class renamed or deleted during the copy is noFirstClass,
+        // and the plan from before the copy must not be carried out.
+        let replanned: Result<(located: Located, plan: StartOfYearPlan), StartOfYearRefusal> = startOfYearPlan(arguments)
+        if case .failure(let problem) = replanned {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: problem.reason),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(problem.message)
+        }
+        if case .success(let afterTheBackup) = replanned,
+           afterTheBackup.plan.fingerprint != plan.fingerprint {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "changedSinceShown"),
+                course: course.code, section: sectionNumber
+            )
+            let said: String = AssistWording.startOfYearPlanHasChanged(course: course.code, section: String(sectionNumber))
+            return AssistToolOutcome(
+                summary: said, detail: said + "\n\n" + afterTheBackup.plan.describe(), shouldContinue: false
+            )
+        }
+
+        let previewCanBeRebuilt: Bool = whatBlocksABuild(of: course) == nil
+        _ = await stopThePreviewBeforeWriting(for: course, sectionNumber: sectionNumber)
+
+        let change: AssistChange
+        var leftAlone: [String] = []
+        do {
+            let applied: (change: AssistChange, leftAlone: [String]) = try StartOfYearPlanner.apply(
+                plan, in: course
+            )
+            change = applied.change
+            leftAlone = applied.leftAlone
+        } catch {
+            ActivityTrail.note(
+                .startOfTheYearNotDone,
+                ActivityTrail.startOfYearNotDoneLine(source: source, reason: "writeFailed"),
+                course: course.code, section: sectionNumber
+            )
+            return AssistToolOutcome.refused(
+                StartOfYearWording.writeFailed(backup: backupURL.lastPathComponent)
+            )
+        }
+        history.record(change)
+
+        let written: Int = max(0, plan.changeCount - leftAlone.count)
+        ActivityTrail.note(
+            .sectionMadeReadyForTheStartOfTheYear,
+            ActivityTrail.sectionMadeReadyLine(
+                source: source,
+                classes: plan.classChangeCount,
+                otherPagesByReason: plan.otherChangesByReason,
+                leftAsTheyWere: plan.publishPlan.noRoomForAKey.count + leftAlone.count,
+                backupFileName: backupURL.lastPathComponent,
+                previewRebuilt: previewCanBeRebuilt
+            ),
+            course: course.code, section: sectionNumber
+        )
+
+        var said: String = StartOfYearWording.done(pages: StartOfYearWording.pages(written))
+        if !leftAlone.isEmpty {
+            said += " " + AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: leftAlone)
+        }
+        var detail: String = said
+        detail += "\n\n" + StartOfYearWording.publishingFromNowOn(noun: plan.noun.singular)
+        detail += "\n\nundo_last_change takes this back while this session lasts. The course was backed up "
+                + "first, as “\(backupURL.lastPathComponent)”, which is the way back after that."
+        detail += "\n\n" + (await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber))
+        return AssistToolOutcome.wrote(said, detail: detail)
+    }
+
     /// What to call the pages a class-page add created, for the sentence an
     /// undo reads back later.
     private static func namingClassesCreated(_ urls: [URL]) -> String {
@@ -1402,10 +2559,26 @@ final class AssistToolRunner {
         return lines.joined(separator: "\n")
     }
 
+    /// The page word of this course when it names its pages with ONE number
+    /// ("Week" in a club, #267), and nil for every other course — what the
+    /// card matcher needs to read "make room for a meeting at Week 5" as this
+    /// course's page and nothing else (`AssistCardCommand.matching`). Read
+    /// at the moment of asking, like everything else here.
+    func numberedPageWord(forCourse code: String) -> String? {
+        guard let course = course(withCode: code) else {
+            return nil
+        }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        if naming.isNumbered {
+            return naming.word
+        }
+        return nil
+    }
+
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             return candidate
         }
         return nil
@@ -1450,6 +2623,26 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(refusal(from: found).message)
         }
 
+        // BEFORE the preview is stopped, deliberately. A refusal placed any
+        // later kills a preview the teacher was reading, for nothing.
+        if located.course.isKeptForReference {
+            return AssistToolOutcome.refused(
+                AssistWording.deployRefusedForAReferenceCourse(course: located.course.displayCode)
+            )
+        }
+
+        // Another program building or previewing the course (#156) — asked
+        // here for the same reason, before anything is stopped. The window's
+        // Deploy and the headless deploy each check again after taking their
+        // own lease; this look only spares the preview.
+        if let holding = whatBlocksABuild(of: located.course) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: located.course.code,
+                sectionNumber: located.sectionNumber, holding: holding
+            )
+            return AssistToolOutcome.refused(builtElsewhereSentence(for: located.course))
+        }
+
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
@@ -1472,6 +2665,9 @@ final class AssistToolRunner {
         }
 
         if !result.succeeded {
+            if result.wasBuiltElsewhere {
+                return AssistToolOutcome.refused(builtElsewhereSentence(for: located.course))
+            }
             return AssistToolOutcome.refused(result.message)
         }
         // The stopped preview is NOT mentioned, and that was a decision.
@@ -1500,6 +2696,18 @@ final class AssistToolRunner {
         guard case .success(let located) = found else {
             return .failure(refusal(from: found))
         }
+        // Here rather than only in `scheduleDeploy`, so `plan_scheduled_deploy`
+        // refuses too: a plan that DESCRIBES a deploy which cannot happen
+        // teaches a session to go and try it.
+        if located.course.isKeptForReference {
+            return .failure(
+                .notInThisBuild(
+                    AssistWording.deployRefusedForAReferenceCourse(
+                        course: located.course.displayCode
+                    )
+                )
+            )
+        }
         let raw: String = text("when", in: arguments)
         guard let when = AssistToolRunner.moment(named: raw) else {
             return .failure(.unreadableTime(raw))
@@ -1509,7 +2717,8 @@ final class AssistToolRunner {
             sectionNumber: located.sectionNumber,
             when: when,
             now: Date(),
-            cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+            cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
         )
         return .success(ScheduleRequest(located: located, when: when, plan: plan))
     }
@@ -1523,11 +2732,14 @@ final class AssistToolRunner {
             return AssistToolOutcome.couldNotRead(AssistToolRefusal.noWorkingFolder.message)
         }
 
-        // `ScheduledDeployPlan` already says what has to be true of the Mac,
-        // and which of the section's classes are still held back. The classes
-        // the TEACHER had in mind are checked here on top of that: a deploy
-        // that runs perfectly and ships a site without tomorrow's class is the
-        // failure worth catching while somebody is awake.
+        // `ScheduledDeployPlan` already says where the deploy goes and what
+        // has to be true of the Mac. Since #396 it no longer lists the
+        // section's unpublished classes — later classes are unpublished on
+        // purpose all year, so that list fired on every schedule (Russell:
+        // "completely unnecessary"). The classes the CALLER names are still
+        // checked here, and are the only class check left: a deploy that runs
+        // perfectly and ships a site without tomorrow's class is the failure
+        // worth catching while somebody is awake.
         var lines: [String] = [asked.plan.description]
         let classes: [String] = names("classes", in: arguments)
         if !classes.isEmpty {
@@ -1571,8 +2783,20 @@ final class AssistToolRunner {
         // Everything the plan refuses is something that would ASK A QUESTION
         // at the scheduled moment, with nobody there to answer it.
         if let problem = asked.plan.problem {
+            ScheduledDeploy.noteRefusedBeforeAnythingWasWritten(plan: asked.plan, course: asked.located.course)
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
+
+        // What this is about to replace, read BEFORE it goes (issue #195).
+        // An outside assistant over MCP sees no card, so the result is the
+        // only place it — and through it the teacher — learns that a deploy
+        // already set is gone. The same named sentence the card uses.
+        let replacing: Date? = ScheduledDeploy.momentBeingReplaced(
+            courseCode: asked.located.course.code,
+            sectionNumber: asked.located.sectionNumber,
+            by: asked.when,
+            inWorkingFolder: workspaceURL
+        )
 
         if let problem = ScheduledDeploy.scheduleDeploy(
             course: asked.located.course,
@@ -1585,9 +2809,27 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused("Nothing was scheduled. \(problem)")
         }
 
+        // Ask whether Plantoir may tell the teacher how it went (#212), the
+        // first time — but only from Plantoir's own assistant. An outside
+        // assistant over MCP runs this same binary with no window: the
+        // question would appear with nothing on screen to say why, so that
+        // teacher is not asked, and not told (a known limit, docs 07).
+        if surface != .mcp {
+            let courseCode: String = asked.located.course.code
+            let section: Int = asked.located.sectionNumber
+            Task {
+                await ScheduledPublishNotice.askPermissionIfNotAskedYet(course: courseCode, section: section)
+            }
+        }
+
         let moment: String = ScheduledDeploy.dayAndTimeText(asked.when)
-        let summary: String = "Scheduled: \(asked.located.course.code) Section "
-            + "\(asked.located.sectionNumber) deploys to \(asked.plan.destination) at \(moment)."
+        var summary: String = "Scheduled: \(asked.located.course.code) Section "
+            + "\(asked.located.sectionNumber) deploys to \(asked.plan.destinationsText) at \(moment)."
+        if let replacing {
+            summary += " " + AssistWording.scheduleReplaces(
+                moment: ScheduledDeploy.dayAndTimeText(replacing)
+            )
+        }
         return AssistToolOutcome.wrote(
             summary,
             detail: summary + "\n\nThis Mac has to be on and awake then — plugged in if it is a laptop, "
@@ -1602,17 +2844,34 @@ final class AssistToolRunner {
         }
 
         let pending: Date? = ScheduledDeploy.nextRun(
-            courseCode: located.course.code, sectionNumber: located.sectionNumber
+            courseCode: located.course.code,
+            sectionNumber: located.sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
         )
         if pending == nil {
             // Safe to call when nothing is scheduled — and it still tidies
             // away an agent left behind by a Mac that was off, which is why
             // this goes ahead rather than returning here.
-            ScheduledDeploy.cancelScheduledDeploy(
+            //
+            // Gated on the agent belonging to THIS working folder since
+            // 2026-09-20. `nextRun` is scoped now, so it answers nil both for
+            // "nothing is scheduled here" and for "the one agent this code
+            // and section have belongs to another working folder" — and the
+            // tidy-up below would have deleted somebody else's live deploy
+            // on the strength of that nil.
+            let ours: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
                 courseCode: located.course.code,
                 sectionNumber: located.sectionNumber,
-                runner: launchControl
+                inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL
             )
+            if !ours.isEmpty {
+                ScheduledDeploy.cancelScheduledDeploy(
+                    courseCode: located.course.code,
+                    sectionNumber: located.sectionNumber,
+                    inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL,
+                    runner: launchControl
+                )
+            }
             return AssistToolOutcome.wrote(
                 "There is no deploy scheduled for \(located.course.code) Section "
                 + "\(located.sectionNumber).",
@@ -1624,6 +2883,7 @@ final class AssistToolRunner {
         if let problem = ScheduledDeploy.cancelScheduledDeploy(
             courseCode: located.course.code,
             sectionNumber: located.sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? located.course.directoryURL,
             runner: launchControl
         ) {
             return AssistToolOutcome.refused("That could not be cancelled: \(problem)")
@@ -1653,7 +2913,9 @@ final class AssistToolRunner {
                 courseCode: located.course.code,
                 sectionNumber: located.sectionNumber,
                 workingFolder: workspace.workspaceURL ?? located.course.directoryURL,
-                because: "Replacing the class dates on file for \(where_)."
+                because: AssistWording.datesToReplace(
+                    for: where_, noun: located.course.configuration.classNoun
+                )
             )
             let opening: String = "Here you are — the dates for \(where_) are open for editing. "
                                 + "What you save replaces what was there."
@@ -1677,7 +2939,11 @@ final class AssistToolRunner {
             )
             let asking: String = "I don't know when \(where_) meets yet. "
                                + AssistWording.mayIAskForYourDates
-            return AssistToolOutcome(summary: asking, detail: asking, shouldContinue: false)
+            // The teacher's copy in the course's own noun (#267); the model's
+            // as it always was.
+            let askingTheTeacher: String = "I don't know when \(where_) meets yet. "
+                + AssistWording.mayIAskForYourDates(for: located.course.configuration.classNoun)
+            return AssistToolOutcome(summary: askingTheTeacher, detail: asking, shouldContinue: false)
         }
 
         // "All of them" is asked for by a fixed phrasing the window offers
@@ -1698,7 +2964,12 @@ final class AssistToolRunner {
             )
         }
 
+        // Written twice (#267): `lines` for the model, which reads "class"
+        // whatever the course says, and `teacherLines` in the course's own
+        // noun for the teacher, who reads the summary.
+        let noun: ClassNoun = located.course.configuration.classNoun
         var lines: [String] = []
+        var teacherLines: [String] = []
 
         // What the dates are actually FOR: map existing class pages by date or schedule index.
         let existing: [ClassPageSummary] = ClassPages.list(
@@ -1719,8 +2990,13 @@ final class AssistToolRunner {
                     upcomingDates.append(date)
                 }
             }
-            let countStr: String = upcomingDates.count == 1 ? "first class is" : "first \(upcomingDates.count) classes are"
-            lines.append("The semester begins on \(remembered.firstDate.weekdayName), \(remembered.firstDate.text). The \(countStr):")
+            let first: CalendarDay = remembered.firstDate
+            lines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count
+            ))
+            teacherLines.append(AssistWording.theSemesterBegins(
+                on: "\(first.weekdayName), \(first.text)", showing: upcomingDates.count, noun: noun
+            ))
         } else {
             for date in remembered.dates {
                 if date >= today && upcomingDates.count < 3 {
@@ -1728,10 +3004,18 @@ final class AssistToolRunner {
                 }
             }
             if upcomingDates.isEmpty {
-                lines.append("All \(remembered.dates.count) scheduled classes for \(where_) have concluded (last class was on \(remembered.lastDate.weekdayName), \(remembered.lastDate.text)).")
+                let last: String = "\(remembered.lastDate.weekdayName), \(remembered.lastDate.text)"
+                lines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last
+                ))
+                teacherLines.append(AssistWording.allScheduledDatesHaveConcluded(
+                    count: remembered.dates.count, for: where_, last: last, noun: noun
+                ))
             } else {
-                let countStr: String = upcomingDates.count == 1 ? "upcoming class" : "\(upcomingDates.count) upcoming classes"
-                lines.append("Your next \(countStr) for \(where_):")
+                lines.append(AssistWording.yourNextUpcoming(count: upcomingDates.count, for: where_))
+                teacherLines.append(AssistWording.yourNextUpcoming(
+                    count: upcomingDates.count, for: where_, noun: noun
+                ))
             }
         }
 
@@ -1745,16 +3029,26 @@ final class AssistToolRunner {
                 classTitle = "(page not yet created)"
             }
             lines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
+            teacherLines.append("• \(date.weekdayName), \(date.text) — \(classTitle)")
         }
 
         lines.append("")
+        teacherLines.append("")
         let spare: Int = remembered.spareDates(after: existing.count)
-        lines.append("\(where_) has \(existing.count) class \(existing.count == 1 ? "page" : "pages") across \(remembered.dates.count) recorded dates (\(spare) spare).")
+        lines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare
+        ))
+        teacherLines.append(AssistWording.pagesAcrossTheDates(
+            for: where_, pages: existing.count, dates: remembered.dates.count, spare: spare, noun: noun
+        ))
         if spare == 0 {
-            lines.append("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.")
+            lines.append(AssistWording.everyDateIsSpokenFor())
+            teacherLines.append(AssistWording.everyDateIsSpokenFor(noun: noun))
         } else {
             let next: CalendarDay = remembered.dates[existing.count]
-            lines.append("The next class would fall on \(next.text) (\(next.weekdayName)).")
+            let when: String = "\(next.text) (\(next.weekdayName))"
+            lines.append(AssistWording.theNextWouldFallOn(when))
+            teacherLines.append(AssistWording.theNextWouldFallOn(when, noun: noun))
         }
 
         var origin: String = "Where they came from: \(remembered.source)."
@@ -1763,16 +3057,21 @@ final class AssistToolRunner {
         }
         lines.append("")
         lines.append(origin)
+        teacherLines.append("")
+        teacherLines.append(origin)
 
         if remembered.dates.count > upcomingDates.count {
             let rest: Int = remembered.dates.count - upcomingDates.count
+            let more: String = "There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule."
             lines.append("")
-            lines.append("There \(rest == 1 ? "is" : "are") \(rest) more. Say “show me all the dates” to see the full schedule.")
+            lines.append(more)
+            teacherLines.append("")
+            teacherLines.append(more)
         }
 
         let fullAnswer: String = lines.joined(separator: "\n")
         return AssistToolOutcome(
-            summary: fullAnswer,
+            summary: teacherLines.joined(separator: "\n"),
             detail: fullAnswer,
             shouldContinue: false
         )
@@ -1832,7 +3131,7 @@ final class AssistToolRunner {
         }
     }
 
-    private func rememberTimetable(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func rememberTimetable(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch timetablePlan(arguments) {
         case .failure(let problem):
             return AssistToolOutcome.refused(problem.localizedDescription)
@@ -1848,9 +3147,14 @@ final class AssistToolRunner {
             // Replacing a year's dates is worth having a way back from, and
             // the copy is made once per conversation however many writes
             // follow it.
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .success(let again) = timetablePlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
             do {
                 try SectionTimetableStore.applyRememberTimetable(asked.plan)
             } catch {
@@ -1940,7 +3244,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Adding the next class page needs to know which days this section meets."
+            because: AssistWording.datesForTheNextPage(noun: noun(forCourse: code))
         )
     }
 
@@ -1954,6 +3258,12 @@ final class AssistToolRunner {
     /// forward. A teacher who has never given their dates cannot act on "I
     /// can't find a class on Monday": what they need is not a better sentence,
     /// it is the question nobody asked them.
+    /// What a course calls one of its class pages (#267), for a sentence the
+    /// teacher reads — "class" when the course cannot be found.
+    private func noun(forCourse code: String) -> ClassNoun {
+        return course(withCode: code)?.configuration.classNoun ?? .class
+    }
+
     private func askForTheTimetable(courseCode: String, sectionNumber: Int, because: String) {
         guard let folder = workspace.workspaceURL else {
             return
@@ -1996,7 +3306,8 @@ final class AssistToolRunner {
                 asked.plan.changesNothing
                     ? "The next class page already exists."
                     : "Worked out what the next class page would be.",
-                plan: asked.plan.description
+                plan: asked.plan.description,
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2019,7 +3330,7 @@ final class AssistToolRunner {
     /// duplicating a published lesson is a draft of next week's, and putting
     /// it in front of students the moment it is made is the one thing it must
     /// not do.
-    private func duplicateClassRequested(_ arguments: [String: Any]) -> AssistToolOutcome? {
+    private func duplicateClassRequested(_ arguments: [String: Any]) async -> AssistToolOutcome? {
         guard let asked = duplicateAsked(arguments) else {
             return nil
         }
@@ -2030,9 +3341,17 @@ final class AssistToolRunner {
             return nil
         }
 
-        let backedUp: Bool = backUpOnceForThisConversation(
+        let backedUp: Bool = await backUpOnceForThisConversation(
             request.located.course, forSection: request.located.sectionNumber
         )
+        // Held again to the plan after the copy (#351's plan/write gap): the
+        // source's words are compared too, since they are what is copied.
+        guard case .success(let again)? = duplicateAsked(arguments),
+              again.plan.description == request.plan.description,
+              again.sourceText == request.sourceText,
+              again.newURL == request.newURL else {
+            return AssistToolRunner.changedWhileSavingACopy(request.located)
+        }
 
         let outcome: ClassChangeOutcome
         do {
@@ -2043,11 +3362,75 @@ final class AssistToolRunner {
             )
         }
 
+        // The one case here that could destroy a lesson. `ClassInsertionPlanner`
+        // SKIPS a rename whose destination already exists, or whose page it
+        // cannot read — right in itself — but a skipped rename leaves the page
+        // the copy was meant to BECOME still holding somebody's real class,
+        // and the write below is unconditional.
+        //
+        // **Asked of the planner, not of the file's text.** The obvious guard
+        // — "is what is there now what was there before?" — is defeated by the
+        // planner's own link rewriting, which touches every page of the
+        // section including this one: a lesson that happens to link to a page
+        // that WAS renamed comes back with different text, the comparison says
+        // "not the same page", and the lesson is written over anyway. The
+        // planner already knows exactly which pages it wrote, so ask it.
+        //
+        // A PRE-check cannot do this job: when the destination exists at plan
+        // time it is ALWAYS in `plan.renames` — it is a numbered page at or
+        // after the insertion point — so nothing before the shuffle can tell
+        // the ordinary duplicate from the dangerous one.
+        //
+        // Nor is the question "was a page there before the shuffle?", which
+        // this used to ask first. `apply` renames, rewrites links and re-dates
+        // between that sample and this write, and Obsidian is open in the
+        // other window — a page appearing in that gap read as "the planner
+        // must have made it", so the copy took it and `before: nil` meant
+        // "Undo that" would then delete it. `created` is exact on its own:
+        // `apply` cannot take its `changesNothing` early return here, because
+        // `duplicateAsked` has already failed if the plan added nothing.
+        if !wasCreatedByThisRun(request.newURL, outcome: outcome) {
+            // Worth its own line on the trail: the room has been made by the
+            // time this is answered, so a teacher sees their classes move and
+            // no copy appear, and nothing else recorded would say why.
+            ActivityTrail.note(
+                .classCopyNotMade,
+                "did not copy a class — the page the copy would have become still held a lesson, "
+                + "and other classes may already have moved",
+                course: request.located.course.code, section: request.located.sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.thePlaceForTheCopyIsStillTaken(
+                page: request.newTitle,
+                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
+            ))
+        }
+
         // The new page exists as a blank class page; give it the source's
         // content, its own title and date, and leave it hidden.
         var copied: String = PageFrontmatter.settingTitle(
             in: request.sourceText, to: request.newTitle
         )
+        // Every PER-SECTION key the source happened to carry comes out FIRST,
+        // before this writes a date and a visibility flag on the plain keys.
+        //
+        // The copy lands in one section's own folder, so it is section-local
+        // for ever (`AssistPageVisibility.isSectionLocal` decides from the
+        // path) and every key written to it from here on is a plain one — but
+        // the BUILD resolves `publishForSection<N>` onto `publish` and
+        // `createdSection<N>` onto `created` before Quartz reads either. An
+        // inherited key therefore beats everything below, and a copy that
+        // arrived carrying `publishForSection1: true` was visible to students
+        // the moment it existed while its own file read `publish: false`.
+        //
+        // What was REJECTED, because it is the obvious answer and it is a
+        // worse fault than the one it fixes: writing `publishForSection<N>:
+        // false` onto the copy as well. It does hide the page — and then the
+        // publish path, which picks its key from the path, writes plain
+        // `publish: true` and never touches the per-section line, so the page
+        // stays hidden while the teacher is told "Published 1 page", every
+        // time they ask. A page nobody can publish, reported as published, is
+        // worse than a page that starts visible.
+        copied = AssistPageVisibility.withoutPerSectionKeys(in: copied)
         copied = PageFrontmatter.settingCreated(
             in: copied,
             key: PageFrontmatter.createdKey(forSection: request.located.sectionNumber,
@@ -2064,7 +3447,60 @@ final class AssistToolRunner {
             forSection: request.located.sectionNumber, isSectionLocal: true
         ).text
 
-        let before: String? = try? String(contentsOf: request.newURL, encoding: .utf8)
+        // Read back what was just written rather than trusting it, and ABANDON
+        // the copy rather than write one this app cannot vouch for.
+        //
+        // The test is `!= .hidden`, not `== .visible`, deliberately. A value
+        // the reader will not guess at is one the build may well publish — a
+        // key whose value continues on an indented line reaches the site as
+        // the string `'false false'` — so "cannot tell" is not an excuse to
+        // carry on. It is also strictly stronger than asking `setting` for its
+        // outcome: `.noRoomForAKey` (#186) lands here as an answer that is not
+        // `.hidden` too, and so does anything the outcome cannot see.
+        //
+        // Refusing is the safe end state and that is why it is allowed to be
+        // this blunt: `ClassInsertionPlanner.apply` has already written the
+        // blank class page at this path, and `ClassPages.skeleton` writes
+        // `publish: false`, so a teacher who meets this keeps a hidden empty
+        // page where the copy would have been rather than a visible copy of a
+        // published lesson.
+        //
+        // **Reachable today, and not only through #186.** The strip above
+        // takes out the only KEYS that beat the plain one, but a `cannotTell`
+        // has two other causes, neither of which has anything to do with
+        // per-section keys and neither of which any write here can mend: a TAB
+        // used as indentation anywhere in the source's frontmatter (the reader
+        // answers `.unreadable`, because the build's own parser throws on it),
+        // and a frontmatter whose first line is indented, where `setting` now
+        // declines to write at all (#186) — it used to insert `publish: false`
+        // above that line, which adopted the line as its value. Both were
+        // measured; both are pages the BUILD cannot read as they stand, which
+        // is why stopping is the right answer rather than a shrug.
+        if AssistPageVisibility.answer(
+            in: copied, forSection: request.located.sectionNumber
+        ) != .hidden {
+            ActivityTrail.note(
+                .classCopyNotMade,
+                "did not copy a class — the copy could not be made certainly hidden, and a copy "
+                + "of a published lesson must never arrive where students can read it",
+                course: request.located.course.code, section: request.located.sectionNumber
+            )
+            return AssistToolOutcome.refused(AssistWording.theCopyCouldNotBeMadeHidden(
+                page: request.sourceTitle,
+                as: request.newTitle,
+                backupNamed: conversationBackups[request.located.course.code]?.lastPathComponent
+            ))
+        }
+
+        // Nil, and provably so. Past the guard above, either this page did not
+        // exist before the shuffle, or it existed, was vacated by a rename and
+        // the planner created the blank now standing there — and the branch
+        // below only records when nothing was renamed or re-dated at all,
+        // which is the case where a page here could not have existed. So an
+        // undo DELETES the copy rather than putting a blank class page back,
+        // which is what `AssistWording.aCreatedPageCanBeTakenBack` has always
+        // said and is only now true.
+        let before: String? = nil
         do {
             try copied.write(to: request.newURL, atomically: true, encoding: .utf8)
         } catch {
@@ -2073,11 +3509,19 @@ final class AssistToolRunner {
             )
         }
 
-        // Undoable ONLY when nothing else moved. A partial undo that deleted
-        // the new page and left every later class renamed would be worse than
-        // no undo at all, so when classes were shuffled the way back is the
-        // backup taken before any of it.
-        let shuffled: Bool = !request.plan.renames.isEmpty
+        // Undoable ONLY when nothing else moved — renames AND date moves. A
+        // partial undo that deleted the new page and left every later class
+        // renamed would be worse than no undo at all, so when classes were
+        // shuffled the way back is the backup taken before any of it.
+        //
+        // Keyed on renames alone this was wrong in the one shape that hurts
+        // most: `ClassInsertionPlanner` renames only WITHIN the unit being
+        // changed, so duplicating the LAST day of a unit renames nothing while
+        // re-dating every class of every later unit — and the undo was offered
+        // there, took back the copy, and left the rest of the year moved with
+        // nothing said about it. `movesAnythingElse` is the same property, and
+        // the same reasoning, `makeRoomForClasses` has always used.
+        let shuffled: Bool = request.plan.movesAnythingElse
         if !shuffled {
             history.record(AssistChange(
                 whatHappened: "duplicated “\(request.sourceTitle)” as “\(request.newTitle)”",
@@ -2088,21 +3532,41 @@ final class AssistToolRunner {
             ))
         }
 
-        var detail: String = "“\(request.sourceTitle)” was copied to “\(request.newTitle)”, "
-                           + "dated \(request.newDate.text). It is hidden, so nothing changed on "
-                           + "the site — write it, then publish when it is ready."
+        var detail: String = AssistWording.copiedTo(
+            page: request.sourceTitle, as: request.newTitle, on: request.newDate.text
+        )
         if shuffled {
             detail += "\n\n" + outcome.message
-            detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
-                    + "The copy made before any of it is in Plantoir's Backups list."
+            detail += "\n\n" + AssistWording.otherClassesMoved
+        } else {
+            // Nothing else moved, so the copy really can be taken away again —
+            // which this sentence has always claimed and, until the undo
+            // recorded no "before" for a page it created, was not quite true.
+            detail += "\n\n" + AssistWording.aCreatedPageCanBeTakenBack
         }
         if backedUp {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
 
         return AssistToolOutcome.wrote(
-            "Duplicated “\(request.sourceTitle)” as “\(request.newTitle)”.", detail: detail
+            AssistWording.duplicated(page: request.sourceTitle, as: request.newTitle),
+            detail: detail
         )
+    }
+
+    /// Whether this run of the planner is what put a page at this URL.
+    ///
+    /// Content-free on purpose — see the guard that calls it. The comparison
+    /// is exact because both URLs come from the same plan object:
+    /// `request.newURL` IS `plan.added[0].fileURL`, and `created` carries the
+    /// very same values.
+    private func wasCreatedByThisRun(_ url: URL, outcome: ClassChangeOutcome) -> Bool {
+        for made in outcome.created {
+            if made == url {
+                return true
+            }
+        }
+        return false
     }
 
     /// The card a teacher agrees to before a duplicate, which may move other
@@ -2118,19 +3582,48 @@ final class AssistToolRunner {
             return nil
         }
         var lines: [String] = []
-        lines.append("“\(request.sourceTitle)” would be copied to “\(request.newTitle)”, "
-                     + "dated \(request.newDate.text).")
-        lines.append("The copy starts hidden, so nothing changes on the site until you publish it.")
-        if !request.plan.renames.isEmpty {
+        lines.append(AssistWording.wouldBeCopiedTo(
+            page: request.sourceTitle, as: request.newTitle, on: request.newDate.text
+        ))
+        lines.append(AssistWording.theCopyStartsHidden)
+        // Counted from renames AND date moves, and said whenever either
+        // happens. Keyed on the rename count this line was not printed at all
+        // when a short unit was widened — the plan said not one word about the
+        // whole of the rest of the year being re-dated, and this is the card a
+        // teacher reads before pressing Go.
+        // The card takes the course's own noun (#267); the model's copy of
+        // the plan says "class" whatever the course calls them.
+        var cardLines: [String] = lines
+        if request.plan.movesAnythingElse {
             lines.append("")
-            lines.append("\(request.plan.renames.count) later "
-                         + "\(request.plan.renames.count == 1 ? "class moves" : "classes move") "
-                         + "a day along to make room, and the links that point at them are "
-                         + "rewritten to match.")
+            lines.append(AssistWording.otherClassesWouldMove(
+                moving: request.plan.otherClassesMoving,
+                renaming: request.plan.renames.count
+            ))
+            cardLines.append("")
+            cardLines.append(AssistWording.otherClassesWouldMove(
+                moving: request.plan.otherClassesMoving,
+                renaming: request.plan.renames.count,
+                noun: request.located.course.configuration.classNoun
+            ))
+            // And that the undo will not help (#185). The plan is where a
+            // teacher can still say no, and a duplicate that moves other
+            // classes IS a make-room, so it says what make-room's plan has
+            // always said — gated on the same `movesAnythingElse` that
+            // withholds the undo in `duplicateClass`, so the card warns
+            // exactly when the undo will be refused. The PLAN form, never
+            // `otherClassesMoved`: nothing has moved yet.
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone())
+            cardLines.append("")
+            cardLines.append(AssistWording.makingRoomCannotBeUndone(
+                noun: request.located.course.configuration.classNoun
+            ))
         }
         return AssistToolOutcome.planned(
             "Worked out what duplicating “\(request.sourceTitle)” would do.",
-            plan: lines.joined(separator: "\n")
+            plan: lines.joined(separator: "\n"),
+            card: cardLines.joined(separator: "\n")
         )
     }
 
@@ -2171,12 +3664,9 @@ final class AssistToolRunner {
             )
         }
         guard let numbers = UnitDay(
-            pageTitle: source.title, term: located.course.configuration.unitWord
+            pageTitle: source.title, naming: located.course.configuration.classPageNaming
         ) else {
-            return .failure(
-                "“\(source.displayTitle)” isn't a numbered class page, so there is no next day "
-                + "for it to become."
-            )
+            return .failure(AssistWording.notANumberedClassPage(page: source.displayTitle))
         }
 
         let plan: ClassInsertionPlan
@@ -2214,8 +3704,7 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: located.course.code, sectionNumber: located.sectionNumber,
-            because: "Duplicating a class needs to know which days this section meets, "
-                   + "so the copy can be given a date."
+            because: AssistWording.datesToDuplicate(noun: located.course.configuration.classNoun)
         )
     }
 
@@ -2242,8 +3731,9 @@ final class AssistToolRunner {
             let websiteAnswer: String = text("website", in: arguments).lowercased()
             let isRollover: Bool = isARollover(arguments)
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 guard isRollover else {
                     return AssistToolOutcome.wrote(already, detail: already)
                 }
@@ -2277,17 +3767,21 @@ final class AssistToolRunner {
                 )
             }
             if isRollover, websiteAnswer == "new" {
+                let newWebsite: String =
+                    "\n\nIt would also start a new website for this section, so publishing it "
+                    + "no longer replaces last year's. Last year's details are kept, and any "
+                    + "publish set to happen on its own is turned off."
                 return AssistToolOutcome.planned(
                     "Worked out what rolling that section over would do.",
-                    plan: asked.plan.describe()
-                        + "\n\nIt would also start a new website for this section, so publishing it "
-                        + "no longer replaces last year's. Last year's details are kept, and any "
-                        + "publish set to happen on its own is turned off."
+                    plan: asked.plan.describe() + newWebsite,
+                    card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
+                        + newWebsite
                 )
             }
             return AssistToolOutcome.planned(
                 "Worked out what re-dating that section would do.",
-                plan: asked.plan.describe()
+                plan: asked.plan.describe(),
+                card: asked.plan.describe(noun: asked.located.course.configuration.classNoun)
             )
         }
     }
@@ -2300,8 +3794,9 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(problem.localizedDescription)
         case .success(let asked):
             if asked.plan.changesNothing {
-                let already: String = "Every page in \(asked.located.course.code) Section "
-                                    + "\(asked.located.sectionNumber) is already on the day it should be."
+                let already: String = AssistWording.everyPageIsAlreadyOnItsDay(
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
                 // The website is settled HERE TOO, and this is the SECOND TURN
                 // of the whole conversation. A teacher answers the website
                 // question by saying one of the two sentences, which comes back
@@ -2312,6 +3807,23 @@ final class AssistToolRunner {
                 // last year's. An offer that looks like it worked is worse than
                 // no offer at all.
                 var said: String = already
+                // The record is set aside on a rollover that moved no page,
+                // too (#379): the year still turned over.
+                if isARollover(arguments) {
+                    let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                        courseDirectory: asked.located.course.directoryURL,
+                        section: asked.located.sectionNumber
+                    )
+                    if !released.isEmpty {
+                        history.record(AssistChange(
+                            whatHappened: "set aside the record of pages published last year",
+                            courseCode: asked.located.course.code,
+                            sectionNumber: asked.located.sectionNumber,
+                            rebuildsThePreview: false,
+                            files: released
+                        ))
+                    }
+                }
                 let aboutTheWebsite: String = settleTheWebsiteAfterARollover(
                     arguments,
                     course: asked.located.course,
@@ -2328,31 +3840,68 @@ final class AssistToolRunner {
                 return AssistToolOutcome.wrote(said, detail: said)
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
             _ = await stopThePreviewBeforeWriting(
                 for: asked.located.course, sectionNumber: asked.located.sectionNumber
             )
 
-            let change: AssistChange
+            var change: AssistChange
+            var leftAlone: [String] = []
+            var classesReDated: Int = 0
+            var pagesTheyUseReDated: Int = 0
             do {
-                change = try SectionReDatePlanner.apply(
+                let applied: (
+                    change: AssistChange, leftAlone: [String], classesReDated: Int, pagesTheyUseReDated: Int
+                ) = try SectionReDatePlanner.apply(
                     asked.plan, forSection: asked.located.sectionNumber, in: asked.located.course
                 )
+                change = applied.change
+                leftAlone = applied.leftAlone
+                classesReDated = applied.classesReDated
+                pagesTheyUseReDated = applied.pagesTheyUseReDated
             } catch {
                 return AssistToolOutcome.refused(
                     "Nothing was changed: \(error.localizedDescription)"
                 )
             }
+            // A rollover sets aside the section's published-pages record
+            // (#379, plan review finding 12): a new year's site has published
+            // nothing yet. Whichever website answer is given, and inside the
+            // rollover's own change, so taking the rollover back brings it back.
+            if isARollover(arguments) {
+                let released: [AssistSavedFile] = PublishedPagesRecord.release(
+                    courseDirectory: asked.located.course.directoryURL,
+                    section: asked.located.sectionNumber
+                )
+                var files: [AssistSavedFile] = change.files
+                for file in released {
+                    files.append(file)
+                }
+                change = AssistChange(
+                    whatHappened: change.whatHappened, courseCode: change.courseCode,
+                    sectionNumber: change.sectionNumber, rebuildsThePreview: change.rebuildsThePreview,
+                    files: files, appliesToTheWholeCourse: change.appliesToTheWholeCourse, kind: change.kind
+                )
+            }
             history.record(change)
 
-            let moved: Int = asked.plan.moves.count
-            let summary: String = "Re-dated \(asked.plan.classCount) "
-                                + "\(asked.plan.classCount == 1 ? "class" : "classes") and "
-                                + "\(moved - asked.plan.classCount) "
-                                + "\((moved - asked.plan.classCount) == 1 ? "page" : "pages") "
-                                + "they use."
+            // The model's copy says "class" whatever the course calls them;
+            // only the line the teacher reads takes the course's noun (#267).
+            // Both counts are what was WRITTEN, each from its own kind (#343):
+            // never one subtracted from the other.
+            let summary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated, noun: .class,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
+            )
+            let teacherSummary: String = AssistToolRunner.sayingWhatWasReDated(
+                classes: classesReDated, pagesTheyUse: pagesTheyUseReDated,
+                noun: asked.located.course.configuration.classNoun,
+                course: asked.located.course.code, section: asked.located.sectionNumber,
+                anyDeclined: !leftAlone.isEmpty
+            )
             var detail: String = summary
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
@@ -2368,13 +3917,52 @@ final class AssistToolRunner {
             // The website goes in the SUMMARY beside the count of what moved:
             // it is the part a teacher has to answer, and `detail` is not shown
             // to them at all for a write.
-            var said: String = summary
+            var said: String = teacherSummary
+            // Pages the re-date could not date, named — and counted nowhere
+            // above, since the counts are of dates written (#186, #343).
+            if !leftAlone.isEmpty {
+                let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
+                said += said.isEmpty ? declined : " " + declined
+                detail += "\n\n" + declined
+                AssistToolRunner.notePagesLeftAsTheyWere(
+                    leftAlone.count, act: "re-dating classes",
+                    course: asked.located.course.code, section: asked.located.sectionNumber
+                )
+            }
             if aboutTheWebsite.isEmpty == false {
                 said += "\n\n" + aboutTheWebsite
                 detail += "\n\n" + aboutTheWebsite
             }
             return AssistToolOutcome.wrote(said, detail: detail)
         }
+    }
+
+    /// The line a teacher reads after a re-date (#343). When every class was
+    /// already on its day and only what they use moved, "Re-dated 0 classes"
+    /// would read as nothing happening, so that case has its own sentence.
+    ///
+    /// **When no date at all was written** — a plan whose only moves hid an
+    /// overflow class already on the last day, or were declined (#186) — the
+    /// reply is the same sentence a plan that changes nothing gets,
+    /// `AssistWording.everyPageIsAlreadyOnItsDay`, never "only the 0 pages"
+    /// (the implementation review's F4). Except when a page was DECLINED: it
+    /// is not on its day, so saying every page is would be the same kind of
+    /// untruth #343 fixes; the reply is then the declined sentence alone
+    /// (empty here, and the caller adds it).
+    static func sayingWhatWasReDated(
+        classes: Int, pagesTheyUse: Int, noun: ClassNoun,
+        course: String, section: Int, anyDeclined: Bool
+    ) -> String {
+        if classes == 0 && pagesTheyUse == 0 {
+            if anyDeclined {
+                return ""
+            }
+            return AssistWording.everyPageIsAlreadyOnItsDay(course: course, section: section)
+        }
+        if classes == 0 {
+            return AssistWording.reDatedOnlyPagesTheyUse(pagesTheyUse: pagesTheyUse, noun: noun)
+        }
+        return AssistWording.reDated(count: classes, pagesTheyUse: pagesTheyUse, noun: noun)
     }
 
     /// The whole question, in ONE place, because it is said from two.
@@ -2543,19 +4131,32 @@ final class AssistToolRunner {
     ///
     /// **Not politeness — the alternative is a website nobody named going
     /// live.** A section cut loose has no agreed website to publish TO, and a
-    /// scheduled run has nobody to ask: `runScheduled` re-checks nothing, and
-    /// `deploy.py`'s name prompt returns its DEFAULT when there is no terminal
-    /// rather than failing. So the overnight run would create
+    /// scheduled run has nobody to ask: `runScheduled` re-checks WHETHER IT IS
+    /// STILL THE DAY (since 2026-09-20) and nothing else — not what the site is
+    /// called — and `deploy.py`'s name prompt returns its DEFAULT when there is
+    /// no terminal rather than failing. So the overnight run would create
     /// `<code>-s<n>-<year>-<name>` and publish there, while the address the
     /// teacher's students actually read quietly stopped updating. Renaming a
     /// course turns scheduled publishes off for the same reason and says so.
+    ///
+    /// **Scoped to THIS working folder since 2026-09-20 (issue #236), and it
+    /// was the one cancel path that was not.** It used to ask whether
+    /// `plistURL` exists, which was a Mac-wide question: a label was the course
+    /// code and the section number and nothing else (until #237). So a teacher holding last
+    /// year's working folder and this year's, both with ICS3U section 1, with
+    /// the live deploy in last year's, would roll section 1 over in THIS
+    /// year's folder and have the OTHER folder's deploy deleted — and be told
+    /// it had been turned off. That is the fault #236 exists to close, in the
+    /// one place the fix first missed.
     private func turnOffAnyScheduledPublish(
         course: Course, sectionNumber: Int
     ) -> ScheduledPublishOutcome {
-        let plistURL: URL = ScheduledDeploy.plistURL(
-            courseCode: course.code, sectionNumber: sectionNumber
+        let ours: [ScheduledDeploy.Agent] = ScheduledDeployCleanup.agentsOwnedBy(
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? course.directoryURL
         )
-        guard FileManager.default.fileExists(atPath: plistURL.path) else {
+        guard !ours.isEmpty else {
             return .noneWasSet
         }
         // `runner: launchControl` is not optional here. The default runs the
@@ -2564,7 +4165,10 @@ final class AssistToolRunner {
         // to whoever is running the suite — the fixture course is ICS3U, which
         // is a course a teacher plausibly has.
         let problem: String? = ScheduledDeploy.cancelScheduledDeploy(
-            courseCode: course.code, sectionNumber: sectionNumber, runner: launchControl
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            inWorkingFolder: workspace.workspaceURL ?? course.directoryURL,
+            runner: launchControl
         )
         // The failure is REPORTED, never swallowed: a plist left behind is
         // loaded again at next login, so the publish really can still fire —
@@ -2618,16 +4222,19 @@ final class AssistToolRunner {
     }
 
     /// A full copy of one course.
-    private func backUpCourse(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func backUpCourse(_ arguments: [String: Any]) async -> AssistToolOutcome {
         let asked: String = text("course", in: arguments)
         // Matched the way every other tool here matches a course code, so a
         // teacher typing "ics3u" reaches the same course either way.
         var found: Course? = nil
-        for candidate in workspace.courses
+        for candidate in coursesAsSavedNow
         where candidate.code.lowercased() == asked.lowercased() && found == nil {
             found = candidate
         }
         guard let course = found else {
+            if asked.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return AssistToolOutcome.couldNotRead(AssistWording.noCourseNamed)
+            }
             return AssistToolOutcome.couldNotRead(
                 "There is no course called “\(asked)” in this working folder."
             )
@@ -2644,9 +4251,11 @@ final class AssistToolRunner {
         // precisely to stop that.
         let section: Int = number("section", in: arguments) ?? 1
         do {
-            let backupURL: URL = try CourseArchiver.backUpCourse(
-                course, coursesDirectoryURL: coursesDirectoryURL,
-                madeBy: .assistant(sectionNumber: section)
+            // Every call a NEW copy, which is what this tool is for — so no
+            // sharing with a copy under way, unlike the once-per-conversation
+            // one. The same line in the window, and the same trail line.
+            let backupURL: URL = try await savingACopy(
+                of: course, forSection: section, coursesDirectoryURL: coursesDirectoryURL
             )
             let said: String = AssistWording.backedUpCourse(
                 course: course.code, to: backupURL.lastPathComponent
@@ -2671,21 +4280,29 @@ final class AssistToolRunner {
             // promises a teacher will be shown, and a hand-rolled count of
             // renames delivered none of it. The more dangerous tool was the
             // one showing less.
-            var lines: [String] = [asked.plan.description]
-            lines.append("")
-            lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
-            if asked.plan.movesAnythingElse {
-                lines.append("")
-                lines.append(
-                    "Because other classes move, “Undo that” will not take this back afterwards — "
-                    + "the copy made before any of it is in Plantoir's Backups list."
-                )
-            }
+            //
+            // Written twice: once with "class" for the model, and once in the
+            // course's own noun for the card (#267), so a club changes
+            // nothing the model is given.
+            let noun: ClassNoun = asked.located.course.configuration.classNoun
             return AssistToolOutcome.planned(
                 "Worked out what making room in that unit would do.",
-                plan: lines.joined(separator: "\n")
+                plan: AssistToolRunner.makeRoomPlan(asked.plan, noun: .class),
+                card: AssistToolRunner.makeRoomPlan(asked.plan, noun: noun)
             )
         }
+    }
+
+    /// A make-room plan, in the words a teacher agrees to.
+    private static func makeRoomPlan(_ plan: ClassInsertionPlan, noun: ClassNoun) -> String {
+        var lines: [String] = [plan.describe(noun: noun)]
+        lines.append("")
+        lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
+        if plan.movesAnythingElse {
+            lines.append("")
+            lines.append(AssistWording.makingRoomCannotBeUndone(noun: noun))
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Make the room.
@@ -2697,7 +4314,7 @@ final class AssistToolRunner {
     /// is the way out. That is the same rule the duplicate path already lives
     /// by, said out loud here because this tool moves more pages than anything
     /// else on the surface.
-    private func makeRoomForClasses(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func makeRoomForClasses(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch roomPlan(arguments) {
         case .couldNot(let message):
             return AssistToolOutcome.couldNotRead(message)
@@ -2718,9 +4335,14 @@ final class AssistToolRunner {
                 )
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .planned(let again) = roomPlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
             let outcome: ClassChangeOutcome
             do {
                 outcome = try ClassInsertionPlanner.apply(asked.plan, in: asked.located.course)
@@ -2740,17 +4362,17 @@ final class AssistToolRunner {
             // so a teacher's whole year moved and the reply said nothing about
             // undo at all — while "undo that" answered "nothing to undo".
             if asked.plan.movesAnythingElse {
-                detail += "\n\nBecause other classes moved, “Undo that” will not take this back. "
-                        + "The copy made before any of it is in Plantoir's Backups list. Look the "
-                        + "section over in Plantoir before you publish."
+                detail += "\n\n" + AssistWording.otherClassesMoved + " "
+                        + AssistWording.lookTheSectionOverBeforePublishing
             }
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
             return AssistToolOutcome.wrote(
-                "Made room for \(asked.count) "
-                + (asked.count == 1 ? "class" : "classes")
-                + " at \(asked.located.course.configuration.unitWord) \(asked.unit), Day \(asked.atDay).",
+                AssistWording.madeRoom(
+                    count: asked.count, at: asked.plan.positionTitle,
+                    noun: asked.located.course.configuration.classNoun
+                ),
                 detail: detail
             )
         }
@@ -2776,13 +4398,37 @@ final class AssistToolRunner {
         guard case .success(let located) = found else {
             return .couldNot(refusal(from: found).message)
         }
-        guard let unit = number("unit", in: arguments) else {
-            return .couldNot(
-                "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
-            )
-        }
-        guard let atDay = number("atDay", in: arguments) else {
-            return .couldNot("Which day should the new class take?")
+        let naming: ClassPageNaming = located.course.configuration.classPageNaming
+        var unit: Int = 0
+        var atDay: Int = 0
+        if naming.isNumbered {
+            // A numbered course (#267) has one number and no units, but the
+            // tool's schema — frozen, because routing was measured against
+            // it — still asks for `unit` and `atDay`. Which one a small model
+            // fills for "make room at Week 5" is a routing question, so the
+            // reading accepts either and refuses the one shape it cannot
+            // read: two different numbers.
+            guard let position = ClassInsertionPlanner.numberedPosition(
+                unit: number("unit", in: arguments), atDay: number("atDay", in: arguments)
+            ) else {
+                return .couldNot(
+                    "Which \(naming.word.lowercased()) should I make room at? Name one, like "
+                    + "“\(naming.title(unit: 1, day: 3))”."
+                )
+            }
+            unit = 1
+            atDay = position
+        } else {
+            guard let askedUnit = number("unit", in: arguments) else {
+                return .couldNot(
+                    "Which \(located.course.configuration.unitWord.lowercased()) should I make room in?"
+                )
+            }
+            guard let askedDay = number("atDay", in: arguments) else {
+                return .couldNot("Which day should the new class take?")
+            }
+            unit = askedUnit
+            atDay = askedDay
         }
         // One unless asked for more, matching what the teacher means by "make
         // room for a class".
@@ -2827,7 +4473,19 @@ final class AssistToolRunner {
     /// did not expect. Windows' version answers the same three things, so a
     /// Claude Code session sees the same shape on either platform.
     private func listCourses() -> AssistToolOutcome {
-        let courses: [Course] = workspace.courses
+        // **The local window never lists a reference course.** `list_courses`
+        // is MCP-only as a TOOL, but the app reaches it too: "what courses do
+        // i have?" is matched in code by `AssistCardCommand.fixedShapes`, and
+        // what comes back is shown to the teacher. Decision (d) says the
+        // local assistant is told nothing about a reference course, so this is
+        // where that is true rather than nearly true.
+        var courses: [Course] = []
+        for course in coursesAsSavedNow {
+            if surface == .local && course.isKeptForReference {
+                continue
+            }
+            courses.append(course)
+        }
         guard courses.isEmpty == false else {
             return AssistToolOutcome.read(
                 AssistWording.noCoursesYet, detail: AssistWording.noCoursesYet
@@ -2843,17 +4501,41 @@ final class AssistToolRunner {
             let sectionList: String = sections.isEmpty
                 ? "none yet"
                 : sections.joined(separator: ", ")
+            if course.isKeptForReference {
+                // Everything a session needs to say "last year's ICS3U" and
+                // then ADDRESS it: the name `locate` accepts, the code a
+                // teacher reads, what kind of course it is, and which year.
+                // Not a teacher surface, so all three can be shown at once.
+                lines.append(
+                    "\(course.code) — \(course.configuration.courseName)\n"
+                    + "  course code: \(course.displayCode)\n"
+                    + "  kept for reference — never deployed"
+                    + "\n  school year: \(AssistToolRunner.schoolYearText(of: course, today: readToday()))"
+                    + "\n  sections: \(sectionList)"
+                    + howITeachLine(for: course)
+                )
+                continue
+            }
             lines.append(
                 "\(course.code) — \(course.configuration.courseName)\n"
                 + "  sections: \(sectionList)\n"
-                // `AssistToolRunner.destination(of:)`, NOT
-                // `DeployCommand.destinationDescription`: that one returns the raw
-                // PATH for a folder destination, which is machinery a teacher is not
-                // the audience for, disagrees with what the deploy card says two
-                // functions away, disagrees with Windows' "a folder on this computer",
-                // and prints BLANK for a course set to a folder that has not been
-                // chosen yet — a state the product models on purpose.
-                + "  publishes to: \(AssistToolRunner.destination(of: course))"
+                // EVERY place the course publishes to (#403), primary first then
+                // each additional destination in the order saved — the same list
+                // a deploy walks (`allDeployDestinations`) — named by TYPE and
+                // joined "A, B and C", in the scheduled deploy card's words
+                // (`planOpening.cardNaming`, #396). This used to name the primary
+                // alone, so a course publishing to Netlify AND Cloudflare Pages
+                // read "Netlify", and one set to a folder not chosen yet read
+                // "Netlify" too. The app's own assistant window shows this line
+                // when a teacher asks what courses they have, so it is a teacher
+                // surface. Rejected: `deployPlan(...).descriptions` and
+                // `DeployCommand.destinationDescription`, which name a folder by
+                // its PATH — machinery on that surface, and BLANK for a folder
+                // that has not been chosen yet, a state the product models on
+                // purpose. Pinned by shared-rules.json →
+                // scheduledDeployRefusals.planOpening.listCoursesLine.
+                + "  publishes to: \(AssistToolRunner.everyDestination(of: course))"
+                + howITeachLine(for: course)
             )
         }
 
@@ -2862,6 +4544,63 @@ final class AssistToolRunner {
             ? "There is 1 course in this working folder."
             : "There are \(courses.count) courses in this working folder."
         return AssistToolOutcome.read(summary, detail: said, showingTheTeacher: said)
+    }
+
+    /// Whether a course has a How I Teach page, as one more `list_courses`
+    /// line — to an MCP client ONLY (#209 plan review, item 1). The local
+    /// window reaches `list_courses` through a phrase matched in code and
+    /// shows the answer to the teacher, and the local assistant neither reads
+    /// nor drafts the page, so a line there would be a suggestion that window
+    /// cannot act on (`howITeachPage.listCoursesLine`).
+    private func howITeachLine(for course: Course) -> String {
+        if surface != .mcp {
+            return ""
+        }
+        // Written means WORDS (#329): an empty page — Course Settings'
+        // "Create and Open" makes one — is "not written yet".
+        if HowITeachPage.writtenURL(for: course) != nil {
+            return "\n" + AssistWording.howITeachListedAsWritten
+        }
+        return "\n" + AssistWording.howITeachListedAsNotWritten
+    }
+
+    /// The LIVE courses whose How I Teach page exists, by the name they are
+    /// addressed by, sorted — for the MCP session briefing
+    /// (`howITeachPage.briefingInInstructions`). Empty in most folders, and
+    /// then the briefing says nothing about it at all.
+    func coursesWithAHowITeachPage() -> [String] {
+        var codes: [String] = []
+        for course in coursesAsSavedNow where !course.isKeptForReference {
+            if HowITeachPage.writtenURL(for: course) != nil {
+                codes.append(course.code)
+            }
+        }
+        codes.sort()
+        return codes
+    }
+
+    /// One line per reference course, for the MCP session briefing: the name
+    /// it is addressed by, the code a teacher reads, and the school year.
+    ///
+    /// Public because the server builds the briefing and the runner is what
+    /// knows the courses. Empty when there are none, which is most folders.
+    func referenceCourseBriefingLines() -> [String] {
+        var lines: [String] = []
+        for course in coursesAsSavedNow where course.isKeptForReference {
+            lines.append(
+                "  \(course.code) — \(course.displayCode), "
+                + AssistToolRunner.schoolYearText(of: course, today: readToday())
+            )
+        }
+        return lines
+    }
+
+    /// "2025–26", or "Other" — the label a session repeats back to a teacher.
+    static func schoolYearText(of course: Course, today: CalendarDay) -> String {
+        guard let year = course.schoolYear(on: today) else {
+            return SchoolYear.otherGroupName
+        }
+        return SchoolYear.label(forStartingYear: year)
     }
 
     private struct PlannedReDate {
@@ -2893,13 +4632,12 @@ final class AssistToolRunner {
         }
         askForTheTimetable(
             courseCode: code, sectionNumber: number,
-            because: "Re-dating a section puts its classes onto the days it meets, so it needs "
-                   + "those days first."
+            because: AssistWording.datesToReDate(noun: noun(forCourse: code))
         )
     }
 
-    private func addNextClass(_ arguments: [String: Any]) -> AssistToolOutcome {
-        if let duplicated = duplicateClassRequested(arguments) {
+    private func addNextClass(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        if let duplicated = await duplicateClassRequested(arguments) {
             return duplicated
         }
         switch nextClassPlan(arguments) {
@@ -2916,9 +4654,16 @@ final class AssistToolRunner {
                 )
             }
 
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap) —
+            // and a course removed meanwhile is not locatable, so its section
+            // folder is never made again by the apply.
+            guard case .success(let again) = nextClassPlan(arguments),
+                  again.plan.description == asked.plan.description else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
 
             let outcome: ClassChangeOutcome
             do {
@@ -2968,7 +4713,9 @@ final class AssistToolRunner {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
 
-            var summary: String = "Added the next class page."
+            var summary: String = AssistWording.addedTheNextPage(
+                noun: asked.located.course.configuration.classNoun
+            )
             if let created = asked.plan.classes.first {
                 summary = "Added \(created.title), dated \(created.date.text)."
             }
@@ -3079,7 +4826,7 @@ final class AssistToolRunner {
         }
     }
 
-    private func addCurriculumMentions(_ arguments: [String: Any]) -> AssistToolOutcome {
+    private func addCurriculumMentions(_ arguments: [String: Any]) async -> AssistToolOutcome {
         switch mentionsPlan(arguments) {
         case .failure(let refusal):
             return AssistToolOutcome.refused(refusal.message)
@@ -3095,9 +4842,14 @@ final class AssistToolRunner {
             // Before anything is touched — but only the first time in a
             // conversation. The undo history covers the rest of it; the
             // backup outlives the conversation.
-            let backedUp: Bool = backUpOnceForThisConversation(
+            let backedUp: Bool = await backUpOnceForThisConversation(
                 asked.located.course, forSection: asked.located.sectionNumber
             )
+            // Held again to the plan after the copy (#351's plan/write gap).
+            guard case .success(let again) = mentionsPlan(arguments),
+                  again.plan.describe() == asked.plan.describe() else {
+                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+            }
 
             let change: AssistChange
             do {
@@ -3128,24 +4880,345 @@ final class AssistToolRunner {
 
     // MARK: - Finding the course and section
 
+    // MARK: - The How I Teach page (#209), MCP only
+
+    /// `read_how_i_teach`: the course's page, or — when there is none — where
+    /// it would go and how to offer a draft.
+    ///
+    /// Works on a course kept for reference (it is read-only), because last
+    /// year's page is evidence of how the course was taught.
+    private func readHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.couldNotRead(refusal.message)
+        case .success(let found):
+            course = found
+        }
+
+        guard let pageURL = HowITeachPage.existingURL(for: course) else {
+            ActivityTrail.note(
+                .howITeachPageRead,
+                "\(course.code) · " + HowITeachPage.trailLineForARead(words: nil, cutShort: false)
+            )
+            let answer: String = AssistWording.howITeachMissing(course: course.code)
+                + "\n\n" + AssistWording.howITeachDraftingBrief
+            return AssistToolOutcome.read(answer, detail: answer)
+        }
+        guard let pageData = try? Data(contentsOf: pageURL), let pageText = HowITeachPage.text(of: pageData) else {
+            return AssistToolOutcome.couldNotRead(AssistToolRefusal.unreadablePage(HowITeachPage.title).message)
+        }
+        // Started and never written (#329): Course Settings' "Create and
+        // Open" makes a page with its settings and nothing else. Handed over
+        // as nothing to keep to, with the way to offer a draft — never as the
+        // teacher's account of their course.
+        if !HowITeachPage.hasWords(pageText) {
+            ActivityTrail.note(
+                .howITeachPageRead,
+                "\(course.code) · " + HowITeachPage.trailLineForARead(words: nil, cutShort: false, empty: true)
+            )
+            let answer: String = AssistWording.howITeachEmpty(course: course.code)
+                + "\n\n" + AssistWording.howITeachDraftingBrief
+            return AssistToolOutcome.read(answer, detail: answer)
+        }
+
+        let body: String = HowITeachPage.trimmed(HowITeachPage.body(of: pageText))
+        let words: Int = HowITeachPage.wordCount(of: pageText)
+        var shown: String = body
+        var cutShort: Bool = false
+        if body.count > HowITeachPage.mostCharacters {
+            cutShort = true
+            shown = String(body.prefix(HowITeachPage.mostCharacters)) + "\n\n"
+                + AssistWording.howITeachCutShort(
+                    course: course.code,
+                    path: AssistSectionGraph.relativePath(of: pageURL, workspaceURL: workspace.workspaceURL)
+                )
+        }
+        ActivityTrail.note(
+            .howITeachPageRead,
+            "\(course.code) · " + HowITeachPage.trailLineForARead(words: words, cutShort: cutShort)
+        )
+        let answer: String = AssistWording.howITeachRead(course: course.code, text: shown)
+        return AssistToolOutcome.read(answer, detail: answer)
+    }
+
+    /// What a write of the page would do, worked out once for the plan and
+    /// the write, so the plan refuses exactly what the write refuses
+    /// (`howITeachPage.tools.planAndWriteAgree`).
+    private struct PlannedHowITeach {
+        let course: Course
+        let text: String
+        /// The page the teacher has, found by its real name — nil for a new one.
+        let existingURL: URL?
+        let existingText: String?
+        let existingMark: String?
+        /// The mark the caller passed, trimmed; empty when none.
+        let replacing: String
+        /// Whether the page there has WORDS (#329). A page without them is
+        /// planned and written as a new one — no mark needed — with its
+        /// settings block kept byte for byte.
+        let existingIsWritten: Bool
+    }
+
+    private func howITeachPlan(_ arguments: [String: Any]) -> Result<PlannedHowITeach, AssistToolRefusal> {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return .failure(refusal)
+        case .success(let found):
+            course = found
+        }
+        // The write is refused on a reference course by the gate every write
+        // shares; the PLAN is read-only and so passes that gate, and must not
+        // promise what the write will refuse.
+        if course.isKeptForReference {
+            return .failure(.keptForReference(course.displayCode))
+        }
+
+        let pageText: String = text("text", in: arguments)
+        if pageText.isEmpty {
+            return .failure(.notInThisBuild(AssistWording.howITeachNeedsWords))
+        }
+        if pageText.count > HowITeachPage.mostCharacters {
+            return .failure(.notInThisBuild(AssistWording.howITeachTooLong))
+        }
+        if HowITeachPage.opensWithAFence(pageText) {
+            return .failure(.notInThisBuild(AssistWording.howITeachCarriesNoSettings))
+        }
+
+        let replacing: String = text("replacing", in: arguments).lowercased()
+        var existingText: String? = nil
+        var existingMark: String? = nil
+        let existingURL: URL? = HowITeachPage.existingURL(for: course)
+        if let existingURL {
+            guard let data = try? Data(contentsOf: existingURL),
+                  let decoded = HowITeachPage.text(of: data) else {
+                return .failure(.unreadablePage(HowITeachPage.title))
+            }
+            existingText = decoded
+            existingMark = HowITeachPage.mark(of: data)
+            if !replacing.isEmpty && replacing != existingMark {
+                return .failure(.notInThisBuild(AssistWording.howITeachChangedSincePlanned(course: course.code)))
+            }
+        }
+        var existingIsWritten: Bool = false
+        if let existingText {
+            existingIsWritten = HowITeachPage.hasWords(existingText)
+        }
+        return .success(PlannedHowITeach(
+            course: course,
+            text: pageText,
+            existingURL: existingURL,
+            existingText: existingText,
+            existingMark: existingMark,
+            replacing: replacing,
+            existingIsWritten: existingIsWritten
+        ))
+    }
+
+    /// `plan_write_how_i_teach`: where it would go, and whether it replaces
+    /// the page the teacher has — with the mark the write then needs.
+    private func planWriteHowITeach(_ arguments: [String: Any]) -> AssistToolOutcome {
+        let planned: PlannedHowITeach
+        switch howITeachPlan(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.couldNotRead(refusal.message)
+        case .success(let found):
+            planned = found
+        }
+        guard let existingURL = planned.existingURL,
+              let existingText = planned.existingText,
+              let existingMark = planned.existingMark,
+              planned.existingIsWritten else {
+            // A new page — or an EMPTY one (#329), which is saved into where
+            // it already is, under the teacher's own spelling.
+            let path: String = AssistSectionGraph.relativePath(
+                of: planned.existingURL ?? HowITeachPage.newPageURL(for: planned.course),
+                workspaceURL: workspace.workspaceURL
+            )
+            let plan: String = AssistWording.howITeachPlanCreates(course: planned.course.code, path: path)
+            return AssistToolOutcome.planned("Worked out where the How I Teach page would go.", plan: plan)
+        }
+        let path: String = AssistSectionGraph.relativePath(of: existingURL, workspaceURL: workspace.workspaceURL)
+        var changed: String = "at a time that could not be read"
+        if let modified = (try? existingURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate {
+            changed = CalendarDay.today(modified).text
+        }
+        let plan: String = AssistWording.howITeachPlanReplaces(
+            course: planned.course.code,
+            path: path,
+            words: String(HowITeachPage.wordCount(of: existingText)),
+            changed: changed,
+            mark: existingMark
+        )
+        return AssistToolOutcome.planned("Worked out what replacing the How I Teach page would do.", plan: plan)
+    }
+
+    /// `write_how_i_teach`: save the page the teacher agreed to.
+    ///
+    /// Never replaces the teacher's page without the mark its plan gave;
+    /// backs the course up first (once per conversation, as every write
+    /// does); keeps a replaced page's settings block byte for byte; and
+    /// records ONE undo entry that never touches a preview, because the page
+    /// is never on the site.
+    private func writeHowITeach(_ arguments: [String: Any]) async -> AssistToolOutcome {
+        let planned: PlannedHowITeach
+        switch howITeachPlan(arguments) {
+        case .failure(let refusal):
+            return AssistToolOutcome.refused(refusal.message)
+        case .success(let found):
+            planned = found
+        }
+        // Decided against the bytes read HERE, at the write (#329): a page
+        // the teacher typed into in Obsidian after the plan is written, and
+        // refused as it always was.
+        if planned.existingIsWritten && planned.replacing.isEmpty {
+            return AssistToolOutcome.refused(AssistWording.howITeachAlreadyWritten(course: planned.course.code))
+        }
+
+        let pageURL: URL = planned.existingURL ?? HowITeachPage.newPageURL(for: planned.course)
+        let newText: String
+        if let existingText = planned.existingText, HowITeachPage.settingsBlock(of: existingText) != nil {
+            // Replaced — or an empty page filled — keeping its settings byte
+            // for byte.
+            newText = HowITeachPage.replacedPageText(existing: existingText, with: planned.text)
+        } else if let existingText = planned.existingText, planned.existingIsWritten {
+            // A written page with no settings is given none: the location is
+            // the guarantee.
+            newText = HowITeachPage.replacedPageText(existing: existingText, with: planned.text)
+        } else {
+            // A new page, or an empty one with no settings: written as new.
+            newText = HowITeachPage.newPageText(planned.text)
+        }
+
+        // A backup and an undo entry both want a SECTION; the page belongs to
+        // the course, so the lowest section stands in. The backup's name says
+        // "before an assistant chat about Section 1" — accepted rather than
+        // teaching the backup-name parser a new maker on both platforms
+        // (#209 plan review, item 6); the zip holds the whole course.
+        var sections: [Int] = planned.course.sectionNumbers
+        sections.sort()
+        let standInSection: Int = sections.first ?? 1
+        let backedUp: Bool = await backUpOnceForThisConversation(planned.course, forSection: standInSection)
+
+        // The copy is saved off the main actor (#351), and the teacher can be
+        // typing in Obsidian while it runs: the page must still be the one
+        // the plan read, or nothing is written.
+        if howITeachPageMovedOn(since: planned) {
+            return AssistToolOutcome.refused(AssistWording.howITeachChangedSincePlanned(course: planned.course.code))
+        }
+
+        do {
+            try newText.write(to: pageURL, atomically: true, encoding: .utf8)
+        } catch {
+            return AssistToolOutcome.refused("Nothing was saved: \(error.localizedDescription)")
+        }
+
+        // `after` is the file as the undo will READ it back — Foundation's
+        // reading drops a byte-order mark, and an `after` that kept one would
+        // never match, so the undo would leave the page alone as "edited
+        // since". `before` keeps it, so taking the change back restores it.
+        let readBack: String = (try? String(contentsOf: pageURL, encoding: .utf8)) ?? newText
+        let created: Bool = !planned.existingIsWritten
+        history.record(AssistChange(
+            whatHappened: created ? "wrote a new How I Teach page" : "replaced the How I Teach page",
+            courseCode: planned.course.code,
+            sectionNumber: standInSection,
+            rebuildsThePreview: false,
+            files: [AssistSavedFile(fileURL: pageURL, before: planned.existingText, after: readBack)],
+            appliesToTheWholeCourse: true
+        ))
+
+        var wordsBefore: Int? = nil
+        if let existingText = planned.existingText, planned.existingIsWritten {
+            wordsBefore = HowITeachPage.wordCount(of: existingText)
+        }
+        var backupName: String? = nil
+        if backedUp, let backupURL = conversationBackups[planned.course.code] {
+            backupName = backupURL.lastPathComponent
+        }
+        ActivityTrail.note(
+            .howITeachPageWritten,
+            "\(planned.course.code) · " + HowITeachPage.trailLineForAWrite(
+                wordsBefore: wordsBefore,
+                wordsAfter: HowITeachPage.wordCount(of: newText),
+                backupName: backupName
+            )
+        )
+
+        let saved: String = AssistWording.howITeachSaved(course: planned.course.code)
+        var detail: String = saved
+        if backedUp {
+            detail += "\n\n" + AssistToolRunner.backedUpNote
+        }
+        return AssistToolOutcome.wrote(saved, detail: detail)
+    }
+
+    /// Whether the How I Teach page on disk is no longer the one a write
+    /// planned from: a page has appeared where there was none, or the one
+    /// there has other bytes. Read after the backup, which now runs off the
+    /// main actor (#351) and can take a minute — long enough for a teacher
+    /// to type into the page in Obsidian.
+    private func howITeachPageMovedOn(since planned: PlannedHowITeach) -> Bool {
+        let nowURL: URL? = HowITeachPage.existingURL(for: planned.course)
+        guard let plannedURL = planned.existingURL else {
+            return nowURL != nil
+        }
+        guard let nowURL, nowURL.lastPathComponent == plannedURL.lastPathComponent,
+              let data = try? Data(contentsOf: nowURL) else {
+            return true
+        }
+        return HowITeachPage.mark(of: data) != planned.existingMark
+    }
+
     /// A course and section the model named, both found.
     private struct Located {
         let course: Course
         let sectionNumber: Int
     }
 
-    private func locate(_ arguments: [String: Any]) -> Result<Located, AssistToolRefusal> {
+    /// The course the model named, found — the first half of `locate`, for
+    /// the tools that take a course and no section (the How I Teach page,
+    /// #209). `locate` calls it, so every other tool finds a course exactly
+    /// as it always has.
+    private func locateCourse(_ arguments: [String: Any]) -> Result<Course, AssistToolRefusal> {
         if workspace.workspaceURL == nil {
             return .failure(.noWorkingFolder)
         }
 
         let code: String = text("course", in: arguments).trimmingCharacters(in: .whitespaces)
         var course: Course? = nil
-        for candidate in workspace.courses where candidate.code.lowercased() == code.lowercased() {
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
             course = candidate
+        }
+        // **A reference course is addressed by its FOLDER NAME and nothing
+        // else.** A bare `ICS3U` resolves to the live ICS3U exactly as it
+        // always has; if there is no live one and a reference course carries
+        // that code, this REFUSES and names the candidates rather than
+        // guessing. A session asked to read last year's material and handed
+        // this year's would report on the wrong course and never know — and
+        // the two deliberately show the same code, so the guess would be
+        // right-looking every time.
+        if course == nil {
+            let candidates: [String] = referenceCoursesShowing(code: code)
+            if !candidates.isEmpty {
+                return .failure(.askedForACourseByItsCodeAlone(code, candidates))
+            }
         }
         guard let course else {
             return .failure(.noSuchCourse(code))
+        }
+        return .success(course)
+    }
+
+    private func locate(_ arguments: [String: Any]) -> Result<Located, AssistToolRefusal> {
+        let course: Course
+        switch locateCourse(arguments) {
+        case .failure(let refusal):
+            return .failure(refusal)
+        case .success(let found):
+            course = found
         }
 
         var numbers: [Int] = course.sectionNumbers
@@ -3164,6 +5237,23 @@ final class AssistToolRunner {
         return .failure(.noSuchSection(course.code, 0))
     }
 
+    /// The folder names of every reference course showing this code.
+    ///
+    /// Sorted, so the sentence a session reads is the same every time.
+    private func referenceCoursesShowing(code: String) -> [String] {
+        let wanted: String = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if wanted.isEmpty {
+            return []
+        }
+        var result: [String] = []
+        for candidate in coursesAsSavedNow
+        where candidate.isKeptForReference && candidate.displayCode.lowercased() == wanted {
+            result.append(candidate.code)
+        }
+        result.sort()
+        return result
+    }
+
     private func refusal(from result: Result<Located, AssistToolRefusal>) -> AssistToolRefusal {
         switch result {
         case .failure(let refusal):
@@ -3173,15 +5263,29 @@ final class AssistToolRunner {
         }
     }
 
-    /// Where a course's site goes, named rather than described.
-    static func destination(of course: Course) -> String {
-        if course.configuration.deploysToLocalFolder {
+    /// One destination, named by TYPE rather than described: "a folder on
+    /// this computer", "Cloudflare Pages" or "Netlify". Never a path — a path
+    /// is machinery here — and never blank for a folder not chosen yet.
+    static func destinationName(of destination: CourseConfiguration.DeployDestination) -> String {
+        if destination.type == "local_folder" {
             return "a folder on this computer"
         }
-        if course.configuration.deploysToCloudflare {
+        if destination.type == "cloudflare_pages" {
             return "Cloudflare Pages"
         }
         return "Netlify"
+    }
+
+    /// Every place a course's site goes, primary first then each additional
+    /// destination in the order saved, named by type and joined "A", "A and
+    /// B", "A, B and C" — the scheduled deploy's approval card (#396). Each
+    /// entry the file lists is named once, as the run deploys to each.
+    static func everyDestination(of course: Course) -> String {
+        var names: [String] = []
+        for destination in course.configuration.allDeployDestinations {
+            names.append(destinationName(of: destination))
+        }
+        return MultiDestinationDeployRunner.joinedWithAnd(names)
     }
 
     // MARK: - Reading the model's arguments
@@ -3347,6 +5451,13 @@ final class AssistToolRunner {
     /// fixed phrasings send it; it is not RENAMED, because `AssistCardCommand`
     /// is generated into the contract and both suites assert that key.
     ///
+    /// **A MOMENT has its own settler beside this one**, added with the
+    /// deploy-at-a-time family: `settlingTheDeployMoment`, which reads the
+    /// tools that declare `when` and NOT `date`. The two divide the tool
+    /// surface between them by construction rather than by agreement — a tool
+    /// cannot be in both — so "which settler owns this argument" is answered by
+    /// the schema and never by memory.
+    ///
     /// A word this cannot read is left exactly as it arrived, so the sentence
     /// a teacher sees is still the runner's own refusal rather than a silent
     /// change of subject.
@@ -3382,6 +5493,225 @@ final class AssistToolRunner {
             settled[key] = day.text
         }
         return settled
+    }
+
+    /// The same arguments, with a bare clock time settled into the whole
+    /// moment it means.
+    ///
+    /// The twin of `settlingTheClassDay`, for the tools that take a MOMENT:
+    /// one that declares `when` and does not declare `date`. `schedule_deploy`
+    /// and its plan twin are those two today, so `publish_class_on`'s
+    /// day-shaped `when` is untouched by construction rather than by being
+    /// remembered.
+    ///
+    /// **Called ONCE, where the call is made**, for the same reason the day is
+    /// — the card holds these arguments while the teacher decides, and
+    /// `approvePending` hands the very same object to `execute`. A clock time
+    /// carried through would be read again against a clock that has moved, so
+    /// a card shown at 06:29 and agreed to at 06:31 would schedule a different
+    /// minute than the one it named. Settling here makes the moment on the
+    /// card and the moment in the plist the same by construction.
+    ///
+    /// **It is idempotent**, which is what lets the caller settle before
+    /// writing its trail line and then hand the settled call straight on:
+    /// `"2026-09-20 06:30"` is not a bare time, so it is handed back untouched.
+    ///
+    /// Anything this cannot read is left exactly as it arrived, so a teacher
+    /// still meets the runner's own refusal rather than a silent change of
+    /// subject. `AssistMCPServer` deliberately calls neither settler — see the
+    /// note above.
+    static func settlingTheDeployMoment(in arguments: [String: Any],
+                                        forTool definition: AssistToolDefinition,
+                                        today: CalendarDay,
+                                        now: Date,
+                                        timeZone: TimeZone = TimeZone.current) -> [String: Any] {
+        guard definition.parameters["when"] != nil, definition.parameters["date"] == nil else {
+            return arguments
+        }
+        let raw: String = AssistToolRunner.text("when", in: arguments)
+        if raw.isEmpty {
+            return arguments
+        }
+        guard let moment = AssistToolRunner.momentText(
+            forTimeOfDay: raw, today: today, now: now, timeZone: timeZone
+        ) else {
+            return arguments
+        }
+        var settled: [String: Any] = arguments
+        settled["when"] = moment
+        return settled
+    }
+
+    /// `"06:30"` → `"2026-09-20 06:30"`, and the same for `"today 06:30"` and
+    /// `"tomorrow 06:30"`. Nil for anything else, including a moment that is
+    /// already whole.
+    ///
+    /// **A bare time means the next such time, forwards, counting today while
+    /// it is still to come.** That is word for word the rule
+    /// `dayNamedByWeekday` already applies to a bare day word, one unit down,
+    /// and it is the reading a person gives it: asked at nine in the morning
+    /// for "6:30 am", a teacher means tomorrow.
+    ///
+    /// **The guess is never silent**, which is the reason it is allowed to be
+    /// a guess at all. `schedule_deploy` waits for a button, and its card names
+    /// the whole moment — weekday, date and time — before anything is written,
+    /// so a teacher who meant this morning reads the day and presses Cancel.
+    /// The alternative considered and rejected was "today at that time,
+    /// always", which invents no rule but answers the shelf's own card with a
+    /// refusal for most of the day.
+    ///
+    /// **An explicit day word is obeyed, even into the past.** "today 06:30"
+    /// said at nine stays on today and meets `ScheduledDeploy`'s existing
+    /// "…has already passed" refusal, in the teacher's own words. They named
+    /// the day; the app does not move it for them.
+    ///
+    /// **What comes back is always a real instant, written the way
+    /// `moment(named:)` reads it back** — see `text(ofMoment:timeZone:)`,
+    /// which is where that is made true rather than merely intended, and what
+    /// it costs on the morning the clocks go forward.
+    ///
+    /// The time zone is a parameter so a test can pin the answer; everything
+    /// in the app passes the machine's own, which is the zone
+    /// `moment(named:)` reads the settled text back in.
+    static func momentText(forTimeOfDay raw: String,
+                           today: CalendarDay,
+                           now: Date,
+                           timeZone: TimeZone = TimeZone.current) -> String? {
+        var words: [String] = []
+        for piece in raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .split(separator: " ") {
+            words.append(String(piece))
+        }
+        var dayWord: String = ""
+        if words.count == 2 {
+            dayWord = words[0]
+            words.removeFirst()
+        }
+        guard words.count == 1, AssistToolRunner.isAClockReading(words[0]) else {
+            return nil
+        }
+        let time: String = words[0]
+
+        switch dayWord {
+        case "":
+            guard let todayAt = AssistToolRunner.moment(
+                on: today, atTimeOfDay: time, timeZone: timeZone
+            ) else {
+                return nil
+            }
+            if todayAt > now {
+                return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
+            }
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
+        case "today":
+            guard let todayAt = AssistToolRunner.moment(
+                on: today, atTimeOfDay: time, timeZone: timeZone
+            ) else {
+                return nil
+            }
+            return AssistToolRunner.text(ofMoment: todayAt, timeZone: timeZone)
+        case "tomorrow":
+            return AssistToolRunner.text(
+                ofTimeOfDay: time, onDayAfter: today, timeZone: timeZone
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// The same, on the day after the one given.
+    private static func text(ofTimeOfDay time: String,
+                             onDayAfter today: CalendarDay,
+                             timeZone: TimeZone) -> String? {
+        guard let tomorrow = AssistToolRunner.shifting(today, byDays: 1),
+              let moment = AssistToolRunner.moment(
+                  on: tomorrow, atTimeOfDay: time, timeZone: timeZone
+              ) else {
+            return nil
+        }
+        return AssistToolRunner.text(ofMoment: moment, timeZone: timeZone)
+    }
+
+    /// A real instant, written the way `moment(named:)` reads it back.
+    ///
+    /// **Built from the INSTANT rather than by joining a day to a time**, and
+    /// that is the whole of the difference on one night a year. On the morning
+    /// the clocks go forward, 02:30 does not happen: joining the strings would
+    /// hand back "2026-03-08 02:30", which is a wall time this Mac's calendar
+    /// has no instant for — so `moment(named:)`, three strict `DateFormatter`
+    /// patterns, reads it back as NOTHING. The consequences were all silent
+    /// and all wrong: the trail line would drop its moment, the approval card
+    /// would fall back to printing the raw text instead of "Sunday 8 March,
+    /// 2:30 AM", and approving it would fail with the app quoting its own
+    /// output back at the teacher as unreadable.
+    ///
+    /// `Calendar` moves a nonexistent wall time FORWARD to the instant the
+    /// clocks jump to, so a teacher who asks for half two on that night is
+    /// shown 3:30 AM on the card and can say no. That is the same standard the
+    /// rest of this feature is held to: the app may choose, as long as it
+    /// shows what it chose before anything happens.
+    ///
+    /// **Rejected: returning nil for a wall time that does not exist.** It is
+    /// one line and it keeps the invariant too, but it answers a teacher who
+    /// asked for a perfectly ordinary time with "I could not read that" — on
+    /// the one night when the reason is a fact about their clock rather than
+    /// about their sentence, and with nothing anywhere to explain it.
+    private static func text(ofMoment moment: Date, timeZone: TimeZone) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: moment)
+    }
+
+    /// Whether the text is exactly `HH:mm` on a 24-hour clock.
+    ///
+    /// Deliberately narrow: this reads what `AssistCardCommand` writes, and a
+    /// model that sends `"6:30"` still meets the runner's own refusal rather
+    /// than having a day guessed onto a time nobody could read.
+    static func isAClockReading(_ text: String) -> Bool {
+        guard text.count == 5 else {
+            return false
+        }
+        let characters: [Character] = Array(text)
+        for position in 0..<5 {
+            if position == 2 {
+                if characters[position] != ":" {
+                    return false
+                }
+            } else if !characters[position].isASCII || !characters[position].isNumber {
+                return false
+            }
+        }
+        guard let hour = Int(String(characters[0..<2])),
+              let minute = Int(String(characters[3..<5])),
+              hour <= 23, minute <= 59 else {
+            return false
+        }
+        return true
+    }
+
+    /// A day and a time of day, as one instant in a given time zone.
+    private static func moment(on day: CalendarDay,
+                               atTimeOfDay time: String,
+                               timeZone: TimeZone) -> Date? {
+        let characters: [Character] = Array(time)
+        guard AssistToolRunner.isAClockReading(time),
+              let hour = Int(String(characters[0..<2])),
+              let minute = Int(String(characters[3..<5])) else {
+            return nil
+        }
+        var calendar: Calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        var components: DateComponents = DateComponents()
+        components.year = day.year
+        components.month = day.month
+        components.day = day.day
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components)
     }
 
     /// A day the teacher named: `2026-09-15`, or the handful of words the

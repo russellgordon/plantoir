@@ -1,7 +1,8 @@
 import Foundation
 
-/// Every sentence the assistant says to a teacher about deploying, previewing
-/// and agreeing to things — written once, here.
+/// Every sentence the assistant says to a teacher about deploying, previewing,
+/// agreeing to things and changing the class pages themselves — written once,
+/// here.
 ///
 /// **Why a table rather than the sentences where they are used.** They were
 /// where they were used, and the same sentence existed four times: in the
@@ -21,9 +22,17 @@ import Foundation
 /// See `AssistContract` and `contracts/README.md`.
 ///
 /// **What belongs here.** Sentences BOTH platforms say — the approval card,
-/// the cancels, what a deploy or a preview reports. Not the model's own words,
-/// not anything composed from a list (a plan naming eleven pages is written
-/// where the pages are known), and nothing platform-specific.
+/// the cancels, what a deploy or a preview reports, and since 2026-09-19 what
+/// duplicating a class says and refuses. Not the model's own words, not
+/// anything composed from a list (a plan naming eleven pages is written where
+/// the pages are known), and nothing platform-specific.
+///
+/// The class-change sentences came in from the other direction, and it is
+/// worth saying which: Windows gathered them in a `ClassChangeWording` of its
+/// own precisely BECAUSE the mac worded them inline and a generated file
+/// cannot gain keys from that side. Both apps said nearly the same eight
+/// sentences with nothing holding them together, which is the drift this table
+/// exists to stop.
 nonisolated enum AssistWording {
 
     // MARK: - Agreeing to something
@@ -39,12 +48,109 @@ nonisolated enum AssistWording {
     /// against the question that follows it: agreeing to do a thing and then
     /// asking permission for it. What is left is the consequence and one piece
     /// of advice a teacher can act on.
+    ///
+    /// **"This happens now." was added in front of those two, and it is the
+    /// only thing this sentence says about TIME.** The two approval cards were
+    /// asymmetric exactly where a misroute lands: `schedule_deploy`'s names the
+    /// whole moment, and this one named no time at all — so a teacher who
+    /// asked for 6:30 tomorrow and was routed to an immediate deploy read a
+    /// card that was perfectly true and said nothing to contradict them
+    /// (measured: ten trials out of ten on the smaller assistant, issue #168).
+    /// It says WHEN rather than WHAT, so it does not reinstate the naming of
+    /// the act that was cut above, and it is first because the word that
+    /// contradicts the teacher has to be the one they read first.
+    ///
+    /// The property is pinned rather than the sentence:
+    /// `contracts/shared-rules.json` → `assistantConfirmation.`
+    /// `theImmediateDeployCardSaysItIsImmediate`, which asks only that the
+    /// sentence carry the word. This will be reworded again; the rule is meant
+    /// to outlive the wording.
     static let deployApproval: String =
-        "Students will see what is deployed. Be certain to review changes you have made."
+        "This happens now. Students will see what is deployed. "
+      + "Be certain to review changes you have made."
 
     /// The question under the deploy card. The act is named HERE, which is why
     /// the sentence above does not name it.
     static let deployQuestion: String = "Shall I deploy?"
+
+    /// The question under a SCHEDULED deploy's card (issue #184).
+    ///
+    /// Its own sentence because `deployQuestion` reads as "now", and the card
+    /// above it has just named a moment that is not now — so the question
+    /// contradicted the card it sat under. It mattered more once "deploy at
+    /// <time>" was matched in code (#168) and scheduling stopped being the rare
+    /// path. It must never carry the word "now", and it must differ from
+    /// `deployQuestion`; a test pins both rather than the words.
+    ///
+    /// A FIRST DRAFT for Russell's wording pass. It names "the deploy" rather
+    /// than saying "it", because the card above ends on a sentence about this
+    /// Mac, and "it" would read as the Mac.
+    static let scheduleQuestion: String = "Shall I schedule the deploy?"
+
+    /// Said under a scheduled deploy's card, and in the schedule sheet, when
+    /// setting it will REPLACE a deploy already set for that section
+    /// (issue #195). `moment` is when the old one was set for, written the
+    /// way the card writes its own moment.
+    ///
+    /// The card is the only moment before anything is written, so it is the
+    /// only place a teacher can still act on it: scheduling a section again
+    /// removes the one already set, on purpose, and until this sentence the
+    /// teacher was told nothing about it. The fact and nothing else, in the
+    /// house style of `deployWasCancelled`. A FIRST DRAFT for Russell's
+    /// wording pass. It names only a deploy set from THIS working folder —
+    /// since #237 a section's scheduled deploy is one per working folder, and
+    /// another folder's is a different alarm that scheduling here leaves
+    /// standing. (Until #237 it could name another folder's, one per Mac.)
+    static func scheduleReplaces(moment: String) -> String {
+        return "This replaces the deploy already set for \(moment)."
+    }
+
+    /// The answer to "deploy at 6:30" — a time that is morning or evening,
+    /// and nobody can tell which (issue #194). Asked in code; nothing is
+    /// scheduled and nothing is sent to the model.
+    ///
+    /// **Both halves or neither**, as with the rollover question: the two
+    /// sentences it names are built by `AssistCardCommand.morningOrEvening`
+    /// and are sentences the matcher already accepts, so a teacher who types
+    /// either one gets the scheduled deploy's card on the very next turn. It
+    /// says "Nothing is set yet" because the sentence the teacher typed looked
+    /// like an instruction, and a teacher who glances away should not believe
+    /// a deploy was scheduled. A FIRST DRAFT for Russell's wording pass.
+    static func morningOrEvening(clock: String, sayMorning: String, sayEvening: String) -> String {
+        return "Is that \(clock) in the morning or in the evening? Nothing is set yet. "
+            + "Say “\(sayMorning)” or “\(sayEvening)”."
+    }
+
+    /// The answer to a deploy time written a way the app can read but does
+    /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
+    /// Answered in code; nothing is scheduled and nothing is sent to the
+    /// model.
+    ///
+    /// ONE sentence to type, never two: the time is already placed (the am
+    /// or pm, or the part of the day, says which), so there is nothing to
+    /// choose between, only a spelling to use. `say` is built by
+    /// `AssistCardCommand.timeToSayAs` and is a sentence the matcher accepts,
+    /// so typing it puts the scheduled deploy's card up on the very next
+    /// turn. It names the time as the teacher wrote it — unless all that
+    /// stood in the way was a comma (without it, their own sentence sets the
+    /// same moment), when naming their time back would look like calling it
+    /// the problem: then it says to leave the comma out instead (the
+    /// director's rulings, 2026-09-25; a "without “please”" form was ruled
+    /// too and measured unreachable, see `onlyDifference`). "Nothing is
+    /// set yet" for the reason `morningOrEvening` gives it. A FIRST DRAFT for
+    /// Russell's wording pass.
+    static func sayTheTimeAs(
+        written: String,
+        say: String,
+        onlyDifference: AssistTimeRespelling.OnlyDifference
+    ) -> String {
+        switch onlyDifference {
+        case .spelling:
+            return "To set a deploy for “\(written)”, say it as “\(say)”. Nothing is set yet."
+        case .theComma:
+            return "To set that deploy, say it as “\(say)”, without the comma. Nothing is set yet."
+        }
+    }
 
     /// The question under a plan card.
     static let planQuestion: String = "Shall I go ahead?"
@@ -81,6 +187,33 @@ nonisolated enum AssistWording {
 
     static func deployDidNotFinish(course: String, section: String) -> String {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
+    }
+
+    /// A deploy from a caller with no window (an assistant in another app,
+    /// or the in-app assistant with no section window open) stopped at a
+    /// question — a site name, a surname, a token — rather than waiting for
+    /// an answer nobody on this path can give (GitHub #378). Nothing was sent
+    /// to students. The window can answer it, and once it is answered it is
+    /// remembered, so the next deploy from here goes through.
+    static func deployNeedsAnAnswer(course: String, section: String) -> String {
+        return "\(course) Section \(section) needs one answer before it can be deployed from here, so nothing "
+             + "was sent to students. Deploy it once from its window in Plantoir, where the question can be "
+             + "answered; after that it can be deployed from here."
+    }
+
+    /// The same, when a course deploys to more than one place and the
+    /// question came from some of them. `destinations` is already joined
+    /// ("Cloudflare Pages", "Netlify and your folder").
+    static func deployNeedsAnAnswerAt(course: String, section: String, destinations: String) -> String {
+        return "\(course) Section \(section) was not deployed to \(destinations): it needs one answer there "
+             + "that can only be given from its window in Plantoir. Deploy it once from there; after that it "
+             + "can be deployed from here."
+    }
+
+    /// Added after `deployNeedsAnAnswerAt` when the other destinations did
+    /// go out, so the teacher is not left thinking nothing happened.
+    static func deployWentOutTo(destinations: String) -> String {
+        return "It did go out to \(destinations)."
     }
 
     /// Said only when a course has MORE THAN ONE deploy destination
@@ -130,6 +263,47 @@ nonisolated enum AssistWording {
              + "Wait for that to finish, then ask again."
     }
 
+    /// Said when a copy of the course is being saved in Plantoir (#351) — a
+    /// backup, or the archive before a restore or a removal — and the
+    /// assistant was asked to preview or deploy it. Not `courseIsBusy`, whose
+    /// "a preview or a deploy is running" would be untrue.
+    static func courseIsBeingCopied(course: String) -> String {
+        return "A copy of \(course) is being saved in Plantoir. Wait for that to finish, then ask again."
+    }
+
+    /// Said when ANOTHER program on this computer is previewing, building or
+    /// publishing the course — an assistant working from another app, another
+    /// copy of Plantoir, or a deploy set for later (#156) — to a teacher who
+    /// pressed Preview or Deploy, or asked the in-app assistant for either.
+    ///
+    /// Names the COURSE, not the section, because the lease it comes from
+    /// names only the course (Windows' format). Names no program: the same
+    /// sentence has to be true whichever of the three is in the way, and an
+    /// assistant reached from Claude Code and one reached from Codex are the
+    /// same thing to a teacher. An assistant working from another app is told
+    /// `courseIsBusy` instead — it is the one talking to the program that is
+    /// busy, so "busy in Plantoir" is the true sentence there.
+    static func courseIsBeingBuiltElsewhere(course: String) -> String {
+        return "\(course) is being previewed or published somewhere else on this computer right now — "
+             + "by an assistant working from another app, another copy of Plantoir, or a deploy set "
+             + "for later. Both would build the same pages in the same place, so doing it here as "
+             + "well would spoil both. Try again once that has finished."
+    }
+
+    /// Said when a preview of a section was asked for while THIS copy of
+    /// Plantoir is deploying that same section — from any of its windows, or
+    /// by the assistant with no window open (GitHub #381, Russell's decision
+    /// 4 on #378). Shown under "Cannot Preview Yet".
+    ///
+    /// Names the SECTION, unlike `courseIsBeingBuiltElsewhere`, because the
+    /// in-app publish record it comes from knows the section, and the rule
+    /// is about the section. "Deployed" is the word on the button that
+    /// started it. `shared-rules.json` → `previewWhileItsSectionDeploys`.
+    static func sectionIsBeingDeployed(course: String, section: String) -> String {
+        return "\(course) Section \(section) is being deployed right now. "
+             + "Preview it once the deploy has finished."
+    }
+
     // MARK: - Previewing
 
     /// A section window is open, so its own Preview is what runs.
@@ -148,6 +322,13 @@ nonisolated enum AssistWording {
     static func rebuiltForACallerWithNoWindow(course: String, section: String) -> String {
         return "Rebuilt the preview for \(course) Section \(section). Open that section in Plantoir "
              + "to look it over."
+    }
+
+    /// A rebuild for a caller with no window stopped at a question rather
+    /// than waiting for ever (#378) — the course-code check a build asks.
+    static func previewBuildNeedsAnAnswer(course: String, section: String) -> String {
+        return "The preview for \(course) Section \(section) needs one answer before it can be built from "
+             + "here. Build it once from its window in Plantoir, where the question can be answered."
     }
 
     static func previewDidNotBuild(course: String, section: String) -> String {
@@ -197,6 +378,27 @@ nonisolated enum AssistWording {
         return "Earlier, you \(whatHappened), and you have asked me to undo that — but I have not "
              + "changed anything, because \(pages) been edited since. Putting my old copy back "
              + "would throw away that newer work."
+    }
+
+    /// A section restore that could not put the backup's setting back on
+    /// some shared pages, because the settings at the top of those pages are
+    /// written with no place a new line can safely go (indented, or written as
+    /// a list). Those pages were left exactly as they are — so the restore is
+    /// not "back to how it was" for them, and a sentence saying only that
+    /// would be the silence #182 closes. Past tense, said once the restore is
+    /// done, after `AssistSectionRestore.doneMessage`'s own sentence.
+    ///
+    /// Counted, not named: the restore walks every shared page without a
+    /// title to hand, and it is almost always zero.
+    static func sharedPagesWhoseSettingsCouldNotBePutBack(count: Int, section: String) -> String {
+        if count == 1 {
+            return "One shared page kept the setting it has now for Section \(section): the settings "
+                 + "at the top of it are written in a way I can’t add to, so I left that page exactly "
+                 + "as it is."
+        }
+        return "\(count) shared pages kept the settings they have now for Section \(section): the "
+             + "settings at the top of them are written in a way I can’t add to, so I left those "
+             + "pages exactly as they are."
     }
 
     /// Why a partly-done undo is still on the list.
@@ -309,6 +511,36 @@ nonisolated enum AssistWording {
         + "It may still try to publish, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
+    // MARK: - Getting a section ready for the start of the year (#96)
+
+    /// An outside assistant called `prepare_for_start_of_year` without the
+    /// code its plan gave. Nothing is written; the reply carries the plan as
+    /// it stands and its code, so the next call can be the right one.
+    ///
+    /// Only an MCP client meets this (the tool is MCP-only), which is why it
+    /// may name the tool: it is read by the assistant, which then shows the
+    /// teacher the plan.
+    static func startOfYearNeedsItsPlan(course: String, section: String) -> String {
+        return "Nothing was changed. Getting \(course) Section \(section) ready for the start of the "
+             + "year needs the code from its plan. Show the teacher the plan below, and when they "
+             + "agree, call prepare_for_start_of_year again with its code."
+    }
+
+    /// The code given no longer matches the plan — a page changed after the
+    /// plan was made, or the code belongs to another plan. Nothing is written.
+    static func startOfYearPlanHasChanged(course: String, section: String) -> String {
+        return "Nothing was changed. \(course) Section \(section) is not what that plan described any "
+             + "more, so its code no longer fits. Show the teacher the plan below, which is how things "
+             + "stand now, and pass its code when they agree."
+    }
+
+    /// The fresh backup this write needs could not be made, so nothing was
+    /// written — the app's button refuses the same way.
+    static func startOfYearNeedsABackup(course: String) -> String {
+        return "Nothing was changed. Plantoir could not save a copy of \(course) first, and this "
+             + "change is too large to make without one."
+    }
+
     /// There is nothing on the list at all.
     ///
     /// "No PAGES", not "nothing", and the distinction is load-bearing. The old
@@ -338,6 +570,444 @@ nonisolated enum AssistWording {
     static let undoDoesNotReachTheLiveSite: String =
         "If you had already deployed this section, undoing it here does not change what students "
         + "see. Deploy again when you want the live site to match."
+
+    // MARK: - Duplicating a class
+
+    /// The one line a teacher reads in the chat when a copy is made.
+    static func duplicated(page: String, as copy: String) -> String {
+        return "Duplicated “\(page)” as “\(copy)”."
+    }
+
+    /// What the copy is, where it landed, and that nobody can see it yet.
+    ///
+    /// **The date is a String here, and it is a literal in the generated
+    /// contract rather than a placeholder.** Windows formats a real date
+    /// before it ever reaches its own sentence, so "{date}" is a shape that
+    /// side cannot produce; a real date is the only form both apps can render.
+    /// `backedUpCourse` set that precedent with a real file name.
+    static func copiedTo(page: String, as copy: String, on date: String) -> String {
+        return "“\(page)” was copied to “\(copy)”, dated \(date). It is hidden, so nothing changed "
+             + "on the site — write it, then publish when it is ready."
+    }
+
+    /// The same fact in the future tense, for the plan a teacher agrees to.
+    static func wouldBeCopiedTo(page: String, as copy: String, on date: String) -> String {
+        return "“\(page)” would be copied to “\(copy)”, dated \(date)."
+    }
+
+    /// Said in the plan, because "hidden" is the part a teacher would
+    /// otherwise have to ask about.
+    static let theCopyStartsHidden: String =
+        "The copy starts hidden, so nothing changes on the site until you publish it."
+
+    /// What a plan says about the classes that would move along to make room.
+    ///
+    /// **`moving` is the UNION of renamed and re-dated pages, not the rename
+    /// count** — `ClassInsertionPlan.otherClassesMoving`. Renames happen only
+    /// WITHIN the unit being changed, so duplicating the last day of a unit
+    /// renames nothing while re-dating every class of every later unit. Keyed
+    /// on renames alone, this line was not printed at all in that case, and a
+    /// teacher agreed to a plan smaller than what ran.
+    ///
+    /// Two branches rather than two names, because a caller never has to
+    /// choose: the numbers decide. Both are in the contract, since one
+    /// rendering cannot show the other.
+    ///
+    /// - Parameter moving: how many other class pages move, counted once each.
+    /// - Parameter renaming: how many of those are also renamed.
+    /// - Parameter noun: what the course calls one of them (#267). A club's
+    ///   pages carry one number, so a renamed meeting moves "one along", not
+    ///   "a day along".
+    static func otherClassesWouldMove(moving: Int, renaming: Int, noun: ClassNoun = .class) -> String {
+        let verb: String = moving == 1 ? "\(noun.singular) moves" : "\(noun.plural) move"
+        if renaming > 0 {
+            let along: String = noun == .class ? "a day along" : "one along"
+            return "\(moving) later \(verb) \(along) to make room, and the links that point at "
+                 + "them are rewritten to match."
+        }
+        // Nothing is renamed, so nothing links anywhere new — but the dates
+        // still move, and that is the half a rename count leaves out.
+        let theirs: String = moving == 1 ? "Its name does" : "Their names do"
+        return "\(moving) later \(verb) onto a later \(noun.singular) day to make room. \(theirs) not change."
+    }
+
+    /// Said after a change that shuffled other classes: the undo list cannot
+    /// take this back, and the backup is what can.
+    ///
+    /// The REPLY form, said after both changes that shuffle other classes —
+    /// the duplicate and make-room. Its PLAN form is
+    /// `makingRoomCannotBeUndone(noun:)`. There are two on purpose: the plan
+    /// speaks before anything has moved ("move"), the reply after ("moved"),
+    /// and a single tense-neutral sentence would have changed two sentences
+    /// teachers already read (#185; documentation/10-local-ai-assistant.md →
+    /// "The PLAN says it too").
+    ///
+    /// A partial undo — the copy deleted, every later class left renamed and
+    /// re-dated — is worse than no undo at all, so the way back is named
+    /// instead. Windows' `ClassChangeWording.OtherClassesMoved` has a second
+    /// form that names the backup's file; this is the form both apps say, and
+    /// theirs is a platform extra measured against this one.
+    static let otherClassesMoved: String =
+        "Because other classes moved, “Undo that” will not take this back. The copy made before "
+        + "any of it is in Plantoir's Backups list."
+
+    /// A page that is not "Unit N, Day N" has no next day to become.
+    static func notANumberedClassPage(page: String) -> String {
+        return "“\(page)” isn’t a numbered class page, so there is no next day for it to become."
+    }
+
+    /// The copy's place is still occupied, so nothing was written over it.
+    ///
+    /// **The one refusal here that has to admit to half a job.** It is
+    /// answered AFTER the room has been made, so later classes may already
+    /// have been renamed and re-dated when a teacher reads it — saying only
+    /// "nothing was copied" would be true and would leave them believing
+    /// nothing happened. Nothing else in this table fires after a change has
+    /// begun, which is why this is the only sentence that says so.
+    ///
+    /// Two forms, the way Windows' has two: the backup is named when there is
+    /// a name for it, because a teacher looking at a list of five backups is
+    /// better off with the file than with the category.
+    static func thePlaceForTheCopyIsStillTaken(page: String, backupNamed name: String?) -> String {
+        var wayBack: String = "The copy of the course made before any of this is "
+        if let name {
+            wayBack += "\(name), in Plantoir's Backups list."
+        } else {
+            wayBack += "in Plantoir's Backups list."
+        }
+        return "“\(page)” is still there — the class that had to move out of the way did not, and "
+             + "I will not write over a lesson. Nothing was copied, but other classes may already "
+             + "have moved. \(wayBack) Look the section over in Plantoir."
+    }
+
+    /// The copy could not be made certainly hidden, so it was not made at all.
+    ///
+    /// **Reachable, and only where the page being copied is one this app
+    /// cannot read well enough to answer about** — a tab used as indentation
+    /// in the settings at the top of the page, or a value that runs on below
+    /// its own line. Measured: both are pages the BUILD refuses too, so the
+    /// honest answer is to stop rather than to guess, and a copy of a lesson
+    /// students can already see is the one thing that must not be guessed at.
+    ///
+    /// Said after the room has been made, like its sibling
+    /// `thePlaceForTheCopyIsStillTaken`, so it carries the same two facts that
+    /// sentence carries and one of its own: other classes may already have
+    /// moved, the backup is the way back — and a blank class page is standing
+    /// on the day the copy was meant to have, because the planner wrote it
+    /// before any of this was known. Leaving that unsaid would let a teacher
+    /// read "was not copied" as "nothing happened", twice over.
+    static func theCopyCouldNotBeMadeHidden(
+        page: String, as copy: String, backupNamed name: String?
+    ) -> String {
+        var wayBack: String = "The copy of the course made before any of this is "
+        if let name {
+            wayBack += "\(name), in Plantoir's Backups list."
+        } else {
+            wayBack += "in Plantoir's Backups list."
+        }
+        return "“\(page)” was not copied — I could not be certain the copy would start hidden, "
+             + "and a lesson students can already see must not turn up somewhere new where they "
+             + "can read it. A blank class page called “\(copy)” is waiting on that day instead, "
+             + "and it is hidden. Other classes may already have moved. \(wayBack) "
+             + "Look the section over in Plantoir."
+    }
+
+    // MARK: - Planning pages, in the course's own noun
+
+    // What a club hears (#267). Every sentence in this section was typed
+    // inline in a planner or in the tool runner until then; each moved here
+    // so that its "meeting" form has a NAME, in the contract, beside the
+    // "class" form it has always had. The `.class` rendering of every one is
+    // byte-for-byte the sentence it replaced.
+    //
+    // **These are for the teacher's eyes only.** A plan's card, a write's
+    // one-line summary, a line in the window: never a tool result's detail,
+    // which is what a model reads. The runner renders the detail with
+    // `.class` whatever the course says, so what the model is shown in a club
+    // is byte-for-byte what it is shown anywhere else — see
+    // `AssistToolOutcome.planned(_:plan:card:)` and
+    // documentation/10-local-ai-assistant.md.
+
+    /// The first line of a make-room plan.
+    ///
+    /// - Parameter position: where the room is made, as the course names a
+    ///   page — "Unit 3, Day 4", "Week 5" (`ClassInsertionPlan.positionTitle`).
+    static func wouldMakeRoom(
+        count: Int, at position: String, course: String, section: String, noun: ClassNoun = .class
+    ) -> String {
+        let room: String = count == 1 ? "one new \(noun.singular)" : "\(count) new \(noun.plural)"
+        return "Make room for \(room) at \(position) in \(course) Section \(section)."
+    }
+
+    /// The heading over a plan's list of pages that move to later dates.
+    static func movedToLaterDays(count: Int, noun: ClassNoun = .class) -> String {
+        return "Moved to later \(noun.singular) days — \(count):"
+    }
+
+    /// The PLAN form of the undo caveat, said on every plan that moves other
+    /// classes — make-room AND a duplicate that makes room (#185), gated on
+    /// the same `ClassInsertionPlan.movesAnythingElse` that withholds the undo.
+    /// Its reply form, after the fact, is `otherClassesMoved`.
+    static func makingRoomCannotBeUndone(noun: ClassNoun = .class) -> String {
+        return "Because other \(noun.plural) move, “Undo that” will not take this back afterwards — "
+             + "the copy made before any of it is in Plantoir's Backups list."
+    }
+
+    /// The one line a teacher reads when the room has been made.
+    static func madeRoom(count: Int, at position: String, noun: ClassNoun = .class) -> String {
+        return "Made room for \(count) \(noun.counted(count)) at \(position)."
+    }
+
+    /// The one line a teacher reads when a day's page has been published.
+    static func publishedTheClassOn(_ date: String, noun: ClassNoun = .class) -> String {
+        return "Published the \(noun.singular) on \(date)."
+    }
+
+    /// The first line of a plan to add class pages.
+    ///
+    /// - Parameter place: where they go — "Unit 4 of ICS3U Section 1", or in a
+    ///   numbered course just "CODING Section 1" (`PlaceholderClassPlan.whereTheyGo`).
+    static func wouldAddPages(count: Int, to place: String, noun: ClassNoun = .class) -> String {
+        let days: String = count == 1 ? "day" : "days"
+        let who: String = noun == .class ? "this class" : "this group"
+        return "Add \(count) \(noun.singular) page\(count == 1 ? "" : "s") to \(place), on the \(days) "
+             + "\(who) actually meets:"
+    }
+
+    /// How many dates are left on file after a plan's new pages.
+    static func spareDatesAfterThese(count: Int, source: String, noun: ClassNoun = .class) -> String {
+        return "\(count) more \(noun.singular) date\(count == 1 ? "" : "s") \(count == 1 ? "is" : "are") "
+             + "spare after these, out of the timetable recorded from \(source)."
+    }
+
+    /// Said when new pages ran out of dates and share the last one.
+    static func sharingTheLastDay(count: Int, noun: ClassNoun = .class) -> String {
+        return "\(count == 1 ? "This one has" : "\(count) of these have") "
+             + "no \(noun.singular) date left, so \(count == 1 ? "it shares" : "they share") "
+             + "the last day with the \(noun.singular) already on it. Give "
+             + "\(count == 1 ? "it a day" : "them days") of your own when you "
+             + "know what they are."
+    }
+
+    /// The one line a teacher reads when the next page was added and there
+    /// is no title to name — which only a plan that added nothing leaves.
+    static func addedTheNextPage(noun: ClassNoun = .class) -> String {
+        return "Added the next \(noun.singular) page."
+    }
+
+    /// The first line of a re-dating plan.
+    static func reDatingOntoTheDatesOnFile(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "\(course) Section \(section): re-dating onto the \(noun.singular) dates on file."
+    }
+
+    /// How far a re-dated section's pages run.
+    ///
+    /// - Parameter first: the first day, written "2026-09-08 (Tuesday)".
+    /// - Parameter last: the last day, written the same way.
+    static func pagesRunFrom(count: Int, first: String, last: String, noun: ClassNoun = .class) -> String {
+        let run: String = count == 1 ? "\(noun.singular) runs" : "\(noun.plural) run"
+        return "\(count) \(run) from \(first) to \(last)."
+    }
+
+    /// Pages a re-date cannot give a day of their own.
+    ///
+    /// - Parameter lastDay: the last date on file, e.g. 2027-01-20.
+    static func pagesWithNoDayOfTheirOwn(count: Int, lastDay: String, noun: ClassNoun = .class) -> String {
+        let have: String = count == 1 ? "\(noun.singular) has" : "\(noun.plural) have"
+        return "\(count) \(have) no day "
+             + "of \(count == 1 ? "its" : "their") own this year, so "
+             + "\(count == 1 ? "it goes" : "they all go") on "
+             + "\(lastDay) with the last one as \(count == 1 ? "a draft" : "drafts"). Move, publish or delete "
+             + "\(count == 1 ? "it" : "them") when you have decided what to do."
+    }
+
+    /// One line of a re-dating plan: a page that runs out of dates.
+    static func movesAndBecomesADraft(page: String, to date: String, noun: ClassNoun = .class) -> String {
+        return "“\(page)” moves to \(date) and becomes a draft because it has no \(noun.singular) date."
+    }
+
+    /// One line of a re-dating plan: a page Key Links points at.
+    static func movesToTheFirstDay(page: String, to date: String, noun: ClassNoun = .class) -> String {
+        let firstDay: String = noun == .class ? "the first day of class" : "the first \(noun.singular) day"
+        return "“\(page)” moves to \(date), \(firstDay), "
+             + "because Key Links points at it."
+    }
+
+    /// The one line a teacher reads when a section has been re-dated.
+    static func reDated(count: Int, pagesTheyUse: Int, noun: ClassNoun = .class) -> String {
+        return "Re-dated \(count) "
+             + "\(noun.counted(count)) and "
+             + "\(pagesTheyUse) "
+             + "\(pagesTheyUse == 1 ? "page" : "pages") "
+             + "they use."
+    }
+
+    /// Said when re-dating a section wrote no date: its plan changed nothing,
+    /// or everything it would have written was already right (#343's review,
+    /// F4). The one no-change sentence, named so the reply and its twin
+    /// cannot drift.
+    static func everyPageIsAlreadyOnItsDay(course: String, section: Int) -> String {
+        return "Every page in \(course) Section \(section) is already on the day it should be."
+    }
+
+    /// Said instead of `reDated` when every class was already on its day and
+    /// only pages they use moved (#343) — where `reDated` would say
+    /// "Re-dated 0 classes".
+    static func reDatedOnlyPagesTheyUse(pagesTheyUse: Int, noun: ClassNoun = .class) -> String {
+        return "Every \(noun.singular) was already on its day, so only the \(pagesTheyUse) "
+             + "\(pagesTheyUse == 1 ? "page" : "pages") they use "
+             + "\(pagesTheyUse == 1 ? "was" : "were") re-dated."
+    }
+
+    // MARK: - Publishing stops at a class
+
+    /// Said when publishing followed a link onto another class and left it
+    /// alone.
+    ///
+    /// A teacher who is not told this reads a plan quietly smaller than the one
+    /// they pictured, and has no way to tell "it decided" from "it missed it".
+    /// The class is NAMED rather than counted: "1 class was left alone" is a
+    /// number about a lesson.
+    ///
+    /// **Only about a class students cannot already see.** Said about a class
+    /// that is already published it is simply false — it would tell a teacher
+    /// to publish a page that is already published — and the sentence exists to
+    /// explain a link students cannot follow yet. `AssistPublishPlan` decides
+    /// which classes reach this.
+    ///
+    /// Two branches rather than two names, because a caller never has to
+    /// choose: the count decides. Both are in the contract, since one rendering
+    /// cannot show the other.
+    ///
+    /// - Parameter listing: the classes, already quoted and joined — "“a” and
+    ///   “b”".
+    /// - Parameter count: how many classes that listing names.
+    /// - Parameter noun: what the course calls one of them (#267).
+    static func linkedClassesWereLeftAlone(_ listing: String, count: Int, noun: ClassNoun = .class) -> String {
+        if count == 1 {
+            return "\(listing) is a \(noun.singular) of its own, so it stays as it is — publish it when you "
+                 + "get to that \(noun.singular)."
+        }
+        return "\(listing) are \(noun.plural) of their own, so they stay as they are — publish each one "
+             + "when you get to it."
+    }
+
+    /// Why a linked class stays visible when an unpublish reached it (#201):
+    /// the clause that finishes "“Unit 2, Day 4” stays visible, because …".
+    ///
+    /// Said in the plan's "N linked pages stay visible:" list rather than
+    /// counted, beside the other pages that stay, because each of those is
+    /// named with its reason and a class is one more page a student can still
+    /// reach. **Only about a class students can SEE**: one already hidden is
+    /// not "staying visible", and saying so would be false — the same
+    /// visible-only rule every kept page follows.
+    ///
+    /// Not `linkedClassesWereLeftAlone`, the publishing sentence, because
+    /// "publish it when you get to that class" is false about a class an
+    /// unpublish left up. The contract renders it through
+    /// `AssistPublishPlan.stayingVisibleLine` as `linkedClassStaysVisible`.
+    ///
+    /// - Parameter noun: what the course calls one of them (#267). The model
+    ///   is always given `.class`; only a club's card says "meeting".
+    static func aLinkedClassStaysBecause(noun: ClassNoun = .class) -> String {
+        return "it is a \(noun.singular) of its own."
+    }
+
+    /// Pages nothing could be written to, NAMED rather than counted (#186).
+    ///
+    /// The settings at the top of a page can be written in a way that leaves
+    /// no safe place for a new line: indented, or written as a list, so a line
+    /// added there either folds into the one below it or makes settings the
+    /// website builder cannot read. Measured 2026-09-25 — and in the shape
+    /// that matters most, the fold leaves the page PUBLISHED while the teacher
+    /// is told it was hidden. So nothing is written, and this is what says so.
+    ///
+    /// **One sentence for both tenses, deliberately.** It is said on a plan
+    /// card before anything is done and again in a reply afterwards, and the
+    /// page stays exactly as the teacher wrote it either way — so a sentence
+    /// in the present tense is true in both places, and two nearly identical
+    /// sentences are two sentences to keep in step. (The section restore's
+    /// own sentence, `sharedPagesWhoseSettingsCouldNotBePutBack`, is past
+    /// tense because it is only ever said afterwards, and counts rather than
+    /// names.)
+    ///
+    /// - Parameter listing: the pages, already quoted and joined, at most a
+    ///   few named — `AssistPublishPlan.listingAFew`.
+    /// - Parameter count: how many pages that listing stands for.
+    static func pagesWhoseSettingsCannotBeAddedTo(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I can’t add to the settings at the top of \(listing), so that page stays exactly "
+                 + "as it is. Open it in Obsidian to set it there."
+        }
+        return "I can’t add to the settings at the top of \(listing), so those pages stay exactly "
+             + "as they are. Open them in Obsidian to set them there."
+    }
+
+    /// Pages a re-date or a make-room could not give their new date (#186's
+    /// review, B3). Not `pagesWhoseSettingsCannotBeAddedTo`: that one says the
+    /// page "stays exactly as it is", and here it may just have been renamed,
+    /// moved or had its links rewritten — what was NOT done is the date, so
+    /// the sentence says the date.
+    static func pagesWhoseNewDateCouldNotBeSet(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I couldn’t set the new date on \(listing): the settings at the top of it are "
+                 + "written in a way I can’t add to. Open it in Obsidian to set the date there."
+        }
+        return "I couldn’t set the new dates on \(listing): the settings at the top of them are "
+             + "written in a way I can’t add to. Open them in Obsidian to set the dates there."
+    }
+
+    // MARK: - Already the way you asked (#174)
+
+    // Asked to publish what is already published, or to hide what is already
+    // hidden, the assistant answers in four words rather than with a plan that
+    // changes nothing. These were typed inline — the page forms once in
+    // `AssistPublishPlan.nothingToDoSentence`, the whole-unit forms TWICE in
+    // `AssistToolRunner` (the plan path and the path that writes) — and were
+    // in no contract, so Windows' identical words were a coincidence nobody
+    // could check. One key per branch, because a rendering can show only one.
+
+    /// One page, asked to be published, already is.
+    static let alreadyPublishedOne: String = "It's already been published."
+
+    /// One page, asked to be hidden, already is.
+    static let alreadyHiddenOne: String = "It's already hidden."
+
+    /// Several pages, asked to be published, already are.
+    static let alreadyPublishedSeveral: String = "They have already been published."
+
+    /// Several pages, asked to be hidden, already are.
+    static let alreadyHiddenSeveral: String = "They have already been hidden."
+
+    /// Which of the four page sentences answers a request that changes nothing.
+    static func alreadyTheWayYouAsked(publishing: Bool, pages: Int) -> String {
+        if pages == 1 {
+            if publishing {
+                return alreadyPublishedOne
+            } else {
+                return alreadyHiddenOne
+            }
+        }
+        if publishing {
+            return alreadyPublishedSeveral
+        } else {
+            return alreadyHiddenSeveral
+        }
+    }
+
+    /// A whole unit, asked to be published, already is.
+    ///
+    /// - Parameter unitWord: the course's own word for a unit ("Unit",
+    ///   "Module"). No `…ForAMeeting` twin: nothing here says "class", and a
+    ///   club has no whole unit to ask about.
+    static func unitAlreadyPublished(unitWord: String, unit: Int) -> String {
+        return "\(unitWord) \(unit) has already been published."
+    }
+
+    /// A whole unit, asked to be hidden, already is.
+    static func unitAlreadyHidden(unitWord: String, unit: Int) -> String {
+        return "\(unitWord) \(unit) is already hidden."
+    }
 
     // MARK: - What publishing means here
 
@@ -370,11 +1040,41 @@ nonisolated enum AssistWording {
 
     // MARK: - Backing a course up
 
+    /// (T) A write refused because the section changed while the copy made
+    /// before it was being saved (#351): what was worked out no longer fits,
+    /// so nothing is written from it.
+    static func changedWhileSavingACopy(course: String, section: String) -> String {
+        return "Nothing was changed: \(course) Section \(section) changed while a copy of it was being "
+             + "saved, so what I worked out no longer fits. Ask again and I’ll work it out afresh."
+    }
+
+    /// Shown under the three dots while the assistant saves a copy of a
+    /// course before changing it (#351) — the wait a teacher approving a
+    /// change used to see as a frozen window. It names the course and says
+    /// why the wait is worth it; the time is said as "a minute" because a
+    /// course full of pictures really does take that long.
+    static func backingUpFirst(course: String) -> String {
+        return "Saving a copy of \(course) first, so this can be undone — a course with lots of "
+             + "pictures can take a minute."
+    }
+
     /// Where the copy went.
     static func backedUpCourse(course: String, to name: String) -> String {
         return "Backed up \(course) to \(name). It is in Plantoir's Backups list, and restoring "
              + "from it puts the whole course back as it is right now."
     }
+
+    /// Said beside a backup whose size a finished measurement could not read
+    /// — deleted in Finder a moment ago, or unreadable (#242). It is left out
+    /// of the total, and this says so rather than showing a number that is
+    /// quietly too small or "Working out…" for ever. Shown in the Backups
+    /// list, not by the assistant; kept here so the sentence has one home and
+    /// reaches the contract. A FIRST DRAFT for Russell's wording pass.
+    static let backupSizeCouldNotBeRead: String = "Size could not be read, so it is not in the total"
+
+    /// The same, short enough for the Size column of All Backups; the whole
+    /// sentence is in the row's tooltip and the backup's own pane.
+    static let backupSizeCouldNotBeReadShort: String = "Unknown"
 
     // MARK: - Listing what is here
 
@@ -397,6 +1097,103 @@ nonisolated enum AssistWording {
     /// is the same courtesy every other write in the window already gets.
     static let mayIAskForYourDates: String = "May I ask you for your class dates?"
 
+    /// The same question in the course's own noun (#267). Only the card in
+    /// the window says it this way: the sentences that carry the question
+    /// back to the model keep `mayIAskForYourDates` as it is.
+    static func mayIAskForYourDates(for noun: ClassNoun) -> String {
+        if noun == .class {
+            return mayIAskForYourDates
+        }
+        return "May I ask you for your \(noun.singular) dates?"
+    }
+
+    // "When are my next classes?" — the answer is the teacher's summary AND,
+    // in its "class" form, the model's copy; only the summary takes the
+    // course's noun (#267).
+
+    /// Before the first date on file.
+    ///
+    /// - Parameter day: the first date, written "Tuesday, 2026-09-08".
+    /// - Parameter count: how many dates are listed below it.
+    static func theSemesterBegins(on day: String, showing count: Int, noun: ClassNoun = .class) -> String {
+        let first: String = count == 1 ? "first \(noun.singular) is" : "first \(count) \(noun.plural) are"
+        return "The semester begins on \(day). The \(first):"
+    }
+
+    /// After the last date on file.
+    ///
+    /// - Parameter last: the last date, written "Tuesday, 2026-12-15".
+    static func allScheduledDatesHaveConcluded(
+        count: Int, for place: String, last: String, noun: ClassNoun = .class
+    ) -> String {
+        return "All \(count) scheduled \(noun.plural) for \(place) have concluded "
+             + "(last \(noun.singular) was on \(last))."
+    }
+
+    /// The heading over the next few dates.
+    static func yourNextUpcoming(count: Int, for place: String, noun: ClassNoun = .class) -> String {
+        let upcoming: String = count == 1
+            ? "upcoming \(noun.singular)"
+            : "\(count) upcoming \(noun.plural)"
+        return "Your next \(upcoming) for \(place):"
+    }
+
+    /// How the pages sit against the dates.
+    static func pagesAcrossTheDates(
+        for place: String, pages: Int, dates: Int, spare: Int, noun: ClassNoun = .class
+    ) -> String {
+        return "\(place) has \(pages) \(noun.singular) \(pages == 1 ? "page" : "pages") across "
+             + "\(dates) recorded dates (\(spare) spare)."
+    }
+
+    /// No date left for another page.
+    static func everyDateIsSpokenFor(noun: ClassNoun = .class) -> String {
+        return "Every recorded date is spoken for, so another \(noun.singular) cannot be dated "
+             + "until more dates are recorded."
+    }
+
+    /// Where the next page would go.
+    ///
+    /// - Parameter day: written "2026-09-14 (Monday)".
+    static func theNextWouldFallOn(_ day: String, noun: ClassNoun = .class) -> String {
+        return "The next \(noun.singular) would fall on \(day)."
+    }
+
+    // Why the dates are being asked for — the line under the question on the
+    // card, and on the sheet. The teacher's alone: none of these is ever part
+    // of a tool result, so each has a "meeting" twin (#267).
+
+    /// Asked for when a day's page was looked for and there are no dates.
+    static func datesToFindADaysPage(noun: ClassNoun = .class) -> String {
+        let taught: String = noun == .class ? "the class taught" : "the \(noun.singular) held"
+        return "Finding \(taught) on a given day needs to know which days "
+             + "this section meets."
+    }
+
+    /// Opened when the teacher offers a revised list.
+    ///
+    /// - Parameter place: "ICS3U Section 1".
+    static func datesToReplace(for place: String, noun: ClassNoun = .class) -> String {
+        return "Replacing the \(noun.singular) dates on file for \(place)."
+    }
+
+    /// Asked for by the next page.
+    static func datesForTheNextPage(noun: ClassNoun = .class) -> String {
+        return "Adding the next \(noun.singular) page needs to know which days this section meets."
+    }
+
+    /// Asked for by a duplicate.
+    static func datesToDuplicate(noun: ClassNoun = .class) -> String {
+        return "Duplicating a \(noun.singular) needs to know which days this section meets, "
+             + "so the copy can be given a date."
+    }
+
+    /// Asked for by a re-date.
+    static func datesToReDate(noun: ClassNoun = .class) -> String {
+        return "Re-dating a section puts its \(noun.plural) onto the days it meets, so it needs "
+             + "those days first."
+    }
+
     /// What the teacher is told after saying no.
     ///
     /// Deliberately does not re-ask or explain again. They declined a
@@ -406,6 +1203,455 @@ nonisolated enum AssistWording {
         "Right you are. I will not be able to date new classes until I have them — "
         + "say “I have a revised list of class dates” whenever you would like to give them."
 
+    /// The same answer in the course's own noun (#267). The sentence it tells
+    /// a teacher to say is matched in code in both nouns
+    /// (`AssistCardCommand.fixedShapes`), so it is never an offer the matcher
+    /// does not understand.
+    static func datesNotGivenYet(for noun: ClassNoun) -> String {
+        if noun == .class {
+            return datesNotGivenYet
+        }
+        return "Right you are. I will not be able to date new \(noun.plural) until I have them — "
+             + "say “I have a revised list of \(noun.singular) dates” whenever you would like to give them."
+    }
+
+    // MARK: - When the answer did not finish
+
+    /// The engine stopped the assistant part way through its answer, so
+    /// whatever it had begun to ask for was thrown away unread — or a finished
+    /// answer's arguments could not be read at all, which the teacher cannot
+    /// tell apart from the first and is mended the same way. NOT said when a
+    /// finished answer wrote nothing: that one has its own sentence,
+    /// `answerLeftOutWhatItWasFor` (issue #198), because the advice below is
+    /// about the teacher's request and an empty answer is not its fault.
+    ///
+    /// Three things it has to do, in this order. **Say the answer did not
+    /// finish**, because the teacher has just waited for one. **Say that
+    /// nothing changed**, which is the fact genuinely in doubt — the same
+    /// reasoning as `planWasCancelled`, and the opposite of
+    /// `deployWasCancelled`, where the teacher already knew. And **say
+    /// something they can act on**: the shape that causes this is a long
+    /// list, so "fewer pages at a time" addresses the cause rather than
+    /// shrugging politely. The advice is followable because the abandoned
+    /// turn is wound out of the conversation as well — a shorter retry sent
+    /// with the runaway request still in front of it would meet the same
+    /// wall. See `AssistAgent.sayTheAnswerDidNotFinish`.
+    ///
+    /// **"I haven't changed anything" is true on every path that can reach
+    /// this, and it was checked rather than assumed.** A turn only comes back
+    /// to the model for another lap when a tool said to
+    /// (`AssistToolOutcome.shouldContinue`), and that is true for exactly
+    /// three outcomes — `read`, `couldNotRead` and `planned`. Every write
+    /// answers `wrote` or `refused`, `read(` is built only by the tools that
+    /// read (listing pages, reading a page, explaining publishing, listing
+    /// courses, listing curriculum expectations), and a `planned` outcome is
+    /// held behind the approval card and never reaches a second lap. So an
+    /// answer cut off on a second lap follows a READ, and the sentence stays
+    /// true there too.
+    ///
+    /// Says nothing about why. A teacher cannot act on a limit they cannot
+    /// see, and naming it would be exactly the machinery rule 1 keeps out of
+    /// the interface.
+    static let answerWasCutOff: String =
+        "I didn't get to the end of that, so I haven't changed anything. Ask me again — "
+        + "a shorter sentence, or fewer pages at a time."
+
+    /// A tool was asked for with no course at all — which reaches the runner
+    /// only from outside the app, over MCP, where nothing binds a window's own
+    /// course onto the call (issue #198).
+    ///
+    /// Replaces "There is no course called “” in this working folder", which
+    /// is false in its own terms (it names a course nobody named) and reads,
+    /// relayed to a teacher, as a complaint about what they typed.
+    static let noCourseNamed: String = "No course was named, so nothing was done."
+
+    /// A finished answer chose a tool that needs something this window cannot
+    /// supply — which pages, which day, which time — and wrote nothing for it,
+    /// so nothing was done (issue #198).
+    ///
+    /// Its own sentence rather than `answerWasCutOff`, whose advice ("a
+    /// shorter sentence, or fewer pages") is about the teacher's request. Here
+    /// the teacher had named what they meant and the assistant dropped it, so
+    /// the sentence owns that — it is the assistant that did not work it out —
+    /// and asks for nothing but the same request again. "Nothing was done" is
+    /// true for the same reasons as in `answerWasCutOff`: the gate that says
+    /// this sits above every tool.
+    static let answerLeftOutWhatItWasFor: String =
+        "I did not work out which pages, day or time you meant, so nothing was done. "
+      + "Please ask me again."
+
+    // MARK: - When the answer was the question again
+
+    /// The assistant's whole reply was the teacher's own sentence, handed
+    /// back.
+    ///
+    /// **Measured, twice over** (issue #215, 2026-09-19). Asked to "hide unit
+    /// 4, day 21", the smaller assistant chose no tool and replied with the
+    /// sentence it had just been given, date line and all — five phrasings out
+    /// of five. Worse: that reply was kept in the conversation, and the model
+    /// then copied the pattern it could see. "Unpublish Unit 4, Day 20", a
+    /// sentence it gets right every time in a fresh conversation, came
+    /// straight back as an echo too. One unrecognised phrase made the window
+    /// useless until it was closed and opened again.
+    ///
+    /// Three things this sentence has to do, and they are the three
+    /// `answerWasCutOff` does. **Say it did not follow**, because the teacher
+    /// is looking at a reply that said nothing. **Say nothing changed**, which
+    /// is the fact genuinely in doubt — and which is true on every path that
+    /// can reach here, by the same walk `answerWasCutOff` records: a turn only
+    /// comes back for another lap when a tool said to, and no write ever does.
+    /// And **say something followable**.
+    ///
+    /// **Deliberately general, and that is the whole of the second sentence.**
+    /// An earlier draft offered three verbs to start with — publish, unpublish
+    /// or hide — and named the page. That is wrong advice for most of the
+    /// sentences this fires on: the guard catches an echo of ANY request the
+    /// model answers with plain words, including a deploy, a request to make
+    /// room for a class, and a question about dates, none of which begin with
+    /// a verb about publishing or name a page at all. A sentence that will be
+    /// believed and is false in a whole class of cases is worse than a vaguer
+    /// true one. The working phrasings belong in
+    /// `documentation/10-local-ai-assistant.md`, not in a sentence said to
+    /// everybody.
+    ///
+    /// **Never the echoed text.** Handing a teacher their own sentence back is
+    /// the fault being fixed; repeating it inside an apology would be the same
+    /// fault, politely.
+    static let didNotFollowThat: String =
+        "I didn't follow that, so I haven't changed anything. Try saying it again in "
+        + "different words."
+
+    // MARK: - A request that named another course
+
+    /// The model filled in a COURSE that is not the one this window is for,
+    /// and that course is here in the working folder.
+    ///
+    /// The window is opened for one section of one course, and the section is
+    /// simply taken back from whatever the model answered — a fact the app
+    /// already knows is not worth asking a model for. The COURSE is not, and
+    /// the difference is the whole of this sentence: taking the course back
+    /// too means "publish MCV4U's class", typed in an ICS3U window, quietly
+    /// succeeding on ICS3U. A failure that reports success is the one failure
+    /// a teacher cannot catch, so the request is refused and nothing runs.
+    ///
+    /// Three things it has to do. **Say which course this window is for**,
+    /// because the teacher is looking at one window among several and the
+    /// answer is not otherwise in front of them. **Say that nothing was
+    /// done** — the fact genuinely in doubt, by the same test
+    /// `planWasCancelled` passes and `deployWasCancelled` fails: somebody who
+    /// asked for a publish and was refused does not know whether something
+    /// happened in the wrong place. "Nothing was DONE" rather than "nothing
+    /// was CHANGED", deliberately: the refusal fires on the four reading
+    /// tools as well, and "I haven't changed anything" answers a question
+    /// nobody asked of "what pages does MCV4U have?". And **say what to do
+    /// next**, which is followable here precisely because that course is in
+    /// this working folder — see `askedAboutACourseThatIsNotHere` for the
+    /// case where it is not, and where this sentence would be a lie.
+    ///
+    /// Windows refuses the same request today from an inline literal of its
+    /// own (`AssistWorkspace.cs`), whose session is locked to one course.
+    /// That literal says "Start again from {wanted} in Plantoir", and it is
+    /// replaced by this key so the two apps say the same thing about the same
+    /// refusal. "Session" and "can't be reached from here" are dropped on the
+    /// way across: rule 1, plain words about courses and windows rather than
+    /// about how the assistant is wired.
+    static func askedAboutAnotherCourse(course: String, otherCourse: String) -> String {
+        return "This window is for \(course), so nothing was done for \(otherCourse). "
+             + "Open \(otherCourse)'s section in Plantoir and ask me there."
+    }
+
+    /// The model filled in a course code that names NO course in this working
+    /// folder — a typo, or a code it invented.
+    ///
+    /// A separate sentence rather than a second use of the one above, because
+    /// that one ends by telling the teacher to open the course, and a teacher
+    /// cannot open a course that is not there. Advice that cannot be followed
+    /// is worse than no advice: it sends somebody looking in the sidebar for
+    /// something they will not find.
+    ///
+    /// **Refused rather than bound to this window**, which is the decision
+    /// worth writing down, because binding it is what the old code did and it
+    /// looks harmless: a code matching nothing cannot reach another course.
+    /// But "publish MCV4U's class" mistyped in an ICS3U window would then
+    /// publish an ICS3U class and say it had — the very fault this change
+    /// exists to fix, arriving through the one door left open. The measured
+    /// cost of refusing instead is negligible: with the real course code
+    /// written into the tool descriptions, which is what the app always does,
+    /// the model wrote a course that was not this window's **0 times in 686
+    /// recorded responses**. Every wrong course value in `research/ai-assist/`
+    /// — 19 of them — sits in the one results file whose arms were shown a
+    /// PLACEHOLDER code in the schema, and echoed it back.
+    static func askedAboutACourseThatIsNotHere(course: String, otherCourse: String) -> String {
+        return "There is no course called \(otherCourse) in this working folder, so nothing "
+             + "was done. This window is for \(course)."
+    }
+
+    // MARK: - A course kept for reference
+
+    /// A deploy was asked for on a course that is kept for reference.
+    ///
+    /// **The same string the shared Python says**, pinned against
+    /// `contracts/shared-rules.json` → `referenceCourses.refusal.sentence` by
+    /// a test on each side — because the launchers and `deploy.py` have to say
+    /// it too, and `scripts/contracts.py` can read that file and not
+    /// `assist-wording.json`. A teacher who is refused at the button and again
+    /// at the Terminal must not read two different explanations of one rule.
+    ///
+    /// `course` is the code a TEACHER reads — `ICS3U`, never the folder name.
+    ///
+    /// **It does not tell them to copy anything**, and that was decided
+    /// rather than overlooked. It stayed decided when Plantoir gained "Copy a
+    /// Page from This Course…" (issue #207, same release): this is a refusal
+    /// about DEPLOYING, the way out it names is the course they are actually
+    /// teaching, and a refusal that advertises an unrelated feature is one a
+    /// teacher has to read twice. The menu item is on the course's own row,
+    /// where they will meet it.
+    static func deployRefusedForAReferenceCourse(course: String) -> String {
+        return "\(course) is kept for reference, so it is never deployed. "
+             + "Deploy the course you are teaching instead."
+    }
+
+    /// The model named a course that is kept for reference.
+    ///
+    /// A third sentence rather than a second use of `askedAboutAnotherCourse`,
+    /// which ends "Open that course's section in Plantoir and ask me there."
+    /// — advice that cannot be followed here, because the assistant is not
+    /// offered on a reference course at all.
+    static func askedAboutAReferenceCourse(course: String, otherCourse: String) -> String {
+        return "\(otherCourse) is kept for reference, so I can't work in it. "
+             + "This window is for \(course)."
+    }
+
+    // MARK: - What a page links to (#167)
+
+    /// The first line of the answer to "what does <page> link to?" — the list
+    /// of the pages it links to follows it, one to a line.
+    ///
+    /// Answered in code and never by the model, so this is the whole reply a
+    /// teacher reads. `page` is the name the sidebar shows, never a file name.
+    static func pageLinksTo(page: String) -> String {
+        return "“\(page)” links to:"
+    }
+
+    /// The same question, about a page with no links on it.
+    static func pageLinksToNothing(page: String) -> String {
+        return "“\(page)” doesn’t link to any other page."
+    }
+
+    /// Written after a linked page students cannot see yet.
+    ///
+    /// No placeholder, so the scenario that pins it can name it. "Draft" is
+    /// the word the window already uses for a page that is not published.
+    static let linkedPageIsADraft: String = "a draft, so students can’t open it yet"
+
+    /// Written after a link that reaches no page at all — the link as the
+    /// teacher wrote it goes in front, so they can find it on the page.
+    static let linkedPageIsMissing: String = "no page is called this, so the link leads nowhere"
+
+    /// No page in the section is called what the teacher asked about.
+    ///
+    /// **Not `AssistToolRefusal.noSuchPage`**, which ends by telling the MODEL
+    /// to use `list_pages`. This sentence goes straight to the teacher, so it
+    /// names nothing of the machinery and says what they can do instead.
+    static func noPageCalled(page: String, course: String, section: String) -> String {
+        return "No page in \(course) Section \(section) is called “\(page)”. "
+             + "Check the name as the sidebar shows it and ask again."
+    }
+
+    /// Two or more names, none of which is a page in the section (#197).
+    ///
+    /// `pages` is already rendered, "“a” or “b”" — see
+    /// `AssistPublishPlan.listingEither`. Said to the teacher, so it names
+    /// nothing of the machinery, the same as `noPageCalled` beside it.
+    static func noPagesCalled(pages: String, course: String, section: String) -> String {
+        return "No page in \(course) Section \(section) is called \(pages). "
+             + "Check the names as the sidebar shows them and ask again."
+    }
+
+    /// A publish whose page list was only a word meaning every page — "all",
+    /// "everything" — and no dates (#197).
+    ///
+    /// Measured on the smaller assistant: after listing a section's pages,
+    /// "Publish all of those." came back as `"pages": "all"` three times in
+    /// three on one real course, and this app used to answer that with
+    /// "Nothing needed changing." — success, about a request that did
+    /// nothing. `example` is something they can type next, built from the
+    /// section's own pages ("Publish Unit 3"). In a Unit course that sentence
+    /// is matched in code, so following the advice never reaches the model;
+    /// a Module or numbered course's example ("Publish Module 2", "Publish
+    /// Week 1") is read by the model, because the frames are term-blind.
+    static func everyPageIsNotAPageToPublish(example: String) -> String {
+        return "Nothing was published, because I need to know which pages. "
+             + "Say which ones — for example “\(example)”."
+    }
+
+    /// The same, for hiding. "Hidden", the window's own word since #215.
+    static func everyPageIsNotAPageToHide(example: String) -> String {
+        return "Nothing was hidden, because I need to know which pages. "
+             + "Say which ones — for example “\(example)”."
+    }
+
+    /// More than one page goes by the name the teacher asked about — two
+    /// folders' landing pages called the same thing, say. The pages follow,
+    /// one to a line, by where they are; the app does not choose between them.
+    static func morePagesThanOneAreCalled(page: String, course: String, section: String) -> String {
+        return "More than one page in \(course) Section \(section) is called “\(page)”, so I "
+             + "haven’t chosen one. Ask again using the name at the end of one of these:"
+    }
+
+    /// The page was found and could not be opened.
+    static func pageCouldNotBeRead(page: String) -> String {
+        return "“\(page)” could not be opened, so I can’t say what it links to."
+    }
+
+    // MARK: - The How I Teach page (#209)
+
+    // Said by the three MCP-only tools that read and write a course's How I
+    // Teach page, and by publishing when a teacher names it. Agent-facing
+    // unless marked (T): the teacher reads it, relayed or on screen. The rule
+    // they serve is `contracts/shared-rules.json` → `howITeachPage`. FIRST
+    // DRAFTS for Russell's wording pass.
+
+    /// The page, as `read_how_i_teach` hands it over: a header naming the
+    /// course and what to do with it, then the teacher's words.
+    static func howITeachRead(course: String, text: String) -> String {
+        return "Here is the How I Teach page for \(course): the teacher's own account of how this course "
+             + "is taught. Keep to it in anything you draft or revise for \(course). It is never put on "
+             + "the website.\n\n" + text
+    }
+
+    /// There is no page yet. States the exact name and place, so an agent
+    /// relaying it sets the teacher up to write one that is kept private — a
+    /// page with any other name is published (#209 plan review, item 8).
+    static func howITeachMissing(course: String) -> String {
+        return "\(course) has no How I Teach page yet. It would be a page named exactly “How I Teach”, "
+             + "at the top of the \(course) course folder beside its other pages — only a page with "
+             + "exactly that name, in exactly that place, is kept off the website. The teacher can write "
+             + "it there in Obsidian, or you can offer to draft one."
+    }
+
+    /// The page is there and has nothing written in it (#329) — Course
+    /// Settings' "Create and Open" makes exactly that. Said so an agent does
+    /// not read an empty page as the teacher's account, and knows it may
+    /// offer a draft without replacing anything.
+    static func howITeachEmpty(course: String) -> String {
+        return "\(course)’s How I Teach page has been started but has nothing written in it yet, so "
+             + "there is nothing to keep to. The teacher can write it in Obsidian, or you can offer to "
+             + "draft one; saving a draft fills the empty page, and needs no replacing mark."
+    }
+
+    /// How to offer, and draft, a page: the product decision in prose.
+    ///
+    /// Names no teaching approach on purpose. Whatever lean the ready-made
+    /// courses have should be FOUND in the pages, not asserted by Plantoir
+    /// about a teacher who may have rewritten every one of them.
+    static let howITeachDraftingBrief: String =
+        "If you offer to draft it: offer first, and draft only if the teacher says yes. Before drafting, "
+      + "read the course's own pages with the plantoir tools — the section's landing page, class pages "
+      + "from at least two different units, and a few of its warm-ups, tasks and discussions where "
+      + "there are any; if a course kept for reference has the same code, read that too. Write in the "
+      + "teacher's own first person. Say what the pages SHOW — how a class is shaped, whether ideas are "
+      + "explored before they are named, how practice and feedback work, the kinds of page that keep "
+      + "coming back and what each is for, and how the pages speak to students — and never invent "
+      + "what they do not show. Aim for 200 to 500 words. Show the teacher the whole draft and change "
+      + "it until they agree. Then save it with plan_write_how_i_teach and write_how_i_teach, never "
+      + "with your own file tools, so it is kept off the website, backed up first and can be undone."
+
+    /// The page is longer than one answer carries.
+    static func howITeachCutShort(course: String, path: String) -> String {
+        return "The How I Teach page for \(course) is longer than one answer can carry, so it stops "
+             + "here. The rest is in \(path) — read it with your own tools."
+    }
+
+    /// The plan for a NEW page.
+    static func howITeachPlanCreates(course: String, path: String) -> String {
+        return "This would save a new How I Teach page for \(course) at \(path), set so it is never put "
+             + "on the website. Show the teacher the whole text and wait for them to agree before "
+             + "calling write_how_i_teach."
+    }
+
+    /// The plan for REPLACING the page the teacher has. The mark is what the
+    /// write must be handed (`howITeachPage.tools.replacingIsAMarkNotABoolean`).
+    static func howITeachPlanReplaces(course: String, path: String, words: String,
+                                      changed: String, mark: String) -> String {
+        return "\(course) already has a How I Teach page, at \(path) (\(words) words, last changed "
+             + "\(changed)). Saving would REPLACE what it says; any settings at its top are kept. Show "
+             + "the teacher the whole new text, tell them it replaces the page they have, and only if "
+             + "they agree call write_how_i_teach with replacing: “\(mark)”."
+    }
+
+    /// Refused: a page is there, and nothing said it may be replaced.
+    static func howITeachAlreadyWritten(course: String) -> String {
+        return "Nothing was saved: \(course) already has a How I Teach page, and a teacher's own page is "
+             + "never replaced without their agreement. Use plan_write_how_i_teach, show the teacher what "
+             + "it says, and pass the mark it gives as replacing only if they agree to replace their page."
+    }
+
+    /// Refused: the page is not the one that was planned.
+    static func howITeachChangedSincePlanned(course: String) -> String {
+        return "Nothing was saved: the How I Teach page for \(course) is not the one that was planned — "
+             + "it has changed since, or that is not its mark. Plan again with plan_write_how_i_teach "
+             + "and show the teacher before replacing it."
+    }
+
+    /// Refused: no words.
+    static let howITeachNeedsWords: String =
+        "Nothing was saved: the page's text is empty. Pass the words of the page as text."
+
+    /// Refused: too long.
+    static let howITeachTooLong: String =
+        "Nothing was saved: that is longer than a How I Teach page can be (\(HowITeachPage.mostCharacters) "
+      + "characters). Make it shorter and show the teacher again."
+
+    /// Refused: the text opens with a settings block.
+    static let howITeachCarriesNoSettings: String =
+        "Nothing was saved: pass the page's words only, without a --- settings block at the top. "
+      + "Plantoir writes the page's settings itself."
+
+    /// (T) Saved.
+    static func howITeachSaved(course: String) -> String {
+        return "Saved the How I Teach page for \(course). It’s in the course folder beside your other "
+             + "pages, so you can change it in Obsidian any time. It’s never put on your website."
+    }
+
+    /// The one sentence an assistant says for the #333 finding when the
+    /// build has written a links checklist offer the teacher has not yet
+    /// answered (#379): the section window will offer to publish the pages,
+    /// so the list of pairs is not read out.
+    static func linksIntoHiddenPagesWillBeOffered(course: String, section: String) -> String {
+        return "Some links on pages students can see lead to pages that are still hidden. "
+             + "Plantoir will offer to publish them when you next open \(course) Section \(section)."
+    }
+
+    /// (T) Asked to publish or hide the page by name. The local window can
+    /// show this, with no routing change: the model still picks
+    /// `publish_pages`, and the refusal is in the tool.
+    static func howITeachIsNeverPublished(course: String) -> String {
+        return "The How I Teach page for \(course) is never put on the website — it is for you and your "
+             + "assistant. To share something like it with students, make a page with a different name."
+    }
+
+    /// The MCP session briefing's paragraph (mac only —
+    /// `howITeachPage.briefingInInstructions`), naming each live course whose
+    /// page exists.
+    static func howITeachBriefing(courses: [String]) -> String {
+        var lines: [String] = []
+        lines.append(
+            "These courses have a How I Teach page — the teacher's own account of how the course is "
+            + "taught. Read it with read_how_i_teach before drafting or revising anything in that "
+            + "course, and keep to it:"
+        )
+        for course in courses {
+            lines.append("  \(course)")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// `list_courses`' line for a course, to an MCP client only
+    /// (`howITeachPage.listCoursesLine`).
+    static let howITeachListedAsWritten: String = "  How I Teach page: yes"
+    static let howITeachListedAsNotWritten: String = "  How I Teach page: not written yet"
+
     // MARK: - Shared fragments
 
     /// One phrasing for "go and look at what happened", because it was two:
@@ -414,6 +1660,12 @@ nonisolated enum AssistWording {
     /// depending only on whether a window happened to be open. The window is
     /// the thing a teacher opens; the console is a part of it.
     static let whereTheOutputIs: String = "The output is in that section's window in Plantoir."
+
+    /// The last words of make-room's reply when other classes moved, after
+    /// `otherClassesMoved`. Named rather than typed inline, so that reply
+    /// carries no copy of the undo caveat of its own (#185).
+    static let lookTheSectionOverBeforePublishing: String =
+        "Look the section over in Plantoir before you publish."
 
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."

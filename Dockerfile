@@ -1,5 +1,17 @@
 # Use a slim Node+Python base image
-FROM python:3.11-slim
+#
+# PINNED BY DIGEST (the multi-architecture index, so arm64 and amd64 Macs and
+# PCs each get their own image from the one line), decided with #334 on
+# 2026-09-26. The tag alone moves under us: teachers who built at different
+# times held different Debian and Python patch releases, and a build could
+# change beneath a teacher with no change to this recipe at all. This digest
+# is the one this recipe was measured and verified on - Python 3.11.15,
+# Debian 13 (trixie), built 2026-08-05 - and the one BuildKit already resolved
+# for every build since, so pinning it re-downloads nothing for a Mac that
+# has it. The cost is that security fixes arrive only when someone bumps it:
+# `docker buildx imagetools inspect python:3.11-slim` names the current
+# index digest; bump it deliberately, and run verify.sh.
+FROM python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
 
 # Python packages: frontmatter parsing, and Pillow to draw each
 # section's social sharing card.
@@ -35,8 +47,16 @@ RUN apt-get update && apt-get install -y curl git lsof dos2unix fonts-noto-color
 RUN npm install -g wrangler@4.80.0 && npm cache clean --force
 
 # Clone Quartz v4.5.0 into /opt/quartz
+#
+# Depth 1 (#334): the tag's one commit, not Quartz's whole history. Measured
+# 2026-09-26, per container on this Mac: 2.3 MB against 42.0 MB, which is
+# ~40 MB off every new teacher's ~382 MB first download, and 38 MB less .git
+# that build_site.py stages into EVERY section's output folder at its first
+# build. Nothing reads Quartz's history: build_site.py already takes "git"
+# out of CreatedModifiedDate's priority, and the one-commit clone is still a
+# repository.
 WORKDIR /opt
-RUN git clone --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
+RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git quartz
 
 # Pre-install dependencies inside the image so npm install does not run over slow 9P mounts
 RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
@@ -51,9 +71,6 @@ COPY patches/publish.ts /opt/quartz/quartz/plugins/filters/publish.ts
 COPY patches/filters-index.ts /opt/quartz/quartz/plugins/filters/index.ts
 COPY patches/Head.tsx /opt/quartz/quartz/components/Head.tsx
 COPY patches/build.ts /opt/quartz/quartz/build.ts
-
-# Copy Quartz scaffold to /opt/quartz-site
-RUN cp -r /opt/quartz /opt/quartz-site
 
 # Copy in setup_course.py, build_site.py, deploy.py
 # toolchain_paths.py is the shared path shim: in here its container defaults
@@ -70,9 +87,17 @@ COPY scripts/site_health.py /opt/scripts/site_health.py
 # toolchain change is gated on it: the unit tests were green and the image
 # could not be built at all.
 COPY scripts/class_pages.py /opt/scripts/class_pages.py
+# Where a page's CODE is, so a link written inside code is not read as one
+# (#313) — imported by build_site.py and setup_course.py; the rule is
+# contracts/shared-rules.json → readingALink.whatIsCode.
+COPY scripts/markdown_code.py /opt/scripts/markdown_code.py
 # One home for "does the built site show this page?" — read by build_site.py
 # and setup_course.py, and pinned by contracts/file-formats.json.
 COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
+# The teacher's How I Teach page is never on the website (#209): build_site.py
+# asks this at discovery, preflight, the copy lists and a final sweep. Imported
+# by bare name, so it must be baked beside it (test_baked_modules.py).
+COPY scripts/how_i_teach.py /opt/scripts/how_i_teach.py
 # Which processes belong to a section's preview — the one answer, imported by
 # build_site.py before a build for publishing so the preview server cannot
 # overwrite what was just built. `preview.sh --stop` does NOT run this copy:
@@ -82,6 +107,11 @@ COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
 COPY scripts/stop_preview.py /opt/scripts/stop_preview.py
 COPY scripts/setup_course.py /opt/scripts/setup_course.py
 COPY scripts/build_site.py /opt/scripts/build_site.py
+# Is this course kept for reference, and therefore never deployed? deploy.py
+# imports it by bare name, which only resolves if it is baked in beside it —
+# and `test_baked_modules.py` fails the image build rather than letting a
+# missing copy turn into an ImportError at a teacher's publish.
+COPY scripts/reference_course.py /opt/scripts/reference_course.py
 COPY scripts/deploy.py /opt/scripts/deploy.py
 COPY scripts/social_card.py /opt/scripts/social_card.py
 # deploy.py's Netlify ad-badge suppression lives in this sibling module —
@@ -107,7 +137,7 @@ COPY scripts/netlify_badge.py /opt/scripts/netlify_badge.py
 # becomes a harmless no-op instead of the only source of truth.
 #
 # Same function, imported rather than copied, so the two cannot drift.
-RUN python3 -c "import sys; sys.path.insert(0, '/opt/scripts');     import setup_course; setup_course.ensure_quartz_explorer_anchor()"  && grep -q 'CQ4T-OMIT-ANCHOR' /opt/quartz/quartz.layout.ts  && cp /opt/quartz/quartz.layout.ts /opt/quartz-site/quartz.layout.ts
+RUN python3 -c "import sys; sys.path.insert(0, '/opt/scripts');     import setup_course; setup_course.ensure_quartz_explorer_anchor()"  && grep -q 'CQ4T-OMIT-ANCHOR' /opt/quartz/quartz.layout.ts
 
 # Copy course metadata lookup & other support files into container
 COPY support/ /opt/support/

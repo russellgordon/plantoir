@@ -99,10 +99,24 @@ final class AssistPromptShelfTests: XCTestCase {
     /// an argument — measured it. See
     /// `research/ai-assist/shelf-phrasings-results.txt`.
     func testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel() {
+        // Two, not three, and not four. "Deploy at 6:30 AM" left this list on
+        // 2026-09-19: it was measured going to `deploy_section` ten trials out
+        // of ten on the smaller assistant — a deploy to students on the spot
+        // in answer to a teacher who asked for half six tomorrow — and is now
+        // a parsed family in `AssistCardCommand` (issue #168).
+        //
+        // "Unpublish Unit 2, Day 3" left it the same day, for the opposite
+        // reason: the model routes THAT sentence perfectly, and could not
+        // route "hide unit 4, day 21" at all — five phrasings out of five, no
+        // tool chosen, the teacher's own sentence handed back as text (issue
+        // #215). Both verbs are one frame now, so the card goes with the word
+        // that needed the help rather than being left to drift away from it.
+        //
+        // "Publish Unit 2, Day 3" stays with the model deliberately:
+        // publishing is the direction that reaches students, and the smaller
+        // assistant is 10/10 on that sentence today.
         let goesToTheModel: Set<String> = [
             "Publish Unit 2, Day 3",
-            "Unpublish Unit 2, Day 3",
-            "Deploy at 6:30 AM",
             "Cancel scheduled deploy",
         ]
 

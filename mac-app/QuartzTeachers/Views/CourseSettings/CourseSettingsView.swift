@@ -16,32 +16,69 @@ struct CourseSettingsView: View {
     /// sheet is opened again.
     @State var unitWordNotice: String? = nil
     @State var saveProblem: String?
+
+    /// Why the How I Teach page could not be made, shown under its row until
+    /// the next press (#329).
+    @State var howITeachProblem: String? = nil
     @State var didJustSave: Bool = false
+
+    /// What the last Save could not reach — a preview or a publish of this
+    /// course already running (issue #265). Unlike "Saved ✓" it does not
+    /// fade after three seconds: it has to stay long enough to be read, so it
+    /// stays until the next Save, Preview Again, or leaving this course.
+    @State var saveNotice: SettingsSaveNotice? = nil
+
+    /// Counts the times this window has become key, so the page is drawn
+    /// again — and the course folder walked again for the marks questions —
+    /// when the teacher comes back from Finder or Obsidian (issue #152). The
+    /// floor now depends on what is on disk, and `onAppear` does not fire
+    /// when a window merely becomes key again.
+    @State var marksWalkGeneration: Int = 0
+
+    /// Whether this window is key, read only to notice it BECOMING key.
+    @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
+
+    /// Whether `settings save held back` has been written on this visit to
+    /// the course, so a teacher typing in a held-back form leaves one line,
+    /// not one per keystroke. Starts afresh when the form is rebuilt for a
+    /// course (`.id(code)` in MainWindowView).
+    @State var heldBackWasNoted: Bool = false
 
     // MARK: - Body
 
     var body: some View {
         @Bindable var configuration = course.configuration
         @Bindable var settings = AppSettings.shared
+        // ONE walk of the course folder per drawing, shared by the Marks
+        // checklist and by all three folder lists' protections (issue #152).
+        // A walk per row cost 53 ms each on a 400-folder course; the rows are
+        // drawn from this, and a click is decided afresh (`protectionWhenActedOn`).
+        let _ = marksWalkGeneration
+        let marks: MarksFloor.Snapshot = marksSnapshot()
 
         VStack(spacing: 0) {
             Form {
                 Section {
                     TextField("Course name", text: $configuration.courseName)
-                        .textFieldStyle(.roundedBorder)
+                        .borderedTextField()
                         .accessibilityIdentifier("courseNameField")
 
                     if configuration.isClub {
                         TextField("Short label beside emoji (clubs, ≤ 12 characters)", text: $configuration.customShortName)
-                            .textFieldStyle(.roundedBorder)
+                            .borderedTextField()
                             .accessibilityIdentifier("customShortNameField")
                     }
 
-                    Picker("Language / region (Quartz locale)", selection: $configuration.locale) {
-                        ForEach(LocaleCatalog.codes, id: \.self) { code in
-                            Text(LocaleCatalog.displayName(forCode: code))
-                                .tag(code)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Picker(CourseSettingsWording.localeLabel, selection: $configuration.locale) {
+                            ForEach(LocaleCatalog.codes, id: \.self) { code in
+                                Text(LocaleCatalog.displayName(forCode: code))
+                                    .tag(code)
+                            }
                         }
+                        .accessibilityIdentifier("localePicker")
+                        ExampleCaption(CourseSettingsWording.localeCaption)
+                            .accessibilityIdentifier("localeCaption")
                     }
 
                     Toggle("Show page read-time estimates to students", isOn: $configuration.showReadingTime)
@@ -74,12 +111,22 @@ struct CourseSettingsView: View {
                                 unitWordNotice = nil
                                 isRenamingUnitWord = true
                             }
+                            // A numbered course's word is part of the
+                            // vocabulary chosen in the wizard (#267).
+                            .disabled(configuration.classPageNaming.isNumbered)
                             .accessibilityIdentifier("renameUnitWordButton")
                         }
                     }
-                    Text(UnitWordRenameWording.rowCaption(word: configuration.unitWord))
+                    Text(UnitWordRenameWording.rowCaption(naming: configuration.classPageNaming))
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                    if configuration.classPageNaming.isNumbered {
+                        Text(UnitWordRenameWording.renameLockedNumbered)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("unitWordLockedNotice")
+                    }
                     if let unitWordNotice {
                         Text(unitWordNotice)
                             .font(.callout)
@@ -91,12 +138,39 @@ struct CourseSettingsView: View {
                     FormSectionHeader("Settings — Overall")
                 }
 
+                // The words the course was made with (#267): shown, and
+                // LOCKED — a club's are chosen in the wizard and are not
+                // switchable afterwards, and an existing course (CODING
+                // included) can never become one from here. Only what the
+                // course RECORDED is shown, and the group goes when that is
+                // nothing — every course but a club made since #267 (#376).
+                let lockedRows: [ClassPagesLockedRows.Row] = ClassPagesLockedRows.rows(for: configuration)
+                if !lockedRows.isEmpty {
+                    Section {
+                        ForEach(lockedRows, id: \.key) { row in
+                            LabeledContent(row.label) {
+                                Text(row.value)
+                                    .accessibilityIdentifier(row.identifier)
+                            }
+                        }
+                        Text(WizardWording.settingsLockedCaption)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } header: {
+                        FormSectionHeader("Class Pages")
+                    }
+                }
+
                 Section {
                     PublishingChoiceView(
                         deployTarget: $configuration.deployTarget,
                         deployFolderPath: $configuration.deployFolderPath,
                         cloudflareAccountID: $settings.cloudflareAccountID,
                         additionalDeployTargets: $configuration.additionalDeployTargets
+                    )
+                    ScheduledDeployLatenessPicker(
+                        days: $configuration.scheduledDeployMayRunLateDays
                     )
                 } header: {
                     FormSectionHeader("Deploying")
@@ -111,18 +185,18 @@ struct CourseSettingsView: View {
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
+                        removalTrail: removalTrail(for: .sharedFolders),
                         items: $configuration.sharedFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded shared folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .shared)
                         },
-                        protection: sharedFolderProtection,
+                        protection: { folder in
+                            return sharedFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: sharedFolderProtection,
                         renameProblem: { oldName, newName, finishing in
                             return folderRenameProblem(
                                 oldName, to: newName, scope: .shared, finishing: finishing
@@ -142,34 +216,48 @@ struct CourseSettingsView: View {
                             return noticeAfterFolderChange(name, change: change, scope: .shared)
                         }
                     )
+                    // Which of those hold curriculum expectations, each with a
+                    // coverage map of its own (#128) — offered, never decided
+                    // for the teacher, and only when there is a choice.
+                    if !offeredCurriculumFolders.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            MembershipToggleListView(
+                                title: CurriculumFoldersOffer.label,
+                                removalTrail: removalTrail(for: .curriculumFolders),
+                                allItems: offeredCurriculumFolders,
+                                members: curriculumFolderTicksBinding,
+                                protection: curriculumFolderTickProtection
+                            )
+                            ExampleCaption(CurriculumFoldersOffer.caption)
+                        }
+                    }
+                    howITeachRow
                     StringListEditorView(
                         title: "Shared files (all sections)",
+                        removalTrail: removalTrail(for: .sharedFiles),
                         hidesMarkdownExtension: true,
                         items: $configuration.sharedFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "shared")
-                            ActivityTrail.note(.itemExcluded, "excluded shared file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .shared)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "shared") {
-                                ActivityTrail.note(.itemReincluded, "re-included shared file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .shared)
                         }
                     )
                     StringListEditorView(
                         title: "Per-section folders",
+                        removalTrail: removalTrail(for: .perSectionFolders),
                         items: $configuration.perSectionFolders,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            dropFromMarksPool(name)
-                            ActivityTrail.note(.itemExcluded, "excluded per-section folder " + name + " in " + course.code)
+                            folderWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section folder " + name + " in " + course.code)
-                            }
+                            folderWasAdded(name, scope: .perSection)
                         },
-                        protection: perSectionFolderProtection,
+                        protection: { folder in
+                            return perSectionFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: perSectionFolderProtection,
                         renameProblem: { oldName, newName, finishing in
                             return folderRenameProblem(
                                 oldName, to: newName, scope: .perSection, finishing: finishing
@@ -191,16 +279,14 @@ struct CourseSettingsView: View {
                     )
                     StringListEditorView(
                         title: "Per-section files",
+                        removalTrail: removalTrail(for: .perSectionFiles),
                         hidesMarkdownExtension: true,
                         items: $configuration.perSectionFiles,
                         onRemove: { name in
-                            configuration.exclude(name, inScope: "per_section")
-                            ActivityTrail.note(.itemExcluded, "excluded per-section file " + name + " in " + course.code)
+                            fileWasRemoved(name, scope: .perSection)
                         },
                         onAdd: { name in
-                            if configuration.reinclude(name, inScope: "per_section") {
-                                ActivityTrail.note(.itemReincluded, "re-included per-section file " + name + " in " + course.code)
-                            }
+                            fileWasAdded(name, scope: .perSection)
                         },
                         protection: perSectionFileProtection
                     )
@@ -214,9 +300,13 @@ struct CourseSettingsView: View {
                 Section {
                     MembershipToggleListView(
                         title: GradedFolderWording.listTitle,
-                        allItems: gradedFolderChoices,
-                        members: gradedFoldersBinding,
-                        protection: gradedFolderProtection
+                        removalTrail: removalTrail(for: .marks),
+                        allItems: marks.choices,
+                        members: gradedFoldersBinding(offered: marks.choices),
+                        protection: { folder in
+                            return gradedFolderProtection(for: folder, marks: marks)
+                        },
+                        protectionWhenActedOn: gradedFolderProtection
                     )
                     Text(GradedFolderWording.caption)
                         .font(.callout)
@@ -230,15 +320,10 @@ struct CourseSettingsView: View {
                 }
 
                 Section {
-                    MembershipToggleListView(
-                        title: "Hide from the site's sidebar",
+                    SidebarVisibilityTableView(
                         allItems: configuration.allSidebarItems,
-                        members: $configuration.hiddenItems
-                    )
-                    MembershipToggleListView(
-                        title: "Expandable in the site's sidebar",
-                        allItems: configuration.allSidebarItems,
-                        members: $configuration.expandableItems
+                        hidden: $configuration.hiddenItems,
+                        expandable: $configuration.expandableItems
                     )
                 } header: {
                     FormSectionHeader("Sidebar Visibility")
@@ -255,22 +340,74 @@ struct CourseSettingsView: View {
 
             Divider()
 
+            if let saveNotice {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(saveNotice.sentences, id: \.self) { sentence in
+                            Text(sentence)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        // The preview this was about has stopped, or its
+                        // window closed: say so rather than leave a button
+                        // that does nothing (the review's L2).
+                        if !saveNotice.sectionsToPreviewAgain.isEmpty
+                            && sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty {
+                            Text(SpecialNames.settingsPreviewAgainNothingOpen)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("settingsPreviewAgainNothingOpen")
+                        }
+                    }
+                    Spacer()
+                    if !saveNotice.sectionsToPreviewAgain.isEmpty {
+                        Button("Preview Again") {
+                            previewAgain(sections: sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain))
+                        }
+                        .disabled(sectionsStillPreviewed(offered: saveNotice.sectionsToPreviewAgain).isEmpty)
+                        .accessibilityIdentifier("settingsPreviewAgainButton")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                // A container element with its own identifier (#353): without `.contain`
+                // SwiftUI applies an identifier on a stack to every element inside it,
+                // and the inner identifiers (settingsPreviewAgainButton, settingsPreviewAgainNothingOpen) never reach the tree.
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("settingsSaveNotice")
+            }
+
             HStack {
                 // "Revert", not "Cancel": this is a settings form, not a
                 // dialog — the button puts the values back the way the last
-                // save left them.
+                // save left them. The FILE's values, not this copy's memory
+                // of them: another window may have saved since (issue #265).
                 Button("Revert") {
-                    try? course.configuration.discardChanges()
+                    revertToFile()
                 }
-                .disabled(!course.configuration.hasUnsavedChanges)
+                .disabled(!SaveEnablement.revertIsEnabled(hasUnsavedChanges: course.configuration.hasUnsavedChanges))
                 .accessibilityIdentifier("revertButton")
 
                 Spacer()
 
+                // The press-time problem wins when both exist; otherwise,
+                // when there is something to save and a destination problem
+                // holds it back, the reason is said HERE, beside the button
+                // it explains (#373). It used to be said only under
+                // Deploying, screens away from a section's settings.
                 if let saveProblem {
                     Text(saveProblem)
                         .foregroundStyle(.red)
                         .font(.callout)
+                } else if saveIsHeldBack, let holdingProblem {
+                    Text(CourseSettingsWording.saveHeldBack(reason: holdingProblem.sentence))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("saveHeldBackReason")
                 }
                 if didJustSave {
                     Text("Saved ✓")
@@ -279,17 +416,11 @@ struct CourseSettingsView: View {
                         .accessibilityIdentifier("savedConfirmation")
                 }
 
-                Button("Save") {
-                    save()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .buttonStyle(.borderedProminent)
-                .disabled(!course.configuration.hasUnsavedChanges || savingProblem != nil)
-                .accessibilityIdentifier("saveButton")
+                saveButton
             }
             .padding(12)
         }
-        .navigationTitle(course.code)
+        .navigationTitle(course.displayCode)
         .toolbar {
             ToolbarItem {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
@@ -309,40 +440,116 @@ struct CourseSettingsView: View {
             }
         }
         .navigationSubtitle(course.configuration.courseName)
+        .onAppear {
+            // The file may have moved on since this window read it: a build
+            // adds folders it discovers, and another window on the same
+            // folder may have saved. Never over unsaved edits (issue #265).
+            course.configuration.reloadIfNothingUnsaved(url: course.configFileURL)
+        }
+        .onChange(of: controlActiveState) { oldState, newState in
+            if newState == .key {
+                marksWalkGeneration += 1
+            }
+        }
+        .onChange(of: saveIsHeldBack) { wasHeldBack, isHeldBack in
+            noteHeldBackIfNew(wasHeldBack: wasHeldBack, isHeldBack: isHeldBack)
+        }
     }
 
     // MARK: - Computed properties
 
-    /// Why saving is blocked right now, or nil when it isn't. A deploy
-    /// destination that cannot be reached must not reach disk: the deploy
-    /// would quietly have nowhere to go, and would only say so much later.
-    var savingProblem: String? {
-        if course.configuration.deployTarget == "local_folder" {
-            if let problem = CourseConfiguration.deployFolderProblem(forPath: course.configuration.deployFolderPath) {
-                return problem
-            }
-        }
-        if course.configuration.deploysToCloudflare {
-            if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
-                return problem
-            }
-        }
-        // Every ADDITIONAL destination gets the same check — a redundancy
-        // target with no valid folder or credential would otherwise only
-        // fail the first time a deploy actually reached it.
-        for target in course.configuration.additionalDeployTargets {
-            if target.type == "local_folder" {
-                if let problem = CourseConfiguration.deployFolderProblem(forPath: target.path) {
-                    return problem
+    /// The course's How I Teach page, in Obsidian (#329): "Open" when the
+    /// course has one, "Create and Open" when it has none — the page is then
+    /// made with its settings and nothing else, never a starter text
+    /// (`HowITeachPage.startOrFind`). Shown for every course this form is
+    /// drawn for; a course kept for reference never reaches this form.
+    /// Whether the page is there is read on every drawing, and the drawing
+    /// is redone when the window becomes key (`marksWalkGeneration`), so a
+    /// page made or deleted in Obsidian meanwhile is noticed.
+    var howITeachRow: some View {
+        let pageExists: Bool = HowITeachPage.existingURL(for: course) != nil
+        return VStack(alignment: .leading, spacing: 4) {
+            LabeledContent(HowITeachButtonWording.rowLabel) {
+                Button(pageExists ? HowITeachButtonWording.openButton : HowITeachButtonWording.createButton) {
+                    openOrStartHowITeachPage()
                 }
+                .disabled(!FolderActions.obsidianIsInstalled)
+                .help("Edit this course's pages in Obsidian")
+                .accessibilityIdentifier("howITeachButton")
             }
-            if target.type == "cloudflare_pages" {
-                if let problem = CourseConfiguration.cloudflareAccountProblem(forID: AppSettings.shared.cloudflareAccountID) {
-                    return problem
-                }
+            ExampleCaption(HowITeachButtonWording.caption)
+                .accessibilityIdentifier("howITeachCaption")
+            if let howITeachProblem {
+                Text(howITeachProblem)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("howITeachProblem")
             }
         }
-        return nil
+    }
+
+    /// Save, wearing the accent colour ONLY when it can be pressed (#364).
+    /// v1.4.0's dark marketing picture showed a disabled accent Save —
+    /// (17,70,126) against Revert's disabled (38,38,38) — and it read as
+    /// enabled to everyone who looked. Otherwise it is a plain bordered
+    /// button: Revert's own look, the system's disabled button in both
+    /// appearances. ONE predicate decides both the look and the state, so
+    /// they cannot disagree.
+    @ViewBuilder
+    var saveButton: some View {
+        if SaveEnablement.saveWearsTheAccent(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        ) {
+            Button("Save") {
+                save()
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .buttonStyle(.borderedProminent)
+            .disabled(!saveIsEnabled)
+            .accessibilityIdentifier("saveButton")
+        } else {
+            Button("Save") {
+                save()
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .buttonStyle(.bordered)
+            .disabled(!saveIsEnabled)
+            .accessibilityIdentifier("saveButton")
+        }
+    }
+
+    /// The first problem with where this course publishes, as this window
+    /// has it set now — shown under Deploying whatever else is happening.
+    var destinationProblem: SaveEnablement.DestinationProblem? {
+        return SaveEnablement.destinationProblem(
+            for: course.configuration, cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+        )
+    }
+
+    /// The problem that holds Save back, or nil. A destination that cannot
+    /// be reached must not reach disk — but only an edit that CHANGES where
+    /// the course publishes can put it there. A destination already broken
+    /// on disk (a folder from another Mac, a Cloudflare course on a Mac
+    /// with no account ID) no longer blocks saving a section's colour
+    /// scheme: that block was the likeliest real cause of #373.
+    var holdingProblem: SaveEnablement.DestinationProblem? {
+        return SaveEnablement.holdingProblem(
+            destinationProblem: destinationProblem,
+            destinationsChanged: course.configuration.deployDestinationsDifferFromSaved
+        )
+    }
+
+    var saveIsEnabled: Bool {
+        return SaveEnablement.saveIsEnabled(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        )
+    }
+
+    var saveIsHeldBack: Bool {
+        return SaveEnablement.saveIsHeldBack(
+            hasUnsavedChanges: course.configuration.hasUnsavedChanges, holdingProblem: holdingProblem
+        )
     }
 
     /// Every folder that could hold work counting for marks.
@@ -365,6 +572,62 @@ struct CourseSettingsView: View {
         )
     }
 
+    /// The "Curriculum folders" checkboxes (#128), shown only when the course
+    /// has two or more folders to choose between.
+    var offeredCurriculumFolders: [String] {
+        return CurriculumFoldersOffer.offered(
+            folders: course.configuration.sharedFolders,
+            declared: course.configuration.curriculumFolders
+        )
+    }
+
+    /// Ticked: the folders the build maps, read from the disk, or — while none
+    /// holds a page — the ones the course declares.
+    var tickedCurriculumFolders: [String] {
+        let declared: [String] = course.configuration.curriculumFolders
+        let mapped: [String] = CurriculumFolderRule.mappedFolders(
+            declared: declared,
+            in: course.configuration.sharedFolders,
+            withPages: CurriculumFolderRule.foldersWithPages(for: course),
+            withLetterFirstPages: CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
+        )
+        return CurriculumFoldersOffer.ticked(
+            folders: course.configuration.sharedFolders, declared: declared, mapped: mapped
+        )
+    }
+
+    /// A tick or an untick, written as `curriculum_folders` — the folders
+    /// already ticked first, so the primary folder stays primary.
+    var curriculumFolderTicksBinding: Binding<[String]> {
+        return Binding(
+            get: {
+                return tickedCurriculumFolders
+            },
+            set: { newValue in
+                let current: [String] = tickedCurriculumFolders
+                for folder in newValue where !current.contains(folder) {
+                    course.configuration.curriculumFolders = CurriculumFoldersOffer.ticking(
+                        folder, ticked: current, folders: course.configuration.sharedFolders
+                    )
+                    return
+                }
+                for folder in current where !newValue.contains(folder) {
+                    if let written = CurriculumFoldersOffer.unticking(folder, ticked: current) {
+                        course.configuration.curriculumFolders = written
+                    }
+                    return
+                }
+            }
+        )
+    }
+
+    func curriculumFolderTickProtection(for folder: String) -> ItemProtection {
+        if CurriculumFoldersOffer.canUntick(folder, ticked: tickedCurriculumFolders) {
+            return .ordinary
+        }
+        return .blocked(reason: CurriculumFoldersOffer.lastStaysTicked)
+    }
+
     /// The pool, shown as ticks.
     ///
     /// When the course has never been asked (`gradedFolders` is nil), the
@@ -378,6 +641,13 @@ struct CourseSettingsView: View {
     /// be: the first tick freezes it, so anything the build counts today and
     /// this list omits loses its marks without a word.
     var gradedFoldersBinding: Binding<[String]> {
+        return gradedFoldersBinding(offered: nil)
+    }
+
+    /// The same, inferring a never-asked course's pool from `offered` — the
+    /// list the page was drawn with — rather than walking the course folder
+    /// again. Nil walks, as the property above does.
+    func gradedFoldersBinding(offered: [String]?) -> Binding<[String]> {
         return Binding(
             get: {
                 if let chosen = course.configuration.gradedFolders {
@@ -386,6 +656,9 @@ struct CourseSettingsView: View {
                 // The offered list is already de-duplicated by exact name, so
                 // asking the shared rule — which de-duplicates too — gives the
                 // answer the hand-written loop here gave.
+                if let offered {
+                    return GradedFolderRule.inferredPool(from: offered)
+                }
                 return GradedFolderRule.inferredPool(from: gradedFolderChoices)
             },
             set: { newValue in
@@ -396,15 +669,86 @@ struct CourseSettingsView: View {
 
     // MARK: - Functions
 
+    /// Opens the course's How I Teach page, making an empty one first when
+    /// there is none (#329).
+    func openOrStartHowITeachPage() {
+        howITeachProblem = nil
+        do {
+            let page: (url: URL, created: Bool) = try HowITeachPage.startOrFind(for: course)
+            FolderActions.openPageInObsidian(page.url, vaultURL: course.directoryURL)
+            if page.created {
+                marksWalkGeneration += 1
+            }
+        } catch {
+            howITeachProblem = HowITeachButtonWording.couldNotCreate(reason: error.localizedDescription)
+        }
+    }
+
+    /// What a blocked removal in one of this course's lists leaves on the
+    /// trail: the course, by its code (#171).
+    func removalTrail(for list: RemovalTrail.List) -> RemovalTrail {
+        return RemovalTrail.inCourseSettings(courseCode: course.code, list: list)
+    }
+
+    /// Writes `settings save held back` on the change into the held-back
+    /// state, once per visit (#373): the one state in which the form
+    /// changes and no act follows, so without it a "Save would not light
+    /// up" report finds nothing on the trail.
+    func noteHeldBackIfNew(wasHeldBack: Bool, isHeldBack: Bool) {
+        guard SaveEnablement.shouldNoteHeldBack(
+            wasHeldBack: wasHeldBack, isHeldBack: isHeldBack, alreadyNoted: heldBackWasNoted
+        ) else {
+            return
+        }
+        guard let holdingProblem else {
+            return
+        }
+        heldBackWasNoted = true
+        ActivityTrail.note(
+            .settingsSaveHeldBack,
+            SaveEnablement.heldBackTrailLine(courseCode: course.code, check: holdingProblem.check)
+        )
+    }
+
     func save() {
         saveProblem = nil
-        if let savingProblem {
-            saveProblem = savingProblem
+        if let holdingProblem {
+            saveProblem = holdingProblem.sentence
             return
         }
         do {
-            try course.configuration.write(to: course.configFileURL)
-            ActivityTrail.note(.settingsSaved, "saved the settings for " + course.code)
+            // What the file hid BEFORE this Save, for the trail — read from
+            // the file, not this copy, because the file is what the site was
+            // built from.
+            var hiddenBefore: [String] = []
+            let onDisk: CourseConfiguration? = try? CourseConfiguration(contentsOf: course.configFileURL)
+            if let onDisk {
+                hiddenBefore = onDisk.hiddenItems
+            }
+            let result: CourseConfiguration.WriteResult = try course.configuration.write(to: course.configFileURL)
+            let notice: SettingsSaveNotice? = SettingsSaveNotice.afterSave(
+                folderPath: workingFolderPath,
+                courseCode: course.code,
+                previewLeases: PreviewLeases.active,
+                publishes: CourseActivity.activePublishes,
+                replacedChangesFromElsewhere: result.replacedChangesFromElsewhere,
+                scheduledDeploys: SettingsSaveNotice.scheduledDeploysAtSave(
+                    before: onDisk,
+                    saved: course,
+                    scheduled: SettingsSaveNotice.scheduledDeploysStillToCome(
+                        courseCode: course.code, workingFolder: URL(fileURLWithPath: workingFolderPath)
+                    ),
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID
+                )
+            )
+            saveNotice = notice
+            ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
+                courseCode: course.code,
+                hiddenBefore: hiddenBefore,
+                hiddenAfter: course.configuration.hiddenItems,
+                result: result,
+                notice: notice
+            ))
             didJustSave = true
             Task {
                 try? await Task.sleep(for: .seconds(3))
@@ -416,73 +760,208 @@ struct CourseSettingsView: View {
         }
     }
 
-    /// A folder removed from the course leaves the marks pool as well, so the
-    /// confirmation's promise ("Removing it will take it out of your course's
-    /// marks pool") is kept and `graded_folders` never names a folder the
-    /// build has been told to exclude — with two conditions, both of which
-    /// exist to stop a removal quietly taking marks OFF the coverage map.
-    ///
-    /// The rule and its seven cases are `contracts/shared-rules.json` →
-    /// `gradedFolders.removingAFolder`. Called after the name has already left
-    /// its list and been written into `excluded_items`, which is what makes
-    /// `gradedFolderChoices` the right question to ask here.
-    func dropFromMarksPool(_ name: String) {
-        // Still offered? Then a folder of that name is still in the course —
-        // `Portfolios/Tasks`, when the top-level `Tasks` was the one removed —
-        // and the pool entry still names work the build publishes. Dropping it
-        // would stop counting a folder nobody removed, and the checklist would
-        // go on showing an untickable row for it.
-        //
-        // Asked CASE-INSENSITIVELY, because the walk returns on-disk spellings:
-        // `Portfolios/tasks` is offered as `tasks`, and an exact test would
-        // read that as "no longer offered" while `build_site.py` goes on
-        // counting the folder. Seventh case of `gradedFolders.removingAFolder`,
-        // raised from Windows as issue #172; the comparison itself, and what
-        // was measured to choose it, are in `GradedFolderChoices.stillOffers`.
-        if GradedFolderChoices.stillOffers(gradedFolderChoices, aFolderNamed: name) {
-            return
-        }
-        // A course that has NEVER been asked is left unasked, rather than
-        // frozen to the historical rule's answer minus this folder. On the
-        // ordinary course whose only marked folder is `Tasks`, freezing writes
-        // `[]` — asked and answered, nothing counting for marks ever again,
-        // from a gesture the teacher was told would take one folder out of the
-        // pool. An absent key keeps the historical rule running instead.
-        //
-        // **This guard is not what makes the never-asked cases pass today, and
-        // it must not be "simplified" away.** The post-exclusion walk is: the
-        // historical rule only ever names folders drawn FROM the choices
-        // (`GradedFolderRule.inferredPool(from:)` reads that list), so a name
-        // the still-offered test has just rejected cannot be in a materialised
-        // pool either. That redundancy holds only while the DROP below is no
-        // more permissive than the still-offered test above — which is this
-        // file's shape (a case-insensitive test over an exact drop) and
-        // Windows' shape (one comparer for both). Reverse it — an exact test
-        // over a case-insensitive drop — and this guard is the only thing left
-        // standing.
-        //
-        // Measured ON WINDOWS 2026-09-18, on code whose drop is
-        // `OrdinalIgnoreCase`: with an exact still-offered test and this guard
-        // replaced by the materialised pool, a never-asked course that removes
-        // a top-level `Tasks` while `Portfolios/tasks` survives writes
-        // `graded_folders: []` — the #142 damage, back. The mac's own drop is
-        // exact, so that mutation stops one line lower instead, at
-        // `!currentGraded.contains(name)`: the materialised pool is `["tasks"]`
-        // and the name is `"Tasks"`. Do not read the `[]` as a mac number, and
-        // do not conclude from a green suite that the guard is dead.
-        guard let currentGraded = course.configuration.gradedFolders else {
-            return
-        }
-        if !currentGraded.contains(name) {
-            return
-        }
-        var remaining: [String] = []
-        for folder in currentGraded {
-            if folder != name {
-                remaining.append(folder)
+    /// The working folder this course lives in — the folder a preview's
+    /// lease and a publish's record name.
+    var workingFolderPath: String {
+        return course.directoryURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .path
+    }
+
+    /// Of `offered`, the sections whose preview Preview Again can still reach.
+    /// Reads `PreviewLeases.active`, which is observable, so this view is
+    /// drawn again when a preview stops or its window closes.
+    func sectionsStillPreviewed(offered: [Int]) -> [Int] {
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        return SettingsSaveNotice.sectionsStillPreviewed(
+            offered: offered,
+            folderPath: folderPath,
+            courseCode: courseCode,
+            previewLeases: PreviewLeases.active,
+            previewIsRunning: { section in
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    return nil
+                }
+                return controller.isPreviewRunning()
+            }
+        )
+    }
+
+    /// Builds each open preview of this course again, so it shows what was
+    /// just saved. The preview belongs to the section's own view — in another
+    /// window, since leaving a section for its course's settings stops that
+    /// section's preview — so this goes through the same registered controls
+    /// the assistant uses, which stop and start it the way its own button
+    /// does. A section whose preview has since stopped is left alone.
+    func previewAgain(sections: [Int]) {
+        // The preview sentence is answered; a sentence about the Save itself
+        // (another window's sidebar change replaced) stays to be read.
+        saveNotice = saveNotice?.withoutPreviewAgain()
+        let folderPath: String = workingFolderPath
+        let courseCode: String = course.code
+        Task { @MainActor in
+            var rebuilt: [String] = []
+            for section in sections {
+                guard let controller = SectionWindowControllers.shared.controller(
+                    folderPath: folderPath, courseCode: courseCode, sectionNumber: section
+                ) else {
+                    continue
+                }
+                if controller.previewState() == .notRunning {
+                    continue
+                }
+                await controller.stopPreview()
+                controller.startPreview()
+                rebuilt.append(String(section))
+            }
+            if !rebuilt.isEmpty {
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "previewed " + courseCode + " again after saving its settings (section "
+                        + rebuilt.joined(separator: ", ") + ")"
+                )
+            } else {
+                // The button is disabled when nothing is reachable, so this
+                // is the instant between drawing it and pressing it — rare,
+                // and still worth a line rather than silence.
+                ActivityTrail.note(
+                    .previewAgainAfterSettingsSaved,
+                    "pressed Preview Again for " + courseCode + ", but no preview of it was open any more"
+                )
             }
         }
-        course.configuration.gradedFolders = remaining
+    }
+
+    /// A folder removed from the course leaves the marks pool as well — with
+    /// the two exceptions `contracts/shared-rules.json` →
+    /// `gradedFolders.removingAFolder` pins, both of which exist to stop a
+    /// removal quietly taking marks OFF the coverage map. The rule is
+    /// `MarksPoolRemoval.poolAfterRemoving`, which the marks floor asks too,
+    /// so the removal and the floor cannot disagree about what a removal
+    /// leaves in the pool (issue #152).
+    ///
+    /// Called after the name has already left its list and been written into
+    /// `excluded_items`, which is what makes `gradedFolderChoices` — walked
+    /// again HERE, not the drawing's snapshot — the right question to ask.
+    /// That order is `folderWasRemoved`'s, and issue #183's must-fails pin it.
+    func dropFromMarksPool(_ name: String) {
+        let current: [String]? = course.configuration.gradedFolders
+        let remaining: [String]? = MarksPoolRemoval.poolAfterRemoving(
+            name, from: current, choicesAfter: gradedFolderChoices
+        )
+        if remaining != current {
+            course.configuration.gradedFolders = remaining
+        }
+    }
+
+    // MARK: - Adding and removing folders and files
+
+    /// What removing a name from one of the Content Structure lists does
+    /// beyond taking it out of the list: records it in `excluded_items`, so
+    /// the build stops publishing it, and takes it out of the marks pool.
+    ///
+    /// Named methods rather than closures written at the call site so that a
+    /// test can run exactly what the list runs — the goldens for issue #266
+    /// drive these, and a closure in `body` cannot be reached from a test.
+    ///
+    /// **The trail line is written HERE, on the click, saved or not** —
+    /// Russell's decision of 2026-09-06
+    /// (overnight/issues/09-item-excluded-trail-on-click.md), confirmed for
+    /// issue #152 after a first build recorded at the write instead. The
+    /// attempt must leave a trace even if the teacher crashes before saving;
+    /// a Revert that takes it back writes `exclusions reverted`
+    /// (`revertToFile()`). `contracts/shared-rules.json` →
+    /// `excludedItems.recordedOnClick`.
+    func folderWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        dropFromMarksPool(name)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+    }
+
+    /// A folder name added back to a list is taken out of `excluded_items`.
+    func folderWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " folder " + name + " in " + course.code)
+        }
+    }
+
+    /// The file twin of `folderWasRemoved`: a file is never in the marks pool.
+    func fileWasRemoved(_ name: String, scope: FolderScope) {
+        course.configuration.exclude(name, inScope: scope.exclusionKey)
+        ActivityTrail.note(.itemExcluded, "excluded " + trailWord(for: scope) + " file " + name + " in " + course.code)
+    }
+
+    /// The file twin of `folderWasAdded`.
+    func fileWasAdded(_ name: String, scope: FolderScope) {
+        if course.configuration.reinclude(name, inScope: scope.exclusionKey) {
+            ActivityTrail.note(.itemReincluded, "re-included " + trailWord(for: scope) + " file " + name + " in " + course.code)
+        }
+    }
+
+    /// How the trail names a scope: "shared" or "per-section".
+    func trailWord(for scope: FolderScope) -> String {
+        switch scope {
+        case .shared:
+            return "shared"
+        case .perSection:
+            return "per-section"
+        }
+    }
+
+    /// What the Revert button does: puts the form back to the FILE (issue
+    /// #265), and — when that took back exclusion changes whose click lines
+    /// are already on the trail — says so, with how many (issue #152).
+    ///
+    /// Counted against what THIS copy last read or wrote, never against the
+    /// file: a Revert discards exactly this copy's unsaved changes, and an
+    /// exclusion another window saved meanwhile is not one of them. Counting
+    /// against the file reported "reverted 1 unsaved exclusion change" for
+    /// a removal this window never made (#152's implementation review, M1).
+    func revertToFile() {
+        let sharedUnsaved: Int = CourseSettingsView.namesThatDiffer(
+            course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey),
+            course.configuration.savedExcludedItems(forScope: FolderScope.shared.exclusionKey)
+        )
+        let perSectionUnsaved: Int = CourseSettingsView.namesThatDiffer(
+            course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey),
+            course.configuration.savedExcludedItems(forScope: FolderScope.perSection.exclusionKey)
+        )
+        do {
+            try course.configuration.revertToFile(at: course.configFileURL)
+        } catch {
+            return
+        }
+        let takenBack: Int = sharedUnsaved + perSectionUnsaved
+        if takenBack > 0 {
+            var noun: String = " unsaved exclusion changes"
+            if takenBack == 1 {
+                noun = " unsaved exclusion change"
+            }
+            ActivityTrail.note(
+                .exclusionsReverted,
+                "reverted " + String(takenBack) + noun + " in " + course.code
+            )
+        }
+    }
+
+    /// How many names are in one list and not the other, either way round.
+    static func namesThatDiffer(_ first: [String], _ second: [String]) -> Int {
+        var count: Int = 0
+        for name in first {
+            if !second.contains(name) {
+                count += 1
+            }
+        }
+        for name in second {
+            if !first.contains(name) {
+                count += 1
+            }
+        }
+        return count
     }
 
     // MARK: - Renaming a folder
@@ -527,6 +1006,11 @@ struct CourseSettingsView: View {
         // on the main actor, because it touches the observable model.
         let courseDirectory: URL = course.directoryURL
         let sectionNumbers: [Int] = course.configuration.sectionNumbers
+        // Read BEFORE the move, while the folder still has its old name: which
+        // curriculum folders hold expectation pages decides whether this one
+        // is a curriculum folder whose name must be written down (#128).
+        let curriculumWithPages: [String] = CurriculumFolderRule.foldersWithPages(for: course)
+        let curriculumWithLetterFirstPages: [String] = CurriculumFolderRule.foldersWithLetterFirstPages(for: course)
         do {
             outcome = try await Task.detached(priority: .userInitiated) {
                 return try SpecialFolderRenamer.rename(
@@ -540,7 +1024,10 @@ struct CourseSettingsView: View {
         }
         do {
             try course.configuration.recordOnDisk({ values in
-                return SpecialFolderRenamer.renaming(oldName, to: newName, scope: scope, in: values)
+                return SpecialFolderRenamer.renaming(
+                    oldName, to: newName, scope: scope, in: values, foldersWithPages: curriculumWithPages,
+                    foldersWithLetterFirstPages: curriculumWithLetterFirstPages
+                )
             }, at: course.configFileURL)
         } catch {
             // Recorded BEFORE returning, and that ordering is the point: this
@@ -647,38 +1134,91 @@ struct CourseSettingsView: View {
         return created
     }
 
-    func sharedFolderProtection(for folder: String) -> ItemProtection {
-        let resolvedCurriculum: String? = CurriculumFolderRule.resolvedCurriculumFolder(for: course)
-        if let resolvedCurriculum, folder == resolvedCurriculum {
-            if course.configuration.includesCurriculumCoverage {
-                return .blocked(reason: SpecialNames.curriculumFolderBlockedByCoverageSetting)
-            } else {
-                return .consequential(
-                    title: SpecialNames.removeCurriculumFolderTitle(for: folder),
-                    message: SpecialNames.removeCurriculumFolderMessage
-                )
-            }
-        }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) {
-            if course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
-                return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
-            } else {
-                return .consequential(
-                    title: SpecialNames.removeGradedFolderTitle(for: folder),
-                    message: SpecialNames.removeGradedFolderMessage
-                )
-            }
-        }
-        return .ordinary
+    // MARK: - What a removal or an untick may do
+
+    /// One walk of the course folder, and what the Marks checklist offers
+    /// from it — what the page's marks questions are answered from
+    /// (`MarksFloor`, issue #152). The body takes one per drawing; every
+    /// one-argument protection below takes its own, which is the fresh walk
+    /// a teacher's click is decided with.
+    func marksSnapshot() -> MarksFloor.Snapshot {
+        return MarksFloor.snapshot(
+            sharedFolders: course.configuration.sharedFolders,
+            perSectionFolders: course.configuration.perSectionFolders,
+            courseDirectory: course.directoryURL,
+            excludedShared: course.configuration.excludedItems(forScope: FolderScope.shared.exclusionKey),
+            excludedPerSection: course.configuration.excludedItems(forScope: FolderScope.perSection.exclusionKey)
+        )
     }
 
+    /// What the marks floor reads from this course's settings.
+    var marksSettings: MarksFloor.Settings {
+        return MarksFloor.Settings(
+            sharedFolders: course.configuration.sharedFolders,
+            perSectionFolders: course.configuration.perSectionFolders,
+            gradedFolders: course.configuration.gradedFolders,
+            includesCurriculumCoverage: course.configuration.includesCurriculumCoverage
+        )
+    }
+
+    /// How the floor's answer about removing `folder` is shown.
+    func removalProtection(for folder: String, outcome: MarksFloor.Outcome) -> ItemProtection {
+        switch outcome {
+        case .refused:
+            return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
+        case .confirmed:
+            return .consequential(
+                title: SpecialNames.removeGradedFolderTitle(for: folder),
+                message: SpecialNames.removeGradedFolderMessage
+            )
+        case .ordinary:
+            return .ordinary
+        }
+    }
+
+    /// Asked with a FRESH walk: what a click is decided with, and what every
+    /// test through `CourseSettingsGestureScript` calls. Nothing but the
+    /// two-argument form with a new snapshot — if the two ever did different
+    /// things, every test through the script would stay green while the page
+    /// drew something else (the #183 seam; `testTheBodyDrawsTheMarksQuestionsFromOneWalk`).
+    func sharedFolderProtection(for folder: String) -> ItemProtection {
+        return sharedFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func sharedFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
+        // Every curriculum folder with a map, read from the disk (#128): only
+        // the LAST one is refused while the map is on. See
+        // `CurriculumFolderProtection`, which the wizard asks too.
+        if let curriculum = CurriculumFolderProtection.decide(
+            folder: folder,
+            resolved: CurriculumFolderRule.resolvedFolders(for: course),
+            coverageOn: course.configuration.includesCurriculumCoverage,
+            pagesOn: false,
+            declaredPayloadFolder: nil,
+            surface: .settings,
+            jurisdiction: ""
+        ) {
+            return curriculum
+        }
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .remove(folder, .shared), settings: marksSettings, snapshot: marks
+        )
+        return removalProtection(for: folder, outcome: outcome)
+    }
+
+    /// Asked with a fresh walk — see `sharedFolderProtection(for:)`.
     func perSectionFolderProtection(for folder: String) -> ItemProtection {
+        return perSectionFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func perSectionFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
         if course.configuration.perSectionFolders.count <= 1 {
             return .blocked(reason: SpecialNames.lastPerSectionFolderBlocked)
         }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) && course.configuration.includesCurriculumCoverage && currentGraded.count <= 1 {
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .remove(folder, .perSection), settings: marksSettings, snapshot: marks
+        )
+        if outcome == .refused {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
         // "All Classes" — exactly that folder — is never removable (Russell,
@@ -688,13 +1228,7 @@ struct CourseSettingsView: View {
         if ClassFolder.isTheAllClassesFolder(folder, configured: course.configuration.classFolder) {
             return .blocked(reason: SpecialNames.classFolderBlocked)
         }
-        if currentGraded.contains(folder) {
-            return .consequential(
-                title: SpecialNames.removeGradedFolderTitle(for: folder),
-                message: SpecialNames.removeGradedFolderMessage
-            )
-        }
-        return .ordinary
+        return removalProtection(for: folder, outcome: outcome)
     }
 
     func perSectionFileProtection(for file: String) -> ItemProtection {
@@ -705,12 +1239,17 @@ struct CourseSettingsView: View {
         return .ordinary
     }
 
+    /// The Marks checklist's untick, asked with a fresh walk — see
+    /// `sharedFolderProtection(for:)`.
     func gradedFolderProtection(for folder: String) -> ItemProtection {
-        guard course.configuration.includesCurriculumCoverage else {
-            return .ordinary
-        }
-        let currentGraded: [String] = gradedFoldersBinding.wrappedValue
-        if currentGraded.contains(folder) && currentGraded.count <= 1 {
+        return gradedFolderProtection(for: folder, marks: marksSnapshot())
+    }
+
+    func gradedFolderProtection(for folder: String, marks: MarksFloor.Snapshot) -> ItemProtection {
+        let outcome: MarksFloor.Outcome = MarksFloor.outcome(
+            of: .untick(folder), settings: marksSettings, snapshot: marks
+        )
+        if outcome == .refused {
             return .blocked(reason: SpecialNames.lastGradedFolderBlocked)
         }
         return .ordinary

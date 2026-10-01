@@ -44,9 +44,20 @@ class ContractNamingTests(unittest.TestCase):
             # A case with no `term` uses the default word, which is what a
             # course says when `unit_word` is absent from its configuration.
             term = case.get("term") or class_pages.DEFAULT_UNIT_WORD
-            match = re.match(class_pages.class_page_pattern(term), title, re.IGNORECASE)
+            # A case with no `scheme` is the ordinary one — what an absent
+            # `class_page_scheme` means (#267).
+            scheme = case.get("scheme") or class_pages.UNIT_DAY_SCHEME
+            match = re.match(class_pages.class_page_pattern(term, scheme), title, re.IGNORECASE)
+            why = f"{term} ({scheme}): {title} — {case.get('why', '')}"
+            if scheme == class_pages.NUMBERED_SCHEME:
+                expected_number = case.get("expectNumber")
+                if expected_number is None:
+                    self.assertIsNone(match, why)
+                else:
+                    self.assertIsNotNone(match, why)
+                    self.assertEqual(int(match.group(1)), expected_number, why)
+                continue
             expected_unit = case.get("expectUnit")
-            why = f"{term}: {title} — {case.get('why', '')}"
             if expected_unit is None:
                 self.assertIsNone(match, why)
                 continue
@@ -88,6 +99,51 @@ class BuildRecognisesTheCoursesOwnWordTests(unittest.TestCase):
         self.build_site.set_unit_word("Module")
         self.assertFalse(self.build_site._is_class_page(Path("index.md")))
         self.assertFalse(self.build_site._is_class_page(Path("Key Links.md")))
+
+
+class NumberedSchemeTests(unittest.TestCase):
+    """A club's pages carry ONE number: "Week 3" (#267)."""
+
+    def setUp(self):
+        import build_site
+
+        self.build_site = build_site
+        self.addCleanup(build_site.set_unit_word, class_pages.DEFAULT_UNIT_WORD)
+        self.addCleanup(build_site.set_class_page_scheme, class_pages.UNIT_DAY_SCHEME)
+
+    def test_absent_empty_and_unknown_all_mean_the_ordinary_scheme(self):
+        self.assertEqual(class_pages.scheme_from_config({}), "unit_day")
+        self.assertEqual(class_pages.scheme_from_config({"class_page_scheme": ""}), "unit_day")
+        self.assertEqual(class_pages.scheme_from_config({"class_page_scheme": None}), "unit_day")
+        self.assertEqual(
+            class_pages.scheme_from_config({"class_page_scheme": "fortnightly"}), "unit_day",
+            "A scheme a newer app wrote reads as today's shape, never as an error",
+        )
+        self.assertEqual(class_pages.scheme_from_config({"class_page_scheme": " Numbered "}), "numbered")
+
+    def test_a_club_build_recognises_its_own_pages_and_no_others(self):
+        self.build_site.set_unit_word("Week")
+        self.build_site.set_class_page_scheme("numbered")
+        self.assertTrue(self.build_site._is_class_page(Path("Week 9.md")))
+        self.assertFalse(self.build_site._is_class_page(Path("Week 9, Day 1.md")))
+        self.assertFalse(self.build_site._is_class_page(Path("Unit 1, Day 1.md")))
+        self.assertFalse(self.build_site._is_class_page(Path("index.md")))
+
+    def test_the_first_meeting_is_the_first_class_of_the_year(self):
+        import re
+
+        self.build_site.set_unit_word("Week")
+        self.build_site.set_class_page_scheme("numbered")
+        self.assertTrue(re.match(self.build_site.first_class_pattern(), "Week 1"))
+        self.assertTrue(re.match(self.build_site.first_class_pattern(), "Week 01"))
+        self.assertFalse(re.match(self.build_site.first_class_pattern(), "Week 10"))
+
+    def test_a_course_that_says_nothing_about_a_scheme_is_unchanged(self):
+        """Russell's CODING: pages called "Week N", no scheme key — as before."""
+        self.build_site.set_unit_word(class_pages.word_from_config({}))
+        self.build_site.set_class_page_scheme(class_pages.scheme_from_config({}))
+        self.assertFalse(self.build_site._is_class_page(Path("Week 9.md")))
+        self.assertTrue(self.build_site._is_class_page(Path("Unit 2, Day 3.md")))
 
 
 class WordFromConfigTests(unittest.TestCase):

@@ -478,7 +478,7 @@ public sealed class AssistWorkspace
             throw new AssistRefusal("No page was named, and no dates were given to choose classes by.");
         if (onOrAfter is { } from && before is { } until && until <= from)
             throw new AssistRefusal(
-                $"No class can be on or after {from:yyyy-MM-dd} and also before {until:yyyy-MM-dd}.");
+                $"No class can be on or after {DateText.Iso(from)} and also before {DateText.Iso(until)}.");
 
         bool isDraft = draft;
         bool isPublish = !draft;
@@ -1156,7 +1156,7 @@ public sealed class AssistWorkspace
         if (matches.Count == 1) return matches[0];
         if (matches.Count > 1)
             throw new AssistRefusal(
-                $"{course.Code} Section {sectionNumber} has {matches.Count} classes on {date:yyyy-MM-dd} — " +
+                $"{course.Code} Section {sectionNumber} has {matches.Count} classes on {DateText.Iso(date)} — " +
                 Humanize(matches.Select(m => "“" + Path.GetFileNameWithoutExtension(m) + "”")) +
                 ". Say which one you mean.");
 
@@ -1165,9 +1165,9 @@ public sealed class AssistWorkspace
             .Where(d => d is not null).Select(d => d!.Value).OrderBy(d => d).ToList();
         string nearby = dated.Count == 0
             ? "None of its classes have dates."
-            : $"Its classes run {dated[0]:yyyy-MM-dd} to {dated[^1]:yyyy-MM-dd}.";
+            : $"Its classes run {DateText.Iso(dated[0])} to {DateText.Iso(dated[^1])}.";
         throw new AssistRefusal(
-            $"{course.Code} Section {sectionNumber} has no class on {date:yyyy-MM-dd}. {nearby}");
+            $"{course.Code} Section {sectionNumber} has no class on {DateText.Iso(date)}. {nearby}");
     }
 
     /// <summary>
@@ -1193,7 +1193,7 @@ public sealed class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
-        RefuseIfPlantoirIsBuilding(course);
+        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's deploy");
 
         var destinations = course.Configuration.AllDeployDestinations;
 
@@ -1232,7 +1232,7 @@ public sealed class AssistWorkspace
         }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
+        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
@@ -1292,10 +1292,10 @@ public sealed class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
-        RefuseIfPlantoirIsBuilding(course);
+        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's rebuild");
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
+        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's rebuild");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         return build.Succeeded
@@ -1429,9 +1429,16 @@ public sealed class AssistWorkspace
         if (!preview)
             return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
 
-        RefuseIfPlantoirIsBuilding(course);
+        // The pages are already written: Markdown never conflicts with a
+        // build, so only the REBUILD is declined when another program is
+        // building, publishing or previewing this course (#289), and the note
+        // where the preview would have been refreshed says so.
+        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        if (claim is null)
+            return new AssistResult(true,
+                Summary(changed, previewed: false, course.Code, section, plan.Hiding) + " " + AssistWording.CourseIsBusy(course.Code),
+                backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
@@ -1490,8 +1497,8 @@ public sealed class AssistWorkspace
         if (moving.Count == 0)
         {
             string already = publishing
-                ? $"{course.Configuration.UnitWord} {unit} has already been published."
-                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
+                ? AssistWording.UnitAlreadyPublished(course.Configuration.UnitWord, unit)
+                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit);
             return new WholeUnitPlanResult(
                 HasPages: true,
                 MovingCount: 0,
@@ -1624,8 +1631,8 @@ public sealed class AssistWorkspace
         if (!changedAnything)
         {
             string already = publishing
-                ? $"{course.Configuration.UnitWord} {unit} has already been published."
-                : $"{course.Configuration.UnitWord} {unit} is already hidden.";
+                ? AssistWording.UnitAlreadyPublished(course.Configuration.UnitWord, unit)
+                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit);
             return new AssistResult(true, already, backup);
         }
 
@@ -1634,9 +1641,11 @@ public sealed class AssistWorkspace
         if (!preview)
             return new AssistResult(true, summary, backup);
 
-        RefuseIfPlantoirIsBuilding(course);
+        // Written already; only the rebuild is declined (#289), as above.
+        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        if (claim is null)
+            return new AssistResult(true, summary + " " + AssistWording.CourseIsBusy(course.Code), backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only" },
                                         _folder, progress, cancellation);
         return build.Succeeded
@@ -1658,8 +1667,7 @@ public sealed class AssistWorkspace
         {
             string path = PagePaths.ResolveInside(_folder, index.RelativePath);
             string text = File.ReadAllText(path);
-            if (SectionIndex.WithMostRecent(text, index.ToClass) is not { } withEmbed) return;
-            var (withDate, _) = PageFrontmatter.SetCreated(withEmbed, "created", index.ToDate, tail);
+            if (SectionIndex.PointedAndDated(text, index.ToClass, index.ToDate, tail) is not { } withDate) return;
             Save(path, withDate);
         }
         catch { /* the front page falling behind must not fail the publish */ }
@@ -1721,11 +1729,51 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>
-    /// Claim the build for as long as it runs, so Plantoir's own Preview and
-    /// Deploy stand off rather than clearing the folder underneath it.
+    /// A first look, before anything is written or backed up: decline a BUILD
+    /// while another program builds, publishes or PREVIEWS this course
+    /// (<c>shared-rules.json</c> → <c>workLeases.declining</c>, #289).
     /// </summary>
-    private IDisposable ClaimTheBuild(Course course) =>
-        WorkLease.Take(_folder, course.Code, WorkLease.Building);
+    /// <remarks>
+    /// Stricter than <see cref="RefuseIfPlantoirIsBuilding"/>, and only for
+    /// paths that BUILD: every <c>--build-only</c> first ends that section's
+    /// serving preview, so a rebuild from here took down the page the teacher
+    /// was reading. Writes keep the old, narrower check — refusing a WRITE
+    /// during a preview made the assistant useless to a teacher watching it.
+    /// The guarantee is <see cref="ClaimTheBuildOrDecline"/>; this only saves a
+    /// backup and a message that would then be thrown away.
+    /// </remarks>
+    private void RefuseIfAnotherProgramStandsInTheWay(Course course, int section, string asked)
+    {
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), course.Code, section);
+        throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+    }
+
+    /// <summary>
+    /// Claim the build for as long as it runs, so Plantoir's own Preview and
+    /// Deploy stand off rather than clearing the folder underneath it — TAKE
+    /// first, then look, with nothing awaited in between, counting only leases
+    /// taken before this one (<c>workLeases.declining.takeThenCheck</c>), so two
+    /// programs that race cannot both go ahead. Declined: the lease is given
+    /// back, the trail says why, and the caller is refused with the sentence an
+    /// assistant working from outside is told (<c>wording.courseIsBusy</c>).
+    /// </summary>
+    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked) =>
+        ClaimTheBuildUnlessDeclined(course, section, asked)
+            ?? throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+
+    /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
+    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked)
+    {
+        var claim = WorkLease.Take(_folder, course.Code, WorkLease.Building);
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
+            return claim;
+        claim.Dispose();
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), course.Code, section);
+        return null;
+    }
 
 
 
@@ -2017,7 +2065,7 @@ public sealed class AssistWorkspace
     {
         var kept = new List<string>();
         var stillPinned = new List<string>();
-        string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
+        string stamp = DateText.Invariant(DateTime.Now, "yyyy-MM-dd_HHmmss");
 
         // ONE undo entry for the whole release, not one per destination. A
         // rollover is a single act to the teacher, and a partial undo would
@@ -2437,18 +2485,19 @@ public sealed class AssistWorkspace
         if (ScheduledDeploy.Problem(course, section, when, DateTime.Now, cloudflareAccountId) is { } problem)
             throw new AssistRefusal(problem);
 
-        var unpublished = new List<string>();
+        // Only the classes the caller NAMED, each said as published or not
+        // (#400: the section-wide unpublished list is gone from scheduling).
+        var named = new List<(string Title, bool? Published)>();
         foreach (string title in classesToCheck ?? Array.Empty<string>())
         {
             try
             {
                 string path = Page(course, section, title);
-                if (PageFrontmatter.IsDraft(File.ReadAllText(path), section))
-                    unpublished.Add(Path.GetFileNameWithoutExtension(path));
+                named.Add((Path.GetFileNameWithoutExtension(path),
+                           !PageFrontmatter.IsDraft(File.ReadAllText(path), section)));
             }
-            // A page that cannot be found is reported by the caller's own
-            // lookup; it is not this check's job to refuse over it.
-            catch (AssistRefusal) { }
+            // A page that cannot be found is said so, not refused over.
+            catch (AssistRefusal) { named.Add((title, null)); }
         }
 
         return new ScheduledDeploy
@@ -2456,8 +2505,9 @@ public sealed class AssistWorkspace
             CourseCode = course.Code,
             SectionNumber = section,
             When = when,
-            UnpublishedClasses = unpublished,
-            Destination = DestinationOf(course),
+            ClassesNamed = named,
+            // EVERY destination, from the list the run deploys to (#400).
+            Destination = ScheduledDeploy.EveryDestination(course.Configuration),
         };
     }
 
@@ -2726,7 +2776,7 @@ public sealed class AssistWorkspace
         if (runway.Count < needed)
         {
             int short_ = needed - runway.Count;
-            problems.Add($"This needs {needed} class days from {firstFree:yyyy-MM-dd} onwards and the " +
+            problems.Add($"This needs {needed} class days from {DateText.Iso(firstFree)} onwards and the " +
                          $"timetable only has {runway.Count}. Add {short_} more class " +
                          $"date{(short_ == 1 ? "" : "s")} and ask again.");
             return new InsertPlan
@@ -2795,16 +2845,24 @@ public sealed class AssistWorkspace
             try { text = File.ReadAllText(PagePaths.ResolveInside(_folder, path)); }
             catch { continue; }
 
-            foreach (var match in System.Text.RegularExpressions.Regex
-                         .Matches(text, @"!?\[\[([^\]|#]+)").Cast<System.Text.RegularExpressions.Match>())
-                if (names.Contains(match.Groups[1].Value.Trim())) total++;
+            // The shared rewriter's own count (#339, #318): a link inside code
+            // or a comment is not counted, and an escaped pipe is a link.
+            total += WikiLinks.CountLinksTo(names, text);
         }
         return total;
     }
 
     /// <summary>Carry out the insertion: rename, re-date, relink, then create the blanks.</summary>
-    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null)
+    public AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress = null) =>
+        ApplyInsertClasses(plan, progress, out _);
+
+    /// <param name="created">The full paths of the blank class pages this run
+    /// WROTE — a page already standing at a path is not among them. The
+    /// duplicate asks it, because it is the one question link rewriting and
+    /// date moves cannot fool (#200 A).</param>
+    private AssistResult ApplyInsertClasses(InsertPlan plan, IProgress<string>? progress, out List<string> created)
     {
+        created = new List<string>();
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
         if (plan.ChangesNothing)
@@ -2884,14 +2942,15 @@ public sealed class AssistWorkspace
             string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
             if (File.Exists(path)) continue;
             Save(path, ClassSkeleton(added, plan.Unit, plan.Added.Count, tail));
+            created.Add(path);
         }
 
         string said =
-            $"Made room for {plan.Added.Count} class{(plan.Added.Count == 1 ? "" : "es")} at {UnitWordFor(plan.CourseCode)} " +
-            $"{plan.Unit}, Day {plan.AtDay}. Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
+            AssistWording.MadeRoom(plan.Added.Count, UnitWordFor(plan.CourseCode), plan.Unit, plan.AtDay) +
+            $" Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
-            "Look the section over in Plantoir before you deploy it.";
+            AssistWording.LookTheSectionOverBeforePublishing;
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
@@ -2932,7 +2991,7 @@ public sealed class AssistWorkspace
 
         var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
             ?? throw new AssistRefusal(
-                ClassChangeWording.NotANumberedClassPage(sourceTitle, course.Configuration.UnitWord));
+                ClassChangeWording.NotANumberedClassPage(sourceTitle));
 
         // The source's own next day. Throws the timetable refusal unchanged,
         // which is the sentence that asks for the class dates.
@@ -2986,11 +3045,6 @@ public sealed class AssistWorkspace
         int section = Section(course, plan.SectionNumber);
         string newPath = Path.Combine(ClassFolder(course, section), plan.NewTitle + ".md");
 
-        // Read BEFORE anything moves, so the guard below can tell "the page
-        // that was in the way is still there" from "the new skeleton".
-        string? occupying = null;
-        try { if (File.Exists(newPath)) occupying = File.ReadAllText(newPath); } catch { }
-
         // OUTERMOST, and that is the whole of why this reads the way it does.
         // Begin ignores a nested call, so whoever opens the entry first owns
         // the description — and everything ApplyInsertClasses writes lands in
@@ -2999,35 +3053,53 @@ public sealed class AssistWorkspace
         using var recording = UndoHistory.Record(_undo,
             $"duplicated “{plan.SourceTitle}” as “{plan.NewTitle}”");
 
-        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress);
+        AssistResult inserted = ApplyInsertClasses(plan.Insertion, progress, out var created);
 
-        // The one case that could destroy a lesson. ApplyInsertClasses
-        // SKIPS a rename whose destination already exists rather than
-        // writing over it — right in itself, but it leaves the page the
-        // copy was meant to become holding somebody's real class. Writing
-        // the copy there anyway would lose it.
-        if (occupying is not null && File.Exists(newPath) && File.ReadAllText(newPath) == occupying)
+        // The one case that could destroy a lesson (#200 A, the mac's #163).
+        // Asked of the PLANNER — did this run write the page standing there? —
+        // not of the page's text. The text comparison this replaced was
+        // defeated by the link pass: a destination whose rename was skipped
+        // but which linked to a page that WAS renamed came back with different
+        // text, read as "not the same page", and the copy was written over the
+        // lesson. Deliberately not ANDed with "was a page there before?": a
+        // sample taken before the shuffle is blind to a page appearing during
+        // it, and Obsidian being open in the other window is the premise.
+        if (!created.Contains(newPath, StringComparer.OrdinalIgnoreCase))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                "did not copy a class — the page the copy would have become still held a lesson, " +
+                "and other classes may already have moved", course.Code, section);
             throw new AssistRefusal(
                 ClassChangeWording.ThePlaceForTheCopyIsStillTaken(plan.NewTitle, inserted.BackupPath));
+        }
 
         progress?.Report($"Copying “{plan.SourceTitle}”…");
         bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, newPath);
-        string copied = PageFrontmatter.SetTitle(plan.SourceText, plan.NewTitle);
+        // #200 B: REMOVE what the copy inherited, never add a per-section key
+        // to hide it — see PageFrontmatter.WithoutPerSectionKeys for the page
+        // that could never be published again while the reply said it was.
+        string copied = PageFrontmatter.WithoutPerSectionKeys(plan.SourceText);
+        copied = PageFrontmatter.SetTitle(copied, plan.NewTitle);
         copied = PageFrontmatter.SetCreated(
             copied, PageFrontmatter.CreatedKeyFor(section, sectionLocal), plan.NewDate,
             SiblingTimeAndOffset(course, section, ClassPages(course, section))).Text;
         copied = PageFrontmatter.SetDraft(
             copied, PageFrontmatter.PublishKeyFor(section, sectionLocal), draft: true, section).Text;
 
-        // A shared source carrying publishForSection<N>: true beats the
-        // plain publish: false just written (PageFrontmatter.IsDraft reads
-        // the per-section key FIRST), so the copy would be VISIBLE to this
-        // section's students the moment it existed. Checked rather than
-        // assumed, because the frontmatter the copy inherits is whatever
-        // the teacher's page happened to carry.
-        if (!PageFrontmatter.IsDraft(copied, section))
-            copied = PageFrontmatter.SetDraft(
-                copied, PageFrontmatter.PublishKeyFor(section, isSectionLocal: false), draft: true, section).Text;
+        // Read back what is about to be written and ABANDON the copy rather
+        // than write one this app cannot vouch for. `!= Hidden`, not
+        // `== Visible`: "cannot tell" may well be published by the build.
+        // Reachable — a TAB used as indentation in the source's block, or a
+        // block whose first line is indented (SetDraft declines, #186) — and
+        // safe: the blank the insertion wrote here is `publish: false`.
+        if (PageFrontmatter.Visibility(copied, section) != PageVisibility.Hidden)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.ClassCopyNotMade,
+                "did not copy a class — the copy could not be made certainly hidden, and a copy " +
+                "of a published lesson must never arrive where students can read it", course.Code, section);
+            throw new AssistRefusal(
+                ClassChangeWording.TheCopyCouldNotBeMadeHidden(plan.SourceTitle, plan.NewTitle, inserted.BackupPath));
+        }
 
         Save(newPath, copied);
 
@@ -3090,15 +3162,10 @@ public sealed class AssistWorkspace
             catch { continue; }
 
             // Only the TARGET is rewritten; an alias after "|" is the
-            // teacher's own words and stays exactly as written.
-            string updated = System.Text.RegularExpressions.Regex.Replace(
-                text, @"(!?\[\[)([^\]|#]+)", match =>
-                {
-                    string target = match.Groups[2].Value;
-                    return byName.TryGetValue(target.Trim(), out string? renamed)
-                        ? match.Groups[1].Value + renamed
-                        : match.Value;
-                });
+            // teacher's own words and stays exactly as written, and so do an
+            // escaping backslash and a link inside code or a comment (#318,
+            // #339) — the one shared rewriter.
+            string updated = WikiLinks.Rewriting(text, byName);
 
             if (updated != text) Save(full, updated);
         }
@@ -3298,7 +3365,7 @@ public sealed class AssistWorkspace
         return new AssistResult(true,
             $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in Unit " +
             $"{plan.Unit} of {course.Code} Section {section}, dated " +
-            $"{plan.Classes[0].Date:yyyy-MM-dd} to {plan.Classes[^1].Date:yyyy-MM-dd}. " +
+            $"{DateText.Iso(plan.Classes[0].Date)} to {DateText.Iso(plan.Classes[^1].Date)}. " +
             "They are unpublished, so nothing changed in the site — write them, then publish when ready.",
             backup);
     }
@@ -3386,7 +3453,7 @@ public sealed class AssistWorkspace
             ---
             title: {created.Title}
             publish: false
-            created: {created.Date:yyyy-MM-dd}{tail}
+            created: {DateText.Iso(created.Date)}{tail}
             transcludeTitleSize: h2
             enableToc: false
             excludeBacklinks: true

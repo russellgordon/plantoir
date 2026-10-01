@@ -234,6 +234,10 @@ problem — **nobody answers a question at 6 a.m.**
 
   It records **four outcomes**, not one: a question went unanswered, the BUILD
   asked a question, it did not finish for some other reason, and it WORKED.
+  (Eight since 2026-09-30, bundle 3: a build that failed outright is
+  `buildDidNotFinish`, naming no destination, and a run that stood down is
+  `tooLateToRun`, `courseWasBusy` or `couldNotRunAsSetNow` — the run is
+  Plantoir itself now; see 07-deployment → "On Windows since bundle 3".)
   The last is there for the same reason as the failures read backwards — a
   scheduled publish that leaves no trace cannot be told from one that never
   happened, so the trail could answer *"why did my site not update?"* and
@@ -427,6 +431,35 @@ while the line explaining it went to the redirected trail, where nobody would
 look. Everything now derives from `AppDataRoot`, so the next thing somebody
 adds inherits the isolation instead of leaking.
 
+**The mac has the same flag, by the same name, on purpose (#154) — worth
+KNOWING, nothing to do.** One word should mean the same thing to a harness on
+either platform. Its root is different: the mac's state is spread across four
+`~/Library` folders, so `--state-dir` there stands in for the whole HOME
+folder rather than one app folder, and preferences need a door of their own
+because macOS's preferences daemon ignores a moved home. The same sharp edge
+applies there (children, the launchers, take the real home), and the mac
+refuses `launchctl`, notifications, the quit-time container stop and its
+updater under the flag; a malformed flag exits 64. Doc 09 → "Testing: the UI
+target keeps its state in `--state-dir`". The mac also now drives the
+new-site DIALOG through the real window (`NewSiteDialogUITests`, with a
+stubbed `deploy.sh`) — the test this platform ruled out, its reason 4 being
+that `ToolchainMirror.RefreshLaunchers` replaces a stub launcher on every
+`Reload()`. The mac's `refreshLaunchersIfNeeded` leaves launchers alone under
+test (a four-line guard; doc 09 → "The first-publish path"), and the same
+guard here would make the same test possible. Optional, and not an issue: if
+Russell wants it, it becomes one.
+
+**AppKit's frame autosave under test (mac #361, v1.4.1) — worth KNOWING,
+nothing owed.** On the mac, AppKit and SwiftUI save window frames and
+split-view positions straight into the app's real preferences whatever store
+the app picks, so the unit gate and UI runs were moving the teacher's real
+main window; a run a test drives now puts those keys back the moment they
+change (`AppKitBookkeepingGuard`, doc 09 → "AppKit's own bookkeeping is put
+back"). Windows has no analogue: WinUI has no frame autosave, the main window
+sizes itself from `App.Settings`, and the assistant's placements live in
+`AppSettings.AssistWindowPlacements` — all inside the folder `--state-dir`
+moves. No issue, and nothing to mirror.
+
 ## Reading a test run: the exit code cannot tell you what happened
 
 `dotnet test` exits 1 when a test fails. It also exits 1 when the test HOST
@@ -559,7 +592,7 @@ holds one entry per key, carrying the key, the issue, the milestone and the
 reason. Everything else is asserted exactly as before, and the ledger fails
 both ways — if a ledgered thing starts existing here (saying to delete the
 entry) and if it stops being in the contract. **So a green totals line on this
-suite can mean "green, with two written debts"**, and the ledger file is the
+suite can mean "green, with the debts the ledger names"**, and the ledger file is the
 one place that says which. `contracts/README.md` → "Named gaps" carries the
 boundary: a named gap is allowed only while an open issue milestoned LATER
 than the release being cut owns the work, and never for a difference a teacher
@@ -567,6 +600,43 @@ can see at the current milestone. Softening the contract instead — an
 `appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
 — was rejected there and the reasoning is worth reading before proposing it
 again.
+
+**Since 2026-09-30 the ledger is the parity milestone's BURN-DOWN LIST**
+(Russell: no Windows release before parity, so an entry may name an open issue
+on "Windows: parity with mac v1.4.0" itself; `contracts/README.md` → "Named
+gaps"). Bundle 1 of the parity run widened it from two entries to every debt
+the suite could name, so that a red run means something again:
+
+| Area | What is held open | Wired into |
+|---|---|---|
+| `activityTrail.mustRecord` | 58 events this app does not declare yet, each against the issue carrying its mac piece | `ContractTests.SharedRules_ActivityTrailEvents_Exist` |
+| `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
+| `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
+| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` does not name (#345, #274, #239, #241) | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
+| `modelTiers.requirements` | 3 requirements no test here answers (#196, #262) | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
+| `sectionIndexPointer.dateCases` | the club front-page case (#274) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
+| `gradedFolders.newCourse.cases` | the declined-skeleton case (#250), the club case (#274) | `GradedFoldersNewCourseContractTests` |
+
+The event-to-issue mapping was made from each event's own `#` references in
+the contract, matched to the open `windows` issue that names that mac piece;
+where two issues could own one, the choice is the entry's to change. An entry
+goes when its issue lands, and the mend-check says so.
+
+**`AssistWording_MatchesContract` walks the file now (#157).** Every key of
+`assist-wording.json` → `wording` is resolved by reflection to a public static
+member of the same name (first letter upper-cased) on `AssistWording`, then on
+`ClassChangeWording`; a constant is compared WHOLE, and the methods keep their
+hand-written calls because their example values live in the file, not in a
+signature. In the other direction every member of `AssistWording` must have a
+key, except the three multi-destination sentences this app words differently
+(`WindowsOnlyWording` in the test, mend-checked both ways; owed on #165).
+REJECTED: resolving only against `AssistWording` (seven duplicate-and-copy
+sentences live in `ClassChangeWording` and would have been ledgered as absent
+while being said); a reverse check over `ClassChangeWording` too (it carries
+three helpers with no key by design, and the issue asked for the file to be
+the list, not for a second allow-list); searching the whole codebase for each
+sentence's text (a sentence built inline from pieces cannot be found by its
+text, and a text search would call a stale copy present).
 
 ## Driving the real interface
 
@@ -846,13 +916,19 @@ as work happens:
 - **The embedded preview** — WebView2, and the `127.0.0.1` question that was
   measured and found to be a no-op here.
 - **The assistant's own window**, the model running natively with Vulkan, and
-  the second door: `ClaudeCodeLauncher` writes an MCP configuration and starts
+  the OUTSIDE doors: `ClaudeCodeLauncher` writes an MCP configuration and starts
   `claude` with `--strict-mcp-config`, so a teacher's own servers are neither
-  used nor disturbed. See [the assistant](10-local-ai-assistant.md) for what
-  the assistant IS.
+  used nor disturbed. There are TWO of those doors on the mac since 2026-09-19
+  — "Revise with Claude…" and "Revise with Codex…" — and this app has only the
+  first; both are described as data in `contracts/app-rules.json` →
+  `outsideAgents`, which nothing here reads yet. See
+  [the assistant](10-local-ai-assistant.md) for what the assistant IS, and
+  [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
+  for what each door launches, what was measured and what was rejected.
 - **Window and state restoration**, archived courses, problem reporting, and
-  the `WorkLease` protocol that keeps two windows from building the same
-  section at once.
+  the `WorkLease` protocol that keeps two programs from building the same
+  course at once — since bundle 3 the mac's rules both ways, take-then-check
+  (09-mac-app → "On Windows since bundle 3 (#289)").
 - **What is built and what is missing.** Outstanding work is in [GitHub
   issues](https://github.com/russellgordon/plantoir/issues) labelled `windows`;
   the rest of this folder carries the reasoning behind past decisions.
@@ -900,7 +976,7 @@ What replaces the old container concepts:
   container name.** All three launchers still compute `$WORKDIR_ID` — the
   first 8 hex characters of SHA-256 over the folder's physical path (via
   `GetFinalPathNameByHandleW`, the same Win32 call as before) plus a
-  newline, matching the mac's `pwd -P | shasum -a 256` derivation. A
+  newline, matching the mac's `/bin/pwd -P | shasum -a 256` derivation. A
   `$CONTAINER_NAME = "teaching-quartz-$WORKDIR_ID"` variable is still
   assigned in each script for parity with the mac's naming scheme, but
   nothing native reads it — the real use of `$WORKDIR_ID` today is naming a
@@ -909,10 +985,105 @@ What replaces the old container concepts:
   entirely **out of the working folder**, because teachers keep working
   folders in OneDrive and a build's thousands of small files would sync and
   lock in place there.
+
+  **One folder, one spelling — what the mac learned, for Windows to KNOW
+  (GitHub #189, 2026-09-25).** The mac found that its launchers and its app
+  named one working folder two ways: bash's built-in `pwd -P` keeps the TYPED
+  case and Unicode form (é as one character or as e + accent), while the app
+  asked the disk — so a folder reached in the wrong case, or with an accented
+  name stored the Terminal way, had two containers and two builds folders
+  that cleared each other's builds. The fix there is `cd "$(/bin/pwd -P)"` in
+  each launcher and one Swift function (`FolderIdentity.canonicalPath`) used
+  for the hash AND every comparison of two folder paths; the reasoning is in
+  [03](03-launcher-scripts.md) → "One folder, one spelling" and
+  [09](09-mac-app.md) → "One folder, however it is spelled". **Windows has no
+  `pwd -P` to get wrong**: `GetFinalPathNameByHandleW` already returns the
+  disk's own casing, and NTFS is case-insensitive, so it is the Windows twin
+  of `/bin/pwd` and nothing needs to change on the strength of this note.
+  The trap, if a new derivation of a folder id or a new folder comparison is
+  ever written on that side: take the OS's own name for the folder, never the
+  string that was typed or passed on a command line — and use the same
+  function for the id and for the comparison, so they cannot disagree. (Git
+  Bash's and WSL's `pwd -P` are bash's built-in and keep the typed case.)
+  Whether the two already agree on one spelling is a check, not a change; the
+  `windows` issue opened with #189 asks for it.
+
+  **A remake never ends live work — what the mac learned, for Windows to KNOW
+  (GitHub #94, 2026-09-25).** The mac's launchers used to remove a folder's
+  container to remake it (after an update, for a new mount, for a stale
+  connection) without looking at what ran inside it, which killed an open
+  preview or a publish half-way through its upload. They now wait for a build
+  or publish, refuse while a preview whose launcher is still running is open,
+  and remove by id ([03](03-launcher-scripts.md) → "Before a workspace is
+  remade"). **Nothing is owed here**: Windows builds natively, so there is no
+  container to remake, and `contracts/app-rules.json` →
+  `previewPorts.whenTheWorkspaceIsInUse` and the `workspace was in use` trail
+  event are both `appliesOn: ["mac"]`, permanently. The trap, if Windows ever
+  gains something long-lived that is shared by a folder's runs and replaced
+  when it goes stale (a warm builder process, a per-folder server): look at
+  what is using it before replacing it, and tell a live user from an orphan by
+  whether the program that started it is still running — an orphan counted as
+  live refuses for ever.
+
+  **Work left behind by a program that closed is ENDED, not waited on — for
+  Windows to KNOW, and one thing to OWE (GitHub #378, 2026-09-29).** A
+  Revise with Claude session was closed while a deploy it had started sat at
+  a question inside the mac's container; every later preview waited ten
+  minutes and refused, until the Mac was restarted. The mac's launchers now
+  prove each piece of work's OWNER from the live process table (a launcher
+  whose own command line names the same course and section; never a
+  remembered pid), end work whose owner has gone with the remake's own stop,
+  name what they wait for in the status line (`PLANTOIR_WAITING_FOR:`), and
+  record `left-over work stopped` ([03](03-launcher-scripts.md) → "Work left
+  behind, and proving its owner has gone"). **None of that is owed here**:
+  no container, so nothing to wait for and nothing left inside one; the
+  contract block and both trail events are `appliesOn: ["mac"]`,
+  permanently, and no shared Python changed. **What IS owed** is the cause:
+  the mac's MCP deploys and rebuilds were not `--non-interactive`, so a
+  `deploy.py` question (a site name, the surname, a token) waited for ever on
+  a pseudo-terminal nobody read — `deploy.py`'s own header records the
+  Windows twin, a `python.exe` waiting 45 minutes at the site-name prompt.
+  `plantoir-mcp.exe`'s deploy and rebuild should pass `--non-interactive`
+  and turn exit 3 into `wording.deployNeedsAnAnswer` /
+  `deployNeedsAnAnswerAt` / `previewBuildNeedsAnAnswer`; the window's Deploy
+  must NOT (its dialog is the feature). The proposed contract case is
+  `assist-cases.json` → `scenarios` → "deploy with no section window open,
+  which meets a question". ([10](10-local-ai-assistant.md) → "A deploy from
+  another app refuses at a question".)
+
+  **A preview cannot start while its own section is being deployed — what
+  Windows OWES (GitHub #381, 2026-09-29).** Russell's decision 4 on #378: a
+  preview of a section cannot start AT ALL while that same section is being
+  deployed, whoever started the deploy. Unlike the remake above this is NOT
+  mac-only: `contracts/shared-rules.json` → `previewWhileItsSectionDeploys`
+  is `appliesOn: ["mac", "windows"]`, with one case per deployer. The mac
+  found two gaps by reading its code, and Windows should check for the same
+  two before assuming it has neither: (1) the window's preview asked other
+  PROGRAMS' work leases only, never this program's own publishes, so another
+  window of the app — or the in-app assistant's windowless deploy — deploying
+  the same section did not refuse; (2) `preview.sh` started by hand checked
+  nothing, and a bare `deploy.sh` writes no lease. The mac's fixes, to match
+  in rule and not in mechanism: a check at the top of the one function every
+  window preview goes through, reading the in-process publish record; and a
+  check in the launcher, on serving runs only and before anything is changed,
+  that reads the LIVE process table for `deploy C S` working in the same
+  folder or a deploy set for later of C/S. Three details that are easy to get
+  wrong: a `--build-only` run is NOT a deploy (it is also the assistant's
+  "rebuild the preview", and counting it refuses every preview with a false
+  sentence); a process table that cannot be read lets the preview THROUGH
+  (the opposite of the remake's rule, and why is in
+  [03](03-launcher-scripts.md) → "A section being deployed cannot be
+  previewed (#381)"); and never a remembered process id. Until it is done the
+  cases are a named gap against the `windows` issue opened with #381.
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
   base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket) and prints the exact "Preview will be available at:" line the
+  websocket — six blocks, where the mac launchers walk forty since GitHub
+  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
+  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
+  when it cannot"; whether its probe sees ANOTHER signed-in account's
+  listeners is the open question the mac answered for itself in #310 — the
+  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
   app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
@@ -967,7 +1138,10 @@ as history, not as what Windows does today.
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
 - **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131): base..base+3 for the preview
+  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
+  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
+  `build_site.py`'s own native re-probe already walks forty blocks from the
+  port it is given): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
@@ -1007,7 +1181,13 @@ as history, not as what Windows does today.
   `<CODE>_backup_<timestamp>.zip` (teacher-made backups),
   `<CODE>_<timestamp>.zip` / `<CODE>-sectionN_<timestamp>.zip`
   (archives from removals), `<timestamp>.zip` (the wizard's automatic
-  zips, never listed). Backups get their own sidebar group above
+  zips, never listed). The `<timestamp>` is `yyyy-MM-dd_HHmmss` in the
+  **Gregorian** calendar on every machine, which on this side is already
+  true by construction — `CourseArchiver.cs` writes and `ArchivedItem.cs`
+  parses with `CultureInfo.InvariantCulture`. The mac reached the same
+  place on 2026-09-10 ([issue #160](https://github.com/russellgordon/plantoir/issues/160));
+  the moment each name is read as is now contract data
+  (`contracts/course-management.json` → `zipNames`, the `moment` per case). Backups get their own sidebar group above
   Archived. Restoring a backup archives the current course FIRST, then
   replaces the course folder's CONTENTS in place — never the folder
   itself (see the Obsidian note below) — and keeps the zip. Deleting a
@@ -1026,6 +1206,39 @@ as history, not as what Windows does today.
 - **BuildKit, the image tag, and "the legacy builder corrupts a layer" are
   mac-only facts now** — Colima still needs them; native Windows has no
   image and no builder of any kind.
+
+### What each platform downloads and carries, like for like (mac #312)
+
+Since #312 the Mac app carries its own helper programs and the Linux
+virtual machine's starting disk, as Windows has always carried its runtime.
+Windows has nothing to DO about it (the contract key
+`app-rules.json → helperBootstrap` and the trail events "helper programs
+installed" and "website builder created" are `appliesOn: ["mac"]`); these are
+the two things it should KNOW. Mac figures measured 2026-09-26 on an M4 Pro;
+Windows figures are the v1.1.0 release assets.
+
+| | macOS v1.3.1 | macOS after #312 | Windows (v1.1.0, latest with an installer) |
+|---|---|---|---|
+| Installer | DMG 58.8 MB | DMG ~410 MB (LZMA; 410,488,446 B at the rehearsal) | PlantoirSetup.exe 235 MB; zip 398 MB |
+| Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
+| Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
+| Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
+| The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
+
+Bundle B's two rows are KNOW, not DO: Windows owes nothing for the warm-up
+or the image, because it downloads and builds nothing for building. (The
+bundle's brief assumed otherwise, from a stale line in `CLAUDE.md`, corrected
+the same day.)
+
+1. **The mac installer is now almost twice Windows'**, because the mac still
+   needs a Linux virtual machine and Windows does not.
+2. **The mac now checks every helper download against a pinned SHA-256**
+   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
+   Python, get-pip.py and the emoji font without checksums. It runs when the
+   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
+   rather than a defect — the Windows issue from #312 asks for it.
 
 ## Behaviours with platform-specific mechanics
 
@@ -1053,7 +1266,14 @@ as history, not as what Windows does today.
   way: resolve claims on the platform's restoration-complete signal
   rather than polling, and while a claim may still arrive show a quiet
   loading state, never the folder picker the claim is about to replace.
-  The scenario test suite in the macOS app is the porting spec. **The
+  The scenario test suite in the macOS app is the porting spec. **Since #311
+  the FOLDER comes back whatever happens to the window set** — the first
+  window reopens the last working folder (the one last in FRONT, not last
+  chosen), and a failed reopen says why in one sentence and is kept:
+  `contracts/shared-rules.json` → `reopeningTheLastWorkingFolder`, whose
+  `launchCases` and `folderCases` are the acceptance list; the reasoning is
+  in [`09-mac-app.md`](09-mac-app.md) → "Reopening on the last working
+  folder (#311)". **The
   other half of that — what a window lets GO of when it is pointed at a
   different folder** — is `contracts/shared-rules.json` →
   `workingFolderSelection`, and since 2026-09-19 all four of its cases run
@@ -1067,12 +1287,25 @@ as history, not as what Windows does today.
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
-- **Updates**: WinSparkle, with its own feed at `site/appcast-windows.xml`
-  alongside the mac's `site/appcast-macos.xml` — **per-platform file names from
-  the start**, so the two update feeds can never collide. (An earlier draft of
-  this line said the two would share one appcast; that is exactly the collision
-  the mac side asked to avoid. Deferred on both platforms until the first
-  release.)
+- **Updates** (#204): **NetSparkleUpdater**, not WinSparkle — corrected
+  2026-09-25, when the mac shipped Sparkle and the Windows half was drafted as
+  its own `windows` issue (milestone v1.4.0). NetSparkle reads the same feed
+  format and can run the per-user Inno installer silently
+  (`PrivilegesRequired=lowest`, so no administrator prompt — unlike a standard
+  account on a Mac). Its OWN feed, `https://plantoir.app/updates/windows.xml`
+  (never a GitHub release asset, never shared with the mac's
+  `updates/macos.xml`), signed with its OWN key, with NetSparkle's separate
+  `.signature` file beside it. What is owed is the promise, not the mechanism:
+  `contracts/shared-rules.json` → `appUpdates` (ask first; once a day; never
+  install while this app is publishing or building a preview, or a scheduled
+  publish of this install is running — Task Scheduler's run is the counterpart
+  of the mac's launchd one; never refuse a quit), and the eight trail events it
+  added to `activityTrail.mustRecord`. NetSparkle gathers the notes of every
+  newer release itself, so a skipped release's warning is not lost the way it
+  would be on the mac without the cumulative notes; each Windows item carries
+  only its own. The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
+  "Updating itself". (Earlier drafts of this line said WinSparkle with
+  `site/appcast-windows.xml`, and before that one shared appcast.)
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -1296,15 +1529,22 @@ fenced with `----` got a second block PREPENDED and the teacher's real
 frontmatter became body text on the student's site.
 
 One fence finder and one key matcher now serve the reader and every
-VISIBILITY writer — and that qualifier is load-bearing, because two other
-finders are still hand-rolled and were deliberately left alone:
-`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
-#140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), a
-`decision`) and `SectionAdder.FrontmatterLines` (strict on BOTH platforms, so
-the section carry agrees with itself — parity, not a divergence, and
-documented rather than filed). Four finders, two unified. Check which one you
-are looking at before "tidying" any of them.
+writer. Until 2026-09-30 two finders were hand-rolled and strict here:
+`CourseRestorer.FrontmatterBounds`, which a restore used — lenient on the mac
+since #140, so a restore reached different pages on the two platforms
+([issue #177](https://github.com/russellgordon/plantoir/issues/177), decided
+2026-09-19: adopt the shared finder) — and `SectionAdder.FrontmatterLines`,
+whose strictness was measured on the mac (#175) to PUBLISH a page hidden in
+section 1 into a newly added section. Parity bundle 2 removed
+`FrontmatterBounds` and pointed both at `PageVisibilityReader.FenceIndices`
+(#177/#308 with #182's carry-the-value-lines restore; #282 with the splice by
+line), and since the fix round a per-section key is named by ONE helper,
+`SectionAdder.PerSectionKey`, which accepts the quoted spelling too — see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK".
+`AssistWorkspace.BodyAfterFrontmatter` is still hand-rolled (it trims and
+accepts `...`); the #188 rule is what it should agree with if it is touched.
+Only `BodyAfterFrontmatter` is still its own finder here (the mac keeps
+several). Check which one you are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
 2026-09-19; the mac followed the same day.**
@@ -1382,9 +1622,23 @@ should mirror it:
   assembly the way the mac test uses `#filePath`). Include a guard that the
   scan actually found a plausible number of source files, so a moved folder
   fails loudly instead of passing vacuously.
+  **Mirrored on Windows 2026-09-30** as
+  `Plantoir.Tests/ActivityTrailWiringTests.cs`: every `ActivityTrail.Event`
+  member must be referenced as `Event.X` on a non-comment line of product
+  source (`windows-app/` minus the test projects and build output) other than
+  its `KeyFor` arm, with a floor of 100 files so a moved folder fails. One
+  event is written through a helper rather than `Note(Event.X, …)` —
+  `assistant asked`, by `ActivityTrail.NotePrompt` — and is listed with its
+  helper, which must itself be called. An event the contract names that this
+  app has not DECLARED is the other test's business
+  (`SharedRules_ActivityTrailEvents_Exist`, or a ledger entry), so together
+  they say: every event the contract asks of Windows is declared and
+  referenced, or ledgered by name. On the day it was written every declared
+  event was referenced.
 - **Its honest limit, so nobody oversells it**: the scan proves a call site
   EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
-  against a scratch store and counts its three lines. Full runtime coverage
+  and `noteHelpers(_:)` (split since #222, because the helpers line waits for
+  the programs to be asked) against a scratch store and counts the three lines. Full runtime coverage
   of every event would mean driving every feature in unit tests; REJECTED as
   disproportionate — the failure Windows actually shipped was
   zero-references, which the scan catches outright.
@@ -1394,7 +1648,9 @@ should mirror it:
   test target is app-hosted (`TEST_HOST`), so the host app writes its launch
   lines before any test-bundle code loads. Instead the redirect lives in the
   product (`ProblemReportStore.standard` returns a throwaway folder when
-  `XCTestConfigurationFilePath` is in the environment), and
+  XCTest is loaded in the process — `RealHome.isInsideTestBundle` since
+  #264; it read `XCTestConfigurationFilePath` from the environment before),
+  and
   `testTheSuiteWritesToAThrowawayTrail` pins it so a refactor cannot lose it
   silently. Worth a matching pin on Windows: one test asserting the trail
   path is the redirected one, so the module initializer's presence is itself
@@ -1484,7 +1740,10 @@ so all three are worth having before you write it.
 
 One more thing the mac learned here that is NOT about stubs. The app will not
 show a preview until the section's built `index.html` has CHANGED, and it
-waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2). A stub
+waits up to 120 seconds for that (mac: `waitForPreviewServer` phase 2 — which
+since 2026-09-20 also breaks out early when the run has announced its server
+and then gone quiet for 45 seconds, so the late arrival is now about 45 s
+rather than two minutes; the cap itself is unchanged). A stub
 that serves a site from anywhere other than the folder a real build writes into
 never trips the check, so the preview arrives two minutes late and the test
 times out first — which looks like the server never came up. The stub must
@@ -1703,10 +1962,15 @@ phrasing made a teacher the caller:
   against "writes the local model can reach". `make_room_for_classes` is
   MCP-only, so it was not in it — and it is the most far-reaching tool on the
   surface, renaming pages a teacher's links point at. Without the entry it
-  would have been the ONE card that ran with nothing shown first. The mac has
-  never had this hole because `AssistToolDefinition.planTwinName` DERIVES the
-  twin from the tool; a list has to be told. If you add a card phrasing, check
-  that map by hand.
+  would have been the ONE card that ran with nothing shown first. If you add a
+  card phrasing, check that map by hand. (This used to say the mac could not
+  have the hole because `planTwinName` DERIVES the twin. It had its own:
+  `add_curriculum_mentions` derived `plan_add_curriculum_mentions`, which does
+  not exist, so the mac's gate ran that write with no plan — reachable only by
+  a model naming a tool it was not offered, which the mac also did not refuse.
+  Both closed in #327: an explicit `irregularPlanTwins` map, and a refusal for
+  any tool the model was not offered — see doc 10, Part 6. `tools.planTwins`
+  now carries the pair.)
 - **A plan twin that returns a bare `string` cannot say it is a plan.** The
   mark is `_meta["plantoir.app/isPlan"]`, set only by `PlantoirTools.Proposing`,
   and `AssistAgent.ShowPlan` reads an unmarked answer as a REFUSAL: it prints
@@ -1717,7 +1981,12 @@ phrasing made a teacher the caller:
   read and never accept. `AssistSurfaceContractTests.EveryPlanTwinTheGateRunsCanSayItIsAPlan`
   now checks the RETURN TYPE of every twin the gate runs, which is the thing
   that makes the mark possible; it unwraps `Task<>`, since an async tool marks
-  just as well.
+  just as well. (The mac pins the same property by RUNNING every `plan_` tool
+  on a happy path, since its return type is always `AssistToolOutcome` — #150,
+  doc 10 → "A plan has to be able to SAY it is a plan". Since #150 the
+  contract also DECLARES "make room for a class at Unit 3, Day 4" in
+  `cardPhrasings.parsed`, so `InsertClassesTests`' local pin of the article
+  form can read the contract instead — optional, not owed.)
 - **A sentence written for a model becomes a sentence a teacher reads.**
   `explain_publishing`'s second answer said "Don't repeat it — carry on with
   what the teacher asked", which was harmless while a model was the only
@@ -1875,9 +2144,11 @@ below-floor tests; making either bound exclusive reddens
 **Part 2 of #161 is deliberately not done, and the issue stays open.** The mac
 turned these bounds into contract data — `contracts/course-management.json` →
 `zipNames` → `couldHaveBeenStamped`, ten cases plus the two bounds, and a
-`moment` on each recognised `zipNames` case — but that block lives only on the
-unmerged `issue/160-archive-stamp-calendar` branch. Nothing here touches that
-file. When it reaches `dev`, Windows runs the ten cases and pins both bounds
+`moment` on each recognised `zipNames` case. That block was on the unmerged
+`issue/160-archive-stamp-calendar` branch when this was written and **reached
+`dev` on 2026-09-19 with #160** (mac GUI row 498), so nothing blocks part 2 any
+more; nothing here touched that file either way. Windows now runs the ten cases
+and pins both bounds
 against `ArchiveStamp`, and `CouldHaveBeenStamped_BoundsAreTheOnesTheMacUses` —
 the one test here holding the literals, marked as such in its own comment —
 goes away. Take the `moment` apart with a Gregorian calendar and compare the
@@ -1912,9 +2183,20 @@ that test fails on a pair that is listed and has started arriving, so deleting
 it is not optional. Both halves of `add_next_class` now declare `duplicate`;
 the pair moved to `agreedExtras` with the binder reason, since the mac needs
 no such argument (its card and tool runner share a process). What the feature
-does, and the two places it is deliberately stricter than the mac, is in
-[`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which tools record an
-undo entry, and which deliberately do not".
+does is in [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "Which
+tools record an undo entry, and which deliberately do not".
+
+**The two places this was stricter than the mac are no longer two.** Both —
+the undo keyed on renames AND date moves, and the plan card counting the
+union of the two lists — were proposed from here as
+`contracts/class-planning.json` → `duplication` and implemented on the mac in
+[#163](https://github.com/russellgordon/plantoir/issues/163) on 2026-09-19,
+along with three faults that side found in the same path while doing it. Two
+of those three are faults Windows shares, and the same section says which and
+gives the construction that reaches them: the text comparison in
+`AssistWorkspace.ApplyDuplicateClass` does not stop a lesson being written
+over when the planner rewrote a link inside it, and the duplicate's refusal
+there leaves no line on the trail.
 
 **One thing to know before adding another card-only argument.**
 `add_next_class` IS one of the thirteen tools the local model routes to, so an
@@ -1951,6 +2233,178 @@ stayed green because its example says "two classes". A form one side supports
 and does not DECLARE is invisible to the other. If a family here accepts
 something the contract's `shape` does not spell out, that is a case to propose,
 not a detail to leave in the code.
+
+## Dates are written in the Gregorian calendar, by one helper (#144)
+
+Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
+from a cloud session on Linux (see "Working from a cloud session" in
+`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+The mac needs nothing from this and owes nothing back; it is written up here
+because the REASON is what a future reader of the C# needs, and the reason
+cannot be read off the code.
+
+**The fault.** `date.ToString("yyyy-MM-dd")` and `$"{date:yyyy-MM-dd}"` render
+the year in the current culture's DEFAULT CALENDAR. The `-` is a literal and
+is safe; the `yyyy` is not. On a Windows 11 PC whose regional format is Thai
+(default calendar Buddhist), 2026-09-09 renders as `2569-09-09`, measured in
+the issue; under `ar-SA` (Umm al-Qura) the same day is `1448-03-27`. Sixty-six
+sites in this app's product code formatted a date that way and none passed a
+culture. Most only DISPLAY a sentence — wrong once, and not corrupting. The
+ones that mattered WROTE:
+
+| Writer | What it wrote on a Thai PC | What read it back |
+|---|---|---|
+| `TimetableMemory.Write` | `"dates": ["2569-09-08", …]`, `"recorded": "2569-09-09"` | `TimetableMemory.Read`, which was ALREADY invariant — so every remembered class landed 543 years out, "when are my next classes?" answered from a list matching nothing, and `add_next_class` continued from a date no teacher gave it. Symmetric-looking, broken in one file, nothing reported |
+| `PageFrontmatter.SetCreated` and `AssistWorkspace.ClassSkeleton` | `created: 2569-09-09T07:00:00.000-0400` into every re-dated and every new class page | The build, which sorts and dates the site by it |
+| `ProblemReportStore.SaveRunTranscript` | the transcript's FILE NAME, `2569-09-19 120000 setup.ps1.txt`, and its "Started" line | `RunFilePaths` and `PruneRuns`, which sorted by name ordinally and deleted past twenty |
+| `ActivityTrail.Note`, `ProblemReportBuilder.Stamp` / `About`, `AssistWorkspace.ReleaseSite` | every trail timestamp, the report's folder name and "Made on" line, the released-marker stamp | A person reading a problem report |
+
+**A second column had the same fault.** The `:` in a custom format is the
+culture's TIME SEPARATOR, so a bare `HH:mm:ss` renders `14.15.30` on a
+Finnish or Danish machine. Every trail line and every transcript carried it.
+Found by the plan review, not by the issue.
+
+**The shape of the fix: one helper, `Plantoir.Core/Models/DateText.cs`**, and
+every product site goes through it — `Iso(DateOnly)` for the ISO day,
+`Stamp(DateTime)` for the trail's `yyyy-MM-dd HH:mm:ss`, `Invariant(…, format)`
+for the four other shapes that exist (`yyyy-MM-dd_HHmmss`, `yyyy-MM-dd HHmmss`,
+`yyyy-MM-dd 'at' HH.mm.ss`, `yyyy-MM-dd HH:mm:ss zzz`), and `TryReadDay` for
+the reader half. The issue proposed the name `Dates`; three classes
+(`TimetableMemory`, `ReDatePlan`, `ScheduleReading`) already have a `Dates`
+property, which shadowed the type inside exactly the files that needed it
+most, so it is `DateText`. The mac is immune by construction (`CalendarDay.text`
+is three integers through `String(format:)`) and this is how the C# reaches the
+same place. Two decisions inside the helper, both from the plan review:
+
+- **No `Iso(DateTime)`.** It would drop the time silently, and the next site
+  written as `DateText.Iso(DateTime.Now)` would be exactly the kind of call
+  that looks right and is not. A caller with a moment says which shape it
+  wants.
+- **`TryReadDay` is EXACT, not lenient.** A lenient invariant parse reads
+  `09/08/2026` as September the 8th — US order — while the cultural parse it
+  replaced read it as the 9th of August on a Canadian or British machine.
+  Switching the two `remember_timetable` readers to lenient-invariant would
+  have silently swapped day and month for those teachers. The tools ask for
+  `YYYY-MM-DD` by name and refuse anything else by name, so exact is what
+  they meant. (Under `ar-SA` the old bare parse did not misread the app's own
+  spelling; it FAILED outright, so every date was refused on such a machine.)
+
+**Two things the fix itself would have broken, and what was done about them.**
+A fixed writer beside an unchanged reader can be worse than the old state,
+and this piece had two of those:
+
+- **The runs folder becomes MIXED on every affected machine** — twenty old
+  transcripts named `2569-…` beside the new `2026-…` ones — and ordinally the
+  old names win, so `PruneRuns` would have kept the old twenty for ever and
+  deleted each new transcript on arrival, with the problem report showing the
+  twenty oldest runs and never the one being reported. The second comment on
+  the issue had judged this reachable only after a locale change; the fix
+  reaches it on day one. Both readers now order by the file's write time
+  (`File.GetLastWriteTimeUtc`, name descending as the tie-break), which has
+  no calendar. **This reverses a mac decision on purpose**: the mac's
+  `runFileURLs` (`ProblemReport.swift`) sorts by NAME so that "nothing a copy
+  or a restore from a backup could disturb" is involved. That reason does not
+  hold here, because this folder never travels — `ProblemReportStore.LogsDirectory`
+  is `%LOCALAPPDATA%\Plantoir\Logs`, not the working folder — while the
+  mixed-calendar folder is real on the day the fix lands. Two consequences
+  worth knowing: the order is by when a task FINISHED (the file is written
+  once, at the end), so a long preview started earlier lists above a short
+  task that ended after it; and a file deleted between the listing and the
+  sort reads as 1601-01-01 and drops to the bottom, harmless. Rejected:
+  skipping implausible names the way `ArchiveStamp` does — a name is only a
+  label here, and the write time is what "the last twenty tasks" means anyway.
+- **A timetable already remembered in the other calendar** is still on that
+  teacher's disk, and the invariant reader takes `2569-09-08` as the year
+  2569. `TimetableMemory.Read` now returns null — "not remembered" — when any
+  date is before `EarliestBelievable` (2000-01-01) or more than
+  `YearsAheadBelievable` (3) years past today, the same shape as
+  `ArchiveStamp`: a date that cannot be true does not get to decide anything.
+  The assistant asks for the timetable again, and the next `Write` replaces
+  the file with one it can read. **`Write` refuses the same list**
+  (`TimetableMemory.Unbelievable` is the one rule both consult), because the
+  implementation review found what a reader-only guard does: `remember_timetable`
+  saved the file, read it back for its reply, and dereferenced the null —
+  a crash after the write, where before there had been a working tool. The
+  two MCP tools and the section-schedule dialog now refuse first, naming the
+  date. The window is contract data since this piece —
+  `contracts/file-formats.json` → `sectionTimetable.believable` (the two
+  bounds and eight cases, run here by `DateTextTests`) — because a working
+  folder travels, so a file written by a pre-#144 Windows on a Thai PC can be
+  restored on a mac, whose `SectionTimetable` reads it just as invariantly;
+  the `mac` issue opened with this piece says so. The floor is 2000, not
+  `ArchiveStamp`'s 2025, because a teacher may keep last year's timetable;
+  it is still centuries clear of every wrong reading (2569, 1483, 1448). The
+  ceiling is three years, not two days, because future class dates are the
+  point of the file. **It leaves a trail line** — `remembered timetable set
+  aside`, `appliesOn: ["windows"]` in `shared-rules.json` → `activityTrail.mustRecord`,
+  carrying the date it refused — written by the reader, once per read of
+  such a file until the teacher answers and the file is replaced. Windows
+  only because only this app ever wrote such a file; the mac's guard, when
+  it adopts one, meets a file that arrived rather than one it wrote, and
+  can decide its own line then.
+
+**What is deliberately left in the machine's culture**, so nobody "fixes"
+it: `TaskScheduling.All` parses the `Next Run Time` column of `schtasks /Query
+/FO CSV` that Windows wrote in its own culture (since bundle 3 `Schedule`
+registers from XML with an invariant StartBoundary, so no date format is
+guessed any more) — that program
+accepts nothing else. `BackupItem.Subtitle` and `ArchivedItem.Subtitle` show
+a month by name to the teacher and say `CurrentCulture` out loud. Sentences
+of the shape `dddd d MMMM, h:mm tt` (no year) are read by a person in their
+language and carry nothing a calendar can shift. Worth knowing, not fixed:
+`/ST when.ToString("HH:mm")` in `TaskScheduling.Schedule` renders `14.15` on
+a Finnish machine, and whether `schtasks` takes that is unmeasured.
+
+**Five sites were left to `origin/issue/159-settle-the-day-once`**, the
+unmerged Windows branch from 2026-09-19 that `WINDOWS-PARITY.md` Phase 5
+step 1 says to take up as it stands: the model's dateline (`AssistAgent`
+:610), the "deploy tomorrow at" card's moment (:704), that card's reader
+(:815), and the two `DateTime.TryParse(when)` readers in `PlantoirTools`
+(`plan_scheduled_deploy`, `schedule_deploy`), which #159 routes through one
+reader, `ScheduledDeploy.ReadTheMoment`. Changing them here would have put
+the same lines in conflict for no gain. **The order matters**: once this
+piece is on `dev`, tool output the model reads is Gregorian while the
+dateline and the `when` readers are still cultural, so on a Thai PC a model
+echoing `2026-09-20 06:30` into `schedule_deploy` is refused as "already
+passed" (the cultural reader takes it as 1483). #159 merges first, or the two
+merge together; on a Gregorian machine neither order changes anything.
+**Whichever lands second needs one follow-up commit**: if #159 is already on
+`dev`, this branch's five `DeliberatelyCultural` entries excuse lines that
+no longer exist, and #159's `ReadTheMoment` carries a cultural FALLBACK that
+the source scan will flag — one entry to add, five to remove. (And #159's
+middle step, an invariant LENIENT parse, is the very `09/08/2026` month/day
+swap `TryReadDay` rejects; a comment on #159 says so.)
+
+**What keeps it fixed** is `DateTextTests`, and the two tests that matter are
+not the ones about the helper:
+
+- `NoProductSourceRendersOrReadsAYearInTheMachinesCalendar` walks every `.cs`
+  under `Plantoir.Core`, `Plantoir.Mcp` and `Plantoir` (never `bin/` or
+  `obj/`, never a `//` line) and fails on any line that renders a year
+  (`ToString("…yyyy`, `{x:yyyy…}`, `.ToString(format)`) or parses a date
+  (`DateTime`/`DateOnly`/`DateTimeOffset` `.Parse`/`.TryParse`/`…Exact(`)
+  without `InvariantCulture` or an explicit `CurrentCulture` on the same line,
+  or `string.Create(CultureInfo.InvariantCulture, …)` on the line before
+  (#159's shape). `DeliberatelyCultural` excuses one line per entry, by file
+  name and a substring of the line, with the reason; the five #159 lines are
+  in it until that branch lands, when its `ReadTheMoment` will want an entry
+  of its own for its cultural FALLBACK. Its blind spot is a format passed
+  through a variable, which is why `TaskScheduling`'s `when.ToString(format)`
+  is matched by name. Three more, none with a site today: a second bare
+  `yyyy` on a line that also says `InvariantCulture` gets through; the line
+  after a `string.Create(CultureInfo.InvariantCulture, …)` is skipped
+  whatever it holds; and `{x:MMMM d, yyyy}` is missed because the pattern
+  wants `yyyy` right after the colon. A bare `{date}`, `ToString("d")` or
+  `ToShortDateString()` is not scanned at all, and the greps found none.
+- `EveryExcuseStillExcusesALineThatExists` fails the moment an entry matches
+  nothing, so a dead excuse cannot one day excuse a new site by accident. The
+  #159 entries are exempt from it, for the reason above.
+- Every culture test FIRST asserts that the bare rendering really does shift
+  under the swapped culture on this machine (`2569` under `th-TH`, `14.15.30`
+  under `fi-FI`). A machine running with invariant globalization would
+  otherwise pass every assertion while proving nothing. Measured on Linux
+  with ICU 74 and on Windows 11 alike: `new CultureInfo("th-TH")` has the
+  Buddhist calendar as its default on both.
 
 ## What a window lets go of when its working folder changes
 

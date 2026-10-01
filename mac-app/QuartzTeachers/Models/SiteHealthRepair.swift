@@ -398,6 +398,17 @@ enum SiteHealthRepair {
     static func repair(
         _ findings: [SiteHealthFinding], in course: Course
     ) -> [Attempt] {
+        // A course kept for reference is FROZEN, and a repair CREATES files
+        // inside it — a Media folder, a section's front page. The directories
+        // are deliberately left unlocked so the preview can work, so those
+        // writes would SUCCEED. Nothing here is refused by the lock; it is
+        // refused here.
+        //
+        // No attempts rather than failed ones: an attempt that failed says
+        // Plantoir tried and could not, and it did not try.
+        if course.isKeptForReference {
+            return []
+        }
         var attempts: [Attempt] = []
         for finding in findings where canRepair(finding) {
             switch finding.name {
@@ -465,6 +476,9 @@ enum SiteHealthRepair {
     /// course gets — the pictures themselves are the teacher's and cannot be
     /// conjured back.
     static func restoreMediaFolder(in course: Course) -> Bool {
+        if course.isKeptForReference {
+            return false
+        }
         let url: URL = course.directoryURL.appendingPathComponent("Media")
         if FileManager.default.fileExists(atPath: url.path) {
             return false
@@ -490,6 +504,9 @@ enum SiteHealthRepair {
     /// inventing content for it would be putting words in their mouth. What it
     /// must have is a title, or the site shows the file name.
     static func restoreSectionIndex(forSection sectionNumber: Int, in course: Course) -> Bool {
+        if course.isKeptForReference {
+            return false
+        }
         // A finding's section number is parsed from the build's output and
         // falls back to 0 when it is missing or the wrong type. Creating a
         // `section0` folder because a line was malformed would be inventing

@@ -12,7 +12,8 @@ namespace Plantoir.Tests;
 /// <c>scripts/deploy.py</c>'s <c>rebuild_for_production</c> and
 /// <c>ensure_base_url_and_rebuild</c>, and <c>deploy.ps1</c>'s
 /// <c>--to-folder</c> branch, which shells <c>preview.bat --build-only</c>).
-/// Fifteen test files cover them. <c>verify.sh</c> runs all fifteen on the mac.
+/// The runner DISCOVERS the <c>scripts/test_*.py</c> files rather than naming a
+/// count (55 on 2026-09-30); <c>verify.sh</c> runs the same files on the mac.
 /// Until this class, Windows ran NONE of them — <c>verify.sh</c> is bash and
 /// expects <c>docker</c> on PATH, so it does not run here, and nothing replaced
 /// it. A shared file could be broken from this machine and every gate on this
@@ -36,7 +37,7 @@ namespace Plantoir.Tests;
 /// environment variable any of them sets (<c>PLANTOIR_BUILD_ROOT</c>, in
 /// <c>test_deploy_course_dir_resolution.py</c>) is set inside the CHILD, so it
 /// cannot reach this process. xUnit also serialises the cases within a class,
-/// so the fifteen never run concurrently with each other. Written down because
+/// so the files never run concurrently with each other. Written down because
 /// it is not obvious, and the next person to review this will otherwise spend
 /// an hour re-deriving it.</para>
 ///

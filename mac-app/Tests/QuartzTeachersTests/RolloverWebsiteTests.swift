@@ -258,6 +258,51 @@ final class RolloverWebsiteTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: live.path))
     }
 
+    /// A rollover sets aside the published-pages record, whichever website
+    /// answer is given, and taking the rollover back brings it back (#379,
+    /// plan review finding 12): a new year's site has published nothing yet.
+    @MainActor
+    func testARolloverSetsAsideThePublishedPagesRecordAndUndoBringsItBack() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder: URL = PublishedPagesRecord.folderURL(courseDirectory: course.directoryURL, section: 1)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fragment: URL = folder.appendingPathComponent("20260601T120000Z-netlify.json")
+        try "{\"places\": [\"Concepts/Worksheet\"]}".write(to: fragment, atomically: true, encoding: .utf8)
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), ["Concepts/Worksheet"])
+
+        _ = await reDate(runner, course: course, arguments: ["rollover": "yes", "website": "same"])
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), [],
+                       "Keeping last year's website must still start this year's record empty")
+
+        _ = await runTool(runner, course: course, arguments: [:], tool: "undo_last_change")
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), ["Concepts/Worksheet"],
+                       "Taking the rollover back must bring the record back")
+    }
+
+    /// A rollover whose pages are already on their days moves nothing — and
+    /// still sets the record aside, as its own change that undo takes back
+    /// (the `already` path; implementation review, N11).
+    @MainActor
+    func testARolloverThatMovesNothingStillSetsTheRecordAside() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // First rollover: pages move onto their days.
+        _ = await reDate(runner, course: course, arguments: ["rollover": "yes", "website": "same"])
+        let folder: URL = PublishedPagesRecord.folderURL(courseDirectory: course.directoryURL, section: 1)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "{\"places\": [\"Concepts/Worksheet\"]}".write(
+            to: folder.appendingPathComponent("20260901T120000Z-folder.json"), atomically: true, encoding: .utf8
+        )
+        // Second rollover: nothing moves.
+        let said: String = await reDate(runner, course: course, arguments: ["rollover": "yes", "website": "same"])
+        XCTAssertTrue(said.contains(AssistWording.everyPageIsAlreadyOnItsDay(course: course.code, section: 1)),
+                      "The second rollover should have moved nothing: \(said)")
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), [])
+        _ = await runTool(runner, course: course, arguments: [:], tool: "undo_last_change")
+        XCTAssertEqual(PublishedPagesRecord.places(courseDirectory: course.directoryURL, section: 1), ["Concepts/Worksheet"])
+    }
+
     /// Answering "a new website" cuts the section loose and names where last
     /// year's details went.
     @MainActor
@@ -302,8 +347,14 @@ final class RolloverWebsiteTests: XCTestCase {
         let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1)
-        try "<plist/>".write(to: plistURL, atomically: true, encoding: .utf8)
+        // A REAL agent rather than the `<plist/>` stub this used to write.
+        // Since 2026-09-20 the rollover asks each agent WHICH WORKING FOLDER
+        // it belongs to, so a file that says nothing is a file that belongs to
+        // nobody — see `testARolloverNeverTouchesAnotherFoldersScheduledDeploy`.
+        let plistURL: URL = ScheduledDeploy.plistURL(courseCode: course.code, sectionNumber: 1, inWorkingFolder: root)
+        try RolloverWebsiteTests.writeAgent(
+            courseCode: course.code, sectionNumber: 1, workingFolder: root, at: plistURL
+        )
 
         let said: String = await reDate(
             runner, course: course, arguments: ["rollover": "yes", "website": "new"]
@@ -317,6 +368,74 @@ final class RolloverWebsiteTests: XCTestCase {
             FileManager.default.fileExists(atPath: plistURL.path),
             "The scheduled publish must actually be gone, not just described as gone."
         )
+    }
+
+    /// Rolling a section over in ONE working folder must not destroy another
+    /// folder's live scheduled deploy.
+    ///
+    /// **The case the rest of issue #236 was written for, in the one cancel
+    /// path its first pass missed.** An agent's label was the course code and
+    /// the section number and nothing else until #237, so `plistURL` named one
+    /// file per code and section for the whole Mac — which is why the other
+    /// folder's job below carries that old label. A teacher holding last year's
+    /// working folder and this year's, both with ICS3U section 1, with the
+    /// live deploy in LAST year's, used to roll section 1 over in this year's
+    /// and have the other folder's deploy deleted — and be told it had been
+    /// turned off. Nothing ran the contract sentence that forbade it, so the
+    /// sentence read as true and was false.
+    @MainActor
+    func testARolloverNeverTouchesAnotherFoldersScheduledDeploy() async throws {
+        let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let otherFolder: URL = root.deletingLastPathComponent()
+            .appendingPathComponent("last-years-working-folder-\(UUID().uuidString)")
+        // Under the label every release before #237 wrote — the one name a
+        // section had for the whole Mac, and so the one another folder's job
+        // could share with this folder's. A job of the other folder's under
+        // today's label could not be confused by name at all.
+        let plistURL: URL = ScheduledDeploy.plistURL(
+            label: ScheduledDeploy.legacyAgentLabel(courseCode: course.code, sectionNumber: 1)
+        )
+        try RolloverWebsiteTests.writeAgent(
+            courseCode: course.code, sectionNumber: 1, workingFolder: otherFolder, at: plistURL
+        )
+
+        let said: String = await reDate(
+            runner, course: course, arguments: ["rollover": "yes", "website": "new"]
+        )
+
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: plistURL.path),
+            "The OTHER working folder's live scheduled deploy was destroyed by a rollover here."
+        )
+        XCTAssertFalse(
+            said.contains(AssistWording.rolloverTurnedOffTheScheduledPublish),
+            "Nothing of this folder's was turned off, so nothing may say it was: \(said)"
+        )
+    }
+
+    /// One agent on disk, in the shape every release since v1.0.0 writes.
+    static func writeAgent(
+        courseCode: String, sectionNumber: Int, workingFolder: URL, at plistURL: URL
+    ) throws {
+        let plist: [String: Any] = [
+            // The label the file is named for, as every plist of ours is.
+            "Label": plistURL.deletingPathExtension().lastPathComponent,
+            "WorkingDirectory": workingFolder.path,
+            "ProgramArguments": [
+                "/Applications/Plantoir.app/Contents/MacOS/Plantoir",
+                ScheduledDeploy.runFlag,
+                "/tmp/scheduled.sh",
+                ScheduledDeploy.sectionFlag,
+                workingFolder.path,
+                courseCode,
+                String(sectionNumber),
+            ],
+        ]
+        try PropertyListSerialization.data(
+            fromPropertyList: plist, format: .xml, options: 0
+        ).write(to: plistURL)
     }
 
     /// A section with no scheduled publish is told nothing about one.
@@ -655,46 +774,13 @@ final class RolloverWebsiteTests: XCTestCase {
 
 
     /// A section with class dates on file and one page sitting on the wrong
-    /// day, built on the shared fixture so the course, its settings and its
-    /// site marker are the ones every other assistant test uses.
+    /// day — the shared fixture, which the card-argument walk uses too (#150).
     @MainActor
     private func makeSectionNeedingReDating(
         withMarker: Bool = false
     ) throws -> (root: URL, course: Course, runner: AssistToolRunner) {
-        let made = try AssistFixture.makeRunner(hasDeployedBefore: withMarker)
-
-        // Point scheduled-publish lookups at a throwaway folder. Without this
-        // `plistURL` resolves to the REAL ~/Library/LaunchAgents, and the
-        // fixture's course is ICS3U — a course a teacher plausibly has
-        // scheduled — so a test could boot out and delete their agent.
-        let agentsDirectory: URL = made.root.appendingPathComponent("LaunchAgents")
-        try FileManager.default.createDirectory(
-            at: agentsDirectory, withIntermediateDirectories: true
-        )
-        ScheduledDeploy.launchAgentsDirectoryOverride = agentsDirectory
-        addTeardownBlock {
-            MainActor.assumeIsolated { ScheduledDeploy.launchAgentsDirectoryOverride = nil }
-        }
-
-        let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
-            dates: ["2026-09-08", "2026-09-10"], source: "timetable.xlsx, block H",
-            forSection: 1, in: made.course
-        )
-        try SectionTimetableStore.applyRememberTimetable(plan)
-
-        // Dated a day the section does not meet, so a re-date has something
-        // real to move and does not stop at "already on the right day".
-        let classesURL: URL = made.course.directoryURL
-            .appendingPathComponent("section1/All Classes")
-        try """
-        ---
-        title: Unit 1, Day 1
-        date: 2020-01-15
-        ---
-        Something to move.
-        """.write(
-            to: classesURL.appendingPathComponent("Unit 1, Day 1.md"),
-            atomically: true, encoding: .utf8
+        let made: AssistFixture.Made = try AssistFixture.makeSectionNeedingReDating(
+            withMarker: withMarker, for: self
         )
         return (made.root, made.course, made.runner)
     }

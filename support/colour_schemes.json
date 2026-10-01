@@ -1,7 +1,7 @@
 [
    {
       "id":"quartz-standard",
-      "name":"Quartz Standard Colours",
+      "name":"Standard Colours",
       "colors":{
          "lightMode":{
             "light":"#faf8f8",

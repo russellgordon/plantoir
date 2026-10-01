@@ -185,7 +185,105 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 3: the trail, leases, scheduled deploys and quit (2026-09-30)
+
+Branch `issue/bundle3-trail-leases`. The scheduled deploy is Plantoir now, not a
+baked PowerShell script, and every rule decided at its moment lives there.
+
+- **The trail keeps every line** (#303): a named mutex round each append.
+  Measured two processes × 500 lines: 4,444 of 5,000 kept before, 5,000 after;
+  the share-flag fix alone kept 4,512 and was rejected.
+- **Leases both ways, take-then-check** (#289): another program's build,
+  publish OR preview declines a build (never a write); Deploy claims before it
+  stops the preview; `plantoir-mcp` stops its own launcher before leaving.
+  `workLeases.declining` (29), `.liveness` (17 of 19), `workLease.bodyCases` (7).
+- **A scheduled task runs `Plantoir.exe --run-scheduled-deploy "<name>"`**
+  (#347): the lateness window (#239), a ten-minute wait for the course (#289),
+  whether it still stands, the settings as they are now, then the wrapper.
+  Verified end to end through the real Task Scheduler on this PC. Old tasks
+  drain. `theDestination` (11 of 12), `howLateIsTooLate` (10),
+  `storedValueCases` (7), `savingSettings.scheduledDeploys` (5).
+- **One task per section per working folder** (#309), found by the folder its
+  job names; records filed under the folder id.
+- **Removing a course turns its deploys off FIRST** (#239), asked of the
+  scheduler, this folder only; the contract's sentences.
+- **A failed build is `buildDidNotFinish`** (#297); `whichKind` (6) through the
+  real wrapper.
+- **The notice arrives while the section is open** (#218): one app-wide
+  watcher; records moved in whole (40 of 40 readable at the first event,
+  against 18–21 of 40 written in place).
+- **Quitting asks** before leaving a publish or preview build (#231), never on
+  a log-off; the WSL release is hardened (leases, a launcher scan, docker must
+  answer, System32 paths). Both `appliesOn: ["mac"]` keys deleted.
+- **Every destination named** (#400, #404); the unpublished-classes note gone.
+
+Not built: #324 (clicking the toast — the toast itself, #212's Windows half, is
+first). Manuals: doc 07 → "On Windows since bundle 3"; doc 09 → "On Windows
+since bundle 3 (#289)" and "(#231)"; doc 09 → "On Windows: a sharing violation".
+
+## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
+
+Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's
+frontmatter now finds the block the way the build does and takes a key's whole
+value with it; every link reader and rewriter shares one definition of code.
+
+- **Dates are Gregorian whatever the PC's region** (#144): `DateText`, taken
+  from the cloud branch `claude/nifty-mendel-q8ixto` (cherry-picked, not
+  re-derived).
+- **One fence rule, asymmetric** (#308/#188): the closing fence is column-0
+  dashes only; the opening may be indented. **One `ReplaceKeyLine`** (#284) for
+  `SetTitle`, `SetCreated` and the section copy and scaffold. **No key goes
+  where the block has no column-0 place for it** (#186): `SetDraft` and
+  `SetCreated` answer `NoRoomForAKey`. *Not yet*: the plan, re-date and
+  make-room callers naming the declined pages (four wording keys still ledgered
+  on #308).
+- **Adding a section** (#282) finds `----`, a blank line before the fence and a
+  trailing space, splices by line, keeps CR LF, and records `section added`.
+- **Restoring a section** (#177/#182) uses the shared finder, carries each key
+  WITH its lines, and counts and says the pages it had no room on.
+- **Duplicating a class** (#200): a forced-hidden copy can be published again
+  (B), the guard asks what the insertion created (A), the refusal admits other
+  classes may have moved (C); the plan card warns the undo will not help (#346).
+- **Renaming the word for a unit** (#158): Course Settings → Rename…, the whole
+  feature, off the UI thread. The sheet is compiled, not driven.
+- **Links** (#339/#318/#338): `MarkdownCode` (0 disagreements with
+  `markdown_code.py` over 12,490 pages), escaped pipes, angle-bracket links in a
+  folder rename.
+- **The unreadable front page gets its own card** (#300).
+
+Contract lists run here for the first time: `datesAndTitles.writingCases` (16),
+`sectionNumbers.addingKeysToAPage` (8), `backups.restoringOneSectionsKeys` (6),
+`readingALink.cases` (52), `renamingTheUnitWord.cases` + `.linkCases` (7 + 6).
+
+## Parity run, bundle 1: red means something again (2026-09-30)
+
+The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
+every red mapped to an open issue (`plantoir-windows-run\logs\baseline-red-list.md`
+on Russell's machine). Bundle 1 (branch `issue/bundle1-plumbing`) was plumbing,
+so that "did I break something?" has an answer again:
+
+- **`NamedGapLedger` is the parity milestone's burn-down list** — 58 trail
+  events, 140 wording keys, 7 config keys, 3 model requirements and 3 contract
+  cases held open BY NAME against their issues; `documentation/12-windows-app.md`
+  → "Named gaps" has the table. A green totals line now means "green with the
+  debts the ledger names", and the ledger fails the day one is paid.
+- **`AssistWording_MatchesContract` walks `assist-wording.json`** by reflection
+  in both directions (#157); still red on `deployApproval` alone, which #193 owns.
+- **`ActivityTrailWiringTests`** is the source scan the mac has: every declared
+  event must have a call site. All do; `assistant asked` is written by
+  `NotePrompt`, and the scan knows that.
+- **`PLANTOIR_DATED:`** is hidden from the console and recorded on the trail,
+  from the console and from a scheduled publish's record (#279).
+- **A payload course gets its manifest's marks pool** (#317).
+- **Five shared Python test files that failed on Windows pass or skip with a
+  reason** — one was a real shared bug (`build_site._is_draft` did not read
+  CR LF, and the native build writes CR LF copies).
+
 ## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
+
+> **Superseded 2026-09-30:** `ActivityTrailWiringTests` now checks this on
+> every run, including `AssistantAsked`'s helper; the paragraph below is kept
+> as the history of why the scan exists.
 
 `ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
@@ -294,6 +392,28 @@ days after the log passed 250.
 this app's source from the mac, read rather than run — `dotnet` is not
 installed there — so treat it as a starting point, and report anything it gets
 wrong in a `mac` issue.
+
+## Work done from a cloud (Linux) session — 2026-09-27
+
+The first piece of this port built off the Windows PC: [#144](https://github.com/russellgordon/plantoir/issues/144),
+in a Claude Code cloud session (Ubuntu 24.04, no Windows App SDK). What that
+kind of session can do, measured on the day and written for the next one in
+[`WINDOWS-DIRECTOR-PROMPT.md`](../WINDOWS-DIRECTOR-PROMPT.md) → "Working from a
+cloud session":
+
+- `Plantoir.Core`, `Plantoir.Mcp`, `PtyDriver` and `Plantoir.Tests` build and
+  run on Linux with the .NET 10 SDK (Microsoft's apt repository no longer
+  carries 9.0) plus the .NET 9 runtime from `dotnet-install.sh`. `Plantoir/`
+  (WinUI 3) and `Plantoir.UiTests` do not build there at all.
+- `dotnet test` on Linux: **1538 tests, 111 red before the change** — every
+  red one either a Windows path (`C:\Users\…` expected, `CreateFileW` in
+  `FolderContainers`) or a handover the parity plan already lists. The gate
+  for a cloud session is therefore **"no NEW red"**, judged by diffing the
+  failing-test list before and after, not by the totals line alone.
+- The WinUI project's edits (#144: one line in `App.xaml.cs`, one line plus a
+  refusal block in `SectionScheduleDialog.cs`) were NOT compiled. The first
+  `dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64` on the PC
+  is the check, and "PT - Dev" is stale until then.
 
 ## Known rough edges for the next session
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 # Twice the widest the page ever draws each kind of shot, so a Retina screen
 # still gets a pixel per pixel and nobody downloads more than that.

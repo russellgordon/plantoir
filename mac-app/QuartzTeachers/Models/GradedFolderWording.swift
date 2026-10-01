@@ -44,13 +44,33 @@ enum GradedFolderWording {
     /// over Windows' — it is the closer match to `SpecialFoldersHelpView`'s
     /// already-pinned "Work that counts for marks".
     ///
-    /// **Look before changing it.** `MembershipToggleListView` puts this
-    /// title into the trail line a teacher's blocked untick leaves behind, and
-    /// on Windows it is built into every marks checkbox's automation id.
+    /// **Look before changing it.** On Windows it is built into every marks
+    /// checkbox's automation id. (It no longer reaches the trail: since #171
+    /// a blocked untick's line calls this "the marks list", in Windows' words
+    /// — see `RemovalTrail`.)
     nonisolated static let listTitle: String =
         "Folders whose work counts for marks"
 
     /// The caption below the list.
     nonisolated static let caption: String =
         "Tick the folders holding work that counts for marks. The curriculum coverage map shows an expectation as evaluated when a page in one of these addresses it. Most courses keep “Tasks”; tick “Tests” or anything else you mark."
+
+    /// The same caption in the New Course panel while "This is a club" is
+    /// ticked (#368, review N3): a club starts without a coverage map, so
+    /// the course caption's map and "Most courses keep Tasks" do not apply.
+    /// `contracts/shared-rules.json` → `wizard.clubToggle.gradedFolderCaption`.
+    /// Kept HERE, beside the course's, because the marks wording has one home
+    /// (`testBothSurfacesDrawTheMarksWordingFromOneHome`).
+    nonisolated static let clubCaption: String =
+        "Tick the folders holding work that counts for marks. A club starts without a curriculum coverage map, so these matter only if the coverage page is turned on later in Course Settings."
+
+    // MARK: - Functions
+
+    /// The caption for what the wizard is making — the tick box decides.
+    nonisolated static func captionFor(isClub: Bool) -> String {
+        if isClub {
+            return clubCaption
+        }
+        return caption
+    }
 }

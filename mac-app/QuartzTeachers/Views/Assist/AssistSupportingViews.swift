@@ -4,13 +4,17 @@ import SwiftUI
 /// What the assistant tells a teacher it is good at — kept on screen for
 /// the whole conversation, not just at the start.
 ///
-/// These twelve are not decoration. They are measured — the routing suite
+/// These nineteen are not decoration. They are measured — the routing suite
 /// probes them word for word — and most are matched in code rather than
 /// routed, precisely so that what the window promises is what the window
 /// delivers. A card offering something the assistant is unreliable at is worse
 /// than a card with nothing on it: "What would publishing Unit 3, Day 1
 /// change?" was removed for exactly that reason, having gone to the wrong tool
 /// on both models ten times out of ten.
+///
+/// (It said "twelve" until 2026-09-19, from a shelf that had grown by seven
+/// without the sentence being re-counted. Count the list rather than trusting
+/// a number here, and correct it when you do.)
 ///
 /// **Two tests, and a card has to pass both.** It sat at nine for a while and
 /// was missing things the assistant could genuinely do, so nobody was told
@@ -26,19 +30,31 @@ import SwiftUI
 ///    see a page than the two windows already in front of them.
 ///
 /// The second test is the one that keeps this a list rather than an inventory.
-/// The tool surface is thirteen; the shelf is twelve of a different set, and
+/// The tool surface is thirteen; the shelf is nineteen of a different set, and
 /// the gap is deliberate.
+///
+/// **Sixteen of the nineteen are answered in code and three reach the model**,
+/// measured 2026-09-18 and changed by one on 2026-09-19: "Deploy at 6:30 AM"
+/// was among the four that reached it, and the smaller assistant answered it
+/// with an immediate deploy ten trials out of ten — so it became a parsed
+/// family in `AssistCardCommand` instead (issue #168). Which card is which is
+/// pinned by `AssistPromptShelfTests`, not by this comment.
 ///
 /// **Why it stays, and why it folds.** It used to appear only while the
 /// conversation was empty, which meant the teacher saw the list once, at the
 /// moment they knew least about what to do with it, and never again. But a
 /// list this long sitting open would push the conversation off the screen it
 /// belongs on. So each kind of request is a disclosure group, shut by
-/// default: four short lines a teacher can scan, and open when they want
+/// default: five short lines a teacher can scan, and open when they want
 /// reminding.
 struct AssistPromptShelfView: View {
 
     // MARK: - Stored properties
+
+    /// What this shelf offers: `groups` for an ordinary course, a club's own
+    /// list for a course whose pages carry one number (#267) — see
+    /// `groups(naming:noun:)`.
+    let offered: [(String, [String])]
 
     /// Called with the phrasing the teacher chose, verbatim — the wording
     /// matters, so nothing paraphrases it on the way through.
@@ -57,7 +73,7 @@ struct AssistPromptShelfView: View {
     /// Stored as one string because `@AppStorage` holds no sets. Group titles
     /// contain no `|`, so it is a safe separator; a title that ever does will
     /// simply be forgotten rather than corrupting the rest.
-    @AppStorage("AssistPromptShelfOpenGroups") private var openGroupsRaw: String = ""
+    @AppStorage("AssistPromptShelfOpenGroups", store: PlantoirDefaults.shared) private var openGroupsRaw: String = ""
 
     /// How tall the groups actually are, measured.
     @State private var contentHeight: CGFloat = 0
@@ -108,7 +124,10 @@ struct AssistPromptShelfView: View {
             ("Making pages visible", [
                 // No "and everything it links to" any more: publishing a page
                 // publishes what it links to by rule, so the short phrasing is
-                // the true one.
+                // the true one. Still true since #173 — the reach now stops at
+                // another CLASS page, which makes the short phrasing more
+                // accurate rather than less: a teacher who typed "and
+                // everything it links to" would be promised more than they get.
                 "Publish Unit 2, Day 3",
                 "Publish tomorrow's class",
                 // Reads the way a teacher says it, and — unlike the earlier
@@ -174,6 +193,7 @@ struct AssistPromptShelfView: View {
             ]),
     ]
 
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             // Says what tapping one DOES. Without it a teacher either never
@@ -198,7 +218,7 @@ struct AssistPromptShelfView: View {
             // what makes four closed lines occupy four lines.
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(AssistPromptShelfView.groups, id: \.0) { group in
+                    ForEach(offered, id: \.0) { group in
                         DisclosureGroup(isExpanded: binding(for: group.0)) {
                             VStack(alignment: .leading, spacing: 4) {
                                 ForEach(group.1, id: \.self) { phrasing in
@@ -255,7 +275,65 @@ struct AssistPromptShelfView: View {
         .background(.bar)
     }
 
+    // MARK: - Initializer
+
+    init(groups: [(String, [String])] = AssistPromptShelfView.groups, choose: @escaping (String) -> Void) {
+        self.offered = groups
+        self.choose = choose
+    }
+
     // MARK: - Functions
+
+    /// The shelf for one course.
+    ///
+    /// An ordinary course gets `groups`, unchanged. A course whose pages carry
+    /// ONE number — a club's "Week 3" (#267) — gets a list of its own, in its
+    /// own noun and with its own page names, because most of `groups` is about
+    /// units and days it does not have: "Publish Unit 5", "Start a new unit",
+    /// "Add five more days to Unit 4" would each be refused there.
+    ///
+    /// **Every card on it is matched in code** (`AssistCardCommand`), so it
+    /// promises nothing a model was never measured on. That is why the club
+    /// shelf has no "Publish Week 2": publishing one page by its title goes to
+    /// the model, and no routing measurement has been made in a club course.
+    /// "Duplicate Week 2 as my next meeting" carries a title too, but its frame
+    /// is parsed in code, the title lifted out rather than read by a model.
+    static func groups(naming: ClassPageNaming, noun: ClassNoun) -> [(String, [String])] {
+        if !naming.isNumbered {
+            return AssistPromptShelfView.groups
+        }
+        let one: String = noun.singular
+        let many: String = noun.plural
+        let second: String = naming.title(unit: 1, day: 2)
+        let third: String = naming.title(unit: 1, day: 3)
+        return [
+            ("Making pages visible", [
+                "Publish tomorrow's \(one)",
+                "Publish Monday's \(one)",
+            ]),
+            ("Taking it back", [
+                "Undo that",
+            ]),
+            ("Checking", [
+                "What would students see in this section right now?",
+                "Preview",
+            ]),
+            ("Planning \(many)", [
+                "Add the next \(one) page",
+                "Duplicate \(second) as my next \(one)",
+                "Make room for one \(one) at \(third)",
+                "When are my next \(many)?",
+                "I have a revised list of \(one) dates",
+                "Re-date my \(many)",
+            ]),
+            ("Putting the site online", [
+                "Deploy now",
+                "Deploy at 6:30 AM",
+                "Cancel scheduled deploy",
+            ]),
+        ]
+    }
+
 
     /// One group's open/shut state, as a binding a `DisclosureGroup` can
     /// drive, written straight back to the stored preference.

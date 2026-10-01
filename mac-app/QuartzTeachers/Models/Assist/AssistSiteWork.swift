@@ -19,12 +19,40 @@ struct AssistSiteWorkResult {
     /// says through its console, which is already on screen.
     let isAboutTheDestination: Bool
 
+    /// Whether what stopped it was ANOTHER program building or previewing the
+    /// same course (#156). The message is then
+    /// `AssistWording.courseIsBeingBuiltElsewhere`; `AssistToolRunner` swaps
+    /// it for `courseIsBusy` when the one asking is an assistant working from
+    /// another app, since the program that is busy is the one it talks to.
+    let wasBuiltElsewhere: Bool
+
     // MARK: - Initializer
 
-    init(succeeded: Bool, message: String, isAboutTheDestination: Bool = false) {
+    init(
+        succeeded: Bool,
+        message: String,
+        isAboutTheDestination: Bool = false,
+        wasBuiltElsewhere: Bool = false
+    ) {
         self.succeeded = succeeded
         self.message = message
         self.isAboutTheDestination = isAboutTheDestination
+        self.wasBuiltElsewhere = wasBuiltElsewhere
+    }
+
+    // MARK: - Functions
+
+    /// The refusal for a build another program is in the way of — raised as
+    /// the window's alert (`isAboutTheDestination`, the flag the window reads
+    /// for "say this in an alert", as the reference-course refusal uses it:
+    /// the console has nothing to show, because nothing ran).
+    static func builtElsewhere(course: Course) -> AssistSiteWorkResult {
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode),
+            isAboutTheDestination: true,
+            wasBuiltElsewhere: true
+        )
     }
 }
 
@@ -91,12 +119,53 @@ final class AssistToolchainWork: AssistSiteWork {
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
             )
         }
+        // Not while a copy of the course is being zipped (#351): a removal
+        // waiting on that zip deletes the folder this would build from.
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false, message: AssistWording.courseIsBeingCopied(course: course.code)
+            )
+        }
+
+        // Recorded for ⌘Q (issue #232): the delegate cannot see this runner,
+        // and a quit in the middle of it is a quit through a preview build.
+        // Recorded HERE and not inside `ScriptRunner`, because a publish's own
+        // `--build-only` wears the same launcher's name and is already counted
+        // as the publish it belongs to. The `defer` covers every return below.
+        CourseActivity.beginPreviewBuild(
+            folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+        )
+        defer {
+            CourseActivity.endPreviewBuild(
+                folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
+            )
+        }
+
+        // Taken, THEN checked (#156): the `build` lease is on disk from the
+        // line above, and only a lease another program took before it counts,
+        // so two that ask at once cannot both go ahead or both back off. The
+        // backstop on this path, whatever the caller checked first.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
 
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
+        // `--non-interactive` (#378): nobody on this path can answer a
+        // question, and one asked on a terminal nobody reads waits for ever
+        // — inside the folder's workspace, where it held every later preview
+        // back until the Mac was restarted.
         runner.run(
             scriptNamed: "preview.sh",
-            arguments: [course.code, String(sectionNumber), "--build-only"],
+            arguments: MultiDestinationDeployRunner.buildArguments(
+                courseCode: course.code, sectionNumber: sectionNumber, unattended: true
+            ),
             workingDirectory: workspaceURL
         )
         if let problem = runner.launchProblem {
@@ -105,6 +174,14 @@ final class AssistToolchainWork: AssistSiteWork {
         let built: Bool = await runner.waitUntilFinished()
 
         if !built {
+            if runner.lastExitCode == 3 {
+                return AssistSiteWorkResult(
+                    succeeded: false,
+                    message: AssistWording.previewBuildNeedsAnAnswer(
+                        course: course.code, section: String(sectionNumber)
+                    )
+                )
+            }
             return AssistSiteWorkResult(
                 succeeded: false,
                 message: AssistWording.previewDidNotBuild(
@@ -118,7 +195,7 @@ final class AssistToolchainWork: AssistSiteWork {
                 to: AssistWording.rebuiltForACallerWithNoWindow(
                     course: course.code, section: String(sectionNumber)
                 ),
-                from: runner
+                from: runner, courseDirectory: course.directoryURL
             )
         )
     }
@@ -132,9 +209,26 @@ final class AssistToolchainWork: AssistSiteWork {
     /// the console the teacher is looking at — `AssistToolRunner.deploySection`
     /// decides which, and this runs when nothing is on screen to press.
     func deploy(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {
+        // The backstop on the headless path — what an MCP client and a
+        // scheduled deploy take. The runner refuses first; this is here
+        // because a deploy that reports success on a course kept for
+        // reference is the worst direction this can fail in, and one guard in
+        // one function is one edit away from being gone.
+        if course.isKeptForReference {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployRefusedForAReferenceCourse(course: course.displayCode)
+            )
+        }
         guard let workspaceURL = workspace.workspaceURL else {
             return AssistSiteWorkResult(
                 succeeded: false, message: AssistToolRefusal.noWorkingFolder.message
+            )
+        }
+        if CourseActivity.courseIsBeingCopied(folderPath: workspaceURL.path, courseCode: course.code) {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.courseIsBeingCopied(course: course.code)
             )
         }
         if CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code) != nil {
@@ -151,6 +245,16 @@ final class AssistToolchainWork: AssistSiteWork {
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)
+        // `course` here is already the saved copy — #322's reading at the
+        // call — so the deploy follows the file. What an in-app assistant
+        // adds is the SAYING (#335): when a window holds unsaved Course
+        // Settings edits, the conversation is told the deploy used the saved
+        // ones, as the window would be. In-process only: the MCP server is
+        // another process with no window models, so nothing unsaved exists
+        // that it could see, and it says nothing.
+        let notice: String? = SettingsSaveNotice.whenDeployStarts(
+            settingsHaveUnsavedChanges: WorkspaceModel.anyCopyHasUnsavedChanges(configFileURL: course.configFileURL)
+        )
         CourseActivity.beginPublish(
             folderPath: workspaceURL.path, courseCode: course.code, sectionNumber: sectionNumber
         )
@@ -160,12 +264,40 @@ final class AssistToolchainWork: AssistSiteWork {
             )
         }
 
+        // The same take-then-check as the rebuild above (#156). Synchronous
+        // from the busy check to here, so nothing of this process's own can
+        // have started in between.
+        if let holding = WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+        ) {
+            WorkLeaseRegistry.noteDeclined(
+                act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: course.code,
+                sectionNumber: sectionNumber, holding: holding
+            )
+            return AssistSiteWorkResult.builtElsewhere(course: course)
+        }
+
+        // Noted once nothing can refuse it any more.
+        if notice != nil {
+            SettingsSaveNotice.noteDeployUsedTheSavedSettings(
+                act: "deployed by the assistant with no section window open",
+                saved: course, windowCourse: nil, sectionNumber: sectionNumber
+            )
+        }
+
         // The same sequencer the Deploy button uses. Built separately
         // here once, this path sent a Cloudflare course to Netlify —
         // `--target` and `--account` were never passed, and `deploy.sh`
         // defaults to Netlify because every course written before
         // Cloudflare existed relies on that. Nothing failed; the site
         // simply went to the wrong web host.
+        //
+        // `unattended` (#378): nobody on this path can answer a question —
+        // a site name, a surname, a token — so both legs run with
+        // `--non-interactive` and a question refuses with exit 3, which
+        // reaches the reply as `deployNeedsAnAnswer`. Before, the question
+        // waited for ever on a terminal nobody read, and a session closed
+        // meanwhile left it waiting inside the folder's workspace.
         deployRunner = MultiDestinationDeployRunner()
         await deployRunner.run(
             course: course,
@@ -173,8 +305,17 @@ final class AssistToolchainWork: AssistSiteWork {
             destinations: destinations,
             cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
             workingDirectory: workspaceURL,
-            needsBuild: needsBuild
+            needsBuild: needsBuild,
+            unattended: true
         )
+
+        if deployRunner.legs.first?.buildNeededAnAnswer == true {
+            let message: String = SettingsSaveNotice.addingTheNotice(
+                notice,
+                to: AssistWording.deployNeedsAnAnswer(course: course.code, section: String(sectionNumber))
+            )
+            return AssistSiteWorkResult(succeeded: false, message: message)
+        }
 
         if deployRunner.legs.first?.buildFailed == true {
             // The findings travel even when the build failed: a missing
@@ -184,8 +325,9 @@ final class AssistToolchainWork: AssistSiteWork {
                 course: course.code, section: String(sectionNumber)
             )
             if let runner = deployRunner.legs.first?.runner {
-                message = SiteHealthFinding.appending(to: message, from: runner)
+                message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
             }
+            message = SettingsSaveNotice.addingTheNotice(notice, to: message)
             return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
@@ -195,14 +337,16 @@ final class AssistToolchainWork: AssistSiteWork {
             destinationCount: destinations.count,
             outcome: deployRunner.outcome
         )
-        guard let runner = deployRunner.legs.first?.runner else {
-            return outcome
-        }
+        var message: String = outcome.message
         // Taken from the FIRST leg: every destination publishes the same built
         // site, so a second leg only repeats the same findings.
+        if let runner = deployRunner.legs.first?.runner {
+            message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
+        }
+        message = SettingsSaveNotice.addingTheNotice(notice, to: message)
         return AssistSiteWorkResult(
             succeeded: outcome.succeeded,
-            message: SiteHealthFinding.appending(to: outcome.message, from: runner),
+            message: message,
             isAboutTheDestination: outcome.isAboutTheDestination
         )
     }

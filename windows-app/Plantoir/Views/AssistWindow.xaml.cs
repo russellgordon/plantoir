@@ -215,9 +215,10 @@ public sealed partial class AssistWindow : Window
         catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
         if (choice != ContentDialogResult.Primary) return;
 
+        int notPutBack;
         try
         {
-            AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
+            notPutBack = AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
                                          Workspace.CoursesDirectory(_folder));
         }
         catch (Exception error)
@@ -228,7 +229,7 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.SectionRestored,
             "put the section back to how it was when this conversation started, from " +
             Path.GetFileName(_conversationBackupPath!), _course.Code, _section);
-        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section));
+        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section, notPutBack));
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)
@@ -529,12 +530,10 @@ public sealed partial class AssistWindow : Window
                 _conversationBackupPath = path;
                 ShowRestoreBanner();
             }),
-            DestinationProvider = () =>
-            {
-                if (_course.Configuration.DeploysToLocalFolder) return "a folder on this computer";
-                if (_course.Configuration.DeploysToCloudflare) return "Cloudflare Pages";
-                return "Netlify";
-            },
+            // Every destination, by type, in the saved order (#400): the card
+            // for a course deploying to Netlify AND Cloudflare Pages said
+            // "Netlify" alone.
+            DestinationProvider = () => DeployCommand.EveryDestinationByType(_course.Configuration),
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.

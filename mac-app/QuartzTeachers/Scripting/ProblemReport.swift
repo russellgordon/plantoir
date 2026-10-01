@@ -195,6 +195,47 @@ nonisolated struct RunRecord {
 /// records is the fastest way that has ever been available to see it.
 nonisolated enum ProblemReportEnvironment {
 
+    // MARK: - Stored properties
+
+    /// The assistant's engine is bundled inside the app, so its build IS
+    /// known without asking anything.
+    static let bundledEngineDescription: String = "llama.cpp b10435 (Metal)"
+
+    /// The versions the launchers download when a program is missing
+    /// (`setup.sh`, `COLIMA_VERSION` and its three neighbours — a test holds
+    /// the two lists together). Shown only as what WOULD be installed, never
+    /// as what is.
+    static let pinnedHelpers: [PinnedHelper] = [
+        PinnedHelper(displayName: "Colima", probeName: "colima", pinnedVersion: "v0.10.3", setupVariable: "COLIMA_VERSION"),
+        PinnedHelper(displayName: "Lima", probeName: "limactl", pinnedVersion: "2.2.0", setupVariable: "LIMA_VERSION"),
+        PinnedHelper(displayName: "Docker CLI", probeName: "docker", pinnedVersion: "29.7.2", setupVariable: "DOCKER_CLI_VERSION"),
+        PinnedHelper(displayName: "Buildx", probeName: "buildx", pinnedVersion: "v0.36.1", setupVariable: "BUILDX_VERSION")
+    ]
+
+    /// One `sh` run asks all four, printing one tab-separated row each:
+    /// the program, the first line of its version, and where it was found.
+    /// Buildx has no path of its own to report (see `helperDescription`).
+    static let helperProbeScript: String = """
+    for tool in colima limactl docker; do
+      where=$(command -v "$tool" 2>/dev/null)
+      line=""
+      if [ -n "$where" ]; then
+        line=$("$tool" --version 2>/dev/null </dev/null | head -n 1 | tr -d '\t\r')
+      fi
+      printf '%s\t%s\t%s\n' "$tool" "$line" "$where"
+    done
+    line=""
+    if command -v docker >/dev/null 2>&1; then
+      line=$(docker buildx version 2>/dev/null </dev/null | head -n 1 | tr -d '\t\r')
+    fi
+    printf 'buildx\t%s\t\n' "$line"
+    """
+
+    /// Guards `storedHelperDescription`, which the background check writes
+    /// and every record reads, from any thread.
+    private static let measuredHelperLock: NSLock = NSLock()
+    nonisolated(unsafe) private static var storedHelperDescription: String?
+
     // MARK: - Computed properties
 
     /// "Plantoir 1.0 (12) · pid 4711 · /Applications/Plantoir.app"
@@ -223,15 +264,306 @@ nonisolated enum ProblemReportEnvironment {
         return text
     }
 
-    /// "llama.cpp b10435 (Metal) · Colima v0.10.3 · Lima 2.2.0 · Docker CLI 29.7.2 · Buildx v0.36.1"
+    /// "llama.cpp b10435 (Metal) · Colima 0.10.3 (Homebrew) · Lima 2.2.0 (Homebrew) · …"
+    ///
+    /// What was MEASURED the last time this app asked the programs
+    /// themselves, or — before it has asked — every helper marked "not
+    /// checked yet" beside the version the launchers would download. Never a
+    /// bare version it did not check: this line used to print the pinned
+    /// versions as though they were installed, and on a Mac with Homebrew's
+    /// Docker CLI 29.7.1 it said 29.7.2, which is how a report nearly sent a
+    /// diagnosis the wrong way (issue #222).
     static var helperDescription: String {
-        var parts: [String] = []
-        parts.append("llama.cpp b10435 (Metal)")
-        parts.append("Colima v0.10.3")
-        parts.append("Lima 2.2.0")
-        parts.append("Docker CLI 29.7.2")
-        parts.append("Buildx v0.36.1")
+        if let measured = measuredHelperDescription {
+            return measured
+        }
+        var parts: [String] = [bundledEngineDescription]
+        for helper in pinnedHelpers {
+            parts.append(helper.displayName + " not checked yet (pinned " + helper.pinnedVersion + ")")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// The last measured description, shared by every record and trail line
+    /// this process writes. Only `refreshHelpers` stores into it; a test that
+    /// measures stub programs through `measureHelpers` leaves it alone, so a
+    /// stub's made-up version cannot leak into a later test's record.
+    static var measuredHelperDescription: String? {
+        get {
+            return measuredHelperLock.withLock {
+                return storedHelperDescription
+            }
+        }
+        set {
+            measuredHelperLock.withLock {
+                storedHelperDescription = newValue
+            }
+        }
+    }
+
+    // MARK: - Helper versions, measured
+
+    /// Asks the helper programs which versions they are, and says where each
+    /// was found.
+    ///
+    /// Synchronous and slow (about 0.3 s measured on a Mac with all four from
+    /// Homebrew, 0.08 s with none), so it is only ever called off the main
+    /// thread — see `refreshHelpers`. PURE apart from running the programs:
+    /// it stores nothing, which is what lets a test point it at stub
+    /// programs without the stubs' versions reaching any other test.
+    ///
+    /// `colima --version`, never `colima version`: the undashed form talks to
+    /// the running virtual machine (0.256 s against 0.045 s measured, and it
+    /// prints a second, server-side line), so a stopped machine would make
+    /// the check slow and a wedged one would make it hang.
+    ///
+    /// The time limit is a backstop for a program that never answers. Every
+    /// program's output is captured by the shell's own `$( … )`, so only the
+    /// shell itself writes to the pipe read here; ending the shell ends the
+    /// read, even if a helper it started is still stuck.
+    static func measureHelpers(
+        environment: [String: String] = HelperPrograms.environment(),
+        toolsFolder: String = HelperPrograms.binDirectory(),
+        timeLimit: Duration = .seconds(5)
+    ) -> String {
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", helperProbeScript]
+        process.environment = environment
+        process.standardInput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        let outputPipe: Pipe = Pipe()
+        process.standardOutput = outputPipe
+        do {
+            try process.run()
+        } catch {
+            return helperDescription(fromProbeOutput: "", toolsFolder: toolsFolder)
+        }
+        let watchdog: Task<Void, Never> = Task.detached(priority: .utility) {
+            try? await Task.sleep(for: timeLimit)
+            if Task.isCancelled {
+                return
+            }
+            if process.isRunning {
+                process.terminate()
+            }
+        }
+        let outputData: Data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        watchdog.cancel()
+        let output: String = String(decoding: outputData, as: UTF8.self)
+        // Ended by the watchdog rather than finishing: the first program with
+        // no row is the one that HUNG, which is itself the diagnosis.
+        var secondsWaitedForAHungHelper: Int64?
+        if process.terminationReason == .uncaughtSignal {
+            secondsWaitedForAHungHelper = timeLimit.components.seconds
+        }
+        return helperDescription(
+            fromProbeOutput: output,
+            toolsFolder: toolsFolder,
+            secondsWaitedForAHungHelper: secondsWaitedForAHungHelper,
+            installedFrom: installedFrom(toolsFolder: toolsFolder),
+            resolvingLinks: { path in
+                return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+            }
+        )
+    }
+
+    /// Where each of Plantoir's own programs came from, by the name the
+    /// check asks it by (`colima`, `limactl`, `docker`): `bundled` or
+    /// `downloaded`, read from the install stamp's `source <program> <how>`
+    /// lines beside the tools folder (`tools/.installed`, GitHub #312). Per
+    /// program, because one install can replace one program and leave the
+    /// others as an earlier one set them up. Empty when there is no stamp —
+    /// every Mac set up before the stamp existed.
+    static func installedFrom(toolsFolder: String) -> [String: String] {
+        let stamp: URL = URL(fileURLWithPath: toolsFolder)
+            .deletingLastPathComponent()
+            .appendingPathComponent(".installed")
+        var sources: [String: String] = [:]
+        guard let text = try? String(contentsOf: stamp, encoding: .utf8) else {
+            return sources
+        }
+        for line in text.components(separatedBy: "\n") {
+            let words: [String] = line.components(separatedBy: " ")
+            if words.count == 3 && words[0] == "source" && (words[2] == "bundled" || words[2] == "downloaded") {
+                sources[words[1]] = words[2]
+            }
+        }
+        return sources
+    }
+
+    /// Measures in the background and remembers the answer for every record
+    /// written after it.
+    ///
+    /// A DETACHED task, not a plain `nonisolated async` function: this
+    /// project builds with approachable concurrency, under which a plain one
+    /// runs on its caller's actor — here, the main one — and the 0.3 s
+    /// check would stall the window it was meant to stay out of the way of.
+    /// The result says which thread the check ran on so a test can hold the
+    /// code to that, rather than to a belief about it.
+    @discardableResult
+    static func refreshHelpers(
+        environment: [String: String] = HelperPrograms.environment(),
+        toolsFolder: String = HelperPrograms.binDirectory()
+    ) -> Task<HelperMeasurement, Never> {
+        return Task.detached(priority: .utility) {
+            let ranOnTheMainThread: Bool = pthread_main_np() != 0
+            let answer: String = ProblemReportEnvironment.measureHelpers(
+                environment: environment,
+                toolsFolder: toolsFolder
+            )
+            let description: String = answer + " · " + ProblemReportEnvironment.whenChecked(Date())
+            ProblemReportEnvironment.measuredHelperDescription = description
+            return HelperMeasurement(description: description, ranOnTheMainThread: ranOnTheMainThread)
+        }
+    }
+
+    /// "checked 2026-09-24 00:41:07" — when the remembered answer was taken.
+    ///
+    /// A record can carry an answer from the launch or from the end of the
+    /// last task, and the trail's helpers line is written once per launch; a
+    /// report read without this could not tell a Mac that has no Colima from
+    /// one that had none an hour ago, before a first setup installed it.
+    static func whenChecked(_ moment: Date, timeZone: TimeZone = TimeZone.current) -> String {
+        let formatter: DateFormatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return "checked " + formatter.string(from: moment)
+    }
+
+    /// Turns the check's output into the Helpers line. PURE — the part the
+    /// rules live in, and the part a test feeds real machine output to.
+    ///
+    /// The output is one `name<TAB>first line of its version<TAB>where it was
+    /// found` row per program. A row with no path, or with nothing that
+    /// reads as a version, is "not found". When the check was ENDED by its
+    /// time limit (`secondsWaitedForAHungHelper`), the first program with no
+    /// row is the one that hung — it "did not answer within N s" — and any
+    /// after it were never reached, "not checked".
+    static func helperDescription(
+        fromProbeOutput output: String,
+        toolsFolder: String,
+        secondsWaitedForAHungHelper: Int64? = nil,
+        installedFrom: [String: String] = [:],
+        resolvingLinks resolve: (String) -> String = { path in return path }
+    ) -> String {
+        var rowsByName: [String: [String]] = [:]
+        for line in output.components(separatedBy: "\n") {
+            let fields: [String] = line.components(separatedBy: "\t")
+            if fields.count < 2 || fields[0].isEmpty {
+                continue
+            }
+            rowsByName[fields[0]] = fields
+        }
+
+        var parts: [String] = [bundledEngineDescription]
+        var hungHelperIsNamed: Bool = false
+        for helper in pinnedHelpers {
+            guard let fields = rowsByName[helper.probeName] else {
+                if let secondsWaitedForAHungHelper, !hungHelperIsNamed {
+                    hungHelperIsNamed = true
+                    parts.append(
+                        helper.displayName + " did not answer within \(secondsWaitedForAHungHelper) s (pinned "
+                        + helper.pinnedVersion + ")"
+                    )
+                } else {
+                    parts.append(helper.displayName + " not checked (pinned " + helper.pinnedVersion + ")")
+                }
+                continue
+            }
+            let versionLine: String = fields[1]
+            let path: String = fields.count > 2 ? fields[2] : ""
+            let isBuildx: Bool = helper.probeName == "buildx"
+            if versionLine.isEmpty || (!isBuildx && path.isEmpty) {
+                parts.append(helper.displayName + " not found (would install " + helper.pinnedVersion + ")")
+                continue
+            }
+            guard let version = versionNumber(in: versionLine) else {
+                if isBuildx {
+                    parts.append(helper.displayName + " not found (would install " + helper.pinnedVersion + ")")
+                } else {
+                    parts.append(helper.displayName + " found, version unreadable" + sourceLabel(
+                        path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
+                        installedFrom: installedFrom[helper.probeName]
+                    ))
+                }
+                continue
+            }
+            var text: String = helper.displayName + " " + version
+            if isBuildx {
+                // Buildx is a plug-in of the Docker CLI, found in
+                // `~/.docker/cli-plugins` — the SAME folder Plantoir's own
+                // download and Homebrew's link both use — so where `docker`
+                // lives says nothing about where buildx came from. Only its
+                // own words are trusted: Homebrew's build says "Homebrew".
+                if versionLine.contains("Homebrew") {
+                    text += " (Homebrew)"
+                }
+            } else {
+                text += sourceLabel(
+                    path: path, resolvedPath: resolve(path), toolsFolder: toolsFolder,
+                    installedFrom: installedFrom[helper.probeName]
+                )
+            }
+            parts.append(text)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// " (Plantoir's copy)", " (Homebrew)", or " (found in <folder>)".
+    ///
+    /// Plantoir's copy is recognised by the folder it was FOUND in, before
+    /// any link is followed. Homebrew by where the link LEADS, because
+    /// `/usr/local/bin` is also where Docker Desktop puts its own link, and
+    /// calling that Homebrew would be the same kind of wrong answer this
+    /// line exists to stop giving.
+    ///
+    /// Plantoir's copy says where it came from when the install stamp
+    /// (`tools/.installed`, GitHub #312) says so: " (Plantoir's copy, from
+    /// inside Plantoir)" or " (Plantoir's copy, downloaded)". Copies set up
+    /// before the stamp existed have no answer, and say only "Plantoir's copy".
+    static func sourceLabel(
+        path: String, resolvedPath: String, toolsFolder: String, installedFrom: String? = nil
+    ) -> String {
+        if path.hasPrefix(toolsFolder + "/") {
+            if installedFrom == "bundled" {
+                return " (Plantoir's copy, from inside Plantoir)"
+            }
+            if installedFrom == "downloaded" {
+                return " (Plantoir's copy, downloaded)"
+            }
+            return " (Plantoir's copy)"
+        }
+        if resolvedPath.hasPrefix("/opt/homebrew/")
+            || resolvedPath.hasPrefix("/usr/local/Cellar/")
+            || resolvedPath.hasPrefix("/usr/local/Homebrew/") {
+            return " (Homebrew)"
+        }
+        let folder: String = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        return " (found in " + folder + ")"
+    }
+
+    /// The first word that reads as a version: after an optional leading
+    /// "v", it starts with a digit and has a dot in it. "Docker version
+    /// 29.7.1, build e9452d6e78" gives "29.7.1"; "github.com/docker/buildx
+    /// v0.36.1 Homebrew" gives "0.36.1".
+    static func versionNumber(in line: String) -> String? {
+        let separators: CharacterSet = CharacterSet.whitespaces.union(CharacterSet(charactersIn: ","))
+        for word in line.components(separatedBy: separators) {
+            var candidate: String = word
+            if candidate.hasPrefix("v") {
+                candidate = String(candidate.dropFirst())
+            }
+            guard let first = candidate.first else {
+                continue
+            }
+            if first.isASCII && first.isNumber && candidate.contains(".") {
+                return candidate
+            }
+        }
+        return nil
     }
 
     /// Exact OS build number (e.g. "24G84"), via sysctl kern.osversion.
@@ -277,6 +609,35 @@ nonisolated enum ProblemReportEnvironment {
     }
 }
 
+/// One helper program the launchers can download, and the version they
+/// would download.
+nonisolated struct PinnedHelper: Sendable {
+
+    // MARK: - Stored properties
+
+    /// What a report calls it: "Docker CLI".
+    let displayName: String
+
+    /// Its row in the check's output: "docker".
+    let probeName: String
+
+    /// The version `setup.sh` downloads when it is missing: "29.7.2".
+    let pinnedVersion: String
+
+    /// The `setup.sh` variable that pins it, for the test that keeps the two
+    /// in step.
+    let setupVariable: String
+}
+
+/// What one background check found, and whether it kept off the main thread.
+nonisolated struct HelperMeasurement: Sendable {
+
+    // MARK: - Stored properties
+
+    let description: String
+    let ranOnTheMainThread: Bool
+}
+
 /// Where records are kept, and how many.
 ///
 /// `~/Library/Logs/Plantoir` — the folder macOS keeps application logs in,
@@ -308,6 +669,10 @@ nonisolated struct ProblemReportStore {
     static let mostActivityLines: Int = 1200
     static let keptActivityLines: Int = 600
 
+    /// Put at the top of the trail when the teacher's own sentences were
+    /// left out. `problemReportTrail.promptsLeftOutNote` in the contract.
+    static let promptsLeftOutNote: String = "(What the teacher typed was left out of this report.)"
+
     /// The folder for the running app.
     ///
     /// Under a test run this is a throwaway folder instead. The tests build
@@ -324,9 +689,12 @@ nonisolated struct ProblemReportStore {
         return ProblemReportStore(folderURL: ProblemReportStore.defaultFolderURL())
     }
 
-    /// True while XCTest is hosting the app.
+    /// True while XCTest is hosting the app. The same question
+    /// `RealHome.isInsideTestBundle` answers, asked in one place (#264) —
+    /// this used to read `XCTestConfigurationFilePath` from the environment,
+    /// a third definition of "under test" beside the two class lookups.
     static var isRunningTests: Bool {
-        return ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        return RealHome.isInsideTestBundle
     }
 
     /// One folder per test RUN rather than per call, so that a test which
@@ -345,7 +713,7 @@ nonisolated struct ProblemReportStore {
 
     /// `~/Library/Logs/Plantoir`.
     static func defaultFolderURL() -> URL {
-        let library: URL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        let library: URL = RealHome.forFiles.appendingPathComponent("Library", isDirectory: true)
         return library.appendingPathComponent("Logs", isDirectory: true)
             .appendingPathComponent("Plantoir", isDirectory: true)
     }
@@ -410,6 +778,36 @@ nonisolated struct ProblemReportStore {
     /// started and finished, the assistant answering — because the trail is
     /// what turns a pile of records into an account of what somebody was
     /// doing. The task records hold the DETAIL; this holds the order.
+    ///
+    /// **Several writers share this file, and none of them may lose a line
+    /// (#238).** The app, a scheduled publish (its own process), the
+    /// `--mcp-stdio` server and every launcher (`note_on_the_trail`, which
+    /// appends with `>>`) can all write within the same second. This used to
+    /// read the whole file, add the line and rename a rewritten copy over it
+    /// — so a line another writer added between the read and the rename was
+    /// silently thrown away: 446 of 900 lines lost across 100 bursts of three
+    /// processes writing three lines each, measured.
+    ///
+    /// So, two things:
+    ///
+    /// - The line is ADDED to the end of the file (`O_APPEND`, one `write`),
+    ///   never by rewriting it. An append cannot discard somebody else's
+    ///   append, including a launcher's that takes no lock at all.
+    /// - Everything is done holding an exclusive `flock` on the Logs FOLDER,
+    ///   and the trim — which DOES rewrite the file — happens only under it.
+    ///   The launchers take the same lock round their `>>` (`/usr/bin/lockf
+    ///   -k` on the folder), so a trim can never land between their check
+    ///   and their write either. The folder is the lock so that no extra
+    ///   file appears in the folder a teacher is shown.
+    ///
+    /// The line is redacted BEFORE any of this, so nothing unredacted is ever
+    /// held or written. If the folder cannot be opened, or `flock` refuses
+    /// (`ENOTSUP` on some network volumes), the line is still written, just
+    /// unlocked — which is exactly the old behaviour, and better than
+    /// dropping it. The lock is held for one append and, rarely, one trim:
+    /// about a millisecond. It dies with its process, so nothing can leave it
+    /// held. ``documentation/09-mac-app.md` → "Two writers at once"` has the measurements and what
+    /// was rejected.
     func appendActivityLine(_ line: String) {
         let safeLine: String = LogRedactor.redacting(line)
         do {
@@ -419,10 +817,95 @@ nonisolated struct ProblemReportStore {
         } catch {
             return
         }
+        let folderLock: Int32 = ProblemReportStore.takeTheTrailLock(onFolder: folderURL)
+        defer {
+            ProblemReportStore.releaseTheTrailLock(folderLock)
+        }
         let url: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
-        var existing: String = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        existing += safeLine + "\n"
-        try? ProblemReportStore.trimmed(existing).write(to: url, atomically: true, encoding: .utf8)
+        ProblemReportStore.addToTheEnd(of: url, text: safeLine + "\n")
+        ProblemReportStore.trimIfTooLong(url)
+    }
+
+    /// Opens the Logs folder and takes an exclusive lock on it, waiting for
+    /// whoever holds it. Returns the open folder, or -1 when there is nothing
+    /// to release.
+    ///
+    /// The lock belongs to this open folder rather than to the process, so
+    /// two threads of the app wait for each other exactly as two processes
+    /// do. `O_CLOEXEC` keeps a launcher the app starts from inheriting it.
+    /// A refusal from `flock` other than an interruption is ignored and the
+    /// write goes ahead unlocked (see `appendActivityLine`).
+    static func takeTheTrailLock(onFolder folderURL: URL) -> Int32 {
+        let folder: Int32 = folderURL.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return open(path, O_RDONLY | O_CLOEXEC)
+        }
+        if folder < 0 {
+            return -1
+        }
+        var result: Int32 = flock(folder, LOCK_EX)
+        while result != 0 && errno == EINTR {
+            result = flock(folder, LOCK_EX)
+        }
+        return folder
+    }
+
+    /// Lets the next writer in. Closing the folder would release the lock on
+    /// its own; unlocking first says so.
+    static func releaseTheTrailLock(_ folder: Int32) {
+        if folder < 0 {
+            return
+        }
+        flock(folder, LOCK_UN)
+        close(folder)
+    }
+
+    /// Adds `text` to the end of the file in ONE write, creating the file if
+    /// it is not there.
+    ///
+    /// One `write` on a file opened `O_APPEND` lands whole at the end even
+    /// with other appenders at work: measured on APFS with four processes
+    /// writing lines of 60 bytes up to 1 MB, not one torn or lost.
+    static func addToTheEnd(of url: URL, text: String) {
+        let file: Int32 = url.withUnsafeFileSystemRepresentation { path in
+            guard let path else {
+                return -1
+            }
+            return open(path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o644)
+        }
+        if file < 0 {
+            return
+        }
+        defer {
+            close(file)
+        }
+        let bytes: [UInt8] = Array(text.utf8)
+        bytes.withUnsafeBytes { buffer in
+            _ = Darwin.write(file, buffer.baseAddress, buffer.count)
+        }
+    }
+
+    /// Rewrites the file without its oldest lines once it has grown past the
+    /// limit. Call it only while holding the trail lock: this is the one
+    /// write that replaces the file, and a line added between its read and
+    /// its rename would be lost.
+    ///
+    /// Read as bytes and decoded leniently, because a launcher can `printf`
+    /// anything into this file: a strict UTF-8 read used to come back empty
+    /// on one bad byte, and the next write then replaced the whole trail with
+    /// its own single line. A file that needs no trimming is never
+    /// rewritten, so its bytes are left exactly as they were.
+    static func trimIfTooLong(_ url: URL) {
+        guard let text = ProblemReportStore.trailText(at: url) else {
+            return
+        }
+        let kept: String = ProblemReportStore.trimmed(text)
+        if kept.utf8.count == text.utf8.count {
+            return
+        }
+        try? kept.write(to: url, atomically: true, encoding: .utf8)
     }
 
     /// Whether there is anything worth gathering.
@@ -462,27 +945,87 @@ nonisolated struct ProblemReportStore {
     /// teacher ticks the box. Everything else — which tool was chosen, with
     /// which arguments filled in, how long it took — goes either way, and
     /// that is most of what a routing problem is diagnosed from.
+    ///
+    /// Read leniently (#301): one byte that cannot be read used to make this
+    /// come back empty, so the report left the trail out and a teacher with
+    /// no task records was told there was nothing to send. Every line is
+    /// kept, what cannot be read shows as U+FFFD, and a note at the top says
+    /// how many of the lines SHOWN carry one. A readable file with the
+    /// prompts included comes back exactly as it is on disk. The rule, with
+    /// its cases, is `contracts/shared-rules.json` → `problemReportTrail`.
     func activityText(includingPrompts: Bool) -> String {
         let url: URL = folderURL.appendingPathComponent(ProblemReportStore.activityFileName)
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+        guard let text = ProblemReportStore.trailText(at: url) else {
             return ""
         }
-        if includingPrompts {
-            return text
-        }
-        var kept: [String] = []
+        var shownLines: [String] = []
         var droppedAny: Bool = false
         for line in text.components(separatedBy: "\n") {
-            if line.hasPrefix(AssistTurnRecord.promptMarker) {
+            if !includingPrompts && line.hasPrefix(AssistTurnRecord.promptMarker) {
                 droppedAny = true
                 continue
             }
-            kept.append(line)
+            shownLines.append(line)
         }
+        var notes: [String] = []
         if droppedAny {
-            kept.insert("(What the teacher typed was left out of this report.)", at: 0)
+            notes.append(ProblemReportStore.promptsLeftOutNote)
         }
-        return kept.joined(separator: "\n")
+        let damagedLineCount: Int = ProblemReportStore.linesWithUnreadableCharacters(in: shownLines)
+        if damagedLineCount > 0 {
+            notes.append(ProblemReportStore.unreadableCharactersNote(lineCount: damagedLineCount))
+        }
+        return (notes + shownLines).joined(separator: "\n")
+    }
+
+    /// Put at the top of the trail when lines in it carry characters that
+    /// could not be read (#301). No plural branch: "on 1 of these lines" and
+    /// "on 3 of these lines" both read naturally. No word about bytes or
+    /// encodings, because a teacher reads it (rule 1).
+    /// `problemReportTrail.unreadableCharactersNote` in the contract.
+    static func unreadableCharactersNote(lineCount: Int) -> String {
+        return "(Some characters on \(lineCount) of these lines could not be read, and are shown as \u{FFFD}.)"
+    }
+
+    /// How many of `lines` hold U+FFFD anywhere — whether this read put it
+    /// there or an earlier trim did, since in this file it always means
+    /// "something here could not be read".
+    ///
+    /// Walks SCALARS on purpose. U+FFFD followed by a combining mark is one
+    /// grapheme, and `String.contains` — with a `Character` or a `String` —
+    /// then answers false (measured: `{C3}{CC}{81}` decodes to exactly that).
+    static func linesWithUnreadableCharacters(in lines: [String]) -> Int {
+        var count: Int = 0
+        for line in lines {
+            var holdsOne: Bool = false
+            for scalar in line.unicodeScalars {
+                if scalar.value == 0xFFFD {
+                    holdsOne = true
+                    break
+                }
+            }
+            if holdsOne {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// The trail file as text, or nil when it cannot be read at all.
+    ///
+    /// The ONE decode rule for this file, used by the trim and by the report
+    /// alike so the two cannot drift apart. Lenient, because the file has
+    /// writers that are not the app — every launcher appends with `printf`,
+    /// which passes any byte — and a teacher can open it in any editor. Each
+    /// ill-formed sequence becomes one U+FFFD, and since 0x0A never occurs
+    /// inside a UTF-8 multibyte sequence a replacement never swallows a line
+    /// break (measured: `a {E2}{80}\n` keeps the next line intact). What the
+    /// report shows is therefore what the file will say after its next trim.
+    static func trailText(at url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Drops the oldest lines once the file has grown past its limit.

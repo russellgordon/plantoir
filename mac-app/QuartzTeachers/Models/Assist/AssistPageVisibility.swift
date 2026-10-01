@@ -40,7 +40,12 @@ import Foundation
 /// page's folder really decides. Until 2026-09-18 the reading branched as
 /// well, and a course-level page carrying a plain `publish: false` was
 /// therefore reported visible while the build hid it.
-enum AssistPageVisibility {
+/// **`nonisolated`, since 2026-09-21**: every function here but the last is
+/// pure over its arguments — strings in, strings out — and "Copy a Page from
+/// This Course…" composes a copied page's frontmatter OFF the main actor,
+/// beside a backup that takes ten seconds. The one exception is
+/// `isSectionLocal`, which reads a `Course` and stays where the course is.
+nonisolated enum AssistPageVisibility {
 
     // MARK: - Functions
 
@@ -90,8 +95,10 @@ enum AssistPageVisibility {
         return statedPublishing(in: pageText, forSection: sectionNumber) ?? true
     }
 
-    /// The page text with this section's visibility set, and whether that
-    /// changed anything.
+    /// The page text with this section's visibility set, and what the write
+    /// came to — `.written`, `.alreadyRight`, or `.noRoomForAKey` when the key
+    /// is missing and the page's settings have nowhere a new line can go
+    /// (`PageVisibilityReader.placeForANewTopLevelKey`, #186).
     ///
     /// A line-level edit, for the reason `PageFrontmatter` gives: the
     /// teacher's frontmatter is theirs, and round-tripping it through a YAML
@@ -115,7 +122,7 @@ enum AssistPageVisibility {
         in pageText: String,
         forSection sectionNumber: Int,
         isSectionLocal: Bool
-    ) -> (text: String, changed: Bool) {
+    ) -> (text: String, outcome: FrontmatterWriteOutcome) {
         let key: String = publishKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         let legacy: String = draftKey(forSection: sectionNumber, isSectionLocal: isSectionLocal)
         // Found with the READER's own key matcher, so the writer rewrites the
@@ -140,14 +147,14 @@ enum AssistPageVisibility {
         let stated: PageVisibilityAnswer = answer(in: pageText, forSection: sectionNumber)
         let alreadySaysIt: Bool = (stated == .visible && published) || (stated == .hidden && !published)
         if alreadySaysIt && !carriesLegacyKey {
-            return (pageText, false)
+            return (pageText, .alreadyRight)
         }
 
         let line: String = key + ": " + (published ? "true" : "false")
         guard let block = PageFrontmatter.block(in: pageText) else {
             // No frontmatter at all: give the page a block of its own, the
             // way `PageFrontmatter.settingCreated` does.
-            return ("---\n" + line + "\n---\n" + pageText, true)
+            return ("---\n" + line + "\n---\n" + pageText, .written)
         }
 
         var lines: [String] = pageText.components(separatedBy: "\n")
@@ -210,7 +217,18 @@ enum AssistPageVisibility {
                 }
             }
         } else {
-            lines.insert(line, at: block.openIndex + 1)
+            // A NEW key, and only where the block has a column-0 level for
+            // one. Measured 2026-09-25: `publish: false` written above
+            // `  false` is the string "false false" and the page stays
+            // PUBLISHED while the teacher is told it was hidden; above
+            // `  a: 1`, `{a: 1}` or `- a` it makes a block the build cannot
+            // read. So nothing is written, and the caller says so (#186).
+            guard let place = PageVisibilityReader.placeForANewTopLevelKey(
+                in: lines, openIndex: block.openIndex, closeIndex: block.closeIndex
+            ) else {
+                return (pageText, .noRoomForAKey)
+            }
+            lines.insert(line, at: place)
         }
 
         // Last first, so the earlier indices stay put.
@@ -222,7 +240,108 @@ enum AssistPageVisibility {
         for index in doomed.reversed() {
             lines.remove(at: index)
         }
-        return (lines.joined(separator: "\n"), true)
+        return (lines.joined(separator: "\n"), .written)
+    }
+
+    /// The page text with every PER-SECTION key taken out of its frontmatter.
+    ///
+    /// **For a page that has just been copied INTO one section's own folder.**
+    /// A per-section key on a section-local page is not merely redundant, it
+    /// wins: the build resolves `publishForSection<N>` onto `publish` and
+    /// `createdSection<N>` onto `created` before Quartz sees either, so an
+    /// inherited one overrules whatever this app writes on the plain key —
+    /// while `AssistPageVisibility.setting` and `PageFrontmatter.settingCreated`
+    /// go on writing the plain key, because which key is WRITTEN is decided by
+    /// where the page lives. The result is a page that cannot be published
+    /// however often a teacher asks, and is told it has been.
+    ///
+    /// `createdSection<N>` goes with the other two rather than being left as
+    /// harmless: `scripts/build_site.py` → `process_frontmatter` does
+    /// `post["created"] = post[created_key]` on exactly the same line as the
+    /// publish one, so an inherited date key would show the SOURCE's day on
+    /// the built site while the copy's own file said otherwise.
+    ///
+    /// Answering by ADDING a per-section key instead was tried and is the
+    /// trap this replaces: it hides the page and makes it unpublishable. The
+    /// build deletes all three families after resolving them, so removing
+    /// them changes nothing about a page that was already correct.
+    ///
+    /// Lines, not one line: a key's value can continue below it, and a value
+    /// left behind by its key is the failure `PageVisibilityReader.continuationLineIndices`
+    /// exists for.
+    static func withoutPerSectionKeys(in pageText: String) -> String {
+        guard let block = PageFrontmatter.block(in: pageText) else {
+            return pageText
+        }
+        var lines: [String] = pageText.components(separatedBy: "\n")
+
+        // Gathered before anything is removed, so every index still means
+        // what it said — the same reason `setting` above works this way.
+        var removals: Set<Int> = []
+        for index in (block.openIndex + 1)..<block.closeIndex {
+            let bare: String = PageFrontmatter.trimmingCarriageReturn(lines[index])
+            if bare.hasPrefix(" ") || bare.hasPrefix("\t") {
+                continue
+            }
+            guard let key = perSectionKey(namedIn: bare) else {
+                continue
+            }
+            removals.insert(index)
+            for taken in PageVisibilityReader.continuationLineIndices(
+                belowKeyAt: index, in: lines, closeIndex: block.closeIndex,
+                keyValueWasEmpty: valueIsEmpty(ofKey: key, inLine: lines[index])
+            ) {
+                removals.insert(taken)
+            }
+        }
+        if removals.isEmpty {
+            return pageText
+        }
+
+        var doomed: [Int] = []
+        for index in removals {
+            doomed.append(index)
+        }
+        doomed.sort()
+        for index in doomed.reversed() {
+            lines.remove(at: index)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    /// The per-section key this frontmatter line names, or nil.
+    ///
+    /// Any section's number, not just one: a page copied out of a shared
+    /// folder carries a key for every section the course has. Confirmed with
+    /// the READER's own matcher once the name is known, so a quoted
+    /// `"publishForSection2": true` is found — `SectionAdder.perSectionKeyNumber`
+    /// answers the same question with a plain prefix test and misses that
+    /// spelling, which is why this does not call it.
+    static func perSectionKey(namedIn line: String) -> String? {
+        var name: Substring = Substring(line)
+        if name.hasPrefix("\"") || name.hasPrefix("'") {
+            name = name.dropFirst()
+        }
+        for family in ["publishForSection", "draftSection", "createdSection"] {
+            guard name.hasPrefix(family) else {
+                continue
+            }
+            var digits: String = ""
+            for character in name.dropFirst(family.count) {
+                if !character.isNumber {
+                    break
+                }
+                digits.append(character)
+            }
+            if digits.isEmpty {
+                continue
+            }
+            let key: String = family + digits
+            if PageVisibilityReader.valuePart(ofKey: key, inLine: line) != nil {
+                return key
+            }
+        }
+        return nil
     }
 
     /// True when this line names the key with nothing after its colon — the
@@ -264,6 +383,7 @@ enum AssistPageVisibility {
 
     /// True when this page lives in one section's own folder, and so carries
     /// the plain keys rather than the per-section ones.
+    @MainActor
     static func isSectionLocal(pageAt url: URL, forSection sectionNumber: Int, in course: Course) -> Bool {
         let folder: String = course.sectionDirectoryURL(forSection: sectionNumber)
             .standardizedFileURL.path

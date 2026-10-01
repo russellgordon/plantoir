@@ -1,141 +1,136 @@
 #!/usr/bin/env python3
-"""Build the two figures that are assembled rather than photographed.
+"""Assemble the figures that are made of more than one window.
 
-Both make a point about COLOUR, which is why they are static images on the
-marketing page: a figure showing what three courses look like would be arguing
-against itself if it changed to match the reader's own colour scheme.
+**Every part is a whole macOS window capture, and stays whole.** Each comes
+from `screencapture -x -o -l <window id>` — the Option-click window capture —
+with the window's own rounded corners, transparent outside the curve. This
+module only PLACES them: it never crops through a window, never re-rounds a
+corner, and never draws a shape. Scaling is Lanczos, of a whole image. A
+shadow, where there is one, is made from the capture's own alpha channel, so
+it follows the real curve. (Until 2026-09-27 this file cut Safari's toolbar
+off the class-site captures and painted an 18 px rounded mask over the cut;
+Russell saw the painted corners on the live site, and the code is gone.
+`test_native_corners.py` fails on a square corner, or one drawn tighter than
+any real window's.)
 
 - `colour-schemes` fans three course home pages out like a hand of cards, so
-  the different Quartz schemes sit side by side and can be compared.
+  the different colour schemes sit side by side and can be compared.
 - `light-and-dark` puts one site's two schemes next to each other.
+
+Both make a point about COLOUR, which is why they are static images on the
+marketing page. Their parts are photographed in a window with no browser
+around it (`webwindow.swift`), so the subject is the sites, not three
+browsers — and the edge of each part is the window's real edge.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageFilter
 
 # The finished figures are the same width as every other screenshot on the
 # page, so the column edges line up down the whole site.
 FIGURE_WIDTH = 1700
 
-CORNER_RADIUS = 18
 SHADOW_BLUR = 26
-
-
-def rounded(image: Image.Image, radius: int = CORNER_RADIUS) -> Image.Image:
-    mask = Image.new("L", image.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [(0, 0), (image.width - 1, image.height - 1)], radius=radius, fill=255
-    )
-    result = image.convert("RGBA")
-    result.putalpha(mask)
-    return result
+SHADOW_STRENGTH = 0.40
+SHADOW_DROP = 8
 
 
 def with_shadow(card: Image.Image) -> Image.Image:
-    """A soft drop shadow, so overlapping cards read as a stack."""
-    from PIL import ImageFilter
+    """The card on a transparent canvas with a soft shadow beneath it.
 
+    The shadow is the card's OWN alpha channel, darkened, moved down a little
+    and blurred — so it has exactly the window's real corner curve, because it
+    is made of it. Nothing is drawn. The card itself is pasted back untouched.
+    """
     pad = SHADOW_BLUR * 2
     canvas = Image.new("RGBA", (card.width + pad * 2, card.height + pad * 2), (0, 0, 0, 0))
-
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    shape = Image.new("L", card.size, 0)
-    ImageDraw.Draw(shape).rounded_rectangle(
-        [(0, 0), (card.width - 1, card.height - 1)], radius=CORNER_RADIUS, fill=105
-    )
-    shadow.paste((0, 0, 0, 105), (pad, pad + 6), shape)
-    shadow = shadow.filter(ImageFilter.GaussianBlur(SHADOW_BLUR / 2))
-
-    canvas = Image.alpha_composite(canvas, shadow)
-    canvas.paste(card, (pad, pad), card)
+    card_alpha = card.getchannel("A")
+    shadow_alpha = card_alpha.point(lambda value: round(value * SHADOW_STRENGTH))
+    shadow_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
+    shadow_layer.paste(Image.new("RGBA", card.size, (0, 0, 0, 255)), (0, 0), shadow_alpha)
+    canvas.alpha_composite(shadow_layer, (pad, pad + SHADOW_DROP))
+    canvas = canvas.filter(ImageFilter.GaussianBlur(SHADOW_BLUR / 2))
+    canvas.alpha_composite(card, (pad, pad))
     return canvas
 
 
-# The browser's own chrome, in points, at the top of a Safari capture. Cropped
-# off for the fanned figure: three sets of traffic lights and three address
-# bars stacked up read as three browser windows, when the subject is the three
-# SITES. The full-window captures elsewhere on the page keep their chrome.
-CHROME_POINTS = 52
+def whole_captures(sources: list[Path]) -> list[Image.Image]:
+    """Open each capture as it is, and bring them all to one height.
+
+    Whole images, scaled with Lanczos: the corner curve and its transparency
+    scale with the rest of the window.
+    """
+    cards: list[Image.Image] = []
+    for path in sources:
+        with Image.open(path) as opened:
+            cards.append(opened.convert("RGBA"))
+    if not cards:
+        raise SystemExit("Nothing to assemble.")
+    height = cards[0].height
+    for card in cards:
+        height = min(height, card.height)
+    scaled: list[Image.Image] = []
+    for card in cards:
+        if card.height != height:
+            width = round(card.width * height / card.height)
+            card = card.resize((width, height), Image.Resampling.LANCZOS)
+        scaled.append(card)
+    return scaled
 
 
-def without_chrome(image: Image.Image, width_in_points: int = 1280) -> Image.Image:
-    scale = max(1, round(image.width / width_in_points))
-    top = CHROME_POINTS * scale
-    if top >= image.height:
-        return image
-    return image.crop((0, top, image.width, image.height))
+def save_figure(canvas: Image.Image, destination: Path, figure_width: int = FIGURE_WIDTH) -> Path:
+    """Trim the empty canvas round the figure, scale it whole, write PNG and WebP.
+
+    The trim is to the bounding box of everything visible, shadows included,
+    so it only ever removes fully transparent canvas — never part of a window.
+    """
+    visible = canvas.getbbox()
+    if visible:
+        canvas = canvas.crop(visible)
+    if canvas.width != figure_width:
+        height = round(canvas.height * figure_width / canvas.width)
+        canvas = canvas.resize((figure_width, height), Image.Resampling.LANCZOS)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(destination, format="PNG", optimize=True)
+    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
+    return destination
 
 
 def fan(sources: list[Path], destination: Path, visible_fraction: float = 0.42) -> Path:
-    """Overlap several captures horizontally, left one behind, right one in front.
+    """Overlap several whole captures, left one behind, right one in front.
 
     Each card shows `visible_fraction` of its width before the next one covers
     it — enough of the left edge of each site, which is where its colours and
-    its typeface live, to compare them at a glance.
+    its typeface live, to compare them at a glance. Every card keeps its own
+    corners; the ones in front simply lie over the ones behind.
     """
-    cards = [rounded(without_chrome(Image.open(path).convert("RGBA"))) for path in sources]
-    if not cards:
-        raise SystemExit("Nothing to fan out.")
-
-    # Every card the same height, so the fan sits on one line.
-    height = min(card.height for card in cards)
-    scaled = []
+    cards = whole_captures(sources)
+    pad = SHADOW_BLUR * 2
+    step = round(cards[0].width * visible_fraction)
+    total_width = step * (len(cards) - 1) + cards[-1].width + pad * 2
+    canvas = Image.new("RGBA", (total_width, cards[0].height + pad * 2), (0, 0, 0, 0))
+    index = 0
     for card in cards:
-        if card.height != height:
-            width = round(card.width * height / card.height)
-            card = card.resize((width, height), Image.LANCZOS)
-        scaled.append(card)
-
-    step = round(scaled[0].width * visible_fraction)
-    total = step * (len(scaled) - 1) + scaled[-1].width
-
-    canvas = Image.new("RGBA", (total, height), (0, 0, 0, 0))
-    for index, card in enumerate(scaled):
-        shadowed = with_shadow(card)
-        canvas.alpha_composite(shadowed, (step * index - SHADOW_BLUR * 2,
-                                          max(0, -SHADOW_BLUR * 2)))
-
-    # Trim to the drawn area, then scale to the page's figure width.
-    canvas = canvas.crop(canvas.getbbox())
-    if canvas.width != FIGURE_WIDTH:
-        height = round(canvas.height * FIGURE_WIDTH / canvas.width)
-        canvas = canvas.resize((FIGURE_WIDTH, height), Image.LANCZOS)
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(destination, format="PNG", optimize=True)
-    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
-    return destination
+        canvas.alpha_composite(with_shadow(card), (step * index, 0))
+        index += 1
+    return save_figure(canvas, destination)
 
 
-def side_by_side(sources: list[Path], destination: Path, gap: int = 34) -> Path:
-    """Two captures next to each other, same size, nothing overlapping."""
-    cards = [rounded(without_chrome(Image.open(path).convert("RGBA"))) for path in sources]
-    height = min(card.height for card in cards)
-    scaled = []
+def side_by_side(sources: list[Path], destination: Path, gap: int = 60) -> Path:
+    """Whole captures next to each other, the same height, nothing overlapping."""
+    cards = whole_captures(sources)
+    total_width = gap * (len(cards) - 1)
     for card in cards:
-        if card.height != height:
-            width = round(card.width * height / card.height)
-            card = card.resize((width, height), Image.LANCZOS)
-        scaled.append(card)
-
-    total = sum(card.width for card in scaled) + gap * (len(scaled) - 1)
-    canvas = Image.new("RGBA", (total, height), (0, 0, 0, 0))
+        total_width += card.width
+    canvas = Image.new("RGBA", (total_width, cards[0].height), (0, 0, 0, 0))
     offset = 0
-    for card in scaled:
+    for card in cards:
         canvas.alpha_composite(card, (offset, 0))
         offset += card.width + gap
-
-    if canvas.width != FIGURE_WIDTH:
-        height = round(canvas.height * FIGURE_WIDTH / canvas.width)
-        canvas = canvas.resize((FIGURE_WIDTH, height), Image.LANCZOS)
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(destination, format="PNG", optimize=True)
-    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
-    return destination
+    return save_figure(canvas, destination)
 
 
 def diagonal_hero(
@@ -152,8 +147,6 @@ def diagonal_hero(
     2. Middle: Plantoir deploying progress view
     3. Front / Bottom-Right: Safari viewing the live published class site
     """
-    from PIL import ImageFilter
-
     raw_images = [
         Image.open(obsidian_path).convert("RGBA"),
         Image.open(plantoir_path).convert("RGBA"),
@@ -165,7 +158,7 @@ def diagonal_hero(
     for img in raw_images:
         aspect = img.width / img.height
         w = round(base_height * aspect)
-        # Resampling with Lanczos smoothly scales the native anti-aliased rounded corners
+        # The whole capture, scaled with Lanczos: its real corner curve scales with it.
         resized = img.resize((w, base_height), Image.Resampling.LANCZOS)
         cards.append(resized)
 
@@ -187,30 +180,68 @@ def diagonal_hero(
         (stagger * 2, stagger * 2),
     ]
 
-    for card, (ox, oy) in zip(cards, offsets):
-        shadow_canvas = Image.new("RGBA", (card.width + pad * 2, card.height + pad * 2), (0, 0, 0, 0))
-        # Derive drop shadow directly from card's own alpha channel so shadow perfectly conforms
-        card_alpha = card.split()[3]
-        shadow_alpha = card_alpha.point(lambda p: round(p * 0.40))
-        shadow_layer = Image.new("RGBA", card.size, (0, 0, 0, 0))
-        shadow_color = Image.new("RGBA", card.size, (0, 0, 0, 255))
-        shadow_layer.paste(shadow_color, (0, 0), shadow_alpha)
-        shadow_canvas.alpha_composite(shadow_layer, (pad, pad + 8))
-        shadow_canvas = shadow_canvas.filter(ImageFilter.GaussianBlur(SHADOW_BLUR / 2))
+    for card, (offset_x, offset_y) in zip(cards, offsets):
+        canvas.alpha_composite(with_shadow(card), (offset_x, offset_y))
 
-        canvas.alpha_composite(shadow_canvas, (ox, oy))
-        canvas.alpha_composite(card, (ox + pad, oy + pad))
+    return save_figure(canvas, destination, figure_width)
 
-    bbox = canvas.getbbox()
-    if bbox:
-        canvas = canvas.crop(bbox)
 
-    if canvas.width != figure_width:
-        h = round(canvas.height * figure_width / canvas.width)
-        canvas = canvas.resize((figure_width, h), Image.Resampling.LANCZOS)
 
+# ---------- Per-appearance composites (v1.4.0 scenes) ----------
+#
+# These are ordinary light/dark PAIRS once assembled — `build.py` serves them
+# like any window shot — built from parts the scenes photograph once per
+# appearance. Each part is a real `screencapture -l` of a real window; the
+# composite only places them, it never paints over one.
+
+
+def pair_of_windows(sources: list[Path], destination: Path, gap: int = 40) -> Path:
+    """Two window captures side by side, tops aligned, same height.
+
+    Like every figure here, nothing is cropped and nothing is drawn.
+    """
+    cards: list[Image.Image] = []
+    for path in sources:
+        with Image.open(path) as opened:
+            cards.append(opened.convert("RGBA"))
+    height = min(card.height for card in cards)
+    scaled: list[Image.Image] = []
+    for card in cards:
+        if card.height != height:
+            card = card.resize((round(card.width * height / card.height), height), Image.LANCZOS)
+        scaled.append(card)
+    total = sum(card.width for card in scaled) + gap * (len(scaled) - 1)
+    canvas = Image.new("RGBA", (total, height), (0, 0, 0, 0))
+    offset = 0
+    for card in scaled:
+        canvas.alpha_composite(card, (offset, 0))
+        offset += card.width + gap
     destination.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(destination, format="PNG", optimize=True)
-    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
     return destination
 
+
+def banner_over_window(window: Path, banner: Path, destination: Path, margin_fraction: float = 0.012) -> Path:
+    """A notification banner laid over a window's top-right corner.
+
+    macOS draws the banner at the top right of the SCREEN; placing it at the
+    window's top right keeps the figure the size of the window while reading
+    the way a teacher sees it. Both parts keep their own transparent corners.
+    """
+    with Image.open(window) as opened:
+        base = opened.convert("RGBA")
+    with Image.open(banner) as opened:
+        card = opened.convert("RGBA")
+    widest = round(base.width * 0.42)
+    if card.width > widest:
+        card = card.resize((widest, round(card.height * widest / card.width)), Image.LANCZOS)
+    margin = max(8, round(base.width * margin_fraction))
+    # Room above the window for the banner to sit partly outside it, so it
+    # reads as something on top of the window rather than part of it.
+    lift = round(card.height * 0.35)
+    canvas = Image.new("RGBA", (base.width, base.height + lift), (0, 0, 0, 0))
+    canvas.alpha_composite(base, (0, lift))
+    canvas.alpha_composite(card, (base.width - card.width - margin, 0))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(destination, format="PNG", optimize=True)
+    return destination

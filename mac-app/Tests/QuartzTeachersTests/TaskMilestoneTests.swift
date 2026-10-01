@@ -20,7 +20,7 @@ final class TaskMilestoneTests: XCTestCase {
         XCTAssertEqual(runner.currentMilestoneLabel, "Getting this Mac ready…")
         XCTAssertEqual(runner.stepDescription, "Step 1 of 8")
 
-        runner.receiveOutput( "🚀 Starting container if needed...\n")
+        runner.receiveOutput( "🚀 Getting this folder's website builder ready…\n")
         XCTAssertEqual(runner.milestonesReached, 3)
         XCTAssertEqual(runner.currentMilestoneLabel, "Gathering your content…")
         XCTAssertEqual(runner.stepDescription, "Step 4 of 8")

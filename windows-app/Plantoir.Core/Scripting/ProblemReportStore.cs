@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Scripting;
 
@@ -32,11 +33,29 @@ public class ProblemReportStore
     public IReadOnlyList<string> RunFilePaths()
     {
         if (!Directory.Exists(RunsFolder)) return Array.Empty<string>();
-        return Directory.GetFiles(RunsFolder, "*.txt")
-            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+        return NewestFirst(Directory.GetFiles(RunsFolder, "*.txt"))
             .Take(MostRetainedRuns)
             .ToList();
     }
+
+    /// <summary>
+    /// Newest transcript first, by when the file was last written, with the
+    /// name as the tie-break.
+    ///
+    /// <para>Not by name alone, which is what this did until #144. The name
+    /// begins with a date, and until then that date was rendered in the
+    /// machine's default calendar — <c>2569-…</c> on a PC whose regional
+    /// format is Thai. Ordinally, every such name outranks every real
+    /// <c>2026-…</c> one, so the moment the names became Gregorian, a runs
+    /// folder that already held twenty old transcripts would have kept those
+    /// twenty for ever and deleted each NEW transcript on arrival — the
+    /// problem report showing the twenty oldest runs and never the one the
+    /// teacher was reporting. The file system's clock has no calendar, so it
+    /// orders old names and new ones alike.</para>
+    /// </summary>
+    private static IEnumerable<string> NewestFirst(IEnumerable<string> paths) =>
+        paths.OrderByDescending(File.GetLastWriteTimeUtc)
+             .ThenByDescending(Path.GetFileName, StringComparer.Ordinal);
 
     /// <summary>
     /// Writes one finished task's transcript into the runs folder, redacting
@@ -52,11 +71,11 @@ public class ProblemReportStore
     {
         Directory.CreateDirectory(RunsFolder);
         string safeName = string.Concat(scriptName.Split(Path.GetInvalidFileNameChars()));
-        string path = Path.Combine(RunsFolder, $"{startedAt:yyyy-MM-dd HHmmss} {safeName}.txt");
+        string path = Path.Combine(RunsFolder, $"{DateText.Invariant(startedAt, "yyyy-MM-dd HHmmss")} {safeName}.txt");
         var lines = new List<string>
         {
             $"{scriptName} — {outcome}",
-            $"Started {startedAt:yyyy-MM-dd HH:mm:ss}.",
+            $"Started {DateText.Stamp(startedAt)}.",
             "",
         };
         foreach (string line in transcriptLines)
@@ -68,8 +87,7 @@ public class ProblemReportStore
 
     private void PruneRuns()
     {
-        var stale = Directory.GetFiles(RunsFolder, "*.txt")
-            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+        var stale = NewestFirst(Directory.GetFiles(RunsFolder, "*.txt"))
             .Skip(MostRetainedRuns);
         foreach (string path in stale)
         {

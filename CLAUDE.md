@@ -297,10 +297,43 @@ Neither app contains toolchain logic of its own: they write the same
    and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
 
 7. **Colima is shared with other projects** on this machine (Supabase local dev,
-   among others). Never `colima stop` unless `docker ps -q` comes back empty.
-   The app's quit path and the scripts already enforce this; keep it that way.
+   among others). Never `colima stop` unless `docker ps -q` comes back empty —
+   **and the question has to have SUCCEEDED**, which is the half this rule used
+   to leave out. `DOCKER_CONTEXT=default docker ps -q` exits 1 and prints
+   nothing; so does a daemon that did not answer; and the old check read both
+   as "the machine is empty". Ask the socket Colima owns
+   (`DOCKER_HOST=unix://$HOME/.colima/default/docker.sock`), require exit 0 AND
+   no output, and leave it alone otherwise.
+
+   The launchers never stop it on purpose — with ONE exception worth knowing
+   before you read a log and think the rule was broken: when the Docker daemon
+   has already failed to answer, they force-cycle it (`colima stop --force`
+   then `colima start`, in each launcher's `ensure_container_runtime` —
+   `setup.sh:1421`, `preview.sh:1743`, `deploy.sh:2320` on 2026-09-30; grep the
+   function name, since the line numbers drift),
+   ungated, because at that point no Colima-based tool is working anyway.
+   **The app's quit path is the other one, and as of
+   2026-09-19 it does so for the first time** — it used to shell out to
+   `docker` and `colima` without saying where they are, and on a teacher's Mac
+   they are on no shell's PATH, so the whole path had never run (issue #220).
+   It now also refuses while any launcher is running on the host, which is the
+   window `docker ps` cannot see: building the image or starting the VM adds no
+   container at all. What it frees, what it refuses to free and what was
+   rejected is in `documentation/09-mac-app.md` → "Quitting: what it frees,
+   what it refuses to free, and why". Keep it that way.
+
    The Colima VM only mounts `$HOME`, so a working folder outside the home
-   directory bind-mounts as an empty folder inside the container.
+   directory cannot be handed to the container at all: since 2026-09-19 the
+   launchers name their mounts in a form that REFUSES a source the VM cannot
+   see (exit 125, `bind source path does not exist`), and the teacher is told
+   to keep the folder inside their home folder — GitHub issue #221,
+   `documentation/03-launcher-scripts.md`. Under the old `-v` form it mounted
+   as an EMPTY folder at exit 0 and the build silently produced nothing, which
+   is still what a container created the old way does until it is recreated.
+   If you ever re-measure this, use a path the VM has never been given: `-v`
+   CREATES its source inside the VM, so running it first makes the next
+   `--mount` to the same path succeed, and that is how the first measurement
+   of this came out backwards.
 8. **Swift follows the project style rules; the C# deliberately does not.**
    The Swift in `mac-app/` avoids `map`/`filter`/`reduce`, uses `@Observable`
    (never `ObservableObject`) and `// MARK: -` sections, and prefers clarity
@@ -501,6 +534,8 @@ truth, and generated project files churn and merge badly.
 brew install xcodegen
 cd mac-app
 ./Vendor/fetch-llama.sh     # REQUIRED before generating — see below
+./Vendor/fetch-sparkle.sh   # REQUIRED too, since #204 — see below
+./Vendor/fetch-helpers.sh   # REQUIRED too, since #312 — ~470 MB, see below
 xcodegen generate
 open Plantoir.xcodeproj
 ```
@@ -516,6 +551,24 @@ declares `Vendor/llama` as a resource folder, so `xcodegen generate` fails with
 again; nothing in the repo or the bundle carries them, and the app downloads
 them to `~/Library/Application Support/Plantoir/models` on a teacher's explicit
 yes.
+
+`fetch-sparkle.sh` fetches Sparkle 2.9.6, the framework a released Plantoir
+finds and installs its own updates with (#204), pinned by version AND SHA-256
+and refusing a mismatch. Also **not optional**: `project.yml` embeds
+`Vendor/Sparkle/Sparkle.framework`, so generating without it fails. A Debug
+build carries no update feed and never checks for anything —
+`documentation/09-mac-app.md` → "Updating itself".
+
+`fetch-helpers.sh` fetches the website builder's helper programs (Colima,
+Lima, the Docker CLI, buildx) and the virtual machine's starting disk for
+Apple silicon — **about 470 MB** — which the app carries so a teacher's first
+run does not download them (#312). Also **not optional**: `project.yml` names
+`Vendor/helpers` as a resource folder. It reads every version and checksum
+from `setup.sh` and keeps its downloads in a cache OUTSIDE the repository
+(`${PLANTOIR_HELPERS_CACHE:-~/Library/Caches/Plantoir-dev/helpers}`), so a
+second clone or worktree costs a few seconds and no disk; the first costs the
+download. Run `xcodegen generate` again after it replaces the folder (Trap 1).
+`documentation/09-mac-app.md` → "What the app carries for the website builder".
 
 Debug builds are signed with a real "Apple Development" identity
 (`DEVELOPMENT_TEAM` in `project.yml`) rather than ad-hoc — an ad-hoc signature
@@ -629,14 +682,25 @@ each working folder's `.toolchain/`. The launchers:
 
 - tag the image `teaching-quartz:src-<hash>`, where the hash covers every file
   in the build context — a changed recipe means a new tag, a rebuild and a
-  recreated container, with no update checks anywhere;
+  recreated container, with no update checks anywhere (this is about the
+  IMAGE: the released app itself does check plantoir.app for a new version of
+  the app once a day, #204);
 - build with BuildKit (`docker buildx build --load`) — the legacy builder
   corrupts a layer, so don't remove that;
-- name containers `teaching-quartz-<hash of pwd -P>`, one per working folder.
-  The Swift side derives the identical name via POSIX `realpath` — Foundation's
-  `resolvingSymlinksInPath()` strips `/private` where `pwd -P` keeps it, so
-  don't swap one for the other;
-- probe a free host port block per container (8081/8091/8101…), mapping to
+- name containers `teaching-quartz-<hash of /bin/pwd -P>`, one per working
+  folder, after moving into `$(/bin/pwd -P)`. `/bin/pwd`, not bash's built-in
+  `pwd -P`, which keeps the TYPED case and Unicode form and gave one folder
+  two containers (#189). The Swift side derives the identical name through
+  `FolderIdentity.canonicalPath` (`fcntl(F_GETPATH)`) — not `realpath`, which
+  keeps a `/System/Volumes/Data` prefix `/bin/pwd` drops, and not Foundation's
+  `resolvingSymlinksInPath()`, which strips `/private` — and compares folders
+  with the same function, so don't swap one for the other;
+- probe a free host port block per container (8081/8091/8101…, walking up
+  through forty blocks and skipping any block another folder's container
+  holds, stopped ones included, or anything on the Mac, in ANY account, is
+  listening on — the kernel's `netstat` list joined to `lsof`, since #310 —
+  `contracts/app-rules.json` → `previewPorts`,
+  one block of code shared by all three launchers), mapping to
   fixed container ports 8081–8084 for sites plus 9081–9084 for Quartz's
   live-reload websockets (`--wsPort` = port + 1000 — without it, concurrent
   previews collide on the websocket even with distinct site ports);
@@ -646,7 +710,9 @@ each working folder's `.toolchain/`. The launchers:
   websites live — `courses/<CODE>/.merged_output` is a symlink to it, so the
   link has to resolve to the same string on both sides. A container missing
   that mount is recreated, because a mount cannot be added to one that
-  already exists. Every launcher creates the same mount set; if one of them
+  already exists — and, since #94, only once nothing is running in it: every
+  recreation waits for a build or publish and refuses while a preview from
+  the folder is open (`documentation/03-launcher-scripts.md`). Every launcher creates the same mount set; if one of them
   stopped, two launchers would recreate the container away from each other
   on alternate runs. The rule, and what was rejected, is in
   [`contracts/shared-rules.json`](contracts/shared-rules.json) →
@@ -661,10 +727,14 @@ Node 22, while the image ships Node 20 because that is what Quartz v4.5.0 is
 known-good against. **If you raise Node, revalidate Quartz before chasing a
 newer CLI.**
 
-First-run bootstrap: if Docker isn't available, the launchers download pinned
+First-run bootstrap: if Docker isn't available, the launchers install pinned
 static binaries (Colima, Lima, the Docker CLI, buildx) into `~/Library/
-Application Support/Plantoir/tools` — no Homebrew, no admin rights. The image
-lives inside the Colima VM's disk (`~/.colima`).
+Application Support/Plantoir/tools` — no Homebrew, no admin rights. Since #312
+the app CARRIES those helpers and the VM's starting disk, and hands them over
+through `PLANTOIR_BUNDLED_HELPERS`; downloading them is only the fallback, for
+a launcher typed at the command line or a copy the app does not have
+(`documentation/03-launcher-scripts.md` → "Where the helper programs come from
+(GitHub #312)"). The image lives inside the Colima VM's disk (`~/.colima`).
 
 ### Editing the toolchain: two traps that cost real time
 
@@ -724,8 +794,11 @@ and every folder built before the fix stays broken until someone passes
 ## The local assistant
 
 Plantoir has an on-device assistant: the teacher types "publish tomorrow's
-class" and the pages are published. It is on `main` in both apps and in no
-released version, because no release has been tagged yet.
+class" and the pages are published. It is on `main` in both apps and it has
+SHIPPED: it is in v1.1.0 (2026-08-20), so a change to it is a change to
+something teachers already use — not to a feature still waiting for its first
+release. (This paragraph said "in no released version, because no release has
+been tagged yet" until 2026-09-19, a month after that stopped being true.)
 
 One sentence explains the architecture — **the model never does anything.** It
 reads a sentence and answers with the name of a function and its arguments;
@@ -768,10 +841,17 @@ Four things that cost a day each if you do not know them:
   tool as a recommendation, not a boundary. The rule went into Swift instead.
 - **Adding a tool is a routing change.** On the mac the local model is shown
   13 of the 22 tools that exist (`AssistToolRunner.localTools`); an MCP client
-  is shown 32 (`.mcpTools`, the 22 plus ten: three that ask for judgement about
-  meaning). More choices is the classic way a router degrades. **Windows'
-  `plantoir-mcp.exe` serves 37**, so the two MCP surfaces are no longer the
-  same product — see [issue #66](https://github.com/russellgordon/plantoir/issues/66).
+  is shown 37 (`.mcpTools`, the 22 plus fifteen: six that ask for judgement
+  about meaning — the three curriculum tools and #209's three for the How I
+  Teach page — #96's start-of-year pair, and seven more: `list_courses`, `explain_publishing`, `back_up_course` and the
+  `add_classes` and `make_room_for_classes` pairs). The local 13's full digest is pinned
+  (`scripts/test_tool_surface_digest.py`, made by `research/ai-assist/toolhash.py`). More choices is the classic way a router degrades, and
+  that is true of the MCP list as well as the local one. **Windows'
+  `plantoir-mcp.exe` also serves 37, but not the same 37** — five tools on
+  each side are the other's to have or to decline, so the two MCP surfaces are
+  still not the same product; which five, and why, is in
+  `documentation/10-local-ai-assistant.md` → "The two MCP surfaces are not the
+  same product" (issue #66, now closed, is where the count was first measured).
 
 On the mac the MCP server IS the app: `Plantoir --mcp-stdio <working-folder>`
 serves the same tools to Claude Code, so there is no second binary to sign or
@@ -780,7 +860,7 @@ forget. Windows ships `plantoir-mcp.exe` instead.
 ## Example content and skeletons
 
 `support/example_content/<CODE>/` holds ready-made course content, one folder
-per Ontario course code (ADA1O is the template to copy; **38 codes** have
+per Ontario course code (ADA1O is the template to copy; **39 codes** have
 payloads today — count the folders rather than trusting a number). Each payload
 is `manifest.json` plus `shared/` and `per_section/` trees, and the manifest is
 the course's ENTIRE structure when a teacher pre-populates: the wizard asks no
@@ -790,8 +870,10 @@ relies on are in
 — use that skill for any payload work rather than reasoning from scratch.
 
 Adding a course code is pure content: drop in a payload, no code changes. The
-wizard discovers it by the manifest's existence, and the payload automatically
-retires that code's skeleton.
+wizard discovers it by the manifest's existence, and the payload retires that
+code's skeleton only for a teacher who TAKES it — decline it and the course
+starts from the subject's skeleton (#248), with the payload's curriculum
+expectations installed into it so the coverage map still works (#251).
 
 Every other Ontario code (~1,900 of them) gets a **skeleton** from
 `support/skeletons/<family>/`: `families.json` maps 499 three-letter prefixes to
@@ -804,15 +886,17 @@ mistake there is a mistake in nineteen hundred courses.
 
 | Change | Gate |
 |---|---|
-| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh` |
-| macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests` |
+| Toolchain (launchers, `scripts/`, Dockerfile, patches, `contracts/`) | `./verify.sh` — builds a fresh `quartz-teacher:dev-test` image from the working tree, checks the baked files match, drives the real launchers. Needs a TTY; from a non-interactive shell: `script -q /dev/null ./verify.sh`. **One run at a time per Mac**: a second run says which one holds `/tmp/plantoir-verify-<uid>.lock` and exits 1 — run it again when the first has finished. |
+| macOS app | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersTests`. **3 skipped is the baseline; more than 3 skipped: read the reasons** — the tests that read the real window skip when it is on a desktop that is not showing, when the screen is locked, or when another account is using the Mac, and say so (`documentation/09-mac-app.md`, #249, #315). |
+| macOS app, **through the real interface** | `cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir -configuration Debug test -only-testing:QuartzTeachersUITests`, **alone on a quiet machine, with Plantoir quit**. Part of no gate. Every test launches through `IsolatedLaunch` with `--state-dir` (#154), so the app keeps its trail and preferences in a temp folder of its own; launchers are NOT redirected, so these run stub launchers only, and the marketing captures are the named exception. `AssistantRolloverUITests` is opt-in (`PLANTOIR_UI_TESTS=1`, real weights). `documentation/09-mac-app.md` → "Testing: the UI target keeps its state in `--state-dir`". |
 | Windows app | `cd windows-app && dotnet test Plantoir.Tests/Plantoir.Tests.csproj` — which since 2026-09-07 also runs every shared `scripts/test_*.py` through `PythonToolchainTests`, so a change to the shared Python is gated on Windows too. Needs a `python` on PATH and FAILS rather than skips without one. **Judge it by the TOTALS line, never the exit code** — `dotnet test` exits 1 for a failing test, for a test host that DIED underneath the run, and for a project that did not compile, and only the output tells the three apart. `.\run-tests.ps1` (repo root) runs the same command and says which happened; a convenience, not a gate. What each looks like, measured, is in `documentation/12-windows-app.md` → "Reading a test run". **A green totals line may carry NAMED GAPS** — contract keys this app does not implement yet, held open by name rather than left red; `windows-app/Plantoir.Tests/NamedGapLedger.cs` lists them with the issue and milestone that own each, and `contracts/README.md` → "Named gaps" says when one is allowed (and `RELEASING.md` step 2 says to read the ledger before cutting). |
 | Windows app, **through the real interface** | `.\run-ui-tests.ps1`, **run from the repository root** (every other command in this table starts `cd windows-app`; this one does not), — launches the x64 Debug `Plantoir.exe` with `--state-dir` and drives it with UI Automation, for what a unit test cannot see: that a control can be REACHED, that clicking it opens something, that the RENDERED text is what the model said in the order the contract fixes, that a scrolling list is not cut off at the bottom, that a panel follows the course a teacher selected rather than going stale, and that a sentence the contract pins is actually RENDERED where a teacher can see it rather than merely held in a constant. **Opt-in and part of no gate**: every test carries `[UiFact]` and skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and runs none. It is in the solution, so a SOLUTION build compiles it — the per-project commands this table names do not, which is the honest limit of the compile-rot protection. Needs a desktop session and the foreground, takes minutes, and CLOSES a running Plantoir (saying so, and not reopening it). Nothing of the teacher's is touched: `--state-dir` moves the whole state folder for the run — but that redirects only what the APP resolves, and one test now presses the wizard's Create button and so runs `setup.ps1`, which computes the builds root from the real environment itself. That one is safe because `setup_course.py` never resolves `merged_output_root`; **a test that drove Preview or a scheduled deploy would NOT be**, and `documentation/12-windows-app.md` is where to read why before writing one. |
 | Assistant routing | **Nothing.** Measured by hand — see below. |
+| Signing the updater into a release, and the mac's update feed (`mac-app/release/`, `publish.sh`, `website/update_feed.py`, `website/update_feeds.py`) | `python3 mac-app/release/test_release_signing.py` and `python3 website/test_update_feed.py` — macOS only, ad-hoc signatures and a throwaway key only, in NO suite. Run them when that path changes and before any `publish.sh -Sign` (RELEASING.md step 4). |
 | Publishing (any destination, `deploy.sh`/`deploy.py`, the preview→publish path) | `./verify-deploy.sh` — publishes to a folder, Netlify and Cloudflare, and every primary+secondary pairing, then FETCHES EACH SITE BACK and reads it. Deliberately NOT part of `verify.sh`: it needs three credentials, the network, and it creates real sites. Run it when the publishing path changes. |
 
-`verify.sh` **does not run on Windows** (bash, and it expects `docker` on PATH;
-in the normal Windows setup Docker Engine lives inside WSL2). What Windows does
+`verify.sh` **does not run on Windows** (bash, and it builds a Docker image;
+Windows has had no Docker at all since 2026-08-19). What Windows does
 and does not get from that, corrected 2026-09-07 — this used to say toolchain
 changes made there have "no automated gate" at all, which is no longer true:
 
@@ -823,10 +907,15 @@ changes made there have "no automated gate" at all, which is no longer true:
   eight seconds. They need no Docker, no network and no
   credentials, and until 2026-09-07 Windows ran none of them, so a shared file
   could be broken from that machine with every gate on it staying green.
-- **The IMAGE is still ungated there**, and that part stands: nothing on
-  Windows builds the Docker image or checks the baked files. Verify those by
-  driving a real publish through the app, and re-run `verify.sh` from the mac
-  after the next sync.
+- **The IMAGE is ungated there, because Windows has no image at all**: it
+  carries its own runtime and builds natively (since 2026-08-19,
+  `documentation/12-windows-app.md` → "Nothing here runs in a container"), so
+  a change to the Dockerfile or the baked files made from Windows is gated
+  only when `verify.sh` runs on the mac after the next sync. (This said
+  "verify those by driving a real publish through the app" until 2026-09-27,
+  which on Windows exercises the bundled runtime, not the image; bundle B's
+  review found that stale Windows-builds-an-image reading here had misled a
+  brief.)
 - **Publishing for real is `verify-deploy.ps1`**, the Windows counterpart of
   `verify-deploy.sh` in the row above and opt-in for the same reasons. No suite
   runs either of them; `.githooks/pre-commit` says so when a commit touches the
@@ -835,8 +924,8 @@ changes made there have "no automated gate" at all, which is no longer true:
 
 **The mac suite runs its test classes one at a time, and that is load-bearing.**
 The scheme sets `parallelizable = "NO"` on the test target. `PreviewLeaseTests`,
-`CourseActivityTests` and `CourseActivityPublishOnlyTests` all reset
-process-wide statics
+`CourseActivityTests`, `CourseActivityPublishOnlyTests` and
+`QuitConfirmationTests` all reset process-wide statics
 (`PreviewLeases.reset()`, `CourseActivity.reset()`) around individual methods,
 so turning parallel testing on would let one class wipe the state another is
 mid-assertion on — an intermittent failure that looks exactly like a
@@ -873,9 +962,9 @@ it rather than restating it:
 | What must HAPPEN, and in what order? | [`contracts/assist-cases.json`](contracts/assist-cases.json) — run by both test suites. |
 | What is the launcher asked to do, what is a teacher told about what they typed, which progress markers are shared? | [`contracts/app-rules.json`](contracts/app-rules.json). |
 | How is a teacher's list of class dates read? | [`contracts/schedule-rules.json`](contracts/schedule-rules.json). |
-| Which page titles carry numbers, what is the next class called, what happens when room is made for one? | [`contracts/class-planning.json`](contracts/class-planning.json). |
-| What are the backup and archive files called, and what section number is offered next? | [`contracts/course-management.json`](contracts/course-management.json). |
-| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, and **where a section's built website is kept — and what happens to a folder that already has one in the old place**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
+| Which page titles carry numbers, what is the next class called, what happens when room is made for one, and does Preview offer today's class for the front page (#397)? | [`contracts/class-planning.json`](contracts/class-planning.json). |
+| What are the backup and archive files called, what section number is offered next, and what may a course code be, at the app and at the command line (#402)? | [`contracts/course-management.json`](contracts/course-management.json). |
+| What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, **when quitting asks the teacher first (and when it must never ask)**, **when the app may install a new version of itself, and what a quit does to one that is ready (#204)**, and **when the links checklist is offered, what it says, and what Publish writes from it (#379)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
 | WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
@@ -960,10 +1049,11 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
+| [`WINDOWS-PARITY.md`](WINDOWS-PARITY.md) | **Temporary.** The ordered strategy for the milestone "Windows: parity with mac v1.4.0": every issue in a phase, what the shared Python gives free, the traps. `WINDOWS-BOOTSTRAP.md` points at it. The issues stay the source of truth, and the file is deleted when that milestone closes. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
 | [`documentation/13-windows-port-archive.md`](documentation/13-windows-port-archive.md) | Write-ups for Windows-port work verified shipped as of 2026-08-22, kept for the reasoning. **History, not a specification** — where it and a contract disagree, the contract is true. Closed to new entries. |
 | [`contracts/`](contracts/README.md) | **The Plantoir contract**: what the two apps must agree on, as data both test suites run — the assistant's sentences and behaviour, launcher arguments, validation wording, failure explanations, date reading, class naming, file names, progress markers, preview ports. Three of the ten files are generated from the macOS app by `Plantoir --write-contracts` and must never be hand-edited; the other seven — `shared-rules.json` among them — are AUTHORED, and can be proposed or corrected from either platform. `contracts/README.md` says which is which, and this line used to say "never hand-edited" of all ten, which sent a Windows session on 2026-09-08 to ask the mac for an edit it could make itself. Its coverage table says what is deliberately NOT shared, and why. |
-| [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, and the frozen asset names both platforms depend on. |
+| [`RELEASING.md`](RELEASING.md) | Cutting a release: signing, bundling, the frozen asset names both platforms depend on, and — since #204 — the mac's update feed, built and signed at the cut, and the one-time dress rehearsal of the updater. |
 | [`website/`](website/README.md) | **plantoir.app.** The marketing site's SOURCES — a layout, a stylesheet, one file per page, and the screenshot harness. `python3 website/build.py` writes `site/`, and `--deploy` publishes it to Netlify — the site is not Git-connected, so nothing deploys on push. `site/` is a build output and hand-edits to it are overwritten. The release version line lives in `website/site.json`. Screenshots are captured from the real app and the real class sites by `website/shots/capture.py`, in both colour schemes. |
 | [`TODO.md`](TODO.md) | **Closed to new entries** since 2026-09-08 — deferred work is a GitHub issue now. What is left is append-only history like a `GUI-IMPROVEMENTS.md` row: an entry records what was true on its day and what the entry itself got wrong, and is not rewritten when the behaviour changes again. |
 | [`AGENTS.md`](AGENTS.md) | How this file reaches an agent that looks for `AGENTS.md` rather than `CLAUDE.md`. It is a POINTER, four sentences long, and deliberately carries no rules of its own — a second copy of the rules is a second copy to keep in step, and the one that used to live beside it went stale exactly that way. |

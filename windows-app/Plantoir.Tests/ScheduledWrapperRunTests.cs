@@ -59,7 +59,7 @@ public class ScheduledWrapperRunTests : IDisposable
         // and two others do not — so whether the machine is left clean depended
         // on which tests ran and in what order, which is not something to leave
         // to luck. Found by review 2026-09-09.
-        try { ScheduledHealthFindings.Take("ICS3U", 1); } catch { }
+        try { ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()); } catch { }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 
@@ -85,6 +85,9 @@ public class ScheduledWrapperRunTests : IDisposable
 
     /// <summary>The task name of the most recent <see cref="RunWrapper"/>, which the capture files are named after.</summary>
     private string _lastTaskName = "";
+
+    /// <summary>The working folder a run is given — its records are filed under its id (#309).</summary>
+    private string WorkFolder(string? name = null) => Path.Combine(_root, name ?? "work with spaces");
 
     private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null)
     {
@@ -166,10 +169,10 @@ public class ScheduledWrapperRunTests : IDisposable
 
         // The record for the stub's course lives in the real per-user
         // location, so take it the way the app does and put nothing back.
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         RunWrapper(LauncherStub);
-        var found = ScheduledHealthFindings.Take("ICS3U", 1);
+        var found = ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         // The whole point of scanning before the failure guard: this build
         // FAILED, and the finding is the reason it failed.
@@ -193,7 +196,7 @@ public class ScheduledWrapperRunTests : IDisposable
     {
         if (!PowerShellIsAvailable) return;
 
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         var (exitCode, output) = RunWrapper("""
             $ErrorActionPreference = 'Stop'
@@ -206,7 +209,7 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Contains("DEPLOY RAN", output);
         // A clean run clears anything an earlier one left.
-        Assert.Empty(ScheduledHealthFindings.Take("ICS3U", 1));
+        Assert.Empty(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()));
     }
 
     [Fact]
@@ -219,13 +222,13 @@ public class ScheduledWrapperRunTests : IDisposable
         // split and powershell.exe answered "Processing -File 'C:\...\work'
         // failed because the file does not have a '.ps1' extension" — exit
         // -196608, no build, no findings, no deploy, every night, silently.
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder("a folder with spaces"));
 
         var (exitCode, output) = RunWrapper(LauncherStub, "a folder with spaces");
 
         Assert.DoesNotContain("does not have a '.ps1' extension", output);
         Assert.Equal(1, exitCode);                       // the stub's own code, not a launch failure
-        Assert.Single(ScheduledHealthFindings.Take("ICS3U", 1));
+        Assert.Single(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder("a folder with spaces")));
     }
 
     [Fact]
@@ -244,6 +247,6 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.Empty(Directory.Exists(dir)
             ? Directory.GetFiles(dir, _lastTaskName + "*")
             : Array.Empty<string>());
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
     }
 }

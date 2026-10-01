@@ -14,8 +14,10 @@ public static class FailureExplainer
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
+        ?? UnreadableFrontPageExplanation(output)
         ?? MissingFrontPageExplanation(output)
-        ?? MissingBuildExplanation(output);
+        ?? MissingBuildExplanation(output)
+        ?? WorkspaceNotCreatedExplanation(output);
 
     /// <summary>
     /// The one-time Windows setup (the launchers' Install-WindowsSubsystem)
@@ -124,8 +126,59 @@ public static class FailureExplainer
     /// built yet" is the wrong thing to say to somebody who just watched it
     /// build. The build's own reason is the specific one, so it wins.
     /// </summary>
+    /// <summary>
+    /// The mac's builder could not be handed the working folder at all
+    /// (#221, #230): the daemon refused the bind mount with
+    /// "bind source path does not exist". This app builds natively and has no
+    /// mount, so the output cannot appear here today; the case is implemented
+    /// anyway so the two explainers stay ONE list of troubles, exactly as the
+    /// mac implements the Windows-only "untrusted mount point" case.
+    ///
+    /// <para>Matched NARROWLY and asked LAST, both copied from the mac rather
+    /// than re-derived: "Error response from daemon" was the tempting
+    /// substring and would tell a teacher whose disk was full to check where
+    /// their folder is kept, and a matcher placed earlier could shadow the
+    /// specific troubles above it. The sentence is the contract's, and it
+    /// reads mac-shaped (the home-folder advice is the mac VM's limit); said
+    /// so on #230 rather than forked.</para>
+    /// </summary>
+    private static string? WorkspaceNotCreatedExplanation(string output) =>
+        output.Contains("bind source path does not exist")
+            ? "Plantoir could not get this folder ready for building. Check that it is inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then try again."
+            : null;
+
     private static string? MissingFrontPageExplanation(string output) =>
         output.Contains("no front page, so no website was produced")
             ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
             : null;
+
+    /// <summary>
+    /// A section whose FRONT PAGE's settings cannot be read (#300, the mac's
+    /// #246): the build hides such a page, so there is no website to publish.
+    /// Asked before the missing-front-page and missing-build cards — the
+    /// build's line deliberately never says "no front page", and it is
+    /// followed by "Built site not found" — and the line number is read only
+    /// from the same line as the sign. The mac's
+    /// <c>FailureExplainer.unreadableFrontPageExplanation</c>, word for word.
+    /// </summary>
+    private static string? UnreadableFrontPageExplanation(string output)
+    {
+        const string sign = "the settings at the top of its front page could not be read";
+        int at = output.IndexOf(sign, StringComparison.Ordinal);
+        if (at < 0) return null;
+        const string headline = "The settings at the top of this section's front page could not be read, "
+            + "so there is no website to publish. ";
+        return LineNumberAfter("(near line ", output[(at + sign.Length)..]) is { } line
+            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then publish again."
+            : headline + "Open the front page in Obsidian, fix its settings, then publish again.";
+    }
+
+    /// <summary>The number after <paramref name="marker"/>, only when the marker is on the same line.</summary>
+    private static int? LineNumberAfter(string marker, string text)
+    {
+        int at = text.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0 || text[..at].Contains('\n')) return null;
+        string digits = new(text[(at + marker.Length)..].TakeWhile(char.IsAsciiDigit).ToArray());
+        return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int line) ? line : null;
+    }
 }

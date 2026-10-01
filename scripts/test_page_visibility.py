@@ -21,6 +21,12 @@ section. The splitter is where the polarity used to invert: a `draft: yes`
 page was split as PUBLISHED into every section while the build went on hiding
 the original.
 """
+import builtins
+import contextlib
+import io
+import json
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -281,10 +287,11 @@ class CourseLevelSplitterTests(unittest.TestCase):
         self.assertIn("publishForSection2: false", out)
         self.assertNotIn("  false", out)
 
-        # The same where the key's own line looks complete. That page does not
-        # build either way — the orphaned value is a mapping error — so this is
-        # a page that stops building being split into pages that still do not,
-        # rather than a published page becoming one that will not build.
+        # The same where the key's own line looks complete. The build cannot
+        # parse that page either way — the orphaned value is a mapping error —
+        # so this is an unreadable page being split into pages that still are
+        # (hidden and named by the build since #246; before it, a build that
+        # stopped), rather than a published page becoming an unreadable one.
         out = self.split("publish: false\n# note\n  false")
         self.assertIn("publishForSection1: false", out)
         self.assertNotIn("  false", out)
@@ -331,6 +338,221 @@ class CourseLevelSplitterTests(unittest.TestCase):
     def test_a_page_with_no_flag_is_given_none(self):
         out = self.split("title: Course Outline")
         self.assertNotIn("publishForSection", out)
+
+
+class NewCourseIsWrittenInTheCurrentKeys(unittest.TestCase):
+    """
+    What a NEW course's pages are scaffolded with (GitHub issue #139).
+
+    The mac's wizard integration test asserted `draftSection1: false` on a
+    freshly made course — the retired key, with the retired polarity — and
+    never noticed, because that test drives the real setup.sh through Docker
+    and is skipped in every ordinary run. What it was checking is produced
+    entirely by this Python, so it is checked here instead, where it runs on
+    the mac (verify.sh) and on Windows (PythonToolchainTests) without Docker.
+
+    The REAL wizard is driven in process, the way
+    test_graded_folders_new_course.py drives it: `input` and
+    `setup_course.getch` are replaced, COURSES_DIR is a temporary folder and
+    QUARTZ_DIR a folder that does not exist. Prompts are answered by their
+    TEXT, never by position, and every run asserts that the case's own course
+    folder was made and filled — the first #292 measurement silently built
+    the default course.
+
+    Two sections, so the per-section loop is proven rather than one pass of
+    it, along the three ways a new course gets its pages: the plain scaffold
+    (a skeleton declined), a skeleton taken, and ready-made pages taken. The
+    key names are read from contracts/file-formats.json ->
+    pageVisibility.keys, never retyped.
+    """
+
+    SECTIONS = [1, 2]
+    MOST_PROMPTS = 300
+    FEWEST_PAGES = 5
+
+    @classmethod
+    def setUpClass(cls):
+        repo_contracts = Path(__file__).resolve().parent.parent / "contracts"
+        if repo_contracts.is_dir():
+            toolchain_paths.CONTRACTS_DIR = repo_contracts
+        contracts.reset_cache()
+        cls.keys = contracts.section("file-formats", "pageVisibility", "keys")
+
+    def course_level_key(self, which, section):
+        return self.keys["courseLevelPage"][which].replace("<N>", str(section))
+
+    def create_course(self, code, saved_config, takes_example, keeps_skeleton):
+        """Make a new course through the real wizard; return its folder."""
+        temporary = Path(tempfile.mkdtemp(prefix="plantoir-new-course-keys-"))
+        self.addCleanup(shutil.rmtree, temporary, True)
+        courses = temporary / "courses"
+        courses.mkdir()
+        if saved_config is not None:
+            # What the apps do: the wizard's answers are saved first, and
+            # setup.sh reads them as its defaults.
+            course = courses / code
+            course.mkdir()
+            (course / "course_config.json").write_text(
+                json.dumps(saved_config), encoding="utf-8")
+
+        original_courses = toolchain_paths.COURSES_DIR
+        original_quartz = toolchain_paths.QUARTZ_DIR
+        original_input = builtins.input
+        original_getch = setup_course.getch
+        prompts_seen = [0]
+        code_typed = [False]
+        skeleton_offered = [False]
+        example_offered = [False]
+        most_prompts = self.MOST_PROMPTS
+
+        def answer(prompt=""):
+            prompts_seen[0] += 1
+            if prompts_seen[0] > most_prompts:
+                raise RuntimeError("the wizard kept asking; it is looping")
+            text = str(prompt).lower()
+            if "enter the course code" in text:
+                code_typed[0] = True
+                return code
+            if "how many sections" in text:
+                return str(len(self.SECTIONS))
+            if "pre-populate this course with example content?" in text:
+                example_offered[0] = True
+                return "y" if takes_example else "n"
+            if "start this course from that skeleton?" in text:
+                skeleton_offered[0] = True
+                return "y" if keeps_skeleton else "n"
+            return ""
+
+        def press_return():
+            return "ENTER"
+
+        toolchain_paths.COURSES_DIR = courses
+        toolchain_paths.QUARTZ_DIR = temporary / "no-quartz-here"
+        builtins.input = answer
+        setup_course.getch = press_return
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                setup_course.setup_course(no_backup=True)
+        finally:
+            toolchain_paths.COURSES_DIR = original_courses
+            toolchain_paths.QUARTZ_DIR = original_quartz
+            builtins.input = original_input
+            setup_course.getch = original_getch
+
+        self.assertTrue(code_typed[0], "the wizard never asked for the course code")
+        self.assertFalse((temporary / "no-quartz-here").exists(),
+                         "the wizard created Quartz's folder")
+        if takes_example:
+            self.assertTrue(example_offered[0], f"{code}: no ready-made pages were offered")
+        else:
+            self.assertTrue(skeleton_offered[0], f"{code}: no skeleton was offered")
+        course = courses / code
+        config_path = course / "course_config.json"
+        self.assertTrue(config_path.is_file(),
+                        f"no {code} course was made — the run went down another path")
+        written = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(written.get("course_code"), code)
+        self.assertEqual(written.get("section_numbers"), self.SECTIONS,
+                         f"{code}: the course was not made with two sections")
+        self.assertEqual(bool(written.get("prepopulate_example_content")), takes_example)
+        pages = sorted(course.rglob("*.md"))
+        self.assertGreaterEqual(len(pages), self.FEWEST_PAGES,
+                                f"{code}: only {len(pages)} pages were installed")
+        return course
+
+    def frontmatter_keys(self, page):
+        """The top-level keys of a page's frontmatter, with their raw values."""
+        text = page.read_text(encoding="utf-8")
+        found = {}
+        if not text.startswith("---"):
+            return found
+        lines = text.split("\n")
+        for line in lines[1:]:
+            if line.strip() == "---":
+                break
+            if line[:1] in (" ", "\t", "-", "#") or ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            found[key.strip()] = value.strip()
+        return found
+
+    def section_folder_of(self, course, page):
+        first = page.relative_to(course).parts[0]
+        for number in self.SECTIONS:
+            if first == f"section{number}":
+                return number
+        return None
+
+    def assert_every_page_uses_the_current_keys(self, course):
+        section_current = self.keys["sectionLocalPage"]["current"]
+        section_legacy = self.keys["sectionLocalPage"]["legacy"]
+        course_level_pages = 0
+        section_pages = 0
+        for page in sorted(course.rglob("*.md")):
+            name = str(page.relative_to(course))
+            keys = self.frontmatter_keys(page)
+            for number in self.SECTIONS:
+                self.assertNotIn(self.course_level_key("legacy", number), keys,
+                                 f"{name} carries the retired course-level key")
+            self.assertNotIn(section_legacy, keys, f"{name} carries the retired key")
+            if not keys:
+                continue
+            if self.section_folder_of(course, page) is not None:
+                section_pages += 1
+                self.assertIn(section_current, keys,
+                              f"{name}, a section page, says nothing about being published")
+                continue
+            if not any(key.startswith("createdSection") or key.startswith("publishForSection")
+                       for key in keys):
+                # A page with no flag is given none (see the splitter
+                # tests above); it is not a page this check is about.
+                continue
+            course_level_pages += 1
+            self.assertNotIn(section_current, keys,
+                             f"{name}, a course-level page, carries the section key")
+            for number in self.SECTIONS:
+                self.assertIn(f"createdSection{number}", keys,
+                              f"{name} carries no createdSection{number}")
+                self.assertIn(self.course_level_key("current", number), keys,
+                              f"{name} says nothing about section {number}")
+        self.assertGreater(course_level_pages, 0, "no course-level page was checked")
+        self.assertGreater(section_pages, 0, "no section page was checked")
+
+    def saved_scaffold_config(self, code):
+        """The configuration the mac's integration test saves, for two sections."""
+        return {
+            "course_code": code,
+            "course_name": "Wizard Equivalence Test",
+            "custom_short_name": "",
+            "locale": "en-US",
+            "num_sections": len(self.SECTIONS),
+            "section_numbers": self.SECTIONS,
+            "shared_folders": ["Concepts", "Exercises"],
+            "shared_files": ["Learning Goals.md"],
+            "per_section_folders": ["All Classes"],
+            "per_section_files": ["Key Links.md"],
+            "hidden": ["Media", "Learning Goals.md", "Key Links.md"],
+            "expandable": ["Concepts", "Exercises"],
+        }
+
+    def test_the_plain_scaffold_publishes_its_own_pages_in_the_current_keys(self):
+        course = self.create_course("ZZT2O", self.saved_scaffold_config("ZZT2O"),
+                                    takes_example=False, keeps_skeleton=False)
+        self.assert_every_page_uses_the_current_keys(course)
+        for landing in ("Concepts/index.md", "Exercises/index.md", "Learning Goals.md"):
+            keys = self.frontmatter_keys(course / landing)
+            for number in self.SECTIONS:
+                self.assertEqual(keys.get(self.course_level_key("current", number)), "true",
+                                 f"{landing} is not published for section {number}")
+
+    def test_a_skeleton_is_written_in_the_current_keys(self):
+        course = self.create_course("ZZT2O", self.saved_scaffold_config("ZZT2O"),
+                                    takes_example=False, keeps_skeleton=True)
+        self.assert_every_page_uses_the_current_keys(course)
+
+    def test_ready_made_pages_are_written_in_the_current_keys(self):
+        course = self.create_course("ADA1O", None, takes_example=True, keeps_skeleton=False)
+        self.assert_every_page_uses_the_current_keys(course)
 
 
 if __name__ == "__main__":

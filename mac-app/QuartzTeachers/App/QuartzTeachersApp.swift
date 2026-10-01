@@ -13,6 +13,23 @@ struct QuartzTeachersApp: App {
     // MARK: - Initializer
 
     init() {
+        // A folder standing in for the home folder (#154), checked before
+        // ANYTHING else — before the server, the scheduled run and the
+        // contracts below, which all keep state of their own. A malformed flag
+        // ends the launch here: a redirect that silently did not happen is a
+        // test that reports success while writing the teacher's real trail.
+        do {
+            if let stateDirectory = try RealHome.stateDirectory(fromArguments: CommandLine.arguments) {
+                try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+            }
+        } catch let problem as RealHome.StateDirectoryProblem {
+            FileHandle.standardError.write(Data(("Plantoir: " + problem.explanation + "\n").utf8))
+            exit(64)
+        } catch {
+            FileHandle.standardError.write(Data(("Plantoir: could not create the state folder: \(error)\n").utf8))
+            exit(64)
+        }
+
         // Claude Code drives the same tools the built-in assistant does, by
         // launching this binary with --mcp-stdio. Checked FIRST, and it never
         // returns: a server must not put a window on screen, register fonts,
@@ -84,10 +101,10 @@ struct QuartzTeachersApp: App {
                 // its descendants claim, and one overgrown view drags
                 // the whole interface (sidebar included) out of view.
                 .frame(
-                    minWidth: 900,
+                    minWidth: WindowChrome.minimumWindowWidth,
                     idealWidth: 1100,
                     maxWidth: .infinity,
-                    minHeight: 600,
+                    minHeight: WindowChrome.minimumWindowHeight,
                     idealHeight: 720,
                     maxHeight: .infinity
                 )
@@ -99,6 +116,11 @@ struct QuartzTeachersApp: App {
                 Button("About Plantoir") {
                     openWindow(id: "about")
                 }
+            }
+            // Where every Mac application puts it (#204). Drawn only when the
+            // app has an updater, which a development build never does.
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton()
             }
             PreviewCommands()
             CommandGroup(after: .newItem) {
@@ -129,7 +151,10 @@ struct QuartzTeachersApp: App {
         // Not restored on relaunch: reopening would load a model before the
         // teacher had asked for one.
         WindowGroup("Assistant", id: "assistant", for: AssistWindowRequest.self) { $request in
-            if let request {
+            // A window is never opened on a course kept for reference. The
+            // menu item is not drawn on one, so this catches the ways round
+            // that: a restored scene, or a stale `openWindow(value:)`.
+            if let request, !request.namesACourseKeptForReference() {
                 AssistWindowView(
                     courseCode: request.courseCode,
                     sectionNumber: request.sectionNumber,

@@ -257,14 +257,14 @@ final class WorkingFolderSelectionTests: XCTestCase {
                     + "nothing would ever reclaim it"
             ),
             (
-                "func deployAndWait()",
+                "func deployAndWait(pressedByTheAssistant:",
                 "cancelDeploy reclaims the container-side build against the folder noted here"
             ),
         ]
         for capture in captures {
             let body: String = try XCTUnwrap(
                 bodyOfFunction(startingWith: capture.where, in: source),
-                "\(capture.where) is no longer in SectionDetailView"
+                "\(capture.where)…) is no longer in SectionDetailView"
             )
             XCTAssertTrue(
                 body.contains("folderThisSectionWorksIn = "),

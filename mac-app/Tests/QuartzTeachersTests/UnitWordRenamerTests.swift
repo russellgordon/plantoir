@@ -135,12 +135,12 @@ final class UnitWordRenamerTests: XCTestCase {
 
     // MARK: - Carrying it out
 
-    func testRenamingMovesRetitlesRelinksBacksUpAndRecords() throws {
+    func testRenamingMovesRetitlesRelinksBacksUpAndRecords() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
 
         XCTAssertEqual(outcome.pagesRenamed, 3)
@@ -185,16 +185,16 @@ final class UnitWordRenamerTests: XCTestCase {
     }
 
     /// The operation is its own inverse — which is the undo.
-    func testRenamingBackPutsEverythingAsItWas() throws {
+    func testRenamingBackPutsEverythingAsItWas() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         let before: String = try XCTUnwrap(text(of: "section1/All Classes/index.md", in: course))
 
         let there: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
-        try UnitWordRenamer.rename(there, in: course, coursesDirectoryURL: root)
+        try await UnitWordRenamer.rename(there, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(there, in: course)
         let back: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Module", to: "Unit", in: course)
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(back, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(back, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(back, in: course)
 
         XCTAssertEqual(outcome.pagesRenamed, 3)
@@ -203,14 +203,14 @@ final class UnitWordRenamerTests: XCTestCase {
         XCTAssertEqual(course.configuration.unitWord, "Unit")
     }
 
-    func testAChangeOfCapitalisationAloneIsCarriedOut() throws {
+    func testAChangeOfCapitalisationAloneIsCarriedOut() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "unit", in: course)
         XCTAssertTrue(plan.canProceed, plan.problems.joined(separator: " "))
         XCTAssertEqual(plan.renames.count, 3)
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
         XCTAssertEqual(outcome.pagesRenamed, 3)
 
@@ -345,7 +345,7 @@ final class UnitWordRenamerTests: XCTestCase {
 
     /// Finishing a rename that stopped during its link pass moves nothing
     /// and rewrites plenty — and the sentence says so.
-    func testFinishingARenameStoppedDuringTheLinkPassReportsTheLinks() throws {
+    func testFinishingARenameStoppedDuringTheLinkPassReportsTheLinks() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         // Every page moved, no link followed, the record still there.
@@ -361,7 +361,7 @@ final class UnitWordRenamerTests: XCTestCase {
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
         XCTAssertTrue(plan.renames.isEmpty)
         XCTAssertEqual(plan.linksToRewrite, 4)
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
         XCTAssertEqual(outcome.pagesRenamed, 0)
         XCTAssertEqual(outcome.linksRewritten, 4)
@@ -417,10 +417,10 @@ final class UnitWordRenamerTests: XCTestCase {
     }
 
     /// Restoring a backup puts the pages back and takes the record with them.
-    func testRestoringABackupClearsTheRecordOfARenameUnderWay() throws {
+    func testRestoringABackupClearsTheRecordOfARenameUnderWay() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
-        let backupURL: URL = try CourseArchiver.backUpCourse(course, coursesDirectoryURL: root)
+        let backupURL: URL = try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: root)
         try UnitWordRenamer.recordRenameStarting(from: "Unit", to: "Module", courseDirectory: course.directoryURL)
         let folder: URL = course.directoryURL.appendingPathComponent("section1/All Classes")
         try FileManager.default.moveItem(
@@ -439,7 +439,7 @@ final class UnitWordRenamerTests: XCTestCase {
 
     // MARK: - What refuses it
 
-    func testAPageAlreadyInTheWayRefusesTheWholeRenameAndTouchesNothing() throws {
+    func testAPageAlreadyInTheWayRefusesTheWholeRenameAndTouchesNothing() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         try writeClass("Module 1, Day 2", section: 1, in: course)
@@ -451,13 +451,17 @@ final class UnitWordRenamerTests: XCTestCase {
             plan.problems,
             [UnitWordRenameWording.problemPageInTheWay(courseCode: "ICS3U", sectionNumber: 1, name: "Module 1, Day 2")]
         )
-        XCTAssertThrowsError(try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root))
+        do {
+            try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+            XCTFail("A refused plan must not be carried out")
+        } catch {
+        }
         XCTAssertTrue(exists("section1/All Classes/Unit 1, Day 1.md", in: course))
         XCTAssertEqual(backups(in: root).count, 0, "Nothing was backed up because nothing was about to change")
         XCTAssertNil(UnitWordRenamer.interruptedRenameTarget(in: course))
     }
 
-    func testAPageThatCannotBeReadRefusesEverythingBeforeAnythingMoves() throws {
+    func testAPageThatCannotBeReadRefusesEverythingBeforeAnythingMoves() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         let locked: URL = course.directoryURL.appendingPathComponent("section2/All Classes/Unit 2, Day 1.md")
@@ -466,7 +470,10 @@ final class UnitWordRenamerTests: XCTestCase {
 
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
         XCTAssertTrue(plan.canProceed)
-        XCTAssertThrowsError(try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)) { error in
+        do {
+            try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+            XCTFail("A page that cannot be read must stop the rename")
+        } catch {
             XCTAssertEqual(
                 error.localizedDescription,
                 UnitWordRenameWording.problemPageUnreadable(courseCode: "ICS3U", sectionNumber: 2, name: "Unit 2, Day 1")
@@ -479,7 +486,7 @@ final class UnitWordRenamerTests: XCTestCase {
 
     // MARK: - A course with nothing to rename
 
-    func testACourseWithNoClassPagesOnlyChangesItsSettings() throws {
+    func testACourseWithNoClassPagesOnlyChangesItsSettings() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
         for name in ["section1/All Classes/Unit 1, Day 1.md", "section1/All Classes/Unit 1, Day 2.md", "section2/All Classes/Unit 2, Day 1.md"] {
@@ -489,7 +496,7 @@ final class UnitWordRenamerTests: XCTestCase {
         let plan: UnitWordRenamePlan = UnitWordRenamer.plan(from: "Unit", to: "Module", in: course)
         XCTAssertTrue(plan.canProceed)
         XCTAssertEqual(plan.renames.count, 0)
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
         XCTAssertEqual(outcome.pagesRenamed, 0)
         XCTAssertEqual(course.configuration.unitWord, "Module")
@@ -502,7 +509,7 @@ final class UnitWordRenamerTests: XCTestCase {
 
     // MARK: - A rename that stopped part way
 
-    func testAnInterruptedRenameIsRecognisedAndFinishedByRunningItAgain() throws {
+    func testAnInterruptedRenameIsRecognisedAndFinishedByRunningItAgain() async throws {
         let (course, root) = try makeCourse()
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
 
@@ -522,7 +529,7 @@ final class UnitWordRenamerTests: XCTestCase {
         XCTAssertEqual(plan.linkMap["Unit 1, Day 1"], "Module 1, Day 1", "…but links to its old name are still followed")
         XCTAssertEqual(plan.linksToRewrite, 4)
 
-        let outcome: UnitWordRenameOutcome = try UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
+        let outcome: UnitWordRenameOutcome = try await UnitWordRenamer.rename(plan, in: course, coursesDirectoryURL: root)
         try UnitWordRenamer.record(plan, in: course)
         XCTAssertEqual(outcome.pagesRenamed, 2)
         XCTAssertEqual(outcome.linksRewritten, 4)

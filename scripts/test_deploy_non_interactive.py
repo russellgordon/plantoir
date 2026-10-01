@@ -310,7 +310,7 @@ class TheFlagIsAccepted(unittest.TestCase):
             )
             self.assertNotIn("Unknown option", result.stdout + result.stderr)
             self.assertIn(
-                "missing the toolchain's build recipe", result.stdout + result.stderr,
+                "missing the recipe for its website builder", result.stdout + result.stderr,
                 "The flags were parsed and it reached the first real step",
             )
 

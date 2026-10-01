@@ -7,12 +7,23 @@ Run it from the top of the repository::
     python3 website/shots/capture.py --app      # just the app windows
     python3 website/shots/capture.py --sites    # just the class websites
 
+    # The v1.4.0 scenes, in the kept marketing folder (~/Plantoir Marketing):
+    python3 website/shots/capture.py --provision          # make or reuse the folder
+    python3 website/shots/capture.py --scenes             # all eleven scenes
+    python3 website/shots/capture.py --only reference     # one scene (or several, a,b)
+    python3 website/shots/capture.py --dry-run            # prove every scene can be set up
+
+See website/README.md, "Regenerating every image", and scenes.py.
+
 What it does, in order:
 
-1. **Provisions a demo working folder** (``~/Teaching`` by default) by driving
-   the app's own new-course panel for ENG2D, MCV4U and SCH3U -- three subjects
-   chosen so the class sites between them show prose, typeset mathematics and
-   chemistry. Skipped when the courses are already there.
+1. **Provisions a demo working folder** (``~/Desktop/Teaching`` by default,
+   ``--provision-demo``) by driving the app's own new-course panel for ENG2D,
+   MCV4U and SCH3U -- three subjects chosen so the class sites between them
+   show prose, typeset mathematics and chemistry. Skipped when the courses are
+   already there. (Until v1.4.0 this step only wrote launchers and site
+   markers and never ran the course-making test, although this docstring said
+   it did; it runs it now.)
 2. **Builds and publishes** each of those sections, so the address bar in a
    screenshot reads like a real class site rather than like localhost.
 3. **Photographs the app** by running the marketing UI tests, once with the
@@ -34,6 +45,7 @@ import argparse
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -48,7 +60,9 @@ from images import (  # noqa: E402
     WIDEST_WINDOW_PIXELS,
 )
 from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
+from corners import corner_problems, images_the_pages_show  # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
+import scenes as scene_book  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 WEBSITE = REPO / "website"
@@ -58,10 +72,23 @@ SCRATCH = Path(os.environ.get("TMPDIR", "/tmp")) / "plantoir-marketing-shots"
 MAC_APP = REPO / "mac-app"
 APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 
+# The Debug build wears the "BETA" ribbon icon so Russell can tell it from the
+# released app in his Dock (mac-app/project.yml). The screenshots are taken
+# from a Debug build and the notification banner shows the app icon, so every
+# build this script starts names the plain icon instead. The side effect is
+# that the Dock's Debug bundle is ribbonless after a capture run until the
+# next ordinary build. A notification-only run starts NO build (with
+# --skip-preflight), so the banner scene reads the bundle's own icon name
+# first — see bundle_icon_name() — rather than trusting which path built it.
+PLAIN_APP_ICON = "ASSETCATALOG_COMPILER_APPICON_NAME=Plantoir"
+
 # ~/Desktop/Teaching, not ~/Teaching: the plain ~/Teaching folder on this
 # Mac now holds REAL courses (ADA1O, MCR3U), and a default pointing there
 # would provision demo courses into a teacher's actual working folder.
 DEFAULT_WORKSPACE = Path.home() / "Desktop" / "Teaching"
+
+# The kept marketing folder the v1.4.0 scenes are taken in (marketing_folder.py).
+MARKETING_FOLDER = Path.home() / "Plantoir Marketing"
 
 # The courses the marketing shots are taken from, and the Netlify site each is
 # published to. The naming scheme is per-SECTION — <code>-s<n>-2026-gordon —
@@ -108,13 +135,6 @@ ASSISTANT_FRAME = "{{500, 60}, {560, 760}}"
 # frames. (The Windows capture harness has the same dependency if it ever
 # photographs an approval card — its app keeps an equivalent setting.)
 ASSISTANT_ASKS_KEY = "assistantAsksBeforeChanging"
-
-# The width, in points, each captured window is forced to. Only used to work
-# out how many pixels there are per point, so the corner radius comes out
-# right whatever the display.
-WINDOW_POINTS = 1280
-ASSISTANT_WINDOW_POINTS = 560
-
 
 # ---------- Running things ----------
 
@@ -249,6 +269,7 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
             "-project", str(MAC_APP / "Plantoir.xcodeproj"),
             "-scheme", "Plantoir",
             "-configuration", "Debug",
+            PLAIN_APP_ICON,
             "test",
             *only_flags,
             "-resultBundlePath", str(bundle),
@@ -270,8 +291,15 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
     return bundle
 
 
-def export_attachments(bundle: Path, suffix: str) -> list[str]:
-    """Copy a result bundle's screenshots into site/img/<name>-<suffix>.png."""
+def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None,
+                       staging: Path | None = None) -> list[str]:
+    """Copy a result bundle's screenshots into site/img/<name>-<suffix>.png.
+
+    A name in ``parts`` is a piece of a composite, not a picture a page shows,
+    so it goes to the scratch parts folder instead; so does a name starting
+    "demo-" (the demo folder's old window shots, kept only as parts). With
+    ``staging``, EVERYTHING goes there, to be checked before it is promoted.
+    """
     exported = SCRATCH / f"{bundle.stem}-attachments"
     if exported.exists():
         shutil.rmtree(exported)
@@ -297,11 +325,18 @@ def export_attachments(bundle: Path, suffix: str) -> list[str]:
                 continue
             source = exported / attachment["exportedFileName"]
             destination = IMAGE_DIR / f"{shot_name}-{suffix}.png"
+            if (parts and shot_name in parts) or shot_name.startswith("demo-"):
+                PARTS.mkdir(parents=True, exist_ok=True)
+                destination = PARTS / f"{shot_name}-{suffix}.png"
+            if staging is not None:
+                staging.mkdir(parents=True, exist_ok=True)
+                destination = staging / f"{shot_name}-{suffix}.png"
             shutil.copy2(source, destination)
             # No corner masking: the attachment came from `screencapture -l`,
             # which hands back the real curve with the corners already
             # transparent. See the note at the top of images.py.
-            prepare(destination, WIDEST_WINDOW_PIXELS)
+            if staging is None and destination.parent == IMAGE_DIR:
+                prepare(destination, WIDEST_WINDOW_PIXELS)
             saved.append(destination.name)
     return saved
 
@@ -309,19 +344,32 @@ def export_attachments(bundle: Path, suffix: str) -> list[str]:
 # ---------- Provisioning and publishing ----------
 
 def app_bundle_resources() -> Path:
-    """The Resources folder of the Debug build the UI tests run against."""
-    candidates = sorted(
-        (Path.home() / "Library/Developer/Xcode/DerivedData").glob(
-            "Plantoir-*/Build/Products/Debug/Plantoir.app/Contents/Resources"
-        )
+    """The Resources folder of the Debug build the UI tests run against.
+
+    That is the build of THIS checkout's project, found by the WorkspacePath
+    DerivedData records for it. It used to be whichever Plantoir-* folder
+    sorted last, and on a Mac with several clones that was a two-day-old
+    bundle from another one — launchers and a build recipe the app under
+    test did not carry.
+    """
+    import plistlib
+    project = (MAC_APP / "Plantoir.xcodeproj").resolve()
+    for derived in sorted((Path.home() / "Library/Developer/Xcode/DerivedData").glob("Plantoir-*")):
+        try:
+            with (derived / "info.plist").open("rb") as handle:
+                recorded = plistlib.load(handle).get("WorkspacePath", "")
+        except (OSError, plistlib.InvalidFileException):
+            continue
+        if not recorded or Path(recorded).resolve() != project:
+            continue
+        resources = derived / "Build/Products/Debug/Plantoir.app/Contents/Resources"
+        if resources.is_dir():
+            return resources
+    raise SystemExit(
+        f"No built Plantoir.app found for {project}. Build it first:\n"
+        "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
+        "-configuration Debug build"
     )
-    if not candidates:
-        raise SystemExit(
-            "No built Plantoir.app found. Build it first:\n"
-            "  cd mac-app && xcodebuild -project Plantoir.xcodeproj -scheme Plantoir "
-            "-configuration Debug build"
-        )
-    return candidates[-1]
 
 
 def _recipe_folders() -> list:
@@ -355,7 +403,8 @@ def mirror_toolchain(workspace: Path) -> None:
     under a UI test, where it deliberately leaves the folder alone so test
     fixtures can keep their stub launchers. The demo folder is a real folder
     being driven by a UI test, so it falls in the gap: without this, creating
-    a course fails with "this folder is missing the toolchain's build recipe",
+    a course fails with "this folder is missing the recipe for its website
+    builder" (worded "the toolchain's build recipe" until #382),
     and the test then waits half an hour for a course that will never appear.
 
     The FOLDER list is not held here: it is read from
@@ -410,7 +459,12 @@ def workspace_has_course(workspace: Path, code: str) -> bool:
 
 
 def ensure_launchers(workspace: Path) -> None:
-    """A brand-new folder needs the three launchers before anything else."""
+    """A brand-new folder needs the three launchers before anything else —
+    and a `courses/` folder. The app reads a folder with launchers and no
+    `courses/` as a problem ("There are no courses in this folder yet") and
+    keeps the folder picker up, so the new-course button a provisioning test
+    clicks is never shown; that is how the first marketing set-up failed."""
+    (workspace / "courses").mkdir(parents=True, exist_ok=True)
     resources = app_bundle_resources()
     for name in ["setup.sh", "preview.sh", "deploy.sh"]:
         destination = workspace / name
@@ -421,10 +475,27 @@ def ensure_launchers(workspace: Path) -> None:
 
 
 def provision(workspace: Path) -> None:
+    """The demo folder (hero and class-site shots): launchers, the build
+    recipe, the three courses THROUGH THE APP, and the live sites' markers.
+
+    Idempotent: a course already there is not made again (the UI test skips
+    it), and a marker already there is not rewritten.
+    """
     announce(f"Provisioning the demo courses in {workspace}")
     workspace.mkdir(parents=True, exist_ok=True)
     ensure_launchers(workspace)
     mirror_toolchain(workspace)
+
+    missing: list[str] = []
+    for course in DEMO_COURSES:
+        if not workspace_has_course(workspace, course["code"]):
+            missing.append(course["code"])
+    if missing:
+        print(f"   Making {', '.join(missing)} through the app's own new-course panel…")
+        run_ui_test("QuartzTeachersUITests/DemoWorkspaceProvisioning/testCreateDemoCourses",
+                    workspace, "provision-demo")
+    else:
+        print("   ENG2D, MCV4U and SCH3U are already there.")
 
     for course in DEMO_COURSES:
         marker_dir = workspace / "courses" / course["code"] / ".netlify_sites"
@@ -533,7 +604,66 @@ def kill_orphaned_model_servers() -> None:
     at both moments no app instance is (or is about to stay) running, so
     every engine from the app bundle is an orphan by definition.
     """
-    subprocess.run(["pkill", "-f", "Resources/llama/llama-server"], capture_output=True)
+    # Only engines from THIS checkout's build, and only orphans (parent 1).
+    # The sweep used to `pkill -f Resources/llama/llama-server`, which on a
+    # Mac where other sessions run UI tests from their own clones killed
+    # THEIR engines too (2026-09-27: one from ~/plantoir-r mid-run).
+    try:
+        ours = str(app_bundle_resources() / "llama" / "llama-server")
+    except SystemExit:
+        return
+    listing = subprocess.run(["ps", "-axo", "pid=,ppid=,command="], capture_output=True, text=True).stdout
+    for line in listing.splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid, ppid, command = parts
+        if ppid == "1" and command.startswith(ours):
+            subprocess.run(["kill", pid], capture_output=True)
+
+
+class KeyboardNavigationOff:
+    """Keyboard navigation off for the run, put back afterwards.
+
+    With it on (System Settings › Keyboard › Keyboard navigation, the global
+    `AppleKeyboardUIMode` 2), every sheet opens with a focus ring round its
+    first control — the start-of-year plan's first list, in the 2026-09-27
+    capture. Most teachers have it off, so the pictures should too. Passing
+    `-AppleKeyboardUIMode 0` to the app under test was tried first and did
+    not take: AppKit reads it from the global domain. So the global value is
+    borrowed and restored exactly — including its absence (CLAUDE.md rule 9).
+    """
+
+    def __enter__(self) -> "KeyboardNavigationOff":
+        read = subprocess.run(["defaults", "read", "-g", "AppleKeyboardUIMode"], capture_output=True, text=True)
+        self.saved: str | None = read.stdout.strip() if read.returncode == 0 else None
+        # A run ended by SIGTERM or SIGHUP (a closed terminal, a killed
+        # shell) would skip __exit__: Python has no handler for either, so
+        # turn both into SystemExit and the `with` unwinds as for Ctrl-C.
+        import signal
+        self.previous_handlers: dict = {}
+        for number in (signal.SIGTERM, signal.SIGHUP):
+            self.previous_handlers[number] = signal.signal(number, KeyboardNavigationOff.exit_on_signal)
+        if self.saved not in (None, "0"):
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", "0"], capture_output=True)
+            print(f"   Keyboard navigation off for the run (was {self.saved}; put back afterwards — if this run "
+                  f"is killed hard, restore it with: defaults write -g AppleKeyboardUIMode -int {self.saved}).")
+        return self
+
+    @staticmethod
+    def exit_on_signal(number, frame) -> None:
+        raise SystemExit(128 + number)
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        import signal
+        for number, handler in self.previous_handlers.items():
+            signal.signal(number, handler)
+        if self.saved is None:
+            subprocess.run(["defaults", "delete", "-g", "AppleKeyboardUIMode"], capture_output=True)
+        elif self.saved != "0":
+            subprocess.run(["defaults", "write", "-g", "AppleKeyboardUIMode", "-int", self.saved], capture_output=True)
+            print(f"   Keyboard navigation put back ({self.saved}).")
+        return False
 
 
 class BackupsSetAside:
@@ -634,15 +764,27 @@ def site_address(code: str) -> str:
 PARTS = SCRATCH / "parts"
 
 
-def capture_parts(window: "SafariWindow", suffix: str) -> None:
-    """Photograph the three course home pages, for the fanned-out figure."""
+def capture_parts(suffix: str) -> None:
+    """Photograph the three course home pages, for the two colour figures.
+
+    In a plain window with no browser around it (`webwindow.swift`), not in
+    Safari: those figures are about the SITES, and three toolbars read as
+    three browsers. The window's own edge is the picture's edge, so its real
+    corners are kept — never a Safari capture with the toolbar cut off and
+    corners painted back on, which is what this used to be.
+    """
     PARTS.mkdir(parents=True, exist_ok=True)
+    helper = Path(__file__).resolve().parent / "webwindow.swift"
     for course in DEMO_COURSES:
-        window.load(site_address(course["code"]) + "/", settle_seconds=3.5)
         destination = PARTS / f"home-{course['code'].lower()}-{suffix}.png"
-        window.capture(destination)
+        result = subprocess.run(
+            ["swift", str(helper), site_address(course["code"]) + "/", "1280", "860",
+             str(destination), "3.5"],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0 or not destination.exists():
+            raise SystemExit(f"Could not photograph {course['code']}'s home page: {result.stderr.strip()}")
         verify_appearance(destination, suffix == "dark", course["code"])
-        verify_address_bar(destination, course["code"])
         print(f"   part {destination.name}")
 
 
@@ -713,6 +855,12 @@ def build_hero_figures() -> None:
 
 def build_static_figures() -> None:
     """Assemble the figures whose subject is composite or colour."""
+    build_colour_figures()
+    build_hero_figures()
+
+
+def build_colour_figures() -> None:
+    """The fanned colour schemes and the light/dark pair, from whole captures."""
     announce("Assembling the colour figures")
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
     missing = [path.name for path in fanned if not path.exists()]
@@ -728,8 +876,6 @@ def build_static_figures() -> None:
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
-
-    build_hero_figures()
 
 
 def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
@@ -775,6 +921,46 @@ def shots_of_kind(kind: str) -> list[dict]:
     return wanted
 
 
+def capture_browser_shots(identifiers: list[str]) -> None:
+    """Re-take just these class-site shots, in both appearances.
+
+    For a shot that is new or wrong, without re-taking every other picture
+    `--sites` makes (the phone, search, Obsidian and the hero among them).
+    """
+    wanted: list[dict] = []
+    for shot in browser_shots():
+        if shot["id"] in identifiers:
+            wanted.append(shot)
+    if len(wanted) != len(identifiers):
+        raise SystemExit(f"Not every one of {identifiers} is a class-site shot in shots.json.")
+    announce("Photographing " + ", ".join(identifiers))
+    for dark in (False, True):
+        suffix = "dark" if dark else "light"
+        with Appearance(dark=dark):
+            time.sleep(2)
+            with SafariWindow(1280, 860) as window:
+                for shot in wanted:
+                    capture = shot["capture"]
+                    window.load(site_address(capture["course"]) + capture.get("path", "/"), settle_seconds=3.5)
+                    destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
+                    window.capture(destination)
+                    verify_appearance(destination, dark, shot["id"])
+                    verify_address_bar(destination, shot["id"])
+                    prepare(destination, WIDEST_WINDOW_PIXELS)
+                    print(f"   saved {destination.name}")
+
+
+def capture_colour_figures() -> None:
+    """Photograph the three home pages in both appearances and assemble the
+    two colour figures from them — nothing else."""
+    announce("Photographing the course home pages for the colour figures")
+    for dark in (False, True):
+        with Appearance(dark=dark):
+            time.sleep(2)
+            capture_parts("dark" if dark else "light")
+    build_colour_figures()
+
+
 def capture_sites(workspace: Path) -> None:
     announce("Photographing the class websites")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -801,7 +987,7 @@ def capture_sites(workspace: Path) -> None:
                 for shot in search_shots():
                     capture_search(window, shot, suffix)
 
-                capture_parts(window, suffix)
+            capture_parts(suffix)
         capture_phone(dark=dark)
 
 
@@ -819,6 +1005,37 @@ def simulator_udid(device_name: str) -> str:
     if not newest:
         raise SystemExit(f"No simulator named {device_name} is available.")
     return newest
+
+
+def forget_site_theme(udid: str, url: str) -> None:
+    """Remove the light/dark choice a class site saved in the simulator's
+    Mobile Safari, so the page follows the phone's own appearance.
+
+    Quartz keeps it as the localStorage key `theme`. WebKit stores each
+    origin's localStorage in an SQLite file beside a small `origin` file
+    naming the host, under the Safari app's data container. The simulator's
+    Safari is terminated first, since a running WebKit holds the file and
+    would write its copy back. Only the `theme` key of that one site is
+    removed; nothing else in the simulator is touched.
+    """
+    host = url.split("//", 1)[-1].split("/", 1)[0]
+    run(["xcrun", "simctl", "terminate", udid, "com.apple.mobilesafari"], capture_output=True)
+    time.sleep(1)
+    devices = Path.home() / "Library" / "Developer" / "CoreSimulator" / "Devices" / udid / "data"
+    applications = devices / "Containers" / "Data" / "Application"
+    for origin in applications.glob("*/Library/WebKit/com.apple.mobilesafari/WebsiteData/Default/*/*/origin"):
+        if host.encode() not in origin.read_bytes():
+            continue
+        database = origin.parent / "LocalStorage" / "localstorage.sqlite3"
+        if not database.exists():
+            continue
+        connection = sqlite3.connect(str(database))
+        try:
+            connection.execute("DELETE FROM ItemTable WHERE key = 'theme'")
+            connection.commit()
+        finally:
+            connection.close()
+        print(f"   Took away {host}'s saved light/dark choice in the simulator's Safari.")
 
 
 def capture_phone(dark: bool) -> None:
@@ -841,6 +1058,14 @@ def capture_phone(dark: bool) -> None:
         capture_output=True)
 
     url = site_address("ENG2D") + "/"
+    # The site remembers a light/dark choice in Mobile Safari's own storage,
+    # which outranks the simulator's appearance: the committed "light" phone
+    # shot had been dark all along (median luminance 18, measured
+    # 2026-09-27). Tapping the site's own switch through RocketSim by its
+    # label ("Light mode") was tried and did nothing. So the saved choice is
+    # taken away instead, with the simulator's Safari closed, and the site
+    # follows the phone. The shot is still checked below and named if wrong.
+    forget_site_theme(udid, url)
     run(["xcrun", "simctl", "openurl", udid, url], capture_output=True)
     time.sleep(9)
     dismiss_safari_onboarding(udid)
@@ -863,6 +1088,12 @@ def capture_phone(dark: bool) -> None:
         run(["xcrun", "simctl", "io", udid, "screenshot", str(destination)],
             capture_output=True)
     prepare(destination, WIDEST_PHONE_PIXELS)
+    from safari import page_is_dark
+    if page_is_dark(destination) != dark:
+        print(f"   ✗ {destination.name} came out {'light' if dark else 'dark'}: the site has the other "
+              "theme saved in the simulator's Safari. Open it there, tap the site's light/dark switch "
+              "until it follows the phone, and re-take with --phone. Do not commit this one.",
+              file=sys.stderr)
     print(f"   saved {destination.name}")
 
     if not was_booted:
@@ -886,10 +1117,16 @@ def dismiss_safari_onboarding(udid: str) -> None:
     """Close the first-run popover Mobile Safari shows over the page."""
     if not ROCKETSIM.exists():
         return
-    subprocess.run(
-        [str(ROCKETSIM), "interact", "tap", "--udid", udid, "--label", "Close"],
-        capture_output=True,
-    )
+    # With a timeout: when there is no popover (every run after the first),
+    # the tap waits for a "Close" that never comes. It hung a phone run for
+    # over ten minutes on 2026-09-27.
+    try:
+        subprocess.run(
+            [str(ROCKETSIM), "interact", "tap", "--udid", udid, "--label", "Close"],
+            capture_output=True, timeout=20,
+        )
+    except subprocess.TimeoutExpired:
+        pass
     time.sleep(1.5)
 
 
@@ -933,7 +1170,7 @@ def preflight_permissions() -> None:
 
     smoke_command: list[str] = [
         "xcodebuild", "-project", str(MAC_APP / "Plantoir.xcodeproj"),
-        "-scheme", "Plantoir", "-configuration", "Debug", "test",
+        "-scheme", "Plantoir", "-configuration", "Debug", PLAIN_APP_ICON, "test",
         "-only-testing:QuartzTeachersUITests/QuartzTeachersUITests/testSidebarShowsExampleCourse",
     ]
     print(f"   $ {' '.join(smoke_command)}  (in the background)")
@@ -967,16 +1204,423 @@ def preflight_permissions() -> None:
         print("   Both permissions are in place.")
 
 
+# ---------- The v1.4.0 scenes, in the kept marketing folder ----------
+
+def ced_on_this_mac(folder: Path) -> Path | None:
+    """The Course and Exam Description, if it is already on this Mac."""
+    codes = json.loads((Path(__file__).resolve().parent / "marketing" / "csp-codes.json").read_text(encoding="utf-8"))
+    candidates: list[Path] = []
+    if os.environ.get("PLANTOIR_CED_PDF"):
+        candidates.append(Path(os.environ["PLANTOIR_CED_PDF"]))
+    candidates.append(folder / ".sources" / codes["source"]["fileName"])
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def provision_marketing(folder: Path) -> int:
+    """Make the kept marketing folder when it is absent; reuse it when present.
+
+    In order, each step saying "made" or "already there":
+    the launchers and build recipe; ICS3U (1, 2) and ICS4U (1) through the
+    app; the College Board pages from the public document (fetched once into
+    .sources/, hash-checked), into both courses; each course's correlation
+    embeds and folder destination, ICS4U's declared second curriculum and
+    How I Teach (marketing_folder.py); and a reference copy of ICS3U for
+    2025–26, through the app. Declaring ICS3U's second curriculum is NOT
+    here: the curriculum-settings scene does it through Course Settings,
+    because that is the picture.
+    """
+    import marketing_folder
+    import college_board
+
+    announce(f"Setting up the marketing folder, {folder}")
+    marketing_folder.refuse_foreign_courses(folder)
+    marketing_folder.mark_as_ours(folder)
+    ensure_launchers(folder)
+    mirror_toolchain(folder)
+
+    missing: list[str] = []
+    for course in marketing_folder.COURSES:
+        if not workspace_has_course(folder, course["code"]):
+            missing.append(course["code"])
+    if missing:
+        print(f"   Making {', '.join(missing)} through the app's new-course panel, from the ready-made content…")
+        run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testCreateMarketingCourses", folder, "provision-marketing")
+    else:
+        print("   ICS3U and ICS4U are already there.")
+
+    sources = folder / ".sources"
+    try:
+        pdf = college_board.fetch_ced(sources)
+    except college_board.SourceChanged as changed:
+        print(f"   ✗ {changed}", file=sys.stderr)
+        return 1
+    extraction = college_board.build_pages(pdf, overrides=sources / college_board.OVERRIDES_NAME)
+    for problem in extraction.problems:
+        print(f"   ✗ {problem}", file=sys.stderr)
+    if extraction.problems:
+        print("   The College Board pages were not written: the document's copies disagree somewhere above. "
+              "Read those, then record a ruling in marketing/csp-codes.json -> whereCopiesDiffer.", file=sys.stderr)
+        return 1
+    if extraction.needs_a_person:
+        drafts = sources / college_board.DRAFTS_NAME
+        drafts.mkdir(parents=True, exist_ok=True)
+        for code, draft in extraction.needs_a_person.items():
+            path = drafts / f"{code}.md"
+            if not path.exists():
+                path.write_text(draft, encoding="utf-8")
+        print(f"   {len(extraction.needs_a_person)} learning objectives quote drawn code and need a person: "
+              f"{', '.join(sorted(extraction.needs_a_person))}.\n"
+              f"   Drafts are in {drafts}; set each out from the document and save it in "
+              f"{sources / college_board.OVERRIDES_NAME}, then run --provision again.")
+
+    report = marketing_folder.apply_file_steps(folder, extraction.pages)
+    print(f"   {marketing_folder.summary(report)}")
+
+    if not any(True for _ in reference_copies_of(folder, "ICS3U")):
+        print("   Keeping a copy of ICS3U for reference (2025–26), through the app…")
+        run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testKeepACopyForReference", folder, "provision-reference")
+    else:
+        print("   A reference copy of ICS3U is already there.")
+    return 1 if extraction.needs_a_person else 0
+
+
+def reference_copies_of(folder: Path, code: str):
+    courses = folder / "courses"
+    if not courses.is_dir():
+        return
+    for entry in courses.iterdir():
+        config_path = entry / "course_config.json"
+        if not config_path.is_file():
+            continue
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        if config.get("kept_for_reference") is True and config.get("course_code") == code:
+            yield entry
+
+
+def capture_note_in_obsidian(note: Path, destination: Path) -> bool:
+    """Obsidian showing one note, photographed as its own window."""
+    from urllib.parse import quote
+    # Percent-encoded: the folder and the note both have spaces in their names.
+    run(["open", f"obsidian://open?path={quote(str(note), safe='/')}"], capture_output=True)
+    time.sleep(2.5)
+    script = """
+    tell application "Obsidian" to activate
+    delay 0.4
+    tell application "System Events"
+      tell process "Obsidian"
+        set position of window 1 to {60, 60}
+        set size of window 1 to {1280, 800}
+      end tell
+    end tell
+    """
+    subprocess.run(["osascript", "-e", script], capture_output=True)
+    time.sleep(1.5)
+    helper = Path(__file__).resolve().parent / "windowid.swift"
+    result = subprocess.run(["swift", str(helper), "Obsidian", "60", "60", "1280", "800"],
+                            capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["screencapture", "-x", "-o", "-l", result.stdout.strip(), str(destination)], check=True)
+    subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
+    return True
+
+
+def image_path(name: str, suffix: str) -> Path:
+    """Where a scene's picture lands: a composite's part in the scratch parts
+    folder, anything a page shows in site/img/."""
+    for composite in scene_book.COMPOSITES.values():
+        if name in composite["of"]:
+            return PARTS / f"{name}-{suffix}.png"
+    return IMAGE_DIR / f"{name}-{suffix}.png"
+
+
+def bundle_icon_name(app_binary: Path) -> str:
+    """The icon the built bundle names in its Info.plist, or "" if unreadable."""
+    import plistlib
+    info = app_binary.parent.parent / "Info.plist"
+    try:
+        with info.open("rb") as handle:
+            return str(plistlib.load(handle).get("CFBundleIconName", ""))
+    except (OSError, plistlib.InvalidFileException):
+        return ""
+
+
+def plain_icon_problem(app_binary: Path) -> str | None:
+    """Make sure the bundle the banner comes from wears the plain icon.
+
+    The notification banner shows the app icon, and the Debug build wears
+    the Beta ribbon (#372) unless it was built with PLAIN_APP_ICON. A UI-test
+    scene or the preflight builds it plain; a notification-only run with
+    --skip-preflight builds nothing, and would photograph whatever the last
+    ordinary Debug build left. So the BUNDLE is asked, and rebuilt plain when
+    it says otherwise. Returns a sentence naming the problem, or None.
+    """
+    if bundle_icon_name(app_binary) == "Plantoir":
+        return None
+    print("   The Debug build wears the Beta icon; rebuilding it with the plain one for the banner.")
+    result = run(
+        [
+            "xcodebuild",
+            "-project", str(MAC_APP / "Plantoir.xcodeproj"),
+            "-scheme", "Plantoir",
+            "-configuration", "Debug",
+            PLAIN_APP_ICON,
+            "build",
+        ],
+        cwd=MAC_APP,
+        capture_output=True,
+        text=True,
+    )
+    named = bundle_icon_name(app_binary)
+    if result.returncode != 0 or named != "Plantoir":
+        return (f"the Debug build wears the Beta icon ({named or 'no icon name'}) and rebuilding it with "
+                f"the plain one did not take, so the banner would show the ribbon; build with "
+                f"{PLAIN_APP_ICON} and re-take with --only notification-banner")
+    return None
+
+
+def run_scenes(folder: Path, chosen: list) -> int:
+    """Photograph the chosen scenes in both appearances, then check them.
+
+    A scene FAILS, and is named, when a picture it should make is missing or
+    does not show the words shots.json expects of it. The exit code says so:
+    "judge it by the count, never the exit code" (the skill) is the exit code
+    now.
+    """
+    import marketing_folder
+    announce(f"Photographing {len(chosen)} scene(s) in {folder}")
+    if not (folder / "courses" / marketing_folder.CURRICULUM_COURSE / "course_config.json").exists():
+        print("   The marketing folder is not set up yet — run capture.py --provision first.", file=sys.stderr)
+        return 1
+    app_binary = app_bundle_resources().parent / "MacOS" / "Plantoir"
+    parts: set[str] = set()
+    for composite in scene_book.COMPOSITES.values():
+        parts.update(composite["of"])
+
+    tests: list[str] = []
+    for scene in chosen:
+        if scene.kind == "ui-test" and scene.test not in tests:
+            tests.append(scene.test)
+
+    failures: list[str] = []
+    passed: list[str] = []          # "<name>-<suffix>", checked and promoted
+    icon_problem: str | None = None
+    for scene in chosen:
+        if scene.kind == "notification":
+            icon_problem = plain_icon_problem(app_binary)
+            if icon_problem is not None:
+                failures.append(f"{scene.name}: {icon_problem}")
+            break
+    staging: Path = SCRATCH / "scenes-staged"
+    if staging.exists():
+        shutil.rmtree(staging)
+    kill_orphaned_model_servers()
+    try:
+        with RememberedWindowFrames(), BackupsSetAside(folder), KeyboardNavigationOff():
+            for dark in (False, True):
+                suffix = "dark" if dark else "light"
+                print(f"   {suffix} appearance")
+                with Appearance(dark=dark):
+                    time.sleep(2)
+                    if tests:
+                        target = ",".join(f"{scene_book.SCENE_CLASS}/{test}" for test in tests)
+                        bundle = run_ui_test(target, folder, f"scenes-{suffix}", allow_failure=True)
+                        saved = export_attachments(bundle, suffix, staging=staging)
+                        print(f"   staged {len(saved)} image(s): {', '.join(saved)}")
+                    for scene in chosen:
+                        if scene.kind == "notification":
+                            if icon_problem is not None:
+                                continue
+                            destination = staging / f"notification-banner-{suffix}.png"
+                            staging.mkdir(parents=True, exist_ok=True)
+                            for problem in scene_book.capture_notification(app_binary, folder, destination):
+                                failures.append(f"{scene.name} ({suffix}): {problem}")
+                        elif scene.kind == "obsidian":
+                            note = folder / "courses" / marketing_folder.CURRICULUM_COURSE / marketing_folder.HOW_I_TEACH_NAME
+                            with scene_book.ObsidianRegistryKept() as registry:
+                                if not registry.register(note.parent):
+                                    failures.append(f"{scene.name} ({suffix}): Obsidian is open, and opening a "
+                                                    "note in it would need its list of vaults changed under it; "
+                                                    "quit Obsidian (it is not the capture's to quit) and re-take "
+                                                    "with --only how-i-teach")
+                                elif not capture_note_in_obsidian(note, staging / f"how-i-teach-{suffix}.png"):
+                                    failures.append(f"{scene.name} ({suffix}): Obsidian's window was not found")
+                    # Checked in STAGING, and only what passes is promoted —
+                    # to site/img, or to the parts folder for a composite. A
+                    # wrong picture never replaces a right one.
+                    for scene in chosen:
+                        for name in scene.produces:
+                            picture = staging / f"{name}-{suffix}.png"
+                            if not picture.exists():
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} was not made")
+                                continue
+                            drawn = corner_problems(picture)
+                            if drawn:
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} is not a whole window "
+                                                f"capture with its own corners — {drawn[0]}")
+                                continue
+                            missing = scene_book.missing_words(picture, scene_book.expected_text(name))
+                            if missing:
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing} "
+                                                f"(kept for a look in {staging})")
+                                continue
+                            final = image_path(name, suffix)
+                            final.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(picture, final)
+                            if final.parent == IMAGE_DIR:
+                                prepare(final, WIDEST_WINDOW_PIXELS)
+                            passed.append(f"{name}-{suffix}")
+    finally:
+        kill_orphaned_model_servers()
+        for scene in chosen:
+            if scene.kind == "notification":
+                scene_book.cancel_leftover_schedule(app_binary, folder)
+                record = scene_book.scheduled_record(folder, "ICS3U", 1)
+                if record.exists():
+                    record.unlink()
+                print("   Cleared the scheduled run's record for this folder. The delivered notification stays "
+                      "in Notification Center: a script cannot withdraw another app's notification.")
+
+    compose_scene_figures(passed)
+    promote_captured_shots(passed)
+    for failure in failures:
+        print(f"   ✗ {failure}", file=sys.stderr)
+    if failures:
+        print(f"\n   {len(failures)} scene check(s) failed. Nothing above counts as done until each is re-taken.",
+              file=sys.stderr)
+        return 1
+    print("   Every scene made every picture it owes, and each says what its caption says.")
+    return 0
+
+
+def compose_scene_figures(passed: list[str]) -> None:
+    """Assemble each composite whose parts ALL passed this run, per appearance."""
+    from composite import pair_of_windows, banner_over_window
+    for name, composite in scene_book.COMPOSITES.items():
+        for suffix in ("light", "dark"):
+            if not all(f"{part}-{suffix}" in passed for part in composite["of"]):
+                continue
+            sources = [PARTS / f"{part}-{suffix}.png" for part in composite["of"]]
+            destination = IMAGE_DIR / f"{name}-{suffix}.png"
+            if composite["arrange"] == "banner":
+                banner_over_window(sources[0], sources[1], destination)
+            else:
+                pair_of_windows(sources, destination)
+            prepare(destination, WIDEST_WINDOW_PIXELS)
+            drawn = corner_problems(destination)
+            if drawn:
+                print(f"   ✗ {destination.name}: {drawn[0]}", file=sys.stderr)
+                continue
+            passed.append(f"{name}-{suffix}")
+            print(f"   saved {destination.name}")
+
+
+def pictures_with_drawn_corners() -> list[str]:
+    """Every picture the pages show whose corners are not a real window's.
+
+    Run before a picture is called finished: the same check as
+    `test_native_corners.py`. A drawn, cropped or square corner is refused,
+    never fixed up — the capture that made it is what is wrong.
+    """
+    problems: list[str] = []
+    for picture in images_the_pages_show(WEBSITE, IMAGE_DIR):
+        problems.extend(corner_problems(picture))
+    return problems
+
+
+def refuse_drawn_corners(only_ids: list[str] | None = None) -> int:
+    """Name every picture with a square or drawn corner, and exit non-zero.
+
+    Pictures written straight to site/img (the class sites, the figures) are
+    already there when this runs: a failure here means "do not commit them",
+    and the exit code says so. Scene pictures are checked earlier, in
+    staging, and a failing one never reaches site/img.
+    """
+    problems: list[str] = []
+    for problem in pictures_with_drawn_corners():
+        if only_ids is None or any(problem.startswith(f"{identifier}-") for identifier in only_ids):
+            problems.append(problem)
+    for problem in problems:
+        print(f"   ✗ {problem}", file=sys.stderr)
+    if problems:
+        print(f"\n   {len(problems)} corner(s) on the site's pictures are not a real window's. "
+              "Re-take them; do not commit them.", file=sys.stderr)
+        return 1
+    print("   Every picture the pages show has its window's own corners.")
+    return 0
+
+
+def promote_captured_shots(passed: list[str]) -> None:
+    """Bring shots.json up to date with pictures that now exist.
+
+    Only pictures whose corners are a real window's are promoted: a shot
+    with a drawn or square corner stays as it was, and is named.
+
+    A shot taken in BOTH appearances this run loses `awaiting_capture`, and a
+    retaken one has its new words (`retake` → alt, caption, expectText, test)
+    promoted in the same change as its picture, so the words never describe a
+    picture that is not there. Written back in the file's own shape.
+    """
+    path = WEBSITE / "shots.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    changed: list[str] = []
+    for shot in manifest["shots"]:
+        identifier = shot["id"]
+        if f"{identifier}-light" not in passed or f"{identifier}-dark" not in passed:
+            continue
+        drawn: list[str] = []
+        for suffix in ("light", "dark"):
+            picture = IMAGE_DIR / f"{identifier}-{suffix}.png"
+            if picture.exists():
+                drawn.extend(corner_problems(picture))
+        if drawn:
+            print(f"   ✗ {identifier} not promoted: {drawn[0]}", file=sys.stderr)
+            continue
+        if shot.pop("awaiting_capture", None):
+            changed.append(f"{identifier}: taken")
+        issue = shot.pop("waiting_on", None)
+        if issue:
+            changed.append(f"{identifier}: no longer waiting on {issue} — close it when every shot it names is taken")
+        retake = shot.pop("retake", None)
+        if retake:
+            for key in ("alt", "caption", "expectText"):
+                if key in retake:
+                    shot[key] = retake[key]
+            if "test" in retake:
+                shot.setdefault("capture", {})["test"] = retake["test"]
+            changed.append(f"{identifier}: its new alt text and caption promoted")
+    if changed:
+        path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        for line in changed:
+            print(f"   shots.json — {line}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture every screenshot plantoir.app uses.")
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE),
                         help="the demo working folder (must be inside your home folder)")
-    parser.add_argument("--provision", action="store_true", help="only create the demo courses")
+    parser.add_argument("--provision", action="store_true",
+                        help="make or reuse the kept marketing folder (ICS3U, ICS4U, the College Board "
+                             "pages and both courses' correlations) for the v1.4.0 scenes")
+    parser.add_argument("--provision-demo", action="store_true",
+                        help="only create the demo courses (ENG2D, MCV4U, SCH3U) in the demo folder")
+    parser.add_argument("--scenes", action="store_true", help="photograph every v1.4.0 scene")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="prove each scene's set-up is reachable, launching nothing and changing nothing")
+    parser.add_argument("--marketing-folder", default=str(MARKETING_FOLDER),
+                        help="the kept marketing folder (must be inside your home folder)")
     parser.add_argument("--publish", action="store_true", help="only build and publish the demo sites")
     parser.add_argument("--app", action="store_true", help="only photograph the app")
     parser.add_argument("--only", default=None,
-                        help="with --app, run just the named captures, comma-separated "
-                             "(e.g. test4Progress,test6Assistant) instead of all of them")
+                        help="run just these, comma-separated: scene names (reference, two-maps, … — "
+                             "see scenes.py) or, with --app, test names (test4Progress,test6Assistant)")
     parser.add_argument("--sites", action="store_true", help="only photograph the class websites")
     parser.add_argument("--phone", action="store_true",
                         help="only photograph the class site on the phone, both appearances")
@@ -985,6 +1629,10 @@ def main() -> int:
                              "grants were exercised minutes ago and macOS still remembers them")
     parser.add_argument("--figures", action="store_true",
                         help="only reassemble the static figures from parts already captured")
+    parser.add_argument("--colour-figures", action="store_true",
+                        help="only re-take the three home pages and rebuild colour-schemes and light-and-dark")
+    parser.add_argument("--browser-shots", default=None,
+                        help="only re-take these class-site shots, comma-separated ids from shots.json")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -993,10 +1641,54 @@ def main() -> int:
     if Path.home() not in workspace.parents:
         raise SystemExit("The demo folder has to be inside your home folder, or the site builder sees it as empty.")
 
+    marketing = Path(arguments.marketing_folder).expanduser()
+    if Path.home() not in marketing.parents:
+        raise SystemExit("The marketing folder has to be inside your home folder, or the site builder sees it as empty.")
+
+    if arguments.dry_run:
+        return scene_book.dry_run(marketing, ced_on_this_mac(marketing))
+
+    only_scenes: list = []
+    if arguments.only and not arguments.app:
+        only_scenes = scene_book.scenes_for(arguments.only.split(","))
+    if arguments.provision or arguments.scenes or only_scenes:
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            if not arguments.skip_preflight:
+                preflight_permissions()
+            result = 0
+            if arguments.provision:
+                result = provision_marketing(marketing)
+            if result == 0 and (arguments.scenes or only_scenes):
+                result = run_scenes(marketing, only_scenes or list(scene_book.SCENES))
+                rebuild_site()
+                announce("Checking every picture's corners")
+                if refuse_drawn_corners() != 0:
+                    result = 1
+        finally:
+            keeping_awake.terminate()
+        return result
+
+    if arguments.colour_figures or arguments.browser_shots:
+        keeping_awake = stay_awake()
+        try:
+            if not arguments.skip_preflight:
+                preflight_permissions()
+            if arguments.browser_shots:
+                capture_browser_shots(arguments.browser_shots.split(","))
+            if arguments.colour_figures:
+                capture_colour_figures()
+        finally:
+            keeping_awake.terminate()
+        rebuild_site()
+        announce("Checking every picture's corners")
+        return refuse_drawn_corners()
+
     if arguments.hero:
         build_hero_figures()
         rebuild_site()
-        return 0
+        return refuse_drawn_corners(["hero"])
 
     if arguments.phone:
         # No preflight: the phone shot is simctl and RocketSim end to end —
@@ -1013,7 +1705,7 @@ def main() -> int:
         rebuild_site()
         return 0
 
-    everything = not (arguments.provision or arguments.publish or arguments.app
+    everything = not (arguments.provision_demo or arguments.publish or arguments.app
                       or arguments.sites or arguments.figures)
     SCRATCH.mkdir(parents=True, exist_ok=True)
 
@@ -1024,7 +1716,7 @@ def main() -> int:
                   "stalls on a system dialog, re-run without --skip-preflight.")
         else:
             preflight_permissions()
-        if everything or arguments.provision:
+        if everything or arguments.provision_demo:
             provision(workspace)
         if everything or arguments.publish:
             publish_demo_sites(workspace)
@@ -1040,6 +1732,9 @@ def main() -> int:
     finally:
         keeping_awake.terminate()
 
+    announce("Checking every picture's corners")
+    if refuse_drawn_corners() != 0:
+        return 1
     announce("Done.")
     return 0
 

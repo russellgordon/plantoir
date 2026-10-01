@@ -46,7 +46,7 @@ public static class DateAudit
 
         // ---- Two classes on one day --------------------------------------
         foreach (var sameDay in dated.GroupBy(p => dateOf(p)!.Value).Where(g => g.Count() > 1))
-            problems.Add($"{sameDay.Count()} classes share {sameDay.Key:yyyy-MM-dd}: " +
+            problems.Add($"{sameDay.Count()} classes share {DateText.Iso(sameDay.Key)}: " +
                          string.Join(", ", sameDay.Select(p => "“" + Title(p) + "”")) + ".");
 
         // ---- Classes filed out of teaching order -------------------------
@@ -72,8 +72,8 @@ public static class DateAudit
                 DateOnly earlier = dateOf(inOrder[i - 1].Page)!.Value;
                 DateOnly later = dateOf(inOrder[i].Page)!.Value;
                 if (later < earlier)
-                    problems.Add($"“{Title(inOrder[i].Page)}” ({later:yyyy-MM-dd}) is dated BEFORE " +
-                                 $"“{Title(inOrder[i - 1].Page)}” ({earlier:yyyy-MM-dd}), so the classes " +
+                    problems.Add($"“{Title(inOrder[i].Page)}” ({DateText.Iso(later)}) is dated BEFORE " +
+                                 $"“{Title(inOrder[i - 1].Page)}” ({DateText.Iso(earlier)}), so the classes " +
                                  "would appear out of order.");
             }
         }
@@ -106,8 +106,8 @@ public static class DateAudit
             DateOnly classDate = dateOf(nearestClass)!.Value;
             string direction = pageDate < classDate ? "earlier" : "later";
             problems.Add(
-                $"“{Title(nearestClass)}” ({classDate:yyyy-MM-dd}) links to “{Title(page)}”, which is dated " +
-                $"{pageDate:yyyy-MM-dd} — {Gap(nearest)} {direction}, and no class that links to it falls near " +
+                $"“{Title(nearestClass)}” ({DateText.Iso(classDate)}) links to “{Title(page)}”, which is dated " +
+                $"{DateText.Iso(pageDate)} — {Gap(nearest)} {direction}, and no class that links to it falls near " +
                 "that date. A page copied for a new lesson whose date was never changed looks like this.");
         }
 
@@ -145,7 +145,7 @@ public static class DateAudit
         return new List<string>
         {
             $"{left.Count} page{(left.Count == 1 ? " is" : "s are")} still dated outside the course " +
-            $"({firstClass:yyyy-MM-dd} to {lastClass:yyyy-MM-dd}) — for example {string.Join(", ", examples)}" +
+            $"({DateText.Iso(firstClass)} to {DateText.Iso(lastClass)}) — for example {string.Join(", ", examples)}" +
             (left.Count > 3 ? ", …" : "") + ". No class links to " +
             (left.Count == 1 ? "it" : "them") + ", so nothing moved " +
             (left.Count == 1 ? "it" : "them") + " with the lessons. Run check_section to see them all.",

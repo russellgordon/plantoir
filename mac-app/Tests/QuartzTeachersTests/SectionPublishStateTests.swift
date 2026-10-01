@@ -314,6 +314,103 @@ final class SectionPublishStateTests: XCTestCase {
         )
     }
 
+    // MARK: - The fingerprint's rule (#330)
+
+    /// `filesCountedUnderRule2`, through the real walk and the filter, as
+    /// `filesCounted` is: the How I Teach page at a reserved place is left
+    /// out, and anything else still counts.
+    func testRule2LeavesTheHowITeachPageOut() throws {
+        let section: [String: Any] = try XCTUnwrap(
+            try SectionPublishStateTests.rules()["filesCountedUnderRule2"] as? [String: Any]
+        )
+        let sectionNumber: Int = try XCTUnwrap(section["sectionNumber"] as? Int)
+        let cases: [[String: Any]] = try XCTUnwrap(section["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 6)
+        for testCase in cases {
+            let path: String = try XCTUnwrap(testCase["path"] as? String)
+            let counts: Bool = try XCTUnwrap(testCase["counts"] as? Bool)
+            let why: String = testCase["why"] as? String ?? ""
+            try write("first", to: path)
+            let before: String = SectionPublishState.fingerprint(
+                courseDirectory: courseDirectory, sectionNumber: sectionNumber, rule: 2
+            )
+            try write("second, and longer", to: path)
+            let after: String = SectionPublishState.fingerprint(
+                courseDirectory: courseDirectory, sectionNumber: sectionNumber, rule: 2
+            )
+            XCTAssertEqual(before != after, counts, "\(path) — the WALK, under rule 2. \(why)")
+            XCTAssertEqual(
+                SectionPublishState.countsTowardFingerprint(relativePath: path, sectionNumber: sectionNumber, rule: 2),
+                counts,
+                "\(path): \(why)"
+            )
+            try? FileManager.default.removeItem(at: courseDirectory.appendingPathComponent(path))
+        }
+    }
+
+    /// `stampRuleCases`: a stamp is compared under the rule it names, an old
+    /// one is rule 1, and a rule this copy does not know is edited.
+    func testAStampIsComparedUnderItsOwnRule() throws {
+        let section: [String: Any] = try XCTUnwrap(
+            try SectionPublishStateTests.rules()["stampRuleCases"] as? [String: Any]
+        )
+        for testCase in try XCTUnwrap(section["cases"] as? [[String: Any]]) {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            try? FileManager.default.removeItem(at: courseDirectory.appendingPathComponent("How I Teach.md"))
+            try? FileManager.default.removeItem(at: SectionPublishState.stampURL(
+                courseDirectory: courseDirectory, sectionNumber: 1
+            ))
+            if testCase["sameUnderBothRules"] as? Bool == true {
+                XCTAssertEqual(
+                    SectionPublishState.fingerprint(courseDirectory: courseDirectory, sectionNumber: 1, rule: 1),
+                    SectionPublishState.fingerprint(courseDirectory: courseDirectory, sectionNumber: 1, rule: 2),
+                    name
+                )
+                continue
+            }
+            try write("# How I teach", to: "How I Teach.md")
+            let stampRule: Int? = testCase["stampRule"] as? Int
+            let taken: String = SectionPublishState.fingerprint(
+                courseDirectory: courseDirectory, sectionNumber: 1,
+                rule: SectionPublishState.knownFingerprintRules.contains(stampRule ?? 1) ? (stampRule ?? 1) : 2
+            )
+            let stamp: SectionPublishState.Stamp = SectionPublishState.Stamp(
+                fingerprint: taken, publishedAt: Date(), destinations: ["netlify"],
+                fingerprintRule: stampRule
+            )
+            let encoder: JSONEncoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let url: URL = SectionPublishState.stampURL(courseDirectory: courseDirectory, sectionNumber: 1)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try encoder.encode(stamp).write(to: url)
+
+            let change: String = try XCTUnwrap(testCase["change"] as? String, name)
+            if change == "howITeachPage" {
+                try write("# How I teach, rewritten at length", to: "How I Teach.md")
+            } else if change == "lesson" {
+                try write("# A shared lesson, rewritten at length", to: "Unit 1/Lesson.md")
+            }
+            let expected: Bool = try XCTUnwrap(testCase["expectEdited"] as? Bool, name)
+            XCTAssertEqual(
+                SectionPublishState.hasUnpublishedEdits(courseDirectory: courseDirectory, sectionNumber: 1),
+                expected, name
+            )
+            try write("# A shared lesson", to: "Unit 1/Lesson.md")
+        }
+    }
+
+    /// Every stamp this copy writes names the rule it was taken under.
+    func testTheStampRecordsItsRule() throws {
+        publishNow()
+        let stamp: SectionPublishState.Stamp = try XCTUnwrap(
+            SectionPublishState.stamp(courseDirectory: courseDirectory, sectionNumber: 1)
+        )
+        XCTAssertEqual(stamp.fingerprintRule, SectionPublishState.currentFingerprintRule)
+        XCTAssertEqual(SectionPublishState.currentFingerprintRule, 2)
+    }
+
     private func publishNow(destinations: [String] = ["netlify"]) {
         SectionPublishState.recordPublish(
             courseDirectory: courseDirectory,
@@ -443,22 +540,34 @@ final class SectionPublishRecordingTests: XCTestCase {
 
     /// A scheduled deploy never goes through the deploy runner — launchd
     /// runs a shell script — so it needs its own path to the same record.
+    ///
+    /// In a throwaway home: `ICS3U` section 1 is a course a teacher plausibly
+    /// has, and before issue #240 this test created, wrote and deleted the
+    /// sentinel in the real `~/Library/Application Support/Plantoir/scheduled`
+    /// — destroying a real overnight run's result if one was waiting there.
     func testAScheduledDeployRecordsWhatWentOut() throws {
-        let sentinel: URL = ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1)
+        let homeFolderURL: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("scheduled-publish-home-" + UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: homeFolderURL) }
+        let label: String = ScheduledDeploy.legacyAgentLabel(courseCode: "ICS3U", sectionNumber: 1) + ".0a1b2c3d"
+        let sentinel: URL = ScheduledDeploy.successSentinelURL(label: label, inHomeFolder: homeFolderURL)
         try FileManager.default.createDirectory(
             at: sentinel.deletingLastPathComponent(), withIntermediateDirectories: true
         )
-        defer { try? FileManager.default.removeItem(at: sentinel) }
 
         let section: (courseDirectory: URL, courseCode: String, sectionNumber: Int) =
             (course.directoryURL, "ICS3U", 1)
 
         // No sentinel: the script did not say every destination worked.
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc")
+        ScheduledDeploy.recordScheduledPublish(
+            label: label, section: section, fingerprint: "abc", inHomeFolder: homeFolderURL
+        )
         XCTAssertNil(SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1))
 
         try "netlify cloudflare_pages\n".write(to: sentinel, atomically: true, encoding: .utf8)
-        ScheduledDeploy.recordScheduledPublish(section: section, fingerprint: "abc")
+        ScheduledDeploy.recordScheduledPublish(
+            label: label, section: section, fingerprint: "abc", inHomeFolder: homeFolderURL
+        )
         let stamp = SectionPublishState.stamp(courseDirectory: course.directoryURL, sectionNumber: 1)
         XCTAssertEqual(stamp?.fingerprint, "abc")
         XCTAssertEqual(stamp?.destinations, ["netlify", "cloudflare_pages"])
@@ -485,12 +594,18 @@ final class SectionPublishRecordingTests: XCTestCase {
         )
         XCTAssertNil(ScheduledDeploy.requestedSection(from: ["Plantoir"]))
 
+        // ONE home for both sides of the comparison. The script is given it
+        // explicitly (as the app gives it the real one), and the sentinel is
+        // asked for with the same one — asking with no home would answer the
+        // suite's throwaway home, which the script never names.
+        let homeFolderURL: URL = URL(fileURLWithPath: "/Users/teacher", isDirectory: true)
         let script: String = ScheduledDeploy.oneShotCommand(
             courseCode: "ICS3U",
             sectionNumber: 1,
             workspaceURL: workspace,
             deployArgumentsList: [["ICS3U", "1"], ["ICS3U", "1", "--target", "cloudflare"]],
-            destinationTypes: ["netlify", "cloudflare_pages"]
+            destinationTypes: ["netlify", "cloudflare_pages"],
+            homeFolder: homeFolderURL
         )
         XCTAssertTrue(
             script.contains("ALL_OK=0"),
@@ -498,7 +613,10 @@ final class SectionPublishRecordingTests: XCTestCase {
         )
         XCTAssertTrue(script.contains("netlify cloudflare_pages"))
         XCTAssertTrue(
-            script.contains(ScheduledDeploy.successSentinelURL(courseCode: "ICS3U", sectionNumber: 1).path)
+            script.contains(ScheduledDeploy.successSentinelURL(
+                label: ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: workspace),
+                inHomeFolder: homeFolderURL
+            ).path)
         )
     }
 
