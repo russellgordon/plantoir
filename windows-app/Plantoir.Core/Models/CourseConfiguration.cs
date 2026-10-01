@@ -659,6 +659,45 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// The raw <c>class_page_scheme</c> (#274, mac #267), or null when absent.
+    /// Written by the wizard for a CLUB only and never switchable afterwards.
+    /// </summary>
+    public string? ClassPageSchemeRaw
+    {
+        get => _values["class_page_scheme"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_page_scheme"); else _values["class_page_scheme"] = value; }
+    }
+
+    /// <summary>
+    /// The heading a section's front page was CREATED with, or null when the
+    /// course never recorded one. Read only at creation and by the front-page
+    /// pointer's insert fallback; never shown as "Most Recent Class" for a
+    /// course that did not record it (<c>settingsRows.shownWhen</c>, #376).
+    /// </summary>
+    public string? FrontPageHeading
+    {
+        get => _values["front_page_heading"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("front_page_heading"); else _values["front_page_heading"] = value; }
+    }
+
+    /// <summary>The raw <c>class_noun</c>, or null when absent.</summary>
+    public string? ClassNounRaw
+    {
+        get => _values["class_noun"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_noun"); else _values["class_noun"] = value; }
+    }
+
+    /// <summary>What the assistant calls a class page to THIS course's teacher.</summary>
+    public ClassNoun ClassNoun => ClassPageSchemes.NounReading(ClassNounRaw);
+
+    /// <summary>
+    /// How this course names its class pages — word and scheme together. Every
+    /// path that parses or WRITES a class-page title reads this, never the
+    /// word alone (<see cref="ClassPageNaming"/>).
+    /// </summary>
+    public ClassPageNaming Naming => new(UnitWord, ClassPageSchemes.Reading(ClassPageSchemeRaw));
+
+    /// <summary>
     /// The folder this app protects as the curriculum folder, or null.
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>

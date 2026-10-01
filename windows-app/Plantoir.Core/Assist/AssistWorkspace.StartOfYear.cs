@@ -42,7 +42,7 @@ public sealed partial class AssistWorkspace
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         string frontPage = Path.GetFullPath(SectionIndex.PathFor(course, section));
         string keyLinks = Path.GetFullPath(Path.Combine(course.SectionDirectory(section), KeyLinksFileName));
-        string unitWord = course.Configuration.UnitWord;
+        var naming = course.Configuration.Naming;
 
         var pages = new List<StartOfYearPage>();
         foreach (string full in graph.Pages.Where(page => ListsAsAPage(course, page)))
@@ -67,7 +67,7 @@ public sealed partial class AssistWorkspace
                 LinksTo: graph.TargetsOf(full)
                     .Where(target => !string.Equals(target, full, StringComparison.OrdinalIgnoreCase))
                     .ToHashSet(StringComparer.OrdinalIgnoreCase),
-                Number: kind == StartOfYearKind.Class ? UnitDay.Parse(Path.GetFileNameWithoutExtension(full), unitWord) : null,
+                Number: kind == StartOfYearKind.Class ? naming.Parse(Path.GetFileNameWithoutExtension(full)) : null,
                 Date: DateOf(course, section, full)));
         }
         return pages;
