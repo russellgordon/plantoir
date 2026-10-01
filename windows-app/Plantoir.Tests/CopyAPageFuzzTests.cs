@@ -60,6 +60,8 @@ public class CopyAPageFuzzTests
         long oracleMs = clock.ElapsedMilliseconds;
 
         var published = certified.Zip(answers).Where(pair => !pair.Second.HiddenEverywhere).ToList();
+        if (Environment.GetEnvironmentVariable("PLANTOIR_FUZZ_DUMP") is { Length: > 0 } dump)
+            File.WriteAllText(dump, string.Join("\n====\n", published.Select(p => $"{p.First.Composed}\n-> {p.Second.Problem} {string.Join(",", p.Second.HiddenIn)}")));
         _output.WriteLine($"fuzz: {n} sources, {certified.Count} certified, {refused} refused, " +
                           $"{published.Count} certified-and-not-hidden; compose {composeMs} ms, build oracle {oracleMs} ms");
         Assert.True(certified.Count >= n / 10, $"only {certified.Count} of {n} certified - the generator has stopped exercising the guard");
