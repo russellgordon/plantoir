@@ -12,7 +12,7 @@ namespace Plantoir.Mcp;
 /// Asked FIRST, before a tool is dispatched at all — a refusal that arrives
 /// after the work has started is not a refusal — by a call-tool filter on the
 /// server (Program.cs), so it covers the local assistant's window and every
-/// outside session alike, and all 40 tools this server serves, not the 22 the
+/// outside session alike, and all 42 tools this server serves, not the 22 the
 /// mac's runner holds.
 ///
 /// <para><b>Gated on each tool's OWN ReadOnly flag</b>, read off its
@@ -31,7 +31,9 @@ public static class ReferenceWriteGate
 
     /// <summary>The tools whose refusal says "never deployed" rather than "stays as it is".</summary>
     public static readonly IReadOnlySet<string> ToolsThatDeploy =
-        new HashSet<string>(StringComparer.Ordinal) { "deploy_section", "schedule_deploy", "plan_scheduled_deploy" };
+        new HashSet<string>(StringComparer.Ordinal) { "deploy_section", "schedule_deploy" };
+    // plan_scheduled_deploy is ReadOnly, so it is never gated here: its refusal
+    // is ScheduledDeploy.Problem's, asked inside the tool (door 10).
 
     /// <summary>Every tool this server serves, with its own ReadOnly flag.</summary>
     public static IReadOnlyDictionary<string, bool> ServedTools(Type? toolType = null) =>
@@ -62,11 +64,24 @@ public static class ReferenceWriteGate
                 : null;
         if (string.IsNullOrWhiteSpace(code)) return null;
 
-        Course? course;
-        try { course = Workspace.DiscoverCourses(workspace.FolderPath)
-                .FirstOrDefault(c => string.Equals(c.Code, code.Trim(), StringComparison.OrdinalIgnoreCase)); }
-        catch { return null; }
-        if (course is null || !ReferenceCourse.IsKeptForReference(course)) return null;
+        // Read the named course's settings directly, and FAIL SAFE: a settings
+        // file that is there and cannot be read is refused with the launchers'
+        // own "cannot tell" sentence (review L5, ruling 4) — the shell's
+        // stance — rather than let a write through to a course that might be
+        // frozen. A course with no settings file is no course: the tool's own
+        // lookup answers that.
+        string wanted = code.Trim();
+        string folder = Path.Combine(Workspace.CoursesDirectory(workspace.FolderPath), wanted);
+        string settings = Path.Combine(folder, "course_config.json");
+        if (wanted.StartsWith('.') || wanted.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || !File.Exists(settings)) return null;
+        Course course;
+        try { course = new Course(Path.GetFileName(folder), folder, CourseConfiguration.Load(settings)); }
+        catch
+        {
+            return ReferenceCourse.Wording["cannotTellHeadline"].Replace("{course}", wanted)
+                   + " — " + ReferenceCourse.Wording["cannotTellBecauseUnreadable"] + ".";
+        }
+        if (!ReferenceCourse.IsKeptForReference(course)) return null;
         string shown = ReferenceCourse.ShownCode(course);
         return ToolsThatDeploy.Contains(tool)
             ? AssistWording.DeployRefusedForAReferenceCourse(shown)
