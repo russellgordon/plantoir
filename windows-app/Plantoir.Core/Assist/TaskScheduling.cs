@@ -1070,9 +1070,19 @@ public static class TaskScheduling
 
     private static Func<IReadOnlyList<string>, (int ExitCode, string Output)>? _schtasksForTests;
 
+    /// <summary>
+    /// Called just before the REAL schtasks.exe runs. The unit suite sets it
+    /// once (#285) to throw on anything that would register, change, run or
+    /// delete a real task, so a test that forgot its <c>FakeScheduler</c>
+    /// fails loudly instead of putting a task into the teacher's Task
+    /// Scheduler. The source-scan tripwire cannot see a registration; this can.
+    /// </summary>
+    internal static Action<IReadOnlyList<string>>? RealSchtasksGuardForTests;
+
     private static (int ExitCode, string Output) Run(IEnumerable<string> arguments)
     {
         if (SchtasksForTests is { } stand_in) return stand_in(arguments.ToList());
+        RealSchtasksGuardForTests?.Invoke(arguments.ToList());
 
         var info = new ProcessStartInfo
         {
