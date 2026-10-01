@@ -15,10 +15,14 @@ namespace Plantoir.Core.Models;
 /// </summary>
 public static class NextClassPlanner
 {
-    public static UnitDay NextUnitAndDay(IEnumerable<string> pageTitles, string? term = null)
+    public static UnitDay NextUnitAndDay(IEnumerable<string> pageTitles, string? term = null) =>
+        NextUnitAndDay(pageTitles, new ClassPageNaming(term, ClassPageScheme.UnitDay));
+
+    /// <summary>The next position under a course's naming: in a numbered course, one past the HIGHEST number (a gap is never filled).</summary>
+    public static UnitDay NextUnitAndDay(IEnumerable<string> pageTitles, ClassPageNaming naming)
     {
         var unitDays = pageTitles
-            .Select(t => UnitDay.Parse(t, term))
+            .Select(t => naming.Parse(t))
             .Where(u => u.HasValue)
             .Select(u => u!.Value)
             .ToList();
@@ -46,16 +50,43 @@ public static class NextClassPlanner
         return new UnitDay(highestUnit + 1, 1);
     }
 
-    public static List<string> NumberedClasses(IEnumerable<string> pageTitles, string? term = null)
+    public static List<string> NumberedClasses(IEnumerable<string> pageTitles, string? term = null) =>
+        NumberedClasses(pageTitles, new ClassPageNaming(term, ClassPageScheme.UnitDay));
+
+    public static List<string> NumberedClasses(IEnumerable<string> pageTitles, ClassPageNaming naming)
     {
         return pageTitles
-            .Select(t => (Title: t, UnitDay: UnitDay.Parse(t, term)))
+            .Select(t => (Title: t, UnitDay: naming.Parse(t)))
             .Where(x => x.UnitDay.HasValue)
             .OrderBy(x => x.UnitDay!.Value.Unit)
             .ThenBy(x => x.UnitDay!.Value.Day)
             .Select(x => x.Title)
             .ToList();
     }
+
+    /// <summary>
+    /// A numbered course's next date (#274, mac <c>positionAfterTheLatestPage</c>):
+    /// the first class day after the LATEST dated page, because a numbered
+    /// course orders by date and may have gaps. Position counting gave CODING's
+    /// next page a date five weeks before Week 8. Null when the timetable has no
+    /// day after it (the caller then shares the last day, as the ordinary path does).
+    /// </summary>
+    public static DateOnly? DateAfterTheLatestPage(IEnumerable<DateOnly?> pageDates, IReadOnlyList<DateOnly> timetable)
+    {
+        var latest = pageDates.Where(d => d is not null).Select(d => d!.Value).DefaultIfEmpty(DateOnly.MinValue).Max();
+        return timetable.Where(d => d > latest).OrderBy(d => d).Cast<DateOnly?>().FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The refusal for "start a new unit" or "add days to a unit" in a numbered
+    /// course (<c>refusals</c> → <c>noUnitsInANumberedCourse</c>). Says "page", not
+    /// "meeting": a refusal is one string for both audiences, and the model's
+    /// words are not changed by #274. The mac's sentence, word for word.
+    /// </summary>
+    public static string NoUnitsInANumberedCourse(string courseCode, string word) =>
+        $"{courseCode} numbers its pages one after another — “{word} 1”, “{word} 2” — and has " +
+        "no units, so there is no unit to start or add days to. Ask for the next page " +
+        "instead and it takes the next number.";
 
     public static DateOnly Date(int position, IReadOnlyList<DateOnly> dates, string courseCode, int sectionNumber)
     {
