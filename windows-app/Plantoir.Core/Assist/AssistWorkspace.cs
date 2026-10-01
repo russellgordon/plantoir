@@ -1938,9 +1938,7 @@ public sealed partial class AssistWorkspace
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        throw new AssistRefusal(other.Kind == WorkLease.Copying
-            ? AssistWording.CourseIsBeingCopied(course.Code)
-            : AssistWording.CourseIsBusy(course.Code));
+        throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, other.Kind));
     }
 
     /// <summary>
@@ -1952,26 +1950,30 @@ public sealed partial class AssistWorkspace
     /// back, the trail says why, and the caller is refused with the sentence an
     /// assistant working from outside is told (<c>wording.courseIsBusy</c>).
     /// </summary>
-    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked) =>
-        ClaimTheBuildUnlessDeclined(course, section, asked)
-            ?? throw new AssistRefusal(_lastDeclinedBy == WorkLease.Copying
-                ? AssistWording.CourseIsBeingCopied(course.Code)
-                : AssistWording.CourseIsBusy(course.Code));
-
-    /// <summary>The kind of lease that last declined a build here, for the refusal's sentence.</summary>
-    private string? _lastDeclinedBy;
+    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked)
+    {
+        var (held, declinedBy) = ClaimTheBuild(course, section, asked);
+        return held ?? throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, declinedBy!));
+    }
 
     /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
-    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked)
+    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked) =>
+        ClaimTheBuild(course, section, asked).Held;
+
+    /// <summary>
+    /// The claim, or the KIND of lease that declined it — returned with the
+    /// result rather than kept in a field, so two calls cannot read each
+    /// other's answer (bundle 6a ruling 5).
+    /// </summary>
+    private (WorkLease.Held? Held, string? DeclinedBy) ClaimTheBuild(Course course, int section, string asked)
     {
         var claim = WorkLease.Take(_folder, course.Code, WorkLease.Building);
         if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
-            return claim;
+            return (claim, null);
         claim.Dispose();
-        _lastDeclinedBy = other.Kind;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        return null;
+        return (null, other.Kind);
     }
 
 
