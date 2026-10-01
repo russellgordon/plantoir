@@ -668,9 +668,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         => Guarded(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
+            var noun = workspace.NounForCourse(course);
             return plan.ChangesNothing
                 ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(noun));
         });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
@@ -689,10 +690,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => GuardedResult(() =>
+        => Guarded(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
-            return workspace.ApplyInsertClasses(plan).Message;
+            var result = workspace.ApplyInsertClasses(plan);
+            if (!result.Succeeded || workspace.NounForCourse(course) != ClassNoun.Meeting)
+                return Answering(result.Message);
+            // A club's teacher reads "meeting" (#274); the model's copy is untouched.
+            return Answering(result.Message.Replace(
+                                 AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle),
+                                 AssistWording.MadeRoomForAMeeting(plan.Added.Count, plan.PositionTitle)),
+                             result.Message);
         });
 
     [McpServerTool(Name = "plan_add_classes", Title = "Plan adding class pages",
@@ -718,7 +726,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                                 workspace.DayToCarryOnFrom(course, section, unit), howMany);
             return plan.ChangesNothing
                 ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(workspace.NounForCourse(course)));
         });
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
@@ -765,13 +773,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // they reach the write, so a twin that cannot see `duplicate`
             // proposes an ordinary next class and the teacher approves
             // something other than what runs.
+            var noun = workspace.NounForCourse(course);
             if (!string.IsNullOrWhiteSpace(duplicate))
-                return Proposing(workspace.PlanDuplicateClass(course, section, duplicate).Describe());
+            {
+                var copy = workspace.PlanDuplicateClass(course, section, duplicate);
+                return Proposing(copy.Describe(), copy.Describe(noun));
+            }
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             return plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(noun));
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
@@ -2277,6 +2289,22 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         Meta = new JsonObject
         {
             [AssistToolAnswer.TeacherSummaryKey] = plan,
+            [AssistToolAnswer.IsPlanKey] = true,
+        },
+    });
+
+    /// <summary>
+    /// A PLAN whose teacher's card differs from the model's copy — a club's
+    /// "meeting" card (#274). The text content, which the model and Claude Code
+    /// read, is the class form byte for byte; the teacher's card travels only in
+    /// <c>_meta</c>, which the window shows and never forwards to the model.
+    /// </summary>
+    private CallToolResult Proposing(string forModel, string forTeacher) => CarryingTheConversationBackup(new()
+    {
+        Content = [new TextContentBlock { Text = forModel + "\n\n" + AskBeforeGoingAhead }],
+        Meta = new JsonObject
+        {
+            [AssistToolAnswer.TeacherSummaryKey] = forTeacher,
             [AssistToolAnswer.IsPlanKey] = true,
         },
     });

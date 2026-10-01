@@ -3808,6 +3808,16 @@ public sealed partial class AssistWorkspace
     /// </summary>
     public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
 
+    /// <summary>
+    /// What this course's TEACHER hears a class page called (#274). For the
+    /// teacher's copy only; the model's copy is always the class form.
+    /// </summary>
+    public ClassNoun NounForCourse(string courseCode)
+    {
+        try { return Course(courseCode).Configuration.ClassNoun; }
+        catch (AssistRefusal) { return ClassNoun.Class; }
+    }
+
     /// <summary>How this course names its class pages — word AND scheme (#274).</summary>
     public ClassPageNaming NamingForCourse(string courseCode)
     {

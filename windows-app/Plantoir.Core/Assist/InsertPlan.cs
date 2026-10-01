@@ -44,7 +44,11 @@ public sealed class InsertPlan
 
     public bool ChangesNothing => Added.Count == 0 && Renames.Count == 0 && Moves.Count == 0;
 
-    public string Describe()
+    /// <summary>The plan in the class form — what the MODEL reads, in every course.</summary>
+    public string Describe() => Describe(ClassNoun.Class);
+
+    /// <summary>The plan in a course's own noun: the meeting form is the TEACHER's card only (#274).</summary>
+    public string Describe(ClassNoun noun)
     {
         var lines = new List<string>();
 
@@ -55,9 +59,10 @@ public sealed class InsertPlan
             return string.Join("\n", lines);
         }
 
-        string room = Added.Count == 1 ? "one new class" : $"{Added.Count} new classes";
-        lines.Add($"Make room for {room} at {PositionTitle} in {CourseCode} " +
-                  $"Section {SectionNumber}.");
+        string section = SectionNumber.ToString();
+        lines.Add(noun == ClassNoun.Meeting
+            ? AssistWording.WouldMakeRoomForAMeeting(Added.Count, PositionTitle, CourseCode, section)
+            : AssistWording.WouldMakeRoom(Added.Count, PositionTitle, CourseCode, section));
         lines.Add("");
 
         lines.Add($"New, and unpublished until you write {(Added.Count == 1 ? "it" : "them")}:");
@@ -85,7 +90,9 @@ public sealed class InsertPlan
         if (Moves.Count > 0)
         {
             lines.Add("");
-            lines.Add(AssistWording.MovedToLaterDays(Moves.Count));
+            lines.Add(noun == ClassNoun.Meeting
+                ? AssistWording.MovedToLaterDaysForAMeeting(Moves.Count)
+                : AssistWording.MovedToLaterDays(Moves.Count));
             foreach (var move in Moves.Take(MostShown))
             {
                 string fromText = move.From.HasValue ? DateText.Iso(move.From.Value) : "no date";
