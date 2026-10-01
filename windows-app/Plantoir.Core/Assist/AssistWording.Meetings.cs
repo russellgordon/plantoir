@@ -25,6 +25,14 @@ public static partial class AssistWording
 {
     private static string S(int n, string one, string many) => n == 1 ? one : many;
 
+    /// <summary>
+    /// The links-into-hidden-pages finding, said by the assistant when the
+    /// checklist WILL be offered (#392, mac #379) — see
+    /// <c>AssistWorkspace.AppendingFindings</c> for when.
+    /// </summary>
+    public static string LinksIntoHiddenPagesWillBeOffered(string course, string section) =>
+        $"Some links on pages students can see lead to pages that are still hidden. Plantoir will offer to publish them when you next open {course} Section {section}.";
+
     public const string AddedTheNextPage = "Added the next class page.";
     public const string AddedTheNextPageForAMeeting = "Added the next meeting page.";
 

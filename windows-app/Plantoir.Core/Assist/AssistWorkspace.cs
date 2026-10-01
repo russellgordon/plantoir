@@ -1075,6 +1075,11 @@ public sealed partial class AssistWorkspace
         var classPaths = new HashSet<string>(
             ClassPages(course, section).Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
 
+        // A page in the published-pages record has been on a site students
+        // could reach and KEEPS its date (#392, mac #379; Russell's decision 4):
+        // "hidden now" no longer means "never published".
+        var publishedBefore = LinksChecklist.PublishedPlaces(course.DirectoryPath, section);
+
         // Find all targets reachable from named class pages
         var reachableTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var named in pages.Where(p => !p.ViaLink))
@@ -1134,6 +1139,10 @@ public sealed partial class AssistWorkspace
             }
 
             if (earliest is not { } owner) continue;
+
+            string place = Path.ChangeExtension(Path.GetRelativePath(course.DirectoryPath, target), null)
+                .Replace(Path.DirectorySeparatorChar, '/');
+            if (publishedBefore.Contains(LinksChecklist.Key(place))) continue;
 
             // Already out where students can see it — leave it alone.
             //
@@ -1414,15 +1423,15 @@ public sealed partial class AssistWorkspace
             // The build leg's question is the deploy's, not a destination's:
             // no destination was reached (the #132 lesson - keep the legs apart).
             return new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString())), null);
         if (!build.Succeeded)
             return new AssistResult(false,
                 // What the build said about the folders belongs HERE most of
                 // all: a build that failed because the front page is missing
                 // is the case where the finding is the cause.
-                Models.SiteHealthFinding.Appending(
-                    $"The build failed, so nothing was deployed. {build.Message}", build.Findings),
+                AppendingFindings(course, section, build, 
+                    $"The build failed, so nothing was deployed. {build.Message}"),
                 null);
 
         // Every destination's own deploy — one FAILING does not stop the
@@ -1477,7 +1486,7 @@ public sealed partial class AssistWorkspace
                 if (wentOut.Count > 0) answerMessage += " " + AssistWording.DeployWentOutTo(Names(wentOut));
             }
             return new AssistResult(outcomeLegs.Any(leg => leg.Succeeded),
-                Models.SiteHealthFinding.Appending(answerMessage, build.Findings), null);
+                AppendingFindings(course, section, build, answerMessage), null);
         }
 
         bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
@@ -1489,7 +1498,7 @@ public sealed partial class AssistWorkspace
         // the build. Said after the outcome, never instead of it.
         return result with
         {
-            Message = Models.SiteHealthFinding.Appending(result.Message, build.Findings),
+            Message = AppendingFindings(course, section, build, result.Message),
         };
     }
 
@@ -1507,16 +1516,16 @@ public sealed partial class AssistWorkspace
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
             return new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString())), null);
         return build.Succeeded
             ? new AssistResult(true,
-                Models.SiteHealthFinding.Appending(
+                AppendingFindings(course, section, build, 
                     $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
-                    "Look it over in Plantoir, and deploy it there when you're happy.", build.Findings), null)
+                    "Look it over in Plantoir, and deploy it there when you're happy."), null)
             : new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}", build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}"), null);
     }
 
     /// <summary>
@@ -3830,6 +3839,36 @@ public sealed partial class AssistWorkspace
     public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
 
     /// <summary>
+    /// A message with what the build found about the course added, as
+    /// <see cref="Models.SiteHealthFinding.Appending"/> — except that the
+    /// links-into-hidden-pages finding says
+    /// <see cref="AssistWording.LinksIntoHiddenPagesWillBeOffered"/> instead of
+    /// its pairs (#392, mac #379), ONLY when the same build printed the
+    /// checklist marker, the offer on disk is that build's, and it holds
+    /// something the teacher has not answered — so it never promises a sheet
+    /// that will not come. Otherwise the finding's own words.
+    /// </summary>
+    private static string AppendingFindings(Course course, int section, LaunchOutcome build, string message)
+    {
+        var findings = build.Findings;
+        if (findings is null || findings.Count == 0) return message;
+        bool offered = build.LinksChecklist is { } marker
+            && string.Equals(marker.Course, course.Code, StringComparison.OrdinalIgnoreCase)
+            && marker.Section == section && marker.Pages > 0
+            && LinksChecklistShowing.AfterAWatchedBuild(course, section, marker) is not null;
+        if (!offered) return Models.SiteHealthFinding.Appending(message, findings);
+        var parts = new List<string> { message };
+        foreach (var finding in findings)
+            parts.Add(finding.Name == LinksIntoHiddenPagesFinding && finding.Section == section
+                ? AssistWording.LinksIntoHiddenPagesWillBeOffered(course.Code, section.ToString())
+                : finding.Sentence + " " + finding.Detail);
+        return string.Join("\n\n", parts);
+    }
+
+    /// <summary>The site-health check whose finding the links checklist answers (<c>siteHealth.linksIntoHiddenPages</c>).</summary>
+    internal const string LinksIntoHiddenPagesFinding = "linksIntoHiddenPages";
+
+    /// <summary>
     /// What the front-page pointer needs for one class of one section (#274,
     /// #406): every class title, the class, its place INSIDE the course folder
     /// (never the disk path) and the course's recorded heading.
@@ -4054,7 +4093,8 @@ public readonly record struct LaunchOutcome(
     bool Succeeded,
     string Message,
     IReadOnlyList<Models.SiteHealthFinding>? Findings = null,
-    int? ExitCode = null)
+    int? ExitCode = null,
+    LinksChecklistMarker? LinksChecklist = null)
 {
     /// <summary>
     /// deploy.py's NEEDS_AN_ANSWER, which preview.ps1 and deploy.ps1 pass

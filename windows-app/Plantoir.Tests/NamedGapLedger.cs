@@ -156,8 +156,6 @@ internal static class NamedGapLedger
         // inline elsewhere; the walker cannot see those, and hoisting them
         // into AssistWording under their key is #157's remaining half. The
         // rest belong to features this app does not have yet.
-        Owed(AssistWordingKeys, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
-            "linksIntoHiddenPagesWillBeOffered"),
         Owed(AssistWordingKeys, 283, "the backups list does not show sizes yet (mac #242)",
             "backupSizeCouldNotBeRead", "backupSizeCouldNotBeReadShort"),
         Owed(AssistWordingKeys, 308, "the plan, re-date and make-room callers do not yet name the pages SetDraft/SetCreated declined as noRoomForAKey (mac #186); the writers themselves decline since bundle 2",
