@@ -947,6 +947,19 @@ public sealed partial class AssistWorkspace
             }
         }
 
+        // #308 (the mac's #186): ask the REAL writer now whether it can write
+        // each change. A page whose settings have no column-0 place for the
+        // new line is declined at the write, so promising it on the card —
+        // or answering "already hidden" about it — would be the lie #186 was
+        // about. Declined pages leave Changes and are named instead.
+        var cannotBeAddedTo = new List<PlannedPage>();
+        changes.RemoveAll(change =>
+        {
+            if (!WriterDeclines(change.Page.RelativePath, change.Key, draft: !change.WillBeVisible, section)) return false;
+            cannotBeAddedTo.Add(change.Page);
+            return true;
+        });
+
         var allPlannedPages = named.Concat(linked).ToList();
         var inherited = InheritedDates(course, section, allPlannedPages, isDraft);
 
@@ -988,7 +1001,35 @@ public sealed partial class AssistWorkspace
             Index = index,
             Dangling = dangling,
             StoppedAtClasses = stoppedAt,
+            CannotBeAddedTo = cannotBeAddedTo,
         };
+    }
+
+    /// <summary>
+    /// Whether <see cref="PageFrontmatter.SetDraft"/> would decline this page
+    /// for want of a column-0 place for the key (#308). A page that cannot be
+    /// read is not "declined" here: the write reports it the way it always has.
+    /// </summary>
+    private bool WriterDeclines(string relativePath, string key, bool draft, int section)
+    {
+        try
+        {
+            string text = File.ReadAllText(PagePaths.ResolveInside(_folder, relativePath));
+            return PageFrontmatter.SetDraft(text, key, draft, section).Edit.NoRoomForAKey;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// The trail's count of pages a write left as they were (#308,
+    /// <c>page settings left as they were</c>) — never which pages, and nothing
+    /// when the count is 0.
+    /// </summary>
+    private static void NoteSettingsLeftAsTheyWere(string act, int pages, string courseCode, int section)
+    {
+        if (pages <= 0) return;
+        ActivityTrail.Note(ActivityTrail.Event.PageSettingsLeftAsTheyWere,
+            ActivityTrail.PageSettingsLeftAsTheyWereLine(act, pages), courseCode, section);
     }
 
     /// <summary>The reason an unpublish leaves a linked class up (#342 / mac #201).</summary>
@@ -1572,8 +1613,12 @@ public sealed partial class AssistWorkspace
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
 
+        string act = plan.Hiding ? "hiding pages" : "publishing pages";
         if (plan.ChangesNothing && !plan.Publishes)
-            return new AssistResult(true, "Nothing needed changing.", null);
+        {
+            NoteSettingsLeftAsTheyWere(act, plan.CannotBeAddedTo.Count, course.Code, section);
+            return new AssistResult(true, plan.CannotBeAddedToSentence ?? "Nothing needed changing.", null);
+        }
 
         // Anything that would stop the build has to be found NOW, before the
         // backup and the edits. Failing at the last step would leave the
@@ -1594,12 +1639,17 @@ public sealed partial class AssistWorkspace
         // you asked me to undo that…" — so a gerund here puts a broken
         // sentence in front of the teacher at the one moment they are
         // checking that the right thing was put back.
+        // The label names what the plan WILL write: a page the writer declined
+        // at plan time is named in the reply, not "unpublished" here (#308).
+        var declinedAtPlan = new HashSet<string>(plan.CannotBeAddedTo.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
+        var labelled = plan.Named.Where(p => !declinedAtPlan.Contains(p.Title)).ToList();
         using var recording = UndoHistory.Record(_undo,
             $"{(plan.Hiding ? "unpublished" : "published")} " +
-            $"{Humanize(plan.Named.Select(p => "“" + p.Title + "”"))} " +
+            $"{Humanize((labelled.Count > 0 ? labelled : plan.Named.ToList()).Select(p => "“" + p.Title + "”"))} " +
             $"in {course.Code} Section {section}");
 
         var changed = new List<string>();
+        var declined = plan.CannotBeAddedTo.Select(p => p.DisplayTitle).ToList();
         foreach (var page in plan.Changing)
         {
             // Named as it happens, so a teacher watching the conversation
@@ -1609,12 +1659,16 @@ public sealed partial class AssistWorkspace
             string full = PagePaths.ResolveInside(_folder, page.RelativePath);
             string text = File.ReadAllText(full);
             var (updated, edit) = PageFrontmatter.SetDraft(text, page.FrontmatterKey, page.Draft, section);
+            // Edited since the plan into a shape with no room: named, never
+            // counted as done (#308).
+            if (edit.NoRoomForAKey) { declined.Add(page.DisplayTitle); continue; }
             if (!edit.Changed) continue;
             Save(full, updated);
             changed.Add(page.Title);
         }
         if (changed.Count > 0)
             progress?.Report($"Changed {changed.Count} page{(changed.Count == 1 ? "" : "s")}.");
+        NoteSettingsLeftAsTheyWere(act, declined.Count, course.Code, section);
 
         // Pages only this class uses take its date.
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
@@ -1636,7 +1690,7 @@ public sealed partial class AssistWorkspace
         recording.Done();
 
         if (!plan.Publishes)
-            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
+            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined), backup);
 
         // Publishing builds a PREVIEW, and stops there.
         //
@@ -1661,7 +1715,7 @@ public sealed partial class AssistWorkspace
         // So when told not to build, this returns the plain summary and
         // leaves the one visible build to the app.
         if (!preview)
-            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
+            return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined), backup);
 
         // The pages are already written: Markdown never conflicts with a
         // build, so only the REBUILD is declined when another program is
@@ -1670,16 +1724,17 @@ public sealed partial class AssistWorkspace
         using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
         if (claim is null)
             return new AssistResult(true,
-                Summary(changed, previewed: false, course.Code, section, plan.Hiding) + " " + AssistWording.CourseIsBusy(course.Code),
+                Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined) + " " + AssistWording.CourseIsBusy(course.Code),
                 backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
-                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
+                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}" +
+                (declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : ""), backup);
 
-        return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding), backup);
+        return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding, declined), backup);
     }
 
     /// <summary>
@@ -1716,6 +1771,7 @@ public sealed partial class AssistWorkspace
         unitPages = unitPages.OrderByDescending(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList();
 
         var moving = new List<string>();
+        var declined = new List<string>();
         foreach (var p in unitPages)
         {
             // And a page whose flag this app will not read counts as moving,
@@ -1724,8 +1780,25 @@ public sealed partial class AssistWorkspace
             // sentence nobody can stand behind.
             if (p.IsVisibleToStudents != publishing || !p.VisibilityIsCertain)
             {
-                moving.Add(p.DisplayTitle);
+                // A page the writer will decline is NAMED, never counted as
+                // moving or as already done (#308, the mac's #186).
+                if (WriterDeclines(p.RelativePath, p.FrontmatterKey, draft: !publishing, section))
+                    declined.Add(p.DisplayTitle);
+                else
+                    moving.Add(p.DisplayTitle);
             }
+        }
+        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
+
+        if (moving.Count == 0 && declinedSentence is not null)
+        {
+            return new WholeUnitPlanResult(
+                HasPages: true,
+                MovingCount: 0,
+                PlanText: null,
+                Summary: null,
+                AlreadyDoneSentence: declinedSentence,
+                ErrorMessage: null);
         }
 
         if (moving.Count == 0)
@@ -1758,6 +1831,11 @@ public sealed partial class AssistWorkspace
         else
         {
             lines.Add("Pages only they use come down too; anything still needed stays.");
+        }
+        if (declinedSentence is not null)
+        {
+            lines.Add("");
+            lines.Add(declinedSentence);
         }
 
         string summary = $"Worked out what {(publishing ? "publishing" : "unpublishing")} {course.Configuration.UnitWord} {unit} would do.";
@@ -1816,11 +1894,17 @@ public sealed partial class AssistWorkspace
 
         bool changedAnything = false;
         var changed = new List<string>();
+        var declined = new List<string>();
+        void Decline(string title)
+        {
+            if (!declined.Contains(title, StringComparer.OrdinalIgnoreCase)) declined.Add(title);
+        }
 
         foreach (var page in unitPages)
         {
             var pagePlan = PlanPublish(
                 course.Code, section, new[] { page.Title }, includeLinked: true, draft: !publishing, publishes: publishing);
+            foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
             if (pagePlan.ChangesNothing) continue;
 
@@ -1830,6 +1914,7 @@ public sealed partial class AssistWorkspace
                 string full = PagePaths.ResolveInside(_folder, change.RelativePath);
                 string text = File.ReadAllText(full);
                 var (updated, edit) = PageFrontmatter.SetDraft(text, change.FrontmatterKey, change.Draft, section);
+                if (edit.NoRoomForAKey) { Decline(change.DisplayTitle); continue; }
                 if (!edit.Changed) continue;
                 Save(full, updated);
                 if (!changed.Contains(change.Title)) changed.Add(change.Title);
@@ -1861,16 +1946,20 @@ public sealed partial class AssistWorkspace
         }
 
         recording.Done();
+        NoteSettingsLeftAsTheyWere(publishing ? "publishing pages" : "hiding pages", declined.Count, course.Code, section);
+        string? declinedSentence = declined.Count > 0 ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : null;
 
         if (!changedAnything)
         {
-            string already = publishing
+            // Never "already hidden" about pages the writer declined (#308).
+            string already = declinedSentence ?? (publishing
                 ? AssistWording.UnitAlreadyPublished(course.Configuration.UnitWord, unit)
-                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit);
+                : AssistWording.UnitAlreadyHidden(course.Configuration.UnitWord, unit));
             return new AssistResult(true, already, backup);
         }
 
-        string summary = $"{course.Configuration.UnitWord} {unit} was {verb}.";
+        string summary = $"{course.Configuration.UnitWord} {unit} was {verb}." +
+                         (declinedSentence is null ? "" : " " + declinedSentence);
 
         if (!preview)
             return new AssistResult(true, summary, backup);
@@ -1921,16 +2010,23 @@ public sealed partial class AssistWorkspace
             ? "No page needed changing, and the course was backed up"
             : $"{changed.Count} page{(changed.Count == 1 ? " was" : "s were")} changed and the course was backed up";
 
-    private static string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false)
+    private static string Summary(IReadOnlyList<string> changed, bool previewed, string code, int section, bool hiding = false,
+                                  IReadOnlyList<string>? declined = null)
     {
-        if (changed.Count == 0) return "Nothing needed changing.";
+        // Pages the writer declined are NAMED (#308): never folded into
+        // "Nothing needed changing.", which would say they were already right.
+        string? declinedSentence = declined is { Count: > 0 }
+            ? AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined)
+            : null;
+        if (changed.Count == 0) return declinedSentence ?? "Nothing needed changing.";
         string verb = hiding ? "Unpublished" : "Published";
         string what = changed.Count == 1
             ? $"{verb} “{changed[0]}”."
             : $"{verb} {changed.Count} pages ({string.Join(", ", changed)}).";
-        return previewed
+        string said = previewed
             ? $"{what.TrimEnd('.')} and rebuilt the preview of {code} Section {section}."
             : what;
+        return declinedSentence is null ? said : said + " " + declinedSentence;
     }
 
     /// <summary>
@@ -2492,13 +2588,19 @@ public sealed partial class AssistWorkspace
         var classPaths = new HashSet<string>(
             plan.Dates.Select(d => d.RelativePath), StringComparer.OrdinalIgnoreCase);
         int classes = 0, materials = 0;
+        // Pages the writer declined (#308, the mac's #186), NAMED in the reply:
+        // a date it could not set, and a hide it could not write.
+        var undated = new List<string>();
+        var notHidden = new List<string>();
 
         foreach (var date in plan.Changing)
         {
             string full = PagePaths.ResolveInside(_folder, date.RelativePath);
             string fileText = File.ReadAllText(full);
-            var (updated, changed) = PageFrontmatter.SetCreated(
-                fileText, date.FrontmatterKey, date.New, tail);
+            var dateEdit = PageFrontmatter.SetCreated(fileText, date.FrontmatterKey, date.New, tail);
+            string updated = dateEdit.Text;
+            bool changed = dateEdit.Changed;
+            if (dateEdit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(date.Title);
             if (date.Unpublishes)
             {
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
@@ -2507,6 +2609,7 @@ public sealed partial class AssistWorkspace
                     updated, pubKey, draft: true, section);
                 updated = draftUpdated;
                 if (draftEdit.Changed) changed = true;
+                if (draftEdit.NoRoomForAKey) notHidden.Add(date.Title);
             }
             if (!changed) continue;
             Save(full, updated);
@@ -2548,6 +2651,10 @@ public sealed partial class AssistWorkspace
         // from a total: "Re-dated 14 classes and -4 pages they use" came from
         // (pages whose date changes) - (every class in the section).
         string summary = AssistWording.ReDatedSummary(course.Code, section.ToString(), classes, materials);
+        if (undated.Count > 0) summary += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
+        if (notHidden.Count > 0) summary += " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(notHidden);
+        NoteSettingsLeftAsTheyWere("re-dating classes", undated.Union(notHidden, StringComparer.OrdinalIgnoreCase).Count(),
+            course.Code, section);
         string detail = summary +
                         $"\n\n{BackedUpNote}" +
                         "\n\nNothing was published or hidden, so students see no change until you deploy.";
@@ -3368,6 +3475,9 @@ public sealed partial class AssistWorkspace
 
         progress?.Report("Moving the dates…");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
+        // A class the writer could not date (#308, the mac's #186) is NAMED —
+        // by its new name, since by now it has been renamed and moved.
+        var undated = new List<string>();
         foreach (var move in plan.Moves)
         {
             try
@@ -3379,12 +3489,13 @@ public sealed partial class AssistWorkspace
 
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
                 string key = sectionLocal ? "created" : "createdSection" + section;
-                var (updated, changed) = PageFrontmatter.SetCreated(
-                    File.ReadAllText(full), key, move.To, tail);
-                if (changed) Save(full, updated);
+                var edit = PageFrontmatter.SetCreated(File.ReadAllText(full), key, move.To, tail);
+                if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(move.Title);
+                if (edit.Changed) Save(full, edit.Text);
             }
             catch { }
         }
+        NoteSettingsLeftAsTheyWere("making room for a class", undated.Count, course.Code, section);
 
         progress?.Report("Adding the new classes…");
         Directory.CreateDirectory(ClassFolder(course, section));
@@ -3402,6 +3513,7 @@ public sealed partial class AssistWorkspace
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;
+        if (undated.Count > 0) said += " " + AssistWording.PagesWhoseNewDatesCouldNotBeSet(undated);
 
         // Said because it is now TRUE and was not said before: this records no
         // undo entry, so "undo that" afterwards reaches back past it to
