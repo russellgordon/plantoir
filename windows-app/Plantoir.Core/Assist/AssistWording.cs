@@ -406,4 +406,14 @@ public static class AssistWording
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";
 
     public const string NothingToDo = "I am not sure what to do with that.";
+
+    /// <summary>
+    /// A reply that was refused rather than acted on — here, a tool the model
+    /// named that it was never offered (#350 / mac #327). Reused on purpose
+    /// rather than a sentence of its own: any wording specific to the refusal
+    /// would have to describe a tool list, and rule 1 says the window never
+    /// talks about its machinery. (#217's echo guard says it too.)
+    /// </summary>
+    public const string DidNotFollowThat =
+        "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
 }

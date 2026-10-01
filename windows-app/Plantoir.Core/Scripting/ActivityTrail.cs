@@ -24,6 +24,13 @@ public static class ActivityTrail
         AssistantMatchedAFixedPhrase,
         AssistantChoseATool,
         AssistantCouldNotAnswer,
+        /// <summary>
+        /// The model named a tool that exists but was not on the list it was
+        /// shown, and the turn was refused with nothing run (#350 / mac #327).
+        /// Carries the course, the section and the tool IN WORDS — never the
+        /// teacher's sentence and never the argument values.
+        /// </summary>
+        AssistantNamedAToolItWasNotOffered,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -305,6 +312,7 @@ public static class ActivityTrail
         Event.AssistantMatchedAFixedPhrase => "assistant matched a fixed phrase",
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
+        Event.AssistantNamedAToolItWasNotOffered => "assistant named a tool it was not offered",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",

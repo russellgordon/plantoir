@@ -324,6 +324,10 @@ public sealed class AssistAgent
         ["remember_timetable"] = "plan_remember_timetable",
         ["re_date_classes"] = "plan_re_date_classes",
         ["make_room_for_classes"] = "plan_make_room_for_classes",
+        // Irregular, as the mac's AssistToolDefinition.irregularPlanTwins says:
+        // the twin is NOT plan_ + the write's name, and deriving it that way is
+        // how add_curriculum_mentions ran with no plan on the mac (#327 / #350).
+        ["add_curriculum_mentions"] = "plan_curriculum_mentions",
     };
 
     /// <summary>
@@ -592,6 +596,52 @@ public sealed class AssistAgent
 
     private JsonObject? _awaiting;      // a write the teacher has not agreed to yet
 
+    /// <summary>
+    /// Every tool the SERVER serves — the full surface, not the narrowed list
+    /// the model is shown. Set by the window from the server's own listing.
+    ///
+    /// <para>It exists for one refusal (#350 / mac #327): a name that is on
+    /// this list and NOT on the list the model was shown is refused, nothing
+    /// runs and the turn is wound back. The server answers Claude Code as
+    /// well, so it serves every tool either client may call; before this, a
+    /// model that named <c>re_date_classes</c> — kept off its list because
+    /// re-dating a whole section is too big for a router right four times in
+    /// five — simply had it run. Null (the tests' default) means "not told",
+    /// and then nothing is refused, because a refusal decided from a list the
+    /// agent was never given would be a guess.</para>
+    ///
+    /// <para>A name that exists NOWHERE is unchanged: it goes to the server
+    /// and comes back as "no tool by that name", for the model to read.
+    /// Refusing those too was rejected on the mac — it changes documented
+    /// behaviour for no failure anyone has seen. Fixed phrasings never come
+    /// through here, so a tool only a card reaches keeps working.</para>
+    /// </summary>
+    public IReadOnlyCollection<string>? ServedTools { get; set; }
+
+    /// <summary>The names on the list the model was shown.</summary>
+    private HashSet<string> OfferedTools() => new(
+        _schemas.Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .Where(name => name is not null)!,
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether <paramref name="name"/> exists here but was not shown to the model.</summary>
+    internal bool WasNotOffered(string name) =>
+        ServedTools is { } served &&
+        served.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+        !OfferedTools().Contains(name);
+
+    /// <summary>
+    /// Where this turn's messages begin, so a refused turn can be wound back
+    /// out of what the model reads next. The transcript the teacher sees is
+    /// not touched — only the conversation sent to the model.
+    /// </summary>
+    private int _turnStart;
+
+    private void WindTheTurnBack()
+    {
+        while (_messages.Count > _turnStart) _messages.RemoveAt(_messages.Count - 1);
+    }
+
     public bool IsAwaitingApproval => _awaiting is not null;
     public string? PendingTool => _awaiting?["function"]?["name"]?.GetValue<string>();
 
@@ -622,6 +672,7 @@ public sealed class AssistAgent
 
         var today = DateTime.Now;
         _dateline = $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)";
+        _turnStart = _messages.Count;
         _messages.Add(new JsonObject
         {
             ["role"] = "user",
@@ -953,6 +1004,7 @@ public sealed class AssistAgent
         _awaiting = null;
 
         OnPlanAccepted?.Invoke();
+        _turnStart = _messages.Count;
 
         var lines = new List<Line>();
         var answer = await RunTool(call, lines, cancellation);
@@ -1020,10 +1072,25 @@ public sealed class AssistAgent
                 lines.Add(new Line("assistant", "The assistant didn’t answer. Try again in a moment."));
                 return lines;
             }
-            _messages.Add(reply.DeepClone()!);
-
             var calls = reply["tool_calls"] as JsonArray;
             bool acting = calls is { Count: > 0 };
+
+            // Above every other gate, and BEFORE the reply joins the
+            // conversation: a tool that exists but was not offered is
+            // refused, the turn is wound back, and nothing runs — no plan, no
+            // button (#350 / mac #327).
+            if (acting && calls![0]?["function"]?["name"]?.GetValue<string>() is { } named &&
+                WasNotOffered(named))
+            {
+                WindTheTurnBack();
+                ActivityTrail.Note(ActivityTrail.Event.AssistantNamedAToolItWasNotOffered,
+                    $"the assistant named {named.Replace('_', ' ')}, which it was not offered; nothing ran",
+                    _courseCode, _section);
+                lines.Add(new Line("assistant", AssistWording.DidNotFollowThat));
+                return lines;
+            }
+
+            _messages.Add(reply.DeepClone()!);
 
             // Content alongside a tool call is almost always the request
             // parroted back — measured as "Unpublishing Unit 4, Day 5
