@@ -64,7 +64,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public string ListCourses()
     {
         var courses = workspace.Courses();
-        if (courses.Count == 0) return "This working folder has no courses yet.";
+        if (courses.Count == 0) return AssistWording.NoCoursesYet;
 
         var text = new StringBuilder();
         foreach (var course in courses)
@@ -236,11 +236,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (workspace.NoteExplainedThisConversation(found.Code, number))
                 return AssistWording.PublishingAlreadyExplained(found.Code, number.ToString());
 
-            // The SAME answer a deploy gives, so the briefing cannot promise
-            // one destination while the deploy uses another — and a folder is
-            // named rather than described, since "the folder you publish into"
-            // tells a teacher with two courses nothing at all.
-            return Briefing.Words(found.Code, number, AssistWorkspace.DestinationOf(found));
+            // The mac's sentence, from the contract (#157). It names no
+            // destination, so it cannot promise one the deploy does not use —
+            // the reason the old Briefing.Words looked the destination up.
+            return AssistWording.WhatPublishingMeans;
         });
 
     /// <summary>How many of each kind to name before summarising.</summary>

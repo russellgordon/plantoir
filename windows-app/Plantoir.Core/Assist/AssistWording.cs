@@ -172,6 +172,36 @@ public static partial class AssistWording
     public static string PublishingAlreadyExplained(string course, string section) =>
         $"I explained that for {course} Section {section} earlier in this conversation.";
 
+    /// <summary>
+    /// What <c>explain_publishing</c> says the first time for a section — to an
+    /// outside assistant, and to a teacher who asks "what does publishing mean?"
+    /// (#157; GUI-IMPROVEMENTS row 455 is where the mac said it first).
+    /// </summary>
+    /// <remarks>
+    /// <para>This replaced <c>Briefing.Words</c>, this app's own three-paragraph
+    /// answer, on 2026-10-01: the two apps said different things to a teacher
+    /// asking the same fixed question, and a difference a teacher can see is
+    /// matched to the mac rather than ledgered. What was lost, deliberately: the
+    /// old answer named where the course deploys. The mac's sentence names no
+    /// destination, so it cannot disagree with the one the deploy uses, which is
+    /// the risk the old comment was guarding against.</para>
+    /// </remarks>
+    public const string WhatPublishingMeans =
+        "Publishing a page decides whether students can see it in this section's website. " +
+        "Deploying sends the whole website out to the web. They are different acts: a page can be " +
+        "published for days and still not be online, and deploying puts everything already published " +
+        "in front of students straight away. Plantoir opens the preview after a change so the teacher " +
+        "can look it over first, which is the safer order.";
+
+    /// <summary>
+    /// What <c>list_courses</c> says when the working folder has no courses (#157).
+    /// It says what to do next, because a caller that reads "no courses" and
+    /// stops leaves the teacher where they started. It replaced "This working
+    /// folder has no courses yet." on 2026-10-01.
+    /// </summary>
+    public const string NoCoursesYet =
+        "This working folder has no courses in it yet. Add one in Plantoir, and it will appear here.";
+
     public static string SectionIsBusy(string course, string section) =>
         $"{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.";
 

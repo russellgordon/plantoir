@@ -2132,6 +2132,19 @@ phrasing made a teacher the caller:
   and living exactly as long: one assistant window, or one `plantoir-mcp`
   process. Old `.explained` files are inert and are not cleaned up; nothing
   reads them.
+- **The first answer is now the mac's sentence (#157, 2026-10-01).**
+  `explain_publishing` said this app's own three paragraphs (`Briefing.Words`,
+  which named the course's destination) while the mac said
+  `wording.whatPublishingMeans`; `list_courses` in an empty folder said "This
+  working folder has no courses yet." where the mac says `wording.noCoursesYet`,
+  which also says what to do next. Both are teacher-visible through the fixed
+  phrasings, so they were matched rather than ledgered: `AssistWording` carries
+  both constants, the wording walker compares them with the contract, and
+  `Briefing` is gone. What was given up on purpose: naming the destination in
+  that answer. The mac's sentence names none, so it cannot promise a place the
+  deploy does not go — which was the only reason the old answer looked it up.
+  The unknown-course refusal still ends "This working folder has no courses
+  yet." — a clause in a different sentence, with no contract key of its own.
 
 ### Two more the same pass turned up
 
