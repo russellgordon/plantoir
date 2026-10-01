@@ -249,10 +249,21 @@ public static class CourseArchiver
         // in the same one — an assistant publishing two classes in a row does
         // it every time. Without this the second backup throws, which (because
         // no backup means no edits) turns a routine sequence into a refusal.
+        //
+        // On a collision, WAIT for the next second and stamp again (#187). This
+        // used to append "-2", "-3"… to the name, which neither reader parses —
+        // so the second backup was invisible in the Backups list, uncounted by
+        // pruning, and (on the mac, which reads the same folder) invisible
+        // there too. Rejected: teaching both readers a "-N" suffix (the MAC's
+        // reader would then hide a zip Windows wrote until it learned it too),
+        // and a millisecond stamp (it changes the frozen zipNames format). The
+        // cost is at most a second's wait, only when two land in one second.
         string archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now, suffix));
-        for (int attempt = 2; File.Exists(archivePath) && attempt < 100; attempt++)
-            archivePath = Path.Combine(backupsDir,
-                TimestampedName(prefix, DateTime.Now, suffix).Replace(".zip", $"-{attempt}.zip"));
+        for (int attempt = 0; File.Exists(archivePath) && attempt < 3; attempt++)
+        {
+            Thread.Sleep(1000 - DateTime.Now.Millisecond + 10);
+            archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now, suffix));
+        }
 
         ZipFolder(folderPath, archivePath);
         return archivePath;

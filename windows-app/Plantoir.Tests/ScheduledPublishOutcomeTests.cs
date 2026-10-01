@@ -876,6 +876,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
             UseShellExecute = false,
             WorkingDirectory = workingDirectory,
         };
+        // #179: the wrapper's $healthDir and $pendingDir follow this in the CHILD only.
+        info.Environment[TaskScheduling.TestStateDirVariable] = AppDataRoot.Current;
         foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script })
             info.ArgumentList.Add(a);
 

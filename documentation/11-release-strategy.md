@@ -146,6 +146,64 @@ still holds, with the names it finally took:
   deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
   earlier — the last release without an updater — have no updater, and install the first release that carries one by hand.
 
+### Updating itself on Windows (#337) — built; waiting for a feed, a key and a release
+
+**Built (bundle 8, 2026-10-01), all tested from the contract:**
+`Plantoir.Core/Assist/AppUpdates.cs` — the install gate
+(`appUpdates.cases`, 14), the quit (`atQuit.cases`, 6), the feed
+(`FeedFor(developmentBuild: true)` is null: a Debug build constructs nothing),
+the wording (`UpdateWording`, every sentence pinned and walked against
+`machineryCheck`), the per-user check, the installer arguments, and
+`app updated` on the trail at the first launch of a new version (always "by
+hand" until the engine exists). `installer.iss` reads two new parameters.
+
+**The engine** (`Plantoir.Core/Assist/AppUpdater.cs`, NetSparkleUpdater 3.1.0
+core, API checked against the restored package): no UI factory; our own
+dialogs (`Plantoir/Services/UpdatePrompts.cs`) with `UpdateWording`; the
+daily check plus File ▸ Check for Updates…; Install downloads, then asks
+`EvaluateForInstall` with a FRESH snapshot, and a held install goes ahead by
+itself fifteen seconds after the work ends; the quit path calls `AtQuit`.
+All eight update trail events have call sites. **The feed is read from ONE
+place, `AppUpdates.ConfiguredFeed`, and it is EMPTY**, as is
+`AppUpdates.PublicKey`: while it is, no `SparkleUpdater` is constructed,
+nothing is fetched and the menu item is hidden
+(`AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork`). A Debug build
+constructs nothing at all. The verifier is Ed25519 in `SecurityMode.Strict`,
+which refuses an unsigned feed or download (pinned by
+`TheVerifierRequiresEd25519AndRefusesAnUnsignedFeed`).
+
+**What is not done is only this: no feed, no key, no release.** The first
+release that ships it sets `ConfiguredFeed` to `Feed` and `PublicKey` to the
+key's public half, publishes `website/updates/windows.xml` and its
+`.signature`, and adds the RELEASING steps (proposed in the bundle-8 ready
+note). Measured nowhere yet: a real download, a real silent install, a real
+reopen.
+
+| Decision | Choice | Rejected, and why |
+|---|---|---|
+| Engine | NetSparkleUpdater core, **no UI factory**; our own `ContentDialog`s | Its WinForms/WPF/Avalonia UIs: a second UI stack in a WinUI app, English-only, and they say "app cast". |
+| Feed | `https://plantoir.app/updates/windows.xml`, beside `macos.xml` | A release asset (404s when a platform lags); sharing the mac's feed (one key per platform). |
+| Signature | Ed25519, `SecurityMode.Strict`, a detached `windows.xml.signature`. The private key lives OUTSIDE the repo (`%USERPROFILE%\.plantoir-release\`), `.gitignore` refuses `*.priv` | DSA (deprecated); unsigned. |
+| Installer | The per-user Inno `PlantoirSetup.exe`, run `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /PLANTOIRUPDATE=1` (+ `/RELAUNCH=1` from the in-app Install only) | MSIX (the app is unpackaged). |
+| Reopening | installer.iss `[Run]` entry `Check: WantsRelaunch` on `/RELAUNCH=1` (ruling 1) | Renaming "Install and Reopen": the contract's `heldExplanation` promises a reopen, so the installer was made to keep it. |
+| The installer's kill | `CurStepChanged` skips its `taskkill` of plantoir-mcp and llama-server when `/PLANTOIRUPDATE=1` (ruling 2); a hand-run installer keeps it | Leaving it: it kills every plantoir-mcp on the machine, mid-publish. |
+| Held while | `AppUpdates.EvaluateForInstall`: the contract's gate, PLUS any running plantoir-mcp (it may be publishing in a folder this app never opened), asked AGAIN at the moment of install | Checking at the offer only (contract `whatWasRejected`). |
+| All-users installs | Not auto-updated (`IsPerUserInstall`): `needsAdministratorTitle` + a Windows explanation (ruling 3) | Passing `/ALLUSERS` (needs elevation); a silent per-user install beside it (a second copy). |
+| At quit | `DecideAtQuit`: never refuses; work under way sets the update aside | Refusing the quit (decision 7). |
+
+**What the contract and Windows disagree about** (proposed to the mac, not
+changed under it): `elsewhereWork` says "on this Mac"; `needsAdministratorExplanation`
+names a Mac and its menu; a running plantoir-mcp holds the install on Windows
+only; `postponedAtInstall` — the instant between the last check and the
+installer starting — exists on Windows too, because Inno's
+`CloseApplications` still closes `*Plantoir*` (a scheduled run included).
+The Windows-only sentences are `shared-rules.json → appUpdates.windowsWording`.
+
+**Unsigned installer, no Mark-of-the-Web.** A file the app downloads with
+`HttpClient` carries no Zone.Identifier, so SmartScreen does not prompt when
+it is run; the Ed25519 signature is the integrity gate. Do not add MOTW
+handling to "fix" a prompt that does not happen.
+
 The rules a teacher is promised are `contracts/shared-rules.json` →
 `appUpdates`; the mac's mechanism, what was measured and what was rejected are
 in [`09-mac-app.md`](09-mac-app.md) → "Updating itself".
