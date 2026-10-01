@@ -225,6 +225,61 @@ public static class LinksChecklist
     public static bool HoldsSomethingNew(LinksChecklistOffer offer, IReadOnlySet<string> answeredOffered) =>
         offer.Rows.Any(row => !answeredOffered.Contains(Key(row.Place)));
 
+    /// <summary>
+    /// Release the published-pages record on EVERY rollover of the section —
+    /// "same" website or "new" (#392 / mac PublishedPagesRecord.release; NOT in
+    /// ReleaseSite, which runs only for a new website): each fragment moves
+    /// into <c>section&lt;N&gt;.published-pages.previous-yyyy-MM-dd_HHmmss/</c>,
+    /// the folder itself is KEPT so an undo can write them back, and the
+    /// answered file goes. Every write is reported to <paramref name="undo"/>
+    /// so it joins the rollover's own undo entry when one is open.
+    /// </summary>
+    /// <returns>Where the fragments went, or null when there were none.</returns>
+    public static string? ReleasePublishedPages(string courseDirectory, int section, DateTime now, UndoHistory? undo = null)
+    {
+        string state = Path.Combine(courseDirectory, ".publish_state");
+        string record = Path.Combine(state, $"section{section}.published-pages");
+        string? moved = null;
+        if (Directory.Exists(record))
+        {
+            var fragments = Directory.GetFiles(record);
+            if (fragments.Length > 0)
+            {
+                moved = Path.Combine(state, $"section{section}.published-pages.previous-" +
+                    now.ToString("yyyy-MM-dd_HHmmss", System.Globalization.CultureInfo.InvariantCulture));
+                Directory.CreateDirectory(moved);
+                foreach (string fragment in fragments)
+                {
+                    string text = File.ReadAllText(fragment);
+                    string to = Path.Combine(moved, Path.GetFileName(fragment));
+                    undo?.Touch(fragment, text);
+                    undo?.Touch(to, null);
+                    File.WriteAllText(to, text);
+                    File.Delete(fragment);
+                    undo?.Wrote(to, text);
+                    undo?.Wrote(fragment, null);
+                }
+            }
+        }
+        string answered = AnsweredPathFor(courseDirectory, section);
+        if (File.Exists(answered))
+        {
+            undo?.Touch(answered, File.ReadAllText(answered));
+            File.Delete(answered);
+            undo?.Wrote(answered, null);
+        }
+        return moved;
+    }
+
+    /// <summary>The undo's other half, for a caller that is not undoing through <see cref="UndoHistory"/>.</summary>
+    public static void PutPublishedPagesBack(string courseDirectory, int section, string released)
+    {
+        string record = Path.Combine(courseDirectory, ".publish_state", $"section{section}.published-pages");
+        Directory.CreateDirectory(record);
+        foreach (string fragment in Directory.GetFiles(released))
+            File.Move(fragment, Path.Combine(record, Path.GetFileName(fragment)), overwrite: true);
+    }
+
     public static string AnsweredPathFor(string courseDirectory, int section) =>
         Path.Combine(courseDirectory, ".publish_state", $"section{section}.links-checklist-answered.json");
 
