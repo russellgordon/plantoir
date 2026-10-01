@@ -543,7 +543,10 @@ public sealed partial class AssistWindow : Window
             // Every destination, by type, in the saved order (#400): the card
             // for a course deploying to Netlify AND Cloudflare Pages said
             // "Netlify" alone.
-            DestinationProvider = () => DeployCommand.EveryDestinationByType(_course.Configuration),
+            // Read from disk at the call, never from this window's snapshot
+            // (#344 / mac #322): a destination changed in Course Settings
+            // after the window opened must be the one the card names.
+            DestinationProvider = () => DeployCommand.EveryDestinationByTypeAtTheCall(_folder, _course.Code, _course.Configuration),
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.

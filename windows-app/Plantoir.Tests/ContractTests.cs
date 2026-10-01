@@ -1002,7 +1002,15 @@ public class ContractTests
                             Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
                             break;
                         case "neverDeployed":
-                            Assert.Contains("has never been deployed", problem);
+                        case "additionalDestinationNeverDeployed":
+                            // Compared WHOLE (#344 / mac #322): both contain
+                            // "has never been deployed to", so a substring
+                            // cannot tell the primary's from an additional's.
+                            string rendered = ContractLoader.LoadJson("shared-rules.json")!
+                                ["scheduledDeployRefusals"]!["wording"]![expectRefusal]!.ToString()
+                                .Replace("{course}", "ICS3U").Replace("{section}", "1")
+                                .Replace("{destination}", c["destinationNamed"]!.ToString());
+                            Assert.Equal(rendered, problem);
                             break;
                         case "additionalDeployFolderNeedsAttention":
                             Assert.Contains("also deploys to a folder", problem);
@@ -1010,9 +1018,6 @@ public class ContractTests
                             break;
                         case "additionalCloudflareAccountMissing":
                             Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
-                            break;
-                        case "additionalDestinationNeverDeployed":
-                            Assert.Contains("has never been deployed to", problem);
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");

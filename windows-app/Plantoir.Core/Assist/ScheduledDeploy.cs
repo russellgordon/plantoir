@@ -125,9 +125,12 @@ public sealed class ScheduledDeploy
                 $"{course.Code} also deploys to Cloudflare Pages, which needs your Account ID. " +
                 $"{Models.CourseConfiguration.CloudflareAccountProblem(cloudflareAccountID)} Add it in this course’s settings, under Deploying, then schedule this again.",
             "neverDeployed" =>
-                $"{course.Code} Section {sectionNumber} has never been deployed, so deploying it asks " +
-                "what to call the website. Nobody would be there to answer that at the scheduled time, " +
-                "and it would wait. Deploy it once from Plantoir, and after that it can be scheduled.",
+                // Names the destination (#344 / mac #322): a teacher who
+                // expected somewhere else sees the disagreement at once.
+                $"{course.Code} Section {sectionNumber} has never been deployed to {refusal.Destination}, so deploying " +
+                "it there asks what to call the website. Nobody would be there to answer that at the scheduled " +
+                $"time, and it would wait. Deploy it to {refusal.Destination} once from Plantoir, and after that " +
+                "it can be scheduled.",
             "additionalDestinationNeverDeployed" =>
                 $"{course.Code} Section {sectionNumber} has never been deployed to {refusal.Destination}, " +
                 "so deploying it there asks what to call that site. Nobody would be there to answer " +

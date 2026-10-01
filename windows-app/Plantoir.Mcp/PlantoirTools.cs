@@ -358,7 +358,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (!DateTime.TryParse(when, out var moment))
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
-            var plan = workspace.PlanScheduledDeploy(course, section, moment);
+            ScheduledDeploy plan;
+            // A refusal at the ACT says so first (#344 / mac #322): the
+            // contract's sentence is "Nothing was scheduled. " + the reason,
+            // the same opening a refusal from the scheduler itself carries.
+            try { plan = workspace.PlanScheduledDeploy(course, section, moment); }
+            catch (AssistRefusal refusal) { throw new AssistRefusal($"Nothing was scheduled. {refusal.Message}"); }
             // Where it goes and the Cloudflare Account ID are read when the
             // deploy RUNS now (#347), from the course's settings and the app's
             // own; what is written here is only what the teacher was told.
