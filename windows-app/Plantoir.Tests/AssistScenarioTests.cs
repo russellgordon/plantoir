@@ -205,6 +205,15 @@ public class AssistScenarioTests : IDisposable
             _window.Watch(PagePath("Unit 1, Day 1"));
         }
 
+        if (pending == "unpublish_pages" && when != "unpublish_pages")
+        {
+            // "hide Unit 1, Day 1" has nothing to propose unless the page is
+            // there and PUBLISHED: no card appears otherwise, and the case
+            // fails a second time looking like the phrasing did not match
+            // (#217 — the requirement is in the scenario's own `why`).
+            Class("Unit 1, Day 1", "2026-09-08", published: true);
+        }
+
         if (pending == "publish_class_on")
         {
             // A plan needs something real to plan about. The card phrasing is
@@ -603,8 +612,8 @@ public class AssistScenarioTests : IDisposable
     /// <summary>Never answers: every message a scenario sends is a card phrasing, matched in code.</summary>
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
-            => Task.FromResult<JsonObject?>(null);
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+            => Task.FromResult<ModelReply?>(null);
     }
 
     /// <summary>

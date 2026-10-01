@@ -523,6 +523,12 @@ public sealed partial class AssistWindow : Window
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
+            // Asked only when the model names another course, to say whether
+            // that course is here to be opened (#180).
+            CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder).Select(c => c.Code).ToList(),
+            // What a scheduled card would replace, read by task name (#261).
+            ScheduleDeployItWouldReplace = when =>
+                TaskScheduling.MomentItWouldReplace(_folder, _course.Code, _section, when, DateTime.Now),
             OnPlanAccepted = () =>
             {
                 App.Settings.PlansAcceptedCount++;

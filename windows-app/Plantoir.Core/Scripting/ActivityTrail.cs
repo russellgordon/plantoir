@@ -24,6 +24,33 @@ public static class ActivityTrail
         AssistantMatchedAFixedPhrase,
         AssistantChoseATool,
         AssistantCouldNotAnswer,
+        /// <summary>
+        /// The model's call named a course other than this window's, and the
+        /// turn was refused (#180). Carries this window's course and section,
+        /// the course AS THE MODEL SPELT IT, and the tool it had chosen —
+        /// never the teacher's sentence and never the argument values. The
+        /// pair of codes is what tells the guard doing its job apart from a
+        /// model slip refused at the teacher's expense.
+        /// </summary>
+        AssistantWasAskedAboutAnotherCourse,
+        /// <summary>
+        /// The model's reply could not be acted on and nothing was run from
+        /// it (#196). One event, two sentences: the engine STOPPED it part
+        /// way (a question about how much it was asked to write), or it
+        /// finished and its arguments could not be read (a question about the
+        /// model). Carries course, section and the tool it had begun to name —
+        /// never what it had begun to write, which is page titles.
+        /// </summary>
+        AssistantAnswerWasCutOff,
+        /// <summary>
+        /// The model answered with the teacher's own request (#217); nothing
+        /// ran and the turn was taken back out of the conversation. Carries
+        /// course and section only — never the sentence (<c>assistant asked</c>
+        /// has it) and never page content. Not folded into "answer was cut
+        /// off": this answer FINISHED, and a line describing something else is
+        /// worse than none.
+        /// </summary>
+        AssistantRepeatedTheRequestBack,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -231,6 +258,19 @@ public static class ActivityTrail
         /// </summary>
         ScheduledDeployTurnedOff,
         /// <summary>
+        /// A new scheduled deploy replaced one already set for the section
+        /// (#261). Carries course, section, the old moment and the new one —
+        /// written where the task is written, from a reading taken before the
+        /// old one was removed, and only once the new one was accepted.
+        /// </summary>
+        ScheduledDeployReplaced,
+        /// <summary>
+        /// A scheduled deploy could not be set (#261). Carries course, section,
+        /// the moment asked for and, when one was already set, whether it
+        /// still stands.
+        /// </summary>
+        ScheduledDeployCouldNotBeSet,
+        /// <summary>
         /// A publish set for later read the course's settings when it ran
         /// (#347, mac #323) and found them different from what the teacher was
         /// told, or stood down over them. Written only when something differs.
@@ -305,6 +345,9 @@ public static class ActivityTrail
         Event.AssistantMatchedAFixedPhrase => "assistant matched a fixed phrase",
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
+        Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
+        Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
+        Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",
@@ -336,6 +379,8 @@ public static class ActivityTrail
         Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
         Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
+        Event.ScheduledDeployReplaced => "scheduled deploy replaced",
+        Event.ScheduledDeployCouldNotBeSet => "scheduled deploy could not be set",
         Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
         Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
         Event.DeployUsedTheSavedSettings => "deploy used the saved settings",

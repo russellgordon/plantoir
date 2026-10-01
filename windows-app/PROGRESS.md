@@ -185,6 +185,24 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 5a: the assistant chain through AssistAgent (2026-09-30)
+
+Branch `issue/bundle5a-assistant-chain` (built on `issue/159-settle-the-day-once`).
+Done, in order, all at the seam where `AssistAgent` makes a call: #159 (the day
+settled once — reviewed, and #144's four excusals retired), #180 (course and
+section bound to the window, another course refused), #196 (`finish_reason`
+carried out of `IChatModel.Ask`; stopped or unreadable replies run nothing and
+are wound back), #262 (an empty call runs only when the window supplies
+everything; `noCourseNamed`), #217 (hide is unpublish; an echoed reply refused
+and wound back), #193 + #260 (deploy at a time in code, settled once with DST
+handled, scheduled card asks about the moment; `plantoir-mcp` refuses a bare
+time), #281 + #288 (asked, or spelled, in the transcript only), #261 (what a
+schedule replaces, read by task name). New test classes:
+`WindowBindingContractTests`, `CutOffAnswerTests`, `HideAndEchoContractTests`,
+`DeployAtATimeContractTests`, `TimeAskedInCodeTests`, `ScheduleReplacesTests`.
+The reasoning is in `documentation/10-local-ai-assistant.md` → "The Windows
+half of the assistant chain".
+
 ## Parity run, bundle 4: preview and publish mechanics (2026-09-30)
 
 Branch `issue/bundle4-preview-publish`. Done: #278 (address read by whole
@@ -286,7 +304,7 @@ so that "did I break something?" has an answer again:
   → "Named gaps" has the table. A green totals line now means "green with the
   debts the ledger names", and the ledger fails the day one is paid.
 - **`AssistWording_MatchesContract` walks `assist-wording.json`** by reflection
-  in both directions (#157); still red on `deployApproval` alone, which #193 owns.
+  in both directions (#157); green since parity bundle 5a (#193's `deployApproval`).
 - **`ActivityTrailWiringTests`** is the source scan the mac has: every declared
   event must have a call site. All do; `assistant asked` is written by
   `NotePrompt`, and the scan knows that.

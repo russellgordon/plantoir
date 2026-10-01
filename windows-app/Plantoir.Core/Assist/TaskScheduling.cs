@@ -4,6 +4,8 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Plantoir.Core.Models;
 
+using Plantoir.Core.Scripting;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -152,14 +154,20 @@ public static class TaskScheduling
     {
         // The launcher does the deploy, exactly as the app does it.
         if (!File.Exists(Path.Combine(workingFolder, "deploy.ps1")))
-            return $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.";
+            return CouldNotBeSet(courseCode, section, when, null, null,
+                $"There is no deploy.ps1 in {workingFolder}, so there is nothing to schedule.");
 
         if (RunnerExecutable() is not { } runner)
-            return "Plantoir could not find its own program on this computer, so it cannot deploy later on its own. " +
-                   "Deploy this section yourself instead.";
+            return CouldNotBeSet(courseCode, section, when, null, null,
+                "Plantoir could not find its own program on this computer, so it cannot deploy later on its own. " +
+                "Deploy this section yourself instead.");
 
         string taskName = NameFor(courseCode, section, workingFolder);
         var existing = For(workingFolder, courseCode, section);
+        // Read BEFORE anything is written (#261): once the new task is in,
+        // the old one has left nothing behind to ask about.
+        var replacing = WhatSchedulingReplaces(workingFolder, courseCode, section);
+        DateTime? replacedMoment = replacing is null ? null : MomentOf(replacing);
 
         // The job goes into place BEFORE the task is replaced (bundle 3 fix
         // round, ruling 3): a run finishing in between reads the NEW job, sees
@@ -181,7 +189,8 @@ public static class TaskScheduling
         catch (Exception error)
         {
             PutBack(jobPath, kept);
-            return $"The scheduled deploy could not be written down: {error.Message}";
+            return CouldNotBeSet(courseCode, section, when, replacing, replacedMoment,
+                $"The scheduled deploy could not be written down: {error.Message}");
         }
 
         // Registered from XML (ruling 1): schtasks /Create /SC ONCE leaves
@@ -203,7 +212,8 @@ public static class TaskScheduling
         if (exitCode != 0)
         {
             PutBack(jobPath, kept);
-            return $"Windows would not accept the scheduled task: {output.Trim()}";
+            return CouldNotBeSet(courseCode, section, when, replacing, replacedMoment,
+                $"Windows would not accept the scheduled task: {output.Trim()}");
         }
         try { File.Delete(kept); } catch { }
 
@@ -211,8 +221,101 @@ public static class TaskScheduling
         // stands, or the section would deploy twice.
         if (existing is { } old && old.Name != taskName) Cancel(old);
 
+        // Recorded only once the new one is accepted, from the reading taken
+        // before the old one went — and not for the same minute, which
+        // replaces nothing a teacher could tell apart.
+        if (replacedMoment is { } was && !SameMinute(was, when))
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledDeployReplaced,
+                $"replaced the deploy set for {Stamp(was)} with one set for {Stamp(when)}", courseCode, section);
+
         ForgetTheList();
         return null;
+    }
+
+    // ---- What a schedule replaces (#261) ------------------------------------
+
+    /// <summary>
+    /// The scheduled deploy that setting this section in this folder would
+    /// replace, or null.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Read by NAME, across every task on the computer</b>, because
+    /// that is what <see cref="Schedule"/> overwrites: <c>/Create /F</c> on
+    /// <see cref="NameFor"/>, plus this folder's task from before #309 under
+    /// the old name, which it retires. The trap #261 names is copying the
+    /// cancel path's folder filter: <see cref="For"/> finds a task only through
+    /// the folder its JOB names, and a task whose job file cannot be read
+    /// belongs to no folder there — yet <c>/Create /F</c> still replaces it,
+    /// silently. Asking by name cannot miss it.</para>
+    ///
+    /// <para>Since #309 names carry the folder, a task another working folder
+    /// set for the same code is a DIFFERENT task and is not replaced — so it is
+    /// not named here either. That is the mac's #237, closed on this side by
+    /// construction.</para>
+    /// </remarks>
+    public static ScheduledTask? WhatSchedulingReplaces(string workingFolder, string courseCode, int section)
+    {
+        string name = NameFor(courseCode, section, workingFolder);
+        return All().FirstOrDefault(task => task.Name == name) ?? For(workingFolder, courseCode, section);
+    }
+
+    /// <summary>
+    /// The moment the deploy a schedule would replace is set for — or null
+    /// when there is none, it is set for the same minute, or it has passed,
+    /// which are the three cases in which nothing is said.
+    /// </summary>
+    public static DateTime? MomentItWouldReplace(string workingFolder, string courseCode, int section,
+                                                 DateTime when, DateTime now)
+    {
+        if (WhatSchedulingReplaces(workingFolder, courseCode, section) is not { } task) return null;
+        if (MomentOf(task) is not { } at) return null;
+        if (at <= now || SameMinute(at, when)) return null;
+        return at;
+    }
+
+    /// <summary>What Windows says the task will run at, or what its job was set for.</summary>
+    private static DateTime? MomentOf(ScheduledTask task) =>
+        task.NextRun ?? ScheduledRun.ReadJob(JobPath(task.Name))?.ScheduledFor?.LocalDateTime;
+
+    private static bool SameMinute(DateTime a, DateTime b) =>
+        a.Date == b.Date && a.Hour == b.Hour && a.Minute == b.Minute;
+
+    private static string Stamp(DateTime moment) =>
+        moment.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Record a schedule that could not be set, and tell apart what the
+    /// failure LEFT (#261). A failed write here happens before the old task is
+    /// touched — <c>/Create /F</c> is refused whole, and the old job is put
+    /// back — so the old one normally still stands, and the sentence says so.
+    /// If it has gone anyway, that is recorded as "turned off", never claimed
+    /// to stand.
+    /// </summary>
+    private static string CouldNotBeSet(string courseCode, int section, DateTime when,
+                                        ScheduledTask? replacing, DateTime? replacedMoment, string problem)
+    {
+        ForgetTheList();
+        string line = $"could not set a deploy for {Stamp(when)}";
+        string said = problem;
+        if (replacing is not null)
+        {
+            if (Exists(replacing.Name))
+            {
+                string was = replacedMoment is { } at ? $" set for {Stamp(at)}" : "";
+                line += $"; the deploy already{was} still stands";
+                if (replacedMoment is { } moment)
+                    said += $" The deploy already set for {moment:dddd d MMMM, h:mm tt} still stands.";
+            }
+            else
+            {
+                ActivityTrail.Note(ActivityTrail.Event.ScheduledDeployTurnedOff,
+                    "turned off: a new deploy was set in its place and could not be accepted" +
+                    (replacedMoment is { } gone ? $"; it had been set for {Stamp(gone)}" : ""),
+                    courseCode, section);
+            }
+        }
+        ActivityTrail.Note(ActivityTrail.Event.ScheduledDeployCouldNotBeSet, line, courseCode, section);
+        return said;
     }
 
     /// <summary>
