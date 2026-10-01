@@ -879,9 +879,21 @@ separately from the reader:
   took #182, #186 and #188 together on 2026-09-30 (#308, bundle 2):
   `PageVisibilityReader.PlaceForANewTopLevelKey` / `NamesATopLevelKey`, and
   `SetDraft` / `SetCreated` answer `FrontmatterWriteOutcome.NoRoomForAKey`.
-  **Windows' callers do not yet NAME the declined pages** (the four
-  `pagesWhose…` wording keys stay ledgered on #308): a declined page is left
-  exactly as it was, which is the safe half; the sentence is what is owed. The first two are not reached by the fixed reader or writer at all
+  **Windows' callers have NAMED the declined pages since 2026-10-01** (#308,
+  bundle 9; the four `pagesWhose…` / `pageWhose…` keys left the ledger the
+  same day): `PlanPublish` asks the real `SetDraft` at plan time and moves a
+  declined page out of `Changes` into `PublishPlan.CannotBeAddedTo`, so the
+  card names it and never says "no page's visibility would change" or
+  "already hidden" about it; the publish/hide reply, a whole unit (plan and
+  apply), a re-date (`PagesWhoseNewDatesCouldNotBeSet`, and the hide an
+  overflowing class could not take) and a make-room (by the class's NEW name)
+  name them too, a page declined only at the WRITE (edited since the plan)
+  included; the undo label leaves plan-time declines out; and the trail
+  records `page settings left as they were` with the act ("publishing
+  pages", "hiding pages", "re-dating classes", "making room for a class")
+  and the count. Pinned by `DeclinedPagesAreNamedTests`. One honest limit:
+  the make-room reply's "moved N onto later class days" still counts a class
+  it could not date; the sentence after it names that class. The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**

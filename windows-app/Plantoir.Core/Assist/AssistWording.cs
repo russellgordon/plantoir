@@ -262,6 +262,42 @@ public static partial class AssistWording
         ? $"One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is."
         : $"{count} shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.";
 
+    // ---- Pages the writer declined (#308, the mac's #186) ------------------
+
+    /// <summary>
+    /// Pages a publish or a hide could not write a setting into — their
+    /// settings have no column-0 place for a new line — NAMED, on the plan and
+    /// in the reply, so "already hidden" or "done" is never said about them.
+    /// One page, or several: the mac's one function, two keys so the walk
+    /// finds both renderings.
+    /// </summary>
+    public static string PagesWhoseSettingsCannotBeAddedTo(IReadOnlyList<string> pages) => pages.Count == 1
+        ? $"I can’t add to the settings at the top of “{pages[0]}”, so that page stays exactly as it is. Open it in Obsidian to set it there."
+        : PagesWhoseSettingsCannotBeAddedToNamingSeveral(pages);
+
+    /// <summary>Several declined pages: three named, then how many more.</summary>
+    public static string PagesWhoseSettingsCannotBeAddedToNamingSeveral(IReadOnlyList<string> pages) =>
+        $"I can’t add to the settings at the top of {NamedFew(pages)}, so those pages stay exactly as they are. Open them in Obsidian to set them there.";
+
+    /// <summary>
+    /// A class page a re-date or a make-room could not give its new date — said
+    /// instead of "stays exactly as it is", because by then the page may have
+    /// been renamed and moved.
+    /// </summary>
+    public static string PageWhoseNewDateCouldNotBeSet(string page) =>
+        $"I couldn’t set the new date on “{page}”: the settings at the top of it are written in a way I can’t add to. Open it in Obsidian to set the date there.";
+
+    /// <summary>Several pages whose new dates could not be set.</summary>
+    public static string PagesWhoseNewDatesCouldNotBeSet(IReadOnlyList<string> pages) => pages.Count == 1
+        ? PageWhoseNewDateCouldNotBeSet(pages[0])
+        : $"I couldn’t set the new dates on {NamedFew(pages)}: the settings at the top of them are written in a way I can’t add to. Open them in Obsidian to set the dates there.";
+
+    /// <summary>“a”, “a” and “b”, “a”, “b” and “c”, then “a”, “b”, “c” and 2 more.</summary>
+    private static string NamedFew(IReadOnlyList<string> pages, int most = 3) =>
+        pages.Count <= most
+            ? PublishPlan.Listing(pages)
+            : string.Join(", ", pages.Take(most).Select(p => $"“{p}”")) + $" and {pages.Count - most} more";
+
     // ---- Already in that state (#346, the mac's #174) ----------------------
 
     public const string AlreadyPublishedOne = "It's already been published.";
