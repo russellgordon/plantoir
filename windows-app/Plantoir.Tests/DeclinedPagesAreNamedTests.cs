@@ -150,4 +150,55 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
         Assert.Contains(AssistWording.PageWhoseNewDateCouldNotBeSet("Unit 1, Day 4"), result.Message);
         Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("making room for a class", 1), TrailText);
     }
+
+    /// <summary>
+    /// Review N-a: a class the writer declines stays as it is, so the plan works
+    /// the section's front page out from its CURRENT state — measured in the
+    /// hide direction, the one a no-room block can reach (a page with such a
+    /// block reads visible, so it is never planned for a publish).
+    /// </summary>
+    [Fact]
+    public void ADeclinedClassIsNeverPlannedOntoTheFrontPage()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        // No top-level place for a new key (its first line is indented), but a
+        // date this app reads, later than Day 1's.
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), "---\n  a: 1\ncreated: 2026-09-10T07:00:00.000-0400\n---\nBody.\n");
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md"),
+            "---\ntitle: Home\n---\n# Most Recent Class\n![[Unit 1, Day 2]]\n");
+
+        // A HIDE of the newest class, which the writer declines: Day 2 stays
+        // visible, so the front page must not be planned back onto Day 1.
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false, draft: true, publishes: false);
+
+        Assert.Equal(new[] { "Unit 1, Day 2" }, plan.CannotBeAddedTo.Select(p => p.Title));
+        Assert.True(plan.Index is null || plan.Index.ToClass == "Unit 1, Day 2",
+            $"the front page was planned away from a class that stays visible: {plan.Index?.Describe()}");
+    }
+
+    /// <summary>
+    /// Review F1: "moved N onto later class days" counts what was WRITTEN, as
+    /// the mac counts — never a class it declined or a write that failed.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheClassesItActuallyMoved()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        File.WriteAllText(ClassPath("Unit 1, Day 3"), NoRoom);       // declined at the write
+        Class("Unit 2, Day 1", "2026-09-14");
+        string locked = ClassPath("Unit 2, Day 1");
+        File.SetAttributes(locked, FileAttributes.ReadOnly);         // its write fails
+        try
+        {
+            var workspace = Open();
+            var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+            Assert.Contains(plan.Moves, m => m.Title == "Unit 1, Day 4");
+            Assert.Contains(plan.Moves, m => m.Title == "Unit 2, Day 1");
+            var result = workspace.ApplyInsertClasses(plan);
+
+            Assert.Contains($"moved {plan.Moves.Count - 2} onto later class days", result.Message);
+        }
+        finally { File.SetAttributes(locked, FileAttributes.Normal); }
+    }
 }

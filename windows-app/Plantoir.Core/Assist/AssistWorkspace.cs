@@ -960,7 +960,13 @@ public sealed partial class AssistWorkspace
             return true;
         });
 
-        var allPlannedPages = named.Concat(linked).ToList();
+        // A declined page stays exactly as it is, so the plan must not treat it
+        // as published: left out here, the front page and the dates a class
+        // brings are worked out from its CURRENT state (#308 review N-a — the
+        // card could otherwise point the front page at a class that stays
+        // hidden; the mac decides the landing page from what is visible).
+        var declinedTitles = new HashSet<string>(cannotBeAddedTo.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
+        var allPlannedPages = named.Concat(linked).Where(p => !declinedTitles.Contains(p.Title)).ToList();
         var inherited = InheritedDates(course, section, allPlannedPages, isDraft);
 
         var dateMoves = new List<PlannedDateMove>();
@@ -3478,6 +3484,10 @@ public sealed partial class AssistWorkspace
         // A class the writer could not date (#308, the mac's #186) is NAMED —
         // by its new name, since by now it has been renamed and moved.
         var undated = new List<string>();
+        // Counted from what was WRITTEN (#308 review F1, as the mac's
+        // ClassInsertionPlanner counts): a class declined, already on its
+        // date, or whose write failed is not "moved".
+        int moved = 0;
         foreach (var move in plan.Moves)
         {
             try
@@ -3491,7 +3501,11 @@ public sealed partial class AssistWorkspace
                 string key = sectionLocal ? "created" : "createdSection" + section;
                 var edit = PageFrontmatter.SetCreated(File.ReadAllText(full), key, move.To, tail);
                 if (edit.Outcome == FrontmatterWriteOutcome.NoRoomForAKey) undated.Add(move.Title);
-                if (edit.Changed) Save(full, edit.Text);
+                if (edit.Changed)
+                {
+                    Save(full, edit.Text);
+                    moved++;
+                }
             }
             catch { }
         }
@@ -3509,7 +3523,7 @@ public sealed partial class AssistWorkspace
 
         string said =
             AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle) +
-            $" Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
+            $" Renamed {plan.Renames.Count}, moved {moved} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
             AssistWording.LookTheSectionOverBeforePublishing;

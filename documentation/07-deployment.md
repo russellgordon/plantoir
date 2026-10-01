@@ -3279,6 +3279,8 @@ skipping trials whose record "is not there yet", which was the first hypothesis
 and was disproved by the instrumented runs (the record was always there). The
 mac has no share modes; nothing to mirror.
 
-**Not done: the notification itself** (#212's Windows half) — and so not
-#324's click either, which cannot start before it. `scheduled publish
-notification` stays in `NamedGapLedger` against #324.
+**The notification itself landed in parity bundle 8** (#212's Windows half,
+#324): the scheduled run posts a toast in the section's own sentence, and a
+click opens that section (`ScheduledPublishToast`; trail `scheduled publish
+notification`). It is unproven on a real click (the desktop was locked), and
+nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.
