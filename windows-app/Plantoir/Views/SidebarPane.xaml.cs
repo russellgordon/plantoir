@@ -635,6 +635,12 @@ public sealed partial class SidebarPane : UserControl
                                      () => AskWhenToDeploy(course, number, existing: null)));
         }
 
+        // The links checklist on demand (#392, linksChecklist.offeredWhen.onDemand):
+        // whenever an offer exists, so Not Now is not a one-way door.
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, number) is not null)
+            menu.Items.Add(MenuItem(Plantoir.Core.Assist.LinksChecklistWording.MenuItem, Glyphs.Star,
+                                     () => _ = OpenLinksChecklist(course, number)));
+
         menu.Items.Add(new MenuFlyoutSeparator());
 
         // The vault is the COURSE folder even for a section — the section is
@@ -1220,6 +1226,26 @@ public sealed partial class SidebarPane : UserControl
         !WorkingFolder.IsTheSame(askedIn, Workspace.WorkspacePath);
 
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
+
+    /// <summary>"Publish Pages That Links Lead To…": a stale offer asks for a preview first.</summary>
+    private async Task OpenLinksChecklist(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, section) is not { } offer) return;
+        string? said;
+        if (!Plantoir.Core.Assist.LinksChecklistShowing.IsFresh(course, section))
+            said = Plantoir.Core.Assist.LinksChecklistWording.Fill(Plantoir.Core.Assist.LinksChecklistWording.NeedsAPreviewFirst,
+                new Dictionary<string, string> { ["course"] = course.Code, ["section"] = section.ToString() });
+        else
+            said = await LinksChecklistDialog.OfferAsync(folder, course, section, offer, "from the menu", ShowDialogSafelyAsync);
+        if (said is null) return;
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = Plantoir.Core.Assist.LinksChecklistWording.MenuItem.TrimEnd('\u2026'),
+            Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = "OK",
+        });
+    }
 
     private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
     {
