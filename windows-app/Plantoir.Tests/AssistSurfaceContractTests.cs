@@ -870,106 +870,88 @@ public class AssistSurfaceContractTests
     }
 
     /// <summary>
-    /// The <c>TEACHERS SAY:</c> clause of every shared tool matches the
-    /// contract's, character for character.
-    ///
-    /// <para><b>Why this exists.</b> The phrasings are measured artifacts —
-    /// <c>AssistToolSurface</c>'s own comment says they "are what took routing
-    /// from 69% to 91%" — and <c>AssistAgent.Briefly()</c> puts the clause
-    /// FIRST in what the local model reads, so a missing or edited one is a
-    /// routing change nobody chose. Until 2026-09-08 this side was missing the
-    /// clause ENTIRELY on seven tools and no test could see it: the rest of
-    /// this class deliberately asserts names and argument types and never
-    /// descriptions, because <c>NarrowToLocal</c> rewrites every description
-    /// through <c>Briefly()</c> and asserting the mac's full wording would be
-    /// red on all thirteen.</para>
-    ///
-    /// <para>The clause is the part that can be pinned, and pinning only the
-    /// clause is deliberate: the descriptions' BODIES differ between the two
-    /// servers on purpose — this one writes for Claude Code — so asserting
-    /// those would be asserting a difference both sides chose.</para>
-    ///
-    /// <para>Added because the branch that closed the gap wrote up "a hand
-    /// copy of a shipping list needs something that runs on every commit" as
-    /// its own lesson, and had applied it to a research script and not to the
-    /// twenty phrasings that were the point of the work.</para>
+    /// Every shared tool's description is the contract's ONE description, byte
+    /// for byte (#352, the Windows half of #114) — except the tools still
+    /// waiting for the behaviour their pinned sentence promises.
     /// </summary>
+    /// <remarks>
+    /// <para>This used to pin only the <c>TEACHERS SAY:</c> clause, because the
+    /// bodies differed on purpose (this server wrote for Claude Code) and
+    /// <c>NarrowToLocal</c> shortened everything through <c>Briefly()</c>.
+    /// Russell decided one description per tool (2026-09-09, 2026-09-26), and
+    /// #352 measured the change on this PC's tier before it moved: no
+    /// regression, no polarity inversion
+    /// (research/ai-assist/windows-description-convergence-results.txt). The
+    /// procedure the old bodies carried is now <c>McpInstructions</c>. check_section's
+    /// fourth phrasing, kept as an "agreed departure" until then, went with it,
+    /// as #114's 2026-09-09 decision said it would.</para>
+    /// <para>publish_pages and unpublish_pages are held at their own text
+    /// (<c>AssistAgent.StillShortened</c>): the contract's sentences say linked
+    /// pages always come along, and here they come only with includeLinked —
+    /// a behaviour difference with its own windows issue. The test fails the
+    /// day one of them matches, so the hold cannot outlive its reason.</para>
+    /// </remarks>
     [Fact]
-    public void TheTriggerPhrasingsAreTheContractsOwn()
+    public void EveryDescriptionIsTheContractsOwn()
     {
         var served = ServedTools();
-        var doc = ContractLoader.LoadJson("assist-cases.json");
+        var pinned = ContractLoader.LoadJson("assist-cases.json")["toolDescriptions"]!["descriptions"]!.AsObject();
 
-        // check_section: this server offers a fourth phrasing, "what would
-        // students see in this section right now?", written here 2026-08-17
-        // and never adopted on the mac. It is the mac's to take up, and is a
-        // GitHub issue on the `mac` label rather than a difference to erase.
-        var agreedDepartures = new HashSet<string>(StringComparer.Ordinal) { "check_section" };
-
-        var missing = new List<string>();
         var differing = new List<string>();
-        var resolved = new List<string>();
+        var heldButMatching = new List<string>();
         int compared = 0;
-
-        foreach (var tool in doc["toolSchemas"]!["mcp"]!.AsArray())
+        foreach (var (name, text) in pinned)
         {
-            string name = tool!["function"]!["name"]!.ToString();
             if (!served.TryGetValue(name, out var method)) continue;
-
-            string? wanted = TriggerClause(tool["function"]!["description"]?.ToString());
-            if (wanted is null) continue;
-
-            string? here = TriggerClause(
-                method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description);
-
-            if (agreedDepartures.Contains(name))
+            string? here = method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description;
+            if (AssistAgent.StillShortened.Contains(name))
             {
-                if (here == wanted) resolved.Add(name);
+                if (here == text!.ToString()) heldButMatching.Add(name);
                 continue;
             }
-
             compared++;
-            if (here is null) missing.Add(name);
-            else if (here != wanted)
-                differing.Add($"{name} — contract has [{wanted}] and this server has [{here}]");
+            if (here != text!.ToString()) differing.Add(name);
         }
 
-        Assert.True(compared > 0,
-            "No shared tool carried a TEACHERS SAY: clause, so this test compared nothing. "
-            + "Either the contract stopped writing them or the surface stopped overlapping.");
-
-        Assert.True(missing.Count == 0,
-            "These shared tools carry a TEACHERS SAY: clause in the contract and none here: "
-            + string.Join(", ", missing.Order(StringComparer.Ordinal))
-            + ". The phrasings are measured, not decorative — Briefly() puts them FIRST in what "
-            + "the local model reads, so a missing clause is a routing change nobody chose. "
-            + "Copy the contract's clause WHOLE; see research/ai-assist/teachers-say-results.txt "
-            + "for what the last set was worth.");
-
+        Assert.True(compared >= 30, $"compared only {compared} shared descriptions - the surface stopped overlapping");
         Assert.True(differing.Count == 0,
-            "These shared tools' TEACHERS SAY: clauses differ from the contract's: "
-            + string.Join("; ", differing.Order(StringComparer.Ordinal))
-            + ". Copy the contract's, or — if this side is deliberately ahead — add the tool to "
-            + "agreedDepartures above and open a `mac` issue so the mac adopts it.");
-
-        Assert.True(resolved.Count == 0,
-            "These tools are listed as agreed departures and no longer differ: "
-            + string.Join(", ", resolved.Order(StringComparer.Ordinal))
-            + ". That is the gap closing — remove them from agreedDepartures, which is the whole "
-            + "of what is owed here.");
+            "These served descriptions differ from assist-cases.json -> toolDescriptions: " +
+            string.Join(", ", differing.Order(StringComparer.Ordinal)) +
+            ". One description per tool (#114): copy the contract's text WHOLE. A change to it is a routing " +
+            "change - measure it first (documentation/10-local-ai-assistant.md, 'One description per tool').");
+        Assert.True(heldButMatching.Count == 0,
+            "These tools are held at their own text in AssistAgent.StillShortened but now match the contract: " +
+            string.Join(", ", heldButMatching) + ". Take them out of StillShortened.");
     }
 
     /// <summary>
-    /// The leading <c>TEACHERS SAY: "…", "…".</c> of a description, or null.
-    /// MIRRORS the first half of <c>AssistAgent.Briefly()</c>, which splits on
-    /// the first occurrence of quote-full-stop-space.
+    /// What the local model is shown: the served description, unshortened, for
+    /// every tool but <see cref="AssistAgent.StillShortened"/> — with only the
+    /// example course rewritten to the window's.
     /// </summary>
-    private static string? TriggerClause(string? description)
+    [Fact]
+    public void TheLocalModelReadsTheContractsDescriptionsUnshortened()
     {
-        if (description is null) return null;
-        if (!description.StartsWith("TEACHERS SAY:", StringComparison.Ordinal)) return null;
-        int end = description.IndexOf("\". ", StringComparison.Ordinal);
-        return end > 0 ? description[..(end + 2)] : null;
+        var pinned = ContractLoader.LoadJson("assist-cases.json")["toolDescriptions"]!["descriptions"]!.AsObject();
+        var tools = new System.Text.Json.Nodes.JsonArray();
+        foreach (var name in AssistAgent.ForTheLocalModel)
+            tools.Add(new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "function",
+                ["function"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["name"] = name,
+                    ["description"] = pinned[name]!.ToString(),
+                    ["parameters"] = new System.Text.Json.Nodes.JsonObject(),
+                },
+            });
+        var narrowed = AssistAgent.NarrowToLocal(tools, "EXC2O");
+        foreach (var tool in narrowed)
+        {
+            string name = tool!["function"]!["name"]!.ToString();
+            if (AssistAgent.StillShortened.Contains(name)) continue;
+            Assert.Equal(pinned[name]!.ToString().Replace("ICS3U", "EXC2O"), tool["function"]!["description"]!.ToString());
+        }
     }
 
     // ---- Which assistant a teacher is offered ----------------------------

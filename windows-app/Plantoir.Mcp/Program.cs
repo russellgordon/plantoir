@@ -85,7 +85,12 @@ builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogL
 
 builder.Services.AddSingleton(workspace);
 builder.Services.AddMcpServer(options =>
-        options.ServerInfo = new Implementation { Name = "plantoir", Version = "0.1.0" })
+    {
+        options.ServerInfo = new Implementation { Name = "plantoir", Version = "0.1.0" };
+        // The procedure the tool descriptions used to carry (#352): read by an
+        // outside assistant, never by the local router.
+        options.ServerInstructions = McpInstructions.Text;
+    })
     .WithStdioServerTransport()
     .WithToolsFromAssembly()
     // Nothing writes to a course kept for reference (#241), asked BEFORE the
