@@ -869,6 +869,13 @@ Windows a DST requirement discovered here and never discussed there. It is a
 mac test and a named trap in the handover instead, to be proposed as a row once
 both sides have met it. The same goes for the fall-back convention.
 
+*Windows has now met both (parity bundle 5a, 2026-09-30):* `ScheduledMoment.Settle`
+moves a nonexistent wall time forward by the GAP — 02:30 onto 03:30, not onto
+03:00, the first minute that exists, which its first draft did and a test
+caught — and takes a repeated hour as its earlier instant. Both are pinned in
+`DeployAtATimeContractTests` against `America/Toronto`, and proposed back to
+the mac as `resolving` rows in the bundle's mac draft.
+
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read
 that time". That is a deliberate divergence from the `publish_class_on`
@@ -2817,11 +2824,13 @@ described in "Step 1" and "Step 2" above. The rows in the table are from
 before that change and stay as they were written; a re-run of the `--app-body`
 arm reproduces them only with `--uncapped`.
 
-**Windows is not fixed by that, and this is the part they owe.** Their cap
-bounds the wait, and `LocalModel.Ask` returns `choices[0].message` and drops
-the rest of the response, so the finish reason never leaves `Ask` and a
-cut-off call is acted on. They meet it MORE often than the mac ever did,
-because their cap fires where the mac's context used to.
+**Windows was not fixed by that, and was until 2026-09-30.** Its cap bounded
+the wait, but `LocalModel.Ask` returned `choices[0].message` and dropped the
+rest of the response, so the finish reason never left `Ask` and a cut-off call
+was acted on — MORE often than the mac ever met it, because that cap fires
+where the mac's context used to. Parity bundle 5a (#196) carries the reason
+out of `Ask`; see "The Windows half of the assistant chain" at the end of this
+page.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
@@ -7073,3 +7082,95 @@ Written here so nobody adds it later thinking it was an oversight. The check
 that it stayed off is structural rather than a promise: no generated contract
 moved with the feature, so `assist-wording.json` and `assist-cases.json` cannot
 disagree with the Swift, and `--write-contracts` is not owed by it.
+
+---
+
+## The Windows half of the assistant chain (parity bundle 5a, 2026-09-30)
+
+Ten issues landed together on `issue/bundle5a-assistant-chain`, in the order
+they build on one another, all at one seam: the place in `AssistAgent` where a
+call is made. Everything here is provable with a scripted model, so no model
+was run and no routing number moved — nothing the model SEES changed (no
+schema, description, system prompt or dateline), which is what makes that
+claim true rather than hoped.
+
+**The order a model reply now meets, in `AssistAgent.Run`.** (1) An engine
+that did not answer: reported, not wound back. (2) `finish_reason: length`:
+nothing runs, `wording.answerWasCutOff`, wound back (#196) — ABOVE the
+tool-call branch, because a reply cut before the tool name arrives with no
+tool call and a raw `<tool_call>` fragment in its content. (3) Arguments that
+are not a JSON object: the same sentence, a different trail line. (4) Nothing
+written for a tool that needs more than the window supplies:
+`wording.answerLeftOutWhatItWasFor` (#262). (5) No tool call and the reply is
+the request handed back: `wording.didNotFollowThat`, wound back (#217) — below
+the tool branch, above the append. (6) The day settled (#159), the moment
+settled (#193), then course and section bound or the turn refused (#180).
+Only then is the tool chosen, carded or run.
+
+**One rewind, three callers.** `WindTheTurnBack` truncates the messages SENT
+TO THE MODEL to the count taken at the top of `Say`; the window's transcript
+is never touched, so the teacher's own sentence stays on screen. A lap after an
+approved call re-marks at its result, so a rewind can never erase a call that
+already ran. Not on an engine failure, as on the mac.
+
+**#180 — what was decided and rejected.** Gated on the tool's own schema
+declaring `course`/`section`, never on a list. Refused rather than rebound for
+another course (Russell, 2026-09-19); the window's spelling written for a
+casing difference; the folder's spelling named in the refusal; the model's
+spelling kept on the trail. `AssistWorkspace`'s locked-course refusal adopted
+the two contract sentences, which meant asking the folder again — `Courses()`
+has already filtered to the lock. Driven through `WindowBindingContractTests`,
+whose every case is a scripted MODEL call (a card phrasing never meets the
+binder).
+
+**#196 — the seam.** `IChatModel.Ask` returns `ModelReply(Message,
+FinishReason)`; a `JsonObject` converts implicitly so scripted test models stay
+one line. `LocalModel.ReadReply` is the body reader, testable without a
+server. A #159 test that pinned unreadable arguments REACHING a tool was
+changed on purpose: they no longer do.
+
+**#262 — a difference from the mac worth knowing.** The rule reads each tool's
+own schema, and Windows' local `add_next_class` declares `unit` and `days`
+where the mac's declares only course and section — so an EMPTY model call to
+`add_next_class` is refused here and runs there. "Add the next class page" is a
+card and never meets it. Followed as written; recorded for Russell rather than
+excused by a list. "Changes pages" is this app's own list of writes, because the
+schemas the server hands out carry no read-only flag. A call naming no course
+answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
+
+**#193 — the trap at the server, and the choice made there.**
+`ScheduledDeploy.ReadTheMoment`'s lenient step reads a bare `"06:30"` as TODAY,
+silently. The app's calls are settled into whole moments in the agent (card
+path and model path, one clock: `Today` + `Now` + `TimeZone`), so they cross
+already whole. `plantoir-mcp` REFUSES a bare time, matching the mac's
+`--mcp-stdio`, which "deliberately settles nothing" (above). The first draft
+settled it in the server instead — forgiving, and a divergence — and was
+reversed. The scheduled card now asks `wording.scheduleQuestion`, chosen by the
+tool's NAME (#260), and the immediate card says "This happens now."
+
+**#281 and #288 — transcript only.** `AssistCardCommand.Time.cs` is a port of
+the mac's frame, `TimeOfDay`, `askedOutright`, `respellingReading` and its
+`DayPart` table, one reading behind the question and the spelling so a sentence
+is never both. Both replies return before anything is appended for the model.
+The must-fail for that is the damaging direction itself: appending the
+teacher's "deploy at 6:30" and the question "for context" turns
+`TimeAskedInCodeTests` red because the next request carries "6:30".
+`onlyDifference` is decided by running the matcher and comparing the MOMENTS.
+
+**#261 — read by name, not by folder.** Since #309 a task's name carries its
+folder, so `Schedule` replaces exactly the task named `NameFor(code, section,
+folder)` (`/Create /F`) plus this folder's pre-#309 task. `For()` finds tasks
+through the folder their JOB names, and a task whose job cannot be read belongs
+to no folder there — yet is still overwritten. `WhatSchedulingReplaces` asks
+by name first; the must-fail (asking `For()` alone) turns
+`ADeployWhoseJobCannotBeReadIsStillNamedBecauseItIsReadByName` red. Another
+folder's task for the same code is a different task and is neither replaced nor
+named — the mac's #237, closed here by construction. A refused `/Create` leaves
+the old task, so the failure sentence says it "still stands"; "turned off" is
+recorded only if it has actually gone.
+
+**Rejected, so nobody proposes them again.** Settling a bare time in the server
+(above). Folding the echo into "answer was cut off" (that answer finished).
+Steering any of this with a tool description (the measured precedent is in
+"Steer the model with code"). Splitting steps 6–9 into four commits: they share
+one frame and one settler, and the plan pairs #260 with #193.
