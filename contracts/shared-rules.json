@@ -18465,6 +18465,25 @@
       "needsAdministratorTitle": "Plantoir could not install the new version.",
       "needsAdministratorExplanation": "Installing it on this Mac needs an administrator’s name and password, and none was given. To try again, choose Check for Updates… in the Plantoir menu. If you do not have an administrator’s password, whoever looks after this Mac can install it for you."
     },
+    "windowsWording": {
+      "note": "AUTHORED, proposed from Windows in bundle 8 (#337), appliesOn windows only - the mac's tests do not read this object. Windows draws its OWN update dialogs (NetSparkleUpdater with no UI of its own), so it needs the offer's words the mac leaves to Sparkle (updatersOwnWords). The mac needs none of these unless it ever stops using Sparkle's windows. machineryCheck applies to every sentence here.",
+      "appliesOn": [
+        "windows"
+      ],
+      "offerTitle": "A new version of Plantoir is ready: {version}.",
+      "offerInstall": "Install and Reopen",
+      "offerInstallWhy": "True on Windows only because the in-app Install passes /RELAUNCH=1 to the installer, whose [Run] entry relaunches on it (bundle-8 ruling 1); a silent install otherwise never reopens (skipifsilent).",
+      "offerLater": "Not Now",
+      "offerSkip": "Skip This Version",
+      "upToDate": "Plantoir is up to date.",
+      "couldNotCheck": "Plantoir could not find out whether a new version is ready. It will try again tomorrow.",
+      "assistantElsewhereWork": "helping an assistant in another app",
+      "assistantElsewhereWorkWhy": "The {work} for heldTitle when the only thing holding the install is a running plantoir-mcp (bundle-8 ruling 2): the Windows installer replaces plantoir-mcp.exe, so any running one holds the install - it may be publishing in a folder this app has never opened. The mac's server IS the app, so the mac has no such case.",
+      "elsewhereWorkOnWindows": "waiting for {course} to finish building somewhere else on this PC",
+      "elsewhereWorkOnWindowsWhy": "elsewhereWork says 'on this Mac'. Until the contract carries a {machine} placeholder (proposed to the mac), Windows says this.",
+      "needsAdministratorExplanationOnWindows": "Plantoir was installed for everyone who uses this PC, so a new version needs an administrator to install it. Whoever looks after this PC can download it from plantoir.app.",
+      "needsAdministratorExplanationOnWindowsWhy": "Bundle-8 ruling 3: installer.iss allows an all-users install (PrivilegesRequiredOverridesAllowed=dialog); a silent per-user update would put a second copy beside it, so an all-users copy is not updated and says so with needsAdministratorTitle and this sentence. The mac's explanation names a Mac and a menu Windows does not have."
+    },
     "updatersOwnWords": "Everything else a teacher reads while updating - the update window, its buttons, the progress and error windows - is the updater's own, localized by it into 35 languages, and cannot be changed without keeping a fork of it. Ours never use a word on the machinery list; the updater's own error windows can say \"update feed\" (\"An error occurred while parsing the update feed.\", \"The update feed is improperly signed...\") and a few others lean technical, all only when something has failed, and the trail's 'update stopped' line is what makes each of them answerable. The list is in documentation/09-mac-app.md -> 'Updating itself'.",
     "whatWasRejected": [
       "Letting a user default name the feed (the updater honours one by default) - a development feed by another name. The app clears any such value when the updater starts.",

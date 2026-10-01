@@ -489,6 +489,12 @@ public static class ActivityTrail
         /// text, never the working folder's path.
         /// </summary>
         ScheduledPublishNotification,
+        /// <summary>
+        /// The first launch whose version differs from the last launch's (#337 /
+        /// mac #204): from which version to which, and how — by its own updater
+        /// or by hand. "It broke after the update" needs to know WHEN.
+        /// </summary>
+        AppUpdated,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -586,6 +592,7 @@ public static class ActivityTrail
         Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
         Event.BackupsDeleted => "backups deleted",
         Event.ScheduledPublishNotification => "scheduled publish notification",
+        Event.AppUpdated => "app updated",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

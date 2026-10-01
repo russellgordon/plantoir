@@ -119,6 +119,21 @@ public partial class App : Application
             Settings = new AppSettings();
         }
 
+        // `app updated` (#337): the first launch of a new version, whoever
+        // installed it. No updater runs yet, so it is always "by hand".
+        try
+        {
+            string running = Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion;
+            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: false) is { } line)
+                Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AppUpdated, line);
+            if (Settings.LastLaunchedVersion != running)
+            {
+                Settings.LastLaunchedVersion = running;
+                Settings.Save();
+            }
+        }
+        catch (Exception ex) { LogDiagnostic($"app updated: {ex.Message}"); }
+
         // Name every builds folder this app can name, then sweep the ones
         // whose working folder is gone. Once per process, here, never per
         // window. Both are best-effort and silent: a teacher cannot see
