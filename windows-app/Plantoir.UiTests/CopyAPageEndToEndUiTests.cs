@@ -135,6 +135,9 @@ public class CopyAPageEndToEndUiTests
 
     private static void OpenCopyAPage(DrivenApp app, string course)
     {
+        // The previous dialog fully gone first: a second ContentDialog cannot
+        // open while one is still on screen.
+        Retry.WhileFalse(() => app.OpenDialog() is null, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250));
         app.PressRowMenuItem("sidebar-" + course, EndToEnd.CopyPageWording["menuItem"]!.ToString());
         Assert.NotNull(app.FindOrNull("copyPagePicker", TimeSpan.FromSeconds(10)));
     }
@@ -142,8 +145,23 @@ public class CopyAPageEndToEndUiTests
     /// <summary>The picker suggests only on TYPING (by design), so this types.</summary>
     private static void ChoosePage(DrivenApp app, string typed)
     {
-        var picker = app.Find("copyPagePicker", "the page picker");
-        picker.Click();
+        // Waited until it can be clicked: a dialog opened straight after
+        // another one closed is still arriving, and a click then has no point
+        // to land on (NoClickablePointException, runs 6 and 7 of bundle 11).
+        // Re-found on every look: the closing dialog's picker can still be in
+        // the tree for a moment, and it is the new one that has to be ready.
+        AutomationElement? picker = null;
+        Assert.True(Retry.WhileFalse(() =>
+        {
+            try
+            {
+                picker = app.FindOrNull("copyPagePicker", TimeSpan.FromMilliseconds(300));
+                return picker is not null && !picker.IsOffscreen && picker.TryGetClickablePoint(out _);
+            }
+            catch { return false; }
+        }, TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result, "the page picker never came on screen");
+        Thread.Sleep(400);
+        picker!.Click();
         Keyboard.Type(typed);
         Thread.Sleep(600);
         Keyboard.Press(VirtualKeyShort.DOWN);

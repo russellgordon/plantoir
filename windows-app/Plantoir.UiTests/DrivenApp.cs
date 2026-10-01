@@ -326,9 +326,18 @@ public sealed class DrivenApp : IDisposable
         for (int attempt = 1; attempt <= 3; attempt++)
         {
             row.RightClick();
-            var item = Retry.WhileNull(
-                () => Desktop.FindFirstDescendant(cf => cf.ByName(itemName).And(cf.ByControlType(ControlType.MenuItem))),
-                TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
+            // The app's own window first — its menus are popups inside it, and
+            // a whole-desktop query is the one that timed out (COMException
+            // 0x80131505, run 5 of bundle 11); a timeout is "not yet".
+            var item = Retry.WhileNull(() =>
+            {
+                try
+                {
+                    return Window.FindFirstDescendant(cf => cf.ByName(itemName).And(cf.ByControlType(ControlType.MenuItem)))
+                           ?? Desktop.FindFirstDescendant(cf => cf.ByName(itemName).And(cf.ByControlType(ControlType.MenuItem)));
+                }
+                catch (System.Runtime.InteropServices.COMException) { return null; }
+            }, TimeSpan.FromSeconds(8), TimeSpan.FromMilliseconds(250)).Result;
             if (item is null) continue;
             if (item.Patterns.Invoke.IsSupported) item.Patterns.Invoke.Pattern.Invoke();
             else item.Click();

@@ -76,12 +76,23 @@ public class WizardToPreviewUiTests
         // words as Text on one pass and as a Group's name on another, and its
         // tree is built lazily after the first UI Automation question — the
         // fourth run of bundle 11 missed it inside 60 s with Text only.
+        // Run 6 saw ZERO named elements for 120 s: Chromium had not built its
+        // accessibility tree at all. Focusing the view — what a screen reader
+        // or a teacher's click does — makes it, so after ten quiet seconds the
+        // view is given the focus, once.
         var seen = new List<string>();
+        var since = DateTime.UtcNow;
+        bool nudged = false;
         bool shown = Retry.WhileFalse(() =>
         {
             try
             {
                 if (app.FindOrNull("previewWebView", TimeSpan.FromSeconds(1)) is not { } view) return false;
+                if (!nudged && DateTime.UtcNow - since > TimeSpan.FromSeconds(10))
+                {
+                    nudged = true;
+                    try { view.Focus(); } catch { }
+                }
                 seen = view.FindAllDescendants().Select(e => { try { return e.Name ?? ""; } catch { return ""; } })
                            .Where(n => n.Length > 0).ToList();
                 return seen.Any(n => n.Contains(marker, StringComparison.Ordinal));
@@ -90,6 +101,7 @@ public class WizardToPreviewUiTests
         }, TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(1)).Result;
         Assert.True(shown, "the server has the page, but the window's own preview never showed it; the view exposed "
                            + $"{seen.Count} named elements: " + string.Join(" | ", seen.Take(12)));
+        _output.WriteLine($"the web view showed it {(nudged ? "after it was given the focus" : "without being focused")}");
 
         // And the build is where the launchers keep it: the real builds root, not the working folder.
         string builtIndex = Path.Combine(app.RealBuildsRoot, Code, "section1", "public", "index.html");
