@@ -720,6 +720,15 @@ public sealed partial class MainWindow : Window
                 break;
             case SidebarSelection.CourseItem(var code)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
+                // A reference course's row opens a short READ-ONLY summary,
+                // never the settings form (#241, interface.theReadOnlySummary).
+                if (ReferenceCourse.IsKeptForReference(course))
+                {
+                    if (DetailHost.Content is ReferenceSummaryView summary &&
+                        string.Equals(summary.CourseCode, code, StringComparison.OrdinalIgnoreCase)) break;
+                    DetailHost.Content = new ReferenceSummaryView(this, course);
+                    break;
+                }
                 if (DetailHost.Content is CourseSettingsView currentSettings &&
                     string.Equals(currentSettings.CourseCode, code, StringComparison.OrdinalIgnoreCase))
                 {
@@ -1075,7 +1084,11 @@ public sealed partial class MainWindow : Window
     /// section has not stopped meaning the course (the mac's
     /// <c>courseThatCanBeRenamed</c>).
     /// </summary>
-    private Course? CourseThatCanBeRenamed => Workspace.SelectedCourse;
+    private Course? CourseThatCanBeRenamed =>
+        // Never a course kept for reference, by ANY route (#241): its folder
+        // carries the year and course_code the real code, and a rename would
+        // collapse the two. The menu item, F2 and the context menu all ask here.
+        Workspace.SelectedCourse is { } course && !ReferenceCourse.IsKeptForReference(course) ? course : null;
 
     /// <summary>
     /// Read at the moment of asking, never captured earlier (the staleness
@@ -1095,6 +1108,9 @@ public sealed partial class MainWindow : Window
         var course = CourseThatCanBeRenamed;
         string? reason = course is null ? null : WhyRenameIsUnavailable(course);
         RenameCourseItem.IsEnabled = course is not null && reason is null;
+        // Withheld, not greyed, when the selection is a reference course.
+        RenameCourseItem.Visibility = Workspace.SelectedCourse is { } selected && ReferenceCourse.IsKeptForReference(selected)
+            ? Visibility.Collapsed : Visibility.Visible;
         RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
         RenameCourseReason.Text = reason ?? "";
         RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
@@ -1129,6 +1145,8 @@ public sealed partial class MainWindow : Window
         RenameSelectedCourse();
         args.Handled = true;
     }
+
+    private void ImportForReference_Click(object sender, RoutedEventArgs e) => _ = Sidebar.OpenImportForReference();
 
     private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)
     {

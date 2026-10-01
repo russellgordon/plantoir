@@ -49,6 +49,9 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
 
+    /// <summary>The key a group row's fold is remembered under, for rows that are not a course (#241's reference groups).</summary>
+    public string? FoldKey { get; init; }
+
     private MenuFlyout? _menu;
     /// <summary>
     /// Rebuilt every `Refresh()` pass (its closures must always hold the
@@ -182,7 +185,13 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>Write a group/course toggle into the window's memory.</summary>
     private void RecordExpansion(SidebarRow row, bool expanded)
     {
-        if (row.Selection is SidebarSelection.CourseItem(var code))
+        if (row.FoldKey is { } key)
+        {
+            if (Workspace.IsCourseExpanded(key) == expanded) return;
+            Workspace.SetCourseExpanded(key, expanded);
+            App.RememberOpenWindows();
+        }
+        else if (row.Selection is SidebarSelection.CourseItem(var code))
         {
             if (Workspace.IsCourseExpanded(code) == expanded) return;
             Workspace.SetCourseExpanded(code, expanded);
@@ -269,11 +278,14 @@ public sealed partial class SidebarPane : UserControl
             Tree.ItemsSource = _roots;
         }
         ReconcileCourses();
+        ReconcileReference();
         ReconcileBackups();
         ReconcileArchived();
 
-        // Root order: courses, then Backups, then Archived (row 106).
+        // Root order: courses, then Reference Courses (#241), then Backups,
+        // then Archived (row 106).
         var desiredRoots = new List<SidebarRow> { _coursesGroup };
+        if (_referenceGroup is not null) desiredRoots.Add(_referenceGroup);
         if (_backupsGroup is not null) desiredRoots.Add(_backupsGroup);
         if (_archivedGroup is not null) desiredRoots.Add(_archivedGroup);
         ApplyDesiredOrder(_roots, desiredRoots);
@@ -330,7 +342,8 @@ public sealed partial class SidebarPane : UserControl
         foreach (var row in _coursesGroup!.Children) byCode[row.Title] = row;
 
         var desired = new List<SidebarRow>();
-        foreach (var course in Workspace.FilteredCourses)
+        // A course kept for reference lives in its own group (#241).
+        foreach (var course in Workspace.FilteredCourses.Where(c => !ReferenceCourse.IsKeptForReference(c)))
         {
             if (!byCode.TryGetValue(course.Code, out var row))
                 row = new SidebarRow
@@ -368,7 +381,7 @@ public sealed partial class SidebarPane : UserControl
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
                 };
-            row.Menu = SectionMenu(course, number);
+            row.Menu = ReferenceCourse.IsKeptForReference(course) ? ReferenceSectionMenu(course, number) : SectionMenu(course, number);
             // Re-read on EVERY pass, not only when the row is first created —
             // rows are reconciled, not recreated, so an existing row's clock
             // badge would otherwise stay stuck at whatever was true the
@@ -531,6 +544,9 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         // Backing up stays available mid-preview — it only reads (row 106).
         menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        // #241: a frozen copy, kept beside the live course. Offered on a live
+        // course only; a copy of a frozen copy has no purpose.
+        menu.Items.Add(MenuItem(ReferenceCourse.KeepACopyMenuItem, Glyphs.Star, () => _ = KeepACopy(course)));
 
         var reviseItems = ReviseItems(course, section: null);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
@@ -946,6 +962,9 @@ public sealed partial class SidebarPane : UserControl
         string title;
         string message;
         int? sectionNumber = (Workspace.Selection as SidebarSelection.SectionItem)?.Number;
+        // A reference course's section is never removed on its own (#241,
+        // staysAsItIs): the footer's Remove means the whole course there.
+        if (ReferenceCourse.IsKeptForReference(course)) sectionNumber = null;
         if (sectionNumber is int n && course.SectionNumbers.Count > 1)
         {
             title = $"Remove Section {n} of {course.Code}?";
@@ -1356,6 +1375,9 @@ public sealed partial class SidebarPane : UserControl
     public async Task OpenRenameCourseDialog(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        // Never a course kept for reference, from ANY route (#241): its folder
+        // and its code are allowed to disagree only there.
+        if (ReferenceCourse.IsKeptForReference(course)) return;
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = folder;
 

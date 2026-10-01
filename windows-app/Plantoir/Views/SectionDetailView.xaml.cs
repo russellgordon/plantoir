@@ -193,7 +193,7 @@ public sealed partial class SectionDetailView : UserControl
     // so only a deploy already running does. Mac parity: deployAndWait()'s
     // check is deployRunner.isRunning, evaluated after the stop.
     internal bool IsDeploying => _deployRunner.IsRunning;
-    private string TitleText => $"{_course.Code}-S{_sectionNumber}";
+    private string TitleText => $"{ReferenceCourse.ShownCode(_course)}-S{_sectionNumber}";
 
     public SectionDetailView(MainWindow window, Course course, int sectionNumber)
     {
@@ -207,7 +207,16 @@ public sealed partial class SectionDetailView : UserControl
 
         // The empty-state invitation follows the course's destination —
         // "to Netlify" would be wrong twice over for a folder-publishing course.
-        NoPreviewDetail.Text = course.Configuration.DeploysToLocalFolder
+        // A course kept for reference (#241): the Deploy button is WITHHELD,
+        // not greyed — a control that can never become available is an
+        // invitation to wonder what is wrong — and the empty state says what
+        // the course is for instead.
+        if (ReferenceCourse.IsKeptForReference(course))
+        {
+            DeployButton.Visibility = Visibility.Collapsed;
+            NoPreviewDetail.Text = ReferenceCourse.NeverDeployed(ReferenceCourse.ShownCode(course));
+        }
+        else NoPreviewDetail.Text = course.Configuration.DeploysToLocalFolder
             ? "Click Preview to build this section's website and see it here, or Deploy to copy it to your deploy folder."
             : "Click Preview to build this section's website and see it here, or Deploy to put it online.";
 
@@ -752,7 +761,8 @@ public sealed partial class SectionDetailView : UserControl
         bool putBack = false;
         try
         {
-            var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings));
+            var choice = await ShowHealthDialogAsync(FolderProblemsDialog.Findings(findings,
+                repairIsOffered: !ReferenceCourse.IsKeptForReference(_course)));
             if (choice is null)
             {
                 // It never got on screen — another dialog held the one slot
