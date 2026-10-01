@@ -19,6 +19,9 @@ for (int i = 0; i < args.Length; i++)
     if ((args[i] == "--folder" || args[i] == "-f") && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--folder=", StringComparison.Ordinal)) folder = args[i]["--folder=".Length..];
     else if ((args[i] == "--course" || args[i] == "-c") && i + 1 < args.Length) course = args[++i];
+    // outsideAgents.serverArguments: `--mcp-stdio <folder>`, the shape the
+    // contract gives every door, and the one the Codex door passes (#210).
+    else if (args[i] == "--mcp-stdio" && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--course=", StringComparison.Ordinal)) course = args[i]["--course=".Length..];
 }
 
@@ -45,7 +48,10 @@ try
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
-    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory());
+    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory())
+    {
+        ServesTheLocalWindow = Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable) == "1",
+    };
 }
 catch (Exception error)
 {

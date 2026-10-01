@@ -67,6 +67,49 @@ public static class WikiLinks
     }
 
     /// <summary>
+    /// Every link to a PAGE on the page: the wikilinks <see cref="Parse"/>
+    /// reads, then the Markdown-style ones (#359 / mac #325,
+    /// <c>shared-rules.json</c> → <c>followingLinks.markdownStyleLinks</c>):
+    /// <c>[t](Notes.md)</c>, <c>[t](Unit%202/Quiz%201.md#part-a)</c> and
+    /// <c>[t](&lt;Unit 2/Worksheet 2.md&gt;)</c>.
+    /// </summary>
+    /// <remarks>
+    /// Each shape is read by ONE pattern, the folder rename's own
+    /// (<see cref="FolderPathRewriter.MarkdownLink"/> refuses a destination
+    /// opening with <c>&lt;</c>; <see cref="FolderPathRewriter.AngleLink"/>
+    /// takes it), through the same code-and-comment mask as a wikilink. The
+    /// destination is cut at the first <c>#</c> or <c>?</c> and percent-decoded
+    /// (the raw text when it does not decode); one with a scheme, one opening
+    /// <c>//</c>, or one that is only a <c>#heading</c> names no page.
+    /// Publishing, the unpublish referrer test, check_section and the links
+    /// answer read through here; the REWRITERS do not, because a page rename
+    /// does not rewrite a Markdown-style link on either platform (<c>notYet</c>).
+    /// </remarks>
+    public static List<WikiLink> PageLinks(string markdown)
+    {
+        var links = Parse(markdown);
+        var markdownStyle = MarkdownCode.MatchesOutside(FolderPathRewriter.AngleLink, markdown)
+            .Concat(MarkdownCode.MatchesOutside(FolderPathRewriter.MarkdownLink, markdown))
+            .OrderBy(match => match.Index);
+        foreach (Match match in markdownStyle)
+        {
+            string destination = match.Groups[2].Value.Trim();
+            if (destination.Length == 0 || destination.StartsWith('#') || destination.StartsWith("//", StringComparison.Ordinal))
+                continue;
+            if (FolderPathRewriter.Scheme.IsMatch(destination)) continue;
+            int cut = destination.IndexOfAny(new[] { '#', '?' });
+            if (cut >= 0) destination = destination[..cut];
+            string decoded;
+            try { decoded = Uri.UnescapeDataString(destination); }
+            catch (Exception) { decoded = destination; }
+            decoded = decoded.Trim();
+            if (decoded.Length == 0) continue;
+            links.Add(new WikiLink(Target: decoded, Heading: null, Alias: null, IsEmbed: false));
+        }
+        return links;
+    }
+
+    /// <summary>
     /// <paramref name="text"/> with every link whose name is a key of
     /// <paramref name="renamed"/> (case-insensitively, trimmed) pointed at the
     /// new name. Only the name between the brackets changes — an alias, a

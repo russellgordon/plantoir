@@ -61,19 +61,19 @@ public static class FolderPathRewriter
     // mac's #97). Before, this read `<Tasks/Quiz` and missed a first-segment
     // folder, and missed the scheme of `<https://…>` — a live defect that
     // repointed a teacher's link at somebody else's site.
-    private static readonly Regex MarkdownLink =
+    internal static readonly Regex MarkdownLink =
         new(@"(\]\()(?!<)([^)\s]+)", RegexOptions.Compiled);
 
     // `[q](<Tasks/Quiz 1.md>)`. The `>` is a LOOKAHEAD: the rewriter copies on
     // from the end of the match, so consuming it would drop it from every
     // rewritten link (the mac's must-fail M6). Unterminated is plain text.
-    private static readonly Regex AngleLink =
+    internal static readonly Regex AngleLink =
         new(@"(\]\(<)([^<>\r\n]+)(?=>)", RegexOptions.Compiled);
 
     private enum Style { Wiki, Angle, Markdown }
 
     /// <summary>A URL scheme: http:, https:, mailto:, obsidian: and friends.</summary>
-    private static readonly Regex Scheme =
+    internal static readonly Regex Scheme =
         new(@"^[A-Za-z][A-Za-z0-9+.\-]*:", RegexOptions.Compiled);
 
     /// <summary>

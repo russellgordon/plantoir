@@ -60,6 +60,11 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         // runs (#347): this one. In a development build the server is not
         // beside the app, so it could not find it on its own.
         if (Environment.ProcessPath is { } app) info.Environment["PLANTOIR_APP_PATH"] = app;
+        // This server answers PLANTOIR'S OWN window, not an outside door: its
+        // list_courses carries no How I Teach line (#340,
+        // howITeachPage.listCoursesLine) — the local assistant neither reads
+        // nor drafts that page.
+        info.Environment[Plantoir.Core.Assist.AssistWorkspace.LocalWindowVariable] = "1";
 
         Process? server;
         try { server = Process.Start(info); }
@@ -159,10 +164,11 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         bool isPlan = meta?[Plantoir.Core.Assist.AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
         string? summary = meta?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
         string? backup = meta?[Plantoir.Core.Assist.AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
+        bool noPage = meta?[Plantoir.Core.Assist.AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
 
         return string.IsNullOrWhiteSpace(summary)
-            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup }
-            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan, backup);
+            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
+            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan, backup, noPage);
     }
 
     // ---- JSON-RPC --------------------------------------------------------

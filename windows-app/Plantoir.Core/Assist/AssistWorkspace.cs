@@ -30,7 +30,7 @@ namespace Plantoir.Core.Assist;
 /// declines what it has no tool for, which is why "delete the Unit 1 folder"
 /// was harmless in testing; that property is worth keeping by construction.
 /// </summary>
-public sealed class AssistWorkspace
+public sealed partial class AssistWorkspace
 {
     private readonly string _folder;
     private readonly ILauncherRunner _launcher;
@@ -46,7 +46,7 @@ public sealed class AssistWorkspace
     /// </summary>
     internal static Func<string>? CloudflareAccountIdOverrideForTests;
 
-    private static string CurrentCloudflareAccountId() =>
+    internal static string CurrentCloudflareAccountId() =>
         CloudflareAccountIdOverrideForTests?.Invoke() ?? AppSettings.Load().CloudflareAccountId;
 
 
@@ -234,6 +234,7 @@ public sealed class AssistWorkspace
     /// <summary>Every page of a section, as paths relative to the working folder.</summary>
     public List<string> Pages(Course course, int sectionNumber) =>
         PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .Where(page => ListsAsAPage(course, page))   // never the How I Teach page (#340)
             .Select(Relative).ToList();
 
     /// <summary>
@@ -329,7 +330,7 @@ public sealed class AssistWorkspace
         try
         {
             var resolutions = WikiLinks.Resolve(
-                WikiLinks.Parse(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
+                WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, sectionNumber, keyLinks);
             foreach (var resolution in resolutions)
                 if (resolution.Outcome == LinkOutcome.Resolved)
                     protectedPaths.Add(Path.GetFullPath(resolution.Path!));
@@ -391,7 +392,7 @@ public sealed class AssistWorkspace
             try
             {
                 foreach (var resolution in WikiLinks.Resolve(
-                             WikiLinks.Parse(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
+                             WikiLinks.PageLinks(File.ReadAllText(keyLinks)), course.DirectoryPath, section, keyLinks))
                     if (resolution.Outcome == LinkOutcome.Resolved)
                         reference.Add(Path.GetFullPath(resolution.Path!));
             }
@@ -441,8 +442,14 @@ public sealed class AssistWorkspace
             if (File.Exists(direct)) return direct;
         }
 
+        // Asked for by name, the How I Teach page is never published or
+        // hidden — it is never on the site (#340, howITeachPage.notListedAsAPage).
+        if (HowITeachPage.IsItsTitle(wanted))
+            throw new AssistRefusal(AssistWording.HowITeachIsNeverPublished(course.Code));
+
         string bare = wanted.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? wanted[..^3] : wanted;
         var matches = PagePaths.MarkdownPages(course.DirectoryPath, sectionNumber)
+            .Where(p => ListsAsAPage(course, p))
             .Where(p => string.Equals(System.IO.Path.GetFileNameWithoutExtension(p), bare,
                                       StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -460,6 +467,51 @@ public sealed class AssistWorkspace
         File.ReadAllText(Page(course, sectionNumber, title));
 
     // ---- Planning --------------------------------------------------------
+
+    /// <summary>
+    /// Words that mean every page and name none (#352 / mac #197): a closed
+    /// list, held equal to <c>assist-cases.json</c> -> <c>pagesNamingNoPage.everyPageWords</c>.
+    /// </summary>
+    internal static readonly string[] EveryPageWords =
+        { "all", "everything", "all pages", "every page", "all of them", "all of those", "*" };
+
+    private static bool IsAnEveryPageWord(string name) =>
+        EveryPageWords.Contains(name.Trim().ToLowerInvariant(), StringComparer.Ordinal);
+
+    private static bool SectionHasAPageCalled(Course course, int section, string name) =>
+        PagePaths.MarkdownPages(course.DirectoryPath, section)
+                 .Any(path => string.Equals(Path.GetFileNameWithoutExtension(path), name.Trim(),
+                                            StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Something the teacher can type next: "Publish" or "Hide" and the
+    /// LOWEST unit that has class pages, in the course's own word; failing
+    /// that, the first page.
+    /// </summary>
+    private static string ExampleOfWhichPages(Course course, int section, bool hiding)
+    {
+        string verb = hiding ? "Hide" : "Publish";
+        string unitWord = course.Configuration.UnitWord;
+        var titles = PagePaths.MarkdownPages(course.DirectoryPath, section)
+            .Select(path => Path.GetFileNameWithoutExtension(path))
+            .ToList();
+        var units = titles
+            .Select(title => System.Text.RegularExpressions.Regex.Match(title,
+                "^" + System.Text.RegularExpressions.Regex.Escape(unitWord) + @" (\d+), ",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            .Where(match => match.Success)
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
+            .ToList();
+        if (units.Count > 0) return $"{verb} {unitWord} {units.Min()}";
+        string? first = titles.OrderBy(title => title, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        return first is null ? verb : $"{verb} {first}";
+    }
+
+    /// <summary>The trail line for #197: the act and the word or HOW MANY, never the names.</summary>
+    private static void NoteNamedNoPage(string course, int section, string what) =>
+        Plantoir.Core.Scripting.ActivityTrail.Note(
+            Plantoir.Core.Scripting.ActivityTrail.Event.AssistantNamedNoPage,
+            "the assistant named no page it could find: " + what + "; nothing was changed", course, section);
 
     /// <summary>
     /// Work out what publishing (or hiding) these pages would do, without
@@ -487,8 +539,39 @@ public sealed class AssistWorkspace
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
 
+        // A list that is NOTHING BUT words meaning every page names no page
+        // (#352 / mac #197). Asked of the section FIRST: a page really titled
+        // "All" is a page, whatever it is called.
+        var givenNames = pageTitles.Select(title => title.Trim()).Where(title => title.Length > 0).ToList();
+        if (givenNames.Count > 0 && givenNames.All(IsAnEveryPageWord) &&
+            !givenNames.Any(name => SectionHasAPageCalled(course, section, name)))
+        {
+            if (onOrAfter is null && before is null)
+            {
+                NoteNamedNoPage(course.Code, section,
+                    $"the list was only the word \u201c{givenNames[0].ToLowerInvariant()}\u201d");
+                string example = ExampleOfWhichPages(course, section, hiding: draft);
+                throw new AssistRefusal(draft
+                    ? AssistWording.EveryPageIsNotAPageToHide(example)
+                    : AssistWording.EveryPageIsNotAPageToPublish(example));
+            }
+            pageTitles = Array.Empty<string>();
+            givenNames.Clear();
+        }
+
         if (pageTitles.Count == 0 && onOrAfter is null && before is null)
             throw new AssistRefusal("No page was named, and no dates were given to choose classes by.");
+
+        // An OPEN-ENDED publish (every class from a day to the end of the
+        // course) is refused. The mac's rule, and why it is code rather than
+        // a sentence in a tool description is in doc 10: a typo'd "publsh
+        // tomorows class" chose exactly this 10 times in 10, which would have
+        // put the rest of the term in front of students. An open-ended
+        // UNPUBLISH is allowed: it hides work rather than exposing it.
+        if (!draft && pageTitles.Count == 0 && onOrAfter is { } openFrom && before is null)
+            throw new AssistRefusal(
+                $"Nothing was published: every class from {DateText.Iso(openFrom)} to the end of the course is " +
+                "more than one request should put in front of students. Name the pages, or give an end date too.");
         if (onOrAfter is { } from && before is { } until && until <= from)
             throw new AssistRefusal(
                 $"No class can be on or after {DateText.Iso(from)} and also before {DateText.Iso(until)}.");
@@ -501,8 +584,10 @@ public sealed class AssistWorkspace
             ? ProtectedFromHiding(course, section)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Read all markdown pages in the section
-        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section);
+        // Read all markdown pages in the section — never the How I Teach
+        // page, which no publish can put on the site (#340).
+        var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section)
+            .Where(page => ListsAsAPage(course, page)).ToList();
         var pagesList = new List<PlannedPage>();
         var pagesByTitle = new Dictionary<string, PlannedPage>(StringComparer.OrdinalIgnoreCase);
 
@@ -523,7 +608,7 @@ public sealed class AssistWorkspace
             string fullPath = PagePaths.ResolveInside(_folder, page.RelativePath);
             string text = File.ReadAllText(fullPath);
             var targets = new List<string>();
-            foreach (var resolution in WikiLinks.Resolve(WikiLinks.Parse(text), course.DirectoryPath, section, fullPath))
+            foreach (var resolution in WikiLinks.Resolve(WikiLinks.PageLinks(text), course.DirectoryPath, section, fullPath))
             {
                 if (resolution.Problem is { } prob)
                 {
@@ -559,6 +644,11 @@ public sealed class AssistWorkspace
         {
             string wanted = title.Trim();
             if (wanted.Length == 0) continue;
+            if (HowITeachPage.IsItsTitle(wanted))
+            {
+                problems.Add(AssistWording.HowITeachIsNeverPublished(course.Code));
+                continue;
+            }
 
             // Expand a whole unit if the title is like "Unit 4" - in the
             // course's OWN word, so "publish Module 4" is understood at all.
@@ -619,6 +709,20 @@ public sealed class AssistWorkspace
             }
         }
 
+        // Every name given matched nothing: not a stray word in a mixed list,
+        // but the whole list (#352 / mac #197). This used to fall through to
+        // "Nothing needed changing.", success about a request that did
+        // nothing. A unit that expanded to no pages, or a page that is never
+        // hidden, is not an unknown name and keeps its own answer.
+        if (givenNames.Count > 0 && named.Count == 0 && unknownNames.Count == givenNames.Count)
+        {
+            NoteNamedNoPage(course.Code, section,
+                unknownNames.Count == 1 ? "1 name matched no page" : $"{unknownNames.Count} names matched no page");
+            throw new AssistRefusal(unknownNames.Count == 1
+                ? AssistWording.NoPageCalled(course.Code, section.ToString(), unknownNames[0])
+                : AssistWording.NoPagesCalled(course.Code, section.ToString(), AssistWording.ListingEither(unknownNames)));
+        }
+
         // Dates choose classes IN CODE. A teacher's "every class from the 15th
         // onwards" is a comparison, and comparisons are exactly what a model
         // should never be doing on a teacher's behalf — the whole design moves
@@ -645,6 +749,7 @@ public sealed class AssistWorkspace
         }
 
         var linked = new List<PlannedPage>();
+        var stoppedAt = new List<PlannedPage>();
         var kept = new List<PlannedKept>();
         int protectedLinked = 0;
         int stillNeeded = 0;
@@ -703,13 +808,22 @@ public sealed class AssistWorkspace
                 // that decide to SKIP A WRITE are the ones that require
                 // VisibilityIsCertain. The mac collapses here too.
                 if (!candidate.IsVisibleToStudents) continue;
+                // A page that IS going down is not "staying" -- two classes
+                // named together link to each other, and the second must not
+                // be reported as kept because it is a class (#342).
+                if (goingDown.Contains(candidate.Title)) continue;
                 string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
                 if (reason != null && keptSeen.Add(candidate.Title))
                 {
                     kept.Add(new PlannedKept(candidate, reason));
+                    // A class has its own line ("stays visible, because it is
+                    // a class of its own") and no count: the protected
+                    // sentence below says index pages, curriculum and Key
+                    // Links, and a class among them would make it false
+                    // (#342 / mac #201).
                     if (reason.Contains("still links to it"))
                         stillNeeded++;
-                    else
+                    else if (reason != ClassOfItsOwn)
                         protectedLinked++;
                 }
             }
@@ -744,6 +858,13 @@ public sealed class AssistWorkspace
                                     {
                                         linked.Add(targetPage with { ViaLink = true });
                                         queue.Enqueue(targetPage);
+                                    }
+                                    else
+                                    {
+                                        // The stop (#173): neither published
+                                        // nor walked through, and named to the
+                                        // teacher (#203).
+                                        stoppedAt.Add(targetPage);
                                     }
                                 }
                             }
@@ -826,8 +947,12 @@ public sealed class AssistWorkspace
             InheritedDates = inherited,
             Index = index,
             Dangling = dangling,
+            StoppedAtClasses = stoppedAt,
         };
     }
+
+    /// <summary>The reason an unpublish leaves a linked class up (#342 / mac #201).</summary>
+    private const string ClassOfItsOwn = "it is a class of its own.";
 
 
     private static string? ReasonToKeep(
@@ -843,6 +968,13 @@ public sealed class AssistWorkspace
             return "it is in this section's Key Links.";
         if (PagePaths.IsCurriculum(course.DirectoryPath, page.RelativePath))
             return "it is a curriculum page.";
+        // An unpublish never takes a class down by following a link, and does
+        // not walk into one (#342 / mac #201, mirroring #173's publish stop).
+        // After the curriculum check and BEFORE the referrer test: the order
+        // is pinned on the mac -- a class in Key Links keeps its Key Links
+        // reason, and a class a visible page links to gets THIS reason.
+        if (page.IsClassPage)
+            return ClassOfItsOwn;
         if (PageStillLinking(page, referrers, goingDown) is { } referrer)
             return $"“{referrer.DisplayTitle}” still links to it.";
         return null;
@@ -877,7 +1009,7 @@ public sealed class AssistWorkspace
         try { text = File.ReadAllText(page); } catch { return found; }
 
         foreach (var resolution in WikiLinks.Resolve(
-                     WikiLinks.Parse(text), course.DirectoryPath, section, page))
+                     WikiLinks.PageLinks(text), course.DirectoryPath, section, page))
         {
             if (resolution.Problem is { } problem)
             {
@@ -1236,9 +1368,9 @@ public sealed class AssistWorkspace
             bool isPrimary = destination.Type == course.Configuration.DeployTarget;
             string destinationName = Models.DeployCommand.DestinationDescription(destination);
             throw new AssistRefusal(isPrimary
-                ? $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
-                  "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
-                  "do it after that."
+                ? $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying it " +
+                  "there asks what to call the website — and that can only be answered in Plantoir. Deploy it to " +
+                  $"{destinationName} once from there, and I can do it after that."
                 : $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying " +
                   "it there asks what to call that site — and that can only be answered in Plantoir. Deploy it " +
                   "there once from Plantoir, and I can do it after that.");
@@ -2268,7 +2400,8 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>Carry out a re-date the teacher has agreed to, after backing the course up.</summary>
-    public AssistResult ApplyReDate(ReDatePlan plan, IProgress<string>? progress = null)
+    public AssistResult ApplyReDate(ReDatePlan plan, IProgress<string>? progress = null,
+                                    bool isARollover = false)
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -2334,6 +2467,14 @@ public sealed class AssistWorkspace
             }
             catch { }
         }
+
+        // A ROLLOVER releases the published-pages record and the checklist's
+        // answers (#392), INSIDE this undo entry as the issue asks: one
+        // "undo that" puts the dates AND the record back. A separate entry
+        // would let the first undo restore last year's record over this
+        // year's dates.
+        if (isARollover)
+            LinksChecklist.ReleasePublishedPages(course.DirectoryPath, section, DateTime.Now, _undo);
 
         recording.Done();
 

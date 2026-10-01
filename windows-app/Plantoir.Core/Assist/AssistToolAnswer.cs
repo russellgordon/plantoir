@@ -40,7 +40,7 @@ namespace Plantoir.Core.Assist;
 /// prompted the rule, four times in a row.
 /// </param>
 public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan = false,
-                                      string? ConversationBackupPath = null)
+                                      string? ConversationBackupPath = null, bool NoPageFound = false)
 {
     /// <summary>
     /// The <c>_meta</c> key carrying the copy saved before this conversation's
@@ -64,6 +64,13 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
     /// is an ANSWER and must not get Go and Cancel underneath it.
     /// </summary>
     public const string IsPlanKey = "plantoir.app/isPlan";
+
+    /// <summary>
+    /// A links question asked about "the quiz" found no page called that, so
+    /// it is not answered in code: the window hands the sentence to the model,
+    /// which has the conversation to read it against (#305).
+    /// </summary>
+    public const string NoPageFoundKey = "plantoir.app/noPageFound";
 
     /// <summary>The same words to both, which is most tools.</summary>
     public static AssistToolAnswer Same(string both) => new(both, both);

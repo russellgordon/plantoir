@@ -75,6 +75,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // EVERY destination by type (#404, mac #403) — it used to name the
             // primary alone, and a folder with no path chosen yet as Netlify.
             text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
+            // To an outside door only (#340, howITeachPage.listCoursesLine).
+            if (workspace.HowITeachListingLine(course) is { } howITeach) text.AppendLine(howITeach);
         }
         return text.ToString().TrimEnd();
     }
@@ -135,9 +137,30 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult ReadPage(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page)
+        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page,
+        [Description(LinksAnswerHelp)] string answer = "",
+        [Description(LinksAnswerHelp)] string asTyped = "",
+        [Description(LinksAnswerHelp)] string onlyIfFound = "")
         => Guarded(() =>
         {
+            // "What does <page> link to?" (#305 / mac #167): filled by the
+            // window's fixed phrasing, in code, and never shown to the local
+            // model (AssistAgent.CardOnlyArguments). The answer is the whole
+            // reply, for the teacher; the turn ends on it.
+            if (answer.Equals("links", StringComparison.OrdinalIgnoreCase))
+            {
+                string? links = workspace.LinksAnswer(course, section, page,
+                    asTyped.Length > 0 ? asTyped : null, onlyIfFound.Equals("yes", StringComparison.OrdinalIgnoreCase));
+                if (links is null)
+                {
+                    var none = Answering("No page is called that.");
+                    none.Meta ??= new JsonObject();
+                    none.Meta[AssistToolAnswer.NoPageFoundKey] = true;
+                    return none;
+                }
+                return Answering(links);
+            }
+
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
             string path = workspace.Page(found, number, page);
@@ -206,6 +229,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// <summary>How many of each kind to name before summarising.</summary>
     private const int MostListed = 15;
 
+    /// <summary>
+    /// The three arguments only the links phrasing fills (#305). Declared
+    /// because the binder DROPS a key a method does not take (#149's lesson);
+    /// hidden from the local model by <c>AssistAgent.CardOnlyArguments</c>.
+    /// </summary>
+    private const string LinksAnswerHelp =
+        "Leave empty. Filled by Plantoir's own window when a teacher asks what a page links to.";
+
+    /// <summary>How many links into hidden pages check_section names before counting the rest — the build's number.</summary>
+    private const int HiddenLinksNamed = 10;
+
     [McpServerTool(Name = "check_section", Title = "Check what students would see",
                    ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what do students see right now?\", \"what would students see in this section right now?\", " +
@@ -253,10 +287,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var lines = new List<string>();
                 string word = dangling.Count == 1 ? "link" : "links";
                 lines.Add($"{dangling.Count} {word} would take a student to a page that isn’t there:");
-                foreach (var link in dangling.Take(MostListed))
+                // Ten named and the rest counted, as the build's own
+                // linksIntoHiddenPages finding does (#359 / mac #333:
+                // siteHealth.linksIntoHiddenPages, expectDetailNames).
+                foreach (var link in dangling.Take(HiddenLinksNamed))
                     lines.Add($"• {workspace.Relative(link.From)}  →  {Path.GetFileNameWithoutExtension(link.To)}  (hidden)");
-                if (dangling.Count > MostListed)
-                    lines.Add($"…and {dangling.Count - MostListed} more.");
+                if (dangling.Count > HiddenLinksNamed)
+                    lines.Add($"…and {dangling.Count - HiddenLinksNamed} more.");
                 lines.Add("Either publish the page each one points at, or take the link off the page that points at it.");
                 paragraphs.Add(string.Join("\n", lines));
             }
@@ -388,7 +425,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
-            var plan = workspace.PlanScheduledDeploy(course, section, moment);
+            ScheduledDeploy plan;
+            // A refusal at the ACT says so first (#344 / mac #322): the
+            // contract's sentence is "Nothing was scheduled. " + the reason,
+            // the same opening a refusal from the scheduler itself carries.
+            try { plan = workspace.PlanScheduledDeploy(course, section, moment); }
+            catch (AssistRefusal refusal)
+            {
+                ScheduledDeploy.NoteRefusedAtTheAct(workspace, course, section, moment, refusal.Message);
+                throw new AssistRefusal($"Nothing was scheduled. {refusal.Message}");
+            }
             // Where it goes and the Cloudflare Account ID are read when the
             // deploy RUNS now (#347), from the course's settings and the app's
             // own; what is written here is only what the teacher was told.
@@ -476,15 +522,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Work out what adding curriculum transclusions to a page would do, changing nothing. " +
                  "Show the teacher what it says — it quotes each expectation's wording so they can tell " +
                  "whether it fits their lesson without looking it up — then wait for them to agree.")]
-    public string PlanCurriculumMentions(
+    public CallToolResult PlanCurriculumMentions(
         [Description("The course code, for example ADA1O.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title, for example \"Movement Concepts\".")] string page,
         [Description("The expectation codes to add, separated by commas — for example \"A1.1, A2.2\".")]
         string codes)
-        => Guarded(() => workspace.PlanCurriculumMentions(course, section, page,
-                             codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                         .Describe());
+        => Guarded(() =>
+        {
+            // Marked as a PLAN (#350 / mac #327): the window reads an unmarked
+            // answer as a refusal and never offers Go, which left
+            // add_curriculum_mentions unrunnable from the app. A plan that
+            // adds nothing is an ANSWER, not a proposal — there is nothing to
+            // agree to.
+            var plan = workspace.PlanCurriculumMentions(course, section, page,
+                codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return plan.ChangesNothing ? Answering(plan.Describe()) : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_curriculum_mentions", Title = "Point a page at curriculum expectations",
                    Destructive = false, Idempotent = true)]
@@ -1068,7 +1122,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var parsed = await Load(timetable, block, startYear, cancellation, firstDay);
             var plan = workspace.PlanReDate(course, section, parsed,
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
-            var result = workspace.ApplyReDate(plan);
+            var result = workspace.ApplyReDate(plan, isARollover: true);
 
             var found = workspace.Course(course);
 
@@ -1088,7 +1142,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // session calling it has chosen already. The QUESTION belongs to
             // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes", releasedWithTheDates: !plan.ChangesNothing));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -1237,13 +1291,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 // website, and left the section pinned to last year's. An offer
                 // that looks like it worked is worse than no offer at all.
                 string aboutTheWebsiteOnly = SettleTheWebsiteAfterARollover(
-                    found, number, website, rollover);
+                    found, number, website, rollover, releasedWithTheDates: false);
                 if (aboutTheWebsiteOnly.Length == 0) return Answering(already);
                 string bothHalves = already + "\n\n" + aboutTheWebsiteOnly;
                 return Answering(bothHalves, bothHalves);
             }
 
-            var result = workspace.ApplyReDate(plan);
+            var result = workspace.ApplyReDate(plan, isARollover: IsARollover(website, rollover));
             // The counts ApplyReDate made from what it WROTE (#357 / mac #343):
             // its first paragraph. Never recomputed here from the plan.
             string summary = result.Message.Split("\n\n")[0];
@@ -1255,7 +1309,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // summary is the one line the teacher reads in the chat window, and
             // this is the part they have to answer. Put only in `detail` it
             // would work over MCP and be invisible in the app.
-            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover);
+            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover,
+                                                                    releasedWithTheDates: !plan.ChangesNothing);
             if (aboutTheWebsite.Length > 0)
             {
                 summary += "\n\n" + aboutTheWebsite;
@@ -1347,9 +1402,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// rather than silent.</para>
     /// </remarks>
     private string SettleTheWebsiteAfterARollover(
-        Course course, int sectionNumber, string website, string rollover)
+        Course course, int sectionNumber, string website, string rollover, bool releasedWithTheDates)
     {
         if (!IsARollover(website, rollover)) return "";
+
+        // EVERY rollover, same website or new (#392): the published-pages
+        // record and the checklist's answers belong to last year's classes.
+        // Normally released INSIDE the re-date's own undo entry (ApplyReDate);
+        // only a turn whose dates were already right (the website answered on
+        // a second turn) releases here, in an entry of its own, because there
+        // is no re-date write for it to join.
+        if (!releasedWithTheDates) workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
 
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {
@@ -1745,6 +1808,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, null, publishing: true, error));
+        }
     }
 
     /// <summary>
@@ -1861,6 +1933,52 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             workspace.Course(course).Code,
             System.IO.Path.GetFileName(workspace.BackUp(course, section))));
 
+    // ---- The How I Teach page (#340, mac #209), MCP only -----------------
+    //
+    // The local model is never shown these: a small router drafting a
+    // teacher's pedagogy is the wrong job for it, and a prompt change would
+    // owe a routing re-measurement (howITeachPage.tools.surface).
+
+    [McpServerTool(Name = "read_how_i_teach", Title = "Read the How I Teach page", ReadOnly = true, Destructive = false)]
+    [Description("Read the teacher's How I Teach page for a course: their own account of how the course is taught. " +
+                 "Read it before drafting or revising any page in the course, and keep to it. If there is none yet, " +
+                 "it says how to offer to draft one. Changes nothing.")]
+    public CallToolResult ReadHowITeach(
+        [Description("The course code, for example ICS3U.")] string course)
+        => GuardedResult(() => workspace.ReadHowITeach(course));
+
+    [McpServerTool(Name = "plan_write_how_i_teach", Title = "Plan saving the How I Teach page",
+                   ReadOnly = true, Destructive = false)]
+    [Description("Shows where the teacher's How I Teach page would be saved and whether it replaces one they " +
+                 "already have, changing nothing. Use it before write_how_i_teach, and show the teacher the whole text.")]
+    public CallToolResult PlanWriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        // MARKED, so the window would offer Go if anything ever gated on it.
+        => Guarded(() => Proposing(workspace.PlanWriteHowITeach(course, text, replacing)));
+
+    [McpServerTool(Name = "write_how_i_teach", Title = "Save the How I Teach page", Destructive = false, Idempotent = false)]
+    [Description("Save the teacher's How I Teach page for a course, once they have read the whole text and agreed. " +
+                 "Call plan_write_how_i_teach FIRST. The course is backed up first, and the page is never put on the website.")]
+    public CallToolResult WriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        => Guarded(() =>
+        {
+            var result = workspace.WriteHowITeach(course, text, replacing);
+            return Answering(result.Message,
+                result.BackupPath is null ? result.Message : result.Message + "\n\n" + AssistWorkspace.BackedUpNote);
+        });
+
+    private const string HowITeachTextHelp =
+        "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- settings block at the top.";
+
+    private const string HowITeachReplacingHelp =
+        "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach gave for it, passed " +
+        "only after the teacher agreed to replace their page. Leave empty for a new page.";
+
     // ---- Shared ----------------------------------------------------------
 
     private async Task<CallToolResult> Act(string course, int section, string[]? pages, bool includeLinked,
@@ -1895,6 +2013,48 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, pages, publishing: !draft, error));
+        }
+    }
+
+    /// <summary>
+    /// What a publish that stopped part way says (#165). Shaped on the mac's
+    /// inline sentence in <c>AssistToolRunner</c> ("Unit 4 was only partly
+    /// published: ...") -- the mac has no <c>AssistWording</c> key for it, so
+    /// this is Windows' own until a key is proposed (the bundle-5b handover to the mac).
+    /// Names the conversation's copy when there is one, because the undo
+    /// entry is abandoned on a throw and that copy is what puts it back.
+    /// </summary>
+    private string OnlyPartlyDone(string course, int section, string[]? pages, bool publishing, Exception error)
+    {
+        string verb = publishing ? "published" : "unpublished";
+        string? unitWord = null;
+        int? unit = null;
+        if (pages is { Length: 1 })
+        {
+            try
+            {
+                unitWord = workspace.UnitWordForCourse(course);
+            }
+            catch { /* the unit word is a nicety; the sentence stands without it */ }
+            if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], unitWord);
+        }
+        string what = unit is { } number ? $"{unitWord} {number}" : "The pages";
+        string reason = error is UnauthorizedAccessException
+            ? "Plantoir doesn’t have permission to change one of them."
+            : error.Message;
+        string said = $"{what} {(unit is null ? "were" : "was")} only partly {verb}: {reason}";
+        if (workspace.ConversationBackupPath is not null)
+            said += $" A copy from before this conversation changed anything is saved — " +
+                    $"{AssistSectionRestore.ButtonTitle(section)} puts the section back.";
+        return said;
     }
 
     private async Task<CallToolResult?> WholeUnitRequested(

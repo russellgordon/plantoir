@@ -140,7 +140,8 @@ public class AssistScenarioTests : IDisposable
         // first change is per-server, so a fresh one per call would back the
         // course up again on every turn.
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
-        var agent = new AssistAgent(new ScriptedModel(), tools, new JsonArray(), Course, SectionNumber)
+        var model = new ScriptedModel();
+        var agent = new AssistAgent(model, tools, new JsonArray(), Course, SectionNumber)
         {
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
@@ -186,6 +187,9 @@ public class AssistScenarioTests : IDisposable
         AssertEvents(scenario, scenarioName);
         AssertReply(scenario, toolAnswer, transcript);
         AssertTranscript(scenario, scenarioName, transcript);
+        if (scenario["expectModelRequests"] is JsonValue requests)
+            Assert.True(requests.GetValue<int>() == model.Requests,
+                $"{scenarioName}: the engine was asked {model.Requests} time(s), and the case says {requests}.");
     }
 
     // ---- What a case needs on disk ---------------------------------------
@@ -234,6 +238,16 @@ public class AssistScenarioTests : IDisposable
             var today = DateOnly.FromDateTime(DateTime.Now);
             Class("Unit 1, Day 1", today.AddDays(1).ToString("yyyy-MM-dd"), published: false);
             Class("Unit 1, Day 2", today.AddDays(2).ToString("yyyy-MM-dd"), published: false);
+        }
+
+        if (pending == "read_page")
+        {
+            // "what does Unit 1, Day 1 link to?": a published Unit 1, Day 1
+            // whose body links to Unit 1, Day 2, a draft (the scenario's why).
+            Class("Unit 1, Day 2", "2026-09-09", published: false);
+            string day1 = PagePath("Unit 1, Day 1");
+            Directory.CreateDirectory(Path.GetDirectoryName(day1)!);
+            File.WriteAllText(day1, "---\ndraft: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\nNext: [[Unit 1, Day 2]]\n");
         }
 
         if (pending == "re_date_classes")
@@ -612,8 +626,18 @@ public class AssistScenarioTests : IDisposable
     /// <summary>Never answers: every message a scenario sends is a card phrasing, matched in code.</summary>
     private sealed class ScriptedModel : IChatModel
     {
+        /// <summary>
+        /// How many requests reached the engine over the whole conversation —
+        /// the contract's <c>expectModelRequests</c>. A transcript cannot show
+        /// an ABSENCE, so this is what proves the model was never asked (#305).
+        /// </summary>
+        public int Requests { get; private set; }
+
         public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
-            => Task.FromResult<ModelReply?>(null);
+        {
+            Requests++;
+            return Task.FromResult<ModelReply?>(null);
+        }
     }
 
     /// <summary>
@@ -697,10 +721,11 @@ public class AssistScenarioTests : IDisposable
             bool isPlan = meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
             string? summary = meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
             string? backup = meta?[AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
+            bool noPage = meta?[AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
 
             return string.IsNullOrWhiteSpace(summary)
-                ? AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup }
-                : new AssistToolAnswer(summary, detail, isPlan, backup);
+                ? AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
+                : new AssistToolAnswer(summary, detail, isPlan, backup, noPage);
         }
 
         private static object?[] Bind(MethodInfo method, JsonObject arguments, CancellationToken cancellation)

@@ -412,6 +412,137 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - The walk stops at a class page (#203 / #342, mac #173 / #201)
+
+    /// <summary>
+    /// One linked class a PUBLISH stopped at, said on the plan and in the
+    /// reply, and only about a class students cannot certainly see already:
+    /// "publish it when you get to that class" is false about a published one.
+    /// </summary>
+    public static string LinkedClassWasLeftAlone(IReadOnlyList<string> classes) =>
+        $"{PublishPlan.Listing(classes)} is a class of its own, so it stays as it is \u2014 publish it when you get to that class.";
+
+    /// <summary>Several linked classes a publish stopped at. Two keys for one function: one rendering cannot show both branches.</summary>
+    public static string LinkedClassesWereLeftAlone(IReadOnlyList<string> classes) =>
+        $"{PublishPlan.Listing(classes)} are classes of their own, so they stay as they are \u2014 publish each one when you get to it.";
+
+    /// <summary>
+    /// A linked class an UNPUBLISH left visible, under "N linked page(s) stay
+    /// visible:". Only for a class students can see; a hidden linked class is
+    /// not mentioned.
+    /// </summary>
+    public static string LinkedClassStaysVisible(string page) =>
+        $"\u201c{page}\u201d stays visible, because it is a class of its own.";
+
+    // MARK: - What a page links to (#305 / mac #167)
+
+    /// <summary>The heading over the list of links, said only when there is a list.</summary>
+    public static string PageLinksTo(string page) => $"\u201c{page}\u201d links to:";
+
+    /// <summary>Nothing to list.</summary>
+    public static string PageLinksToNothing(string page) => $"\u201c{page}\u201d doesn\u2019t link to any other page.";
+
+    /// <summary>After a linked page students cannot see.</summary>
+    public const string LinkedPageIsADraft = "a draft, so students can\u2019t open it yet";
+
+    /// <summary>After a link that leads nowhere, shown as the teacher wrote it.</summary>
+    public const string LinkedPageIsMissing = "no page is called this, so the link leads nowhere";
+
+    /// <summary>More than one page shows that title: never a guess. Followed by where each one is.</summary>
+    public static string MorePagesThanOneAreCalled(string course, string section, string page) =>
+        $"More than one page in {course} Section {section} is called \u201c{page}\u201d, so I haven\u2019t chosen one. " +
+        "Ask again using the name at the end of one of these:";
+
+    /// <summary>The page was found and could not be opened.</summary>
+    public static string PageCouldNotBeRead(string page) =>
+        $"\u201c{page}\u201d could not be opened, so I can\u2019t say what it links to.";
+
+    // MARK: - A page list that names no page (#352 / mac #197)
+
+    /// <summary>
+    /// A publish whose page list was nothing but a word meaning every page
+    /// ("all", "everything" …) and no dates. <paramref name="example"/> is
+    /// something the teacher can type next — "Publish Unit 3".
+    /// </summary>
+    public static string EveryPageIsNotAPageToPublish(string example) =>
+        $"Nothing was published, because I need to know which pages. Say which ones — for example “{example}”.";
+
+    /// <summary>The hiding half of <see cref="EveryPageIsNotAPageToPublish"/>.</summary>
+    public static string EveryPageIsNotAPageToHide(string example) =>
+        $"Nothing was hidden, because I need to know which pages. Say which ones — for example “{example}”.";
+
+    /// <summary>The one name given matched no page. The teacher's sentence, not the model's "use list_pages".</summary>
+    public static string NoPageCalled(string course, string section, string page) =>
+        $"No page in {course} Section {section} is called “{page}”. Check the name as the sidebar shows it and ask again.";
+
+    /// <summary>
+    /// Two or more names, none of which matched. <paramref name="pages"/> is
+    /// already joined with "or" — "is called “a” and “b”" would say one page
+    /// has two names.
+    /// </summary>
+    public static string NoPagesCalled(string course, string section, string pages) =>
+        $"No page in {course} Section {section} is called {pages}. Check the names as the sidebar shows them and ask again.";
+
+    /// <summary>“a” or “b”, “a”, “b” or “c”.</summary>
+    internal static string ListingEither(IReadOnlyList<string> names)
+    {
+        var quoted = names.Select(name => $"“{name}”").ToList();
+        return quoted.Count <= 1
+            ? string.Concat(quoted)
+            : string.Join(", ", quoted.Take(quoted.Count - 1)) + " or " + quoted[^1];
+    }
+    // MARK: - The How I Teach page (#340, mac #209)
+
+    public static string HowITeachAlreadyWritten(string course) =>
+        $"Nothing was saved: {course} already has a How I Teach page, and a teacher's own page is never replaced without their agreement. Use plan_write_how_i_teach, show the teacher what it says, and pass the mark it gives as replacing only if they agree to replace their page.";
+
+    public static string HowITeachBriefing(string course) =>
+        $"These courses have a How I Teach page — the teacher's own account of how the course is taught. Read it with read_how_i_teach before drafting or revising anything in that course, and keep to it:\n  {course}";
+
+    public const string HowITeachCarriesNoSettings =
+        "Nothing was saved: pass the page's words only, without a --- settings block at the top. Plantoir writes the page's settings itself.";
+
+    public static string HowITeachChangedSincePlanned(string course) =>
+        $"Nothing was saved: the How I Teach page for {course} is not the one that was planned — it has changed since, or that is not its mark. Plan again with plan_write_how_i_teach and show the teacher before replacing it.";
+
+    public static string HowITeachCutShort(string course, string path) =>
+        $"The How I Teach page for {course} is longer than one answer can carry, so it stops here. The rest is in {path} — read it with your own tools.";
+
+    public const string HowITeachDraftingBrief =
+        "If you offer to draft it: offer first, and draft only if the teacher says yes. Before drafting, read the course's own pages with the plantoir tools — the section's landing page, class pages from at least two different units, and a few of its warm-ups, tasks and discussions where there are any; if a course kept for reference has the same code, read that too. Write in the teacher's own first person. Say what the pages SHOW — how a class is shaped, whether ideas are explored before they are named, how practice and feedback work, the kinds of page that keep coming back and what each is for, and how the pages speak to students — and never invent what they do not show. Aim for 200 to 500 words. Show the teacher the whole draft and change it until they agree. Then save it with plan_write_how_i_teach and write_how_i_teach, never with your own file tools, so it is kept off the website, backed up first and can be undone.";
+
+    public static string HowITeachEmpty(string course) =>
+        $"{course}’s How I Teach page has been started but has nothing written in it yet, so there is nothing to keep to. The teacher can write it in Obsidian, or you can offer to draft one; saving a draft fills the empty page, and needs no replacing mark.";
+
+    public static string HowITeachIsNeverPublished(string course) =>
+        $"The How I Teach page for {course} is never put on the website — it is for you and your assistant. To share something like it with students, make a page with a different name.";
+
+    public const string HowITeachListedAsNotWritten =
+        "  How I Teach page: not written yet";
+
+    public const string HowITeachListedAsWritten =
+        "  How I Teach page: yes";
+
+    public static string HowITeachMissing(string course) =>
+        $"{course} has no How I Teach page yet. It would be a page named exactly “How I Teach”, at the top of the {course} course folder beside its other pages — only a page with exactly that name, in exactly that place, is kept off the website. The teacher can write it there in Obsidian, or you can offer to draft one.";
+
+    public const string HowITeachNeedsWords =
+        "Nothing was saved: the page's text is empty. Pass the words of the page as text.";
+
+    public static string HowITeachPlanCreates(string course, string path) =>
+        $"This would save a new How I Teach page for {course} at {path}, set so it is never put on the website. Show the teacher the whole text and wait for them to agree before calling write_how_i_teach.";
+
+    public static string HowITeachPlanReplaces(string course, string path, string words, string changed, string mark) =>
+        $"{course} already has a How I Teach page, at {path} ({words} words, last changed {changed}). Saving would REPLACE what it says; any settings at its top are kept. Show the teacher the whole new text, tell them it replaces the page they have, and only if they agree call write_how_i_teach with replacing: “{mark}”.";
+
+    public static string HowITeachRead(string course, string text) =>
+        $"Here is the How I Teach page for {course}: the teacher's own account of how this course is taught. Keep to it in anything you draft or revise for {course}. It is never put on the website.\n\n{text}";
+
+    public static string HowITeachSaved(string course) =>
+        $"Saved the How I Teach page for {course}. It’s in the course folder beside your other pages, so you can change it in Obsidian any time. It’s never put on your website.";
+
+    public const string HowITeachTooLong =
+        "Nothing was saved: that is longer than a How I Teach page can be (8000 characters). Make it shorter and show the teacher again.";
     // MARK: - A reply that cannot be acted on (#196)
 
     /// <summary>
