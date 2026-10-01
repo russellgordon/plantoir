@@ -141,11 +141,13 @@ public static class AppUpdates
             : null;
 
     /// <summary>
-    /// Whether this copy may update itself (ruling 3). installer.iss allows an
-    /// all-users install into Program Files (PrivilegesRequiredOverridesAllowed=dialog);
-    /// a silent per-user update would put a SECOND copy beside it. So only a
-    /// copy under <c>%LOCALAPPDATA%\Programs</c> is updated, and an all-users
-    /// one shows the contract's needsAdministrator sentences instead.
+    /// Whether this copy may update itself (ruling 3). Only a copy under
+    /// <c>%LOCALAPPDATA%\Programs</c> is updated: a silent per-user update of
+    /// an all-users copy in Program Files would put a SECOND copy beside it, so
+    /// that one shows the contract's needsAdministrator sentences instead.
+    /// Since 2026-10-01 installer.iss installs per-user ONLY (it no longer
+    /// offers an all-users install), so every copy it makes updates itself; the
+    /// refusal stays for an all-users copy an older installer made.
     /// </summary>
     public static bool IsPerUserInstall(string executableDirectory, string localAppData)
     {
