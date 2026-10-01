@@ -109,6 +109,8 @@ public sealed partial class SidebarPane
         menu.Items.Add(ReferenceObsidianItem(course, course.DirectoryPath));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem(ReferenceCourse.SetSchoolYearMenuItem, Glyphs.Clock, () => _ = SetSchoolYear(course)));
+        // Copy a Page only READS this course (#247): offered on every row.
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
         menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(course.DirectoryPath)));

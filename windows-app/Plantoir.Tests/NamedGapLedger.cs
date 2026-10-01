@@ -141,8 +141,6 @@ internal static class NamedGapLedger
             "course created"),
         Owed(ActivityTrailEvents, 348, "Revert does not record the exclusions it put back yet (mac #152)",
             "exclusions reverted"),
-        Owed(ActivityTrailEvents, 247, "this app cannot copy a page from another course yet (mac #207)",
-            "pages copied from another course"),
         Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
             "put today's class on the front page", "left the front page as it was"),
         Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",

@@ -547,6 +547,8 @@ public sealed partial class SidebarPane : UserControl
         // #241: a frozen copy, kept beside the live course. Offered on a live
         // course only; a copy of a frozen copy has no purpose.
         menu.Items.Add(MenuItem(ReferenceCourse.KeepACopyMenuItem, Glyphs.Star, () => _ = KeepACopy(course)));
+        // On EVERY course row, a reference course's included: it only reads (#247).
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
 
         var reviseItems = ReviseItems(course, section: null);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
@@ -1015,6 +1017,15 @@ public sealed partial class SidebarPane : UserControl
         {
             await ShowError("Could not remove", error.Message);
         }
+    }
+
+    /// <summary>Copy a Page from This Course… (#247): the dialog does the rest.</summary>
+    private async Task OpenCopyAPage(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        await CopyAPageDialog.ShowAsync(course, Workspace.Courses, folder, ShowDialogSafelyAsync);
+        Workspace.Reload();
+        _window.ApplyState();
     }
 
     // ---- Backups (row 106) -------------------------------------------------
