@@ -67,11 +67,27 @@ public class SkeletonCatalogTests
         Assert.DoesNotContain("Repertoire", chemistry.SharedFolders);
     }
 
+    /// <summary>
+    /// INVERTED for GitHub issue #250. This used to be
+    /// <c>HasSkeletonReturnsFalseWhenExampleContentExists</c>, asserting this
+    /// app's own rule against itself — which is why no gate could see that a
+    /// teacher who turned DOWN the ready-made pages got empty folders. The
+    /// question is whether the teacher is TAKING the pages, not whether they
+    /// exist.
+    /// </summary>
     [Fact]
-    public void HasSkeletonReturnsFalseWhenExampleContentExists()
+    public void HasSkeletonReturnsTrueWhenExampleContentIsDeclined()
     {
-        Assert.False(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ADA1O"));
-        Assert.True(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ADA2O"));
+        Assert.True(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ADA1O", takingExampleContent: false));
+        Assert.True(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ICS4U", takingExampleContent: false));
+    }
+
+    [Fact]
+    public void HasSkeletonReturnsFalseWhenExampleContentIsTaken()
+    {
+        Assert.False(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ADA1O", takingExampleContent: true));
+        // A code with no ready-made pages cannot be "taking" them: a stale true changes nothing.
+        Assert.True(SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, "ADA2O", takingExampleContent: true));
     }
 
     [Fact]
@@ -126,8 +142,8 @@ public class SkeletonCatalogTests
         var lcs = new[] { "Notes", "Tasks", "College Board Curriculum" };
         var theirs = new[] { "My Folder" };
 
-        Assert.NotNull(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", defaults, defaults, lcs));
-        Assert.Null(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", theirs, defaults, lcs));
+        Assert.NotNull(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", false, defaults, defaults, lcs));
+        Assert.Null(SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, "SNC4M", false, theirs, defaults, lcs));
         Assert.True(SkeletonCatalog.IsOffered(SkeletonsRoot, lcs, defaults, lcs));
         Assert.False(SkeletonCatalog.IsOffered(SkeletonsRoot, theirs, defaults, lcs));
     }

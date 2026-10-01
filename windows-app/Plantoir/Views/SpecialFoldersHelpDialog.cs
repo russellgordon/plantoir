@@ -32,12 +32,12 @@ public static class SpecialFoldersHelpDialog
     /// as wide as the window.</summary>
     private const double BodyWidth = 460;
 
-    public static ContentDialog For(CourseConfiguration config)
+    public static ContentDialog For(CourseConfiguration config, CurriculumFolderRule.Resolution? curriculum = null)
     {
         var dialog = new ContentDialog
         {
             Title = SpecialFoldersHelp.Title,
-            Content = Body(config),
+            Content = Body(config, curriculum),
             CloseButtonText = SpecialFoldersHelp.DismissedBy,
             DefaultButton = ContentDialogButton.Close,
         };
@@ -45,7 +45,7 @@ public static class SpecialFoldersHelpDialog
         return dialog;
     }
 
-    private static UIElement Body(CourseConfiguration config)
+    private static UIElement Body(CourseConfiguration config, CurriculumFolderRule.Resolution? curriculum)
     {
         var stack = new StackPanel { Spacing = 18 };
         stack.Children.Add(new TextBlock
@@ -56,7 +56,7 @@ public static class SpecialFoldersHelpDialog
             MaxWidth = BodyWidth,
         });
 
-        foreach (var entry in SpecialFoldersHelp.Entries(config))
+        foreach (var entry in SpecialFoldersHelp.Entries(config, curriculum))
         {
             var row = new StackPanel { Spacing = 2 };
             row.Children.Add(new TextBlock

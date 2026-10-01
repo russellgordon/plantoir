@@ -261,10 +261,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                    ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what do students see right now?\", \"what would students see in this section right now?\", " +
                  "\"is anything broken?\", \"what's live?\". " +
-                 "Check a section's website as students would meet it, changing nothing. Reports two things that " +
+                 "Check a section's website as students would meet it, changing nothing. Reports three things that " +
                  "publishing and unpublishing tools cannot see for themselves: links on visible pages that lead to a hidden " +
-                 "page (students click and find nothing), and pages nothing links to — which are still published and " +
-                 "still listed in the site's explorer, so students can see them even though no class points there. " +
+                 "page (students click and find nothing), pages nothing links to — which are still published and " +
+                 "still listed in the site's explorer, so students can see them even though no class points there — and " +
+                 "pages only hidden classes use, which students can still see though no class they can see points there. " +
                  "Use this before a term starts, and after any bulk change.")]
     public string CheckSection(
         [Description("The course code, for example ICS3U.")] string course,
@@ -285,6 +286,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var orphans = graph.Unreferenced(classPages: classPages)
                 .Where(p => !isHidden(p)).ToList();
+            var missed = SectionCheck.LinkedButMissed(workspace.StartOfYearPages(found, number))
+                .Select(p => p.Id).ToList();
 
             int visible = graph.Pages.Count(p => !isHidden(p));
             string pageWord = visible == 1 ? "page" : "pages";
@@ -328,6 +331,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 paragraphs.Add(string.Join("\n", lines));
             }
 
+            if (missed.Count > 0)
+            {
+                var lines = new List<string>();
+                string word = missed.Count == 1 ? "page is" : "pages are";
+                lines.Add($"{missed.Count} visible {word} used only by classes students cannot see. Students can still " +
+                          "reach these through the site’s explorer, though no class they can see points there:");
+                foreach (string page in missed.Take(MostListed))
+                    lines.Add("• " + workspace.Relative(page));
+                if (missed.Count > MostListed)
+                    lines.Add($"…and {missed.Count - MostListed} more.");
+                paragraphs.Add(string.Join("\n", lines));
+            }
+
             // What the preview is DOING decides which of three things is worth
             // saying — and for one of them, that nothing is.
             //
@@ -358,6 +374,50 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // Nothing when a preview is showing: they are looking at it.
 
             return string.Join("\n\n", paragraphs);
+        });
+
+    // ---- Getting a section ready for the start of the year (#355, mac #96)
+
+    [McpServerTool(Name = "plan_prepare_for_start_of_year", Title = "Plan getting a section ready for the year",
+                   ReadOnly = true, Destructive = false)]
+    [Description("Work out what getting a section ready for the start of the year would do, changing nothing. " +
+                 "Lists every page that would go into draft and why, what stays, the links that would lead to hidden " +
+                 "pages, and the plan code prepare_for_start_of_year needs.")]
+    public CallToolResult PlanPrepareForStartOfYear(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section)
+        => Guarded(() =>
+        {
+            var proposal = workspace.PlanStartOfYear(course, section);
+            // A plan with nothing to do, or no first class, is an answer, not a proposal.
+            return proposal.Plan.First is null || proposal.Plan.NothingToDo
+                ? Answering(proposal.Text)
+                : Proposing(proposal.Text);
+        });
+
+    [McpServerTool(Name = "prepare_for_start_of_year", Title = "Get a section ready for the year",
+                   Destructive = false, Idempotent = true)]
+    [Description("TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the first class into draft\", " +
+                 "\"hide every class past Day 1\". Put every class after the first into draft, with the pages only later " +
+                 "classes use, leaving the first class, the pages it links to, Key Links and the pages it lists, folder " +
+                 "pages and curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the teacher the " +
+                 "whole plan and wait for them to agree; then pass the code the plan gave. The course is backed up first, " +
+                 "and undo_last_change takes it back. Nothing reaches students until they deploy.")]
+    public CallToolResult PrepareForStartOfYear(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section,
+        [Description("The code on the line that starts \"Plan code:\" in the plan plan_prepare_for_start_of_year gave, " +
+                     "for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and " +
+                     "the current plan comes back instead.")] string planCode = "")
+        => Guarded(() =>
+        {
+            var outcome = workspace.PrepareForStartOfYear(course, section, planCode, StartOfYearAskedFrom.AnOutsideAssistant);
+            if (outcome.Changed) return Answering(outcome.Message);
+            // Refused: the sentence, then the plan as it stands now with its code.
+            var now = workspace.PlanStartOfYear(course, section);
+            return outcome.Message == now.Text
+                ? Answering(outcome.Message)
+                : Answering(outcome.Message, outcome.Message + "\n\n" + now.Text);
         });
 
     // ---- Rolling a course onto a real timetable --------------------------
@@ -1722,6 +1782,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         var result = history.Undo();
         if (!result.Succeeded && result.Restored.Count == 0 && result.Skipped.Count == 0)
             return Answering(AssistWording.NothingToUndo);
+        // #355: an undo of getting a section ready leaves its own line.
+        AssistWorkspace.NoteIfItUndidAStartOfYear(result, StartOfYearAskedFrom.AnOutsideAssistant);
 
         // Nothing went back, because every file has been edited since. This
         // must not read like a success, and a count of files put back reads

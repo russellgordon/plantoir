@@ -246,6 +246,32 @@ public sealed class CourseConfiguration
     private static byte[] Serialize(JObject values) =>
         new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
 
+    /// <summary>
+    /// How many unsaved exclusion changes this copy holds: names that differ,
+    /// in either direction and in both scopes, between the in-memory
+    /// <c>excluded_items</c> and what THIS copy last read or wrote — never the
+    /// file, because an exclusion another window saved meanwhile is not one of
+    /// this copy's changes (<c>excludedItems.recordedOnClick</c>; the mac
+    /// counted against the file first and reported a revert of a removal the
+    /// window never made). The count the <c>exclusions reverted</c> line carries.
+    /// </summary>
+    public int ExclusionChangesSinceLastRead()
+    {
+        if (_lastSavedData.Length == 0) return 0;
+        CourseConfiguration baseline;
+        try { baseline = new CourseConfiguration(ParseObject(_lastSavedData), _lastSavedData); }
+        catch { return 0; }
+        int changes = 0;
+        foreach (string scope in new[] { SharedScope, PerSectionScope })
+        {
+            var now = ExcludedItems(scope);
+            var then = baseline.ExcludedItems(scope);
+            changes += now.Except(then, StringComparer.Ordinal).Count();
+            changes += then.Except(now, StringComparer.Ordinal).Count();
+        }
+        return changes;
+    }
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
@@ -621,6 +647,31 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// Every curriculum folder this course DECLARES, in order (#345, the mac's
+    /// #128): <c>curriculum_folders</c>, then the legacy
+    /// <c>curriculum_folder</c> when it is not already there. Written as BOTH
+    /// keys — the list, and the legacy key naming the list's first (primary)
+    /// folder, because an older Plantoir on another machine reads only that
+    /// one and would otherwise lose the map. An empty list removes both.
+    /// </summary>
+    public List<string> CurriculumFolders
+    {
+        get => CurriculumFolderRule.Declared(_values["curriculum_folders"], _values["curriculum_folder"]);
+        set
+        {
+            var names = CurriculumFolderRule.Declared(new JArray(value ?? new List<string>()), null);
+            if (names.Count == 0)
+            {
+                _values.Remove("curriculum_folders");
+                _values.Remove("curriculum_folder");
+                return;
+            }
+            _values["curriculum_folders"] = new JArray(names);
+            _values["curriculum_folder"] = names[0];
+        }
+    }
+
+    /// <summary>
     /// Which per-section folder holds this course's class pages, or empty when
     /// the course never recorded one.
     ///
@@ -671,7 +722,7 @@ public sealed class CourseConfiguration
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>
     public string? ResolvedCurriculumFolder =>
-        CurriculumFolderRule.Resolve(CurriculumFolder, SharedFolders);
+        CurriculumFolderRule.Resolve(CurriculumFolders, SharedFolders, null).Resolved.FirstOrDefault();
 
     /// <summary>
     /// The folders whose contents count for marks, or <b>null</b> when the key
@@ -1077,6 +1128,45 @@ public sealed class CourseConfiguration
     public static bool CurriculumPagesEnabled(bool hasExampleContent, bool prepopulating,
                                               bool contentIncludesCurriculum, bool curriculumSwitchIsOn) =>
         hasExampleContent && prepopulating && contentIncludesCurriculum && curriculumSwitchIsOn;
+
+    /// <summary>
+    /// Whether a NEW course is offered the curriculum pages written for its
+    /// code (<c>file-formats.json</c> → <c>include_curriculum_pages</c>, GitHub
+    /// issue #252, the mac's #251): the code has a payload, that payload
+    /// declares a curriculum folder, AND either the teacher is taking the
+    /// payload or a skeleton is offered and wanted.
+    /// </summary>
+    /// <remarks>
+    /// <para>Beside <see cref="Catalogs.SkeletonCatalog.HasSkeleton"/> and
+    /// calling it rather than re-deriving it, for the same reason that one
+    /// exists: three surfaces ask — the toggles' enabled state, the three keys
+    /// written, and the <c>course created</c> line. Until #252 the wizard wrote
+    /// <c>hasContent &amp;&amp; prepopulate &amp;&amp; …</c>, so a teacher who
+    /// declined the ready-made pages and kept the subject's skeleton got the
+    /// skeleton's placeholder Curriculum folder (one fake expectation, A1.1)
+    /// instead of the payload's: MEASURED on the mac by driving the real
+    /// <c>setup_course.py</c>, ICS4U 2 curriculum pages against 61, MCMPR11 2
+    /// against 59. Nothing on either platform goes red when this is left out —
+    /// the Python's branch simply never runs — which is the trap.</para>
+    /// </remarks>
+    public static bool CurriculumPagesOffered(string exampleContentRoot, string skeletonsRoot, string code,
+                                              bool takingExampleContent, bool skeletonWanted)
+    {
+        if (!Catalogs.ExampleContentCatalog.HasContent(exampleContentRoot, code)) return false;
+        if (!Catalogs.ExampleContentCatalog.IncludesCurriculum(exampleContentRoot, code)) return false;
+        if (takingExampleContent) return true;
+        return Catalogs.SkeletonCatalog.HasSkeleton(exampleContentRoot, skeletonsRoot, code, takingExampleContent)
+               && skeletonWanted;
+    }
+
+    /// <summary>
+    /// Whether a NEW course's coverage map is switched on: only when the
+    /// curriculum pages are offered and kept, since the map is drawn from
+    /// them. The mac's <c>curriculumCoverageEnabled(curriculumPagesOffered:…)</c>.
+    /// </summary>
+    public static bool NewCourseCoverageEnabled(bool curriculumPagesOffered, bool includesCurriculumPages,
+                                                bool includesCurriculumCoverage) =>
+        curriculumPagesOffered && includesCurriculumPages && includesCurriculumCoverage;
 
     /// <summary>color_schemes is FLAT — {"color_schemes": {"sectionN": "id"}}, no "sections" wrapper.</summary>
     public string ColourSchemeId(int section) =>

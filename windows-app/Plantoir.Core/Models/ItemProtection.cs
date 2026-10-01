@@ -95,7 +95,72 @@ public sealed record ProtectionContext(
     /// <c>class_folder</c> where there is one, otherwise the guess. Optional
     /// so every existing caller keeps its behaviour.
     /// </summary>
-    string? ResolvedClassFolder = null);
+    string? ResolvedClassFolder = null,
+    /// <summary>
+    /// The checklist's walk of the course on disk, every occurrence kept
+    /// (<see cref="GradedFolderChoices.WalkedFolders"/>). Null where there is
+    /// no disk — the New Course wizard — which keeps the old count-the-pool
+    /// floor; with a walk, the floor asks whether the pool would SURVIVE the
+    /// gesture (<c>gradedFolders.floor</c>, #348).
+    /// </summary>
+    IReadOnlyList<WalkedFolder>? Walk = null,
+    /// <summary>The shared folder list, for "after" a removal. Needed only with <see cref="Walk"/>.</summary>
+    IReadOnlyList<string>? SharedFolders = null,
+    /// <summary>
+    /// Whether the course has been asked about marks (<c>graded_folders</c>
+    /// present). A course never asked has the pool the historical rule infers
+    /// from what is offered, before AND after.
+    /// </summary>
+    bool PoolWasAsked = true,
+    /// <summary>
+    /// Every curriculum folder the course resolves to
+    /// (<c>curriculumFoldersResolution</c>'s <c>resolved</c>, #345). Null keeps
+    /// the single <see cref="ResolvedCurriculumFolder"/>.
+    /// </summary>
+    IReadOnlyList<string>? ResolvedCurriculumFolders = null,
+    /// <summary>In the wizard: the folder the payload declares, whose pages are installed while the curriculum switch is on.</summary>
+    string? DeclaredPayloadFolder = null);
+
+/// <summary>
+/// The context Course Settings protects its rows with, built in Core so the
+/// contract's floor cases run through exactly what the page asks
+/// (<c>CourseSettingsView.Protection</c> is a call to this).
+/// </summary>
+public static class CourseSettingsProtection
+{
+    public static ProtectionContext For(CourseConfiguration config, IReadOnlyList<WalkedFolder> walk,
+                                        string? courseDirectory = null) => For(config, walk,
+        CurriculumFolderRule.ForCourse(config, courseDirectory));
+
+    /// <summary>
+    /// The context, with the curriculum folders decided from the disk
+    /// (<see cref="CurriculumFolderRule.ForCourse"/>: which shared folders hold
+    /// an expectation page). Without a course folder, the by-name rule.
+    /// </summary>
+    public static ProtectionContext For(CourseConfiguration config, IReadOnlyList<WalkedFolder> walk,
+                                        CurriculumFolderRule.Resolution curriculum) => new(
+        InWizard: false,
+        CurriculumCoverageEnabled: config.OverallIncludesCurriculumCoverage,
+        // Course Settings has no curriculum-PAGES switch - that choice is made
+        // once, in the wizard - so it can never be the reason here.
+        CurriculumPagesEnabled: false,
+        Jurisdiction: SpecialNames.DefaultJurisdiction,
+        ResolvedCurriculumFolder: curriculum.Resolved.FirstOrDefault(),
+        GradedFolders: config.MaterializedGradedFolders(
+            GradedFolderChoices.For(config, GradedFolderChoices.NamesIn(walk))),
+        PerSectionFolders: config.PerSectionFolders,
+        ResolvedClassFolder: ClassFolderRule.Name(config.ClassFolder, config.PerSectionFolders),
+        Walk: walk,
+        SharedFolders: config.SharedFolders,
+        PoolWasAsked: config.GradedFolders is not null,
+        ResolvedCurriculumFolders: curriculum.Resolved);
+
+    /// <summary>The walk Course Settings takes, with the course's own exclusions applied.</summary>
+    public static List<WalkedFolder> Walk(CourseConfiguration config, string? courseDirectory) =>
+        GradedFolderChoices.WalkedFolders(courseDirectory,
+            config.ExcludedItems(CourseConfiguration.SharedScope),
+            config.ExcludedItems(CourseConfiguration.PerSectionScope));
+}
 
 /// <summary>
 /// The protection rules themselves: given a name, which list it is in, and
@@ -130,7 +195,7 @@ public static class ItemProtectionRule
 
             case ItemList.GradedFolders:
                 // Unticking, not removing: only the floor applies.
-                return MarksFloorProtection(name, context) ?? ItemProtection.Ordinary;
+                return MarksFloorProtection(name, list, context) ?? ItemProtection.Ordinary;
 
             default:
                 return ItemProtection.Ordinary;
@@ -160,38 +225,18 @@ public static class ItemProtectionRule
         if (context.PerSectionFolders.Count <= 1)
             return ItemProtection.Blocked(SpecialNames.LastPerSectionFolderBlocked);
 
-        return MarksFloorProtection(name, context)
-               ?? GradedFolderConfirmation(name, context)
+        return MarksFloorProtection(name, ItemList.PerSectionFolders, context)
+               ?? GradedFolderConfirmation(name, ItemList.PerSectionFolders, context)
                ?? ItemProtection.Ordinary;
     }
 
     private static ItemProtection SharedFolderProtection(string name, ProtectionContext context)
     {
-        if (IsTheCurriculumFolder(name, context))
-        {
-            if (context.InWizard)
-            {
-                if (context.CurriculumCoverageEnabled)
-                    return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCoverageMap);
-                if (context.CurriculumPagesEnabled)
-                    return ItemProtection.Blocked(
-                        SpecialNames.CurriculumFolderBlockedByCurriculumPages(context.Jurisdiction));
-            }
-            else if (context.CurriculumCoverageEnabled)
-            {
-                return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCoverageSetting);
-            }
+        if (CurriculumFolderProtection(name, context) is { } curriculum) return curriculum;
 
-            // Coverage is off, so nothing breaks today — but the expectations
-            // will not be there if it is turned on later, which is worth
-            // saying before the folder goes.
-            return ItemProtection.Consequential(
-                SpecialNames.RemoveCurriculumFolderTitle(name),
-                SpecialNames.RemoveCurriculumFolderMessage);
-        }
 
-        return MarksFloorProtection(name, context)
-               ?? GradedFolderConfirmation(name, context)
+        return MarksFloorProtection(name, ItemList.SharedFolders, context)
+               ?? GradedFolderConfirmation(name, ItemList.SharedFolders, context)
                ?? ItemProtection.Ordinary;
     }
 
@@ -201,9 +246,29 @@ public static class ItemProtectionRule
     /// shows every expectation as never evaluated, which looks like a bug in
     /// the map rather than a choice the teacher made.
     /// </summary>
-    private static ItemProtection? MarksFloorProtection(string name, ProtectionContext context)
+    /// <remarks>
+    /// <para>With a walk of the disk (Course Settings), the floor is "would the
+    /// pool SURVIVE", not "is this the last pooled name" (#348, the mac's
+    /// #152): refused when, before the gesture, some pooled name names a folder
+    /// the walk found, and after it none does. Counting names cut both ways —
+    /// a pooled name whose folder had been deleted refused its own removal on
+    /// the strength of a folder that was not there (F4), and let the last REAL
+    /// folder go while it sat in the pool beside it (F5, F6). Without a walk
+    /// (the wizard, which has no disk and reconciles its pool on every
+    /// removal) the old count stands.</para>
+    /// </remarks>
+    private static ItemProtection? MarksFloorProtection(string name, ItemList list, ProtectionContext context)
     {
         if (!context.CurriculumCoverageEnabled) return null;
+        if (context.Walk is { } walk)
+        {
+            var (poolAfter, walkAfter) = MarksFloor.After(name, list, context, walk);
+            if (!MarksFloor.AnyFound(context.GradedFolders, walk)) return null;
+            if (MarksFloor.AnyFound(poolAfter, walkAfter)) return null;
+            return ItemProtection.Blocked(context.InWizard
+                ? SpecialNames.LastGradedFolderBlockedWizard
+                : SpecialNames.LastGradedFolderBlocked);
+        }
         if (!IsGraded(name, context)) return null;
         if (context.GradedFolders.Count > 1) return null;
 
@@ -212,9 +277,25 @@ public static class ItemProtectionRule
             : SpecialNames.LastGradedFolderBlocked);
     }
 
-    private static ItemProtection? GradedFolderConfirmation(string name, ProtectionContext context)
+    /// <summary>
+    /// The graded-removal confirmation. With a walk it follows the floor's own
+    /// comparison, so its sentence ("Removing it will take it out of your
+    /// course's marks pool") stays TRUE: asked when the removal changes the
+    /// pool or takes a pooled name from found to not found, and not otherwise
+    /// (F7, F16 — a top-level Tasks that Portfolios/Tasks keeps — are not).
+    /// </summary>
+    private static ItemProtection? GradedFolderConfirmation(string name, ItemList list, ProtectionContext context)
     {
-        if (!IsGraded(name, context)) return null;
+        if (context.Walk is { } walk)
+        {
+            var (poolAfter, walkAfter) = MarksFloor.After(name, list, context, walk);
+            bool poolChanged = !context.GradedFolders.SequenceEqual(poolAfter, StringComparer.Ordinal);
+            bool aNameWasLost = context.GradedFolders.Any(pooled =>
+                MarksFloor.Found(pooled, walk) && !MarksFloor.Found(pooled, walkAfter));
+            if (!poolChanged && !aNameWasLost) return null;
+        }
+        else if (!IsGraded(name, context)) return null;
+
         return ItemProtection.Consequential(
             SpecialNames.RemoveGradedFolderTitle(name),
             SpecialNames.RemoveGradedFolderMessage);
@@ -223,7 +304,37 @@ public static class ItemProtectionRule
     private static bool IsGraded(string name, ProtectionContext context) =>
         context.GradedFolders.Contains(name, StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsTheCurriculumFolder(string name, ProtectionContext context) =>
-        context.ResolvedCurriculumFolder is { } resolved &&
-        name.Equals(resolved, StringComparison.Ordinal);
+    /// <summary>
+    /// <c>specialNames.curriculumFolderProtection</c> (#345): for a shared
+    /// folder among the resolved curriculum folders — (1) the ONLY one while
+    /// the map is on is blocked; (2) in the wizard, the payload's declared
+    /// folder while its pages are being installed is blocked; (3) one of
+    /// several while the map is on asks, saying its own map goes; (4) with the
+    /// map off it asks. Null for a folder that is not a curriculum folder here,
+    /// whose removal the other rules (the marks pool) decide.
+    /// </summary>
+    public static ItemProtection? CurriculumFolderProtection(string name, ProtectionContext context)
+    {
+        var resolved = context.ResolvedCurriculumFolders
+                       ?? (context.ResolvedCurriculumFolder is { } one ? new[] { one } : Array.Empty<string>());
+        if (!resolved.Contains(name, StringComparer.Ordinal)) return null;
+
+        if (context.CurriculumCoverageEnabled && resolved.Count == 1)
+            return ItemProtection.Blocked(context.InWizard
+                ? SpecialNames.CurriculumFolderBlockedByCoverageMap
+                : SpecialNames.CurriculumFolderBlockedByCoverageSetting);
+        if (context.InWizard && context.CurriculumPagesEnabled
+            && (context.DeclaredPayloadFolder is null
+                || string.Equals(context.DeclaredPayloadFolder, name, StringComparison.OrdinalIgnoreCase)))
+            return ItemProtection.Blocked(SpecialNames.CurriculumFolderBlockedByCurriculumPages(context.Jurisdiction));
+        if (context.CurriculumCoverageEnabled)
+            return ItemProtection.Consequential(
+                SpecialNames.RemoveCurriculumFolderWithItsMapTitle(name),
+                SpecialNames.RemoveCurriculumFolderWithItsMapMessage);
+        // Coverage is off, so nothing breaks today — but the expectations will
+        // not be there if it is turned on later, which is worth saying first.
+        return ItemProtection.Consequential(
+            SpecialNames.RemoveCurriculumFolderTitle(name),
+            SpecialNames.RemoveCurriculumFolderMessage);
+    }
 }

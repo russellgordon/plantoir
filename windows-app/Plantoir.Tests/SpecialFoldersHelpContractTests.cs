@@ -43,6 +43,8 @@ public class SpecialFoldersHelpContractTests
             json["graded_folders"] = graded.DeepClone();
         if (figure["curriculumFolder"] is JsonValue curriculum)
             json["curriculum_folder"] = curriculum.DeepClone();
+        if (figure["curriculumFolders"] is JsonArray curriculumFolders)
+            json["curriculum_folders"] = curriculumFolders.DeepClone();
 
         return CourseConfiguration.FromBytes(Encoding.UTF8.GetBytes(json.ToJsonString()));
     }
@@ -53,12 +55,27 @@ public class SpecialFoldersHelpContractTests
     /// passing after a row was inserted above them, testing the wrong row and
     /// saying nothing — which is the failure this whole file exists to catch.
     /// </summary>
-    private static string NameOfRow(CourseConfiguration config, string key)
+    /// <summary>
+    /// The case's curriculum folders as the app decides them from the disk:
+    /// `withPages` names the folders holding an expectation page (#345). A case
+    /// without it has no page anywhere, so the by-name rule answers.
+    /// </summary>
+    private static CurriculumFolderRule.Resolution CurriculumFrom(JsonNode figure, CourseConfiguration config) =>
+        CurriculumFolderRule.Resolve(config.CurriculumFolders, config.SharedFolders,
+            figure["withPages"]?.AsArray().Select(n => n!.ToString()).ToList());
+
+    private static IReadOnlyList<SpecialFolderEntry> EntriesFor(JsonNode figure)
+    {
+        var config = CourseFrom(figure);
+        return SpecialFoldersHelp.Entries(config, CurriculumFrom(figure, config));
+    }
+
+    private static string NameOfRow(JsonNode figure, string key)
     {
         var rows = Contract()["rows"]!.AsArray();
         for (int i = 0; i < rows.Count; i++)
             if (rows[i]!["key"]!.ToString() == key)
-                return SpecialFoldersHelp.Entries(config)[i].Name;
+                return EntriesFor(figure)[i].Name;
 
         throw new Xunit.Sdk.XunitException($"a case names a row the contract does not list: {key}");
     }
@@ -70,11 +87,9 @@ public class SpecialFoldersHelpContractTests
         {
             JsonNode figure = node!;
             string name = figure["name"]!.ToString();
-            CourseConfiguration config = CourseFrom(figure);
-
             foreach (var expected in figure["expectNames"]!.AsObject())
             {
-                string actual = NameOfRow(config, expected.Key);
+                string actual = NameOfRow(figure, expected.Key);
                 Assert.True(expected.Value!.ToString() == actual,
                     $"case \"{name}\", row \"{expected.Key}\": "
                     + $"expected \"{expected.Value}\", got \"{actual}\"");
@@ -83,7 +98,7 @@ public class SpecialFoldersHelpContractTests
             if (figure["mustNotAppear"] is JsonArray banned)
             {
                 var shown = new StringBuilder();
-                foreach (var entry in SpecialFoldersHelp.Entries(config))
+                foreach (var entry in EntriesFor(figure))
                     shown.Append(entry.Name).Append(' ');
                 foreach (JsonNode? word in banned)
                     Assert.DoesNotContain(word!.ToString(), shown.ToString());
@@ -142,7 +157,7 @@ public class SpecialFoldersHelpContractTests
         {
             JsonNode figure = node!;
             string name = figure["name"]!.ToString();
-            var entries = SpecialFoldersHelp.Entries(CourseFrom(figure));
+            var entries = EntriesFor(figure);
 
             // Recorded AND enforced: a mismatch has to skip this case, or the
             // indexer throws and takes the whole run down rather than failing
@@ -163,7 +178,10 @@ public class SpecialFoldersHelpContractTests
                 Check(what == entries[i].What,
                     $"{place}: expected what \"{what}\", got \"{entries[i].What}\"");
 
-                string why = row["why"]!.ToString();
+                // The coverage row says its plural sentence when the course has several maps (#345).
+                string why = key == "coverage" && entries[i].Name.Contains(" and ", StringComparison.Ordinal)
+                    ? row["whyForSeveral"]!.ToString()
+                    : row["why"]!.ToString();
                 Check(why == entries[i].Why,
                     $"{place}: expected why \"{why}\", got \"{entries[i].Why}\"");
 
@@ -271,7 +289,9 @@ public class SpecialFoldersHelpContractTests
             if (rows[i]!["namedFrom"]!.ToString() == "fixed") { shown.Append(' ').Append(entries[i].Name); fixedNames++; }
             shown.Append(' ').Append(entries[i].What).Append(' ').Append(entries[i].Why);
         }
-        Assert.Equal(4, fixedNames);
+        // Three since #345: the coverage row is now named from the course (every map's title).
+        Assert.Equal(rows.Count(row => row!["namedFrom"]!.ToString() == "fixed"), fixedNames);
+        Assert.Equal(3, fixedNames);
         string text = shown.ToString().ToLowerInvariant();
 
         // The exclusion is exercised, not merely written: the teacher's

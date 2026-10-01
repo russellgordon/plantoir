@@ -107,6 +107,76 @@ public static class ActivityTrail
         /// </summary>
         FolderCreated,
         /// <summary>
+        /// A course was made — by the New Course wizard (written BEFORE the
+        /// launcher starts, so a creation that fails part-way still says what
+        /// was asked for) or by Add Example Course (written AFTER, from the
+        /// code the run reported). Carries the code and which of the three
+        /// starting points it began from; never the name the teacher typed.
+        /// Before this a creation left only "started setup.ps1" with empty
+        /// arguments, which is how mac #248 stayed invisible for five weeks.
+        /// </summary>
+        CourseCreated,
+        /// <summary>
+        /// Course Settings' "Create and Open" made an EMPTY How I Teach page,
+        /// or could not, and why (#360, mac #329). Opening a page that is
+        /// there writes nothing.
+        /// </summary>
+        HowITeachPageStarted,
+        /// <summary>
+        /// The assistant zipped a course: the backup's file name, its size in
+        /// MB and how long it took in seconds, one decimal each — or that it
+        /// could not, and why (#360, mac #351). One line per REAL zip; the
+        /// conversation's copy reused by a later write writes nothing.
+        /// </summary>
+        AssistantBackedUpACourse,
+        /// <summary>
+        /// Which curriculum coverage maps a build wrote (#345, mac #128): each
+        /// map's title, the folder it was built from and how many expectations
+        /// it shows — or that it wrote none. From the build's PLANTOIR_MAPS:
+        /// line, for a run the app starts and for a scheduled publish.
+        /// </summary>
+        CurriculumMapsBuilt,
+        /// <summary>
+        /// A section was got ready for the start of the year (#355, mac #96):
+        /// where it was asked from, how many classes and other pages went into
+        /// draft (first used later / nothing students can see links to), how
+        /// many were left, the backup's file name, whether the preview was
+        /// rebuilt. Never a page's name — the backup is how anyone finds them.
+        /// </summary>
+        SectionMadeReadyForTheStartOfTheYear,
+        /// <summary>A start-of-year change was undone: from where, how many pages put back, how many left because they changed since.</summary>
+        StartOfYearChangeUndone,
+        /// <summary>
+        /// Getting ready was asked for and nothing was changed, with the reason
+        /// (changedSinceShown, deployUnderWay, backupFailed, writeFailed,
+        /// noFirstClass, missingPlanCode, nothingToDo) — "I pressed the button
+        /// and nothing happened" leaves no file changed to show it.
+        /// </summary>
+        StartOfYearNotDone,
+        /// <summary>
+        /// The APP reopened a working folder at launch rather than the teacher
+        /// choosing one (#320). Carries the path (redacted) and which it was —
+        /// the window's own folder or the last working folder. A window opened
+        /// beside another (Ctrl+N) inherits a folder and writes nothing.
+        /// </summary>
+        WorkingFolderReopened,
+        /// <summary>
+        /// A remembered working folder could not be reopened, so the window shows
+        /// the picker with a sentence. Carries the reason key, which folder it
+        /// was, and the path (redacted): the drive gets plugged back in and the
+        /// permission granted, so they cannot be looked for afterwards.
+        /// </summary>
+        WorkingFolderNotReopened,
+        /// <summary>
+        /// Course Settings' Revert took back unsaved exclusion changes. Carries
+        /// the course and HOW MANY — never the names, which the click lines
+        /// beside it already carry. Russell, 2026-09-06: <c>item excluded</c>
+        /// is written on the click, so a Revert that takes the removal back
+        /// needs its own line or the trail says a folder was excluded when it
+        /// never was. Written only when the count is at least one.
+        /// </summary>
+        ExclusionsReverted,
+        /// <summary>
         /// A working folder was recognised as kept in sync by a cloud service.
         /// Carries the service's name — never the folder's path, which is a
         /// teacher's own filing and is redacted from the trail anyway.
@@ -442,6 +512,16 @@ public static class ActivityTrail
         Event.SectionProcessesReclaimed => "section processes reclaimed",
         Event.FolderRenamed => "folder renamed",
         Event.FolderCreated => "folder created",
+        Event.CourseCreated => "course created",
+        Event.HowITeachPageStarted => "How I Teach page started",
+        Event.AssistantBackedUpACourse => "assistant backed up a course",
+        Event.CurriculumMapsBuilt => "curriculum maps built",
+        Event.SectionMadeReadyForTheStartOfTheYear => "section made ready for the start of the year",
+        Event.StartOfYearChangeUndone => "start of the year change undone",
+        Event.StartOfYearNotDone => "start of the year not done",
+        Event.WorkingFolderReopened => "working folder reopened",
+        Event.WorkingFolderNotReopened => "working folder not reopened",
+        Event.ExclusionsReverted => "exclusions reverted",
         Event.SyncedFolderNoticed => "synced folder noticed",
         Event.SyncedFolderAccepted => "synced folder accepted",
         Event.FolderProblemFound => "folder problem found",
