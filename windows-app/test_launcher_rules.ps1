@@ -58,7 +58,7 @@ function Import-LauncherFunctions([string]$Launcher, [string[]]$Names) {
 }
 
 Import-LauncherFunctions (Join-Path $repo 'preview.ps1') @('Find-FreePreviewPort', 'Split-CommandLine', 'Get-ScheduledDeployScriptName', 'Test-SectionIsBeingDeployed')
-Import-LauncherFunctions (Join-Path $repo 'deploy.ps1') @('Test-CarriesLiveReload')
+Import-LauncherFunctions (Join-Path $repo 'deploy.ps1') @('Test-CarriesLiveReload', 'Resolve-PublishFolder')
 # preview.ps1's Get-PhysicalPath needs a type compiled at run time; the
 # folders in these cases do not exist, so the full path is what it would give.
 function script:Get-PhysicalPath([string]$p) { return ([System.IO.Path]::GetFullPath($p)).TrimEnd('\') }
@@ -203,6 +203,25 @@ try {
     }
 } finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# ---- 4. Where a --to-folder value publishes (#304, review L1) --------
+# Windows-only cases (the contract's deployFolder cases are the APP's check):
+# a plain relative name comes from the working folder; a drive- or
+# root-relative path is refused rather than resolved against the process
+# directory.
+$wf = 'C:\Users\t\Plantoir Here'
+foreach ($c in @(
+    @{ asked = 'out site';            want = 'C:\Users\t\Plantoir Here\out site' },
+    @{ asked = '  Sites\x  ';         want = 'C:\Users\t\Plantoir Here\Sites\x' },
+    @{ asked = 'D:\Published\ics4u';  want = 'D:\Published\ics4u' },
+    @{ asked = '\\server\share\site'; want = '\\server\share\site' },
+    @{ asked = 'C:foo';               want = $null },
+    @{ asked = '\out';                want = $null },
+    @{ asked = '/out';                want = $null },
+    @{ asked = '   ';                 want = $null })) {
+    $got = Resolve-PublishFolder $c.asked $wf
+    Report 'publishFolder' ("'" + $c.asked + "'") ("$got" -eq "$($c.want)") "expected '$($c.want)', got '$got'"
 }
 
 Write-Host ("{0} passed, {1} failed, {2} skipped" -f $passed, $failed, $skipped)
