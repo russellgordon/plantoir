@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Plantoir.Core.Models;
 
@@ -133,6 +134,21 @@ public static class DeployCommand
     public static string EveryDestinationByType(CourseConfiguration configuration) =>
         Plantoir.Core.Scripting.MultiDestinationDeployRunner.JoinedWithAnd(
             configuration.AllDeployDestinations.Select(CardWords).ToList());
+
+    /// <summary>
+    /// <see cref="EveryDestinationByType(CourseConfiguration)"/>, read from the
+    /// course's settings ON DISK at the moment of the call (#344 / mac #322).
+    /// The assistant window's own copy of a course is a snapshot taken when it
+    /// opened; a destination changed in Course Settings afterwards left the
+    /// approval card naming the OLD one. Falls back to <paramref name="opened"/>
+    /// only when the course can no longer be found.
+    /// </summary>
+    public static string EveryDestinationByTypeAtTheCall(string workspacePath, string courseCode, CourseConfiguration opened)
+    {
+        var now = Workspace.DiscoverCourses(workspacePath)
+            .FirstOrDefault(course => string.Equals(course.Code, courseCode, StringComparison.OrdinalIgnoreCase));
+        return EveryDestinationByType(now?.Configuration ?? opened);
+    }
 
     /// <summary>Where this course's PRIMARY destination deploys to, in the teacher's words.</summary>
     public static string DestinationDescription(CourseConfiguration configuration) =>

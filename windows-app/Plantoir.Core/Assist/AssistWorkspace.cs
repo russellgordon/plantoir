@@ -1313,9 +1313,9 @@ public sealed class AssistWorkspace
             bool isPrimary = destination.Type == course.Configuration.DeployTarget;
             string destinationName = Models.DeployCommand.DestinationDescription(destination);
             throw new AssistRefusal(isPrimary
-                ? $"{course.Code} Section {section} has never been deployed, so deploying it asks what to call " +
-                  "the website — and that can only be answered in Plantoir. Deploy it once from there, and I can " +
-                  "do it after that."
+                ? $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying it " +
+                  "there asks what to call the website — and that can only be answered in Plantoir. Deploy it to " +
+                  $"{destinationName} once from there, and I can do it after that."
                 : $"{course.Code} Section {section} has never been deployed to {destinationName}, so deploying " +
                   "it there asks what to call that site — and that can only be answered in Plantoir. Deploy it " +
                   "there once from Plantoir, and I can do it after that.");
