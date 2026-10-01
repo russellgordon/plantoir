@@ -21,11 +21,11 @@ namespace Plantoir.UiTests;
 /// doing so deletes the only coverage of the button and leaves a test with the
 /// same name that proves what was already proven.**</para>
 ///
-/// <para><b>This is the first UI test that runs a LAUNCHER.</b> That is safe
-/// for narrow reasons that nothing enforces, written out once in
-/// <c>documentation/12-windows-app.md</c> under "The flags the app answers".
-/// Read them before running a DIFFERENT launcher from a test: preview and
-/// scheduled deploy would NOT be safe.</para>
+/// <para><b>This was the first UI test that runs a LAUNCHER.</b> Why setup.ps1
+/// was safe is in <c>documentation/12-windows-app.md</c> under "The flags the
+/// app answers"; since bundle 11 other tests run preview and deploy too, and
+/// what they owe is under "Driving the real interface". A scheduled deploy is
+/// still never run from a test.</para>
 ///
 /// <para>Serialised with the rest: one real application at a time.</para>
 /// </summary>
