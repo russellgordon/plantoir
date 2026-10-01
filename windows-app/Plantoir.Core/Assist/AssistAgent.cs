@@ -636,6 +636,7 @@ public sealed class AssistAgent
         // machine, which is what keeps the routing measurements standing.
         // (The writer half of that trap is issue #144.) DayOfWeek is an enum
         // name and carries no culture of its own.
+        _turnBeganAt = _messages.Count;
         var today = Today();
         _dateline = string.Create(CultureInfo.InvariantCulture,
             $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)");
@@ -919,9 +920,16 @@ public sealed class AssistAgent
         if (call["function"] is not JsonObject function) return call;
         if (function["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return call;
 
+        // Blank arguments are an EMPTY call, not an unreadable one: the
+        // window supplies course and section, and whether an empty call may
+        // run at all is decided before this (#262).
         JsonObject? arguments;
-        try { arguments = JsonNode.Parse(json) as JsonObject; }
-        catch { return call; }
+        if (string.IsNullOrWhiteSpace(json)) arguments = new JsonObject();
+        else
+        {
+            try { arguments = JsonNode.Parse(json) as JsonObject; }
+            catch { return call; }
+        }
         if (arguments is null) return call;
 
         if (rewrite(arguments)) function["arguments"] = arguments.ToJsonString();
@@ -996,16 +1004,128 @@ public sealed class AssistAgent
     /// schemas this conversation was built with, which are the ones the model
     /// was shown.
     /// </summary>
-    internal bool DeclaresAClassDay(string tool)
+    internal bool DeclaresAClassDay(string tool) => Declares(tool, "date");
+
+    /// <summary>
+    /// Whether the tool's own schema - the one the model was shown -
+    /// declares <paramref name="argument"/>. Every rewrite at this seam is
+    /// gated this way rather than on a list of tool names, so a list kept
+    /// beside the code cannot fall behind the tools.
+    /// </summary>
+    internal bool Declares(string tool, string argument) =>
+        SchemaOf(tool)?["parameters"]?["properties"]?[argument] is not null;
+
+    /// <summary>The <c>function</c> half of the named tool's schema, or null.</summary>
+    private JsonObject? SchemaOf(string tool)
     {
         foreach (var schema in _schemas)
         {
             if (schema?["function"] is not JsonObject function) continue;
             if (function["name"]?.ToString() is not { } named) continue;
-            if (!named.Equals(tool, StringComparison.OrdinalIgnoreCase)) continue;
-            return function["parameters"]?["properties"]?["date"] is not null;
+            if (named.Equals(tool, StringComparison.OrdinalIgnoreCase)) return function;
         }
-        return false;
+        return null;
+    }
+
+    // ---- Binding the model's call to this window (#180) -------------------
+
+    /// <summary>
+    /// The course codes in this window's working folder, as the folder spells
+    /// them. Asked only when the model names a course that is not this
+    /// window's, to tell "another course that is here" from "no such
+    /// course" - two different sentences, because "open MCV4U" is false
+    /// advice for a code that names nothing.
+    /// </summary>
+    public Func<IReadOnlyList<string>> CoursesInTheFolder { get; init; } = () => Array.Empty<string>();
+
+    /// <summary>
+    /// For a call the MODEL made in this window, <c>course</c> and
+    /// <c>section</c> are this window's - or the turn is refused.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The section is always the window's</b>, present or absent:
+    /// "Unpublish Unit 4, Day 12" was read by the small assistant as section
+    /// 4, and changed the wrong section's pages while reporting success. No
+    /// tool reads an omitted section as "every section", so an absent one is
+    /// bound too.</para>
+    ///
+    /// <para><b>The course is the window's or nothing runs.</b> Rebinding a
+    /// different course to this window would publish an ICS3U class off
+    /// "publish MCV4U's class" and say so - the one failure a teacher cannot
+    /// catch. Russell decided 2026-09-19 that refusing is right on both
+    /// platforms (#208). The same code in another casing is not another
+    /// course: it runs, with the WINDOW's spelling, because the approval card
+    /// prints the code verbatim. Whitespace and newlines are trimmed before
+    /// comparing, as the tools trim.</para>
+    ///
+    /// <para><b>In the agent, not the tool server.</b> <c>plantoir-mcp</c>
+    /// also serves an outside client that legitimately names any course its
+    /// lock allows; this window is the only thing that knows which section
+    /// the teacher is looking at. Gated on the tool's own schema declaring
+    /// each argument, never on a list - <c>undo_last_change</c> declares
+    /// neither and is left exactly as the model wrote it.</para>
+    ///
+    /// <para>Nothing the model SEES changes, so no routing re-measurement is
+    /// owed.</para>
+    /// </remarks>
+    /// <returns>The sentence to say when the turn is refused; null when it runs.</returns>
+    private string? BoundToThisWindow(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name) return null;
+        bool course = Declares(name, "course");
+        bool section = Declares(name, "section");
+        if (!course && !section) return null;
+
+        string? refusal = null;
+        WithArgumentsRewritten(call, arguments =>
+        {
+            bool changed = false;
+            if (course)
+            {
+                string? wrote = arguments["course"] switch
+                {
+                    null => null,
+                    JsonValue value when value.TryGetValue(out string? text) => text,
+                    var other => other.ToJsonString(),
+                };
+                string trimmed = wrote?.Trim() ?? "";
+                if (trimmed.Length > 0 && !trimmed.Equals(_courseCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    refusal = RefuseAnotherCourse(name, wrote!, trimmed);
+                    return false;
+                }
+                if (wrote != _courseCode)
+                {
+                    arguments["course"] = _courseCode;
+                    changed = true;
+                }
+            }
+            if (section && !(arguments["section"] is JsonValue given &&
+                             given.TryGetValue(out int number) && number == _section))
+            {
+                arguments["section"] = _section;
+                changed = true;
+            }
+            return changed;
+        });
+        return refusal;
+    }
+
+    private string RefuseAnotherCourse(string tool, string asTheModelWroteIt, string trimmed)
+    {
+        // The trail keeps the MODEL's spelling - it is evidence about the
+        // model, and normalising it throws away the only record it spelt the
+        // code oddly. The sentence names the folder's spelling instead.
+        ActivityTrail.Note(ActivityTrail.Event.AssistantWasAskedAboutAnotherCourse,
+            $"the assistant named {asTheModelWroteIt.Trim()} for {tool.Replace('_', ' ')} in this " +
+            $"{_courseCode} window - nothing was run from it",
+            _courseCode, _section);
+
+        string? here = CoursesInTheFolder()
+            .FirstOrDefault(code => code.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        return here is not null
+            ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
+            : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, trimmed);
     }
 
     /// <summary>
@@ -1054,6 +1174,32 @@ public sealed class AssistAgent
             new("assistant", AssistWording.PlanQuestion, NeedsApproval: true,
                 Pending: call["function"]?["name"]?.GetValue<string>()),
         };
+    }
+
+    /// <summary>
+    /// How many messages the conversation held when this turn began - the
+    /// mark <see cref="WindTheTurnBack"/> returns to.
+    /// </summary>
+    private int _turnBeganAt = 1;
+
+    /// <summary>
+    /// Take the whole turn back out of what the MODEL is sent: the teacher's
+    /// sentence, the model's reply, and any read a second lap made.
+    /// </summary>
+    /// <remarks>
+    /// <para>The transcript the teacher reads is not touched - it is the
+    /// window's, not this list - so their sentence stays above the answer.
+    /// Only the model's copy goes. Safe because no lap can follow a write:
+    /// a turn comes back to the model only after a read or a refusal made
+    /// before anything was written.</para>
+    ///
+    /// <para>Not called on an engine failure (unreachable, timed out): that
+    /// path reports the engine rather than asking for a rephrase, and the
+    /// context is worth keeping.</para>
+    /// </remarks>
+    private void WindTheTurnBack()
+    {
+        while (_messages.Count > _turnBeganAt) _messages.RemoveAt(_messages.Count - 1);
     }
 
     /// <summary>This turn's date note, remembered so a parroting reply can have it stripped.</summary>
@@ -1210,6 +1356,15 @@ public sealed class AssistAgent
             // read this same object. Today that is the relative day; a
             // section binding belongs beside it.
             call = WithTheDaySettled(call);
+            if (BoundToThisWindow(call) is { } refused)
+            {
+                // Nothing runs: no plan, no card, no tool. The turn comes back
+                // out of what the model is sent, so its next answer is not
+                // made in front of a request it was refused.
+                WindTheTurnBack();
+                lines.Add(new Line("assistant", refused));
+                return lines;
+            }
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,

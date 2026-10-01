@@ -24,6 +24,15 @@ public static class ActivityTrail
         AssistantMatchedAFixedPhrase,
         AssistantChoseATool,
         AssistantCouldNotAnswer,
+        /// <summary>
+        /// The model's call named a course other than this window's, and the
+        /// turn was refused (#180). Carries this window's course and section,
+        /// the course AS THE MODEL SPELT IT, and the tool it had chosen —
+        /// never the teacher's sentence and never the argument values. The
+        /// pair of codes is what tells the guard doing its job apart from a
+        /// model slip refused at the teacher's expense.
+        /// </summary>
+        AssistantWasAskedAboutAnotherCourse,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -275,6 +284,7 @@ public static class ActivityTrail
         Event.AssistantMatchedAFixedPhrase => "assistant matched a fixed phrase",
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
+        Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",

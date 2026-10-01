@@ -357,6 +357,28 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - A call the model made for another course (#180)
+
+    /// <summary>
+    /// The model named a course that IS in this working folder but is not
+    /// this window's. Nothing ran. <paramref name="otherCourse"/> is spelled
+    /// the way the working folder spells it, never the way the model wrote
+    /// it — a teacher told to open "mcv4u" is sent looking for something
+    /// their sidebar does not show.
+    /// </summary>
+    public static string AskedAboutAnotherCourse(string course, string otherCourse) =>
+        $"This window is for {course}, so nothing was done for {otherCourse}. " +
+        $"Open {otherCourse}'s section in Plantoir and ask me there.";
+
+    /// <summary>
+    /// The model named a code that is no course in this working folder — a
+    /// typo, or one it invented. Deliberately gives no "open it" advice:
+    /// there is nothing to open.
+    /// </summary>
+    public static string AskedAboutACourseThatIsNotHere(string course, string otherCourse) =>
+        $"There is no course called {otherCourse} in this working folder, so nothing was done. " +
+        $"This window is for {course}.";
+
     // MARK: - Shared fragments
 
     public const string WhereTheOutputIs = "The output is in that section's window in Plantoir.";
