@@ -5661,6 +5661,52 @@ Whole `exec` session including the model call: 15 s. MCP cold-start was not
 timed separately, and a signed-out launch was not measured (expected: Codex
 asks them to sign in).
 
+### On Windows (#210, 2026-09-30)
+
+"Revise with Codex…" is in the section and course menus beside "Revise with
+Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
+`Plantoir.Core/Assist/CodexLauncher.cs`). It finds `codex.exe`, `codex.cmd` or
+`codex.bat` on PATH, then `%USERPROFILE%\.local\bin\codex.exe`,
+`%APPDATA%\npm\codex.cmd` and `%USERPROFILE%\.bun\bin\codex.exe`, and passes the
+contract's argv exactly — which needed `plantoir-mcp.exe` to accept
+`--mcp-stdio <folder>` (an alias of `--folder`; Windows' server took only
+`--folder` until now). So a Codex session reaches the whole working folder, as
+the contract says (`courseIsNamedInTheGreetingOnly`) — where Windows' CLAUDE
+door still passes `--course` and is locked to one course, a difference the
+contract does not describe; see the questions in `ready/bundle5b.md`.
+
+**The escaping is three layers here, not two, and each is its own function.**
+TOML first (`TomlBasicString`), then the C runtime's argv quoting
+(`ArgvQuote`, the rule Rust's and Node's parsers read back), then cmd's
+metacharacters (`ForCmd`), which follows cmd's OWN quote toggling — cmd knows
+nothing of `\"`, so after a TOML `\"` the rest of a path is unquoted to cmd and
+`&`, `|`, `<`, `>`, `(`, `)` and `^` there get a caret. A `codex.cmd` (npm's
+shim, which re-parses `%*`) is escaped for TWO cmd parses; a `codex.exe` for
+one. `CodexLauncherTests` sends the argv through a real `cmd.exe /s /c` into a
+stub `codex.cmd` shaped like npm's shim and into a native executable, with a
+server path carrying `"` and `&` and a folder carrying `'`, `(`, `&`, `^`, `|`,
+`<`, `>`, `Français 🎓` and a trailing backslash, and asserts the argv arrives
+exactly and that `args` still parses as a list of two strings. Measured
+must-fails: escaping for one cmd parse where the shim needs two cut the argv
+off after the first override; a TOML `"` left unescaped failed the fixture.
+
+**Rejected: `wt.exe`**, which the Claude door uses. Windows Terminal parses its
+own command line — `;` starts a new tab, and it re-joins arguments with its own
+quoting — a third layer no unit test can drive without opening a window. The
+door starts `cmd.exe /s /k "…"` directly; on Windows 11 the console it opens is
+Windows Terminal anyway when that is the default terminal. **Not handled**: a
+`%NAME%` inside a folder or server path is expanded by cmd's first parse when a
+variable of that name exists; cmd offers no escape for `%` on a command line.
+
+**The trail**: `started Claude Code for <CODE>` (the Claude door shipped
+recording nothing) and `started Codex for <CODE>`, both `assistant opened`.
+
+**Start-up was NOT measured here**: Codex is not installed on this PC (`where
+codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
+`%APPDATA%\npm` has no `codex.cmd`). Plantoir never installs it, and neither did
+this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
+Windows machine that has Codex, with its hardware, before trusting it there.
+
 ### The two timeouts, and why they are passed rather than trusted
 
 ```

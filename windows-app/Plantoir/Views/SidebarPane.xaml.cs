@@ -577,6 +577,17 @@ public sealed partial class SidebarPane : UserControl
             "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
     }
 
+    /// <summary>"Revise with Codex…": the second outside door (#210, mac #205).</summary>
+    private void ReviseWithCodex(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
+
+        _ = ShowError("Codex didn’t open",
+            $"Plantoir couldn’t start a Codex session for {course.Code}. " +
+            "If Codex was updated or moved recently, restarting Plantoir may be enough.");
+    }
+
     private MenuFlyout BackupMenu(BackupItem item)
     {
         var menu = new MenuFlyout();
@@ -885,6 +896,12 @@ public sealed partial class SidebarPane : UserControl
         if (ClaudeCodeLauncher.IsAvailable)
             items.Add(MenuItem("Revise with Claude…", Glyphs.Star,
                 () => ReviseWithClaude(course)));
+
+        // Hidden independently when Codex is not installed
+        // (outsideAgents.hiddenWhenNotInstalled, #210).
+        if (CodexLauncher.IsAvailable)
+            items.Add(MenuItem("Revise with Codex…", Glyphs.Star,
+                () => ReviseWithCodex(course)));
 
         // "Local" is the word doing the work: it is what separates this from
         // the Claude item above, and it is the privacy promise in one word.
