@@ -8,12 +8,23 @@ public static class AssistWording
 {
     // MARK: - Agreeing to something
 
-    /// <summary>The deploy approval card, said before "Shall I deploy?".</summary>
+    /// <summary>
+    /// The IMMEDIATE deploy's approval card, said before "Shall I deploy?".
+    /// It leads by saying it happens now (#193): the small assistant sent "Deploy
+    /// at 6:30 AM" to the immediate deploy 10 trials of 10, and a card naming no
+    /// time put nothing in front of the teacher to contradict them.
+    /// </summary>
     public const string DeployApproval =
-        "Students will see what is deployed. Be certain to review changes you have made.";
+        "This happens now. Students will see what is deployed. Be certain to review changes you have made.";
 
     /// <summary>The question under the deploy card.</summary>
     public const string DeployQuestion = "Shall I deploy?";
+
+    /// <summary>
+    /// The question under a SCHEDULED deploy's card (#260) — it names a moment
+    /// that is not now, and the immediate question reads as now.
+    /// </summary>
+    public const string ScheduleQuestion = "Shall I schedule the deploy?";
 
     /// <summary>The question under a plan card.</summary>
     public const string PlanQuestion = "Shall I go ahead?";
@@ -432,6 +443,27 @@ public static class AssistWording
     /// </summary>
     public const string DidNotFollowThat =
         "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
+
+    // MARK: - A time asked about, or spelled for the teacher (#281, #288)
+
+    /// <summary>"deploy at 6:30": morning or evening? Nothing is set; the two sentences named are ones the family accepts.</summary>
+    public static string MorningOrEvening(AssistTimeQuestion question) =>
+        $"Is that {question.Clock} in the morning or in the evening? Nothing is set yet. " +
+        $"Say “{question.SayMorning}” or “{question.SayEvening}”.";
+
+    /// <summary>
+    /// A time the family can read but does not set, answered with the one
+    /// sentence to type — naming the teacher's own spelling, or, when only a
+    /// comma stands in the way, saying so.
+    /// </summary>
+    public static string SayTheTimeAs(AssistTimeRespelling respelling) =>
+        respelling.CommaIsTheOnlyDifference
+            ? SayTheTimeAsWithoutTheComma(respelling.Say)
+            : $"To set a deploy for “{respelling.Written}”, say it as “{respelling.Say}”. Nothing is set yet.";
+
+    /// <summary>The spelling reply when a comma is all that stands in the way.</summary>
+    public static string SayTheTimeAsWithoutTheComma(string say) =>
+        $"To set that deploy, say it as “{say}”, without the comma. Nothing is set yet.";
 
     // MARK: - A call the model made for another course (#180)
 

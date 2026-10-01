@@ -289,9 +289,14 @@ public class RelativeDayFreshnessTests
 
         var act = Assert.Single(rig.Tools.Calls);
         Assert.Equal("schedule_deploy", act.Name);
-        Assert.Equal("tomorrow 06:30", act.Arguments["when"]!.ToString());
+        // The DAY settler still never touches `when`, and no `date` joins it.
+        // Since #193 the MOMENT settler does, deliberately: "tomorrow 06:30"
+        // from a model reached the server's lenient reader, which reads a
+        // bare time as today. It is settled once, against the same clock, into
+        // the whole moment the card named — DeployAtATimeContractTests holds
+        // the rule.
+        Assert.Equal("2026-09-09 06:30", act.Arguments["when"]!.ToString());
         Assert.False(act.Arguments.ContainsKey("date"));
-        Assert.DoesNotContain("2026-09-09", ArgumentsOn(reply));
     }
 
     // ---- What a small model sends when it is having a bad day ------------
@@ -526,7 +531,7 @@ public class RelativeDayFreshnessTests
     }
 
     /// <summary>A course that can legally be scheduled: one section, deployed before.</summary>
-    private static void ACourseThatHasDeployedBefore(string folder)
+    internal static void ACourseThatHasDeployedBefore(string folder)
     {
         string course = Path.Combine(folder, "courses", "ICS3U");
         Directory.CreateDirectory(Path.Combine(course, "section1", "All Classes"));

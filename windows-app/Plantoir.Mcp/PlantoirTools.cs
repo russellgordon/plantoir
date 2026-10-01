@@ -340,7 +340,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
             // which is in the past, so the deploy was refused outright while
             // the card said tomorrow. Issue #144's family, read end.
-            if (ScheduledDeploy.ReadTheMoment(when) is not { } moment)
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
             return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
                 classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -355,6 +355,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "read it out — especially that the computer must be ON and AWAKE at that moment, plugged in " +
                  "if it is a laptop, with the lid open. Plantoir does not wake it. Replaces any deploy already " +
                  "scheduled for the same section. Use cancel_scheduled_deploy to call it off.")]
+    /// <summary>
+    /// A bare time of day — "06:30", "tomorrow 06:30" — settled into the whole
+    /// moment it means BEFORE it is read (#193). ReadTheMoment's lenient step
+    /// would otherwise read "06:30" as TODAY at 06:30, silently, usually a
+    /// moment already past. A whole moment comes back unchanged (the settler
+    /// is idempotent), so the app's own settled calls pass straight through.
+    /// </summary>
+    private string Settled(string when)
+    {
+        var now = DateTime.Now;
+        return ScheduledMoment.Settle(when, Today(), now) ?? when;
+    }
+
     public CallToolResult ScheduleDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -367,7 +380,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
             // which is in the past, so the deploy was refused outright while
             // the card said tomorrow. Issue #144's family, read end.
-            if (ScheduledDeploy.ReadTheMoment(when) is not { } moment)
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);

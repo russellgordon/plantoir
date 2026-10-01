@@ -7,7 +7,7 @@ using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
-public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
+public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
 {
     private static readonly char[] TrimChars = new[] { ' ', '\t', '\r', '\n', '.', '!' };
 
@@ -118,6 +118,7 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
         if (MakeRoom(tidied) is { } room) return room;
+        if (DeployAtATime(tidied) is { } scheduled) return scheduled;
         return DuplicateClass(tidied, message);
     }
 
