@@ -86,6 +86,11 @@ public class ContractTests
         Assert.Equal(wording["linkedClassesWereLeftAlone"]!.ToString(),
                      AssistWording.LinkedClassesWereLeftAlone(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
         Assert.Equal(wording["linkedClassStaysVisible"]!.ToString(), AssistWording.LinkedClassStaysVisible("Unit 2, Day 4"));
+        // #305 (mac #167): the links answer.
+        Assert.Equal(wording["pageLinksTo"]!.ToString(), AssistWording.PageLinksTo("{page}"));
+        Assert.Equal(wording["pageLinksToNothing"]!.ToString(), AssistWording.PageLinksToNothing("{page}"));
+        Assert.Equal(wording["morePagesThanOneAreCalled"]!.ToString(), AssistWording.MorePagesThanOneAreCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["pageCouldNotBeRead"]!.ToString(), AssistWording.PageCouldNotBeRead("{page}"));
 
         // #281/#288: rendered by running this app's own functions on the
         // inputs the generator used, so the keys test the code path rather

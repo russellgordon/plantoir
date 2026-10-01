@@ -164,10 +164,11 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         bool isPlan = meta?[Plantoir.Core.Assist.AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
         string? summary = meta?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
         string? backup = meta?[Plantoir.Core.Assist.AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
+        bool noPage = meta?[Plantoir.Core.Assist.AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
 
         return string.IsNullOrWhiteSpace(summary)
-            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup }
-            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan, backup);
+            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
+            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan, backup, noPage);
     }
 
     // ---- JSON-RPC --------------------------------------------------------
