@@ -926,6 +926,7 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
             await WaitForPreviewServer();
         }
@@ -1058,6 +1059,27 @@ public sealed partial class SectionDetailView : UserControl
         return true;
     }
 
+    /// <summary>
+    /// The sentence that says an act used the SAVED settings (#272, #357),
+    /// shown where the section's notices appear. It stays until closed: a
+    /// preview's end must not clear a deploy's sentence (the mac's review F3).
+    /// </summary>
+    private void ShowSettingsNotice(string sentence)
+    {
+        SettingsNotice.Message = sentence;
+        SettingsNotice.IsOpen = true;
+    }
+
+    /// <summary>previewUsesSavedSettings, when ANY window on the folder holds unsaved edits (#272).</summary>
+    private void SayIfThePreviewUsesSavedSettings()
+    {
+        if (!Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath)) return;
+        ShowSettingsNotice(SavedSettings.PreviewUsesSavedSettings);
+        ActivityTrail.Note(ActivityTrail.Event.PreviewStartedWithUnsavedSettings,
+            "preview started while Course Settings held unsaved changes; it uses the saved settings",
+            _course.Code, _sectionNumber);
+    }
+
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -1117,6 +1139,7 @@ public sealed partial class SectionDetailView : UserControl
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
+            SayIfThePreviewUsesSavedSettings();
             RefreshChrome();
             await WaitForPreviewServer();
         }
@@ -1435,7 +1458,31 @@ public sealed partial class SectionDetailView : UserControl
                 return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
-            var destinations = _course.Configuration.AllDeployDestinations;
+            // The SAVED settings, read at the press (#357 / mac #335): the
+            // launcher, the approval card and the scheduled run all read the
+            // file, so a deploy from the window's unsaved copy was half from
+            // each. Unreadable: refuse; the window's copy is never the fallback.
+            if (SavedSettings.Read(_course) is not { } saved)
+            {
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "This section can't be deployed yet",
+                    Content = SavedSettings.CouldNotBeReadToDeploy(_course.Code),
+                    CloseButtonText = "OK",
+                });
+                return SavedSettings.CouldNotBeReadToDeploy(_course.Code);
+            }
+            string? savedNotice = null;
+            if (Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(_course.ConfigFilePath))
+            {
+                savedNotice = SavedSettings.DeployUsesSavedSettings;
+                ShowSettingsNotice(savedNotice);
+                ActivityTrail.Note(ActivityTrail.Event.DeployUsedTheSavedSettings,
+                    SavedSettings.DeployUsedTheSavedSettingsLine("deployed from the section window", saved, _course),
+                    _course.Code, _sectionNumber);
+            }
+
+            var destinations = saved.Configuration.AllDeployDestinations;
             string cloudflareAccount = _window.Workspace.Settings.CloudflareAccountId.Trim();
 
             // Refuses up front, against EVERY configured destination, rather
@@ -1521,7 +1568,7 @@ public sealed partial class SectionDetailView : UserControl
             // <course>\.merged_output, which Windows stopped writing to when
             // builds moved out of the working folder.
             bool needsBuild = BuildFreshness.NeedsRebuild(
-                _course, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
+                saved, _sectionNumber, BuildOutputLocation.BuildsRootFor(workspacePath));
 
             // The publish is on the books for its WHOLE life — the quiet build
             // included — and comes off them on every exit path: the normal
@@ -1561,7 +1608,7 @@ public sealed partial class SectionDetailView : UserControl
             // also resolves each leg's own milestones and custom domain.
             // For the overwhelming majority of courses (one destination)
             // this behaves exactly as a single deploy always did.
-            await _deployRunner.RunAsync(_course, _sectionNumber, destinations, cloudflareAccount,
+            await _deployRunner.RunAsync(saved, _sectionNumber, destinations, cloudflareAccount,
                 workspacePath, needsBuild);
             // The single place that decides which sentence a teacher (or the
             // assistant, relaying it) hears — success, all-destinations,
@@ -1569,6 +1616,8 @@ public sealed partial class SectionDetailView : UserControl
             // happened, not from having reached this line.
             outcomeMessage = MultiDestinationDeployRunner.Result(
                 _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
+            // Added to what the assistant says, too (#357): it pressed this button.
+            if (savedNotice is not null) outcomeMessage += " " + savedNotice;
             EndPublishActivity();
 
             // What the build said about this course's folders, taken from the
