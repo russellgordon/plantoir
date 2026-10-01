@@ -142,6 +142,10 @@ public partial class App : Application
         }
         catch (Exception ex) { LogDiagnostic($"app updated: {ex.Message}"); }
 
+        // Ruling 12: installer.iss refused the update and reopened us.
+        if (Plantoir.Core.Assist.AppUpdates.NotInstalledLine(Environment.GetCommandLineArgs()) is { } notInstalled)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UpdateHeldWhileWorkIsUnderWay, notInstalled);
+
 #if DEBUG
         const bool developmentBuild = true;
 #else

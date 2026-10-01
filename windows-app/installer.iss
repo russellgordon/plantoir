@@ -85,7 +85,12 @@ begin
     // find.exe exits 0 when the name is in tasklist's output: a plantoir-mcp is running.
     if Exec(ExpandConstant('{cmd}'), '/C tasklist /FI "IMAGENAME eq plantoir-mcp.exe" | find /I "plantoir-mcp.exe"',
             '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+    begin
       Result := False;
+      // Ruling 12: the app has already quit, so reopen it and let it say why.
+      if ExpandConstant('{param:RETURNTO|}') <> '' then
+        Exec(ExpandConstant('{param:RETURNTO|}'), '--update-not-installed', '', SW_SHOW, ewNoWait, ResultCode);
+    end;
   end;
 end;
 
