@@ -659,7 +659,41 @@ public static class TaskScheduling
                     courseCode, section, destination, cloudflareAccountID, unattended: true);
                 string quotedArgs = string.Join(" ", arguments.Select(PsQuote));
 
-                lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
+                if (destination.Type == "cloudflare_pages")
+                {
+                    // CAPTURED, the build leg's way (#395): deploy.py prints
+                    // PLANTOIR_CLOUDFLARE_REMADE: when it had to make the
+                    // section's Cloudflare project again, and with the app
+                    // closed nothing else would read it. Start-Process with
+                    // OS-level redirection, never a pipeline (see the build
+                    // leg's comment: a 5.1 pipeline turns a stderr line into a
+                    // terminating error). The marker lines are APPENDED to the
+                    // section's record, which ScheduledHealthFindings reads into
+                    // the trail's 'cloudflare project made again'. Only this
+                    // destination can print the marker, so the others run as
+                    // before. If the capture cannot be set up, the leg runs plainly.
+                    string commandLineArgs = string.Join(" ", arguments.Select(a => "\"" + a + "\""));
+                    lines.Add("if ($healthDir) {");
+                    lines.Add($"  $deployLog = Join-Path $healthDir ({PsQuote(SafeName(taskName))} + '-deploy-' + [Guid]::NewGuid().ToString('N') + '.log')");
+                    lines.Add($"  $deployArgs = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"' + {PsQuote(launcherPath)} + '\" ' + {PsQuote(commandLineArgs)}");
+                    lines.Add("  $legProc = Start-Process -FilePath 'powershell.exe' -ArgumentList $deployArgs -Wait -PassThru -NoNewWindow -RedirectStandardOutput $deployLog -RedirectStandardError ($deployLog + '.err')");
+                    lines.Add("  $legExit = $legProc.ExitCode");
+                    lines.Add("  try {");
+                    lines.Add($"    $remadeRecord = Join-Path $healthDir {PsQuote(HealthRecordName(courseCode, section, workingFolder))}");
+                    lines.Add($"    $remade = @(Select-String -LiteralPath @($deployLog, ($deployLog + '.err')) -SimpleMatch {PsQuote(CloudflareProjectRemade.Marker)} -Encoding UTF8 -ErrorAction SilentlyContinue | ForEach-Object {{ $_.Line }})");
+                    lines.Add("    if ($remade.Count -gt 0) { Add-Content -LiteralPath $remadeRecord -Value $remade -Encoding utf8 }");
+                    lines.Add("  } catch { }");
+                    lines.Add("  Remove-Item -LiteralPath $deployLog, ($deployLog + '.err') -Force -ErrorAction SilentlyContinue");
+                    lines.Add("} else {");
+                    lines.Add($"  & {PsQuote(launcherPath)} {quotedArgs}");
+                    lines.Add("  $legExit = $LASTEXITCODE");
+                    lines.Add("}");
+                }
+                else
+                {
+                    lines.Add($"& {PsQuote(launcherPath)} {quotedArgs}");
+                    lines.Add("$legExit = $LASTEXITCODE");
+                }
 
                 // Exit 3 is deploy.py's NEEDS_AN_ANSWER and means that alone.
                 // Tested BEFORE the general non-zero branch, because it is also
@@ -683,13 +717,13 @@ public static class TaskScheduling
                 string failure = PsQuote(
                     ScheduledPublishOutcome.Word(ScheduledPublishOutcome.Kind.DidNotFinish));
 
-                lines.Add("if ($LASTEXITCODE -eq 3) {");
+                lines.Add("if ($legExit -eq 3) {");
                 lines.Add("  $allSucceeded = $false");
                 lines.Add("  if (-not $alreadyRecorded) {");
                 lines.Add("    $alreadyRecorded = $true");
                 lines.Add($"    Write-Outcome {question} {name}");
                 lines.Add("  }");
-                lines.Add("} elseif ($LASTEXITCODE -ne 0) {");
+                lines.Add("} elseif ($legExit -ne 0) {");
                 lines.Add("  $allSucceeded = $false");
                 lines.Add("  if (-not $alreadyRecorded) {");
                 lines.Add("    $alreadyRecorded = $true");
