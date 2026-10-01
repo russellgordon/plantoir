@@ -164,7 +164,8 @@ public sealed class LinksChecklistDialog
     /// </summary>
     /// <param name="show">The caller's way of putting a dialog up (one slot, retries).</param>
     public static async Task<string?> OfferAsync(string workspacePath, Course course, int section, LinksChecklistOffer offer,
-                                                 string occasion, Func<ContentDialog, Task<ContentDialogResult?>> show)
+                                                 string occasion, Func<ContentDialog, Task<ContentDialogResult?>> show,
+                                                 Func<bool>? folderMovedMeanwhile = null)
     {
         // never: while this app is publishing the course (it is offered when that finishes).
         if (CourseActivity.IsPublishing(workspacePath, course.Code))
@@ -179,6 +180,8 @@ public sealed class LinksChecklistDialog
         AssistWorkspace.NoteOffered(sheet, occasion);
         var choice = await show(ui._dialog);
         if (choice is null) return null;
+        // Answered after the window moved to another folder: act on nothing.
+        if (folderMovedMeanwhile?.Invoke() == true) return null;
         if (choice != ContentDialogResult.Primary)
         {
             workspace.NotNow(sheet);

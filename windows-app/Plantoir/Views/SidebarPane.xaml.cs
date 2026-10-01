@@ -1237,8 +1237,10 @@ public sealed partial class SidebarPane : UserControl
             said = Plantoir.Core.Assist.LinksChecklistWording.Fill(Plantoir.Core.Assist.LinksChecklistWording.NeedsAPreviewFirst,
                 new Dictionary<string, string> { ["course"] = course.Code, ["section"] = section.ToString() });
         else
-            said = await LinksChecklistDialog.OfferAsync(folder, course, section, offer, "from the menu", ShowDialogSafelyAsync);
+            said = await LinksChecklistDialog.OfferAsync(folder, course, section, offer, "from the menu", ShowDialogSafelyAsync,
+                                                         () => TheFolderMovedUnderThisConfirmation(folder));
         if (said is null) return;
+        // folder-check: not needed — an OK that tells what already happened, and acts on nothing.
         await ShowDialogSafelyAsync(new ContentDialog
         {
             Title = Plantoir.Core.Assist.LinksChecklistWording.MenuItem.TrimEnd('\u2026'),
