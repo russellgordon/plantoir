@@ -1348,7 +1348,7 @@ Windows figures are the v1.1.0 release assets.
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
-| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine); `get-pip.py` deliberately not (below) |
 | When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
 | The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
 
@@ -1360,10 +1360,30 @@ the same day.)
 1. **The mac installer is now almost twice Windows'**, because the mac still
    needs a Linux virtual machine and Windows does not.
 2. **The mac now checks every helper download against a pinned SHA-256**
-   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
-   Python, get-pip.py and the emoji font without checksums. It runs when the
-   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
-   rather than a defect — the Windows issue from #312 asks for it.
+   (the launchers' shared first-run block). **`fetch-runtime.ps1` now does
+   the same for the three FIXED downloads (#356, 2026-10-01)** — the Node zip,
+   the Python embeddable zip and the emoji font — and refuses (deleting the
+   file) on a mismatch. The pins were measured on the build PC (i5-8365U,
+   Windows 11 26200), not copied: Node's equals nodejs.org's own
+   `SHASUMS256.txt` for v20.18.1; the Python zip's `python.exe` and
+   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   equals the shipped font. Proven by running the script's own `Fetch` (lifted
+   out of the file by its syntax tree, against a `file://` copy): the right pin
+   keeps the file, one wrong hex digit refuses it and leaves nothing behind.
+   **`get-pip.py` is NOT hashed, deliberately**: `bootstrap.pypa.io` serves one
+   moving file with no versioned URL, so a hash would break the build on pip's
+   next release while protecting nothing the exact package versions (fetched by
+   pip from PyPI over TLS) do not. **Also rejected:** hashing the Quartz clone
+   (it is a tag on GitHub fetched by git, which checks its own objects) and
+   wrangler (`npm install` of an exact version; npm checks each package
+   against the registry's own integrity hash). It runs when the Windows app is BUILT, not on a teacher's PC;
+   the reason to do it anyway is that the build PC is where a swapped file
+   would enter every installer.
+3. **What #356 asked Windows to confirm, confirmed (2026-10-01):**
+   `scripts/test_helper_bootstrap.py` SKIPS here (`python
+   scripts\test_helper_bootstrap.py`: 5 tests, OK, skipped=5) and
+   `ContractTests.SharedRules_ActivityTrailEvents_Exist` is green with the two
+   mac-only events filtered by `appliesOn`.
 
 ## Behaviours with platform-specific mechanics
 
@@ -2132,6 +2152,19 @@ phrasing made a teacher the caller:
   and living exactly as long: one assistant window, or one `plantoir-mcp`
   process. Old `.explained` files are inert and are not cleaned up; nothing
   reads them.
+- **The first answer is now the mac's sentence (#157, 2026-10-01).**
+  `explain_publishing` said this app's own three paragraphs (`Briefing.Words`,
+  which named the course's destination) while the mac said
+  `wording.whatPublishingMeans`; `list_courses` in an empty folder said "This
+  working folder has no courses yet." where the mac says `wording.noCoursesYet`,
+  which also says what to do next. Both are teacher-visible through the fixed
+  phrasings, so they were matched rather than ledgered: `AssistWording` carries
+  both constants, the wording walker compares them with the contract, and
+  `Briefing` is gone. What was given up on purpose: naming the destination in
+  that answer. The mac's sentence names none, so it cannot promise a place the
+  deploy does not go — which was the only reason the old answer looked it up.
+  The unknown-course refusal still ends "This working folder has no courses
+  yet." — a clause in a different sentence, with no contract key of its own.
 
 ### Two more the same pass turned up
 
@@ -2980,9 +3013,11 @@ numbers onto it: Windows' assistant window drives its tools through
 app's UI thread — the mac's 9.7 s main-thread zip has no analogue, and nothing
 was measured holding the window. Every assistant zip now leaves an `assistant
 backed up a course` line with its seconds, which is how that claim will be
-checked against a real course. What is NOT built: counting the course busy
-while the zip runs in `plantoir-mcp` (`courseIsBeingCopied`), so Preview and
-Deploy stay live meanwhile; that key stays in the ledger against #360.
+checked against a real course. (This said counting the course busy while
+the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
+stayed in the ledger against #360. It was built in parity bundle 6a —
+`AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
+and `NamedGapLedger` has been empty since bundle 9.)
 
 ---
 
@@ -3123,7 +3158,13 @@ a file whose attributes it cannot set (by default a million times at 30 s;
 measured by the plan review). `Copy-Item`, Explorer and a zip do not carry
 it. Nothing in this repository may use those flags:
 `ReferenceLockTests.NoRobocopyInThisRepositoryCopiesSecurity` (must-fail:
-`/SEC` on deploy.ps1's mirror turns it red). A teacher's own script that
+`/SEC` on deploy.ps1's mirror turns it red). Since #419 (2026-10-01) it reads
+the files git TRACKS (`git ls-files`) rather than walking the folder: the walk
+reached the gitignored `courses/`, where an old build output held a WSL
+symlink (reparse tag `0xa000001d`) Windows cannot open, and the test threw
+`IOException` about a teacher's leftover folder rather than this repository's
+code (reproduced through a junction to that tree: old code red, new green; a
+STAGED file carrying `/SEC` still turns it red). A teacher's own script that
 does is answered by Unlock, which matches the shape. **And the refusal to
 deploy never depends on any of it**: every door asks the marker.
 
@@ -3247,7 +3288,7 @@ from one course into another", and its "On Windows" subsection has the numbers.
   `_get_excluded_note_config` (which re-reads the contracts on every call) and
   nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
   PC — every file open pays for Defender — and 30 s across the pool. Set
-  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0. The cause is not known.** The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net. The discrepancy is tracked as an open `windows` issue ("Copy a Page fuzz: reproduce or explain the 856"). Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
+  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0.** **Re-run 2026-10-01 (bundle 9, #414) over the ORIGINAL range in ONE process, seed 20260930, on dev `684993aa`: 399,417 certified, 600,583 refused, 0 certified-and-not-hidden, 1 h 8 m** (this PC, i5-8365U, 16 GB, Windows 11 26200; failing-page dump empty). **What differed is the binary, not the luck:** the generator is seeded and the guard deterministic, so the certified count is a fingerprint of the code — and the 856 run certified 401,096. Every committed state gives 399,417 (measured compose-only at `9f788524`, the very commit that recorded the 856, and at dev; the 400,000-999,999 tail at dev gives 239,722, exactly the clean tail run's count), and nothing the guard reads changed between them. So the 856 came from a binary no commit contains. WHICH part of it differed is NOT known: the guard, the generator, or both on the C# side (the count proves one of them did), and possibly an oracle from before `20adc020` (23:22, "the build oracle's workers share one temp folder"), which falls inside the window the run started in. If the difference was a wider generator, the committed guard may never have been tested on the inputs that failed. Not reproducible, so not explained; the issue stays open on that ruling. The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net either way. Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
 - **The dialog** is a `ContentDialog` whose primary button cancels its own
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
@@ -3486,3 +3527,44 @@ Rejected: a counter every `ShowAsync` call site increments — right only while
 all of them remember. **Whether WinUI delivers the keys under a dialog at all
 was NOT measured** (locked desktop); `AcceleratorUnderDialogUiTests` is that
 measurement. The guard costs nothing if they do not fire.
+
+**How the measurement is made, with the guard in place (bundle 9,
+2026-10-01).** The handlers ask `DialogGate.Holds(root, "<key>")` — `IsOpen`
+plus a record: in a run whose state is redirected (`--state-dir`, which only
+the UI tests pass) every key it holds is appended to
+`accelerators-held-under-a-dialog.txt` in that state folder. The UiFact puts
+the Back Up Now confirmation on screen, presses all four keys (Ctrl+O last,
+because a failed guard would open the native picker over everything), and
+reports per key "DELIVERED under the dialog (the guard held it)" or "not
+delivered (the dialog kept it)" — in the test output and in
+`%TEMP%\plantoir-191-measurement.txt` — while ASSERTING the behaviour either
+way: no rename dialog, no new top-level window, the confirmation still up.
+**Rejected:** removing the guard for one run to see whether the keys act (a
+test that must be edited to measure is not one Russell can run from the
+script), an automation property carrying a count (a screen reader would
+announce it), and a trail line (a teacher-visible record of a key that did
+nothing, with a contract entry and a mac issue for a measurement aid). A
+teacher's run never redirects, so it never writes the file. Unproven until
+`run-ui-tests.ps1` runs on an unlocked desktop.
+
+### A wrapping panel squeezed narrow (#214, the mac's #211)
+
+Read, not measured: `TaskProgressView.xaml`'s Done panel and the section's
+`ScheduledPublishNotice` (an `InfoBar`) are wrapping `TextBlock`s in Auto rows
+and StackPanels, with no construct that makes a text's height rigid — so
+nothing was changed (bundle 9 ruling P1: change layout only if the XAML shows
+an unbounded height by reading). WinUI measures a wrapping `TextBlock` at the
+width its column ACTUALLY has, not at the near-zero width SwiftUI's
+`NavigationSplitView` PROPOSED while measuring the mac's; but a teacher can
+still squeeze the window until the content column is narrow (the sidebar
+column keeps `MinWidth="180"`), and how tall the notice gets then is exactly
+what reading cannot settle. `PanelHeightUnderSqueezeUiTests` is
+the measurement: it writes a scheduled-publish SUCCESS record naming a long
+folder path and Netlify into the run's own state folder, opens the section,
+squeezes the window to 500 px and reports the notice's height against the
+window's (`%TEMP%\plantoir-214-measurement.txt`), asserting the notice stays
+inside it. The folder publish's Done panel is NOT measured by it, and
+deliberately: putting it on screen needs a real publish, which builds into the
+teacher's real builds folder because `--state-dir` redirects only what the app
+resolves (see "Driving the real interface"). Same construct, so the notice's
+number stands for both until a measurement says otherwise.

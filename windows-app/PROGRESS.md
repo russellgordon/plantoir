@@ -1,5 +1,9 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-01 — bundle 9 ("finish")
+
+Branch `issue/bundle9-finish`. Done: #419 (the robocopy scan reads tracked files), #417 (the watcher's reds were a refused READ, not a partial record — the record is now read sharing ReadWrite|Delete; 30 of 30 runs green), #157 (`noCoursesYet`, `whatPublishingMeans`; `Briefing` retired), #308 (declined pages named on the plan and in every reply), #318 (already wired since bundle 5b; confirmed by a must-fail), #356 (SHA-256 pins in `fetch-runtime.ps1`). `NamedGapLedger` is **empty**. Open by ruling: #191 and #214 (a `[UiFact]` now MAKES each measurement — owed one run on an unlocked desktop), #414 (the one-process re-run found 0; the 856 run's certified count proves it ran a binary no commit contains, but not which part differed, and that is not a reproduction). #352: measured (pre-registered; this PC, the smaller assistant: model-seen 160→161 and 150→160 of 220, teachers-say 210→220 of 250, 0 inversions, 0 cut-offs) and moved — one description per tool, except `publish_pages`/`unpublish_pages`, held for the `includeLinked` behaviour (`research/ai-assist/windows-description-convergence-results.txt`). New: a `windows` issue for `publish_pages`' `includeLinked` (the behaviour #352's check found).
+
 ## 2026-10-01 — overnight parity run
 
 Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `0d040a81`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `0d36bd84` (the skip is the native-build test, which needs a runtime).
@@ -37,7 +41,7 @@ Docker Desktop) unless marked otherwise.
 | Project | Role |
 |---|---|
 | `Plantoir/` | The WinUI 3 app (unpackaged, self-contained Windows App SDK, PerMonitorV2 DPI). Bundles the full toolchain recipe under `Toolchain/` and mirrors it into each working folder's `.toolchain/`. |
-| `Plantoir.Core/` | All logic, UI-free: config round-trip, container naming, port leases, build freshness, archiver/restorer, section adder, ConPTY process, transcript builder, script runner, milestones, question parsing, failure explainer, catalogs, workspace/toolchain services — **and the whole assist subsystem** under `Assist/` (18 files): `AssistWorkspace`, `AssistAgent`, the plans (`PublishPlan`, `ReDatePlan`, `SyncPlan`, `InsertPlan`, `NewClassesPlan`, `CurriculumMentionsPlan`), `LinkGraph`, `SectionIndex`, `Timetable` and `TimetableMemory`, `DateAudit`, `UndoHistory`, `ScheduledDeploy` and `TaskScheduling`, `Briefing`, and `WorkLease`. |
+| `Plantoir.Core/` | All logic, UI-free: config round-trip, container naming, port leases, build freshness, archiver/restorer, section adder, ConPTY process, transcript builder, script runner, milestones, question parsing, failure explainer, catalogs, workspace/toolchain services — **and the whole assist subsystem** under `Assist/` (18 files): `AssistWorkspace`, `AssistAgent`, the plans (`PublishPlan`, `ReDatePlan`, `SyncPlan`, `InsertPlan`, `NewClassesPlan`, `CurriculumMentionsPlan`), `LinkGraph`, `SectionIndex`, `Timetable` and `TimetableMemory`, `DateAudit`, `UndoHistory`, `ScheduledDeploy` and `TaskScheduling`, and `WorkLease` (`Briefing` was retired on 2026-10-01, #157: `explain_publishing` says `AssistWording.WhatPublishingMeans`). |
 | `Plantoir.Tests/` | xUnit suite that runs **without Docker**: `dotnet test`. No count is given here on purpose — it rots. Classes touching process-wide state (preview leases, the publish registry) share a serialized collection — see `SharedActivityState`. |
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
@@ -228,7 +232,9 @@ Branch `issue/bundle8-windows-ui`. Manual: doc 12 → "Bundle 8"; doc 11 →
   from the contract's `onClick` cases. Unproven on a real click.
 - **Accelerators** (#191): guarded under a ContentDialog; NOT measured.
   **#302**: the picker path bar's 520 limit dropped; not checked by eye.
-  **#214**: not measured.
+  **#214**: not measured. (Bundle 9: both now have a `[UiFact]` that MAKES
+  the measurement — `AcceleratorUnderDialogUiTests`,
+  `PanelHeightUnderSqueezeUiTests` — owed one run on an unlocked desktop.)
 - **The UI-test runner** (#155): startup.log says when stdio is redirected;
   never closes a busy Plantoir; sweeps only the killed pid's leases;
   `ConPtyProcess.Start` zeroes its std handles (measured: leak reproduced, then

@@ -74,6 +74,19 @@ public sealed class PublishPlan
     public IReadOnlyList<PlannedPage> StoppedAtClasses { get; init; } = Array.Empty<PlannedPage>();
 
     /// <summary>
+    /// Pages that would change but the writer DECLINES (#308, the mac's #186):
+    /// their settings have no column-0 place for a new line, so nothing will be
+    /// written. Asked of the real writer at plan time, and kept out of
+    /// <see cref="Changes"/> so the card never promises them.
+    /// </summary>
+    public IReadOnlyList<PlannedPage> CannotBeAddedTo { get; init; } = Array.Empty<PlannedPage>();
+
+    /// <summary>The sentence naming <see cref="CannotBeAddedTo"/>, or null.</summary>
+    public string? CannotBeAddedToSentence => CannotBeAddedTo.Count == 0
+        ? null
+        : AssistWording.PagesWhoseSettingsCannotBeAddedTo(CannotBeAddedTo.Select(p => p.DisplayTitle).ToList());
+
+    /// <summary>
     /// The sentence naming the linked classes left alone, or null. Only the
     /// ones students cannot CERTAINLY see: a class whose flag the app cannot
     /// read is not left out, because "already published" has to be something
@@ -142,7 +155,12 @@ public sealed class PublishPlan
         lines.Add($"{CourseCode} Section {SectionNumber}: {verb}.");
         lines.Add("");
 
-        if (Changes.Count == 0)
+        if (Changes.Count == 0 && CannotBeAddedTo.Count > 0)
+        {
+            // Said by the sentence below, not as "no page would change",
+            // which reads as "already right" about pages it declined.
+        }
+        else if (Changes.Count == 0)
         {
             lines.Add("No page's visibility would change.");
         }
@@ -173,6 +191,12 @@ public sealed class PublishPlan
         {
             string word = AlreadyRight.Count == 1 ? "page is" : "pages are";
             lines.Add($"{AlreadyRight.Count} {word} already {(Publishes ? "visible" : "hidden")}.");
+        }
+
+        if (CannotBeAddedToSentence is { } declined)
+        {
+            lines.Add("");
+            lines.Add(declined);
         }
 
         if (Kept.Count > 0)

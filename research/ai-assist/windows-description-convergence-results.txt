@@ -1,0 +1,80 @@
+#352 (the #114 half) on WINDOWS: one description per tool - RESULTS.
+Measured 2026-10-01, 07:46-10:41 EDT, against the pre-registration beside
+this file (windows-description-convergence-preregistration.txt, committed
+3a96054b before the first request; dated F4 note 3ccfc58f appended before any
+result was read). Raw per-trial logs: plantoir-windows-run\logs\
+bundle9-352-S{1,2,3}-{before,after}.txt on Russell's Windows PC.
+
+CONDITIONS (as registered)
+  Lenovo, Intel Core i5-8365U (4C/8T), 16 GB, Samsung 980 NVMe, Intel UHD 620,
+  Windows 11 Pro 26200. llama-server b10435, LocalModel.BuildArguments' small-
+  tier flags (--ctx-size 8192 --threads 4 --reasoning off --reasoning-budget 0
+  --jinja --parallel 1 --n-gpu-layers 999). The server log at default verbosity
+  does not say which backend held the layers; ~140 ms/token generation and a
+  103 s cold read of the 2,942-token prompt. Weights qwen2.5-1.5b-instruct
+  q4_k_m (the smaller assistant, this PC's tier). Larger tier NOT measured.
+  Median turn 5.5-6.2 s; median 49-50 completion tokens (thinking is off).
+  The flags are INFERRED, not read off a log: neither server log carries the
+  full command line (PowerShell's error echo truncates it at --ctx-size), and
+  the registered "the results file says which backend ran" cannot be met. The
+  evidence for --reasoning off is indirect: median 49 and max 79 completion
+  tokens per run, max 272 of the 512 cap over every request in both logs
+  (final review's recount). Both arms of every suite ran on the same server
+  process, so the comparison is like for like. Next time: log argv or /props
+  at server start.
+
+DEVIATION, said plainly: the server was started as a background task with a
+  2-hour limit and was killed at ~09:45, three minutes into S3. Both S3 arms
+  failed on connection errors (logs kept as *-serverdied.txt), the server was
+  restarted with the same flags and weights, and S3 was re-run in full,
+  BEFORE then AFTER, 09:47-10:41. No other run was affected (S1 and S2 had
+  finished at 09:42).
+
+RESULTS (10 trials per probe, greedy)
+                                            BEFORE          AFTER
+  S1 trimmed-surface, course EXC2O
+     the 22 the model sees                  160/220 (72.7%) 161/220 (73.2%)
+     all 29                                 230/290         221/290
+     polarity inversions                    0               0
+     cut off (truncated / 'length')         0 / 0           0 / 0
+     probes that differ:  "card: undo" 10 -> 0 (ANSWERED IN CODE, never routed
+       in the app); "HIDE - the inversion case" 0 -> 1 (1x unpublish_pages).
+  S2 teachers-say (EXC2O-rewritten surface)
+     TEST (10)                              90/100          90/100
+     CONTROL (15)                           120/150         130/150
+     OVERALL                                210/250 (84%)   220/250 (88%)
+     wrong course / malformed / truncated   0/0/0           0/0/0
+     probes that differ:  "ctl cancel_scheduled" 0 -> 10.
+  S3 trimmed-surface, course ICS3U (the course spread)
+     the 22 the model sees                  150/220 (68.2%) 160/220 (72.7%)
+     all 29                                 220/290         220/290
+     polarity inversions                    0               0
+     cut off                                0 / 0           0 / 0
+     probes that differ:  "card: undo" 10 -> 0 (answered in code);
+       "schedule a deploy" 0 -> 10.
+
+  The date spread (#352's "three dates") was NOT run, as pre-registered.
+
+CRITERIA (pre-registration with the F4 note)
+  (a) any polarity inversion in AFTER ............ none (0, 0; S2 routed no
+      hide to a publishing tool)                                      PASS
+  (b) a changed tool losing >=3 trials net (check_section, add_next_class,
+      read_remembered_timetable) ...................... none lost a trial PASS
+  (c) model-seen total falling >5 percentage points .. S1 +0.5, S2 +4.0,
+      S3 +4.5                                                         PASS
+  (d) new cut-offs in AFTER ............................ none            PASS
+
+DECISION: the descriptions MOVE (bundle 9 ruling P2). Windows' served
+  descriptions become the contract text for every shared tool except
+  publish_pages and unpublish_pages, which wait for the behaviour (#420,
+  includeLinked; recorded in toolDescriptions.measuredDepartures); NarrowToLocal stops shortening every
+  description except those two; the procedural sentences Windows' MCP
+  descriptions carried for Claude Code move to the server's MCP instructions.
+  The "card: undo" loss is not a router change the app sees: that sentence is
+  answered in code (AssistCardCommand) before any model reads it - the mac's
+  own measurement (description-convergence-results.txt, arm C) saw the same
+  probe move the other way for the same reason.
+
+WHAT THIS DOES NOT MEASURE: what Claude Code does with the converged MCP text
+  and the new instructions field (no model of that kind was run here); the
+  larger tier; dates other than 2026-10-01.

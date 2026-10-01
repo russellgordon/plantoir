@@ -3258,6 +3258,29 @@ news it was woken for. The badge already had hover text; the mac's
 "notice floats in the middle of an empty window" was not reproduced here
 (the band is an InfoBar at the top of the section).
 
-**Not done: the notification itself** (#212's Windows half) — and so not
-#324's click either, which cannot start before it. `scheduled publish
-notification` stays in `NamedGapLedger` against #324.
+**"40 of 40, every run" stopped being true under load, and the cause was the
+READ, not the record (#417, 2026-10-01).** The 40-trial test went red 2 runs in
+10 when the bundle-8 reviewer measured it on this PC, and 14 in 35 under load (an
+eight-process Python fuzz beside it, i5-8365U, 16 GB, Windows 11 26200). Read
+inside the event handler, every failing trial's record EXISTED and was whole;
+the read threw `IOException … being used by another process` — 21 of 1,400
+first-event reads. Something else on the machine (not identified; a scanner or
+indexer is the usual suspect) opens a new file with write access for a moment,
+and `File.ReadAllText` asks for `FileShare.Read`, which refuses to share with a
+writer. A teacher would have seen it as the notice NOT arriving until the
+window was next activated — the exact gap #218 closed. `ReadPath` now opens the
+record sharing ReadWrite|Delete, which reads the same bytes beside that holder:
+30 runs of the class after the change, 30 green, under the same load.
+`ARecordHeldOpenForWritingByAnotherHandleIsStillRead` pins the collision
+deterministically (another handle holds the record open for writing; the old
+reader returned null). **Rejected:** a retry with a pause, as the issue first
+suggested — a guessed interval for something the open mode removes — and
+skipping trials whose record "is not there yet", which was the first hypothesis
+and was disproved by the instrumented runs (the record was always there). The
+mac has no share modes; nothing to mirror.
+
+**The notification itself landed in parity bundle 8** (#212's Windows half,
+#324): the scheduled run posts a toast in the section's own sentence, and a
+click opens that section (`ScheduledPublishToast`; trail `scheduled publish
+notification`). It is unproven on a real click (the desktop was locked), and
+nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.

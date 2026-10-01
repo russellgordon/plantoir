@@ -4,7 +4,7 @@ namespace Plantoir.Tests;
 
 /// <summary>
 /// #191: each of the four window-level accelerators with no ScopeOwner asks
-/// <c>DialogGate.IsOpen</c> before doing anything, so none of them acts under
+/// <c>DialogGate.Holds</c> before doing anything, so none of them acts under
 /// a modal dialog (F2 would otherwise raise a second ContentDialog that WinUI
 /// refuses and the app swallows — a key that silently does nothing). A source
 /// scan, because the handlers live in the WinUI project this suite cannot
@@ -23,6 +23,7 @@ public class AcceleratorDialogGateTests
         var body = Regex.Match(source,
             $@"private void {handler}\(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args\)\s*\{{\s*(?<first>[^\r\n]*)");
         Assert.True(body.Success, $"{handler} was not found in MainWindow.xaml.cs.");
-        Assert.Contains("DialogGate.IsOpen(", body.Groups["first"].Value);
+        // Holds = IsOpen, plus the test-run record that makes #191's measurement.
+        Assert.Contains("DialogGate.Holds(", body.Groups["first"].Value);
     }
 }

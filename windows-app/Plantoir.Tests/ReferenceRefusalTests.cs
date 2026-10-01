@@ -333,6 +333,21 @@ public class ReferenceRefusalTests : IDisposable
         Assert.Contains("ICS3U \u2014", local);
     }
 
+    /// <summary>
+    /// #157 review F2: a folder whose only courses are kept for reference gets
+    /// noCoursesYet in the local window \u2014 never an empty answer \u2014 while an
+    /// outside session is still told about the reference course.
+    /// </summary>
+    [Fact]
+    public void ListCoursesInTheLocalWindowWithOnlyReferenceCoursesSaysNoCoursesYet()
+    {
+        Directory.Delete(Path.Combine(_folder, "courses", "ICS3U"), recursive: true);
+        var local = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = true }).ListCourses();
+        Assert.Equal(AssistWording.NoCoursesYet, local);
+        var outside = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher())).ListCourses();
+        Assert.Contains("ICS3U-2025 \u2014", outside);
+    }
+
     [Fact]
     public void RemovingASectionOfAReferenceCourseStaysAsItIs()
     {

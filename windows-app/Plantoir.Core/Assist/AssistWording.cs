@@ -172,6 +172,36 @@ public static partial class AssistWording
     public static string PublishingAlreadyExplained(string course, string section) =>
         $"I explained that for {course} Section {section} earlier in this conversation.";
 
+    /// <summary>
+    /// What <c>explain_publishing</c> says the first time for a section — to an
+    /// outside assistant, and to a teacher who asks "what does publishing mean?"
+    /// (#157; GUI-IMPROVEMENTS row 455 is where the mac said it first).
+    /// </summary>
+    /// <remarks>
+    /// <para>This replaced <c>Briefing.Words</c>, this app's own three-paragraph
+    /// answer, on 2026-10-01: the two apps said different things to a teacher
+    /// asking the same fixed question, and a difference a teacher can see is
+    /// matched to the mac rather than ledgered. What was lost, deliberately: the
+    /// old answer named where the course deploys. The mac's sentence names no
+    /// destination, so it cannot disagree with the one the deploy uses, which is
+    /// the risk the old comment was guarding against.</para>
+    /// </remarks>
+    public const string WhatPublishingMeans =
+        "Publishing a page decides whether students can see it in this section's website. " +
+        "Deploying sends the whole website out to the web. They are different acts: a page can be " +
+        "published for days and still not be online, and deploying puts everything already published " +
+        "in front of students straight away. Plantoir opens the preview after a change so the teacher " +
+        "can look it over first, which is the safer order.";
+
+    /// <summary>
+    /// What <c>list_courses</c> says when the working folder has no courses (#157).
+    /// It says what to do next, because a caller that reads "no courses" and
+    /// stops leaves the teacher where they started. It replaced "This working
+    /// folder has no courses yet." on 2026-10-01.
+    /// </summary>
+    public const string NoCoursesYet =
+        "This working folder has no courses in it yet. Add one in Plantoir, and it will appear here.";
+
     public static string SectionIsBusy(string course, string section) =>
         $"{course}-S{section} is already busy in Plantoir. Wait for that to finish, then deploy.";
 
@@ -231,6 +261,42 @@ public static partial class AssistWording
     public static string SharedPagesWhoseSettingsCouldNotBePutBack(int count, string section) => count == 1
         ? $"One shared page kept the setting it has now for Section {section}: the settings at the top of it are written in a way I can’t add to, so I left that page exactly as it is."
         : $"{count} shared pages kept the settings they have now for Section {section}: the settings at the top of them are written in a way I can’t add to, so I left those pages exactly as they are.";
+
+    // ---- Pages the writer declined (#308, the mac's #186) ------------------
+
+    /// <summary>
+    /// Pages a publish or a hide could not write a setting into — their
+    /// settings have no column-0 place for a new line — NAMED, on the plan and
+    /// in the reply, so "already hidden" or "done" is never said about them.
+    /// One page, or several: the mac's one function, two keys so the walk
+    /// finds both renderings.
+    /// </summary>
+    public static string PagesWhoseSettingsCannotBeAddedTo(IReadOnlyList<string> pages) => pages.Count == 1
+        ? $"I can’t add to the settings at the top of “{pages[0]}”, so that page stays exactly as it is. Open it in Obsidian to set it there."
+        : PagesWhoseSettingsCannotBeAddedToNamingSeveral(pages);
+
+    /// <summary>Several declined pages: three named, then how many more.</summary>
+    public static string PagesWhoseSettingsCannotBeAddedToNamingSeveral(IReadOnlyList<string> pages) =>
+        $"I can’t add to the settings at the top of {NamedFew(pages)}, so those pages stay exactly as they are. Open them in Obsidian to set them there.";
+
+    /// <summary>
+    /// A class page a re-date or a make-room could not give its new date — said
+    /// instead of "stays exactly as it is", because by then the page may have
+    /// been renamed and moved.
+    /// </summary>
+    public static string PageWhoseNewDateCouldNotBeSet(string page) =>
+        $"I couldn’t set the new date on “{page}”: the settings at the top of it are written in a way I can’t add to. Open it in Obsidian to set the date there.";
+
+    /// <summary>Several pages whose new dates could not be set.</summary>
+    public static string PagesWhoseNewDatesCouldNotBeSet(IReadOnlyList<string> pages) => pages.Count == 1
+        ? PageWhoseNewDateCouldNotBeSet(pages[0])
+        : $"I couldn’t set the new dates on {NamedFew(pages)}: the settings at the top of them are written in a way I can’t add to. Open them in Obsidian to set the dates there.";
+
+    /// <summary>“a”, “a” and “b”, “a”, “b” and “c”, then “a”, “b”, “c” and 2 more.</summary>
+    private static string NamedFew(IReadOnlyList<string> pages, int most = 3) =>
+        pages.Count <= most
+            ? PublishPlan.Listing(pages)
+            : string.Join(", ", pages.Take(most).Select(p => $"“{p}”")) + $" and {pages.Count - most} more";
 
     // ---- Already in that state (#346, the mac's #174) ----------------------
 
