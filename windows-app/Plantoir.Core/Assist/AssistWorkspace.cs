@@ -3841,6 +3841,37 @@ public sealed partial class AssistWorkspace
             course.Configuration.FrontPageHeading);
 
     /// <summary>
+    /// Whether pressing Preview should offer today's class for the front page
+    /// (#406). Called by the section window's Preview button ONLY.
+    /// </summary>
+    public TodaysClassOnTheFrontPage.Offering? TodaysClassOffer(string courseCode, int sectionNumber, DateOnly today)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        return TodaysClassOnTheFrontPage.Offer(course, section, ClassPages(course, section),
+                                               SectionIndex.PathFor(course, section), today);
+    }
+
+    /// <summary>Show on Front Page, decided again for the day the question was asked.</summary>
+    public TodaysClassOnTheFrontPage.Outcome ShowTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+                                                             TodaysClassOnTheFrontPage.Offering offering)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        var classes = ClassPages(course, section);
+        return TodaysClassOnTheFrontPage.ShowOnTheFrontPage(course, section, classes, SectionIndex.PathFor(course, section),
+            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes));
+    }
+
+    /// <summary>Not Today, remembered for this section, day and class.</summary>
+    public void DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+                                   TodaysClassOnTheFrontPage.Offering offering)
+    {
+        var course = Course(courseCode);
+        TodaysClassOnTheFrontPage.RecordNotToday(course, Section(course, sectionNumber), askedOn, offering);
+    }
+
+    /// <summary>
     /// What this course's TEACHER hears a class page called (#274). For the
     /// teacher's copy only; the model's copy is always the class form.
     /// </summary>
