@@ -80,6 +80,9 @@ FOR_THE_LOCAL_MODEL = {
 CARD_ONLY_ARGUMENTS = {
     "add_next_class.duplicate",
     "plan_add_next_class.duplicate",
+    "read_page.answer",
+    "read_page.asTyped",
+    "read_page.onlyIfFound",
 }
 
 # MIRROR of AssistAgent.ExampleCourse.

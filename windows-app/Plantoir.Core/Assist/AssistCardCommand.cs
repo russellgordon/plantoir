@@ -119,6 +119,7 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         if (MoreDays(tidied) is { } more) return more;
         if (MakeRoom(tidied) is { } room) return room;
         if (DeployAtATime(tidied) is { } scheduled) return scheduled;
+        if (LinksCard(message) is { } links) return links;
         return DuplicateClass(tidied, message);
     }
 

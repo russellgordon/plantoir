@@ -137,9 +137,30 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult ReadPage(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page)
+        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page,
+        [Description(LinksAnswerHelp)] string answer = "",
+        [Description(LinksAnswerHelp)] string asTyped = "",
+        [Description(LinksAnswerHelp)] string onlyIfFound = "")
         => Guarded(() =>
         {
+            // "What does <page> link to?" (#305 / mac #167): filled by the
+            // window's fixed phrasing, in code, and never shown to the local
+            // model (AssistAgent.CardOnlyArguments). The answer is the whole
+            // reply, for the teacher; the turn ends on it.
+            if (answer.Equals("links", StringComparison.OrdinalIgnoreCase))
+            {
+                string? links = workspace.LinksAnswer(course, section, page,
+                    asTyped.Length > 0 ? asTyped : null, onlyIfFound.Equals("yes", StringComparison.OrdinalIgnoreCase));
+                if (links is null)
+                {
+                    var none = Answering("No page is called that.");
+                    none.Meta ??= new JsonObject();
+                    none.Meta[AssistToolAnswer.NoPageFoundKey] = true;
+                    return none;
+                }
+                return Answering(links);
+            }
+
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
             string path = workspace.Page(found, number, page);
@@ -207,6 +228,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     /// <summary>How many of each kind to name before summarising.</summary>
     private const int MostListed = 15;
+
+    /// <summary>
+    /// The three arguments only the links phrasing fills (#305). Declared
+    /// because the binder DROPS a key a method does not take (#149's lesson);
+    /// hidden from the local model by <c>AssistAgent.CardOnlyArguments</c>.
+    /// </summary>
+    private const string LinksAnswerHelp =
+        "Leave empty. Filled by Plantoir's own window when a teacher asks what a page links to.";
 
     /// <summary>How many links into hidden pages check_section names before counting the rest — the build's number.</summary>
     private const int HiddenLinksNamed = 10;

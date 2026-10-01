@@ -533,6 +533,10 @@ public sealed partial class AssistWindow : Window
             // Asked only when the model names another course, to say whether
             // that course is here to be opened (#180).
             CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder).Select(c => c.Code).ToList(),
+            // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
+            // because it is a code in the shipped lists, not because of its
+            // shape (#305 / mac #167).
+            IsACourseCode = code => Plantoir.Services.CourseNameCatalogs.Shared.Names(code) is not null,
             // What a scheduled card would replace, read by task name (#261).
             ScheduleDeployItWouldReplace = when =>
                 TaskScheduling.MomentItWouldReplace(_folder, _course.Code, _section, when, DateTime.Now),

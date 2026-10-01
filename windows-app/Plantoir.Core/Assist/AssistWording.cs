@@ -434,6 +434,29 @@ public static class AssistWording
     public static string LinkedClassStaysVisible(string page) =>
         $"\u201c{page}\u201d stays visible, because it is a class of its own.";
 
+    // MARK: - What a page links to (#305 / mac #167)
+
+    /// <summary>The heading over the list of links, said only when there is a list.</summary>
+    public static string PageLinksTo(string page) => $"\u201c{page}\u201d links to:";
+
+    /// <summary>Nothing to list.</summary>
+    public static string PageLinksToNothing(string page) => $"\u201c{page}\u201d doesn\u2019t link to any other page.";
+
+    /// <summary>After a linked page students cannot see.</summary>
+    public const string LinkedPageIsADraft = "a draft, so students can\u2019t open it yet";
+
+    /// <summary>After a link that leads nowhere, shown as the teacher wrote it.</summary>
+    public const string LinkedPageIsMissing = "no page is called this, so the link leads nowhere";
+
+    /// <summary>More than one page shows that title: never a guess. Followed by where each one is.</summary>
+    public static string MorePagesThanOneAreCalled(string course, string section, string page) =>
+        $"More than one page in {course} Section {section} is called \u201c{page}\u201d, so I haven\u2019t chosen one. " +
+        "Ask again using the name at the end of one of these:";
+
+    /// <summary>The page was found and could not be opened.</summary>
+    public static string PageCouldNotBeRead(string page) =>
+        $"\u201c{page}\u201d could not be opened, so I can\u2019t say what it links to.";
+
     // MARK: - A page list that names no page (#352 / mac #197)
 
     /// <summary>

@@ -469,24 +469,6 @@ public sealed partial class AssistWorkspace
     // ---- Planning --------------------------------------------------------
 
     /// <summary>
-    /// Work out what publishing (or hiding) these pages would do, without
-    /// touching anything. This is what the teacher confirms.
-    ///
-    /// Takes a LIST, and takes any page — not just a class page. Both of those
-    /// came out of a real session that the single-class-page version could not
-    /// express:
-    ///
-    /// * Hiding 25 classes meant 25 calls, each one republishing the site: 26
-    ///   deploys for what is logically one change. Batching is not a
-    ///   convenience here, it is the difference between usable and not.
-    /// * A safety contract linked from BOTH the first class (which must stay
-    ///   up) and a later one (which must come down) made the task
-    ///   unsatisfiable: <c>includeLinked</c> took it down, and nothing could
-    ///   put just that page back. Being able to name any page directly
-    ///   dissolves it. That shape — a shared page reachable from several
-    ///   classes — is the normal shape of a course, not an edge case.
-    /// </summary>
-    /// <summary>
     /// Words that mean every page and name none (#352 / mac #197): a closed
     /// list, held equal to <c>assist-cases.json</c> -> <c>pagesNamingNoPage.everyPageWords</c>.
     /// </summary>
@@ -531,6 +513,24 @@ public sealed partial class AssistWorkspace
             Plantoir.Core.Scripting.ActivityTrail.Event.AssistantNamedNoPage,
             "the assistant named no page it could find: " + what + "; nothing was changed", course, section);
 
+    /// <summary>
+    /// Work out what publishing (or hiding) these pages would do, without
+    /// touching anything. This is what the teacher confirms.
+    ///
+    /// Takes a LIST, and takes any page — not just a class page. Both of those
+    /// came out of a real session that the single-class-page version could not
+    /// express:
+    ///
+    /// * Hiding 25 classes meant 25 calls, each one republishing the site: 26
+    ///   deploys for what is logically one change. Batching is not a
+    ///   convenience here, it is the difference between usable and not.
+    /// * A safety contract linked from BOTH the first class (which must stay
+    ///   up) and a later one (which must come down) made the task
+    ///   unsatisfiable: <c>includeLinked</c> took it down, and nothing could
+    ///   put just that page back. Being able to name any page directly
+    ///   dissolves it. That shape — a shared page reachable from several
+    ///   classes — is the normal shape of a course, not an edge case.
+    /// </summary>
     public PublishPlan PlanPublish(
         string courseCode, int sectionNumber, IReadOnlyList<string> pageTitles,
         bool includeLinked, bool draft = false, bool publishes = true,

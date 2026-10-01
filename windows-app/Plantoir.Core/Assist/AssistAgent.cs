@@ -168,6 +168,12 @@ public sealed class AssistAgent
     {
         "add_next_class.duplicate",
         "plan_add_next_class.duplicate",
+        // "What does <page> link to?" (#305 / mac #167): filled in code by
+        // the links phrasing; the mac keeps answer: "links" out of every
+        // schema, and this is that, on a server whose binder needs it declared.
+        "read_page.answer",
+        "read_page.asTyped",
+        "read_page.onlyIfFound",
     };
 
     /// <summary>
@@ -480,6 +486,62 @@ public sealed class AssistAgent
     {
         var listed = names.ToList();
         return listed.Count == 0 ? "with no arguments" : "with " + string.Join(", ", listed);
+    }
+
+    /// <summary>
+    /// Whether a word is a course code that EXISTS in the shipped course
+    /// lists (Ontario and British Columbia). Set by the window from the same
+    /// catalogs the New Course wizard reads; used only to tell "in SPH3U" (a
+    /// course) from "in Lab01" (part of a page's name) in a links question.
+    /// </summary>
+    public Func<string, bool>? IsACourseCode { get; set; }
+
+    /// <summary>
+    /// "What does &lt;page&gt; link to?", answered in code and in full (#305 /
+    /// mac #167). TRANSCRIPT ONLY: a code-matched turn never puts the
+    /// teacher's sentence into the model's conversation, so handing the
+    /// answer back would give the model a tool result with no question in
+    /// front of it, which is the lap on which the smaller assistant turned
+    /// this read-only question into a publish plan. Every branch ends the
+    /// turn; the one exception is "the quiz" when no page is called that,
+    /// which goes to the model as the sentence it was.
+    /// </summary>
+    private async Task<List<Line>?> LinksQuestion(string text, CancellationToken cancellation)
+    {
+        if (AssistCardCommand.LinksQuestion(text, _courseCode, _section, IsACourseCode) is not { } asked) return null;
+
+        if (asked.OtherCourse is { } other)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWasAskedAboutAnotherCourse,
+                $"matched in code, not sent to the model \u2014 asked what a page links to in {other} in this " +
+                $"{_courseCode} window; nothing was read", _courseCode, _section);
+            string? here = CoursesInTheFolder()
+                .FirstOrDefault(code => code.Equals(other, StringComparison.OrdinalIgnoreCase));
+            return new List<Line>
+            {
+                new("assistant", here is not null
+                    ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
+                    : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, other)),
+            };
+        }
+
+        var arguments = new JsonObject
+        {
+            ["course"] = _courseCode,
+            ["section"] = _section,
+            ["page"] = asked.Page,
+            ["answer"] = "links",
+        };
+        if (asked.AsTyped is { } typed) arguments["asTyped"] = typed;
+        if (asked.OnlyIfAPageIsCalled) arguments["onlyIfFound"] = "yes";
+
+        var answer = await _tools.CallTool("read_page", arguments, OnToolProgress, cancellation);
+        if (answer.NoPageFound) return null;   // "the quiz": the model has the conversation to read it against
+
+        ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+            "matched in code, not sent to the model \u2014 ran read_page " + WithArguments(arguments.Select(pair => pair.Key)),
+            _courseCode, _section);
+        return new List<Line> { new("tools", answer.Summary) };
     }
 
     /// <summary>A line for the transcript.</summary>
@@ -813,6 +875,8 @@ public sealed class AssistAgent
     /// </summary>
     private async Task<List<Line>?> CardCommand(string text, CancellationToken cancellation)
     {
+        if (await LinksQuestion(text, cancellation) is { } answered) return answered;
+
         if (AssistCardCommand.Matching(text) is { } match)
         {
             var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
