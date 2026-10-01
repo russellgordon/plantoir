@@ -224,15 +224,27 @@ public sealed class DrivenApp : IDisposable
     public AutomationElement Find(string automationId, string describedAs)
     {
         var found = Retry.WhileNull(
-            () => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)),
+            () => FirstOrNullOnce(automationId),
             Patience, TimeSpan.FromMilliseconds(250)).Result;
         return found ?? throw new InvalidOperationException(
             $"Never found {describedAs} (automation id '{automationId}').");
     }
 
     public AutomationElement? FindOrNull(string automationId, TimeSpan? within = null) =>
-        Retry.WhileNull(() => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)),
+        Retry.WhileNull(() => FirstOrNullOnce(automationId),
                         within ?? TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(200)).Result;
+
+    /// <summary>
+    /// One look. A UI Automation query that TIMES OUT (COMException 0x80131505,
+    /// seen once in bundle 11's fourth run while the app was busy drawing a
+    /// dialog) counts as "not yet" and is asked again by the caller's retry,
+    /// rather than failing a test with a sentence about COM.
+    /// </summary>
+    private AutomationElement? FirstOrNullOnce(string automationId)
+    {
+        try { return Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)); }
+        catch (System.Runtime.InteropServices.COMException) { return null; }
+    }
 
     /// <summary>Select a course in the sidebar, which is what opens its
     /// settings — there is no other way in.</summary>
