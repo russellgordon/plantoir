@@ -188,6 +188,26 @@ public class ReferenceImportTests : IDisposable
         Assert.True(ran >= 9, $"only {ran}");
     }
 
+    /// <summary>
+    /// The loser of a race never tidies the winner's work away (#245): the
+    /// folder another process made between the check and the create, with its
+    /// half-made copy in it, is left exactly as it is.
+    /// </summary>
+    [Fact]
+    public void TwoWindowsImportingOneCourse()
+    {
+        string courses = Directory.CreateDirectory(Path.Combine(_root, "Race", "courses")).FullName;
+        var claim = ReferenceStaging.TryClaim(courses, "ICS4U-2025", ReferenceImport.AlreadyBeingImported, create: staging =>
+        {
+            Directory.CreateDirectory(staging);                                   // the winner slips in
+            File.WriteAllText(Path.Combine(staging, "winner.md"), "theirs");
+            return ReferenceStaging.CreateExclusively(staging);                   // and the real create says so
+        });
+        Assert.Equal(ReferenceStaging.Outcome.Refused, claim.Outcome);
+        Assert.True(File.Exists(Path.Combine(courses, ReferenceStaging.StagingName("ICS4U-2025"), "winner.md")));
+        Assert.False(File.Exists(Path.Combine(ReferenceStaging.ActivityDirectory(courses), ReferenceStaging.LeaseName("ICS4U-2025"))));
+    }
+
     [Fact]
     public void TwoSpellingsOfOneFolderAreOneClaim()
     {
