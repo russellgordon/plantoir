@@ -195,10 +195,20 @@ public sealed class AssistWorkspace
         // A locked session says WHY, rather than claiming the course does not
         // exist. "There's no course called MCV4U" would be a lie the assistant
         // would repeat to a teacher looking straight at it in the sidebar.
+        // Two sentences, from the contract (#180/#208): a code naming another
+        // course that IS here says to open it; a code naming nothing here
+        // (a typo, an invention) must not - "open ZZZ9Z" sends a teacher
+        // looking for something that does not exist. Courses() has already
+        // filtered to the lock, so the folder is asked again to tell the two
+        // apart, and the folder's spelling is the one named.
         if (_lockedCourse is not null)
-            throw new AssistRefusal(
-                $"This session is working on {_lockedCourse} only, so {wanted} can’t be reached from here. " +
-                $"Start again from {wanted} in Plantoir to work on that course.");
+        {
+            var elsewhere = Workspace.DiscoverCourses(_folder)
+                .FirstOrDefault(c => string.Equals(c.Code, wanted, StringComparison.OrdinalIgnoreCase));
+            throw new AssistRefusal(elsewhere is not null
+                ? AssistWording.AskedAboutAnotherCourse(_lockedCourse, elsewhere.Code)
+                : AssistWording.AskedAboutACourseThatIsNotHere(_lockedCourse, wanted));
+        }
 
         string known = courses.Count == 0
             ? "This working folder has no courses yet."

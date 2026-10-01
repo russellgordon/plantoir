@@ -75,6 +75,12 @@ public class ContractTests
         Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
         Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
 
+        // #180: a call the model made for another course.
+        Assert.Equal(wording["askedAboutAnotherCourse"]!.ToString(),
+                     AssistWording.AskedAboutAnotherCourse("{course}", "{otherCourse}"));
+        Assert.Equal(wording["askedAboutACourseThatIsNotHere"]!.ToString(),
+                     AssistWording.AskedAboutACourseThatIsNotHere("{course}", "{otherCourse}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
