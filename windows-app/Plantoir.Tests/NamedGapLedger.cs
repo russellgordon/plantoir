@@ -133,8 +133,6 @@ internal static class NamedGapLedger
         // Mapped 2026-09-30 (bundle 1) from each event's own #references to
         // the open `windows` issue that carries that mac piece. Each goes when
         // its feature lands, and its mend-check says so.
-        Owed(ActivityTrailEvents, 406, "Preview does not offer today's class for the front page yet (mac #397)",
-            "put today's class on the front page", "left the front page as it was"),
         Owed(ActivityTrailEvents, 283, "backups cannot be deleted several at once here yet (mac #242)",
             "backups deleted"),
         Owed(ActivityTrailEvents, 324, "clicking a scheduled-publish toast is not recorded yet (mac #306)",
