@@ -66,15 +66,30 @@ public class AllBackupsUiTests
         Assert.NotNull(confirm);
         confirm!.Click();
 
+        // The sidebar's Backups group starts FOLDED, and a folded TreeView
+        // item's children are not in the tree at all — so before bundle 11
+        // the "gone" check below passed vacuously and the "still there" one
+        // could never pass (measured on the first unlocked run). Unfold it.
+        // The files first, so a failure below is about the SIDEBAR, not the delete.
+        string dir = Path.Combine(app.WorkspacePath, "courses", "_backups", "ICS3U");
+        Assert.True(Retry.WhileFalse(() => !File.Exists(Path.Combine(dir, Names[0])) && !File.Exists(Path.Combine(dir, Names[1])),
+                                     TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(300)).Result,
+                    "the two backups were not deleted from disk");
+        Assert.True(File.Exists(Path.Combine(dir, Names[2])));
+        // All Backups closes with Done (never the confirmation's Cancel).
+        Retry.WhileTrue(() => app.OpenDialog()?.Name == "Delete 2 backups?", TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200));
+        if (app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton")) is { Name: "Done" } done) done.AsButton().Invoke();
+        Thread.Sleep(1500);
+        var group = app.Find("backupsGroup", "the Backups group");
+        if (group.Patterns.ExpandCollapse.IsSupported
+            && group.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value != ExpandCollapseState.Expanded)
+            group.Patterns.ExpandCollapse.Pattern.Expand();
+        Assert.NotNull(app.FindOrNull("backup-" + Names[2], TimeSpan.FromSeconds(8)));
         Assert.True(Retry.WhileTrue(
             () => app.FindOrNull("backup-" + Names[0], TimeSpan.FromMilliseconds(200)) is not null
                   || app.FindOrNull("backup-" + Names[1], TimeSpan.FromMilliseconds(200)) is not null,
-            TimeSpan.FromSeconds(8), TimeSpan.FromMilliseconds(300)).Success,
+            TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(300)).Success,
             "The two deleted backups are still listed in the sidebar.");
         Assert.NotNull(app.FindOrNull("backup-" + Names[2], TimeSpan.FromSeconds(3)));
-        string dir = Path.Combine(app.WorkspacePath, "courses", "_backups", "ICS3U");
-        Assert.False(File.Exists(Path.Combine(dir, Names[0])));
-        Assert.False(File.Exists(Path.Combine(dir, Names[1])));
-        Assert.True(File.Exists(Path.Combine(dir, Names[2])));
     }
 }

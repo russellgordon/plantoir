@@ -343,10 +343,28 @@ public sealed class DrivenApp : IDisposable
         throw new InvalidOperationException($"{code} section {section} never opened after three clicks on its sidebar entry.");
     }
 
-    /// <summary>The ContentDialog on screen, if any, other than the ones named.</summary>
-    public AutomationElement? OpenDialog() =>
-        Window.FindFirstDescendant(cf => cf.ByClassName("ContentDialog"))
-        ?? Desktop.FindFirstDescendant(cf => cf.ByClassName("ContentDialog").And(cf.ByProcessId(Window.Properties.ProcessId.Value)));
+    private static readonly string[] DialogButtonIds = { "PrimaryButton", "SecondaryButton", "CloseButton", "copyPagePrimary", "copyPageClose" };
+
+    /// <summary>
+    /// The ContentDialog on screen, if any. Measured on the first unlocked run
+    /// (bundle 11): UI Automation shows one as a <c>Window</c> of class
+    /// <c>Popup</c> NAMED BY ITS TITLE — there is no "ContentDialog" class in
+    /// the tree — beside other, empty popups, so it is told apart by holding a
+    /// dialog's own buttons.
+    /// </summary>
+    public AutomationElement? OpenDialog()
+    {
+        foreach (var popup in Window.FindAllDescendants(cf => cf.ByClassName("Popup").And(cf.ByControlType(ControlType.Window))))
+        {
+            try
+            {
+                foreach (string id in DialogButtonIds)
+                    if (popup.FindFirstDescendant(cf => cf.ByAutomationId(id)) is not null) return popup;
+            }
+            catch { }
+        }
+        return null;
+    }
 
     /// <summary>
     /// Wait for <paramref name="done"/>, ANSWERING whatever ordinary dialog the
