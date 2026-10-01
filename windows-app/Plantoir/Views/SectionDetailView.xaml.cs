@@ -707,7 +707,8 @@ public sealed partial class SectionDetailView : UserControl
         try
         {
             // Other findings first (siteHealth.repair.oneAlertAtATime).
-            while ((_healthDialogIsUp || _healthQueue.PendingCount > 0) && !_isTornDown) await Task.Delay(300);
+            while ((_healthDialogIsUp || _healthQueue.PendingCount > 0 || _todaysClassQuestionUp) && !_isTornDown)
+                await Task.Delay(300);
             if (_isTornDown) return;
             _linksChecklistShownFor = offer.BuildId;
             string? said = await LinksChecklistDialog.OfferAsync(folder, _course, _sectionNumber, offer, occasion,
@@ -720,6 +721,72 @@ public sealed partial class SectionDetailView : UserControl
             App.LogDiagnostic($"Links checklist: {ex.Message}");
         }
         finally { _linksChecklistUp = false; }
+    }
+
+    /// <summary>Today's-class question launches nothing; anything that tries is refused.</summary>
+    private sealed class NoLauncher : ILauncherRunner
+    {
+        public Task<LaunchOutcome> Run(string launcher, IReadOnlyList<string> arguments, string workingFolder,
+                                       IProgress<string>? progress, CancellationToken cancellation) =>
+            Task.FromResult(new LaunchOutcome(false, "Not from the front page question."));
+    }
+
+    /// <summary>While today's-class question is up, findings and the links checklist wait behind it (#406).</summary>
+    private bool _todaysClassQuestionUp;
+
+    private async Task OfferTodaysClassAsync(string folder)
+    {
+        var askedOn = DateOnly.FromDateTime(DateTime.Now);
+        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
+        TodaysClassOnTheFrontPage.Offering? offer;
+        try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }
+        if (offer is null) return;
+
+        var noun = _course.Configuration.ClassNoun;
+        _todaysClassQuestionUp = true;
+        try
+        {
+            // The words are set once and never reset on dismissal (the mac
+            // flashed "Cannot Preview Yet" while the question closed).
+            var answer = await ShowDialogSafelyAsync(new ContentDialog
+            {
+                Title = TodaysClassOnTheFrontPage.Question(offer.Show),
+                Content = new TextBlock { Text = TodaysClassOnTheFrontPage.Because(noun, offer.Shows), TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = TodaysClassOnTheFrontPage.Show,
+                CloseButtonText = TodaysClassOnTheFrontPage.NotToday,   // Escape is Not Today
+                DefaultButton = ContentDialogButton.Primary,
+            });
+            if (answer is null) return;   // never shown: nothing was answered, nothing is written
+            if (answer != ContentDialogResult.Primary)
+            {
+                workspace.DeclineTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
+                return;
+            }
+
+            // Busy checks again, then decided again for the day ASKED.
+            bool busy = IsDeploying || CourseActivity.IsBuildingElsewhere(folder, _course.Code);
+            if (busy)
+                ActivityTrail.Note(ActivityTrail.Event.LeftTheFrontPageAsItWas,
+                    $"{_course.Code}/{_sectionNumber} · left the front page as it was — it changed while the teacher was asked: {offer.Show} offered, it showed {offer.Shows}");
+            var outcome = busy ? TodaysClassOnTheFrontPage.Outcome.NoLongerOffered
+                               : workspace.ShowTodaysClass(_course.Code, _sectionNumber, askedOn, offer);
+            string? said = outcome switch
+            {
+                TodaysClassOnTheFrontPage.Outcome.NoLongerOffered => TodaysClassOnTheFrontPage.NoLongerOffered(noun),
+                TodaysClassOnTheFrontPage.Outcome.CouldNotSave => TodaysClassOnTheFrontPage.CouldNotSave(offer.Shows),
+                _ => null,
+            };
+            if (said is not null)
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = TodaysClassOnTheFrontPage.NotChangedTitle,
+                    Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
+                    CloseButtonText = "OK",
+                });
+        }
+        catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); }
+        finally { _todaysClassQuestionUp = false; }
     }
 
     private async Task SayAsync(string sentence)
@@ -753,6 +820,8 @@ public sealed partial class SectionDetailView : UserControl
     private async Task PresentPendingHealthFindingsAsync()
     {
         if (_healthDialogIsUp) return;
+        // Folder findings wait behind today's-class question (#406).
+        while (_todaysClassQuestionUp && !_isTornDown) await Task.Delay(300);
         if (_healthQueue.TakeNext() is not { } next) return;
         var findings = next.Findings;
         bool cameFromPublishing = next.CameFromPublishing;
@@ -1224,6 +1293,15 @@ public sealed partial class SectionDetailView : UserControl
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
             if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet") is not null) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
+
+            // #406 (mac #397): today's class for the front page — asked HERE,
+            // on the Preview button and nowhere else, after the refusals above
+            // (a preview that is going to be refused is refused with no
+            // question first) and BEFORE anything is taken. The preview starts
+            // after the question has gone, whatever the answer.
+            await OfferTodaysClassAsync(workspacePath);
+            if (_isTornDown) return;
+
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 

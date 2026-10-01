@@ -64,6 +64,24 @@ public sealed class NewCourseDialog : ContentDialog
         ClassPageTerm.Caption(null));
     private readonly TextBlock _unitWordWarning = FormBuilders.WarningCaption("");
     private readonly TextBlock _sectionsCaption;
+
+    // ---- "This is a club" (#274, mac #267; #390, mac #368) ----------------
+    // Shown for EVERY code, pre-ticked by ClubCodeRule until the teacher
+    // touches it. The panel's words follow THE BOX, never the code.
+    private readonly CheckBox _clubBox = new() { Content = WizardWording.ClubToggleLabel };
+    private bool _clubTouched;
+    private bool _settingClubInCode;
+    private readonly StackPanel _clubRows = new() { Spacing = 4, Visibility = Visibility.Collapsed };
+    private readonly TextBox _classFolderBox = new() { Text = ClubVocabulary.Course.ClassFolder };
+    private readonly TextBlock _classFolderWarning = FormBuilders.WarningCaption("");
+    private readonly TextBox _headingBox = new() { Text = ClubVocabulary.Course.FrontPageHeading };
+    private readonly ComboBox _nounBox = new() { MinWidth = 160, Items = { "class", "meeting" }, SelectedIndex = 0 };
+    private TextBlock? _codeLabel, _nameLabel, _unitWordLabel, _markerCaption, _gradeCaption, _namingHeading;
+
+    /// <summary>Whether the teacher is making a club — the BOX, never the code.</summary>
+    private bool IsClub => _clubBox.IsChecked == true;
+
+    private ClassNoun ChosenNoun => _nounBox.SelectedIndex == 1 ? ClassNoun.Meeting : ClassNoun.Class;
     private readonly ComboBox _localeBox = new() { MinWidth = 300 };
     private readonly StackPanel _suggestionsRow = new() { Spacing = 4, Visibility = Visibility.Collapsed };
     private readonly TextBlock _validationText;
@@ -217,7 +235,7 @@ public sealed class NewCourseDialog : ContentDialog
         // This project is not reachable from Plantoir.Tests at all — different
         // target framework, and a ContentDialog cannot be built off a XAML
         // thread — so a string that must FAIL when it drifts has to live there.
-        PrimaryButtonText = WizardWording.CreateCourseButton;
+        PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;
         CloseButtonText = "Cancel";
         DefaultButton = ContentDialogButton.Primary;
         PrimaryButtonClick += OnPrimaryButton;
@@ -330,7 +348,8 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable;
+        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable
+                                 && (!IsClub || ClubClassFolderProblem() is null);
     }
 
     /// <summary>
@@ -398,19 +417,29 @@ public sealed class NewCourseDialog : ContentDialog
         provinceRow.Children.Add(FormBuilders.ExampleCaption("Narrows the course-code search below — typing a code straight through still works either way"));
         form.Children.Add(provinceRow);
 
-        var codeRow = FormBuilders.LabeledRow("Course code", _codeBox);
+        var codeRow = FormBuilders.LabeledRow(WizardWording.ForACourse.CodeLabel, _codeBox);
+        _codeLabel = (TextBlock)codeRow.Children[0];
         codeRow.Children.Add(FormBuilders.ExampleCaption(
             "e.g. ICS3U — or a club name like CODING. Start typing to search known course codes and names."));
         codeRow.Children.Add(_codeWarning);
         form.Children.Add(codeRow);
+
+        AutomationProperties.SetAutomationId(_clubBox, "clubToggle");
+        var clubRow = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+        clubRow.Children.Add(_clubBox);
+        clubRow.Children.Add(FormBuilders.ExampleCaption(WizardWording.ClubToggleCaption));
+        form.Children.Add(clubRow);
+        _clubBox.Checked += (_, _) => OnClubBoxChanged();
+        _clubBox.Unchecked += (_, _) => OnClubBoxChanged();
         _codeBox.TextChanged += (_, args) =>
         {
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) RefreshCodeSuggestions();
-            AutoFillCourseName(); RefreshClubRow(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
+            AutoFillCourseName(); RefreshClubRow(); PreTickTheClubBox(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
             RefreshStartingContent(); AdoptSkeletonStructure(); RefreshStructureArea(); RefreshFontSample();
         };
 
-        var nameRow = FormBuilders.LabeledRow("Course name", _nameBox);
+        var nameRow = FormBuilders.LabeledRow(WizardWording.ForACourse.NameLabel, _nameBox);
+        _nameLabel = (TextBlock)nameRow.Children[0];
         nameRow.Children.Add(FormBuilders.ExampleCaption("e.g. Introduction to Computer Science"));
         nameRow.Children.Add(_suggestionsRow);
         form.Children.Add(nameRow);
@@ -423,7 +452,23 @@ public sealed class NewCourseDialog : ContentDialog
         form.Children.Add(sectionsRow);
         _sectionsBox.TextChanged += (_, _) => { RefreshSectionsValidation(); RefreshCreateEnabled(); RefreshFontSample(); };
 
+        _namingHeading = new TextBlock { Text = WizardWording.ForAClub.NamingHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
+        _clubRows.Children.Add(_namingHeading);
+        _clubRows.Children.Add(FormBuilders.ExampleCaption(WizardWording.ForAClub.NamingCaption));
+        AutomationProperties.SetAutomationId(_classFolderBox, "clubClassFolderField");
+        AutomationProperties.SetAutomationId(_classFolderWarning, "clubClassFolderProblem");
+        AutomationProperties.SetAutomationId(_headingBox, "clubFrontPageHeadingField");
+        AutomationProperties.SetAutomationId(_nounBox, "clubNounPicker");
+        var classFolderRow = FormBuilders.LabeledRow(WizardWording.ClubClassFolderRow, _classFolderBox);
+        classFolderRow.Children.Add(_classFolderWarning);
+        _clubRows.Children.Add(classFolderRow);
+        _clubRows.Children.Add(FormBuilders.LabeledRow(WizardWording.ClubFrontPageHeadingRow, _headingBox));
+        _clubRows.Children.Add(FormBuilders.LabeledRow(WizardWording.ClubNounRow, _nounBox));
+        form.Children.Add(_clubRows);
+        _classFolderBox.TextChanged += (_, _) => { RenameClubClassFolder(); RefreshCreateEnabled(); };
+
         var unitWordRow = FormBuilders.LabeledRow("What do you call a unit?", _unitWordBox);
+        _unitWordLabel = (TextBlock)unitWordRow.Children[0];
         unitWordRow.Children.Add(_unitWordCaption);
         unitWordRow.Children.Add(_unitWordWarning);
         form.Children.Add(unitWordRow);
@@ -432,7 +477,7 @@ public sealed class NewCourseDialog : ContentDialog
 
         foreach (string code in LocaleCatalog.Codes) _localeBox.Items.Add(LocaleCatalog.DisplayName(code));
         _localeBox.SelectedIndex = LocaleCatalog.Codes.ToList().IndexOf(WizardDefaults.DefaultLocale);
-        form.Children.Add(FormBuilders.LabeledRow("Language / region", _localeBox));
+        form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.LocaleLabel, _localeBox));
 
         // -------- Starting Content (offered per course code) --------
         form.Children.Add(FormBuilders.SectionHeaderWithCaption("Starting Content", null));
@@ -524,14 +569,16 @@ public sealed class NewCourseDialog : ContentDialog
         var markerToggle = new ToggleSwitch { IsOn = _showsMarker, OnContent = "", OffContent = "" };
         markerToggle.Toggled += (_, _) => { _showsMarker = markerToggle.IsOn; RefreshFontSample(); };
         var markerRow = FormBuilders.LabeledRow("Show section marker in the site title", markerToggle);
-        markerRow.Children.Add(FormBuilders.ExampleCaption("e.g. \"S1\" appears beside the course code"));
+        _markerCaption = FormBuilders.ExampleCaption(WizardWording.ForACourse.SectionMarkerCaption);
+        markerRow.Children.Add(_markerCaption);
         form.Children.Add(markerRow);
 
         var gradeToggle = new ToggleSwitch { IsOn = _showsGrade, OnContent = "", OffContent = "" };
         gradeToggle.Toggled += (_, _) => { _showsGrade = gradeToggle.IsOn; RefreshGradeWarning(); RefreshFontSample(); };
         var gradeRow = FormBuilders.LabeledRow("Show the grade in the site title", gradeToggle);
         gradeRow.Children.Add(_gradeWarningSlot);
-        gradeRow.Children.Add(FormBuilders.ExampleCaption("e.g. \"Grade 12\" before the course name"));
+        _gradeCaption = FormBuilders.ExampleCaption(WizardWording.ForACourse.GradeCaption);
+        gradeRow.Children.Add(_gradeCaption);
         form.Children.Add(gradeRow);
 
         // -------- Behaviour --------
@@ -636,6 +683,15 @@ public sealed class NewCourseDialog : ContentDialog
     private void RefreshStartingContent()
     {
         _startingContentBody.Children.Clear();
+        if (IsClub)
+        {
+            // No skeleton, no ready-made pages, no curriculum (#274): both are
+            // Unit/Day pages, which a numbered course does not read as class pages.
+            var note = FormBuilders.ExampleCaption(WizardWording.ClubStartingContentNote);
+            AutomationProperties.SetAutomationId(note, "clubStartingContentNote");
+            _startingContentBody.Children.Add(note);
+            return;
+        }
         bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
         if (hasContent)
         {
@@ -858,6 +914,7 @@ public sealed class NewCourseDialog : ContentDialog
         // runs on every code change, so a teacher who declined the skeleton
         // and then corrected a typo must not be handed it back.
         if (!_startsFromSkeleton) return;
+        if (IsClub) return;   // a club takes no skeleton (wizard.clubToggle.fillRule)
         var skeleton = SkeletonCatalog.StructureToAdopt(
             ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent, _sharedFolders,
             WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
@@ -912,7 +969,7 @@ public sealed class NewCourseDialog : ContentDialog
         bool locked = StructureComesFromExampleContent;
         _structureLockedNote.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
         _structureEditorArea.Visibility = locked ? Visibility.Collapsed : Visibility.Visible;
-        _structureCaption.Text = locked ? "Chosen by the example content" : "Defaults are fine for most courses";
+        _structureCaption.Text = locked ? "Chosen by the example content" : WizardWording.Panel(IsClub).StructureCaption;
     }
 
     /// <summary>
@@ -1063,7 +1120,7 @@ public sealed class NewCourseDialog : ContentDialog
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, WizardProtection()),
             (name, reason) => RecordWizardRemovalBlocked("the marks list", name, reason)));
         // Below the list, for the reason in GradedFolderRule.Caption.
-        _marksArea.Children.Add(FormBuilders.ExampleCaption(GradedFolderRule.Caption));
+        _marksArea.Children.Add(FormBuilders.ExampleCaption(WizardWording.Panel(IsClub).GradedFolderCaption));
 
         // Curriculum folders (#345, specialNames.curriculumFoldersOffer): only
         // with two or more candidates — an LCS course from scratch has Ontario
@@ -1173,6 +1230,103 @@ public sealed class NewCourseDialog : ContentDialog
 
     private bool IsClubCode(string code) => ClubCodeRule.IsClub(code, _nameCatalog);
 
+    /// <summary>
+    /// The box starts ticked for a code ClubCodeRule calls a club — until the
+    /// teacher touches it; after that the box is theirs.
+    /// </summary>
+    private void PreTickTheClubBox()
+    {
+        if (_clubTouched) return;
+        bool club = IsClubCode(NormalizedCode);
+        if (IsClub == club) return;
+        _settingClubInCode = true;
+        try { _clubBox.IsChecked = club; }
+        finally { _settingClubInCode = false; }
+    }
+
+    /// <summary>
+    /// The box moved: give up an adopted skeleton FIRST (the toggle's own
+    /// restore), then fill the words the box carries (ClubFill — a field
+    /// moves only while it still holds the other choice's value), then let
+    /// every word on the panel follow the box (#390).
+    /// </summary>
+    private void OnClubBoxChanged()
+    {
+        if (!_settingClubInCode) _clubTouched = true;
+        if (IsClub) RestoreGenericStructure();
+
+        var filled = ClubFill.Applying(IsClub, new ClubFillFields(
+            _sharedFolders, _perSectionFolders,
+            IsClub ? ClassFolderRule.Name(null, _perSectionFolders) : _classFolderBox.Text.Trim(),
+            ClassPageTerm.Cleaned(_unitWordBox.Text), _headingBox.Text, ChosenNoun), _useLcs);
+        _sharedFolders = filled.SharedFolders.ToList();
+        _perSectionFolders = filled.PerSectionFolders.ToList();
+        _renamingClassFolderInCode = true;
+        try { _classFolderBox.Text = filled.ClassFolder; }
+        finally { _renamingClassFolderInCode = false; }
+        _lastClassFolder = filled.ClassFolder;
+        _unitWordBox.Text = filled.UnitWord == ClassPageTerm.DefaultWord && !IsClub ? "" : filled.UnitWord;
+        _headingBox.Text = filled.FrontPageHeading;
+        _nounBox.SelectedIndex = filled.Noun == ClassNoun.Meeting ? 1 : 0;
+
+        if (!IsClub) AdoptSkeletonStructure();
+        RebuildStructureLists();
+        RefreshPanelWords();
+        RefreshStartingContent();
+        RefreshStructureArea();
+        RefreshUnitWord();
+        RefreshCreateEnabled();
+    }
+
+    /// <summary>Every course-or-club word on the panel, from the BOX (#390).</summary>
+    private void RefreshPanelWords()
+    {
+        var words = WizardWording.Panel(IsClub);
+        if (!_started) PrimaryButtonText = words.CreateButton;
+        if (_codeLabel is not null) _codeLabel.Text = words.CodeLabel;
+        if (_nameLabel is not null) _nameLabel.Text = words.NameLabel;
+        if (_markerCaption is not null) _markerCaption.Text = words.SectionMarkerCaption;
+        if (_gradeCaption is not null) _gradeCaption.Text = words.GradeCaption;
+        if (_unitWordLabel is not null) _unitWordLabel.Text = IsClub ? WizardWording.ClubPageWordRow : "What do you call a unit?";
+        _clubRows.Visibility = IsClub ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private bool _renamingClassFolderInCode;
+    private string _lastClassFolder = ClubVocabulary.Course.ClassFolder;
+
+    /// <summary>
+    /// The club's class-folder field renames ITS entry in the per-section list
+    /// in place, so the folder keeps its place and the recorded name follows.
+    /// </summary>
+    private void RenameClubClassFolder()
+    {
+        if (_renamingClassFolderInCode || !IsClub) return;
+        string typed = _classFolderBox.Text.Trim();
+        int at = _perSectionFolders.IndexOf(_lastClassFolder);
+        if (typed.Length > 0 && at >= 0)
+        {
+            _perSectionFolders[at] = typed;
+            _lastClassFolder = typed;
+            RebuildStructureLists();
+        }
+        string? problem = ClubClassFolderProblem();
+        _classFolderWarning.Text = problem ?? "";
+        _classFolderWarning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// The folder-rename checks on the club's class folder — empty, a
+    /// separator, hidden, Media, section-like, another per-section folder's
+    /// name (mac <c>NewCourseWizardView.clubClassFolderProblem</c>).
+    /// </summary>
+    private string? ClubClassFolderProblem()
+    {
+        string typed = _classFolderBox.Text.Trim();
+        var others = _perSectionFolders.ToList();
+        others.Remove(_lastClassFolder);
+        return SpecialFolderRenamer.Problem(typed, "", others);
+    }
+
     private void RefreshClubRow() =>
         _shortRow.Visibility = IsClubCode(_codeBox.Text.Trim().ToUpperInvariant())
             ? Visibility.Visible : Visibility.Collapsed;
@@ -1213,7 +1367,9 @@ public sealed class NewCourseDialog : ContentDialog
     private void RefreshUnitWord()
     {
         string typed = _unitWordBox.Text;
-        _unitWordCaption.Text = ClassPageTerm.Caption(typed);
+        _unitWordCaption.Text = IsClub
+            ? WizardWording.ClubPageWordCaption(ClassPageTerm.Cleaned(typed))
+            : ClassPageTerm.Caption(typed);
         string? problem = ClassPageTerm.Problem(typed);
         _unitWordWarning.Text = problem ?? "";
         _unitWordWarning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
@@ -1285,9 +1441,9 @@ public sealed class NewCourseDialog : ContentDialog
         { ShowValidation("No working folder is selected."); return; }
 
         string name = _nameBox.Text.Trim();
-        if (name.Length == 0) name = WizardDefaults.FallbackCourseName;
+        if (name.Length == 0) name = WizardWording.Panel(IsClub).DefaultSiteName;
 
-        BeginProgress("Creating your course");
+        BeginProgress(WizardWording.Panel(IsClub).CreatingTitle);
         await _creator.CreateCourse(BuildConfiguration(code, name), workspacePath);
         if (_creator.PreparationProblem is { } preparationProblem)
         {
@@ -1365,8 +1521,11 @@ public sealed class NewCourseDialog : ContentDialog
         // in Plantoir.Tests/Goldens are what a teacher TAKING the ready-made
         // pages must still get (#250). The lists come back as they stand after
         // the last-moment adoption, which the editor then shows too.
-        var answers = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, new NewCourseAnswers.Choices(
-            code, _prepopulate, _startsFromSkeleton, _includeCurriculum, CurrentLists()));
+        // A club takes no ready-made pages, no skeleton and no curriculum pages
+        // (#274): all three answered "no" here, so the keys say so.
+        var answers = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, NewCourseAnswers.ForAClub(
+            new NewCourseAnswers.Choices(code, _prepopulate, _startsFromSkeleton, _includeCurriculum, CurrentLists()),
+            IsClub));
         ApplyLists(answers.Lists);
         // Offered-and-kept is exactly what include_curriculum_pages says.
         bool coverageEnabled = CourseConfiguration.NewCourseCoverageEnabled(
@@ -1416,8 +1575,16 @@ public sealed class NewCourseDialog : ContentDialog
             // TODAY, written down so that reordering the folder list later
             // cannot silently move where class pages are written.
             ["unit_word"] = ClassPageTerm.Cleaned(_unitWordBox.Text),
-            ["class_folder"] = ClassFolderRule.Name(null, _perSectionFolders),
+            // A club records the folder from ITS row: "All Meetings" says no
+            // "class", so the guess would never find it (#274).
+            ["class_folder"] = IsClub ? _classFolderBox.Text.Trim() : ClassFolderRule.Name(null, _perSectionFolders),
         };
+
+        // The three club keys, for a CLUB only: every other course's file
+        // stays byte for byte what it was, which absence already describes.
+        if (IsClub)
+            foreach (var (key, value) in ClubFill.ClubKeys(_headingBox.Text, ChosenNoun))
+                result[key] = value;
 
         // The marks pool, written for EVERY new course before setup runs (#317)
         // — absent only when a payload's manifest could not be read.

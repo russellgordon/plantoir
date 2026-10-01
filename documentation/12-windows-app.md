@@ -696,10 +696,10 @@ the suite could name, so that a red run means something again:
 | `activityTrail.mustRecord` | 58 events this app does not declare yet, each against the issue carrying its mac piece | `ContractTests.SharedRules_ActivityTrailEvents_Exist` |
 | `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
 | `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
-| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` did not name (#345, #274, #239, #241) when bundle 1 took the count; `curriculum_folders` (#345) left with bundle 6a | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
+| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` did not name (#345, #274, #239, #241) when bundle 1 took the count; `curriculum_folders` (#345) left with bundle 6a, the three club keys (#274) with bundle 7 | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
 | `modelTiers.requirements` | none since parity bundle 5a (2026-09-30), which answered #196's and #262's three; the area stays so the next mac requirement can be held by name | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
-| `sectionIndexPointer.dateCases` | the club front-page case (#274) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
-| `gradedFolders.newCourse.cases` | the club case (#274); the declined-skeleton case (#250) since parity bundle 6a runs through `NewCourseAnswers` | `GradedFoldersNewCourseContractTests` |
+| `sectionIndexPointer.dateCases` | none since parity bundle 7 (the club front-page case runs) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
+| `gradedFolders.newCourse.cases` | none since parity bundle 7: the club case runs through `NewCourseAnswers.ForAClub`, the declined-skeleton case (#250) since bundle 6a | `GradedFoldersNewCourseContractTests` |
 
 Bundle 5a (2026-09-30) paid five of those events (`assistant was asked about
 another course`, `assistant answer was cut off`, `assistant repeated the request
@@ -2988,9 +2988,14 @@ equals the file's (holding the #333 finding until then), on section open for
 an unwatched publish when the offer is fresh and holds something new
 (`LinksChecklist.HoldsSomethingNew`), the menu item, and
 `linksIntoHiddenPagesWillBeOffered` in the assistant. `NoteOffered` has no
-caller until the sheet exists. Also not run here: `linksChecklist.naming`'s
-two laid-out cases and `datingPagesAClassBrings.publishedBeforeIsRecorded`
-(a page in the published-pages record keeps its date when a class brings it).
+caller until the sheet exists. (Superseded: bundle 5b built the sheet; parity
+bundle 7 added the rest — the assistant says `linksIntoHiddenPagesWillBeOffered`
+only when the SAME build printed the marker, the offer is that build's and holds
+something new, `plantoir-mcp`'s `LauncherRunner` now keeping the marker on
+`LaunchOutcome.LinksChecklist`; the assistant's publish keeps the date of a page
+in the published-pages record, `LinksChecklist.PublishedPlaces`; and
+`linksChecklist.naming`'s two laid-out cases run in
+`LinksChecklistNamingContractTests`.)
 
 **The folder deploy's record.** `deploy.ps1`'s `Record-PublishedPages` (between
 BEGIN/END markers so the test runs it as written) reads `.build-id` and
@@ -3211,3 +3216,109 @@ from one course into another", and its "On Windows" subsection has the numbers.
   close (`args.Cancel = true` under a deferral) so one dialog walks the three
   stages; the picker is an `AutoSuggestBox` fed only on
   `AutoSuggestionBoxTextChangeReason.UserInput`, so nothing opens on focus.
+
+## Clubs, Course Settings and today's class on Windows (parity bundle 7: #274, #390, #387, #269, #406)
+
+What the mac's pieces became here, and the seams a later reader needs. The
+rules are the contract's; this is where they live in the C#.
+
+### One naming value, with no default on any path that writes a page (#274)
+
+`ClassPageNaming` (`Plantoir.Core/Models/ClassPageNaming.cs`) is word AND
+scheme together, read from `CourseConfiguration.Naming`. Every parse site that
+used to pass `UnitWord` beside a title now asks the naming
+(`Naming.Parse(title)`), and every title is built by `Naming.Title(unit, day)`.
+`InsertPlan` and `NewClassesPlan` carry a `required Naming`, so a plan cannot
+be made without saying whose naming it uses — the mac's #267 plan review found
+that with a default a missed site writes "Week 1, Day 10" and every test stays
+green. A numbered page is held as unit 1 with the number as its day; nothing
+may treat that unit as a real one:
+
+- `PublishPlan.UnitNamed(raw, naming)` returns null in a numbered course, so
+  "publish Week 1" goes to the page path (`wholeUnit`). The mac measured 4 of 4
+  meetings published from that sentence before its fix.
+- `PlanAddNextClass` refuses "start a new unit" and "add N days to Unit M" with
+  `NextClassPlanner.NoUnitsInANumberedCourse` BEFORE the timetable is read.
+- `PlanAddClasses` dates a numbered course's next page on the first class day
+  after the LATEST dated page; `PlanInsertClasses` reads the frozen
+  `unit`/`atDay` through `NumberedPosition` and plans with
+  `PlanNumberedInsert` (renames only the run the new numbers land on; a later
+  page moves only when its date collides; an undated page is placed by its
+  number and never given a date).
+
+**"meeting" never reaches the model.** The `…ForAMeeting` sentences
+(`AssistWording.Meetings.cs`) are rendered only into the TEACHER's copy:
+`Describe(ClassNoun)` on the plans, the start-of-year `TeacherText`, and in
+`plantoir-mcp` the `_meta` teacher summary (`Proposing(forModel, forTeacher)`).
+The text content — what the in-app model and Claude Code read — is the class
+form byte for byte; `ClubNounTests` flips `class_noun` and compares. Refusals
+are one string for both and keep the ordinary wording. (Questions for Russell:
+whether "never in plantoir-mcp's results" was meant to include `_meta`. The
+in-app window's only channel is that result, so the teacher's meeting card
+travels there; Claude Code ignores `_meta`.)
+
+### The wizard and Course Settings (#274, #390, #387)
+
+`ClubFill.Applying` (Core) is the fill rule; the dialog calls it when the box
+moves, after giving up an adopted skeleton, and `AdoptSkeletonStructure` does
+nothing while the box is ticked. `NewCourseAnswers.ForAClub` turns off
+example content, skeleton and curriculum for a club, so the wizard and
+`GradedFoldersNewCourseContractTests` take the same path. Every word that
+follows the box comes from `WizardWording.Panel(IsClub)` — never from
+`ClubCodeRule`, which only pre-ticks the box until the teacher touches it.
+
+Course Settings: `ClubSettingsRows.Shown` (locked rows only when recorded),
+Rename… disabled with `renameLockedNumbered` for a numbered course, and
+`SettingsSaveState.Decide` for Save. Measured/decided: the old
+`dirty && Problem is null` held Save back for a course whose folder is missing
+on THIS PC even for a colour scheme; now only an edit that moves
+`deploy_target`, `deploy_folder_path` or `additional_deploy_targets` (compared
+with the file as last read or written, a missing key equal to an empty one)
+is held back, with `courseSettingsWording.saveHeldBack` in the Save status
+line and `settings save held back` on the trail once per visit. The legacy
+course-wide `show_grade_in_title`/`include_curriculum_coverage` Bool is SEEDED
+into every section before one is changed (it was replaced by an empty map,
+the mac's finding 10, and Windows had the same shape). The emoji field now
+compares with the stored value's FIRST emoji, so a hand-edited "📚🔬" is not
+written back when focus passes through it.
+
+The label scan (`CourseSettingsSaveTests.NoLabelNamesTheMachinery`) reads
+EVERY string literal under `Plantoir/Views` and `Plantoir/*.cs` rather than the
+mac's "literal passed to a label call", and sets aside space-free paths and
+file names and lines that MATCH output (`Contains`/`StartsWith`…). Measured
+2026-10-01: the two #369 labels were the only hits, plus the About credit.
+REJECTED: a list of label-setting calls (WinUI sets text through property
+initialisers as often as calls, so a call list misses most labels).
+
+### The lists as tables (#269)
+
+`FormBuilders.StringListEditor` is a single-selection `ListView` with +/− at
+its lower left; + opens a flyout with the old add rules; − and Delete share
+`RemoveSelected`, which asks the protection again at the moment of acting, and
+a blocked row explains itself (and records `removal blocked`) rather than
+having a disabled −. A disabled list ignores both keys, asked in the handler
+(the mac found `.disabled` did not stop its keys). Hide and Expandable are
+`FormBuilders.SidebarVisibilityTable`, de-duplicated by exact name. Unproven on
+screen: `ListTablesUiTests`, `MarksPoolRemovalUiTests` (now select-then-−).
+
+### The front page's class line, and today's class (#274, #406)
+
+`SectionIndex.Repointed(text, Pointer)` replaces `WithMostRecent`: the line is
+found by the CLASS PAGE it names, outside code and `%%` comments
+(`MarkdownCode.NotALinkRanges`, UTF-16 offsets on both sides), below the
+frontmatter, and rewritten in place by position in the form the teacher wrote
+(`writtenAs`). `Pointer` carries the section's class titles, the class's place
+INSIDE the course folder (`AssistWorkspace.PointerFor`) and the course's
+recorded `front_page_heading`, which only the insert fallback reads: Windows
+still INSERTS under `#… <heading>` (absent → "Most Recent Class") when no line
+names a class — the contract's `expectBodyOnWindows`. A "Help Sessions" embed
+directly under the heading is no longer replaced (it was, until this bundle).
+
+`TodaysClassOnTheFrontPage` (Core) decides and writes; the section window's
+`PreviewOrStop_Click` is its only asker, after the deploy/other-program
+refusals and before any lease is taken, and the preview starts after the
+question has gone. Findings and the links checklist wait while it is up.
+`OnlyThePreviewButtonAsks` pins the callers by source. The day is the first
+ten characters of `created` as written; `cannotTell` visibility is not offered;
+a front page that is a reparse point or read-only, or a course kept for
+reference, is not asked about.

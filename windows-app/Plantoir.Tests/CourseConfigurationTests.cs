@@ -156,10 +156,14 @@ public class CourseConfigurationTests
     [Fact]
     public void FirstPerSectionWriteReplacesLegacyBool()
     {
-        var config = FromJson("""{"course_code":"ICS3U","show_grade_in_title":false}""");
+        var config = FromJson("""{"course_code":"ICS3U","section_numbers":[1,2],"show_grade_in_title":false}""");
         config.SetShowsGradeInTitle(2, true);
         Assert.True(config.ShowsGradeInTitle(2));
-        Assert.True(config.ShowsGradeInTitle(1));   // map default, legacy gone
+        // Section 1 KEEPS the legacy false (#387, mac #373 perSectionEditCases
+        // case 7): this line used to assert true — the map's default — which
+        // was exactly the bug, a change to one section turning another's grade
+        // back on.
+        Assert.False(config.ShowsGradeInTitle(1));
         Assert.IsType<JObject>(config.Values["show_grade_in_title"]);
     }
 

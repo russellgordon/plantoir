@@ -4,7 +4,7 @@ namespace Plantoir.Core.Assist;
 /// Every sentence the assistant says to a teacher about deploying, previewing
 /// and agreeing to things — matching contracts/assist-wording.json.
 /// </summary>
-public static class AssistWording
+public static partial class AssistWording
 {
     // MARK: - Agreeing to something
 
@@ -395,9 +395,6 @@ public static class AssistWording
 
     public const string EveryDateIsSpokenFor =
         "Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.";
-
-    public static string MadeRoom(int added, string unitWord, int unit, int day) =>
-        $"Made room for {added} class{(added == 1 ? "" : "es")} at {unitWord} {unit}, Day {day}.";
 
     public static string MovedToLaterDays(int moved) => $"Moved to later class days — {moved}:";
 

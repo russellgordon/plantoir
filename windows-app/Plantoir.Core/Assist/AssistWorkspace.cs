@@ -521,7 +521,15 @@ public sealed partial class AssistWorkspace
         var titles = PagePaths.MarkdownPages(course.DirectoryPath, section)
             .Select(path => Path.GetFileNameWithoutExtension(path))
             .ToList();
-        var units = titles
+        // A numbered course has no units (#274): its FIRST class page instead,
+        // built from the course's own word — "Publish Week 1".
+        var naming = course.Configuration.Naming;
+        if (naming.IsNumbered)
+        {
+            var numbers = titles.Select(title => naming.Parse(title)?.Day).OfType<int>().ToList();
+            if (numbers.Count > 0) return $"{verb} {naming.Title(1, numbers.Min())}";
+        }
+        var units = naming.IsNumbered ? new List<int>() : titles
             .Select(title => System.Text.RegularExpressions.Regex.Match(title,
                 "^" + System.Text.RegularExpressions.Regex.Escape(unitWord) + @" (\d+), ",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase))
@@ -684,7 +692,7 @@ public sealed partial class AssistWorkspace
             // hours; it is the input half of this feature and the half that
             // fails silently.
             string unitWord = course.Configuration.UnitWord;
-            if (PublishPlan.UnitNamed(wanted, unitWord) is { } unitNum)
+            if (PublishPlan.UnitNamed(wanted, course.Configuration.Naming) is { } unitNum)
             {
                 var unitPages = pagesList.Where(p => p.IsClassPage &&
                     p.Title.StartsWith($"{unitWord} {unitNum},", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -1075,6 +1083,11 @@ public sealed partial class AssistWorkspace
         var classPaths = new HashSet<string>(
             ClassPages(course, section).Select(Path.GetFullPath), StringComparer.OrdinalIgnoreCase);
 
+        // A page in the published-pages record has been on a site students
+        // could reach and KEEPS its date (#392, mac #379; Russell's decision 4):
+        // "hidden now" no longer means "never published".
+        var publishedBefore = LinksChecklist.PublishedPlaces(course.DirectoryPath, section);
+
         // Find all targets reachable from named class pages
         var reachableTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var named in pages.Where(p => !p.ViaLink))
@@ -1134,6 +1147,10 @@ public sealed partial class AssistWorkspace
             }
 
             if (earliest is not { } owner) continue;
+
+            string place = Path.ChangeExtension(Path.GetRelativePath(course.DirectoryPath, target), null)
+                .Replace(Path.DirectorySeparatorChar, '/');
+            if (publishedBefore.Contains(LinksChecklist.Key(place))) continue;
 
             // Already out where students can see it — leave it alone.
             //
@@ -1203,17 +1220,17 @@ public sealed partial class AssistWorkspace
         try { indexText = File.ReadAllText(indexPath); }
         catch { return null; }
 
-        string toClass = Path.GetFileNameWithoutExtension(newest);
+        var pointer = PointerFor(course, section, newest);
         DateOnly toDate = DateOf(course, section, newest) ?? default;
-        bool headingMissing = SectionIndex.WithMostRecent(indexText, toClass) is null;
 
         return new IndexChange(
             RelativePath: Relative(indexPath),
-            FromClass: SectionIndex.CurrentlyShowing(indexText),
-            ToClass: toClass,
+            FromClass: SectionIndex.CurrentlyShowing(indexText, pointer.ClassTitles),
+            ToClass: pointer.PointAt,
             FromDate: PageFrontmatter.CreatedOn(indexText, section, isSectionLocal: true),
             ToDate: toDate,
-            HeadingMissing: headingMissing);
+            HeadingMissing: !SectionIndex.CanBePointed(indexText, pointer),
+            Pointer: pointer);
     }
 
     /// <summary>
@@ -1414,15 +1431,15 @@ public sealed partial class AssistWorkspace
             // The build leg's question is the deploy's, not a destination's:
             // no destination was reached (the #132 lesson - keep the legs apart).
             return new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString())), null);
         if (!build.Succeeded)
             return new AssistResult(false,
                 // What the build said about the folders belongs HERE most of
                 // all: a build that failed because the front page is missing
                 // is the case where the finding is the cause.
-                Models.SiteHealthFinding.Appending(
-                    $"The build failed, so nothing was deployed. {build.Message}", build.Findings),
+                AppendingFindings(course, section, build, 
+                    $"The build failed, so nothing was deployed. {build.Message}"),
                 null);
 
         // Every destination's own deploy — one FAILING does not stop the
@@ -1477,7 +1494,7 @@ public sealed partial class AssistWorkspace
                 if (wentOut.Count > 0) answerMessage += " " + AssistWording.DeployWentOutTo(Names(wentOut));
             }
             return new AssistResult(outcomeLegs.Any(leg => leg.Succeeded),
-                Models.SiteHealthFinding.Appending(answerMessage, build.Findings), null);
+                AppendingFindings(course, section, build, answerMessage), null);
         }
 
         bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
@@ -1489,7 +1506,7 @@ public sealed partial class AssistWorkspace
         // the build. Said after the outcome, never instead of it.
         return result with
         {
-            Message = Models.SiteHealthFinding.Appending(result.Message, build.Findings),
+            Message = AppendingFindings(course, section, build, result.Message),
         };
     }
 
@@ -1507,16 +1524,16 @@ public sealed partial class AssistWorkspace
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
             return new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString()), build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString())), null);
         return build.Succeeded
             ? new AssistResult(true,
-                Models.SiteHealthFinding.Appending(
+                AppendingFindings(course, section, build, 
                     $"Rebuilt the preview of {course.Code} Section {section}. No content was changed. " +
-                    "Look it over in Plantoir, and deploy it there when you're happy.", build.Findings), null)
+                    "Look it over in Plantoir, and deploy it there when you're happy."), null)
             : new AssistResult(false,
-                Models.SiteHealthFinding.Appending(
-                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}", build.Findings), null);
+                AppendingFindings(course, section, build, 
+                    $"Nothing was changed, and the preview couldn’t be built. {build.Message}"), null);
     }
 
     /// <summary>
@@ -1672,7 +1689,7 @@ public sealed partial class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { } ud && ud.Unit == unit)
+            if (planned.IsClassPage && course.Configuration.Naming.Parse(planned.Title) is { } ud && ud.Unit == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1690,7 +1707,7 @@ public sealed partial class AssistWorkspace
         }
 
         // Only the ones that would actually move, ordered highest day first (matching Swift)
-        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
+        unitPages = unitPages.OrderByDescending(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList();
 
         var moving = new List<string>();
         foreach (var p in unitPages)
@@ -1764,7 +1781,7 @@ public sealed partial class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { Unit: var u } && u == unit)
+            if (planned.IsClassPage && course.Configuration.Naming.Parse(planned.Title) is { Unit: var u } && u == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1775,8 +1792,8 @@ public sealed partial class AssistWorkspace
 
         // Highest day first to take a unit down; Day 1 first to put it up.
         unitPages = publishing
-            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList()
-            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
+            ? unitPages.OrderBy(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList()
+            : unitPages.OrderByDescending(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList();
 
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
@@ -1878,7 +1895,8 @@ public sealed partial class AssistWorkspace
         {
             string path = PagePaths.ResolveInside(_folder, index.RelativePath);
             string text = File.ReadAllText(path);
-            if (SectionIndex.PointedAndDated(text, index.ToClass, index.ToDate, tail) is not { } withDate) return;
+            if (index.Pointer is null
+                || SectionIndex.PointedAndDated(text, index.Pointer, index.ToDate, tail) is not { } withDate) return;
             Save(path, withDate);
         }
         catch { /* the front page falling behind must not fail the publish */ }
@@ -2217,7 +2235,7 @@ public sealed partial class AssistWorkspace
         catch { return new List<string>(); }
 
         var classPages = ClassPages(course, section);
-        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.UnitWord);
+        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.Naming);
 
         var newDates = dates.Select(d => d.New).ToList();
         if (newDates.Count > 0)
@@ -2498,8 +2516,8 @@ public sealed partial class AssistWorkspace
                 string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
                 if (newestPublished is not null)
                 {
-                    string targetName = Path.GetFileNameWithoutExtension(newestPublished);
-                    if (SectionIndex.WithMostRecent(indexText, targetName) is { } newIndexText && newIndexText != indexText)
+                    if (SectionIndex.Repointed(indexText, PointerFor(course, section, newestPublished)) is { } newIndexText
+                        && newIndexText != indexText)
                     {
                         Save(indexPath, newIndexText);
                     }
@@ -2978,7 +2996,7 @@ public sealed partial class AssistWorkspace
             // page counted as unnumbered, the plan found no classes, and it
             // refused with "has no pages named ...". The title-building below
             // was converted first and could therefore never run.
-            var parsed = UnitDay.Parse(title, course.Configuration.UnitWord);
+            var parsed = course.Configuration.Naming.Parse(title);
             if (parsed is null) { unnumbered++; continue; }
 
             found.Add(new ClassRef(
@@ -3002,6 +3020,20 @@ public sealed partial class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
+        var naming = course.Configuration.Naming;
+
+        // A numbered course (#274, mac #267) names ONE number; the frozen
+        // schema's two arguments are read into it (insertion.numberedPosition).
+        if (naming.IsNumbered)
+        {
+            int? position = NumberedPosition(unit, atDay);
+            if (position is null)
+                throw new AssistRefusal(
+                    $"{course.Code} numbers its pages one after another — “{naming.Word} 1”, “{naming.Word} 2” — " +
+                    $"so say which one to make room at, for example “{naming.Word} {Math.Max(unit, atDay)}”.");
+            unit = 1;
+            atDay = position.Value;
+        }
 
         if (unit < 1 || atDay < 1) throw new AssistRefusal("Unit and day numbers start at 1.");
         if (count < 1) throw new AssistRefusal("Ask for at least one class.");
@@ -3014,13 +3046,16 @@ public sealed partial class AssistWorkspace
         var classes = NumberedClasses(course, section, out int unnumbered);
         if (classes.Count == 0)
             throw new AssistRefusal(
-                $"{course.Code} Section {section} has no pages named “Unit N, Day N”, so there is nothing " +
+                $"{course.Code} Section {section} has no pages named “{naming.ShapeDescription}”, so there is nothing " +
                 "to make room in.");
 
         var problems = new List<string>();
         if (unnumbered > 0)
             problems.Add($"{unnumbered} class page{(unnumbered == 1 ? " is" : "s are")} not named " +
-                         "“Unit N, Day N”, so I left it where it is — including its date.");
+                         $"“{naming.ShapeDescription}”, so I left it where it is — including its date.");
+
+        if (naming.IsNumbered)
+            return PlanNumberedInsert(course, section, naming, atDay, count, classes, remembered.Dates, problems);
 
         // Everything at or after the insertion point moves along: later days
         // of this unit, and every class of every later unit.
@@ -3046,7 +3081,7 @@ public sealed partial class AssistWorkspace
                          $"date{(short_ == 1 ? "" : "s")} and ask again.");
             return new InsertPlan
             {
-                CourseCode = course.Code, SectionNumber = section, Unit = unit, AtDay = atDay,
+                CourseCode = course.Code, SectionNumber = section, Unit = unit, AtDay = atDay, Naming = naming,
                 Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
                 Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
             };
@@ -3056,7 +3091,7 @@ public sealed partial class AssistWorkspace
         var added = new List<NewClass>();
         for (int i = 0; i < count; i++)
         {
-            string title = $"{course.Configuration.UnitWord} {unit}, Day {atDay + i}";
+            string title = naming.Title(unit, atDay + i);
             added.Add(new NewClass(title, Relative(Path.Combine(folder, title + ".md")),
                                    runway[i], atDay + i));
         }
@@ -3066,7 +3101,7 @@ public sealed partial class AssistWorkspace
         var renames = new List<Rename>();
         foreach (var moving in shifted.Where(c => c.Unit == unit).OrderByDescending(c => c.Day))
         {
-            string to = $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}";
+            string to = naming.Title(unit, moving.Day + count);
             renames.Add(new Rename(moving.Title, to, moving.Path, Path.Combine(folder, to + ".md")));
         }
 
@@ -3079,7 +3114,7 @@ public sealed partial class AssistWorkspace
             var to = runway[count + i];
             if (moving.Date == to) continue;
 
-            string name = moving.Unit == unit ? $"{course.Configuration.UnitWord} {unit}, Day {moving.Day + count}" : moving.Title;
+            string name = moving.Unit == unit ? naming.Title(unit, moving.Day + count) : moving.Title;
             moves.Add(new DateMove(name, Relative(moving.Path), moving.Date ?? to, to));
         }
 
@@ -3089,12 +3124,157 @@ public sealed partial class AssistWorkspace
             SectionNumber = section,
             Unit = unit,
             AtDay = atDay,
+            Naming = naming,
             Added = added,
             Renames = renames,
             Moves = moves,
             LinksToRewrite = CountLinksTo(course, section, renames.Select(r => r.From)),
             Problems = problems,
         };
+    }
+
+    /// <summary>
+    /// The one number a make-room request names in a numbered course, read
+    /// from the tool's frozen <c>unit</c>/<c>atDay</c> (<c>insertion.numberedPosition</c>;
+    /// mac <c>ClassInsertionPlanner.numberedPosition</c>). Two DIFFERENT numbers
+    /// neither of which is 1 cannot be read and give null, so the teacher is
+    /// asked rather than having pages renamed at a guess.
+    /// </summary>
+    public static int? NumberedPosition(int? unit, int? atDay)
+    {
+        if (unit is null) return atDay;
+        if (atDay is null) return unit;
+        if (unit == atDay) return unit;
+        if (unit == 1) return atDay;
+        if (atDay == 1) return unit;
+        return null;
+    }
+
+    /// <summary>
+    /// Making room in a numbered course (#274, mac <c>planNumbered</c>). Pages
+    /// order by DATE and the numbers may have gaps (CODING: Weeks 1, 2, 8, 9 on
+    /// weekly Thursdays). The new pages take the first free class days after the
+    /// LATEST page numbered below the insertion point; a page is renamed only
+    /// when a new number lands on its name (the run stops at the first clear
+    /// number); and a later page keeps its date when it is already after the
+    /// page before it — only a COLLIDING date moves. The ordinary rule, measured
+    /// on CODING by the mac, dated a "make room at Week 3" page on Week 8's day
+    /// and renamed two published meetings for a slot that was empty.
+    /// </summary>
+    private InsertPlan PlanNumberedInsert(Course course, int section, ClassPageNaming naming, int atNumber, int count,
+                                          List<ClassRef> numbered, IReadOnlyList<DateOnly> timetable, List<string> problems)
+    {
+        var shifted = numbered.Where(c => c.Day >= atNumber).OrderBy(c => c.Day).ToList();
+        var untouched = numbered.Where(c => c.Day < atNumber).ToList();
+
+        var held = untouched.Where(c => c.Date is not null).Select(c => c.Date!.Value).ToHashSet();
+        DateOnly? latestKept = untouched.Where(c => c.Date is not null).Select(c => c.Date).Max();
+        var runway = timetable.Where(d => !held.Contains(d) && (latestKept is null || d > latestKept.Value))
+            .OrderBy(d => d).ToList();
+
+        InsertPlan Refused(string why)
+        {
+            problems.Add(why);
+            return new InsertPlan
+            {
+                CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
+                Added = Array.Empty<NewClass>(), Renames = Array.Empty<Rename>(),
+                Moves = Array.Empty<DateMove>(), LinksToRewrite = 0, Problems = problems,
+            };
+        }
+
+        if (runway.Count < count)
+        {
+            int missing = count - runway.Count;
+            string from = latestKept is { } kept ? DateText.Iso(kept) : "the start of the course";
+            return Refused($"This needs {count} class day{(count == 1 ? "" : "s")} after {from} and the timetable " +
+                           $"only has {runway.Count}. Add {missing} more class date{(missing == 1 ? "" : "s")} and ask again.");
+        }
+
+        string folder = ClassFolder(course, section);
+        var added = Enumerable.Range(0, count)
+            .Select(offset => (Title: naming.Title(1, atNumber + offset), Offset: offset))
+            .Select(x => new NewClass(x.Title, Relative(Path.Combine(folder, x.Title + ".md")),
+                                      runway[x.Offset], atNumber + x.Offset))
+            .ToList();
+
+        // Renames: only the run whose numbers the new pages land on.
+        var newNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var upward = new List<Rename>();
+        int firstClear = atNumber + count;
+        foreach (var page in shifted)
+        {
+            if (page.Day >= firstClear) break;
+            string to = naming.Title(1, firstClear);
+            upward.Add(new Rename(page.Title, to, page.Path, Path.Combine(folder, to + ".md")));
+            newNames[page.Title] = to;
+            firstClear++;
+        }
+        upward.Reverse();   // highest number first: no rename lands on a name in use
+
+        var byDate = InDateOrder(shifted);
+        var destinations = DestinationsKeepingGaps(byDate, runway, count);
+        if (destinations is null)
+            return Refused("There are not enough class days after the last page to move it onto. " +
+                           "Add more class dates and ask again.");
+
+        var moves = new List<DateMove>();
+        for (int i = 0; i < byDate.Count; i++)
+        {
+            if (destinations[i] is not { } to || byDate[i].Date == to) continue;
+            moves.Add(new DateMove(newNames.GetValueOrDefault(byDate[i].Title, byDate[i].Title),
+                                   Relative(byDate[i].Path), byDate[i].Date, to));
+        }
+
+        return new InsertPlan
+        {
+            CourseCode = course.Code, SectionNumber = section, Unit = 1, AtDay = atNumber, Naming = naming,
+            Added = added, Renames = upward, Moves = moves,
+            LinksToRewrite = CountLinksTo(course, section, upward.Select(r => r.From)),
+            Problems = problems,
+        };
+    }
+
+    /// <summary>
+    /// Pages by date, the number breaking a tie — and an UNDATED page placed by
+    /// its number just before the first dated page numbered above it. Not
+    /// "undated last": the mac's fix review measured that dating the old Week 1
+    /// after Week 8, so the front page would have jumped to it.
+    /// </summary>
+    private static List<ClassRef> InDateOrder(IEnumerable<ClassRef> pages)
+    {
+        var dated = pages.Where(p => p.Date is not null).OrderBy(p => p.Date).ThenBy(p => p.Day).ToList();
+        var undated = new Queue<ClassRef>(pages.Where(p => p.Date is null).OrderBy(p => p.Day));
+        var ordered = new List<ClassRef>();
+        foreach (var page in dated)
+        {
+            while (undated.Count > 0 && undated.Peek().Day < page.Day) ordered.Add(undated.Dequeue());
+            ordered.Add(page);
+        }
+        ordered.AddRange(undated);
+        return ordered;
+    }
+
+    /// <summary>
+    /// Where each shifted page goes in a course that keeps its gaps: a page
+    /// already after the page before it stays; otherwise it takes the first
+    /// runway day after that page. An undated page stays undated (null). Null
+    /// overall when a page has nowhere to go.
+    /// </summary>
+    private static List<DateOnly?>? DestinationsKeepingGaps(List<ClassRef> shifted, List<DateOnly> runway, int skippingFirst)
+    {
+        var destinations = new List<DateOnly?>();
+        DateOnly? previous = skippingFirst > 0 && skippingFirst <= runway.Count ? runway[skippingFirst - 1] : null;
+        foreach (var page in shifted)
+        {
+            if (page.Date is not { } own) { destinations.Add(null); continue; }
+            DateOnly? chosen = previous is null || own > previous.Value ? own : null;
+            chosen ??= runway.Where(d => previous is null || d > previous.Value).Cast<DateOnly?>().FirstOrDefault();
+            if (chosen is null) return null;
+            destinations.Add(chosen);
+            previous = chosen;
+        }
+        return destinations;
     }
 
     /// <summary>How many links across the section point at any of these page names.</summary>
@@ -3206,12 +3386,12 @@ public sealed partial class AssistWorkspace
         {
             string path = Path.Combine(ClassFolder(course, section), added.Title + ".md");
             if (File.Exists(path)) continue;
-            Save(path, ClassSkeleton(added, plan.Unit, plan.Added.Count, tail));
+            Save(path, ClassSkeleton(added, plan.Naming.IsNumbered ? null : plan.Unit, plan.Added.Count, tail));
             created.Add(path);
         }
 
         string said =
-            AssistWording.MadeRoom(plan.Added.Count, UnitWordFor(plan.CourseCode), plan.Unit, plan.AtDay) +
+            AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle) +
             $" Renamed {plan.Renames.Count}, moved {plan.Moves.Count} onto " +
             $"later class days, and updated {plan.LinksToRewrite} link" +
             $"{(plan.LinksToRewrite == 1 ? "" : "s")}. The new pages are unpublished until you write them. " +
@@ -3254,7 +3434,7 @@ public sealed partial class AssistWorkspace
         string path = Page(course, section, pageTitle);
         string sourceTitle = Path.GetFileNameWithoutExtension(path);
 
-        var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
+        var numbers = course.Configuration.Naming.Parse(sourceTitle)
             ?? throw new AssistRefusal(
                 ClassChangeWording.NotANumberedClassPage(sourceTitle));
 
@@ -3477,7 +3657,7 @@ public sealed partial class AssistWorkspace
         foreach (string page in ClassPages(course, section))
         {
             string title = Path.GetFileNameWithoutExtension(page) ?? "";
-            if (UnitDay.Parse(title, course.Configuration.UnitWord) is { } found
+            if (course.Configuration.Naming.Parse(title) is { } found
                 && found.Unit == unit && found.Day > highestDay)
                 highestDay = found.Day;
         }
@@ -3493,6 +3673,11 @@ public sealed partial class AssistWorkspace
         if (unit < 1) throw new AssistRefusal("A unit number starts at 1.");
         if (firstDay < 1) throw new AssistRefusal("A day number starts at 1.");
         if (count < 1) throw new AssistRefusal("Ask for at least one class.");
+        var naming = course.Configuration.Naming;
+        // A numbered course has one run of pages and no units (#274): any
+        // unit but the one it is held as is refused BEFORE the dates are asked for.
+        if (naming.IsNumbered && unit != 1)
+            throw new AssistRefusal(NextClassPlanner.NoUnitsInANumberedCourse(course.Code, naming.Word));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
@@ -3515,6 +3700,13 @@ public sealed partial class AssistWorkspace
 
         var free = remembered.Dates.Where(date => !taken.Contains(date)).ToList();
 
+        // A numbered course orders by DATE and may have gaps (#274; mac
+        // NextClassPlanner.positionAfterTheLatestPage): its next page goes on
+        // the first class day after the LATEST dated page. The free-date rule
+        // gave CODING's Week 10 a date five weeks before Week 8.
+        if (naming.IsNumbered && taken.Count > 0)
+            free = free.Where(date => date > taken.Max()).ToList();
+
         var classes = new List<NewClass>();
         var alreadyThere = new List<string>();
         var problems = new List<string>();
@@ -3523,7 +3715,7 @@ public sealed partial class AssistWorkspace
         for (int i = 0; i < count; i++)
         {
             int day = firstDay + i;
-            string title = $"{UnitWordFor(courseCode)} {unit}, Day {day}";
+            string title = naming.Title(unit, day);
             string path = Path.Combine(folder, title + ".md");
 
             // Never written over. A page with this name may be a lesson the
@@ -3548,6 +3740,7 @@ public sealed partial class AssistWorkspace
             CourseCode = course.Code,
             SectionNumber = section,
             Unit = unit,
+            Naming = naming,
             Classes = classes,
             AlreadyThere = alreadyThere,
             Problems = problems,
@@ -3560,6 +3753,15 @@ public sealed partial class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
+        var naming = course.Configuration.Naming;
+
+        // A numbered course (#274) has no units, so "start a new unit" and
+        // "add three more days to Unit 1" have nothing to act on — refused
+        // BEFORE the dates are asked for (class-planning.json → refusals).
+        bool aboutAUnit = string.Equals(unitAsked, "next", StringComparison.OrdinalIgnoreCase)
+                          || (days is > 0 && int.TryParse(unitAsked, out _));
+        if (naming.IsNumbered && aboutAUnit)
+            throw new AssistRefusal(NextClassPlanner.NoUnitsInANumberedCourse(course.Code, naming.Word));
 
         var remembered = TimetableMemory.Read(_folder, course.Code, section)
             ?? throw new AssistRefusal(
@@ -3579,7 +3781,7 @@ public sealed partial class AssistWorkspace
         bool startingANewUnit = string.Equals(unitAsked, "next", StringComparison.OrdinalIgnoreCase);
         UnitDay next = startingANewUnit
             ? NextClassPlanner.FirstDayOfANewUnit(existingTitles, course.Configuration.UnitWord)
-            : NextClassPlanner.NextUnitAndDay(existingTitles, course.Configuration.UnitWord);
+            : NextClassPlanner.NextUnitAndDay(existingTitles, naming);
 
         return PlanAddClasses(courseCode, sectionNumber, next.Unit, next.Day, 1);
     }
@@ -3610,7 +3812,8 @@ public sealed partial class AssistWorkspace
         // anything else, so there is no partial-undo question to ask: the mac
         // records this one too (AssistToolRunner, the placeholder-class path).
         using var recording = UndoHistory.Record(_undo,
-            $"added {plan.Classes.Count} class pages to {UnitWordFor(plan.CourseCode)} {plan.Unit} of " +
+            $"added {plan.Classes.Count} class pages to " +
+            (plan.Naming.UnitName(plan.Unit) is { } unitName ? unitName + " of " : "") +
             $"{course.Code} Section {section}");
 
         // Match the time of day and UTC offset the section's existing classes
@@ -3623,13 +3826,14 @@ public sealed partial class AssistWorkspace
         {
             string path = Path.Combine(folder, created.Title + ".md");
             if (File.Exists(path)) continue;       // checked again: the plan may be minutes old
-            Save(path, ClassSkeleton(created, plan.Unit, plan.Classes.Count, tail));
+            Save(path, ClassSkeleton(created, plan.Naming.IsNumbered ? null : plan.Unit, plan.Classes.Count, tail));
         }
         recording.Done();
 
         return new AssistResult(true,
-            $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in Unit " +
-            $"{plan.Unit} of {course.Code} Section {section}, dated " +
+            $"Created {plan.Classes.Count} class page{(plan.Classes.Count == 1 ? "" : "s")} in " +
+            (plan.Naming.UnitName(plan.Unit) is { } unitIn ? unitIn + " of " : "") +
+            $"{course.Code} Section {section}, dated " +
             $"{DateText.Iso(plan.Classes[0].Date)} to {DateText.Iso(plan.Classes[^1].Date)}. " +
             "They are unpublished, so nothing changed in the site — write them, then publish when ready.",
             backup);
@@ -3641,6 +3845,95 @@ public sealed partial class AssistWorkspace
     /// carry the code rather than the course.
     /// </summary>
     public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
+
+    /// <summary>
+    /// A message with what the build found about the course added, as
+    /// <see cref="Models.SiteHealthFinding.Appending"/> — except that the
+    /// links-into-hidden-pages finding says
+    /// <see cref="AssistWording.LinksIntoHiddenPagesWillBeOffered"/> instead of
+    /// its pairs (#392, mac #379), ONLY when the same build printed the
+    /// checklist marker, the offer on disk is that build's, and it holds
+    /// something the teacher has not answered — so it never promises a sheet
+    /// that will not come. Otherwise the finding's own words.
+    /// </summary>
+    private static string AppendingFindings(Course course, int section, LaunchOutcome build, string message)
+    {
+        var findings = build.Findings;
+        if (findings is null || findings.Count == 0) return message;
+        bool offered = build.LinksChecklist is { } marker
+            && string.Equals(marker.Course, course.Code, StringComparison.OrdinalIgnoreCase)
+            && marker.Section == section && marker.Pages > 0
+            && LinksChecklistShowing.AfterAWatchedBuild(course, section, marker) is not null;
+        if (!offered) return Models.SiteHealthFinding.Appending(message, findings);
+        var parts = new List<string> { message };
+        foreach (var finding in findings)
+            parts.Add(finding.Name == LinksIntoHiddenPagesFinding && finding.Section == section
+                ? AssistWording.LinksIntoHiddenPagesWillBeOffered(course.Code, section.ToString())
+                : finding.Sentence + " " + finding.Detail);
+        return string.Join("\n\n", parts);
+    }
+
+    /// <summary>The site-health check whose finding the links checklist answers (<c>siteHealth.linksIntoHiddenPages</c>).</summary>
+    internal const string LinksIntoHiddenPagesFinding = "linksIntoHiddenPages";
+
+    /// <summary>
+    /// What the front-page pointer needs for one class of one section (#274,
+    /// #406): every class title, the class, its place INSIDE the course folder
+    /// (never the disk path) and the course's recorded heading.
+    /// </summary>
+    internal SectionIndex.Pointer PointerFor(Course course, int section, string classPath) =>
+        new(ClassPages(course, section).Select(page => Path.GetFileNameWithoutExtension(page)).ToList(),
+            Path.GetFileNameWithoutExtension(classPath),
+            Path.GetRelativePath(course.DirectoryPath, Path.GetFullPath(classPath)).Replace(Path.DirectorySeparatorChar, '/'),
+            course.Configuration.FrontPageHeading);
+
+    /// <summary>
+    /// Whether pressing Preview should offer today's class for the front page
+    /// (#406). Called by the section window's Preview button ONLY.
+    /// </summary>
+    public TodaysClassOnTheFrontPage.Offering? TodaysClassOffer(string courseCode, int sectionNumber, DateOnly today)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        return TodaysClassOnTheFrontPage.Offer(course, section, ClassPages(course, section),
+                                               SectionIndex.PathFor(course, section), today);
+    }
+
+    /// <summary>Show on Front Page, decided again for the day the question was asked.</summary>
+    public TodaysClassOnTheFrontPage.Outcome ShowTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+                                                             TodaysClassOnTheFrontPage.Offering offering)
+    {
+        var course = Course(courseCode);
+        int section = Section(course, sectionNumber);
+        var classes = ClassPages(course, section);
+        return TodaysClassOnTheFrontPage.ShowOnTheFrontPage(course, section, classes, SectionIndex.PathFor(course, section),
+            askedOn, offering, path => PointerFor(course, section, path), SiblingTimeAndOffset(course, section, classes));
+    }
+
+    /// <summary>Not Today, remembered for this section, day and class.</summary>
+    public void DeclineTodaysClass(string courseCode, int sectionNumber, DateOnly askedOn,
+                                   TodaysClassOnTheFrontPage.Offering offering)
+    {
+        var course = Course(courseCode);
+        TodaysClassOnTheFrontPage.RecordNotToday(course, Section(course, sectionNumber), askedOn, offering);
+    }
+
+    /// <summary>
+    /// What this course's TEACHER hears a class page called (#274). For the
+    /// teacher's copy only; the model's copy is always the class form.
+    /// </summary>
+    public ClassNoun NounForCourse(string courseCode)
+    {
+        try { return Course(courseCode).Configuration.ClassNoun; }
+        catch (AssistRefusal) { return ClassNoun.Class; }
+    }
+
+    /// <summary>How this course names its class pages — word AND scheme (#274).</summary>
+    public ClassPageNaming NamingForCourse(string courseCode)
+    {
+        try { return Course(courseCode).Configuration.Naming; }
+        catch (AssistRefusal) { return ClassPageNaming.Standard; }
+    }
 
     private string UnitWordFor(string courseCode)
     {
@@ -3711,9 +4004,12 @@ public sealed partial class AssistWorkspace
     /// has written yet has no business appearing in the site, and the teacher
     /// asked for exactly that.
     /// </summary>
-    private static string ClassSkeleton(NewClass created, int unit, int howMany, string tail)
+    private static string ClassSkeleton(NewClass created, int? unit, int howMany, string tail)
     {
         string plural = howMany == 1 ? "This page was" : $"{howMany} of these were";
+        // A numbered course has no units, so its page carries no unit tag —
+        // the club start in setup_course.py writes "Week 1" untagged too.
+        string tags = unit is { } u ? $"tags:\n  - unit-{u}\n" : "";
         return $"""
             ---
             title: {created.Title}
@@ -3722,9 +4018,7 @@ public sealed partial class AssistWorkspace
             transcludeTitleSize: h2
             enableToc: false
             excludeBacklinks: true
-            tags:
-              - unit-{unit}
-            ---
+            {tags}---
 
             %%
             This is the shape every class page takes: a numbered agenda of what
@@ -3807,7 +4101,8 @@ public readonly record struct LaunchOutcome(
     bool Succeeded,
     string Message,
     IReadOnlyList<Models.SiteHealthFinding>? Findings = null,
-    int? ExitCode = null)
+    int? ExitCode = null,
+    LinksChecklistMarker? LinksChecklist = null)
 {
     /// <summary>
     /// deploy.py's NEEDS_AN_ANSWER, which preview.ps1 and deploy.ps1 pass
