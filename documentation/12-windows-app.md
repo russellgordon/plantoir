@@ -40,11 +40,23 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
   anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
   first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+- **A typed publish folder (#304, review L1).** `deploy.ps1`'s
+  `Resolve-PublishFolder` takes a plain relative name from the working folder
+  (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
+  drive-relative (`C:foo`) or root-relative (`\out`) one: `IsPathRooted`
+  calls both rooted and `GetFullPath` then resolves them against the PROCESS
+  directory (verified: `C:\Windows\foo` with that working directory).
+  Rejected: refusing every relative name as the app does — the command line
+  and deploy.sh accept one, and #304 asked for it resolved once.
 - **Freshness (#272).** `.build-started` beside `public\` is written natively,
   so one clock stamps it and the Save. `BuiltForPreview` reads bytes; the
   `SearchOption.AllDirectories` overload does not skip Hidden items (a default
   `EnumerationOptions` does — the must-fail proved it once the test gave the
-  dot folder the Hidden attribute, which NTFS does not do by itself).
+  dot folder the Hidden attribute, which NTFS does not do by itself). A
+  folder under `public\` that cannot be LISTED answers "rebuild" (review L2):
+  its pages were never looked at, and the throw used to escape NeedsRebuild
+  and fail the Deploy. Case-sensitivity is pinned by a proposed 16th case
+  (the tag in capitals).
 - **Two windows (#272).** Measured by reading and then by test before writing:
   Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
   loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
