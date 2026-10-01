@@ -2847,3 +2847,35 @@ buildId is the site's. **Every rollover** (same website or new, not only
 `ReleaseSite`) moves the fragments to `.published-pages.previous-<stamp>/`,
 keeps the folder, removes the answered file, and records it all in the undo
 history.
+
+## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
+
+What a Windows implementer needs that the mac's write-up cannot give; the
+rules and the reasoning are in `documentation/09-mac-app.md` → "Copying a page
+from one course into another", and its "On Windows" subsection has the numbers.
+
+- **"Already here" is an HResult, not a check.** Every page and picture is
+  written by stream into `new FileStream(path, FileMode.CreateNew, …)`. An
+  `IOException` whose `HResult` is `0x80070050` (`ERROR_FILE_EXISTS`) — or
+  `0x800700B7` — is the ordinary skip, in the index's words. `File.Exists` then
+  `File.WriteAllText` has a window; `File.Copy` carries the read-only attribute.
+- **NTFS creates an NFD twin of an NFC name** (and refuses a case twin). The
+  name index (`CoursePageCopy.Fold`: `Normalize(FormC)` then
+  `ToUpperInvariant`, ordinal) is therefore the only guard, and it is updated
+  after every successful write. Run every comparison ordinally:
+  `string.Contains(string)` is ordinal; `IndexOf(string)` without a
+  `StringComparison` is culture-sensitive and is what would fuse a combining
+  mark with the space after a colon — Swift's trap, inverted.
+- **The guard is fuzzed against the real build, in one Python pool.**
+  `Plantoir.Tests/BuildFrontmatterOracle.cs` writes the pages to a temp folder
+  and runs a `multiprocessing.Pool` that imports `scripts/build_site.py`, calls
+  `frontmatter.load` and the real `process_frontmatter` for sections 1–4, and
+  reads `publish` as `patches/publish.ts` does. It caches
+  `_get_excluded_note_config` (which re-reads the contracts on every call) and
+  nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
+  PC — every file open pays for Defender — and 30 s across the pool. Set
+  `PLANTOIR_FUZZ_N` to go bigger; one PLANTOIR_FUZZ_N=1000000 run took 1 h 20 min here and found **856 pages certified and not hidden** (of 401,096 certified) — an OPEN defect, see doc 09; set PLANTOIR_FUZZ_DUMP to a path to write the failing pages out.
+- **The dialog** is a `ContentDialog` whose primary button cancels its own
+  close (`args.Cancel = true` under a deferral) so one dialog walks the three
+  stages; the picker is an `AutoSuggestBox` fed only on
+  `AutoSuggestionBoxTextChangeReason.UserInput`, so nothing opens on focus.
