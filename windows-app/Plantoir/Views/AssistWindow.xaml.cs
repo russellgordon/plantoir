@@ -585,7 +585,9 @@ public sealed partial class AssistWindow : Window
             ShowRecalled(phrasing);
             _history.StopBrowsing();
             Input.Focus(FocusState.Programmatic);
-        });
+        },
+        // A club's own shelf, in its own noun (#274).
+        groups: AssistPromptShelf.GroupsFor(_course.Configuration.Naming, _course.Configuration.ClassNoun));
         PromptShelfHost.Content = shelf;
         PromptShelfArea.Visibility = Visibility.Visible;
 

@@ -56,6 +56,39 @@ public static class AssistPromptShelf
         ]),
     ];
 
+    /// <summary>
+    /// The shelf for ONE course (#274, mac <c>AssistPromptShelfView.groups(naming:noun:)</c>).
+    /// An ordinary course gets <see cref="Groups"/> unchanged. A numbered
+    /// course — a club's "Week 3" — gets its own list in its own noun: no
+    /// unit cards (each would be refused there) and no "Publish Week 2" /
+    /// "Unpublish Week 2", because publishing one page by its title goes to
+    /// the model and no routing measurement has been made in a club. Every
+    /// card on it but "Cancel scheduled deploy" is matched in code.
+    /// </summary>
+    public static IReadOnlyList<(string Title, IReadOnlyList<string> Phrasings)> GroupsFor(
+        Plantoir.Core.Models.ClassPageNaming naming, Plantoir.Core.Models.ClassNoun noun)
+    {
+        if (!naming.IsNumbered) return Groups;
+        string one = noun == Plantoir.Core.Models.ClassNoun.Meeting ? "meeting" : "class";
+        string many = noun == Plantoir.Core.Models.ClassNoun.Meeting ? "meetings" : "classes";
+        return
+        [
+            ("Making pages visible", [$"Publish tomorrow's {one}", $"Publish Monday's {one}"]),
+            ("Taking it back", ["Undo that"]),
+            ("Checking", ["What would students see in this section right now?", "Preview"]),
+            ($"Planning {many}",
+            [
+                $"Add the next {one} page",
+                $"Duplicate {naming.Title(1, 2)} as my next {one}",
+                $"Make room for one {one} at {naming.Title(1, 3)}",
+                $"When are my next {many}?",
+                $"I have a revised list of {one} dates",
+                $"Re-date my {many}",
+            ]),
+            ("Putting the site online", ["Deploy now", "Deploy at 6:30 AM", "Cancel scheduled deploy"]),
+        ];
+    }
+
     public static HashSet<string> ParseOpenGroups(string? raw)
     {
         var titles = new HashSet<string>(StringComparer.Ordinal);
