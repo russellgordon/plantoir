@@ -50,8 +50,26 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
   window's Save exactly as on the mac. `Write` now merges per top-level key and
   returns what it kept or replaced; `WorkspaceViewModel.OtherCopiesReread`
-  re-reads every other unchanged copy; Revert reads the file. Still owed on
-  #272: Preview Again and its four sentences, and the two new trail events.
+  re-reads every other unchanged copy; Revert reads the file. After a Save,
+  Course Settings says `settingsSaveReplacedSidebarChange` first, then
+  `settingsSavedWhilePublishing` or `settingsSavedWhilePreviewing` with a
+  Preview Again button (stops and restarts every open preview of the course,
+  in whichever window; `settingsPreviewAgainNothingOpen` and the button
+  disabled once none is open); a preview started with unsaved edits in ANY
+  window says `previewUsesSavedSettings`. Events: `preview started with
+  unsaved settings`, `preview again after settings saved`.
+- **The acts read the saved file (#357 / mac #335).** `SavedSettings.Read` at
+  the Deploy press (and the assistant pressing it) and in the schedule sheet
+  (on open and again at the press); unreadable refuses with
+  `settingsCouldNotBeReadToDeploy`, never the window's copy. Unsaved edits
+  anywhere: `deployUsesSavedSettings` / `schedulingUsesSavedSettings` and
+  `deploy used the saved settings` (kinds only). The section's notices have
+  their own InfoBar, never cleared by a preview's end (the mac's F3 trap).
+- **Overnight Cloudflare remake (#395).** The wrapper runs a Cloudflare leg
+  captured (Start-Process redirection, as the build leg) and appends any
+  `PLANTOIR_CLOUDFLARE_REMADE:` line to the section's record; the app writes
+  `cloudflare project made again` when it reads it. Every leg's exit is
+  `$legExit`.
 - **Windowless work (#391, #386).** `AssistWorkspace` runs every leg
   `--non-interactive`; `LaunchOutcome.ExitCode` 3 becomes the contract's
   sentences. The window refuses a preview while `CourseActivity.IsPublishingSection`

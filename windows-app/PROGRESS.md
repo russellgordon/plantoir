@@ -195,11 +195,10 @@ line), #286 (forty port blocks, the sentence, the launcher trail line),
 (Cloudflare remade, from the app's and plantoir-mcp's own runs), #304 (partial
 publish folder refused; deploy.ps1 resolves once), #358 (fingerprint rule 2),
 #319 and #307 (measured; the re-probe now binds loopback too). Checked, nothing
-to change: #393, #401. Partly: #272 (freshness, preview detection and the
-two-window Save merge done; Preview Again, four sentences and two events
-owed), #357 (re-date counts done; the saved settings at the deploy act owed),
-#395 (the scheduled wrapper captures only the build leg's output, so an
-overnight remake leaves no line yet). Measurements and reasons:
+to change: #393, #401. Then completed on the same branch: #272 (Preview
+Again, the saved-settings sentences, both events), #357 (Deploy and the
+schedule sheet read the saved file), #395 (the overnight Cloudflare leg is
+captured). Measurements and reasons:
 `documentation/12-windows-app.md` → "Preview and publish mechanics that match
 the mac (bundle 4)" and `documentation/03-launcher-scripts.md` →
 "preview.ps1's own port walk…".
