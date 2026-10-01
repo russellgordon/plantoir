@@ -1061,7 +1061,7 @@ public class FolderContainerTests
             string joined = string.Join(" ", command);
             Assert.Contains("docker stop -t 2 teaching-quartz-", joined);
             Assert.Contains("docker ps -q", joined);          // the emptiness check
-            Assert.Contains("wsl --terminate", joined);       // only fires when idle
+            Assert.Contains("--terminate", joined);           // only fires when idle (#231: it must ANSWER)
             // De-duplicated: one container name, mentioned once.
             int count = joined.Split("teaching-quartz-").Length - 1;
             Assert.Equal(1, count);

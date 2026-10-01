@@ -1193,7 +1193,7 @@ public sealed class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
-        RefuseIfPlantoirIsBuilding(course);
+        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's deploy");
 
         var destinations = course.Configuration.AllDeployDestinations;
 
@@ -1232,7 +1232,7 @@ public sealed class AssistWorkspace
         }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
+        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
@@ -1299,7 +1299,7 @@ public sealed class AssistWorkspace
                     string.Join(" and ", legs.Select(Models.DeployCommand.DestinationDescription));
                 answerMessage = AssistWording.DeployNeedsAnAnswerAt(course.Code, section.ToString(), Names(askedAt));
                 var wentOut = outcomeLegs.Where(leg => leg.Succeeded).Select(leg => leg.Destination).ToList();
-                if (wentOut.Count > 0) answerMessage += " " + AssistWording.WentOutTo(Names(wentOut));
+                if (wentOut.Count > 0) answerMessage += " " + AssistWording.DeployWentOutTo(Names(wentOut));
             }
             return new AssistResult(outcomeLegs.Any(leg => leg.Succeeded),
                 Models.SiteHealthFinding.Appending(answerMessage, build.Findings), null);
@@ -1324,10 +1324,10 @@ public sealed class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
-        RefuseIfPlantoirIsBuilding(course);
+        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's rebuild");
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
+        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's rebuild");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
@@ -1465,9 +1465,16 @@ public sealed class AssistWorkspace
         if (!preview)
             return new AssistResult(true, Summary(changed, previewed: false, course.Code, section, plan.Hiding), backup);
 
-        RefuseIfPlantoirIsBuilding(course);
+        // The pages are already written: Markdown never conflicts with a
+        // build, so only the REBUILD is declined when another program is
+        // building, publishing or previewing this course (#289), and the note
+        // where the preview would have been refreshed says so.
+        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        if (claim is null)
+            return new AssistResult(true,
+                Summary(changed, previewed: false, course.Code, section, plan.Hiding) + " " + AssistWording.CourseIsBusy(course.Code),
+                backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
@@ -1670,9 +1677,11 @@ public sealed class AssistWorkspace
         if (!preview)
             return new AssistResult(true, summary, backup);
 
-        RefuseIfPlantoirIsBuilding(course);
+        // Written already; only the rebuild is declined (#289), as above.
+        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        if (claim is null)
+            return new AssistResult(true, summary + " " + AssistWording.CourseIsBusy(course.Code), backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuild(course);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         return build.Succeeded
@@ -1756,11 +1765,51 @@ public sealed class AssistWorkspace
     }
 
     /// <summary>
-    /// Claim the build for as long as it runs, so Plantoir's own Preview and
-    /// Deploy stand off rather than clearing the folder underneath it.
+    /// A first look, before anything is written or backed up: decline a BUILD
+    /// while another program builds, publishes or PREVIEWS this course
+    /// (<c>shared-rules.json</c> → <c>workLeases.declining</c>, #289).
     /// </summary>
-    private IDisposable ClaimTheBuild(Course course) =>
-        WorkLease.Take(_folder, course.Code, WorkLease.Building);
+    /// <remarks>
+    /// Stricter than <see cref="RefuseIfPlantoirIsBuilding"/>, and only for
+    /// paths that BUILD: every <c>--build-only</c> first ends that section's
+    /// serving preview, so a rebuild from here took down the page the teacher
+    /// was reading. Writes keep the old, narrower check — refusing a WRITE
+    /// during a preview made the assistant useless to a teacher watching it.
+    /// The guarantee is <see cref="ClaimTheBuildOrDecline"/>; this only saves a
+    /// backup and a message that would then be thrown away.
+    /// </remarks>
+    private void RefuseIfAnotherProgramStandsInTheWay(Course course, int section, string asked)
+    {
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), course.Code, section);
+        throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+    }
+
+    /// <summary>
+    /// Claim the build for as long as it runs, so Plantoir's own Preview and
+    /// Deploy stand off rather than clearing the folder underneath it — TAKE
+    /// first, then look, with nothing awaited in between, counting only leases
+    /// taken before this one (<c>workLeases.declining.takeThenCheck</c>), so two
+    /// programs that race cannot both go ahead. Declined: the lease is given
+    /// back, the trail says why, and the caller is refused with the sentence an
+    /// assistant working from outside is told (<c>wording.courseIsBusy</c>).
+    /// </summary>
+    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked) =>
+        ClaimTheBuildUnlessDeclined(course, section, asked)
+            ?? throw new AssistRefusal(AssistWording.CourseIsBusy(course.Code));
+
+    /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
+    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked)
+    {
+        var claim = WorkLease.Take(_folder, course.Code, WorkLease.Building);
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
+            return claim;
+        claim.Dispose();
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), course.Code, section);
+        return null;
+    }
 
 
 
@@ -2471,18 +2520,19 @@ public sealed class AssistWorkspace
         if (ScheduledDeploy.Problem(course, section, when, DateTime.Now, cloudflareAccountId) is { } problem)
             throw new AssistRefusal(problem);
 
-        var unpublished = new List<string>();
+        // Only the classes the caller NAMED, each said as published or not
+        // (#400: the section-wide unpublished list is gone from scheduling).
+        var named = new List<(string Title, bool? Published)>();
         foreach (string title in classesToCheck ?? Array.Empty<string>())
         {
             try
             {
                 string path = Page(course, section, title);
-                if (PageFrontmatter.IsDraft(File.ReadAllText(path), section))
-                    unpublished.Add(Path.GetFileNameWithoutExtension(path));
+                named.Add((Path.GetFileNameWithoutExtension(path),
+                           !PageFrontmatter.IsDraft(File.ReadAllText(path), section)));
             }
-            // A page that cannot be found is reported by the caller's own
-            // lookup; it is not this check's job to refuse over it.
-            catch (AssistRefusal) { }
+            // A page that cannot be found is said so, not refused over.
+            catch (AssistRefusal) { named.Add((title, null)); }
         }
 
         return new ScheduledDeploy
@@ -2490,8 +2540,9 @@ public sealed class AssistWorkspace
             CourseCode = course.Code,
             SectionNumber = section,
             When = when,
-            UnpublishedClasses = unpublished,
-            Destination = DestinationOf(course),
+            ClassesNamed = named,
+            // EVERY destination, from the list the run deploys to (#400).
+            Destination = ScheduledDeploy.EveryDestination(course.Configuration),
         };
     }
 

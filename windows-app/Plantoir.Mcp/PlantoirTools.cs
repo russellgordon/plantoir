@@ -70,11 +70,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         foreach (var course in courses)
         {
             var configuration = course.Configuration;
-            string destination = configuration.DeploysToLocalFolder ? "a folder on this computer"
-                : configuration.DeploysToCloudflare ? "Cloudflare Pages" : "Netlify";
             text.AppendLine($"{course.Code} — {configuration.CourseName}");
             text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
-            text.AppendLine($"  publishes to: {destination}");
+            // EVERY destination by type (#404, mac #403) — it used to name the
+            // primary alone, and a folder with no path chosen yet as Netlify.
+            text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
         }
         return text.ToString().TrimEnd();
     }
@@ -359,16 +359,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
             var plan = workspace.PlanScheduledDeploy(course, section, moment);
-            // The Cloudflare Account ID is a per-teacher, machine-global
-            // setting, read the same way PlanScheduledDeploy's own refusal
-            // check does — omitting it here would schedule a Cloudflare
-            // deploy with an empty --account, even once the refusal check
-            // above had already confirmed a real one was configured.
-            string cloudflareAccountId = AppSettings.Load().CloudflareAccountId;
+            // Where it goes and the Cloudflare Account ID are read when the
+            // deploy RUNS now (#347), from the course's settings and the app's
+            // own; what is written here is only what the teacher was told.
             var scheduledCourse = workspace.Course(plan.CourseCode);
-            if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment, scheduledCourse.DirectoryPath,
-                                        scheduledCourse.Configuration.AllDeployDestinations, cloudflareAccountId) is { } problem)
+            if (TaskScheduling.Schedule(workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment,
+                                        scheduledCourse.Configuration.AllDeployDestinations) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the
@@ -393,14 +389,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
-            string name = $"Plantoir deploy {found.Code} section {number}";
 
-            if (!TaskScheduling.Exists(name))
+            // THIS working folder's deploy of the section (#309), found by the
+            // folder its task names — another folder's ICS3U is not ours.
+            if (TaskScheduling.For(workspace.FolderPath, found.Code, number) is not { } scheduled)
                 return Answering($"There is no deploy scheduled for {found.Code} Section {number}.",
                                  $"There is no deploy scheduled for {found.Code} Section {number}, " +
                                  "so there was nothing to call off.");
 
-            return TaskScheduling.Cancel(name) is { } problem
+            return TaskScheduling.Cancel(scheduled) is { } problem
                 ? Answering($"That could not be cancelled: {problem}")
                 : Answering($"Cancelled the scheduled deploy for {found.Code} Section {number}.");
         });
@@ -1365,7 +1362,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             said += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsite(
                 string.Join(", ", released.StillPinned));
 
-        switch (TurnOffAnyScheduledPublish(course.Code, sectionNumber))
+        switch (TurnOffAnyScheduledPublish(workspace.FolderPath, course.Code, sectionNumber))
         {
             case ScheduledPublishOutcome.NoneWasSet: break;
             case ScheduledPublishOutcome.TurnedOff:
@@ -1420,16 +1417,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// while the address the teacher's students actually read quietly stopped
     /// updating.
     /// </remarks>
-    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string courseCode, int sectionNumber)
+    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string workingFolder, string courseCode, int sectionNumber)
     {
-        string taskName = TaskScheduling.NameFor(courseCode, sectionNumber);
-        if (!TaskScheduling.Exists(taskName)) return ScheduledPublishOutcome.NoneWasSet;
+        // THIS working folder's deploy of the section only (#239's rollover
+        // case: the mac's rollover was the one cancel left folder-blind).
+        var (turnedOff, problem) = TaskScheduling.CancelFor(workingFolder, courseCode, sectionNumber);
+        foreach (int section in turnedOff)
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledDeployTurnedOff,
+                "turned off: the section was rolled over onto a new website", courseCode, section);
         // The failure is REPORTED, never swallowed: a task left behind runs at
         // its appointed time, with nobody to ask what the new website should be
         // called — the whole thing turning it off exists to prevent.
-        return TaskScheduling.Cancel(taskName) is null
-            ? ScheduledPublishOutcome.TurnedOff
-            : ScheduledPublishOutcome.CouldNotTurnOff;
+        if (problem is not null) return ScheduledPublishOutcome.CouldNotTurnOff;
+        return turnedOff.Count > 0 ? ScheduledPublishOutcome.TurnedOff : ScheduledPublishOutcome.NoneWasSet;
     }
 
     /// <summary>What became of a publish that was set to happen on its own.</summary>

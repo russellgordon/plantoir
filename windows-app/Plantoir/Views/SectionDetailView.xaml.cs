@@ -67,8 +67,8 @@ public sealed partial class SectionDetailView : UserControl
 
     // The on-disk half of the same claims. In-memory leases are invisible to
     // the MCP server, which is a different process entirely.
-    private IDisposable? _previewWork;
-    private IDisposable? _publishWork;
+    private WorkLease.Held? _previewWork;
+    private WorkLease.Held? _publishWork;
     private IDisposable? _publishActivity;
 
     /// <summary>
@@ -77,7 +77,13 @@ public sealed partial class SectionDetailView : UserControl
     /// SERVER does, which is a different question: serving is not a conflict,
     /// building is.
     /// </summary>
-    private IDisposable? _buildWork;
+    private WorkLease.Held? _buildWork;
+
+    /// <summary>
+    /// This view's preview being BUILT, on the app's own record — what the
+    /// quit question counts (#231). Ends with the build claim.
+    /// </summary>
+    private IDisposable? _previewBuildRecord;
     private Uri? _previewUrl;
     private Uri? _lastLoadedUrl;
     private bool _isWaitingForServer;
@@ -444,7 +450,9 @@ public sealed partial class SectionDetailView : UserControl
         if (_healthDialogIsUp || _healthQueue.PendingCount > 0) return;
         try
         {
-            var waiting = ScheduledHealthFindings.Take(_course.Code, _sectionNumber);
+            var waiting = _window.Workspace.WorkspacePath is { } folder
+                ? ScheduledHealthFindings.Take(_course.Code, _sectionNumber, folder)
+                : Array.Empty<SiteHealthFinding>();
             if (waiting.Count > 0) NoteHealthFindings(waiting, cameFromPublishing: true);
         }
         catch (Exception ex)
@@ -477,10 +485,17 @@ public sealed partial class SectionDetailView : UserControl
     /// section still gets one — and that teacher is precisely the one who
     /// writes in to say their site did not update.</para>
     /// </remarks>
-    private void ShowHowTheScheduledPublishTurnedOut()
+    internal void ShowHowTheScheduledPublishTurnedOut()
     {
         ScheduledPublishOutcome.Result? outcome;
-        try { outcome = ScheduledPublishOutcome.Read(_course.Code, _sectionNumber); }
+        try
+        {
+            // THIS working folder's record (#309): another folder's ICS3U
+            // section 1 is a different alarm with its own news.
+            outcome = _window.Workspace.WorkspacePath is { } folder
+                ? ScheduledPublishOutcome.Read(_course.Code, _sectionNumber, folder)
+                : null;
+        }
         catch (Exception ex)
         {
             App.LogDiagnostic($"ShowHowTheScheduledPublishTurnedOut exception: {ex}");
@@ -552,7 +567,8 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
-            ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber);
+            if (_window.Workspace.WorkspacePath is { } folder)
+                ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber, folder);
             SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
         }
         catch (Exception ex)
@@ -698,18 +714,19 @@ public sealed partial class SectionDetailView : UserControl
         if (_window.Workspace.WorkspacePath is not { } workspacePath) return null;
 
         // Said in the same shape as the other two rather than through
-        // TheAssistantIsBuilding()'s own dialog: that one is a second
+        // AnotherProgramStandsInTheWay()'s own dialog: that one is a second
         // ContentDialog raised while the outcome dialog is still closing,
         // which WinUI refuses — and its refusal is swallowed, so the press
         // would do nothing and say nothing. Silence, in the button meant to
-        // end silence.
-        if (CourseActivity.IsBuildingElsewhere(workspacePath, _course.Code))
+        // end silence. The same rule as Preview itself (#289): another
+        // program's build, publish or preview of this course declines it.
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, workspacePath, _course.Code, claim: null) is { } other)
         {
+            ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                WorkLease.DeclineTrailLine("Preview after a repair", other), _course.Code, _sectionNumber);
             return new SiteHealthRepair.Outcome(
-                $"{_course.Code} is being built just now.",
-                "The assistant is rebuilding this course, and building it here at the same time " +
-                "would clash. You can preview it again once that has finished, and the change " +
-                "will be there.",
+                "Cannot Preview Yet",
+                AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
                 false);
         }
 
@@ -885,14 +902,18 @@ public sealed partial class SectionDetailView : UserControl
             try
             {
                 _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
-                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
+                // BUILD first, then preview, then look (#289, takeThenCheck):
+                // a Preview and an outside build that race cannot both back off.
                 _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
             }
             catch (PreviewLeases.LeaseRefusedException refusal)
             {
                 App.LogDiagnostic($"StartAutomatedPreview refused for {_course.Code} Section {_sectionNumber}: {refusal.Message}");
                 return;
             }
+            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "the assistant's rebuild")) return;
+            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -967,17 +988,24 @@ public sealed partial class SectionDetailView : UserControl
     /// session made a teacher choose between watching their preview and
     /// talking about it, and those two things belong together.
     /// </summary>
-    private async Task<bool> TheAssistantIsBuilding()
+    /// <remarks>
+    /// Since #289 (mac #156) ANOTHER program's build, publish or PREVIEW of
+    /// this course declines a build here — every build first ends that
+    /// section's serving preview — and a publish set for later is one of
+    /// those programs, since it now writes leases too. This first look is
+    /// the quick answer; the guarantee is <see cref="DeclinedAfterTaking"/>.
+    /// </remarks>
+    private async Task<bool> AnotherProgramStandsInTheWay(string asked, string title)
     {
         if (_window.Workspace.WorkspacePath is not { } folder) return false;
-        if (!CourseActivity.IsBuildingElsewhere(folder, _course.Code)) return false;
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim: null) is not { } other) return false;
 
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), _course.Code, _sectionNumber);
         var dialog = new ContentDialog
         {
-            Title = $"{_course.Code} is being built",
-            Content = "The assistant is rebuilding this course right now, and building it here at the " +
-                      "same time would clash — both write to the same place. This usually takes a few " +
-                      "seconds; try again when it finishes.",
+            Title = title,
+            Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
             CloseButtonText = "OK",
         };
         await ShowDialogSafelyAsync(dialog);
@@ -1012,6 +1040,24 @@ public sealed partial class SectionDetailView : UserControl
         return true;
     }
 
+    /// <summary>
+    /// Take-then-check (#289): called right AFTER this view has taken its own
+    /// build lease, with nothing awaited in between. Counts only leases taken
+    /// before <paramref name="claim"/>, so of two programs that race exactly
+    /// one goes ahead. Declined: this view's preview leases are given back and
+    /// the trail says why; the caller says the sentence (or, for the
+    /// assistant's restart, nothing — its tool answer already went).
+    /// </summary>
+    private bool DeclinedAfterTaking(string folder, WorkLease.Claim claim, string asked)
+    {
+        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, folder, _course.Code, claim) is not { } other) return false;
+        ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+            WorkLease.DeclineTrailLine(asked, other), _course.Code, _sectionNumber);
+        ReleaseLease();
+        RefreshChrome();
+        return true;
+    }
+
     private async void PreviewOrStop_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -1020,7 +1066,7 @@ public sealed partial class SectionDetailView : UserControl
             // FIRST, before any lease is taken or anything stopped (#386).
             if (_window.Workspace.WorkspacePath is { } deployingFolder &&
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
-            if (await TheAssistantIsBuilding()) return;
+            if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet")) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
@@ -1029,10 +1075,12 @@ public sealed partial class SectionDetailView : UserControl
             {
                 _lease = PreviewLeases.Take(workspacePath, _course.Code, _sectionNumber);
                 // Say so on disk as well as in memory: an assistant is a separate
-                // process and cannot see the in-memory lease.
-                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
+                // process and cannot see the in-memory lease. The BUILD lease
+                // first, then the preview's (#289, takeThenCheck), so a Preview
+                // and an outside build that race cannot both back off.
                 // Dropped as soon as the server answers — see ReleaseBuildClaim.
                 _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+                _previewWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Previewing);
             }
             catch (PreviewLeases.LeaseRefusedException refusal)
             {
@@ -1046,6 +1094,17 @@ public sealed partial class SectionDetailView : UserControl
                 await ShowDialogSafelyAsync(dialog);
                 return;
             }
+            if (DeclinedAfterTaking(workspacePath, _buildWork.Claim, "Preview"))
+            {
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "Cannot Preview Yet",
+                    Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+                    CloseButtonText = "OK",
+                });
+                return;
+            }
+            _previewBuildRecord = CourseActivity.BeginPreviewBuild(workspacePath, _course.Code, _sectionNumber);
 
             // The same stop-sweep race the deploy path guards against: a
             // just-stopped preview's sweep would kill this one's build.
@@ -1307,6 +1366,8 @@ public sealed partial class SectionDetailView : UserControl
     {
         _buildWork?.Dispose();
         _buildWork = null;
+        _previewBuildRecord?.Dispose();
+        _previewBuildRecord = null;
     }
 
     /// <summary>
@@ -1357,6 +1418,10 @@ public sealed partial class SectionDetailView : UserControl
         // them: refused, already deploying, the assistant is building, or
         // an exception before the deploy started.
         string? outcomeMessage = AssistWording.DeployDidNotFinish(_course.Code, _sectionNumber.ToString());
+        // This deploy's claim, taken before the preview stop (#289). Given back
+        // in the finally unless handed to _buildWork/_publishWork.
+        WorkLease.Held? deployBuild = null;
+        WorkLease.Held? deployPublish = null;
         try
         {
             // _isPreparingDeploy closes a real window, not just a display
@@ -1366,7 +1431,8 @@ public sealed partial class SectionDetailView : UserControl
             // stop-preview-then-deploy sequence against the first's
             // (row 318a).
             if (_deployRunner.IsRunning || _isPreparingDeploy) return outcomeMessage;
-            if (await TheAssistantIsBuilding()) return outcomeMessage;
+            if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet"))
+                return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
 
             var destinations = _course.Configuration.AllDeployDestinations;
@@ -1402,6 +1468,28 @@ public sealed partial class SectionDetailView : UserControl
             _isPreparingDeploy = true;
             RefreshChrome();
 
+            // The claim is taken BEFORE the preview stop, and looked at at once
+            // (#289, takeThenCheck): the stop ends builds by working directory,
+            // so no other program may be told this course is free while it
+            // runs. Its own fields, not _buildWork — the stop below releases
+            // the PREVIEW's build claim, which lives there.
+            deployBuild = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+            deployPublish = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
+            if (WorkLease.InTheWay(WorkLease.Asker.ABuild, workspacePath, _course.Code, deployBuild.Claim) is { } other)
+            {
+                ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                    WorkLease.DeclineTrailLine("Deploy", other), _course.Code, _sectionNumber);
+                _isPreparingDeploy = false;
+                RefreshChrome();
+                await ShowDialogSafelyAsync(new ContentDialog
+                {
+                    Title = "Cannot Deploy Yet",
+                    Content = AssistWording.CourseIsBeingBuiltElsewhere(_course.Code),
+                    CloseButtonText = "OK",
+                });
+                return AssistWording.CourseIsBeingBuiltElsewhere(_course.Code);
+            }
+
             // Stop any running or building preview before deploying, and
             // wait for the container-side stop sweep to finish so it cannot
             // kill or race the deploy build (the sweep kills by WORKING
@@ -1421,10 +1509,11 @@ public sealed partial class SectionDetailView : UserControl
             // Said AFTER the stop, as on the mac: a deploy that began while
             // we were waiting is the one thing that still stands in the way.
             if (_deployRunner.IsRunning) return outcomeMessage;
-            // The stop can take up to ~20 s, and the leases came off with the
-            // preview — long enough for the assistant to begin a build of its
-            // own. The click-time answer is stale; ask again.
-            if (await TheAssistantIsBuilding()) return outcomeMessage;
+            // No second look after the stop any more (#289). It used to ask
+            // again because the leases came off with the preview and the stop
+            // can take ~20 s; now this deploy's own build lease has been up
+            // through the whole stop, so any program that takes and then
+            // looks sees it as earlier and backs off.
 
             // Where THIS working folder's built websites are kept. The app
             // has to be able to name that path to answer the question at all;
@@ -1439,10 +1528,14 @@ public sealed partial class SectionDetailView : UserControl
             // end and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
-            _publishWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Publishing);
-            // A deploy builds and then uploads, and both end together, so the
-            // build claim can simply run its whole length.
-            _buildWork = WorkLease.Take(workspacePath, _course.Code, WorkLease.Building);
+            // Handed over to the fields EndPublishActivity releases. A deploy
+            // builds and then uploads, and both end together, so the build
+            // claim can simply run its whole length.
+            _publishWork = deployPublish;
+            ReleaseBuildClaim();
+            _buildWork = deployBuild;
+            deployPublish = null;
+            deployBuild = null;
 
             // The real progress panel takes over from here — RunAsync is
             // about to give _deployRunner.Legs fresh runners of its own and
@@ -1501,6 +1594,12 @@ public sealed partial class SectionDetailView : UserControl
         }
         finally
         {
+            // A claim taken and never handed over (declined, or a return
+            // between the take and RunAsync) must not outlive this call, or it
+            // would decline every other program's build of the course.
+            deployBuild?.Dispose();
+            deployPublish?.Dispose();
+
             // A safety net for every early-return path above (the refusal
             // dialog, "already deploying", "the assistant is building",
             // an exception before the flag was cleared): _isPreparingDeploy

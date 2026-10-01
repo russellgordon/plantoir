@@ -110,7 +110,7 @@ public class PreviewWhileDeployingTests : IDisposable
         Assert.Equal(Wording["deployNeedsAnAnswer"]!.ToString(), AssistWording.DeployNeedsAnAnswer("{course}", "{section}"));
         Assert.Equal(Wording["deployNeedsAnAnswerAt"]!.ToString(),
                      AssistWording.DeployNeedsAnAnswerAt("{course}", "{section}", "{destinations}"));
-        Assert.Equal(Wording["deployWentOutTo"]!.ToString(), AssistWording.WentOutTo("{destinations}"));
+        Assert.Equal(Wording["deployWentOutTo"]!.ToString(), AssistWording.DeployWentOutTo("{destinations}"));
         Assert.Equal(Wording["previewBuildNeedsAnAnswer"]!.ToString(), AssistWording.PreviewBuildNeedsAnAnswer("{course}", "{section}"));
         Assert.Equal("Cannot Preview Yet", Rule["sentences"]!["windowTitle"]!.ToString());
     }

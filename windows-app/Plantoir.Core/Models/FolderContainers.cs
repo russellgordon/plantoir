@@ -83,7 +83,10 @@ public static class FolderContainers
         // to INSTALL it — precisely the machinery this design removed.
         if (Scripting.NativeRuntime.Directory is not null) return;
         string name = ContainerName(folderPath);
-        RunDetached("wsl", "-e", "docker", "stop", "-t", "2", name);
+        // Refused while a launcher for this folder is running (#231): a build
+        // starting the machine or fetching tools has no container of ours to see.
+        RunDetached(PowerShell, "-NoProfile", "-WindowStyle", "Hidden", "-Command",
+            $"if (-not ({LauncherRunningFor(folderPath)})) {{ & '{Wsl}' -e docker stop -t 2 {name} }}");
     }
 
     /// <summary>
@@ -96,17 +99,67 @@ public static class FolderContainers
     {
         // Same rule as StopContainer: nothing to release on a native build.
         if (Scripting.NativeRuntime.Directory is not null) return;
-        var names = folderPaths.Select(ContainerName).Distinct().ToList();
+        var folders = folderPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        // Leases first (#231): another program building or publishing in any
+        // of these folders - a publish set for later holds both for its whole
+        // run - means nothing is stopped at all.
+        if (folders.Any(Assist.WorkLease.AnotherProgramIsWorkingIn)) return;
+        var names = folders.Select(ContainerName).Distinct().ToList();
         string stopPart = names.Count > 0
             ? $"docker stop -t 2 {string.Join(' ', names)} >/dev/null 2>&1; "
             : "";
-        // The emptiness check runs AFTER our own containers stop, or it could
-        // never pass. `wsl --terminate` must come from the Windows side, so
-        // the inner script only reports; the outer decides.
-        string script = stopPart + "if [ -z \"$(docker ps -q 2>/dev/null)\" ]; then echo IDLE; fi";
-        RunDetached("powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command",
-            $"$out = wsl -u root -e sh -c '{script}'; " +
-            "if ($out -match 'IDLE') { wsl --terminate (wsl -l -q | Select-Object -First 1) }");
+        // Hardened (#231, the mac's #220), though this path runs only without
+        // a native runtime. The emptiness check runs AFTER our own containers
+        // stop, or it could never pass — and it now needs `docker ps` to
+        // ANSWER (exit 0) AND to be empty: a failed question used to read as
+        // an idle machine, and the mac measured exactly that (exit 1, nothing
+        // on stdout, fifteen containers up). `wsl --terminate` comes from the
+        // Windows side, so the inner script only reports; the outer decides.
+        string script = stopPart + "out=$(docker ps -q 2>/dev/null); rc=$?; " +
+                        "if [ $rc -eq 0 ] && [ -z \"$out\" ]; then echo IDLE; fi";
+        // Nothing at all is stopped while a launcher for any of these folders
+        // is running on the machine — a scheduled publish, an outside
+        // assistant, a second window: none is visible as a container while it
+        // is still starting the machine or fetching what it needs.
+        string anyLauncher = folders.Count == 0 ? "$false"
+            : string.Join(" -or ", folders.Select(folder => "(" + LauncherRunningFor(folder) + ")"));
+        RunDetached(PowerShell, "-NoProfile", "-WindowStyle", "Hidden", "-Command",
+            $"if ({anyLauncher}) {{ return }}; " +
+            $"$out = & '{Wsl}' -u root -e sh -c '{script}'; " +
+            $"if ($LASTEXITCODE -eq 0 -and $out -match 'IDLE') {{ & '{Wsl}' --terminate (& '{Wsl}' -l -q | Select-Object -First 1) }}");
+    }
+
+    /// <summary>
+    /// The programs the quit path starts, by their full System32 path (#231's
+    /// CHECK). By name, <c>CreateProcess</c> looks in the app's own folder and
+    /// the current directory BEFORE System32 — so a stray wsl.exe beside the app
+    /// would have been run; a teacher's PATH could not reach them, because
+    /// System32 comes before PATH. The mac's whole bug was a program looked up
+    /// by name in an environment nobody had checked.
+    /// </summary>
+    internal static string PowerShell =>
+        Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+
+    internal static string Wsl => Path.Combine(Environment.SystemDirectory, "wsl.exe");
+
+    /// <summary>
+    /// A PowerShell test for "is a launcher for this folder running right
+    /// now?" — the QUESTION the mac asks with <c>ps -Ao args= | grep -F</c>,
+    /// asked of Windows' own process list. Matched as a literal (never a
+    /// wildcard or a regex: a folder called <c>C++ 26(27)</c> must not need
+    /// escaping, and getting it wrong fails OPEN), and excluding the launchers'
+    /// own <c>--stop</c> runs, or the app's own preview stop would make every
+    /// quit decide something is busy and free nothing.
+    /// </summary>
+    internal static string LauncherRunningFor(string folderPath)
+    {
+        string folder = folderPath.TrimEnd('\\').Replace("'", "''");
+        return "@(Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { " +
+               "$c = [string]$_.CommandLine; " +
+               $"($c.IndexOf('{folder}\\preview.ps1', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or " +
+               $"$c.IndexOf('{folder}\\deploy.ps1', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or " +
+               $"$c.IndexOf('{folder}\\setup.ps1', [StringComparison]::OrdinalIgnoreCase) -ge 0) -and " +
+               "$c.IndexOf('--stop', [StringComparison]::OrdinalIgnoreCase) -lt 0 }).Count -gt 0";
     }
 
     private static void RunDetached(params string[] command)

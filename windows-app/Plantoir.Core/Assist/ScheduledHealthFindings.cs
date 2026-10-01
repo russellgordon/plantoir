@@ -53,8 +53,8 @@ public static class ScheduledHealthFindings
     /// in the quietest way available: the record is written every night and
     /// read never.</para>
     /// </summary>
-    public static string SentinelPath(string courseCode, int sectionNumber) =>
-        Path.Combine(Directory(), TaskScheduling.HealthRecordName(courseCode, sectionNumber));
+    public static string SentinelPath(string courseCode, int sectionNumber, string workingFolder) =>
+        Path.Combine(Directory(), TaskScheduling.HealthRecordName(courseCode, sectionNumber, workingFolder));
 
     /// <summary>
     /// What the last scheduled run found for this section, consuming the record
@@ -68,14 +68,19 @@ public static class ScheduledHealthFindings
     /// closed. (The mac does not write this line; proposed back to it in
     /// <c>contracts/shared-rules.json</c> → <c>siteHealth</c>.)</para>
     /// </summary>
-    public static IReadOnlyList<SiteHealthFinding> Take(string courseCode, int sectionNumber) =>
-        TakeFrom(Directory(), courseCode, sectionNumber);
+    public static IReadOnlyList<SiteHealthFinding> Take(string courseCode, int sectionNumber, string workingFolder)
+    {
+        // A record a task set before #309 wrote under the folder-less name is
+        // filed under its folder's name first, as the outcome records are.
+        ScheduledPublishOutcome.RefileOldNamedRecordsIn(Directory());
+        return TakeFrom(Directory(), courseCode, sectionNumber, workingFolder);
+    }
 
     /// <summary>The same, against an arbitrary directory — what the tests use.</summary>
     public static IReadOnlyList<SiteHealthFinding> TakeFrom(
-        string directory, string courseCode, int sectionNumber)
+        string directory, string courseCode, int sectionNumber, string? workingFolder = null)
     {
-        string path = Path.Combine(directory, TaskScheduling.HealthRecordName(courseCode, sectionNumber));
+        string path = ScheduledPublishOutcome.RecordPath(directory, courseCode, sectionNumber, workingFolder);
         string[] lines;
         DateTime writtenAt;
         try

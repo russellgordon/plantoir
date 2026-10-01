@@ -216,6 +216,35 @@ public static class ActivityTrail
         /// </summary>
         BuildDeclinedCourseBusyElsewhere,
         /// <summary>
+        /// A publish set for later found the course being built or published
+        /// elsewhere and waited for it (#289). Carries how long, for whom, and
+        /// whether it then went ahead or stood down — a publish that went out
+        /// ten minutes late looks, from outside, exactly like one that misfired.
+        /// </summary>
+        ScheduledPublishWaitedForTheCourse,
+        /// <summary>
+        /// A deploy the teacher set to happen on its own was turned off by
+        /// something other than them asking: the course or the section was
+        /// removed (#239), the day it was set for had gone by, the course was
+        /// still busy after the wait, or it could not deploy the way the course
+        /// is set now. Carries the course, the section and WHICH.
+        /// </summary>
+        ScheduledDeployTurnedOff,
+        /// <summary>
+        /// A publish set for later read the course's settings when it ran
+        /// (#347, mac #323) and found them different from what the teacher was
+        /// told, or stood down over them. Written only when something differs.
+        /// </summary>
+        ScheduledPublishReadTheCoursesSettings,
+        /// <summary>
+        /// Quitting asked first, because a publish or a preview build was under
+        /// way (#231). Carries what, in the words shown, and which button was
+        /// pressed — "I closed it and it would not close" is the Keep Working
+        /// branch and nothing else explains it. Never written when Windows is
+        /// logging off: nothing is asked then.
+        /// </summary>
+        QuitAskedAboutWorkUnderWay,
+        /// <summary>
         /// A remembered timetable named a date that cannot be a class date —
         /// the file was written by this app before #144, on a PC whose
         /// regional format uses another calendar — and was set aside, so the
@@ -291,6 +320,10 @@ public static class ActivityTrail
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
         Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
+        Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
+        Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
+        Event.ScheduledPublishReadTheCoursesSettings => "scheduled publish read the course's settings",
+        Event.QuitAskedAboutWorkUnderWay => "quit asked about work under way",
         Event.RememberedTimetableSetAside => "remembered timetable set aside",
         Event.SectionAdded => "section added",
         Event.PageSettingsLeftAsTheyWere => "page settings left as they were",
@@ -364,6 +397,37 @@ public static class ActivityTrail
         Note(Event.Helpers, "using " + ProblemReportEnvironment.HelperDescription);
     }
 
+    /// <summary>
+    /// The one lock every WRITER of the trail takes, across processes: the
+    /// app, <c>plantoir-mcp.exe</c> and a scheduled run are separate
+    /// processes writing one file, and <c>lock</c> covers threads of one.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Measured, #303 (this Windows PC: Intel Core i5-8365U, 4 cores /
+    /// 8 threads, 15.7 GB, NTFS, Windows 11 Pro 25H2 build 26200,
+    /// 2026-09-30).</b> Two processes calling <see cref="Note(Event, string, DateTime?)"/>
+    /// 500 times each, started on the same tick, five rounds: the old
+    /// <c>File.AppendAllText</c> (which opens with <c>FileShare.Read</c>, so the
+    /// second writer's open throws a sharing violation into an empty
+    /// <c>catch</c>) kept <b>4,444 of 5,000</b>; three processes × three lines ×
+    /// 100 bursts, the mac's shape, kept <b>682 of 900</b>. With this mutex:
+    /// every line, both shapes (numbers in documentation/09 → "Two writers at
+    /// once").</para>
+    /// <para><b>REJECTED, measured:</b> <c>FileShare.ReadWrite</c> with one
+    /// <c>Write</c> per line and no lock. The issue's first candidate, on the
+    /// reasoning that an append-mode write lands at end-of-file — but .NET's
+    /// <c>FileMode.Append</c> opens for ordinary write and keeps its OWN
+    /// position, so two writers open at the same end and the second
+    /// overwrites the first: 4,512 of 5,000, and 180 of 270. A retry loop on
+    /// the sharing violation was rejected unmeasured, as the issue says: a
+    /// guessed delay that still drops the line after its last retry.</para>
+    /// <para><c>Local\</c>, not <c>Global\</c>: the trail is per user
+    /// (<c>%LOCALAPPDATA%</c>), and every writer runs in the teacher's own
+    /// session. Tests redirect the PATH, not the lock — one lock for every
+    /// trail file on the machine costs nothing at one line at a time.</para>
+    /// </remarks>
+    private const string WritersMutexName = @"Local\PlantoirActivityTrail";
+
     private static void Append(string line)
     {
         lock (_lock)
@@ -376,7 +440,26 @@ public static class ActivityTrail
                 {
                     Directory.CreateDirectory(dir);
                 }
-                File.AppendAllText(path, line + Environment.NewLine);
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(line + Environment.NewLine);
+
+                using var writers = new System.Threading.Mutex(false, WritersMutexName);
+                bool held = false;
+                try
+                {
+                    try { held = writers.WaitOne(TimeSpan.FromSeconds(5)); }
+                    catch (System.Threading.AbandonedMutexException) { held = true; }   // a writer died holding it: ours now
+
+                    // Written even when the wait timed out: a line that might
+                    // interleave is better than a line certainly lost. Five
+                    // seconds is far beyond one line's append (sub-millisecond).
+                    using var stream = new FileStream(path, FileMode.Append, FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete);
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+                finally
+                {
+                    if (held) writers.ReleaseMutex();
+                }
             }
             catch
             {
