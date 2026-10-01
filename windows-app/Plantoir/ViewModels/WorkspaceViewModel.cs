@@ -414,6 +414,17 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         Reload();
     }
 
+    /// <summary>
+    /// Re-read the Backups list and nothing else (#283): after a delete in
+    /// another window on the same folder, reloading the courses as well would
+    /// redo the folder's upkeep for no reason.
+    /// </summary>
+    public void ReloadBackupsOnly()
+    {
+        if (_state.FolderPath is null || State != WorkspaceState.Ready) return;
+        BackupItems = Workspace.FindBackups(_state.FolderPath);
+    }
+
     private void NotifyLoaded()
     {
         Notify(nameof(State));

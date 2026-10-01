@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 using Plantoir.Services;
 using Plantoir.ViewModels;
 
@@ -42,7 +43,13 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
 
     public required string Title { get; init; }
     public required string Glyph { get; init; }
-    public string? Tooltip { get; init; }
+    private string? _tooltip;
+    /// <summary>Settable after creation: backup sizes arrive from a measurement off the UI thread (#283).</summary>
+    public string? Tooltip
+    {
+        get => _tooltip;
+        set { if (_tooltip != value) { _tooltip = value; Raise(nameof(Tooltip)); } }
+    }
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
@@ -313,6 +320,7 @@ public sealed partial class SidebarPane : UserControl
             AutomationId = "backupsGroup",
         };
         if (!_roots.Contains(_backupsGroup)) _roots.Add(_backupsGroup);
+        _backupsGroup.Menu = BackupsGroupMenu();
 
         var byId = new Dictionary<string, SidebarRow>();
         foreach (var row in _backupsGroup.Children)
@@ -334,7 +342,191 @@ public sealed partial class SidebarPane : UserControl
             desired.Add(row);
         }
         ApplyDesiredOrder(_backupsGroup.Children, desired);
+        MeasureBackupSizes(desired);
     }
+
+    // ---- Backups: what they take, and All Backups (#283) -------------------
+
+    private readonly MeasurementGeneration _backupSizeGeneration = new();
+
+    /// <summary>
+    /// Sizes are read OFF the UI thread (a folder in OneDrive can be slow to
+    /// answer) and applied only if no newer list has been read since — a slow
+    /// measurement of the old list must not overwrite the new one.
+    /// </summary>
+    private void MeasureBackupSizes(IReadOnlyList<SidebarRow> rows)
+    {
+        var group = _backupsGroup;
+        var items = Workspace.BackupItems.ToList();
+        int generation = _backupSizeGeneration.Begin();
+        _ = Task.Run(() => items.Select(i => (Item: i, Bytes: BackupSizes.LogicalSize(i.FilePath))).ToList())
+            .ContinueWith(task =>
+            {
+                if (task.IsFaulted) return;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (!_backupSizeGeneration.IsCurrent(generation) || group is null) return;
+                    var summary = BackupSizes.Summarize(task.Result);
+                    group.Tooltip = BackupsSummarySentence(summary);
+                    foreach (var (item, bytes) in task.Result)
+                        if (rows.FirstOrDefault(r => r.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id) is { } row)
+                            row.Tooltip = $"{item.Subtitle} · " +
+                                (bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeRead);
+                });
+            });
+    }
+
+    /// <summary>"4 backups take 29.3 MB together." — the number the Backups list can act on.</summary>
+    internal static string BackupsSummarySentence(BackupSizes.Summary summary)
+    {
+        string sentence = $"{summary.TotalCount} backup{(summary.TotalCount == 1 ? "" : "s")} " +
+                          $"take{(summary.TotalCount == 1 ? "s" : "")} {BackupSizes.Describe(summary.TotalBytes)} together.";
+        if (!summary.EverySizeKnown)
+            sentence += $" {summary.Unknown} not counted: {AssistWording.BackupSizeCouldNotBeRead.ToLowerInvariant()}.";
+        return sentence;
+    }
+
+    private MenuFlyout BackupsGroupMenu()
+    {
+        var menu = new MenuFlyout();
+        menu.Items.Add(MenuItem("All Backups…", RestoreGlyph, () => _ = ShowAllBackups()));
+        return menu;
+    }
+
+    /// <summary>
+    /// All Backups: one line per backup — course, when, who made it, size —
+    /// with Extended selection, and ONE button whose label carries the count.
+    /// A WinUI ListView rather than the mac's Table; the confirmation names a
+    /// backup an open assistant conversation can restore from as KEPT, and
+    /// "together" counts only what will go.
+    /// </summary>
+    public async Task ShowAllBackups()
+    {
+        string? askedIn = Workspace.WorkspacePath;
+        if (askedIn is null) return;
+        var items = Workspace.BackupItems.ToList();
+        var measured = await Task.Run(() => items.Select(i => (Item: i, Bytes: BackupSizes.LogicalSize(i.FilePath))).ToList());
+        var sizes = measured.ToDictionary(m => m.Item.FilePath, m => m.Bytes);
+        var summary = BackupSizes.Summarize(measured);
+
+        var panel = new StackPanel { Spacing = 8, MinWidth = 520 };
+        panel.Children.Add(new TextBlock { Text = BackupsSummarySentence(summary), TextWrapping = TextWrapping.Wrap });
+        foreach (var course in summary.Courses)
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"{course.CourseCode}: {course.Count} backup{(course.Count == 1 ? "" : "s")}, {BackupSizes.Describe(course.Bytes)}",
+                Opacity = 0.8,
+            });
+        if (CloudSyncedFolder.ServiceFor(askedIn) is { } service)
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"This folder is kept in {service}, so these backups also take space in your {service} storage.",
+                TextWrapping = TextWrapping.Wrap,
+            });
+
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Extended, MaxHeight = 360 };
+        AutomationProperties.SetAutomationId(list, "allBackupsList");
+        foreach (var (item, bytes) in measured)
+        {
+            var grid = new Grid { ColumnSpacing = 12 };
+            foreach (var width in new[] { 80, 200, 150, 90 })
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+            string who = item.Maker is BackupMaker.Assistant a ? $"Assistant, Section {a.SectionNumber}" : "You";
+            string[] cells = { item.CourseCode, item.WhenDescription, who,
+                               bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeReadShort };
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = new TextBlock { Text = cells[i], TextTrimming = TextTrimming.CharacterEllipsis };
+                if (i == 3 && bytes is null) ToolTipService.SetToolTip(cell, AssistWording.BackupSizeCouldNotBeRead);
+                Grid.SetColumn(cell, i);
+                grid.Children.Add(cell);
+            }
+            var row = new ListViewItem { Content = grid, Tag = item };
+            AutomationProperties.SetAutomationId(row, $"allBackups-{Path.GetFileName(item.FilePath)}");
+            AutomationProperties.SetName(row, $"{item.CourseCode} {item.WhenDescription}");
+            list.Items.Add(row);
+        }
+        panel.Children.Add(list);
+
+        var dialog = new ContentDialog
+        {
+            Title = "All Backups",
+            Content = panel,
+            PrimaryButtonText = DeleteBackupsLabel(0),
+            IsPrimaryButtonEnabled = false,
+            CloseButtonText = "Done",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        list.SelectionChanged += (_, _) =>
+        {
+            dialog.PrimaryButtonText = DeleteBackupsLabel(list.SelectedItems.Count);
+            dialog.IsPrimaryButtonEnabled = list.SelectedItems.Count > 0;
+        };
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+        var chosen = list.SelectedItems.OfType<ListViewItem>().Select(r => (BackupItem)r.Tag).ToList();
+        await ConfirmDeleteBackups(chosen, sizes, askedIn);
+    }
+
+    /// <summary>"Delete 2 Backups…" — the one button, carrying the count.</summary>
+    internal static string DeleteBackupsLabel(int count) =>
+        count == 1 ? "Delete 1 Backup…" : $"Delete {count} Backups…";
+
+    private async Task ConfirmDeleteBackups(IReadOnlyList<BackupItem> chosen, IReadOnlyDictionary<string, long?> sizes, string askedIn)
+    {
+        if (chosen.Count == 0) return;
+        var held = HeldBackups.For(askedIn, Workspace.BackupItems);
+        var going = chosen.Where(b => !held.Contains(Path.GetFullPath(b.FilePath))).ToList();
+        var kept = chosen.Except(going).ToList();
+        var goingSizes = going.Select(b => sizes.TryGetValue(b.FilePath, out var s) ? s : null).ToList();
+        string together = going.Count > 0 && goingSizes.All(s => s is not null)
+            ? $", {BackupSizes.Describe(goingSizes.Sum(s => s!.Value))} together"
+            : "";
+        string content = going.Count == 0
+            ? ""
+            : $"{going.Count} backup{(going.Count == 1 ? " is" : "s are")} deleted for good{together}. " +
+              "The courses themselves stay put.";
+        if (kept.Count > 0)
+            content += (content.Length > 0 ? "\n\n" : "") + string.Join("\n", kept.Select(k =>
+                $"The backup of {k.CourseCode} made {k.WhenDescription} is kept: an open assistant conversation can still " +
+                $"restore from it. {KeptBackupAdvice(k)}"));
+        var dialog = new ContentDialog
+        {
+            Title = going.Count == 0 ? "These backups are kept" : $"Delete {going.Count} backup{(going.Count == 1 ? "" : "s")}?",
+            Content = new TextBlock { Text = content, TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = going.Count == 0 ? "" : "Delete",
+            CloseButtonText = going.Count == 0 ? "OK" : "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+
+        // Re-read the hold at the moment of deleting: a conversation that made
+        // its backup while the confirmation was up must not lose it.
+        var outcome = BackupDeleter.Delete(chosen, HeldBackups.For(askedIn, Workspace.BackupItems));
+        ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes));
+        if (Workspace.Selection is SidebarSelection.BackupEntry(var id) && outcome.Deleted.Any(b => b.Id == id))
+            Workspace.Selection = null;
+        Workspace.Reload();
+        _window.ApplyState();
+        // Every other window on this folder re-reads its Backups list ONLY.
+        foreach (var other in App.OpenWindows.Where(w => !ReferenceEquals(w, _window)
+                     && w.Workspace.WorkspacePath is { } path
+                     && string.Equals(Path.GetFullPath(path), Path.GetFullPath(askedIn), StringComparison.OrdinalIgnoreCase)))
+        {
+            other.Workspace.ReloadBackupsOnly();
+            other.SidebarPane.Refresh();
+        }
+        if (outcome.Failed.Count > 0)
+            await ShowError("Some backups could not be deleted",
+                string.Join("\n", outcome.Failed.Select(f => $"{f.Item.CourseCode}, {f.Item.WhenDescription}: {f.Problem}")));
+    }
+
+    /// <summary>The words a second assistant window is refused with, turned to this case.</summary>
+    private static string KeptBackupAdvice(BackupItem item) =>
+        item.Maker is BackupMaker.Assistant a
+            ? $"Close the assistant for {item.CourseCode} Section {a.SectionNumber} first if you want to delete it."
+            : $"Close the assistant for {item.CourseCode} first if you want to delete it.";
 
     private void ReconcileCourses()
     {

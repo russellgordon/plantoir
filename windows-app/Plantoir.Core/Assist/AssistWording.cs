@@ -26,6 +26,14 @@ public static class AssistWording
     /// </summary>
     public const string ScheduleQuestion = "Shall I schedule the deploy?";
 
+    // ---- Backups: the space they take (#283 / mac #242) -------------------
+
+    /// <summary>The tooltip for a backup whose size could not be read.</summary>
+    public const string BackupSizeCouldNotBeRead = "Size could not be read, so it is not in the total";
+
+    /// <summary>What stands in the size column for that backup.</summary>
+    public const string BackupSizeCouldNotBeReadShort = "Unknown";
+
     /// <summary>The question under a plan card.</summary>
     public const string PlanQuestion = "Shall I go ahead?";
 

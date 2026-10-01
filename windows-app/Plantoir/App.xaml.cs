@@ -14,6 +14,9 @@ public partial class App : Application
     public static AppSettings Settings { get; private set; } = null!;
     private static readonly List<MainWindow> _windows = new();
 
+    /// <summary>The windows open now, as a copy (a handler may open or close one).</summary>
+    public static IReadOnlyList<MainWindow> OpenWindows => _windows.ToList();
+
     public App()
     {
         InitializeComponent();
