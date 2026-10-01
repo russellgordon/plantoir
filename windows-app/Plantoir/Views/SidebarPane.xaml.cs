@@ -468,9 +468,12 @@ public sealed partial class SidebarPane : UserControl
         await ConfirmDeleteBackups(chosen, sizes, askedIn);
     }
 
-    /// <summary>"Delete 2 Backups…" — the one button, carrying the count.</summary>
+    /// <summary>"Delete 2 Backups…" — the one button, carrying the count. With
+    /// nothing selected it is greyed and says "Delete Backups…", never "Delete 0
+    /// Backups…", which offers to delete nothing (bundle 11, ruling U9; no shared
+    /// rule existed, so it is proposed to the mac in the bundle's draft).</summary>
     internal static string DeleteBackupsLabel(int count) =>
-        count == 1 ? "Delete 1 Backup…" : $"Delete {count} Backups…";
+        count == 0 ? "Delete Backups…" : count == 1 ? "Delete 1 Backup…" : $"Delete {count} Backups…";
 
     private async Task ConfirmDeleteBackups(IReadOnlyList<BackupItem> chosen, IReadOnlyDictionary<string, long?> sizes, string askedIn)
     {

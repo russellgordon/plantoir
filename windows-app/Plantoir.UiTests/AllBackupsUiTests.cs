@@ -47,6 +47,14 @@ public class AllBackupsUiTests
         Assert.NotNull(open);
         open!.Click();
 
+        // Nothing chosen yet: the button is greyed and offers no count — never
+        // "Delete 0 Backups…" (bundle 11, ruling U9).
+        var none = app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"));
+        Assert.True(Retry.WhileNull(() => none = app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")),
+                                    TimeSpan.FromSeconds(10)).Result is not null, "All Backups opened no dialog");
+        Assert.Equal("Delete Backups…", none!.Name);
+        Assert.False(none.IsEnabled, "Delete was offered with nothing chosen");
+
         var first = app.Find("allBackups-" + Names[0], "the first backup's line");
         var second = app.Find("allBackups-" + Names[1], "the second backup's line");
         first.Click();
@@ -58,13 +66,17 @@ public class AllBackupsUiTests
             () => desktop.FindFirstDescendant(cf => cf.ByName("Delete 2 Backups…").And(cf.ByControlType(ControlType.Button))),
             TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
         Assert.NotNull(button);
-        button!.Click();
+        button!.AsButton().Invoke();
 
+        // The CONFIRMATION's own button, found inside the dialog titled for it
+        // and pressed by Invoke: a mouse click while the dialog was still
+        // animating in landed nowhere and nothing was deleted (run 3).
         var confirm = Retry.WhileNull(
-            () => desktop.FindFirstDescendant(cf => cf.ByName("Delete").And(cf.ByControlType(ControlType.Button))),
-            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
+            () => app.OpenDialog() is { Name: "Delete 2 backups?" } d ? d.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")) : null,
+            TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result;
         Assert.NotNull(confirm);
-        confirm!.Click();
+        Assert.Equal("Delete", confirm!.Name);
+        confirm.AsButton().Invoke();
 
         // The sidebar's Backups group starts FOLDED, and a folded TreeView
         // item's children are not in the tree at all — so before bundle 11
