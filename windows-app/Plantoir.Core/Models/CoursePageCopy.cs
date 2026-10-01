@@ -667,6 +667,14 @@ public static class CoursePageCopy
         return outcome;
     }
 
+    /// <summary>A size as a teacher reads it: "820 KB", "1.4 MB", "2.1 GB".</summary>
+    public static string SizeText(long bytes) => bytes switch
+    {
+        < 1024 * 1024 => $"{Math.Max(1, (bytes + 1023) / 1024)} KB",
+        < 1024L * 1024 * 1024 => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.#} MB", bytes / 1048576.0),
+        _ => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.#} GB", bytes / 1073741824.0),
+    };
+
     /// <summary>A test's racing creator: called with a page's path after every check and before its write.</summary>
     internal static Action<string>? BeforeWritingAPage { get; set; }
 
