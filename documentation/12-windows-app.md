@@ -3156,7 +3156,13 @@ a file whose attributes it cannot set (by default a million times at 30 s;
 measured by the plan review). `Copy-Item`, Explorer and a zip do not carry
 it. Nothing in this repository may use those flags:
 `ReferenceLockTests.NoRobocopyInThisRepositoryCopiesSecurity` (must-fail:
-`/SEC` on deploy.ps1's mirror turns it red). A teacher's own script that
+`/SEC` on deploy.ps1's mirror turns it red). Since #419 (2026-10-01) it reads
+the files git TRACKS (`git ls-files`) rather than walking the folder: the walk
+reached the gitignored `courses/`, where an old build output held a WSL
+symlink (reparse tag `0xa000001d`) Windows cannot open, and the test threw
+`IOException` about a teacher's leftover folder rather than this repository's
+code (reproduced through a junction to that tree: old code red, new green; a
+STAGED file carrying `/SEC` still turns it red). A teacher's own script that
 does is answered by Unlock, which matches the shape. **And the refusal to
 deploy never depends on any of it**: every door asks the marker.
 

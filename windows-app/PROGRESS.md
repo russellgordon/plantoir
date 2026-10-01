@@ -1,5 +1,9 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-01 — bundle 9 ("finish")
+
+Branch `issue/bundle9-finish`. Done: #419 (the robocopy scan reads tracked files), #417 (the watcher's reds were a refused READ, not a partial record — the record is now read sharing ReadWrite|Delete; 30 of 30 runs green), #157 (`noCoursesYet`, `whatPublishingMeans`; `Briefing` retired), #308 (declined pages named on the plan and in every reply), #318 (already wired since bundle 5b; confirmed by a must-fail), #356 (SHA-256 pins in `fetch-runtime.ps1`). `NamedGapLedger` is **empty**. Open by ruling: #191 and #214 (a `[UiFact]` now MAKES each measurement — owed one run on an unlocked desktop), #414 (the one-process re-run found 0; the 856 run's certified count proves it ran an uncommitted guard, but that is not a reproduction). #352: see its closing comment and `research/ai-assist/windows-description-convergence-results.txt`. New: a `windows` issue for `publish_pages`' `includeLinked` (the behaviour #352's check found).
+
 ## 2026-10-01 — overnight parity run
 
 Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `0d040a81`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `0d36bd84` (the skip is the native-build test, which needs a runtime).
