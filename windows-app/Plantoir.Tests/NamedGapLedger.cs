@@ -150,9 +150,6 @@ internal static class NamedGapLedger
         // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
-        Owed(FrontPageDateCases, 274,
-            "this app's pointer finds only the class heading; a club's front-page heading arrives with clubs (mac #267)",
-            "a club's front page, numbered pages"),
 
         // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
 

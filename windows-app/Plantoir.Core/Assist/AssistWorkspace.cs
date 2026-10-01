@@ -1203,17 +1203,17 @@ public sealed partial class AssistWorkspace
         try { indexText = File.ReadAllText(indexPath); }
         catch { return null; }
 
-        string toClass = Path.GetFileNameWithoutExtension(newest);
+        var pointer = PointerFor(course, section, newest);
         DateOnly toDate = DateOf(course, section, newest) ?? default;
-        bool headingMissing = SectionIndex.WithMostRecent(indexText, toClass) is null;
 
         return new IndexChange(
             RelativePath: Relative(indexPath),
-            FromClass: SectionIndex.CurrentlyShowing(indexText),
-            ToClass: toClass,
+            FromClass: SectionIndex.CurrentlyShowing(indexText, pointer.ClassTitles),
+            ToClass: pointer.PointAt,
             FromDate: PageFrontmatter.CreatedOn(indexText, section, isSectionLocal: true),
             ToDate: toDate,
-            HeadingMissing: headingMissing);
+            HeadingMissing: !SectionIndex.CanBePointed(indexText, pointer),
+            Pointer: pointer);
     }
 
     /// <summary>
@@ -1878,7 +1878,8 @@ public sealed partial class AssistWorkspace
         {
             string path = PagePaths.ResolveInside(_folder, index.RelativePath);
             string text = File.ReadAllText(path);
-            if (SectionIndex.PointedAndDated(text, index.ToClass, index.ToDate, tail) is not { } withDate) return;
+            if (index.Pointer is null
+                || SectionIndex.PointedAndDated(text, index.Pointer, index.ToDate, tail) is not { } withDate) return;
             Save(path, withDate);
         }
         catch { /* the front page falling behind must not fail the publish */ }
@@ -2498,8 +2499,8 @@ public sealed partial class AssistWorkspace
                 string? newestPublished = SectionIndex.MostRecentPublished(course, section, ClassPages(course, section));
                 if (newestPublished is not null)
                 {
-                    string targetName = Path.GetFileNameWithoutExtension(newestPublished);
-                    if (SectionIndex.WithMostRecent(indexText, targetName) is { } newIndexText && newIndexText != indexText)
+                    if (SectionIndex.Repointed(indexText, PointerFor(course, section, newestPublished)) is { } newIndexText
+                        && newIndexText != indexText)
                     {
                         Save(indexPath, newIndexText);
                     }
@@ -3827,6 +3828,17 @@ public sealed partial class AssistWorkspace
     /// carry the code rather than the course.
     /// </summary>
     public string UnitWordForCourse(string courseCode) => UnitWordFor(courseCode);
+
+    /// <summary>
+    /// What the front-page pointer needs for one class of one section (#274,
+    /// #406): every class title, the class, its place INSIDE the course folder
+    /// (never the disk path) and the course's recorded heading.
+    /// </summary>
+    internal SectionIndex.Pointer PointerFor(Course course, int section, string classPath) =>
+        new(ClassPages(course, section).Select(page => Path.GetFileNameWithoutExtension(page)).ToList(),
+            Path.GetFileNameWithoutExtension(classPath),
+            Path.GetRelativePath(course.DirectoryPath, Path.GetFullPath(classPath)).Replace(Path.DirectorySeparatorChar, '/'),
+            course.Configuration.FrontPageHeading);
 
     /// <summary>
     /// What this course's TEACHER hears a class page called (#274). For the

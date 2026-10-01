@@ -391,8 +391,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var proposal = workspace.PlanStartOfYear(course, section);
             // A plan with nothing to do, or no first class, is an answer, not a proposal.
             return proposal.Plan.First is null || proposal.Plan.NothingToDo
-                ? Answering(proposal.Text)
-                : Proposing(proposal.Text);
+                ? Answering(proposal.TeacherText, proposal.Text)
+                : Proposing(proposal.Text, proposal.TeacherText);
         });
 
     [McpServerTool(Name = "prepare_for_start_of_year", Title = "Get a section ready for the year",
