@@ -78,9 +78,9 @@ public static class SectionIndex
                 // is LATER in the course, and in a Module course neither name
                 // parses under the default word, so the tie-break would fall
                 // back to whichever file was walked first.
-                string unitWord = course.Configuration.UnitWord;
-                var currentUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(best), unitWord);
-                var newUd = UnitDay.Parse(Path.GetFileNameWithoutExtension(page), unitWord);
+                var naming = course.Configuration.Naming;
+                var currentUd = naming.Parse(Path.GetFileNameWithoutExtension(best));
+                var newUd = naming.Parse(Path.GetFileNameWithoutExtension(page));
                 if (newUd is not null && (currentUd is null || newUd.Value.CompareTo(currentUd.Value) > 0))
                 {
                     best = page;

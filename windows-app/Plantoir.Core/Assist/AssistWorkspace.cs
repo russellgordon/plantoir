@@ -1652,7 +1652,7 @@ public sealed partial class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { } ud && ud.Unit == unit)
+            if (planned.IsClassPage && course.Configuration.Naming.Parse(planned.Title) is { } ud && ud.Unit == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1670,7 +1670,7 @@ public sealed partial class AssistWorkspace
         }
 
         // Only the ones that would actually move, ordered highest day first (matching Swift)
-        unitPages = unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
+        unitPages = unitPages.OrderByDescending(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList();
 
         var moving = new List<string>();
         foreach (var p in unitPages)
@@ -1744,7 +1744,7 @@ public sealed partial class AssistWorkspace
         foreach (var p in allMarkdown)
         {
             var planned = Plan(course, section, p, draft: !publishing, viaLink: false);
-            if (planned.IsClassPage && UnitDay.Parse(planned.Title, course.Configuration.UnitWord) is { Unit: var u } && u == unit)
+            if (planned.IsClassPage && course.Configuration.Naming.Parse(planned.Title) is { Unit: var u } && u == unit)
             {
                 unitPages.Add(planned);
             }
@@ -1755,8 +1755,8 @@ public sealed partial class AssistWorkspace
 
         // Highest day first to take a unit down; Day 1 first to put it up.
         unitPages = publishing
-            ? unitPages.OrderBy(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList()
-            : unitPages.OrderByDescending(p => UnitDay.Parse(p.Title, course.Configuration.UnitWord)?.Day ?? 0).ToList();
+            ? unitPages.OrderBy(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList()
+            : unitPages.OrderByDescending(p => course.Configuration.Naming.Parse(p.Title)?.Day ?? 0).ToList();
 
         if (publishing) RefuseIfPlantoirIsBuilding(course);
 
@@ -2197,7 +2197,7 @@ public sealed partial class AssistWorkspace
         catch { return new List<string>(); }
 
         var classPages = ClassPages(course, section);
-        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.UnitWord);
+        var problems = DateAudit.Run(classPages, graph, Resolve, Relative, course.Configuration.Naming);
 
         var newDates = dates.Select(d => d.New).ToList();
         if (newDates.Count > 0)
@@ -2958,7 +2958,7 @@ public sealed partial class AssistWorkspace
             // page counted as unnumbered, the plan found no classes, and it
             // refused with "has no pages named ...". The title-building below
             // was converted first and could therefore never run.
-            var parsed = UnitDay.Parse(title, course.Configuration.UnitWord);
+            var parsed = course.Configuration.Naming.Parse(title);
             if (parsed is null) { unnumbered++; continue; }
 
             found.Add(new ClassRef(
@@ -3234,7 +3234,7 @@ public sealed partial class AssistWorkspace
         string path = Page(course, section, pageTitle);
         string sourceTitle = Path.GetFileNameWithoutExtension(path);
 
-        var numbers = UnitDay.Parse(sourceTitle, course.Configuration.UnitWord)
+        var numbers = course.Configuration.Naming.Parse(sourceTitle)
             ?? throw new AssistRefusal(
                 ClassChangeWording.NotANumberedClassPage(sourceTitle));
 
@@ -3457,7 +3457,7 @@ public sealed partial class AssistWorkspace
         foreach (string page in ClassPages(course, section))
         {
             string title = Path.GetFileNameWithoutExtension(page) ?? "";
-            if (UnitDay.Parse(title, course.Configuration.UnitWord) is { } found
+            if (course.Configuration.Naming.Parse(title) is { } found
                 && found.Unit == unit && found.Day > highestDay)
                 highestDay = found.Day;
         }
