@@ -496,7 +496,13 @@ public static class FormBuilders
             if (entry.Length == 0) { field.Text = get(); return; }
             var info = new System.Globalization.StringInfo(entry);
             string first = info.LengthInTextElements > 0 ? info.SubstringByTextElements(0, 1) : get();
-            if (first != get()) { set(first); changed(); }
+            // Compared with the STORED value's first emoji, not the stored
+            // value: a hand-edited "📚🔬" read as "📚" must not be written back
+            // merely because focus passed through the field (#387, mac #373
+            // freshOpenCases — the file keeps what it has until the teacher chooses).
+            var stored = new System.Globalization.StringInfo(get());
+            string storedFirst = stored.LengthInTextElements > 0 ? stored.SubstringByTextElements(0, 1) : "";
+            if (first != storedFirst) { set(first); changed(); }
             field.Text = first;
         };
 

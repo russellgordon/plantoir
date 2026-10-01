@@ -554,14 +554,48 @@ public sealed partial class CourseSettingsView : UserControl
 
     private PublishingChoiceView? _publishingChoice;
 
+    /// <summary>The held-back sentence last shown beside Save, so clearing it never clears a saved confirmation.</summary>
+    private string? _heldBackShown;
+
+    /// <summary>Whether this visit's trail already says Save was held back (once per visit, #387).</summary>
+    private bool _heldBackRecorded;
+
     private void RefreshDirtyState()
     {
-        bool dirty = Config.HasUnsavedChanges;
-        // A folder-publishing course with a bad folder cannot be saved — a
-        // publish must never discover the problem after the fact (row 102).
-        SaveButton.IsEnabled = dirty && _publishingChoice?.Problem is null;
-        RevertButton.IsEnabled = dirty;
+        // #387 (mac #364 #373; savingSettings.whatEnablesSave): a destination
+        // problem holds Save back ONLY when the unsaved edit moves where the
+        // course publishes. Before, `dirty && Problem is null` meant a course
+        // whose folder is missing on this PC could not save a colour scheme,
+        // and nothing near Save said why.
+        var state = SettingsSaveState.Decide(Config, _window.Workspace.Settings.CloudflareAccountId ?? "");
+        SaveButton.IsEnabled = state.SaveEnabled;
+        RevertButton.IsEnabled = state.RevertEnabled;
+
+        if (state.Sentence is { } sentence)
+        {
+            SaveStatus.Text = sentence;
+            _heldBackShown = sentence;
+            if (!_heldBackRecorded)
+            {
+                _heldBackRecorded = true;
+                ActivityTrail.Note(ActivityTrail.Event.SettingsSaveHeldBack,
+                    SettingsSaveHeldBackLine(_course.Code, state.Check!));
+            }
+        }
+        else if (_heldBackShown is not null)
+        {
+            if (SaveStatus.Text == _heldBackShown) SaveStatus.Text = "";
+            _heldBackShown = null;
+        }
     }
+
+    /// <summary>The trail line: the course and WHICH check — never the path or the ID. Worded as a hold, not a failure.</summary>
+    internal static string SettingsSaveHeldBackLine(string code, string check) => check switch
+    {
+        SettingsSaveState.DeployFolderCheck => $"Save held back for {code} (deploy folder) — the publishing folder needs attention",
+        SettingsSaveState.CloudflareAccountCheck => $"Save held back for {code} (cloudflare account id) — the Cloudflare Account ID needs attention",
+        _ => $"Save held back for {code} (additional destination) — an additional destination needs attention",
+    };
 
     // ---- Form ------------------------------------------------------------
 
@@ -580,6 +614,7 @@ public sealed partial class CourseSettingsView : UserControl
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
 
         var nameBox = new TextBox { Text = Config.CourseName };
+        AutomationProperties.SetAutomationId(nameBox, "courseNameField");
         nameBox.TextChanged += (_, _) => { Config.CourseName = nameBox.Text; MarkChanged(); RebuildGradeWarnings(); };
         Form.Children.Add(FormBuilders.LabeledRow("Course name", nameBox));
 
@@ -643,7 +678,9 @@ public sealed partial class CourseSettingsView : UserControl
         {
             if (localeBox.SelectedIndex >= 0) { Config.Locale = LocaleCatalog.Codes[localeBox.SelectedIndex]; MarkChanged(); }
         };
-        Form.Children.Add(FormBuilders.LabeledRow("Language / region (Quartz locale)", localeBox));
+        var localeRow = FormBuilders.LabeledRow(CourseSettingsWording.LocaleLabel, localeBox);
+        localeRow.Children.Add(FormBuilders.ExampleCaption(CourseSettingsWording.LocaleCaption));
+        Form.Children.Add(localeRow);
 
         var readTime = new ToggleSwitch { IsOn = Config.ShowReadingTime, OnContent = "", OffContent = "" };
         readTime.Toggled += (_, _) => { Config.ShowReadingTime = readTime.IsOn; MarkChanged(); };
@@ -905,7 +942,7 @@ public sealed partial class CourseSettingsView : UserControl
         var schemeIds = new System.Collections.Generic.List<string>();
         if (currentScheme.Length == 0)
         {
-            schemeBox.Items.Add("Quartz default (none chosen)");
+            schemeBox.Items.Add(CourseSettingsWording.ColourSchemeNoneChosen);
             schemeIds.Add("");
             selectedIndex = 0;
         }
