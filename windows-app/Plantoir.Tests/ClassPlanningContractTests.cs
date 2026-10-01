@@ -293,6 +293,9 @@ public class ClassPlanningContractTests
                 Assert.Equal(expectRenames, plan.Insertion.Renames.Select(r => $"{r.From} → {r.To}").ToList());
 
                 bool undoOffered = c["expectUndoOffered"]!.GetValue<bool>();
+                // undoRule.planWarns (#185 / #346): on the card exactly when the undo is withheld.
+                Assert.True(undoOffered != plan.Describe().Contains(AssistWording.MakingRoomCannotBeUndone),
+                    $"“{name}”: the plan's undo warning disagrees with expectUndoOffered {undoOffered}.");
                 Assert.True(undoOffered != plan.MovesOtherClasses,
                     $"“{name}”: the contract says undo is " + (undoOffered ? "offered" : "withheld")
                     + $" and this app would {(plan.MovesOtherClasses ? "withhold" : "offer")} it — "

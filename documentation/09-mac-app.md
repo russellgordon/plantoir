@@ -3279,6 +3279,14 @@ course's words come back; run it with
 Not changed, on purpose: "Enter a course code." (a refusal before anything is
 known) and the grade-in-title warning's own words.
 
+
+**On Windows** (parity bundle 7, #274/#390/#387, 2026-10-01): the same choice,
+fill rule, panel words, locked rows and disabled Rename…, through Core seams
+(`ClubFill`, `WizardWording.Panel`, `ClubSettingsRows`) the WinUI dialog calls.
+Its trap is the same: the words follow the BOX, never `ClubCodeRule`. Where the
+C# lives and what Windows decided differently (the label scan reads every view
+literal) is in [12 → "Clubs, Course Settings and today's class on
+Windows"](12-windows-app.md).
 ## Renaming a course's word for a unit
 
 Beside the word under Settings — Overall ("What do you call a unit?  Unit
@@ -7242,6 +7250,12 @@ pointer has always written): the file's permissions are kept and any extended
 attributes on the front page are not (implementation review, note 7) — left
 as it is, since no Plantoir feature keeps anything in them.
 
+
+**On Windows** (parity bundle 7, #406, 2026-10-01): `TodaysClassOnTheFrontPage`
+in Core, asked only by `SectionDetailView`'s Preview button (pinned by a source
+test), all 42 cases and the pointer's 27 run through the real readers. Windows'
+pointer still inserts under the course's heading where no line names a class;
+the question is not asked there, on either platform. See [12](12-windows-app.md).
 ## The links checklist (#379)
 
 The section window's answer to #333's alert. The rule that chooses the pages
