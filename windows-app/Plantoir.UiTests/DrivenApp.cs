@@ -325,7 +325,13 @@ public sealed class DrivenApp : IDisposable
         var row = Find(rowAutomationId, $"the sidebar row {rowAutomationId}");
         for (int attempt = 1; attempt <= 3; attempt++)
         {
-            row.RightClick();
+            // A dialog that is still closing covers the window with its
+            // smoke layer, and the row then has no clickable point
+            // (NoClickablePointException, run 8 of bundle 11): wait it out.
+            Retry.WhileFalse(() => { try { return row.TryGetClickablePoint(out _); } catch { return false; } },
+                             TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250));
+            try { row.RightClick(); }
+            catch (FlaUI.Core.Exceptions.NoClickablePointException) { Thread.Sleep(1000); continue; }
             // The app's own window first — its menus are popups inside it, and
             // a whole-desktop query is the one that timed out (COMException
             // 0x80131505, run 5 of bundle 11); a timeout is "not yet".

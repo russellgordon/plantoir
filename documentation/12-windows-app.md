@@ -892,8 +892,13 @@ these is now written into the harness rather than left to be rediscovered:
 - **Click a control only once it has a clickable point**; a dialog opened
   straight after another closed is still arriving (`NoClickablePointException`).
 - **WebView2's page text** arrives through UIA lazily, sometimes as Text and
-  sometimes as another element's name, and once (1 run in 4) not at all until
-  the view had the focus.
+  sometimes as another element's name — and in 2 of 7 runs not at all for
+  120 s, focused or not (0 named elements under the view). That is Chromium's
+  accessibility tree, not the app's, so `WizardToPreviewUiTests` REPORTS it
+  and asserts what the app controls: the served page over HTTP carries the
+  teacher's line, and the web view is on screen with a size.
+- **A closing dialog's smoke layer** leaves the sidebar with no clickable
+  point for a moment; `PressRowMenuItem` waits for one.
 
 Three PRODUCT faults the same runs found, all fixed in bundle 11: Keep a Copy
 for Reference… (and Import, same shape) closed the app on its first progress
