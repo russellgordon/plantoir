@@ -166,9 +166,6 @@ internal static class NamedGapLedger
             "assistant backed up a course"),
         Owed(ActivityTrailEvents, 355, "this app has no Get Ready for the Start of the Year yet (mac #96)",
             "section made ready for the start of the year", "start of the year change undone", "start of the year not done"),
-        Owed(ActivityTrailEvents, 392, "the links-into-hidden-pages checklist is not built here yet (mac #379)",
-            "offered to publish pages that links lead to", "published pages that links led to",
-            "left pages hidden that links lead to"),
 
         // ---- specialNames.platformWording.keys
 

@@ -10,6 +10,7 @@ namespace Plantoir.Tests;
 /// through the sheet MODEL and the publisher on a laid-out course, as
 /// howThePublishCasesRun says.
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public class LinksChecklistPublishContractTests : IDisposable
 {
     private const string Course = "ICS3U";
@@ -118,6 +119,33 @@ public class LinksChecklistPublishContractTests : IDisposable
             Assert.Equal(changed.Select(x => x!.ToString()).Order(), published.ChangedSince.Order());
         if (c["expectCameWithAClass"] is { } came)
             Assert.Equal(came.GetValue<int>(), published.CameWithAClass);
+    }
+
+    /// <summary>The press records places and counts, never what a page says; the answer is remembered.</summary>
+    [Fact]
+    public void PublishingRecordsPlacesNeverContentAndRemembersTheUnticked()
+    {
+        string trail = Path.Combine(_folder, "activity.txt");
+        Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var c = CaseList.First(x => x!["name"]!.ToString().StartsWith("iv-e."))!;
+            Lay(c["pages"]!.AsArray());
+            var workspace = new AssistWorkspace(_folder, new FakeLauncher());
+            var sheet = workspace.OpenLinksChecklist(Offer(c["offer"]!.AsArray()));
+            sheet.Ticks[LinksChecklist.Key("Concepts/Hub")] = false;
+            AssistWorkspace.NoteOffered(sheet, "from the menu");
+            workspace.PublishAndRemember(sheet);
+
+            string written = File.ReadAllText(trail);
+            Assert.Contains("offered to publish pages that links lead to, from the menu", written);
+            Assert.Contains("Concepts/Glossary", written);
+            Assert.Contains("(1 with the page they come under)", written);
+            Assert.DoesNotContain("A sentence.", written);
+            var (_, left) = LinksChecklist.ReadAnswered(CourseDir, 1);
+            Assert.Equal(new[] { "Concepts/Hub" }, left.ToArray());
+        }
+        finally { Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
     }
 
     private static string Part(JsonNode part)
