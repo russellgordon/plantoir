@@ -725,8 +725,14 @@ public sealed partial class SidebarPane : UserControl
             string? problem = chosen is null
                 ? "Pick a day."
                 : ScheduledDeploy.Problem(course, number, chosen.Value, DateTime.Now, Workspace.Settings.CloudflareAccountId);
-            warning.Text = problem ?? "";
-            warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            // #261: what this replaces, said before anything is written — read
+            // by task name across the computer, never through a folder filter.
+            string? replaces = problem is null && chosen is { } at && Workspace.WorkspacePath is { } here &&
+                               TaskScheduling.MomentItWouldReplace(here, course.Code, number, at, DateTime.Now) is { } was
+                ? AssistWording.ScheduleReplaces(was.ToString("dddd d MMMM, h:mm tt"))
+                : null;
+            warning.Text = problem ?? replaces ?? "";
+            warning.Visibility = problem is null && replaces is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
 
         }

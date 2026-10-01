@@ -444,6 +444,13 @@ public static class AssistWording
     public const string DidNotFollowThat =
         "I didn't follow that, so I haven't changed anything. Try saying it again in different words.";
 
+    /// <summary>
+    /// Said on the scheduled card, the schedule dialog and the tool's result
+    /// when the section already has a deploy set (#261). <paramref name="moment"/>
+    /// is written the way the card writes its own.
+    /// </summary>
+    public static string ScheduleReplaces(string moment) => $"This replaces the deploy already set for {moment}.";
+
     // MARK: - A time asked about, or spelled for the teacher (#281, #288)
 
     /// <summary>"deploy at 6:30": morning or evening? Nothing is set; the two sentences named are ones the family accepts.</summary>
