@@ -174,8 +174,6 @@ internal static class NamedGapLedger
             "curriculum_folders"),
         Owed(CourseConfigKeys, 274, "this app has no clubs yet, so a course cannot say its class noun, page scheme or front-page heading (mac #267)",
             "class_page_scheme", "front_page_heading", "class_noun"),
-        Owed(CourseConfigKeys, 241, "this app has no courses kept for reference yet (mac #206 branch A)",
-            "kept_for_reference", "reference_school_year"),
 
         // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
         Owed(FrontPageDateCases, 274,
