@@ -472,6 +472,16 @@ public static class ActivityTrail
         /// is the only answer to "where did this come from?".
         /// </summary>
         PagesCopiedFromAnotherCourse,
+        /// <summary>
+        /// Several backups (or one) were deleted from All Backups (#283 / mac
+        /// #242): the course codes, how many, what they took together when every
+        /// size is known, each deleted file's NAME, and any kept because an open
+        /// assistant conversation can restore from it or that could not be
+        /// deleted. A teacher's backups are never pruned, so a backup that has
+        /// gone was deleted by somebody — and this line is the only answer to
+        /// "my backups vanished".
+        /// </summary>
+        BackupsDeleted,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -567,6 +577,7 @@ public static class ActivityTrail
         Event.UnfinishedImportForReferenceTidiedAway => "unfinished import for reference tidied away",
         Event.CourseImportForReferenceStopped => "course import for reference stopped",
         Event.PagesCopiedFromAnotherCourse => "pages copied from another course",
+        Event.BackupsDeleted => "backups deleted",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 
