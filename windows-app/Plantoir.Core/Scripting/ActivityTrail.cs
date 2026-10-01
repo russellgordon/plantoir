@@ -42,6 +42,15 @@ public static class ActivityTrail
         /// never what it had begun to write, which is page titles.
         /// </summary>
         AssistantAnswerWasCutOff,
+        /// <summary>
+        /// The model answered with the teacher's own request (#217); nothing
+        /// ran and the turn was taken back out of the conversation. Carries
+        /// course and section only — never the sentence (<c>assistant asked</c>
+        /// has it) and never page content. Not folded into "answer was cut
+        /// off": this answer FINISHED, and a line describing something else is
+        /// worse than none.
+        /// </summary>
+        AssistantRepeatedTheRequestBack,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -325,6 +334,7 @@ public static class ActivityTrail
         Event.AssistantCouldNotAnswer => "assistant could not answer",
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
         Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
+        Event.AssistantRepeatedTheRequestBack => "assistant repeated the request back",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",

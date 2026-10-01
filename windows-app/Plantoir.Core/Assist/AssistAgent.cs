@@ -681,13 +681,15 @@ public sealed class AssistAgent
         // (The writer half of that trap is issue #144.) DayOfWeek is an enum
         // name and carries no culture of its own.
         _turnBeganAt = _messages.Count;
+        _typedThisTurn = text;
         var today = Today();
         _dateline = string.Create(CultureInfo.InvariantCulture,
             $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)");
+        _sentThisTurn = text + _dateline;
         _messages.Add(new JsonObject
         {
             ["role"] = "user",
-            ["content"] = text + _dateline,
+            ["content"] = _sentThisTurn,
         });
         return await Run(cancellation);
     }
@@ -1238,6 +1240,45 @@ public sealed class AssistAgent
 
     private static string Spaced(string tool) => tool.Replace('_', ' ');
 
+    /// <summary>The teacher's message as SENT this turn (date line and all), or null for a lap that began with a tool result.</summary>
+    private string? _sentThisTurn;
+
+    /// <summary>
+    /// What the teacher TYPED this turn, before the date line — kept in a
+    /// field rather than recomputed, because recomputing the date line means
+    /// reading the clock a second time.
+    /// </summary>
+    private string? _typedThisTurn;
+
+    /// <summary>
+    /// Whether a reply is the teacher's request handed back (#217) —
+    /// <c>assist-cases.json</c> → <c>echoedRequest</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>Compared against the message the TURN BEGAN WITH, never the last
+    /// user message anywhere: a lap that began with a tool result has none,
+    /// which is what makes a second lap safe by construction. A reply that
+    /// chooses a tool is an instruction whatever its text says, so
+    /// <paramref name="hasToolCall"/> is an argument rather than an
+    /// assumption.</para>
+    ///
+    /// <para>Exact after folding, deliberately not fuzzy: an echo with a
+    /// preamble ("Sure: hide unit 4, day 21") gets through, because a rule
+    /// that fires on a legitimate answer throws a real reply away.</para>
+    /// </remarks>
+    internal static bool IsTheRequestBackAgain(string? sent, string? typed, string reply, bool hasToolCall)
+    {
+        if (hasToolCall) return false;
+        string said = ForComparing(reply);
+        if (said.Length == 0) return false;
+        if (sent is not null && said == ForComparing(sent)) return true;
+        return !string.IsNullOrEmpty(typed) && said == ForComparing(typed);
+    }
+
+    /// <summary>Whitespace and newlines off, . ! ? off both ends, whitespace again, lower-cased.</summary>
+    private static string ForComparing(string text) =>
+        text.Trim().Trim('.', '!', '?').Trim().ToLowerInvariant();
+
     /// <summary>What a finished tool call's arguments amount to.</summary>
     internal enum WhatTheModelWrote
     {
@@ -1399,8 +1440,12 @@ public sealed class AssistAgent
         lines.Add(new Line("tools", answer.Summary));
         if (TurnEnded(lines)) return lines;
         // A lap after an approved call begins at its result: winding back
-        // past it would erase a call that has already run.
+        // past it would erase a call that has already run. It begins with a
+        // TOOL RESULT and no message from the teacher, so there is nothing for
+        // a reply to echo.
         _turnBeganAt = _messages.Count;
+        _sentThisTurn = null;
+        _typedThisTurn = null;
         return lines.Concat(await Run(cancellation)).ToList();
     }
 
@@ -1501,6 +1546,22 @@ public sealed class AssistAgent
                         return NothingRanFromIt(lines, AssistWording.AnswerLeftOutWhatItWasFor,
                             $"the assistant finished answering but wrote nothing for {Spaced(begun)} — nothing was run from it");
                 }
+            }
+            // #217: BELOW the tool-call branch (an echo is by definition a
+            // reply with no tool call) and ABOVE the append — the whole point
+            // is that it must not get into the history, because the model
+            // copies the pattern it can see: measured, after one echo even a
+            // sentence it answers correctly in a fresh conversation echoed.
+            if (!acting && IsTheRequestBackAgain(_sentThisTurn, _typedThisTurn,
+                                                 reply["content"]?.ToString() ?? "", hasToolCall: false))
+            {
+                // Never show the echoed text, not even inside an apology.
+                ActivityTrail.Note(ActivityTrail.Event.AssistantRepeatedTheRequestBack,
+                    "the assistant repeated the request back — nothing was run, and the turn was taken back out of the conversation",
+                    _courseCode, _section);
+                WindTheTurnBack();
+                lines.Add(new Line("assistant", AssistWording.DidNotFollowThat));
+                return lines;
             }
             _messages.Add(reply.DeepClone()!);
 
