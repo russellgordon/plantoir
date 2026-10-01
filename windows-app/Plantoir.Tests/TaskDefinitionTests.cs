@@ -50,6 +50,10 @@ public class TaskDefinitionTests : IDisposable
         TaskScheduling.ScheduledDirectoryForTests = Path.Combine(_root, "jobs");
         TaskScheduling.RunnerExecutableForTests = @"C:\Windows\System32\cmd.exe";
         string name = TaskScheduling.NameFor("PARITYPROBE", 1, folder);
+        // The one test that registers a REAL task on purpose (ruling 7), so it
+        // lifts the suite's guard (#285) for itself and puts it back.
+        var guard = TaskScheduling.RealSchtasksGuardForTests;
+        TaskScheduling.RealSchtasksGuardForTests = null;
         try
         {
             Assert.Null(TaskScheduling.Schedule(folder, "PARITYPROBE", 1, DateTime.Now.AddDays(1), [new("netlify", "")]));
@@ -63,6 +67,7 @@ public class TaskDefinitionTests : IDisposable
             Schtasks("/Delete", "/F", "/TN", name);
             TaskScheduling.ScheduledDirectoryForTests = null;
             TaskScheduling.RunnerExecutableForTests = null;
+            TaskScheduling.RealSchtasksGuardForTests = guard;
             TaskScheduling.ForgetTheList();
             Assert.NotEqual(0, Schtasks("/Query", "/TN", name).Exit);
         }
