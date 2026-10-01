@@ -75,6 +75,23 @@ public class ContractTests
         Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
         Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
 
+        // #352 (mac #197) and #203 / #342 (mac #173 / #201): methods, so the
+        // value walk below cannot see them; rendered here with the
+        // contract's own placeholders and literal titles.
+        Assert.Equal(wording["everyPageIsNotAPageToPublish"]!.ToString(), AssistWording.EveryPageIsNotAPageToPublish("{example}"));
+        Assert.Equal(wording["everyPageIsNotAPageToHide"]!.ToString(), AssistWording.EveryPageIsNotAPageToHide("{example}"));
+        Assert.Equal(wording["noPageCalled"]!.ToString(), AssistWording.NoPageCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["noPagesCalled"]!.ToString(), AssistWording.NoPagesCalled("{course}", "{section}", "{pages}"));
+        Assert.Equal(wording["linkedClassWasLeftAlone"]!.ToString(), AssistWording.LinkedClassWasLeftAlone(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["linkedClassesWereLeftAlone"]!.ToString(),
+                     AssistWording.LinkedClassesWereLeftAlone(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+        Assert.Equal(wording["linkedClassStaysVisible"]!.ToString(), AssistWording.LinkedClassStaysVisible("Unit 2, Day 4"));
+        // #305 (mac #167): the links answer.
+        Assert.Equal(wording["pageLinksTo"]!.ToString(), AssistWording.PageLinksTo("{page}"));
+        Assert.Equal(wording["pageLinksToNothing"]!.ToString(), AssistWording.PageLinksToNothing("{page}"));
+        Assert.Equal(wording["morePagesThanOneAreCalled"]!.ToString(), AssistWording.MorePagesThanOneAreCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["pageCouldNotBeRead"]!.ToString(), AssistWording.PageCouldNotBeRead("{page}"));
+
         // #281/#288: rendered by running this app's own functions on the
         // inputs the generator used, so the keys test the code path rather
         // than a template.
@@ -1018,7 +1035,15 @@ public class ContractTests
                             Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
                             break;
                         case "neverDeployed":
-                            Assert.Contains("has never been deployed", problem);
+                        case "additionalDestinationNeverDeployed":
+                            // Compared WHOLE (#344 / mac #322): both contain
+                            // "has never been deployed to", so a substring
+                            // cannot tell the primary's from an additional's.
+                            string rendered = ContractLoader.LoadJson("shared-rules.json")!
+                                ["scheduledDeployRefusals"]!["wording"]![expectRefusal]!.ToString()
+                                .Replace("{course}", "ICS3U").Replace("{section}", "1")
+                                .Replace("{destination}", c["destinationNamed"]!.ToString());
+                            Assert.Equal(rendered, problem);
                             break;
                         case "additionalDeployFolderNeedsAttention":
                             Assert.Contains("also deploys to a folder", problem);
@@ -1026,9 +1051,6 @@ public class ContractTests
                             break;
                         case "additionalCloudflareAccountMissing":
                             Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
-                            break;
-                        case "additionalDestinationNeverDeployed":
-                            Assert.Contains("has never been deployed to", problem);
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");

@@ -577,6 +577,17 @@ public sealed partial class SidebarPane : UserControl
             "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
     }
 
+    /// <summary>"Revise with Codex…": the second outside door (#210, mac #205).</summary>
+    private void ReviseWithCodex(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
+
+        _ = ShowError("Codex didn’t open",
+            $"Plantoir couldn’t start a Codex session for {course.Code}. " +
+            "If Codex was updated or moved recently, restarting Plantoir may be enough.");
+    }
+
     private MenuFlyout BackupMenu(BackupItem item)
     {
         var menu = new MenuFlyout();
@@ -623,6 +634,12 @@ public sealed partial class SidebarPane : UserControl
             menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
                                      () => AskWhenToDeploy(course, number, existing: null)));
         }
+
+        // The links checklist on demand (#392, linksChecklist.offeredWhen.onDemand):
+        // whenever an offer exists, so Not Now is not a one-way door.
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, number) is not null)
+            menu.Items.Add(MenuItem(Plantoir.Core.Assist.LinksChecklistWording.MenuItem, Glyphs.Star,
+                                     () => _ = OpenLinksChecklist(course, number)));
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -891,6 +908,12 @@ public sealed partial class SidebarPane : UserControl
         if (ClaudeCodeLauncher.IsAvailable)
             items.Add(MenuItem("Revise with Claude…", Glyphs.Star,
                 () => ReviseWithClaude(course)));
+
+        // Hidden independently when Codex is not installed
+        // (outsideAgents.hiddenWhenNotInstalled, #210).
+        if (CodexLauncher.IsAvailable)
+            items.Add(MenuItem("Revise with Codex…", Glyphs.Star,
+                () => ReviseWithCodex(course)));
 
         // "Local" is the word doing the work: it is what separates this from
         // the Claude item above, and it is the privacy promise in one word.
@@ -1203,6 +1226,28 @@ public sealed partial class SidebarPane : UserControl
         !WorkingFolder.IsTheSame(askedIn, Workspace.WorkspacePath);
 
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
+
+    /// <summary>"Publish Pages That Links Lead To…": a stale offer asks for a preview first.</summary>
+    private async Task OpenLinksChecklist(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, section) is not { } offer) return;
+        string? said;
+        if (!Plantoir.Core.Assist.LinksChecklistShowing.IsFresh(course, section))
+            said = Plantoir.Core.Assist.LinksChecklistWording.Fill(Plantoir.Core.Assist.LinksChecklistWording.NeedsAPreviewFirst,
+                new Dictionary<string, string> { ["course"] = course.Code, ["section"] = section.ToString() });
+        else
+            said = await LinksChecklistDialog.OfferAsync(folder, course, section, offer, "from the menu", ShowDialogSafelyAsync,
+                                                         () => TheFolderMovedUnderThisConfirmation(folder));
+        if (said is null) return;
+        // folder-check: not needed — an OK that tells what already happened, and acts on nothing.
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = Plantoir.Core.Assist.LinksChecklistWording.MenuItem.TrimEnd('\u2026'),
+            Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = "OK",
+        });
+    }
 
     private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
     {
