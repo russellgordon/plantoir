@@ -153,9 +153,13 @@ public sealed class DeclinedPagesAreNamedTests : IDisposable
 
     /// <summary>
     /// Review N-a: a class the writer declines stays as it is, so the plan works
-    /// the section's front page out from its CURRENT state — measured in the
-    /// hide direction, the one a no-room block can reach (a page with such a
-    /// block reads visible, so it is never planned for a publish).
+    /// the section's front page out from its CURRENT state. Measured here in the
+    /// hide direction. The publish direction is reachable too (bundle 9 fix
+    /// review, note 1: a section-local class page whose first settings line is
+    /// indented and which carries a top-level <c>publishForSection1: false</c>
+    /// reads certainly hidden, and publishing it is declined because its write
+    /// key <c>publish</c> has nowhere to go); the same exclusion covers it, but
+    /// no test here exercises it.
     /// </summary>
     [Fact]
     public void ADeclinedClassIsNeverPlannedOntoTheFrontPage()
