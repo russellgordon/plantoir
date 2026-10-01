@@ -38,7 +38,9 @@ public static class Program
             string job = named.EndsWith(".job.json", StringComparison.OrdinalIgnoreCase)
                 ? named
                 : Plantoir.Core.Assist.TaskScheduling.JobPath(named);
-            var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job);
+            int at = Array.IndexOf(args, Plantoir.Core.Assist.TaskScheduling.TokenArgument);
+            string? token = at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+            var ending = Plantoir.Core.Assist.ScheduledRun.Execute(job, taskToken: token);
             Environment.Exit(ending is Plantoir.Core.Assist.ScheduledRun.Ending.JobUnreadable ? 2 : 0);
             return;
         }
