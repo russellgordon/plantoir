@@ -71,10 +71,10 @@ public class RelativeDayFreshnessTests
 
         public void Then(JsonObject? reply) => _replies.Enqueue(reply);
 
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
         {
             Asked.Add((JsonArray)messages.DeepClone());
-            return Task.FromResult(_replies.Count > 0 ? _replies.Dequeue() : null);
+            return Task.FromResult<ModelReply?>(_replies.Count > 0 ? _replies.Dequeue() : null);
         }
     }
 
@@ -336,10 +336,12 @@ public class RelativeDayFreshnessTests
         rig.SayThroughTheModel("put tomorrow's class up for me, please");
 
         Assert.Equal(nonsense, ArgumentsOn(reply));
-        // The call REACHED a tool, which is what makes the line above an
-        // assertion about the settler rather than about a call that never
-        // got as far as one.
-        Assert.Single(rig.Tools.Calls);
+        // Until #196 the call then REACHED a tool, and that was this test's
+        // proof the settler had run on it. It no longer does, deliberately: a
+        // finished reply whose arguments cannot be read runs nothing and says
+        // answerWasCutOff (CutOffAnswerTests). Nothing rewrote the string on
+        // the way to that refusal, which is what is left to pin here.
+        Assert.Empty(rig.Tools.Calls);
     }
 
     // ---- The gate, swept across the whole surface ------------------------

@@ -150,15 +150,19 @@ public class WindowBindingContractTests : IDisposable
 
     internal sealed class ScriptedModel : IChatModel
     {
-        private readonly Queue<JsonObject?> _replies = new();
+        private readonly Queue<ModelReply?> _replies = new();
         public readonly List<JsonArray> Asked = new();
 
         public void Then(JsonObject? reply) => _replies.Enqueue(reply);
 
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+        public void Then(JsonObject reply, string finishReason) => _replies.Enqueue(new ModelReply(reply, finishReason));
+
+        public int Waiting => _replies.Count;
+
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
         {
             Asked.Add((JsonArray)messages.DeepClone());
-            return Task.FromResult(_replies.Count > 0 ? _replies.Dequeue() : null);
+            return Task.FromResult<ModelReply?>(_replies.Count > 0 ? _replies.Dequeue() : null);
         }
     }
 

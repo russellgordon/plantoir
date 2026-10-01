@@ -603,8 +603,8 @@ public class AssistScenarioTests : IDisposable
     /// <summary>Never answers: every message a scenario sends is a card phrasing, matched in code.</summary>
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
-            => Task.FromResult<JsonObject?>(null);
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+            => Task.FromResult<ModelReply?>(null);
     }
 
     /// <summary>

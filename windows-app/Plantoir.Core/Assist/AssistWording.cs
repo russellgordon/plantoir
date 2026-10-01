@@ -401,6 +401,17 @@ public static class AssistWording
     public static string TheNextWouldFallOn(string day, string dayName) =>
         $"The next class would fall on {day} ({dayName}).";
 
+    // MARK: - A reply that cannot be acted on (#196)
+
+    /// <summary>
+    /// The engine stopped the reply part way, or its arguments could not be
+    /// read. Nothing ran. Names no limit (rule 1); the advice addresses the
+    /// cause.
+    /// </summary>
+    public const string AnswerWasCutOff =
+        "I didn't get to the end of that, so I haven't changed anything. " +
+        "Ask me again — a shorter sentence, or fewer pages at a time.";
+
     // MARK: - A call the model made for another course (#180)
 
     /// <summary>

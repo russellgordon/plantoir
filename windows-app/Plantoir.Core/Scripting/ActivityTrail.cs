@@ -33,6 +33,15 @@ public static class ActivityTrail
         /// model slip refused at the teacher's expense.
         /// </summary>
         AssistantWasAskedAboutAnotherCourse,
+        /// <summary>
+        /// The model's reply could not be acted on and nothing was run from
+        /// it (#196). One event, two sentences: the engine STOPPED it part
+        /// way (a question about how much it was asked to write), or it
+        /// finished and its arguments could not be read (a question about the
+        /// model). Carries course, section and the tool it had begun to name —
+        /// never what it had begun to write, which is page titles.
+        /// </summary>
+        AssistantAnswerWasCutOff,
         AppSettingsOpened,
         AssistantModelChosen,
         AssistantModelDownloadStarted,
@@ -315,6 +324,7 @@ public static class ActivityTrail
         Event.AssistantChoseATool => "assistant chose a tool",
         Event.AssistantCouldNotAnswer => "assistant could not answer",
         Event.AssistantWasAskedAboutAnotherCourse => "assistant was asked about another course",
+        Event.AssistantAnswerWasCutOff => "assistant answer was cut off",
         Event.AppSettingsOpened => "app settings opened",
         Event.AssistantModelChosen => "assistant model chosen",
         Event.AssistantModelDownloadStarted => "assistant model download started",
