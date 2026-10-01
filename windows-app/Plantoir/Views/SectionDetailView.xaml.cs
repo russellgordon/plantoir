@@ -1698,6 +1698,9 @@ public sealed partial class SectionDetailView : UserControl
             // end and the catch.
             _publishActivity?.Dispose();
             _publishActivity = CourseActivity.BeginPublish(workspacePath, _course.Code, _sectionNumber);
+            // The section's next deploy ends the app's undo of getting it ready
+            // for the start of the year (#355, startOfYear.undo.app).
+            Plantoir.Core.Assist.StartOfYearSessionUndo.End(workspacePath, _course.Code, _sectionNumber);
             // Handed over to the fields EndPublishActivity releases. A deploy
             // builds and then uploads, and both end together, so the build
             // claim can simply run its whole length.

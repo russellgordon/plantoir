@@ -134,6 +134,14 @@ public class AssistScenarioTests : IDisposable
         if (given?["theDeployMeetsAQuestion"]?.GetValue<bool>() == true) _launcher.QuestionOn = "deploy";
 
         SetUpWhatThisCaseNeeds(when, pending);
+        // #355: `given.visibleClasses` lays out those class pages, published,
+        // in section 1 before the call (the first is the first class).
+        if (given?["visibleClasses"] is JsonArray visibleClasses)
+        {
+            int day = 8;
+            foreach (var title in visibleClasses)
+                Class(title!.ToString(), $"2026-09-{day++:00}", published: true);
+        }
 
         // ONE workspace and one tool server for the whole case, because that is
         // what the window holds for a conversation: the backup taken before the
@@ -181,7 +189,7 @@ public class AssistScenarioTests : IDisposable
         }
         else
         {
-            toolAnswer = await RunOneTool(agent, transcript, when);
+            toolAnswer = await RunOneTool(agent, transcript, when, given?["arguments"] as JsonObject);
         }
 
         AssertEvents(scenario, scenarioName);
@@ -356,10 +364,14 @@ public class AssistScenarioTests : IDisposable
         }
     }
 
-    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, List<string> transcript, string when)
+    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, List<string> transcript, string when,
+                                                    JsonObject? givenArguments = null)
     {
         var arguments = new JsonObject { ["course"] = Course, ["section"] = SectionNumber };
         if (when == "unpublish_pages") arguments["pages"] = new JsonArray("Unit 1, Day 1");
+        // `given.arguments` is merged into the direct call's arguments (#355).
+        foreach (var (key, value) in givenArguments ?? new JsonObject())
+            arguments[key] = value?.DeepClone();
 
         var call = new JsonObject
         {

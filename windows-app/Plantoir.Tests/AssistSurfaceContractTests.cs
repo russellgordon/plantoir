@@ -540,8 +540,6 @@ public class AssistSurfaceContractTests
     /// <summary>MCP tools the contract names and this server does not serve yet, with the issue that owns each.</summary>
     private static readonly Dictionary<string, string> KnownMissingMcpTools = new(StringComparer.Ordinal)
     {
-        ["plan_prepare_for_start_of_year"] = "#355 (bundle 5b)",
-        ["prepare_for_start_of_year"] = "#355 (bundle 5b)",
     };
 
     /// <summary>
