@@ -54,6 +54,14 @@ public static class WorkLease
     /// </summary>
     public const string Building = "build";
 
+    /// <summary>
+    /// A copy of the course is being zipped — the assistant's backup, made
+    /// inside <c>plantoir-mcp</c> (#360, mac #351). The course is BUSY for
+    /// every builder while it lasts, as on the mac: a build or a deploy started
+    /// meanwhile would change the files under the zip.
+    /// </summary>
+    public const string Copying = "copy";
+
     private static string Directory(string workspacePath) =>
         Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "activity");
 
@@ -175,8 +183,8 @@ public static class WorkLease
     public static Other? FirstInTheWay(Asker asker, string courseCode, int myPid, Claim? claim, IEnumerable<Other> others)
     {
         string[] blocking = asker == Asker.AScheduledPublish
-            ? [Building, Publishing]
-            : [Building, Publishing, Previewing];
+            ? [Building, Publishing, Copying]
+            : [Building, Publishing, Previewing, Copying];
 
         return others
             .Where(other => string.Equals(other.Course, courseCode, StringComparison.OrdinalIgnoreCase))

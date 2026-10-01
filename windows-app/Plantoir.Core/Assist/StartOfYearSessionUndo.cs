@@ -32,8 +32,14 @@ public static class StartOfYearSessionUndo
     /// the act: the one set at the time has reached its moment, or the section's
     /// last scheduled run (its outcome record) happened after the act.
     /// </summary>
-    public static bool EndedByAScheduledDeploy(Entry entry, DateTime now, DateTime? lastScheduledRun) =>
-        (entry.ScheduledAtTheTime is { } moment && moment <= now)
+    /// <param name="scheduledNow">
+    /// The section's scheduled deploy as it stands NOW, re-read when the undo is
+    /// evaluated. A schedule the teacher cancelled is not there, so its moment
+    /// passing ends nothing (bundle 6a ruling 2); a run that did happen is the
+    /// outcome record's.
+    /// </param>
+    public static bool EndedByAScheduledDeploy(Entry entry, DateTime now, DateTime? lastScheduledRun, DateTime? scheduledNow) =>
+        (entry.ScheduledAtTheTime is { } moment && scheduledNow == moment && moment <= now)
         || (lastScheduledRun is { } ran && ran > entry.ActedAt);
 
     private static readonly Dictionary<string, Entry> Entries = new(StringComparer.OrdinalIgnoreCase);

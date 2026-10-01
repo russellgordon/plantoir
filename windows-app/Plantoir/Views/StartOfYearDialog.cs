@@ -100,7 +100,9 @@ public static class StartOfYearDialog
         // section's pages from anywhere.
         DateTime? lastScheduledRun = null;
         try { lastScheduledRun = ScheduledPublishOutcome.Read(course.Code, section, folder)?.When; } catch { }
-        if (StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, DateTime.Now, lastScheduledRun)
+        DateTime? scheduledNow = null;
+        try { scheduledNow = TaskScheduling.NextRun(folder, course.Code, section); } catch { }
+        if (StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, DateTime.Now, lastScheduledRun, scheduledNow)
             || !string.Equals(workspace.PlanStartOfYear(course.Code, section).Code, entry.SectionCodeAfter, StringComparison.Ordinal))
         {
             StartOfYearSessionUndo.End(folder, course.Code, section);

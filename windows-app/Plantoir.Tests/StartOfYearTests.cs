@@ -273,11 +273,22 @@ public class StartOfYearTests : IDisposable
         var acted = new DateTime(2026, 9, 1, 15, 0, 0);
         var entry = new StartOfYearSessionUndo.Entry(new Dictionary<string, (string, string)>(), "b.zip", "code",
             acted, ScheduledAtTheTime: acted.AddHours(15));
-        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(1), lastScheduledRun: null));
-        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(16), lastScheduledRun: null));
+        var moment = acted.AddHours(15);
+        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(1), null, scheduledNow: moment));
+        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(16), null, scheduledNow: moment));
         var unscheduled = entry with { ScheduledAtTheTime = null };
-        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(-1)));
-        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(3)));
+        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(-1), null));
+        Assert.True(StartOfYearSessionUndo.EndedByAScheduledDeploy(unscheduled, acted.AddDays(2), acted.AddHours(3), null));
+    }
+
+    /// <summary>Ruling 2: a scheduled deploy the teacher CANCELLED ends nothing when its moment passes.</summary>
+    [Fact]
+    public void ACancelledScheduledDeployDoesNotEndTheAppsUndo()
+    {
+        var acted = new DateTime(2026, 9, 1, 15, 0, 0);
+        var entry = new StartOfYearSessionUndo.Entry(new Dictionary<string, (string, string)>(), "b.zip", "code",
+            acted, ScheduledAtTheTime: acted.AddHours(15));
+        Assert.False(StartOfYearSessionUndo.EndedByAScheduledDeploy(entry, acted.AddHours(16), lastScheduledRun: null, scheduledNow: null));
     }
 
     // ---- check_section's groups -------------------------------------------
