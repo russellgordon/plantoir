@@ -2400,7 +2400,8 @@ public sealed partial class AssistWorkspace
     }
 
     /// <summary>Carry out a re-date the teacher has agreed to, after backing the course up.</summary>
-    public AssistResult ApplyReDate(ReDatePlan plan, IProgress<string>? progress = null)
+    public AssistResult ApplyReDate(ReDatePlan plan, IProgress<string>? progress = null,
+                                    bool isARollover = false)
     {
         var course = Course(plan.CourseCode);
         int section = Section(course, plan.SectionNumber);
@@ -2466,6 +2467,14 @@ public sealed partial class AssistWorkspace
             }
             catch { }
         }
+
+        // A ROLLOVER releases the published-pages record and the checklist's
+        // answers (#392), INSIDE this undo entry as the issue asks: one
+        // "undo that" puts the dates AND the record back. A separate entry
+        // would let the first undo restore last year's record over this
+        // year's dates.
+        if (isARollover)
+            LinksChecklist.ReleasePublishedPages(course.DirectoryPath, section, DateTime.Now, _undo);
 
         recording.Done();
 

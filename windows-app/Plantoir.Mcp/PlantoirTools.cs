@@ -1122,7 +1122,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var parsed = await Load(timetable, block, startYear, cancellation, firstDay);
             var plan = workspace.PlanReDate(course, section, parsed,
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
-            var result = workspace.ApplyReDate(plan);
+            var result = workspace.ApplyReDate(plan, isARollover: true);
 
             var found = workspace.Course(course);
 
@@ -1142,7 +1142,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // session calling it has chosen already. The QUESTION belongs to
             // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes", releasedWithTheDates: !plan.ChangesNothing));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -1291,13 +1291,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 // website, and left the section pinned to last year's. An offer
                 // that looks like it worked is worse than no offer at all.
                 string aboutTheWebsiteOnly = SettleTheWebsiteAfterARollover(
-                    found, number, website, rollover);
+                    found, number, website, rollover, releasedWithTheDates: false);
                 if (aboutTheWebsiteOnly.Length == 0) return Answering(already);
                 string bothHalves = already + "\n\n" + aboutTheWebsiteOnly;
                 return Answering(bothHalves, bothHalves);
             }
 
-            var result = workspace.ApplyReDate(plan);
+            var result = workspace.ApplyReDate(plan, isARollover: IsARollover(website, rollover));
             // The counts ApplyReDate made from what it WROTE (#357 / mac #343):
             // its first paragraph. Never recomputed here from the plan.
             string summary = result.Message.Split("\n\n")[0];
@@ -1309,7 +1309,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // summary is the one line the teacher reads in the chat window, and
             // this is the part they have to answer. Put only in `detail` it
             // would work over MCP and be invisible in the app.
-            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover);
+            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover,
+                                                                    releasedWithTheDates: !plan.ChangesNothing);
             if (aboutTheWebsite.Length > 0)
             {
                 summary += "\n\n" + aboutTheWebsite;
@@ -1401,13 +1402,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// rather than silent.</para>
     /// </remarks>
     private string SettleTheWebsiteAfterARollover(
-        Course course, int sectionNumber, string website, string rollover)
+        Course course, int sectionNumber, string website, string rollover, bool releasedWithTheDates)
     {
         if (!IsARollover(website, rollover)) return "";
 
         // EVERY rollover, same website or new (#392): the published-pages
         // record and the checklist's answers belong to last year's classes.
-        workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
+        // Normally released INSIDE the re-date's own undo entry (ApplyReDate);
+        // only a turn whose dates were already right (the website answered on
+        // a second turn) releases here, in an entry of its own, because there
+        // is no re-date write for it to join.
+        if (!releasedWithTheDates) workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
 
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {

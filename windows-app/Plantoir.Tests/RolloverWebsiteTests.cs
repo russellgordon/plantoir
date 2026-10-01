@@ -297,6 +297,33 @@ public class RolloverWebsiteTests : IDisposable
         Assert.Contains(AssistWording.RolloverWebsiteQuestion, TeacherSummary(result));
     }
 
+    /// <summary>
+    /// #392: a rollover releases the published-pages record INSIDE the
+    /// re-date's own undo entry, so ONE "undo that" puts the dates and the
+    /// record back together. A separate entry would let the first undo
+    /// restore last year's record over this year's dates.
+    /// </summary>
+    [Fact]
+    public async Task TheRecordIsReleasedInsideTheReDatesOwnUndoEntry()
+    {
+        string record = Path.Combine(_folder, "courses", "ICS3U", ".publish_state", "section1.published-pages");
+        Directory.CreateDirectory(record);
+        string fragment = Path.Combine(record, "20260901T120000Z-netlify.json");
+        File.WriteAllText(fragment, "{}");
+        var undo = new UndoHistory();
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, _launcher, undo: undo));
+        int before = undo.Entries.Count;
+
+        await tools.ReDateClasses("ICS3U", 1, timetable: "", block: "", cancellation: default,
+                                  pages: null, meetings: null, firstDay: "", startYear: 0,
+                                  website: "same", rollover: "yes");
+
+        Assert.False(File.Exists(fragment), "a rollover releases the record");
+        Assert.Equal(before + 1, undo.Entries.Count);
+        Assert.True(undo.Undo().Succeeded);
+        Assert.True(File.Exists(fragment), "one undo puts the record back with the dates");
+    }
+
     [Fact]
     public async Task KeepingTheSameWebsiteLeavesItAlone()
     {
