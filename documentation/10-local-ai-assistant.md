@@ -3795,7 +3795,12 @@ Links are now keyed by path; a name that fits more than one page is ASKED
 about with `wording.morePagesThanOneAreCalled` and the list of paths (the
 links question's sentence) rather than guessed; a path names exactly one
 page; two pages a teacher would read by the same name are named on the plan
-with their folder ("Notes (in section1)"); and the app's own callers (a whole
+with their folder in the CONTRACT's one shape, the one start of year uses
+(`startOfYear.wording.pageNameInFolder`: “Notes” (in section1)), and the
+"which one?" question names each candidate the same way (or by its own name
+when those differ, as two landing pages do), so the answer can be typed back;
+only that planner-made shape is read back, never a page's own title ending
+"(in …)"; and the app's own callers (a whole
 unit, the links checklist, `publish_class_on`) pass paths.
 `PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks` and
 `.ThePlanSaysWhichOfTwoSameNamedPagesGoes` (both red against the old
@@ -3818,10 +3823,13 @@ inversion anywhere. Said plainly (review N2): without the 37 rejected calls
 the FAIL rests on ONE trial — the S1 hide-inversion probe, which BEFORE
 passed once in ten. So the two descriptions stay at their
 Windows text, shortened for the local model (`AssistAgent.StillShortened`
-unchanged), the two `measuredDepartures` entries stay with these numbers, and
-#420 stays open for the description half. The conditional MIDDLE arm — the
+unchanged) and the two `measuredDepartures` entries stay with these numbers —
+by Russell's decision (2026-10-01) a PERMANENT measured departure, and #420
+closes with the behaviour half landed. The text changes only with a new
+pre-registered measurement; the untrue "optionally" and the stray
+"section's website" fragment in it stay for the same reason. The conditional MIDDLE arm — the
 flag gone, the text held: the surface that ships — is better on S1, level
-on S3 and 4 points lower on S2, with two regressions (review R1): EXC2O
+on S3 and 4 points lower on S2, with three regressions (reviews R1, S3): EXC2O
 161→**190**/220 (two publish-by-name cards 0→10 to `publish_pages`, the
 hide-inversion probe 1→10 to `unpublish_pages`); ICS3U 160→160 with one probe
 gained (`card: plan a publish` 0→10) and one LOST (`schedule a deploy` 10→0,
@@ -3830,8 +3838,10 @@ all to `deploy_section`); teachers-say 220→210/250 (`ctl cancel_scheduled`
 lesson` (61–89 s each; the score did not move because that suite reads no
 `finish_reason`, so under the registered criterion (d) MIDDLE would fail).
 0 inversions, 0 malformed. It ships anyway (ruling Q3: it is the contract's
-schema, and the behaviour needs it); the two regressions are a `windows` +
-`assistant` issue of their own (bundle 10, R2). What the immediate-deploy
+schema, and the behaviour needs it); the three regressions (schedule →
+deploy_section, cancel → declined, next day's lesson → cut off) are a
+`windows` + `assistant` issue of their own (bundle 10, R2/S3); the cancel one
+declines rather than acts, the safe direction. What the immediate-deploy
 mistake meets today: `deploy_section` waits for the approval card, whose
 button is Deploy — nothing goes out until the teacher presses it.
 **Rejected:** moving the text anyway because no inversion was seen (the
@@ -3839,8 +3849,8 @@ registered criteria, not the veto alone, decide); trimming the contract text
 for Windows' router (a second description per tool is what #114 removed);
 re-registering looser criteria after reading the result. **Known, not
 changed:** the held text still says linked pages come "optionally" — untrue
-since step (a), and a routing change to fix; it is Russell's call (bundle 10
-ready note).
+since step (a), and a routing change to fix; kept by Russell's decision with
+the rest of the text (above).
 
 ### The two MCP surfaces are not the same product
 

@@ -275,8 +275,11 @@ public sealed class AssistAgent
     /// PC's tier (an unpublish_pages trial lost on the hide-inversion probe,
     /// research/ai-assist/windows-description-convergence-results.txt, the
     /// #420 section). So they stay, recorded as contracts/assist-cases.json →
-    /// toolDescriptions.measuredDepartures with those numbers, and #420 stays
-    /// open for the description half.
+    /// toolDescriptions.measuredDepartures with those numbers — a PERMANENT
+    /// measured departure by Russell's decision (2026-10-01; #420 closed). It
+    /// changes only with a new pre-registered measurement. The held text's
+    /// untrue "optionally" and its stray "section's website" fragment stay for
+    /// the same reason.
     /// </summary>
     internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
     {

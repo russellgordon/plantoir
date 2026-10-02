@@ -659,11 +659,13 @@ public sealed partial class AssistWorkspace
         }
 
         // Two pages a teacher would read by the same name are named WITH their
-        // folder on the plan, so the card says which one goes.
-        foreach (var group in pagesList.GroupBy(p => p.DisplayTitle, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+        // folder on the plan, in the contract's one shape (startOfYear.wording
+        // .pageNameInFolder: “{page}” (in {folder})), names compared trimmed,
+        // ignoring case, in one Unicode form — as start of year compares them.
+        foreach (var group in pagesList.GroupBy(p => ComparableName(p.DisplayTitle)).Where(g => g.Count() > 1))
             foreach (var page in group.ToList())
             {
-                var withFolder = page with { DisplayTitle = $"{page.DisplayTitle} (in {FolderOf(course, page)})" };
+                var withFolder = page with { Folder = FolderOf(course, page) };
                 pagesList[pagesList.IndexOf(page)] = withFolder;
                 pagesByPath[page.RelativePath] = withFolder;
                 if (ReferenceEquals(pagesByTitle.GetValueOrDefault(page.Title), page)) pagesByTitle[page.Title] = withFolder;
@@ -761,17 +763,32 @@ public sealed partial class AssistWorkspace
                     bare = Path.GetFileNameWithoutExtension(bare.Replace('\\', '/').Split('/')[^1]);
             }
 
-            // By file name, then by the name the teacher sees. More than one
-            // page answering to the name is ASKED about, never guessed: the
-            // walk would follow whichever page it picked (#420 review R5).
+            // By file name, then by the name the teacher sees, then — the answer
+            // to "which one?" — by a name with its folder, in the contract's
+            // shape: “Notes” (in section1). More than one page answering to the
+            // name is ASKED about, never guessed: the walk would follow
+            // whichever page it picked (#420 review R5).
+            var inFolder = System.Text.RegularExpressions.Regex.Match(bare, @"^[“""]?(?<page>.+?)[”""]? \(in (?<folder>[^)]+)\)$");
             var candidates = byPath is not null ? new List<PlannedPage> { byPath }
                 : pagesList.Where(p => string.Equals(p.Title, bare, StringComparison.OrdinalIgnoreCase)).ToList();
             if (candidates.Count == 0)
-                candidates = pagesList.Where(p => string.Equals(p.DisplayTitle, bare, StringComparison.OrdinalIgnoreCase)
-                                               || string.Equals(StrippedOfFolder(p.DisplayTitle), bare, StringComparison.OrdinalIgnoreCase)).ToList();
+                candidates = pagesList.Where(p => ComparableName(p.DisplayTitle) == ComparableName(bare)).ToList();
+            if (candidates.Count == 0 && inFolder.Success)
+                candidates = pagesList.Where(p =>
+                        (ComparableName(p.DisplayTitle) == ComparableName(inFolder.Groups["page"].Value)
+                         || ComparableName(p.Title) == ComparableName(inFolder.Groups["page"].Value))
+                        && ComparableName(FolderOf(course, p)) == ComparableName(inFolder.Groups["folder"].Value)).ToList();
             if (candidates.Count > 1)
+            {
+                // Each named so the answer can be typed back: by its own name
+                // when those differ (two landing pages read as their folders),
+                // with its folder when they do not.
+                bool namesDiffer = candidates.Select(c => ComparableName(c.DisplayTitle)).Distinct().Count() == candidates.Count;
                 throw new AssistRefusal(AssistWording.MorePagesThanOneAreCalled(course.Code, section.ToString(), bare) + "\n" +
-                                        string.Join("\n", candidates.Select(c => "• " + c.RelativePath)));
+                    string.Join("\n", candidates.Select(c => "• " + (namesDiffer
+                        ? StartOfYearWording.PageName(c.DisplayTitle)
+                        : StartOfYearWording.PageNameInFolder(c.DisplayTitle, FolderOf(course, c))))));
+            }
             if (candidates.Count == 0)
             {
                 unknownNames.Add(wanted);
@@ -1065,9 +1082,9 @@ public sealed partial class AssistWorkspace
         return folder == "." ? course.Code : folder;
     }
 
-    /// <summary>A display title without the " (in folder)" the plan adds to tell two same-named pages apart.</summary>
-    private static string StrippedOfFolder(string displayTitle) =>
-        System.Text.RegularExpressions.Regex.Replace(displayTitle, @" \(in [^)]*\)$", "");
+    /// <summary>A name as the contract compares names: trimmed, ignoring case, in one Unicode form.</summary>
+    private static string ComparableName(string name) =>
+        name.Trim().Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
 
     internal static List<PlannedPage> WithoutDeclined(IEnumerable<PlannedPage> planned, IEnumerable<PlannedPage> declined)
     {

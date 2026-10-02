@@ -918,15 +918,25 @@ separately from the reader:
   that swallowed a failed date write is gone. And `PlanPublish` now leaves a
   declined page out of the pages the front page and dates are worked out
   from by PATH (`AssistWorkspace.WithoutDeclined`), not by file name, so a
-  second `index.md` is not taken out with it (fix review note 3). Measured
-  honestly: through `PlanPublish` today the collision is not reachable end
-  to end, because the planner keeps one page per file name upstream (its
-  `chosen` and `pagesByTitle` are keyed by title), so the test pins
-  `WithoutDeclined` itself. Rejected: keying the whole planner on paths —
-  `linksFrom`, `referrers` and the walk are title-keyed throughout, and
-  that is a larger change than #422 asks for. Left as the product question
-  #422 records (Russell, 2026-10-01: leave it): a declined class's linked
-  material is still published by the walk and keeps its own date.
+  second `index.md` is not taken out with it (fix review note 3). The test
+  pins `WithoutDeclined` itself (`ADeclinedPageIsMatchedByPathNotByItsFileName`)
+  because, when #422 was written, the planner kept one page per file name
+  upstream and the collision was not reachable end to end. **That changed
+  in the same bundle:** keying the WHOLE planner on paths — first set aside
+  here as larger than #422 asked — was taken up by the bundle 10 review
+  (R5), because once #420 made every publish follow links, a file-name key
+  let publishing one of two same-named pages follow the OTHER one's links
+  (more published than the plan showed). `PlanPublish` now keys pages,
+  `chosen`, `linksFrom`, `referrers`, the walks and Key Links by path, asks
+  about a name that fits two pages, and names same-named pages with their
+  folder in the contract's `pageNameInFolder` shape; measured by
+  `PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks`
+  and `.ThePlanSaysWhichOfTwoSameNamedPagesGoes`, both red against the old
+  planner (it planned the other index page's "Answer Key"). Doc 10 → "And
+  the walk is keyed by PATH". Left as the product question #422 records
+  (Russell, 2026-10-01: leave it): a declined class's linked material is
+  still published by the walk and keeps its own date — wider now that
+  every publish follows links.
   **Getting a section ready for the start of the year and the links
   checklist's Publish name them too since 2026-10-01** (#421, bundle 10 —
   the two callers bundle 9 found still dropping the outcome). Start of year

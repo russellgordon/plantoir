@@ -194,3 +194,18 @@ above are unchanged and the review recounted them independently.
   - "card: undo" is wrongly listed among MIDDLE's model-seen gains above; it
     is answered in code and not in the model-seen total. The +13.2 points are
     publish by name +10, plan a publish +10 and the hide probe +9 = 29/220.
+
+NOTE ADDED 2026-10-01 evening (Russell's decision; bundle 10 rulings R7/S3).
+  - #420 CLOSES when bundle 10 lands. The decision above stands (the two
+    descriptions do not move), and is now PERMANENT: Windows keeps its own
+    publish_pages / unpublish_pages text for the smaller assistant as a
+    measured departure (toolDescriptions.measuredDepartures, issue 420). It
+    changes only with a new pre-registered measurement; the untrue
+    "optionally" and the stray "section's website" fragment stay with it.
+    "#420 stays open for the description half" above is superseded by this.
+  - The shipped (MIDDLE) surface has THREE regressions against BEFORE, not
+    two: S3 "schedule a deploy" 10 -> 0 (deploy_section); S2 "ctl
+    cancel_scheduled" 10 -> 0 (declined - the whole of teachers-say's
+    220 -> 210; the safe direction); and, separately, ten S2 turns at the
+    512-token cap on "next: next day's lesson" that the score cannot see.
+    They are one windows + assistant issue.
