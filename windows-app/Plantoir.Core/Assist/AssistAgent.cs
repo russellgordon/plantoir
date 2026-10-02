@@ -267,10 +267,19 @@ public sealed class AssistAgent
     /// (assist-cases.json → toolDescriptions) — measured before and after on
     /// this PC's tier with no regression and no polarity inversion
     /// (research/ai-assist/windows-description-convergence-results.txt).
-    /// These two keep their Windows text, shortened, because the contract's
-    /// sentences promise behaviour Windows does not have yet (includeLinked
-    /// defaults to false here); they move when that behaviour does (#420, and
-    /// recorded as contracts/assist-cases.json → toolDescriptions.measuredDepartures).
+    /// These two keep their Windows text, shortened. They were held first for
+    /// behaviour (#352: Windows' includeLinked defaulted to false, so the
+    /// contract's sentences were untrue here); #420 step (a) made the
+    /// behaviour match on 2026-10-01, and step (b) then MEASURED the move to
+    /// the contract text and it failed its pre-registered criteria on this
+    /// PC's tier (an unpublish_pages trial lost on the hide-inversion probe,
+    /// research/ai-assist/windows-description-convergence-results.txt, the
+    /// #420 section). So they stay, recorded as contracts/assist-cases.json →
+    /// toolDescriptions.measuredDepartures with those numbers — a PERMANENT
+    /// measured departure by Russell's decision (2026-10-01; #420 closed). It
+    /// changes only with a new pre-registered measurement. The held text's
+    /// untrue "optionally" and its stray "section's website" fragment stay for
+    /// the same reason.
     /// </summary>
     internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
     {
@@ -978,7 +987,9 @@ public sealed class AssistAgent
         {
             string tool = withLinks.Groups["verb"].Value.StartsWith("un", StringComparison.OrdinalIgnoreCase)
                 ? "unpublish_pages" : "publish_pages";
-            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value, includeLinked: true),
+            // "…and everything it links to" is what every publish does since
+            // #420; the phrasing is still answered, with the same call.
+            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value),
                                     cancellation);
         }
         // The old "publish|unpublish Unit N, Day M" shape lived here and was
@@ -988,7 +999,7 @@ public sealed class AssistAgent
         // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
-                                    PageArguments(planned.Groups["title"].Value, includeLinked: true),
+                                    PageArguments(planned.Groups["title"].Value),
                                     cancellation);
         if (scheduled.Success)
         {
@@ -1011,11 +1022,10 @@ public sealed class AssistAgent
         return null;
     }
 
-    private JsonObject PageArguments(string title, bool includeLinked) => new()
+    private JsonObject PageArguments(string title) => new()
     {
         ["course"] = _courseCode,
         ["section"] = _section,
-        ["includeLinked"] = includeLinked,
         ["pages"] = new JsonArray(JsonValue.Create(TidyTitle(title))),
     };
 

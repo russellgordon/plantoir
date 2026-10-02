@@ -294,7 +294,8 @@ public static class CourseRestorer
     /// <para>The block is found with the shared finder (#177, decided
     /// 2026-09-19 and again 2026-09-25: Windows matches the mac), so a restore
     /// reaches the same pages the build reads — a <c>----</c> fence, a blank
-    /// line before the fence. Rejected: both apps going strict (restore would
+    /// line before the fence (which the restored page drops, as the mac's
+    /// does — Russell, 2026-10-01). Rejected: both apps going strict (restore would
     /// then disagree with hide and show on the same page), and leaving the
     /// divergence. The old <c>liveText.Contains("\n---")</c> refuse-to-prepend
     /// guard went with the strict finder, which is what it compensated for.</para>
@@ -321,9 +322,12 @@ public static class CourseRestorer
         var doomed = PerSectionLineIndices(sectionNumber, liveText).ToHashSet();
         int lastPerSectionIndex = PerSectionLineIndices(null, liveText).DefaultIfEmpty(-1).Max();
 
-        // Whatever came before the opening fence (blank lines) is kept: the
-        // mac's settingPerSectionKeys starts at the fence and drops them.
-        var rebuilt = lines.Take(liveBlock.Open + 1).ToList();
+        // The rebuilt page starts AT the opening fence: blank lines before it
+        // (the only thing that can stand there) are dropped, as the mac's
+        // settingPerSectionKeys drops them. Windows kept them from bundle 2
+        // until Russell chose to match on 2026-10-01; either is harmless to
+        // the build, and one behaviour is one less difference to explain.
+        var rebuilt = new List<string> { lines[liveBlock.Open] };
         bool placed = false;
         for (int index = liveBlock.Open + 1; index < liveBlock.Close; index++)
         {

@@ -177,8 +177,8 @@ public sealed class PublishPlan
                     break;
                 }
                 string becoming = change.WillBeVisible ? "visible" : "hidden";
-                string line = $"“{change.Page.DisplayTitle}” will become {becoming}";
-                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.Title, change.Page.Title, StringComparison.OrdinalIgnoreCase)))
+                string line = $"{change.Page.Named} will become {becoming}";
+                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                 {
                     line += $", with the same date as “{move.TakenFrom}”";
                 }
@@ -212,7 +212,7 @@ public sealed class PublishPlan
                     lines.Add($"…and {Kept.Count - listed} more.");
                     break;
                 }
-                lines.Add($"“{staying.Page.DisplayTitle}” stays visible, because {staying.Reason}");
+                lines.Add($"{staying.Page.Named} stays visible, because {staying.Reason}");
                 listed++;
             }
         }
@@ -223,14 +223,14 @@ public sealed class PublishPlan
             lines.Add(leftAlone);
         }
 
-        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.Title), StringComparer.OrdinalIgnoreCase);
-        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.Title)).ToList();
+        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
         if (orphaned.Count > 0)
         {
             lines.Add("");
             foreach (var move in orphaned)
             {
-                lines.Add($"“{move.Page.DisplayTitle}” will take the same date as “{move.TakenFrom}”.");
+                lines.Add($"{move.Page.Named} will take the same date as “{move.TakenFrom}”.");
             }
         }
 
@@ -360,6 +360,23 @@ public sealed record PlannedPage(
     bool IsSectionLocal = false,
     bool VisibilityIsCertain = true)
 {
+    /// <summary>
+    /// The folder the page sits in (from the course folder), set ONLY when another
+    /// page of the section has the same display title, so the plan can say which
+    /// one goes (bundle 10, S1). Null otherwise.
+    /// </summary>
+    public string? Folder { get; init; }
+
+    /// <summary>
+    /// The page as a plan line names it: the contract's one naming rule, the
+    /// one start of year uses (shared-rules.json → startOfYear.wording.pageName /
+    /// pageNameInFolder) — “{page}”, or “{page}” (in {folder}) when the
+    /// section has two pages of that name.
+    /// </summary>
+    public string Named => Folder is null
+        ? StartOfYearWording.PageName(DisplayTitle)
+        : StartOfYearWording.PageNameInFolder(DisplayTitle, Folder);
+
     /// <summary>What the teacher sees this page called (Quartz displayName).</summary>
     public string DisplayTitle { get; init; } = DisplayTitle ?? Title;
 
