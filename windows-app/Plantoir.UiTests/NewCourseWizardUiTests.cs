@@ -21,11 +21,11 @@ namespace Plantoir.UiTests;
 /// doing so deletes the only coverage of the button and leaves a test with the
 /// same name that proves what was already proven.**</para>
 ///
-/// <para><b>This is the first UI test that runs a LAUNCHER.</b> That is safe
-/// for narrow reasons that nothing enforces, written out once in
-/// <c>documentation/12-windows-app.md</c> under "The flags the app answers".
-/// Read them before running a DIFFERENT launcher from a test: preview and
-/// scheduled deploy would NOT be safe.</para>
+/// <para><b>This was the first UI test that runs a LAUNCHER.</b> Why setup.ps1
+/// was safe is in <c>documentation/12-windows-app.md</c> under "The flags the
+/// app answers"; since bundle 11 other tests run preview and deploy too, and
+/// what they owe is under "Driving the real interface". A scheduled deploy is
+/// still never run from a test.</para>
 ///
 /// <para>Serialised with the rest: one real application at a time.</para>
 /// </summary>
@@ -201,8 +201,7 @@ public class NewCourseWizardUiTests
         // This does lean on the ContentDialog template dropping a button whose
         // text is empty rather than showing a blank one — true today, and the
         // thing to suspect first if this line ever fails on its own.
-        Assert.True(app.FindOrNull("CloseButton", TimeSpan.FromSeconds(2)) is null,
-                    "Cancel was still offered after the course had been made");
+        app.AssertAbsent("CloseButton", "Cancel, after the course had been made");
 
         create.AsButton().Invoke();
 
@@ -259,7 +258,7 @@ public class NewCourseWizardUiTests
 
         Assert.Equal(WizardContract["noStartingContentNote"]!.ToString(),
             app.Find("noStartingContentNote", "the note for a course starting with nothing at all").Name);
-        Assert.Null(app.FindOrNull("noExampleContentNote", TimeSpan.FromSeconds(1)));
+        app.AssertAbsent("noExampleContentNote", "the no-example-content note", TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
@@ -310,7 +309,7 @@ public class NewCourseWizardUiTests
     // ---- Driving the wizard -----------------------------------------------
 
     /// <summary>Press the button in the course list and wait for the wizard.</summary>
-    private static AutomationElement OpenWizard(DrivenApp app)
+    internal static AutomationElement OpenWizard(DrivenApp app)
     {
         // Invoked rather than clicked: a physical click can land while
         // something else briefly holds the foreground, and this button offers
@@ -340,7 +339,7 @@ public class NewCourseWizardUiTests
     /// version of <c>SpecialFoldersHelpUiTests</c> failed a DIFFERENT test each
     /// run for a reason unrelated to what that test checked.</para>
     /// </summary>
-    private static void PutCodeIn(DrivenApp app, string code)
+    internal static void PutCodeIn(DrivenApp app, string code)
     {
         var box = app.Find("newCourseCodeBox", "the course-code picker");
         var edit = Retry.WhileNull(() => box.FindFirstDescendant(cf => cf.ByControlType(ControlType.Edit)),
@@ -366,7 +365,7 @@ public class NewCourseWizardUiTests
     /// the failure, so the app's own explanation and the tail of its console
     /// are pulled into the message instead.</para>
     /// </summary>
-    private static void WaitForTheWorkToFinish(DrivenApp app)
+    internal static void WaitForTheWorkToFinish(DrivenApp app)
     {
         // Wait for the work to have STARTED before waiting for it to end.
         // Without this the next wait is racy in the direction that lies:
@@ -402,7 +401,7 @@ public class NewCourseWizardUiTests
     }
 
     /// <summary>The app's own words for the failure, when it has any.</summary>
-    private static string Explanation(DrivenApp app)
+    internal static string Explanation(DrivenApp app)
     {
         string why = app.FindOrNull("failureExplanation", TimeSpan.FromSeconds(1))?.Name ?? "";
         return why.Length > 0 ? $" It explained it as \"{why}\"." : " It explained nothing.";
@@ -414,7 +413,7 @@ public class NewCourseWizardUiTests
     /// read from a file, because the console is only in the visual tree once
     /// that pane is open.
     /// </summary>
-    private static string ConsoleTail(DrivenApp app)
+    internal static string ConsoleTail(DrivenApp app)
     {
         try
         {

@@ -22,9 +22,9 @@ namespace Plantoir.Services;
 /// every <c>ShowAsync</c> call site increments, which is right only while
 /// every one of ~40 call sites remembers it.</para>
 ///
-/// <para>Whether the keys actually fire under a dialog has not been measured
-/// (bundles 8 and 9 had no unlocked desktop); the guard costs nothing if they
-/// do not. <see cref="Holds"/> is also how the measurement is MADE: in a run
+/// <para>Measured in bundle 11 (documentation/12, "Accelerators under a
+/// dialog"): with the positive control that the same keys DO arrive with no
+/// dialog up. <see cref="Holds"/> is also how the measurement is MADE: in a run
 /// whose state is redirected (<c>--state-dir</c>, which only the UI tests
 /// pass), every key it holds is written, one name per line, to
 /// <see cref="HeldUnderADialogFileName"/> in that state folder.
@@ -51,12 +51,23 @@ public static class DialogGate
     /// </summary>
     public static bool Holds(XamlRoot? root, string accelerator)
     {
-        if (!IsOpen(root)) return false;
+        bool open = IsOpen(root);
         if (AppDataRoot.IsRedirected)
         {
-            try { File.AppendAllText(AppDataRoot.Combine(HeldUnderADialogFileName), accelerator + Environment.NewLine); }
+            try
+            {
+                // Every ARRIVAL, held or passed — the positive control for the
+                // measurement (bundle 11, W2): a key absent from the held list
+                // means something only if the same key, pressed with no dialog
+                // up, is shown to arrive at all.
+                File.AppendAllText(AppDataRoot.Combine(ArrivedFileName), $"{accelerator} {(open ? "held" : "passed")}{Environment.NewLine}");
+                if (open) File.AppendAllText(AppDataRoot.Combine(HeldUnderADialogFileName), accelerator + Environment.NewLine);
+            }
             catch (Exception) { /* a measurement must never change what the key does */ }
         }
-        return true;
+        return open;
     }
+
+    /// <summary>Every accelerator that reached its handler, in a redirected run only: "&lt;key&gt; held|passed".</summary>
+    public const string ArrivedFileName = "accelerators-arrived.txt";
 }

@@ -477,17 +477,28 @@ spaces.
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
 builds root from `$env:LOCALAPPDATA` themselves, and `TaskScheduling` bakes the
-same into the wrapper script it registers. So a redirected run that PREVIEWED
-would look for its build where the launcher did not put it, and one that
-SCHEDULED a deploy would register a REAL Task Scheduler task whose sentinels
-land in the teacher's real pending folder. Neither is done by any test, and a
-test that drives Preview is the obvious next thing somebody writes — this is
-the paragraph they will have read first. `plantoir-mcp.exe` resolves its own
-paths too.
+same into the wrapper script it registers. So a redirected run that PREVIEWS
+builds into the REAL `%LOCALAPPDATA%\Plantoir\builds\<folder id>` while the
+app's own idea of that folder is under the state directory (so
+`BuildFreshness` always says "build", harmlessly), and one that SCHEDULED a
+deploy would register a REAL Task Scheduler task whose sentinels land in the
+real pending folder. **No test schedules a deploy.** `plantoir-mcp.exe`
+resolves its own paths too.
 
-**One launcher IS run from a test now**, and the reasons that is safe are
-narrower than they look. `NewCourseWizardUiTests` presses the wizard's Create
-button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
+**Previewing and publishing from a test ARE done, since bundle 11
+(2026-10-01).** Until then this paragraph said neither was, and that a test
+which drove Preview "would NOT be safe". Russell lifted that rule — "I don't
+care if you have real build folders. We need to test this. End to end." —
+because course import, reference courses, Copy a Page, preview and publishing
+had never been proven through the window, and this PC holds no teacher's real
+work. What remains is hygiene, and it is `DrivenApp.Dispose`'s job, so it runs
+when a test fails as well: see "Driving the real interface" → "A test that
+runs a launcher".
+
+**`setup.ps1` was the first launcher run from a test**, and the reasons it
+was safe even before that ruling are narrower than they look.
+`NewCourseWizardUiTests` presses the wizard's Create button, which runs
+`setup.ps1`. **Two guards, neither enforced by anything:**
 
 1. `setup.ps1` sets `PLANTOIR_BUILD_ROOT` to the real
    `%LOCALAPPDATA%\Plantoir\builds\<id>` like every other launcher — but
@@ -501,8 +512,13 @@ button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
    the shared runtime.
 
 Checked rather than assumed, 2026-09-07: after a create there was no new folder
-under the real builds root and the real breadcrumb trail was untouched. Check
-both again before a test runs a different launcher.
+under the real builds root and the real breadcrumb trail was untouched. The
+preview and deploy launchers DO make a folder under the real builds root (it is
+deleted afterwards, see below), and they write to the REAL trail
+(`%LOCALAPPDATA%\Plantoir\Logs\activity.txt`) only on their refusals — "the
+preview stopped before building…", "every address … was taken" — which no
+end-to-end test provokes; bundle 11 measured the trail's size before and after
+its runs (the ready note has the numbers).
 
 Two things about it are worth more than the flag itself.
 
@@ -744,9 +760,11 @@ bottom, that a panel follows the course a teacher selected rather than
 going stale, and that a sentence the contract pins is actually RENDERED where
 a teacher can see it rather than merely held in a constant.
 
-**It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
-skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and
-runs none. The project is in the solution so a SOLUTION build compiles it —
+**It is opt-in and belongs to no gate.** Every test that drives the window
+carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
+`dotnet test` builds them and runs none of those — only
+`AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
+and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -814,6 +832,113 @@ caught by the same match because `setup.ps1` runs it as `python.exe -u
 <workspace>\.toolchain\scripts\setup_course.py` — the script path is inside
 the temporary folder, so it is on the command line even though the folder is
 otherwise only python's working directory.
+
+### A test that runs a launcher (bundle 11, 2026-10-01)
+
+Until bundle 11 the suite drove no Preview and no Deploy, so course import,
+courses kept for reference, Copy a Page, preview and publishing had never been
+proven through the window. Russell lifted the rule against it — "I don't care
+if you have real build folders. We need to test this. End to end." — and five
+classes now run the real launchers:
+
+| Class | What it drives | What it reads back |
+|---|---|---|
+| `WizardToPreviewUiTests` | the wizard's Create, a line added to the front page, Preview, Stop | the SERVED front page over HTTP (the marker line), the address the window's preview pane LOADED (equal to it, status 200), the build in the real builds root, the address going quiet after Stop; the pane's page text is reported, not asserted |
+| `ImportForReferenceUiTests` | File › Import Courses for Reference…, the Windows folder picker, the sheet, Import; the open folder and an empty folder | the done screen's contract sentences, the row under Reference Courses › 2025–26, the copied config's marker and year, the page LOCKED on disk, `.merged_output` left behind, the source untouched |
+| `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
+| `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
+| `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+
+**What a test that runs a launcher owes, and where it is done.** The launchers
+build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
+working folder>` (`DrivenApp.RealBuildsRoot`) whatever `--state-dir` says. So
+`DrivenApp.Dispose` — which runs when a test FAILS too — after killing the app:
+runs `preview.ps1 CODE N --stop` for every section the test declared with
+`WillServe` (the launcher's own sweep, by the directories the build and serve
+work in); ends any process whose command line still names the run's
+temporary folder or that builds folder (a deploy's launcher, its python);
+deletes that builds folder; and unlocks the working folder's courses so a
+reference course the app locked can be deleted with it. (Before bundle 11 the
+reference tests' temporary folders outlived their runs for exactly that
+reason.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
+launchers would build under the state folder — it would have stopped the
+tests exercising the real path the ruling asked for, and node and npm resolve
+caches from the same variable.
+
+**Still never done from a test:** scheduling a deploy (it registers a REAL
+Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
+real globally unique site — `verify-deploy.ps1` owns those).
+
+**What the first unlocked runs taught (bundle 11, 2026-10-01, this PC: Intel
+i5-8365U, 16 GB, Windows 11 26200).** Eleven tests written while the desktop
+was locked had never run; the first whole run failed 9 of 33, and every one of
+these is now written into the harness rather than left to be rediscovered:
+
+- **A ContentDialog is a `Window` of class `Popup`, named by its title.** There
+  is no "ContentDialog" class in the UIA tree, and an empty `Popup` sits beside
+  it; `DrivenApp.OpenDialog` tells them apart by the dialog's own buttons.
+- **A panel has no automation peer.** An `AutomationId` set on a `StackPanel`
+  or a `UserControl` never reaches the tree (`clubLockedRows`,
+  `referenceSummary` — the latter moved to its `ScrollViewer`). A test that
+  asserts such an element ABSENT passes whatever the screen shows.
+- **A folded TreeView item has no children in the tree.** The sidebar's
+  Backups group starts folded; unfold it (ExpandCollapse) before asserting a
+  backup row is there or gone.
+- **`AutomationProperties.AutomationId` replaces `x:Name`, case-sensitively.**
+  `DeployButton` matched nothing; the id is `deployButton`.
+- **`SetScrollPercent(-1, 100)` on Course Settings' form stuck at 2.8 %**; a
+  `LargeIncrement` walk reaches the bottom.
+- **An empty `TextBlock` has no Name** (`PropertyNotSupportedException`), and a
+  UIA query can time out (`COMException 0x80131505`) while the app draws a
+  dialog — both mean "nothing yet", not a fault, for something AWAITED
+  (`FindOrNull`). Never for an absence: a negative check built on
+  `FindOrNull` passed whenever every query timed out, so negative checks use
+  `DrivenApp.AssertAbsent`, which says "absent" only when the tree ANSWERED
+  empty and fails when it never answers (`AssertAbsentRuleTests`, plain facts
+  that run without a desktop; the timeout case is the must-fail). It also
+  keeps watching for 2 s after the first empty answer, so a control drawn a
+  moment late is not declared absent.
+- **An id set on a ContentDialog's TEMPLATE button once, at Opened, does not
+  always stick**: Copy a Page's Cancel was found as the template's own
+  "CloseButton" in 2 of 5 runs (17, 18). The app now re-tags its two buttons
+  on every layout pass while the dialog is up, and the tests close it by
+  `copyPageClose` only (`EndToEnd.CloseCopyAPage`, which fails when there is
+  no dialog or no id) — a "whichever id" fallback had hidden the race.
+- **Click a control only once it has a clickable point**; a dialog opened
+  straight after another closed is still arriving (`NoClickablePointException`).
+- **WebView2's page text** arrives through UIA lazily, sometimes as Text and
+  sometimes as another element's name — and in 3 of 8 runs it did not arrive
+  in time (once 0 named elements for 120 s, focused or not). That is Chromium's
+  accessibility tree, not the app's, so `WizardToPreviewUiTests` REPORTS it.
+  What it ASSERTS is the address the preview pane loaded: in a `--state-dir`
+  run the app writes "loaded 200 <address>" into Open in Browser's ItemStatus
+  on every completed navigation (the WebView2's own peer drops an ItemStatus
+  set on it — measured empty), and the test compares it with the address it
+  read the page from (must-fail: a wrong port in it turns the test red). It
+  also asserts the served page over HTTP carries the
+  teacher's line, and the web view is on screen with a size.
+- **A closing dialog's smoke layer** leaves the sidebar with no clickable
+  point for a moment; `PressRowMenuItem` waits for one.
+
+Three PRODUCT faults the same runs found, all fixed in bundle 11: Keep a Copy
+for Reference… (and Import, same shape) closed the app on its first progress
+report — a `Progress<T>` made inside `Task.Run` reports on a pool thread
+(`ProgressMadeOnTheInterfaceThreadTests` now refuses the shape); choosing a
+folder and then Netlify again in Course Settings left Revert on
+(`CourseConfiguration.DeployTarget` now restores the saved spelling); and
+every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
+
+Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
+29–32 s; its first preview served 52–61 s after Preview was pressed;
+publishing a one-section course to a folder 1 m 52 s – 3 m 3 s per test (build
+included); the end-to-end set of 13 tests 16 m 47 s – 20 m 33 s; the whole
+suite of 40, 43 m 38 s – 48 m 43 s (with the PC also busy with other work).
+After the harness lessons above and the review's fixes (absences need an
+answer; the preview pane's loaded address asserted), and on a tree merged with
+bundle 10, the end-to-end set ran 13 of 13 five times in a row (7 m 2 s –
+7 m 17 s each on a quiet PC) and the whole suite 44 of 44 (19 m 39 s), with no
+launcher left running, no new folder under the real builds root and the real
+trail untouched.
 
 ### Never start the app with its output redirected
 
@@ -2797,8 +2922,10 @@ The fix is structural, and two notes rather than one:
 right all along; only the folder-keyed sweep beside it had to change.
 
 **It is gated by a source scan, and the shape of the scan matters.** No
-`SectionDetailView` mounts in a unit test, and CLAUDE.md forbids a `[UiFact]`
-that drives Preview, so `SectionDetailTeardownSourceTests` reads the file and
+`SectionDetailView` mounts in a unit test, and when this was written CLAUDE.md
+forbade a `[UiFact]` that drives Preview (lifted in bundle 11, 2026-10-01; a
+UI test still does not switch a window's working folder under a running preview,
+which is what this guards), so `SectionDetailTeardownSourceTests` reads the file and
 asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
@@ -3547,8 +3674,23 @@ test that must be edited to measure is not one Russell can run from the
 script), an automation property carrying a count (a screen reader would
 announce it), and a trail line (a teacher-visible record of a key that did
 nothing, with a contract entry and a mac issue for a measurement aid). A
-teacher's run never redirects, so it never writes the file. Unproven until
-`run-ui-tests.ps1` runs on an unlocked desktop.
+teacher's run never redirects, so it never writes the file.
+
+**Measured, 2026-10-01 13:40 (bundle 11, run 1, unlocked desktop, Intel
+i5-8365U, Windows 11 26200), verbatim:** "F2: not delivered (the dialog kept
+it) / Ctrl+Shift+R: not delivered (the dialog kept it) / Ctrl+N: not delivered
+(the dialog kept it) / Ctrl+O: not delivered (the dialog kept it)". That
+first reading had NO control — a key missing from the held list could have
+meant only that the keystroke went to another window (fix-round review,
+ruling W2). So since bundle 11's last round `DialogGate.Holds` records every
+ARRIVAL in a `--state-dir` run (`accelerators-arrived.txt`, "<key>
+passed|held"), and the test first presses the four keys with NO dialog up and
+requires each to arrive (closing the rename dialog, the second window and the
+folder picker they open). Measured 2026-10-01 22:28, verbatim:
+"Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not delivered (the dialog kept it);
+control (no dialog): all four arrived at their handlers". So keys from the
+test DO reach the window's handlers, and under a ContentDialog the same four
+do not, on this build; the guard is belt and braces, and costs nothing.
 
 ### A wrapping panel squeezed narrow (#214, the mac's #211)
 
@@ -3566,8 +3708,30 @@ the measurement: it writes a scheduled-publish SUCCESS record naming a long
 folder path and Netlify into the run's own state folder, opens the section,
 squeezes the window to 500 px and reports the notice's height against the
 window's (`%TEMP%\plantoir-214-measurement.txt`), asserting the notice stays
-inside it. The folder publish's Done panel is NOT measured by it, and
-deliberately: putting it on screen needs a real publish, which builds into the
-teacher's real builds folder because `--state-dir` redirects only what the app
-resolves (see "Driving the real interface"). Same construct, so the notice's
-number stands for both until a measurement says otherwise.
+inside it. Until bundle 11 the folder publish's Done panel was left
+unmeasured because putting it on screen needs a real publish; tests may run one
+since then (see "A test that runs a launcher"), so a second fact,
+`TheFolderPublishsDonePanelStaysInsideASqueezedWindow`, publishes a course to a
+folder, squeezes the window the same way and measures the Done panel's five
+parts — the phase, the folder sentence (given its own id for this), Show in
+File Explorer, the render note and Show details — each an element with an
+automation peer, a missing one FAILING the test (`%TEMP%\plantoir-214-donepanel.txt`).
+Measured 2026-10-01 22:31 (bundle 11, last round), verbatim: "window 900x737;
+taskPhaseLabel 33x20 (bottom 167); publishedFolderSentence 631x19 (bottom
+209); publishedFolderButton 153x32 (bottom 247); publishedFolderRenderNote
+631x32 (bottom 285); taskDetailsDisclosure 655x29 (bottom 328)" — all inside
+the window at the narrowest width it allows. Why #214's own two methods do
+not apply here: there is no splitter to drag (the sidebar is a fixed 230 px)
+and WinUI does not measure a TextBlock at a proposed near-zero width; with a
+900 px minimum window the detail column cannot get narrower than about
+670 px. Height was not squeezed (737 of a 600 px minimum), and the lowest
+part sits at 328 px.
+
+**Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
+"window 900x737; notice 631x157 (top 135 below the window's top)". The
+resize to 500 px was NOT honoured: the window would go no narrower than 900,
+so the squeeze a teacher can make is bounded there, and at that width the
+notice is 157 px of a 737 px window, inside it. The test's own wait for the
+width to reach 520 times out silently; it should say so if the window's
+minimum ever drops (left as it is: the assertion that matters — the notice
+stays inside the window — holds at the narrowest width a teacher can reach).

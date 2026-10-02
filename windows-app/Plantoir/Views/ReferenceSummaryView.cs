@@ -47,7 +47,11 @@ public sealed class ReferenceSummaryView : UserControl
         panel.Children.Add(Line("Folder: " + course.Code, 0.75));
         panel.Children.Add(Line(ReferenceCourse.NeverDeployed(shown)));
         panel.Children.Add(Line(ReferenceCourse.PagesAreLocked));
-        SetValue(Microsoft.UI.Xaml.Automation.AutomationProperties.AutomationIdProperty, "referenceSummary");
-        Content = new ScrollViewer { Content = panel };
+        // On the ScrollViewer, not on this UserControl: a UserControl has no
+        // automation peer, so an id set on it never reaches UI Automation and
+        // "referenceSummary" could not be found (measured, bundle 11).
+        var scroller = new ScrollViewer { Content = panel };
+        scroller.SetValue(Microsoft.UI.Xaml.Automation.AutomationProperties.AutomationIdProperty, "referenceSummary");
+        Content = scroller;
     }
 }

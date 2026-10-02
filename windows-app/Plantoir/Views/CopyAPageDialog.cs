@@ -90,7 +90,15 @@ public sealed class CopyAPageDialog
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
         };
+        // The template's buttons are named once, but NOT once only: Opened can
+        // fire before the template's buttons exist, and a button can be
+        // re-realised later, so the ids were lost now and then (runs 17 and 18
+        // of bundle 11 found Cancel as "CloseButton"). So: tagged on Opened and
+        // on every layout pass while the dialog is up, and each button re-tags
+        // itself whenever it is loaded again.
         _dialog.Opened += (_, _) => TagButtons();
+        _dialog.LayoutUpdated += TagWhileUntagged;
+        _dialog.Closed += (_, _) => _dialog.LayoutUpdated -= TagWhileUntagged;
         _dialog.PrimaryButtonClick += async (_, args) =>
         {
             var deferral = args.GetDeferral();
@@ -375,10 +383,31 @@ public sealed class CopyAPageDialog
 
     // ---- Plumbing --------------------------------------------------------------
 
+    /// <summary>
+    /// Every layout pass while the dialog is up: cheap enough (two walks of a
+    /// dialog's tree that stop at the first match, and nothing is set when the
+    /// id is already there), and
+    /// it catches a button the template made anew, which a Loaded hook on the
+    /// old one would not.
+    /// </summary>
+    private void TagWhileUntagged(object? sender, object e) => TagButtons();
+
     private void TagButtons()
     {
-        if (FindByName(_dialog, "PrimaryButton") is Button primary) AutomationProperties.SetAutomationId(primary, PrimaryAutomationId);
-        if (FindByName(_dialog, "CloseButton") is Button close) AutomationProperties.SetAutomationId(close, CloseAutomationId);
+        Tag("PrimaryButton", PrimaryAutomationId);
+        Tag("CloseButton", CloseAutomationId);
+    }
+
+    /// <summary>Set the id on the named template button, and again whenever it is loaded anew.</summary>
+    private bool Tag(string templateName, string automationId)
+    {
+        if (FindByName(_dialog, templateName) is not Button button) return false;
+        if (AutomationProperties.GetAutomationId(button) != automationId)
+        {
+            AutomationProperties.SetAutomationId(button, automationId);
+            button.Loaded += (_, _) => AutomationProperties.SetAutomationId(button, automationId);
+        }
+        return true;
     }
 
     private static DependencyObject? FindByName(DependencyObject root, string name)

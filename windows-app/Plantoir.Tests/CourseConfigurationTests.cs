@@ -322,6 +322,30 @@ public class CourseConfigurationTests
         Assert.False(config.HasUnsavedChanges);
     }
 
+    /// <summary>
+    /// Choosing a folder and then Netlify again, on a course whose settings
+    /// never named a destination, leaves nothing to save (bundle 11: found by
+    /// CourseSettingsSaveUiTests through the real window — "netlify" written
+    /// over an ABSENT key read as a change, so Revert stayed on).
+    /// </summary>
+    [Fact]
+    public void ChoosingTheSavedDestinationAgainLeavesNothingUnsaved()
+    {
+        var absent = FromJson("""{"course_code":"X"}""");
+        absent.DeployTarget = "local_folder";
+        Assert.True(absent.HasUnsavedChanges);
+        absent.DeployTarget = "netlify";
+        Assert.False(absent.HasUnsavedChanges);
+        Assert.Null(absent.Values["deploy_target"]);
+
+        var named = FromJson("""{"course_code":"X","deploy_target":"local_folder","deploy_folder_path":"C:\\out"}""");
+        named.DeployTarget = "netlify";
+        Assert.True(named.HasUnsavedChanges);
+        Assert.Equal("netlify", named.Values["deploy_target"]!.ToString());   // a real change is still written
+        named.DeployTarget = "local_folder";
+        Assert.False(named.HasUnsavedChanges);
+    }
+
     [Fact]
     public void IsClubByCodeShape()
     {

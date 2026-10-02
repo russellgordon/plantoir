@@ -30,9 +30,9 @@ namespace Plantoir.Core.Models;
 /// wrapper bakes the same into the script it registers. So a redirected run
 /// that PREVIEWED would look for its build where the launcher did not put it,
 /// and one that SCHEDULED a deploy would register a REAL Task Scheduler task
-/// whose sentinels land in the teacher's real pending folder. Nothing in the
-/// suite does either today — but a UI test that drives Preview is the obvious
-/// next thing somebody writes.
+/// whose sentinels land in the teacher's real pending folder. Since bundle 11
+/// the UI suite DOES preview and publish (into the real builds root, which
+/// <c>DrivenApp</c> deletes afterwards); no test schedules a deploy.
 /// <c>plantoir-mcp.exe</c> resolves its own too.</para>
 /// </summary>
 public static class AppDataRoot

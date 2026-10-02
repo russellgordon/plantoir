@@ -28,8 +28,10 @@ public class ClubSettingsUiTests
         Assert.Equal("Most Recent Meeting", app.Find("clubLockedRow_frontPageHeading", "the front page heading row").Name);
         Assert.Equal("“Week 1”", app.Find("clubLockedRow_pageNaming", "the page naming row").Name);
         Assert.Equal("meeting", app.Find("clubLockedRow_noun", "the noun row").Name);
-        Assert.Contains(SettingsRows()["lockedCaption"]!.ToString(),
-                        DrivenApp.TextsUnder(app.Find("clubLockedRows", "the locked rows")));
+        // Read off the whole window: the rows' group is a StackPanel, and a
+        // panel has no automation peer, so its id "clubLockedRows" never
+        // reaches the tree (measured on the first unlocked run, bundle 11).
+        Assert.Contains(SettingsRows()["lockedCaption"]!.ToString(), DrivenApp.TextsUnder(app.Window));
         Assert.False(app.Find("renameUnitWordButton", "Rename…").IsEnabled,
                      "Rename… is enabled for a numbered course; a club's word is chosen once, in the wizard.");
     }
@@ -40,7 +42,10 @@ public class ClubSettingsUiTests
         using var app = new DrivenApp(CourseFixtures.WriteBothAndAClub);
         app.SelectCourse(CourseFixtures.NeverAsked);
 
-        Assert.Null(app.FindOrNull("clubLockedRows", TimeSpan.FromSeconds(2)));
+        // Not "clubLockedRows" (a panel, never in the tree, so it passed
+        // vacuously): the rows themselves, and the caption.
+        app.AssertAbsent("clubLockedRow_noun", "a club's noun row");
+        Assert.DoesNotContain(SettingsRows()["lockedCaption"]!.ToString(), DrivenApp.TextsUnder(app.Window));
         Assert.True(app.Find("renameUnitWordButton", "Rename…").IsEnabled);
     }
 }

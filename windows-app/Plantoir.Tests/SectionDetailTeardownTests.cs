@@ -13,9 +13,10 @@ namespace Plantoir.Tests;
 ///
 /// <para>Read as SOURCE rather than driven, and deliberately so. No
 /// <c>SectionDetailView</c> mounts in a unit test — it is WinUI, and
-/// <c>Plantoir.Tests</c> is plain <c>net9.0</c> — and CLAUDE.md forbids a
-/// <c>[UiFact]</c> that drives Preview, because <c>--state-dir</c> does not
-/// redirect what the launcher itself resolves. The mac's own guard for this
+/// <c>Plantoir.Tests</c> is plain <c>net9.0</c> — and when this was written
+/// CLAUDE.md forbade a <c>[UiFact]</c> that drives Preview (lifted in bundle 11;
+/// no UI test switches a window's folder under a running preview, which is what
+/// this guards, and opt-in UI tests gate nothing). The mac's own guard for this
 /// rule is a source read too.</para>
 ///
 /// <para>It asserts ZERO reads of the window's live folder inside the marked
