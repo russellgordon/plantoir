@@ -22,6 +22,9 @@ public class ReferenceCourseUiTests
 {
     private const string Folder = "ICS3U-2025";
 
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
+    public ReferenceCourseUiTests(Xunit.Abstractions.ITestOutputHelper output) => _output = output;
+
     private static void WriteCourses(string coursesDir)
     {
         foreach (var (folder, config) in new[]
@@ -155,7 +158,16 @@ public class ReferenceCourseUiTests
         string[] names = offered?.Select(i => i.Text).ToArray() ?? Array.Empty<string>();
         into.Collapse();
         Assert.Equal(new[] { "ICS3U" }, names);
-        app.Find(CopyAPageDialogIds.Close, "Cancel").AsButton().Invoke();
+        // Closing is tidying, not the claim. In runs 17 and 18 of bundle 11
+        // "copyPageClose" was never found here after the combo box had been
+        // opened and shut (the claim above had already passed), so the dialog
+        // is closed by whichever id its Cancel carries, and the test SAYS
+        // which, so the cause can be pinned if it recurs.
+        var dialog = app.OpenDialog();
+        var cancel = dialog?.FindFirstDescendant(cf => cf.ByAutomationId(CopyAPageDialogIds.Close))
+                     ?? dialog?.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
+        _output.WriteLine($"Copy a Page's Cancel was found as '{cancel?.AutomationId ?? "nothing"}' in dialog '{dialog?.Name ?? "none"}'");
+        cancel?.AsButton().Invoke();
     }
 
     [UiFact]
