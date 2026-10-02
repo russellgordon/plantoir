@@ -205,7 +205,7 @@ public static class UpdateWording
     public const string CouldNotCheck = "Plantoir could not find out whether a new version is ready. It will try again tomorrow.";
     public const string AssistantElsewhereWork = "helping an assistant in another app";
     public const string NeedsAdministratorExplanationOnWindows =
-        "Plantoir was installed for everyone who uses this PC, so a new version needs an administrator to install it. Whoever looks after this PC can download it from plantoir.app.";
+        "Plantoir was installed for everyone who uses this PC, so it cannot update itself. To get the new version, whoever looks after this PC can uninstall Plantoir in Windows Settings, and then you can install it again from plantoir.app. Your courses stay as they are.";
 
     /// <summary>The {work} phrase for a hold.</summary>
     public static string Work(AppUpdates.Hold hold, string theQuitQuestionsWords) => hold.NamedAs switch

@@ -165,3 +165,32 @@ DECISION: the two descriptions DO NOT MOVE. publish_pages and unpublish_pages
 WHAT THIS DOES NOT MEASURE: the larger tier; dates other than 2026-10-01;
   what Claude Code does with either text (the MCP description is what it
   reads, and it is unchanged by this decision).
+
+NOTE ADDED 2026-10-01 (bundle 10 fix round, implementation review findings 1,
+N2 and N5; director's ruling R1). Appended, not edited in place; the numbers
+above are unchanged and the review recounted them independently.
+  - MIDDLE is NOT "0 cut-offs": the S2-MIDDLE server log has TEN requests that
+    ran to the 512-token cap, every trial of "next: next day's lesson" (61-89 s
+    each, against 24-36 s declines in BEFORE and AFTER). The score did not
+    move (0/10 declined in all three arms) because teachers-say-suite.py reads
+    no finish_reason. Under the registered criterion (d) MIDDLE would FAIL.
+  - MIDDLE also LOST a probe on S3: "schedule a deploy" 10 -> 0 (all
+    deploy_section), beside the gain "card: plan a publish" 0 -> 10. So
+    MIDDLE is: better on S1 (161 -> 190), level on S3 (160 -> 160, one probe
+    gained, one lost), 4 points lower on S2 (220 -> 210) with ten new
+    cut-offs - not "routes better" without qualification. It still ships
+    (ruling Q3); the two regressions are a windows + assistant issue of their
+    own (R2).
+  - The 37 rejected ICS3U calls in AFTER are a llama.cpp grammar fault
+    ("Unexpected empty grammar stack after accepting piece", 74 log lines,
+    two per call) seen only under the AFTER surface. Criterion (c) for S3 is
+    entirely them (123 + 37 = 160), and 10 of unpublish_pages' 11 lost trials
+    are them. Without them the FAIL rests on criterion (b) alone, on ONE
+    trial: S1's hide-inversion probe, which BEFORE passed once in ten.
+  - S1's re-run server (14:33-15:43, which produced S1 BEFORE and AFTER) left
+    no log: its log was overwritten by the S1-MIDDLE server's. The dead first
+    run's log survives with both reasoning flags, and its BEFORE equals the
+    re-run's row for row.
+  - "card: undo" is wrongly listed among MIDDLE's model-seen gains above; it
+    is answered in code and not in the model-seen total. The +13.2 points are
+    publish by name +10, plan a publish +10 and the hide probe +9 = 29/220.

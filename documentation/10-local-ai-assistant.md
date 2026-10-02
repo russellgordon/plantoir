@@ -3783,6 +3783,25 @@ that still sends the key is harmless: the SDK's binder drops undeclared
 arguments. `PublishFollowsLinksTests` pins the undo (one "undo that" puts
 every linked page back), the reply's count, the cards and the schema.
 
+**And the walk is keyed by PATH (bundle 10 review, R5).** `PlanPublish` used
+to key its link graph by FILE NAME: the first page per name answered a
+lookup, the last page per name owned the links. Two pages can share a name
+— every folder's landing page is `index.md`, and a section page can share a
+shared page's name — so publishing one followed the OTHER one's links
+(measured before the fix: publishing `Concepts/index` put the Labs page's
+`Answer Key` on the plan). Once links are always followed, that is the
+damaging direction, so pages, links, referrers, the unpublish sweep and Key
+Links are now keyed by path; a name that fits more than one page is ASKED
+about with `wording.morePagesThanOneAreCalled` and the list of paths (the
+links question's sentence) rather than guessed; a path names exactly one
+page; two pages a teacher would read by the same name are named on the plan
+with their folder ("Notes (in section1)"); and the app's own callers (a whole
+unit, the links checklist, `publish_class_on`) pass paths.
+`PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks` and
+`.ThePlanSaysWhichOfTwoSameNamedPagesGoes` (both red against the old
+planner). Rejected: picking the first match silently (the old behaviour, and
+the bug).
+
 **Step (b), the text — measured, and it FAILED.** Pre-registered before the
 first request (`windows-description-convergence-preregistration.txt`, the
 #420 section; ruling Q3: ANY inversion a veto, neither changed tool may lose
@@ -3792,20 +3811,29 @@ server's full command line and `--list-devices` written into each suite's log.
 BEFORE = dev's local surface; AFTER = the flag gone and the contract text in
 full. Trimmed-surface EXC2O model-seen 161→150/220; teachers-say 220→210/250;
 trimmed-surface ICS3U 160→**123**/220, with 37 turns the SERVER rejected
-mid-call ("Unexpected empty grammar stack", none in BEFORE). `unpublish_pages`
-lost 11 trials (the hide-inversion probe 1→0, ICS3U "no course named: hide"
-10→0). No polarity inversion anywhere. So the two descriptions stay at their
+mid-call (a llama.cpp grammar fault, "Unexpected empty grammar stack", seen
+only under the AFTER surface). `unpublish_pages` lost 11 trials (the
+hide-inversion probe 1→0, ICS3U "no course named: hide" 10→0). No polarity
+inversion anywhere. Said plainly (review N2): without the 37 rejected calls
+the FAIL rests on ONE trial — the S1 hide-inversion probe, which BEFORE
+passed once in ten. So the two descriptions stay at their
 Windows text, shortened for the local model (`AssistAgent.StillShortened`
 unchanged), the two `measuredDepartures` entries stay with these numbers, and
 #420 stays open for the description half. The conditional MIDDLE arm — the
-flag gone, the text held: the surface that ships — routes BETTER than
-BEFORE: EXC2O 161→**190**/220 (two publish-by-name cards 0→10 to
-`publish_pages`, the hide-inversion probe 1→10 to `unpublish_pages`), ICS3U
-160→160, teachers-say 220→210/250 (`ctl cancel_scheduled` 10→0, declined —
-the same loss AFTER had, so it comes from the schema; the probe went 0→10 in
-#352's run). 0 inversions, 0 malformed. So removing the flag, which the
-behaviour needed anyway, is also the better routing; it is the contract's
-longer TEXT that this tier does not take.
+flag gone, the text held: the surface that ships — is better on S1, level
+on S3 and 4 points lower on S2, with two regressions (review R1): EXC2O
+161→**190**/220 (two publish-by-name cards 0→10 to `publish_pages`, the
+hide-inversion probe 1→10 to `unpublish_pages`); ICS3U 160→160 with one probe
+gained (`card: plan a publish` 0→10) and one LOST (`schedule a deploy` 10→0,
+all to `deploy_section`); teachers-say 220→210/250 (`ctl cancel_scheduled`
+10→0, declined), and TEN turns at the 512-token cap on `next: next day's
+lesson` (61–89 s each; the score did not move because that suite reads no
+`finish_reason`, so under the registered criterion (d) MIDDLE would fail).
+0 inversions, 0 malformed. It ships anyway (ruling Q3: it is the contract's
+schema, and the behaviour needs it); the two regressions are a `windows` +
+`assistant` issue of their own (bundle 10, R2). What the immediate-deploy
+mistake meets today: `deploy_section` waits for the approval card, whose
+button is Deploy — nothing goes out until the teacher presses it.
 **Rejected:** moving the text anyway because no inversion was seen (the
 registered criteria, not the veto alone, decide); trimming the contract text
 for Windows' router (a second description per tool is what #114 removed);
