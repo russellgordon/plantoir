@@ -138,7 +138,7 @@ public sealed class UndoAcrossToolsTests : IDisposable
         FourClasses();
         var workspace = Open();
         var plan = workspace.PlanPublish("ICS3U", 1,
-            new[] { "Unit 1, Day 1", "Unit 1, Day 2" }, includeLinked: false, publishes: false);
+            new[] { "Unit 1, Day 1", "Unit 1, Day 2" }, publishes: false);
 
         File.Delete(ClassPath("Unit 1, Day 2"));
 
@@ -155,7 +155,7 @@ public sealed class UndoAcrossToolsTests : IDisposable
 
         // And the next operation's undo is ITS OWN.
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 1" },
-            includeLinked: false, publishes: false), preview: false);
+            publishes: false), preview: false);
 
         var entry = Assert.Single(_history.Entries);
         Assert.Contains("“Unit 2, Day 1”", entry.Description);
@@ -196,7 +196,7 @@ public sealed class UndoAcrossToolsTests : IDisposable
         workspace.ApplyInsertClasses(workspace.PlanInsertClasses("ICS3U", 1, unit: 2, atDay: 1, count: 1));
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" },
-            includeLinked: false, publishes: false), preview: false);
+            publishes: false), preview: false);
 
         var entry = Assert.Single(_history.Entries);
         Assert.Contains("published “Unit 1, Day 1”", entry.Description);

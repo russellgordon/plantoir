@@ -565,10 +565,14 @@ separately from the reader:
   took both on 2026-09-30 (#177/#308, bundle 2): `CourseRestorer
   .FrontmatterBounds` is gone, `SettingPerSectionKeys` walks
   `PageVisibilityReader.LinesOwnedByKey`, and `SectionRestoreTests` runs
-  `backups.restoringOneSectionsKeys`. One small difference, Windows' on
-  purpose: blank lines before the opening fence are KEPT by Windows' restore,
-  where the mac's `settingPerSectionKeys` starts its rebuilt page at the fence
-  and drops them (harmless to the build; told to the mac). The trap to avoid
+  `backups.restoringOneSectionsKeys`. Blank lines before the opening fence
+  are DROPPED by both restores: the mac's `settingPerSectionKeys` starts its
+  rebuilt page at the fence, and Windows' does the same since 2026-10-01
+  (parity bundle 10). Windows had kept them from bundle 2 and asked the mac
+  whether to keep them too; Russell chose one behaviour, the mac's, and the
+  ask was withdrawn. Harmless to the build either way — the case is
+  `restoringOneSectionsKeys` → "a blank line before the opening fence is
+  dropped from the restored page". The trap to avoid
   is reading "one fence finder" and making the MAC strict, which puts the
   second-block bug straight back.
 
@@ -894,7 +898,73 @@ separately from the reader:
   and the count. Pinned by `DeclinedPagesAreNamedTests`. The make-room
   reply's "moved N onto later class days" counts only classes actually
   written, as the mac's `ClassInsertionPlanner` does (a declined class, one
-  already on its date and a failed write are not "moved"; review F1). The first two are not reached by the fixed reader or writer at all
+  already on its date and a failed write are not "moved"; review F1).
+  **Since 2026-10-01 every count in that reply is of what was WRITTEN**
+  (#422, bundle 10): "Renamed N" counts renames that happened (a rename
+  whose new name is taken — a page the teacher made after the plan was
+  shown — is not one, and the chain of renames below it fails with it,
+  which is the "highest day first" rule refusing to land on a name in use);
+  links are rewritten only for renames that happened and "updated N links"
+  counts them on pages that were SAVED; a class whose rename did not happen
+  is re-dated at its OLD path, never under the new name (which may be the
+  teacher's own page); a blank class whose name is still taken is not
+  written and not counted in "Made room for N" (the sentence is left out
+  when none was); and every page a write did not finish — a rename, a
+  date, a page of links, a blank class — is NAMED with Windows' own
+  sentence `AssistWording.PagesAChangeCouldNotFinish` (no contract key
+  yet; proposed to the mac as `pagesAChangeCouldNotFinish`), and the trail
+  records `making room did not finish every page` with counts by kind
+  (`appliesOn: ["windows"]` until the mac records it). The bare `catch { }`
+  that swallowed a failed date write is gone. And `PlanPublish` now leaves a
+  declined page out of the pages the front page and dates are worked out
+  from by PATH (`AssistWorkspace.WithoutDeclined`), not by file name, so a
+  second `index.md` is not taken out with it (fix review note 3). The test
+  pins `WithoutDeclined` itself (`ADeclinedPageIsMatchedByPathNotByItsFileName`)
+  because, when #422 was written, the planner kept one page per file name
+  upstream and the collision was not reachable end to end. **That changed
+  in the same bundle:** keying the WHOLE planner on paths — first set aside
+  here as larger than #422 asked — was taken up by the bundle 10 review
+  (R5), because once #420 made every publish follow links, a file-name key
+  let publishing one of two same-named pages follow the OTHER one's links
+  (more published than the plan showed). `PlanPublish` now keys pages,
+  `chosen`, `linksFrom`, `referrers`, the walks and Key Links by path, asks
+  about a name that fits two pages, and names same-named pages with their
+  folder in the contract's `pageNameInFolder` shape; measured by
+  `PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks`
+  and `.ThePlanSaysWhichOfTwoSameNamedPagesGoes`, both red against the old
+  planner (it planned the other index page's "Answer Key"). Doc 10 → "And
+  the walk is keyed by PATH". Left as the product question #422 records
+  (Russell, 2026-10-01: leave it): a declined class's linked material is
+  still published by the walk and keeps its own date — wider now that
+  every publish follows links.
+  **Getting a section ready for the start of the year and the links
+  checklist's Publish name them too since 2026-10-01** (#421, bundle 10 —
+  the two callers bundle 9 found still dropping the outcome). Start of year
+  (`AssistWorkspace.StartOfYear.cs`) used to discard the `DraftEdit`, so the
+  reply could say a class went into draft while students could still see it
+  — the damaging direction; now a declined page is NOT saved (not even the
+  half of a two-key write that succeeded: `publish: false` beside a stray
+  `publishForSection<N>: true` still leaves the page up), is named with
+  `pagesWhoseSettingsCannotBeAddedTo` after the `done` sentence (alone, when
+  nothing at all went into draft), and the "Put into draft: N" count and the
+  trail line's class/page counts are what WAS put into draft; the declined
+  page is one of the line's "N left as they were", as
+  `activityTrail.mustRecord` says, never a second line. The links checklist
+  (`PublishLinksChecklist`) used to count a declined ticked page as "left
+  hidden" and remember it as if the teacher had left it; now it collects the
+  ticked classes' plan-time `CannotBeAddedTo`, any write-time decline of a
+  class's page or a ticked row (a declined row gets no date either), keeps
+  them out of `Written`, the remembered-unticked list and the
+  left-with-their-page list, names them at the end of the reply
+  (`LinksChecklistPublished.Reply`, which the dialog now calls), and records
+  `page settings left as they were` with the act "publishing pages that
+  links lead to". Rejected: naming them on the start-of-year PLAN (the
+  contract's `startOfYear` says nothing of declines, and probing the writer
+  for every page at plan time changes no code the plan hashes — left for the
+  mac to decide, not invented here). Pinned by
+  `DeclinedPagesAreNamedTests.StartOfYearNamesAClassItCouldNotPutIntoDraft`
+  and `.TheLinksChecklistNamesAPageItCouldNotPublish`.
+  The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**

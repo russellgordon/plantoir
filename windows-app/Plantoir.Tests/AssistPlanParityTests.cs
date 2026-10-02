@@ -62,7 +62,7 @@ public sealed class AssistPlanParityTests : IDisposable
         Page("ICD2O", "Concepts/Tech Headlines.md", draftSection1: false);
 
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, includeLinked: true, draft: true);
+        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, draft: true);
 
         string expected =
             "ICD2O Section 1: unpublishing.\n\n" +
@@ -81,7 +81,7 @@ public sealed class AssistPlanParityTests : IDisposable
         Page("ICD2O", "Concepts/Exclusive Material.md", draftSection1: false);
 
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, includeLinked: true, draft: true);
+        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, draft: true);
 
         string expected =
             "ICD2O Section 1: unpublishing.\n\n" +
@@ -99,7 +99,7 @@ public sealed class AssistPlanParityTests : IDisposable
         Page("ICD2O", "Concepts/Tech Headlines.md", draftSection1: true);
 
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, includeLinked: true, draft: false);
+        var plan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, draft: false);
 
         string expected =
             "ICD2O Section 1: publishing.\n\n" +
@@ -116,11 +116,11 @@ public sealed class AssistPlanParityTests : IDisposable
         DatedClass("ICD2O", "Unit 4, Day 20", "2027-01-15", draft: true);
         var workspace = Open();
 
-        var unpublishPlan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, includeLinked: true, draft: true);
+        var unpublishPlan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 4, Day 20" }, draft: true);
         Assert.Equal("It's already hidden.", unpublishPlan.NothingToDoSentence);
 
         DatedClass("ICD2O", "Unit 1, Day 1", "2026-09-08", draft: false);
-        var publishPlan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 1, Day 1" }, includeLinked: true, draft: false);
+        var publishPlan = workspace.PlanPublish("ICD2O", 1, new[] { "Unit 1, Day 1" }, draft: false);
         Assert.Equal("It's already been published.", publishPlan.NothingToDoSentence);
     }
 }

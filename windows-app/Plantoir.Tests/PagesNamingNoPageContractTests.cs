@@ -67,10 +67,10 @@ public class PagesNamingNoPageContractTests : IDisposable
 
         CallToolResult result = c["tool"]!.ToString() switch
         {
-            "publish_pages" => await tools.PublishPages(Course, 1, false, progress, default, pages, onOrAfter, beforeDate, preview: false),
-            "unpublish_pages" => await tools.UnpublishPages(Course, 1, false, progress, default, pages, onOrAfter, beforeDate, preview: false),
-            "plan_publish_pages" => tools.PlanPublishPages(Course, 1, false, pages, onOrAfter, beforeDate),
-            "plan_unpublish_pages" => tools.PlanUnpublishPages(Course, 1, false, pages, onOrAfter, beforeDate),
+            "publish_pages" => await tools.PublishPages(Course, 1, progress, default, pages, onOrAfter, beforeDate, preview: false),
+            "unpublish_pages" => await tools.UnpublishPages(Course, 1, progress, default, pages, onOrAfter, beforeDate, preview: false),
+            "plan_publish_pages" => tools.PlanPublishPages(Course, 1, pages, onOrAfter, beforeDate),
+            "plan_unpublish_pages" => tools.PlanUnpublishPages(Course, 1, pages, onOrAfter, beforeDate),
             var other => throw new InvalidOperationException("No runner for " + other),
         };
 

@@ -179,6 +179,11 @@ public sealed partial class AssistWorkspace
             return NotDone("changedSinceShown", AssistWording.ChangedWhileSavingACopy(course.Code, section.ToString()));
 
         var written = new Dictionary<string, (string Before, string After)>(StringComparer.OrdinalIgnoreCase);
+        // Pages the writer DECLINED (#421, the mac's #186): no column-0 place
+        // for a new line in their settings, so they are left exactly as they
+        // were and named — never counted as put into draft while students can
+        // still see them, which is the damaging direction.
+        var declined = new List<StartOfYearDraft>();
         using var recording = UndoHistory.Record(_undo,
             $"got {course.Code} Section {section} ready for the start of the year");
         try
@@ -188,11 +193,22 @@ public sealed partial class AssistWorkspace
                 string full = draft.Page.Id;
                 string before = File.ReadAllText(full);
                 bool sectionLocal = PagePaths.IsSectionLocal(course.DirectoryPath, full);
-                var (after, _) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
+                var (after, edit) = PageFrontmatter.SetDraft(before, PageFrontmatter.PublishKeyFor(section, sectionLocal), true, section);
+                bool noRoom = edit.NoRoomForAKey;
                 // A stray per-section key beside `publish:` is read FIRST by the
                 // build, so writing only `publish: false` would leave the class up.
-                if (!PageFrontmatter.IsDraft(after, section))
-                    (after, _) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
+                if (!noRoom && !PageFrontmatter.IsDraft(after, section))
+                {
+                    (after, edit) = PageFrontmatter.SetDraft(after, PageFrontmatter.PublishKeyFor(section, false), true, section);
+                    noRoom = edit.NoRoomForAKey;
+                }
+                // Half a write that still leaves the page up is no write at
+                // all: nothing is saved, and the page is named.
+                if (noRoom)
+                {
+                    declined.Add(draft);
+                    continue;
+                }
                 if (after == before) continue;
                 Save(full, after);
                 written[full] = (before, after);
@@ -226,19 +242,27 @@ public sealed partial class AssistWorkspace
         }
         recording.Done();
 
-        int classesDrafted = plan.Classes.Count();
-        int firstUsedLater = plan.OtherPages.Count(d => d.Reason == StartOfYearReason.FirstUsedIn);
-        int nothingSees = plan.OtherPages.Count() - firstUsedLater;
+        // Counted from what was put into draft: a declined page is one of the
+        // pages "left as they were" (the trail's one line carries it, per
+        // activityTrail.mustRecord — never a second line).
+        var drafted = plan.Drafts.Where(d => !declined.Contains(d)).ToList();
+        int classesDrafted = drafted.Count(d => d.Reason == StartOfYearReason.LaterClass);
+        int firstUsedLater = drafted.Count(d => d.Reason == StartOfYearReason.FirstUsedIn);
+        int nothingSees = drafted.Count - classesDrafted - firstUsedLater;
         ActivityTrail.Note(ActivityTrail.Event.SectionMadeReadyForTheStartOfTheYear,
             $"made ready for the start of the year {where} — {StartOfYearWording.ClassesCounted(classesDrafted)} and " +
             $"{StartOfYearWording.Counted(firstUsedLater + nothingSees, "other page", "other pages")} put into draft " +
             $"({firstUsedLater} first used later, {nothingSees} that nothing students can see links to), " +
-            $"{plan.Pages.Count - plan.Drafts.Count} left as they were; backup {Path.GetFileName(backup)}; preview not rebuilt",
+            $"{plan.Pages.Count - drafted.Count} left as they were; backup {Path.GetFileName(backup)}; preview not rebuilt",
             course.Code, section);
 
-        return new StartOfYearOutcome(true,
-            StartOfYearWording.Fill(StartOfYearWording.Done, ("pages", StartOfYearWording.PagesCounted(plan.Drafts.Count))),
-            backup, written);
+        string? declinedSentence = declined.Count == 0 ? null
+            : AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined.Select(d => d.Page.Name).ToList());
+        string message = drafted.Count == 0 && declinedSentence is not null
+            ? declinedSentence
+            : StartOfYearWording.Fill(StartOfYearWording.Done, ("pages", StartOfYearWording.PagesCounted(drafted.Count)))
+              + (declinedSentence is null ? "" : " " + declinedSentence);
+        return new StartOfYearOutcome(written.Count > 0, message, backup, written);
     }
 
     /// <summary>

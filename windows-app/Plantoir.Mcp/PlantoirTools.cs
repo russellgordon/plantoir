@@ -1639,13 +1639,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult PlanPublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also publish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "")
-        => Plan(course, section, pages, includeLinked, draft: false, onOrAfter, before);
+        => Plan(course, section, pages, draft: false, onOrAfter, before);
 
     [McpServerTool(Name = "plan_unpublish_pages", Title = "Plan unpublishing pages", ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what happens if I take that down?\", \"check before you hide Unit 3, Day 2\". Work " +
@@ -1653,22 +1651,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult PlanUnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also unpublish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "")
-        => Plan(course, section, pages, includeLinked, draft: true, onOrAfter, before);
+        => Plan(course, section, pages, draft: true, onOrAfter, before);
 
-    private CallToolResult Plan(string course, int section, string[]? pages, bool includeLinked,
+    // No `includeLinked` on any of the four (#420): links are always followed,
+    // as the contract says (followingLinks) and as the mac's schema has it
+    // (toolSchemas.departures.absentHere). An old client that still sends the
+    // key is harmless: the SDK's binder drops an argument a tool does not
+    // declare.
+    private CallToolResult Plan(string course, int section, string[]? pages,
                                 bool draft, string onOrAfter, string before)
     {
         if (WholeUnitPlan(course, section, pages, publishing: !draft) is { } whole)
             return whole;
 
         return Guarded(() => Proposing(workspace.PlanPublish(
-            course, section, pages ?? Array.Empty<string>(), includeLinked, draft,
+            course, section, pages ?? Array.Empty<string>(), draft,
             publishes: !draft, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
     }
 
@@ -1875,8 +1876,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string page = workspace.ClassOn(found, number, when);
 
         return workspace.PlanPublish(course, number,
-            new[] { Path.GetFileNameWithoutExtension(page) },
-            includeLinked: true, draft: false, publishes: publishes);
+            new[] { workspace.Relative(Path.GetFullPath(page)) },
+            draft: false, publishes: publishes);
     }
 
     // ---- Acting ----------------------------------------------------------
@@ -1890,7 +1891,6 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> PublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also publish every page these pages link to.")] bool includeLinked = false,
         IProgress<ProgressNotificationValue> progress = null!,
         CancellationToken cancellation = default,
         [Description("The page titles to publish. May be empty if you give dates instead.")]
@@ -1898,7 +1898,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "",
         [Description("False to change the pages without rebuilding the preview.")] bool preview = true)
-        => Act(course, section, pages, includeLinked, draft: false, preview, onOrAfter, before,
+        => Act(course, section, pages, draft: false, preview, onOrAfter, before,
                progress, cancellation);
 
     [McpServerTool(Name = "unpublish_pages", Title = "Unpublish pages", Destructive = false, Idempotent = true)]
@@ -1912,7 +1912,6 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> UnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also unpublish every page these pages link to.")] bool includeLinked = false,
         IProgress<ProgressNotificationValue> progress = null!,
         CancellationToken cancellation = default,
         [Description("The page titles to unpublish. May be empty if you give dates instead.")]
@@ -1920,7 +1919,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "",
         [Description("False to change the pages without rebuilding the preview.")] bool preview = true)
-        => Act(course, section, pages, includeLinked, draft: true, preview, onOrAfter, before,
+        => Act(course, section, pages, draft: true, preview, onOrAfter, before,
                progress, cancellation);
 
     // The cues cover STARTING a preview as well as refreshing one. The first
@@ -2006,7 +2005,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     // ---- Shared ----------------------------------------------------------
 
-    private async Task<CallToolResult> Act(string course, int section, string[]? pages, bool includeLinked,
+    private async Task<CallToolResult> Act(string course, int section, string[]? pages,
                                            bool draft, bool preview, string onOrAfter, string before,
                                            IProgress<ProgressNotificationValue> progress,
                                            CancellationToken cancellation)
@@ -2017,7 +2016,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 return whole;
 
             var plan = workspace.PlanPublish(
-                course, section, pages ?? Array.Empty<string>(), includeLinked, draft, publishes: !draft,
+                course, section, pages ?? Array.Empty<string>(), draft, publishes: !draft,
                 ParseDate(onOrAfter, "onOrAfter"), ParseDate(before, "before"));
 
             // Four words, when four words are the whole answer.

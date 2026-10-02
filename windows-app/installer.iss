@@ -22,8 +22,11 @@ AppSupportURL=https://plantoir.app/support/
 AppUpdatesURL=https://plantoir.app/
 DefaultDirName={localappdata}\Programs\Plantoir
 DisableProgramGroupPage=yes
+; Per-user ONLY (Russell, 2026-10-01): no "install for all users" choice, so
+; every copy this makes is under %LOCALAPPDATA%\Programs and can update itself
+; (AppUpdates.IsPerUserInstall). An all-users copy left by an older installer
+; still says it needs an administrator rather than updating beside itself.
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=dist
 OutputBaseFilename=PlantoirSetup
 SetupIconFile=Plantoir\Assets\Plantoir.ico
