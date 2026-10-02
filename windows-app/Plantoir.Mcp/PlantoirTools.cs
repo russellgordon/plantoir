@@ -1876,7 +1876,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string page = workspace.ClassOn(found, number, when);
 
         return workspace.PlanPublish(course, number,
-            new[] { Path.GetFileNameWithoutExtension(page) },
+            new[] { workspace.Relative(Path.GetFullPath(page)) },
             draft: false, publishes: publishes);
     }
 

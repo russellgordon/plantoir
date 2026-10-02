@@ -640,18 +640,36 @@ public sealed partial class AssistWorkspace
         // page, which no publish can put on the site (#340).
         var allMarkdown = PagePaths.MarkdownPages(course.DirectoryPath, section)
             .Where(page => ListsAsAPage(course, page)).ToList();
+        // Every page is keyed by its PATH (#420 review R5). Two pages can share
+        // a file name — every folder's landing page is index.md — and keying
+        // the walk by file name made publishing one of them follow the OTHER
+        // one's links: more published than the plan could show. Now that a
+        // publish always follows links, that is the damaging direction.
         var pagesList = new List<PlannedPage>();
         var pagesByTitle = new Dictionary<string, PlannedPage>(StringComparer.OrdinalIgnoreCase);
+        var pagesByPath = new Dictionary<string, PlannedPage>(StringComparer.OrdinalIgnoreCase);
 
         foreach (string p in allMarkdown)
         {
             var planned = Plan(course, section, p, isDraft, viaLink: false);
             pagesList.Add(planned);
+            pagesByPath[planned.RelativePath] = planned;
             if (!pagesByTitle.ContainsKey(planned.Title))
                 pagesByTitle[planned.Title] = planned;
         }
 
-        // Build link graph and referrers
+        // Two pages a teacher would read by the same name are named WITH their
+        // folder on the plan, so the card says which one goes.
+        foreach (var group in pagesList.GroupBy(p => p.DisplayTitle, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+            foreach (var page in group.ToList())
+            {
+                var withFolder = page with { DisplayTitle = $"{page.DisplayTitle} (in {FolderOf(course, page)})" };
+                pagesList[pagesList.IndexOf(page)] = withFolder;
+                pagesByPath[page.RelativePath] = withFolder;
+                if (ReferenceEquals(pagesByTitle.GetValueOrDefault(page.Title), page)) pagesByTitle[page.Title] = withFolder;
+            }
+
+        // Build link graph and referrers, by path.
         var linksFrom = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var referrers = new Dictionary<string, List<PlannedPage>>(StringComparer.OrdinalIgnoreCase);
 
@@ -669,12 +687,12 @@ public sealed partial class AssistWorkspace
                 }
                 if (resolution.Outcome == LinkOutcome.Resolved && resolution.Path != null)
                 {
-                    string targetTitle = Path.GetFileNameWithoutExtension(resolution.Path);
-                    if (!targets.Contains(targetTitle, StringComparer.OrdinalIgnoreCase))
-                        targets.Add(targetTitle);
+                    string target = Relative(Path.GetFullPath(resolution.Path));
+                    if (pagesByPath.ContainsKey(target) && !targets.Contains(target, StringComparer.OrdinalIgnoreCase))
+                        targets.Add(target);
                 }
             }
-            linksFrom[page.Title] = targets;
+            linksFrom[page.RelativePath] = targets;
             foreach (var target in targets)
             {
                 if (!referrers.TryGetValue(target, out var list))
@@ -682,7 +700,7 @@ public sealed partial class AssistWorkspace
                     list = new List<PlannedPage>();
                     referrers[target] = list;
                 }
-                if (!list.Any(r => string.Equals(r.Title, page.Title, StringComparison.OrdinalIgnoreCase)))
+                if (!list.Any(r => string.Equals(r.RelativePath, page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                     list.Add(page);
             }
         }
@@ -690,7 +708,7 @@ public sealed partial class AssistWorkspace
         // Identify named pages
         var named = new List<PlannedPage>();
         var unknownNames = new List<string>();
-        var chosen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var chosen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);   // paths
 
         foreach (string title in pageTitles)
         {
@@ -717,48 +735,58 @@ public sealed partial class AssistWorkspace
                 var ordered = isDraft ? unitPages.OrderByDescending(p => p.Title) : unitPages.OrderBy(p => p.Title);
                 foreach (var up in ordered)
                 {
-                    if (chosen.Add(up.Title)) named.Add(up);
+                    if (chosen.Add(up.RelativePath)) named.Add(up);
                 }
                 continue;
             }
 
             string bare = wanted.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? wanted[..^3] : wanted;
+
+            // A PATH names exactly one page — the answer to "which one?" below.
+            // Read from the working folder (the way the refusal lists them),
+            // then from the course folder.
+            PlannedPage? byPath = null;
             if (bare.Contains('/') || bare.Contains('\\'))
             {
-                string direct = PagePaths.ResolveInside(_folder, bare);
-                bare = Path.GetFileNameWithoutExtension(direct);
+                foreach (string root in new[] { _folder, course.DirectoryPath })
+                {
+                    try
+                    {
+                        string rel = Relative(Path.GetFullPath(Path.Combine(root, bare.Replace('\\', '/') + ".md")));
+                        if (pagesByPath.TryGetValue(rel, out byPath)) break;
+                    }
+                    catch { }
+                }
+                if (byPath is null)
+                    bare = Path.GetFileNameWithoutExtension(bare.Replace('\\', '/').Split('/')[^1]);
             }
 
-            if (pagesByTitle.TryGetValue(bare, out var matchedPage))
+            // By file name, then by the name the teacher sees. More than one
+            // page answering to the name is ASKED about, never guessed: the
+            // walk would follow whichever page it picked (#420 review R5).
+            var candidates = byPath is not null ? new List<PlannedPage> { byPath }
+                : pagesList.Where(p => string.Equals(p.Title, bare, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (candidates.Count == 0)
+                candidates = pagesList.Where(p => string.Equals(p.DisplayTitle, bare, StringComparison.OrdinalIgnoreCase)
+                                               || string.Equals(StrippedOfFolder(p.DisplayTitle), bare, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (candidates.Count > 1)
+                throw new AssistRefusal(AssistWording.MorePagesThanOneAreCalled(course.Code, section.ToString(), bare) + "\n" +
+                                        string.Join("\n", candidates.Select(c => "• " + c.RelativePath)));
+            if (candidates.Count == 0)
             {
-                string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, matchedPage.RelativePath));
-                if (isDraft && protectedPaths.Contains(full))
-                {
-                    problems.Add($"“{matchedPage.Title}” is never hidden — " +
-                                 "it is an index page or something Key Links points at. Left published.");
-                    continue;
-                }
-                if (chosen.Add(matchedPage.Title)) named.Add(matchedPage);
+                unknownNames.Add(wanted);
+                continue;
             }
-            else
+
+            var matchedPage = candidates[0];
+            string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, matchedPage.RelativePath));
+            if (isDraft && protectedPaths.Contains(full))
             {
-                var dispMatch = pagesList.FirstOrDefault(p => string.Equals(p.DisplayTitle, bare, StringComparison.OrdinalIgnoreCase));
-                if (dispMatch != null)
-                {
-                    string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, dispMatch.RelativePath));
-                    if (isDraft && protectedPaths.Contains(full))
-                    {
-                        problems.Add($"“{dispMatch.Title}” is never hidden — " +
-                                     "it is an index page or something Key Links points at. Left published.");
-                        continue;
-                    }
-                    if (chosen.Add(dispMatch.Title)) named.Add(dispMatch);
-                }
-                else
-                {
-                    unknownNames.Add(wanted);
-                }
+                problems.Add($"“{matchedPage.Title}” is never hidden — " +
+                             "it is an index page or something Key Links points at. Left published.");
+                continue;
             }
+            if (chosen.Add(matchedPage.RelativePath)) named.Add(matchedPage);
         }
 
         // Every name given matched nothing: not a stray word in a mixed list,
@@ -788,14 +816,17 @@ public sealed partial class AssistWorkspace
                 if (onOrAfter is { } start && date < start) continue;
                 if (before is { } end && date >= end) continue;
                 dateMatched++;
-                if (chosen.Add(page.Title)) named.Add(page);
+                if (chosen.Add(page.RelativePath)) named.Add(page);
             }
             if (dateMatched == 0 && named.Count == 0)
                 problems.Add($"No class in {course.Code} Section {section} falls in that date range.");
         }
 
-        var mustStay = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Key Links" };
-        if (pagesByTitle.TryGetValue("Key Links", out var klPage) && linksFrom.TryGetValue(klPage.Title, out var klTargets))
+        // Paths: every page titled Key Links, and what this section's links to.
+        var mustStay = new HashSet<string>(
+            pagesList.Where(p => string.Equals(p.Title, "Key Links", StringComparison.OrdinalIgnoreCase)).Select(p => p.RelativePath),
+            StringComparer.OrdinalIgnoreCase);
+        if (pagesByTitle.TryGetValue("Key Links", out var klPage) && linksFrom.TryGetValue(klPage.RelativePath, out var klTargets))
         {
             foreach (var t in klTargets) mustStay.Add(t);
         }
@@ -808,19 +839,19 @@ public sealed partial class AssistWorkspace
 
         if (isDraft) // unpublishing
         {
-            var goingDown = new HashSet<string>(named.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
+            var goingDown = new HashSet<string>(named.Select(p => p.RelativePath), StringComparer.OrdinalIgnoreCase);
             bool foundMore = true;
             while (foundMore)
             {
                 foundMore = false;
                 var candidates = new List<PlannedPage>();
-                foreach (var title in goingDown)
+                foreach (var path in goingDown)
                 {
-                    if (linksFrom.TryGetValue(title, out var targets))
+                    if (linksFrom.TryGetValue(path, out var targets))
                     {
                         foreach (var target in targets)
                         {
-                            if (pagesByTitle.TryGetValue(target, out var targetPage))
+                            if (pagesByPath.TryGetValue(target, out var targetPage))
                                 candidates.Add(targetPage);
                         }
                     }
@@ -828,10 +859,10 @@ public sealed partial class AssistWorkspace
 
                 foreach (var candidate in candidates)
                 {
-                    if (goingDown.Contains(candidate.Title)) continue;
+                    if (goingDown.Contains(candidate.RelativePath)) continue;
                     string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
                     if (reason != null) continue;
-                    goingDown.Add(candidate.Title);
+                    goingDown.Add(candidate.RelativePath);
                     linked.Add(candidate with { ViaLink = true });
                     foundMore = true;
                 }
@@ -839,13 +870,13 @@ public sealed partial class AssistWorkspace
 
             var keptSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var sweepCandidates = new List<PlannedPage>();
-            foreach (var title in goingDown)
+            foreach (var path in goingDown)
             {
-                if (linksFrom.TryGetValue(title, out var targets))
+                if (linksFrom.TryGetValue(path, out var targets))
                 {
                     foreach (var target in targets)
                     {
-                        if (pagesByTitle.TryGetValue(target, out var targetPage))
+                        if (pagesByPath.TryGetValue(target, out var targetPage))
                             sweepCandidates.Add(targetPage);
                     }
                 }
@@ -863,9 +894,9 @@ public sealed partial class AssistWorkspace
                 // A page that IS going down is not "staying" -- two classes
                 // named together link to each other, and the second must not
                 // be reported as kept because it is a class (#342).
-                if (goingDown.Contains(candidate.Title)) continue;
+                if (goingDown.Contains(candidate.RelativePath)) continue;
                 string? reason = ReasonToKeep(candidate, mustStay, referrers, goingDown, course);
-                if (reason != null && keptSeen.Add(candidate.Title))
+                if (reason != null && keptSeen.Add(candidate.RelativePath))
                 {
                     kept.Add(new PlannedKept(candidate, reason));
                     // A class has its own line ("stays visible, because it is
@@ -891,18 +922,18 @@ public sealed partial class AssistWorkspace
         }
         else // publishing: ALWAYS takes what the pages link to (#420)
         {
-            var seenLinked = new HashSet<string>(named.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
+            var seenLinked = new HashSet<string>(named.Select(p => p.RelativePath), StringComparer.OrdinalIgnoreCase);
             var queue = new Queue<PlannedPage>(named);
             while (queue.Count > 0)
             {
                 var cur = queue.Dequeue();
-                if (linksFrom.TryGetValue(cur.Title, out var targets))
+                if (linksFrom.TryGetValue(cur.RelativePath, out var targets))
                 {
                     foreach (var target in targets)
                     {
-                        if (pagesByTitle.TryGetValue(target, out var targetPage))
+                        if (pagesByPath.TryGetValue(target, out var targetPage))
                         {
-                            if (seenLinked.Add(targetPage.Title))
+                            if (seenLinked.Add(targetPage.RelativePath))
                             {
                                 if (!targetPage.IsClassPage)
                                 {
@@ -947,7 +978,7 @@ public sealed partial class AssistWorkspace
         {
             if (page.IsVisibleToStudents == isPublish && page.VisibilityIsCertain)
             {
-                if (!named.Any(n => string.Equals(n.Title, page.Title, StringComparison.OrdinalIgnoreCase)))
+                if (!named.Any(n => string.Equals(n.RelativePath, page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                     alreadyRight.Add(page);
             }
             else
@@ -980,11 +1011,11 @@ public sealed partial class AssistWorkspace
         var dateMoves = new List<PlannedDateMove>();
         foreach (var date in inherited)
         {
-            if (pagesByTitle.TryGetValue(date.Title, out var p))
+            if (pagesByPath.TryGetValue(date.RelativePath, out var p))
             {
                 string introducingTitle = p.DisplayTitle;
                 // Find introducing class title
-                if (referrers.TryGetValue(p.Title, out var refs))
+                if (referrers.TryGetValue(p.RelativePath, out var refs))
                 {
                     var introducingClass = refs.Where(r => r.IsClassPage && r.Date == date.New).FirstOrDefault();
                     if (introducingClass != null) introducingTitle = introducingClass.DisplayTitle;
@@ -1026,6 +1057,18 @@ public sealed partial class AssistWorkspace
     /// other one out too, so the front page and the dangling-link warning
     /// were worked out as if it stayed as it was.
     /// </summary>
+    /// <summary>The folder a planned page sits in, from the course folder ("Labs", "section1/All Classes").</summary>
+    private string FolderOf(Course course, PlannedPage page)
+    {
+        string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, page.RelativePath));
+        string folder = Path.GetRelativePath(course.DirectoryPath, Path.GetDirectoryName(full)!).Replace('\\', '/');
+        return folder == "." ? course.Code : folder;
+    }
+
+    /// <summary>A display title without the " (in folder)" the plan adds to tell two same-named pages apart.</summary>
+    private static string StrippedOfFolder(string displayTitle) =>
+        System.Text.RegularExpressions.Regex.Replace(displayTitle, @" \(in [^)]*\)$", "");
+
     internal static List<PlannedPage> WithoutDeclined(IEnumerable<PlannedPage> planned, IEnumerable<PlannedPage> declined)
     {
         var declinedPaths = new HashSet<string>(declined.Select(p => PathKey(p.RelativePath)), StringComparer.OrdinalIgnoreCase);
@@ -1074,7 +1117,7 @@ public sealed partial class AssistWorkspace
     {
         if (page.IsFolderIndex)
             return "it is a folder's landing page, which following links never takes down.";
-        if (mustStay.Contains(page.Title))
+        if (mustStay.Contains(page.RelativePath))
             return "it is in this section's Key Links.";
         if (PagePaths.IsCurriculum(course.DirectoryPath, page.RelativePath))
             return "it is a curriculum page.";
@@ -1095,11 +1138,11 @@ public sealed partial class AssistWorkspace
         Dictionary<string, List<PlannedPage>> referrers,
         HashSet<string> goingDown)
     {
-        if (referrers.TryGetValue(page.Title, out var list))
+        if (referrers.TryGetValue(page.RelativePath, out var list))
         {
             foreach (var referrer in list)
             {
-                if (goingDown.Contains(referrer.Title)) continue;
+                if (goingDown.Contains(referrer.RelativePath)) continue;
                 if (!referrer.IsVisibleToStudents) continue;
                 return referrer;
             }
@@ -1670,8 +1713,8 @@ public sealed partial class AssistWorkspace
         // checking that the right thing was put back.
         // The label names what the plan WILL write: a page the writer declined
         // at plan time is named in the reply, not "unpublished" here (#308).
-        var declinedAtPlan = new HashSet<string>(plan.CannotBeAddedTo.Select(p => p.Title), StringComparer.OrdinalIgnoreCase);
-        var labelled = plan.Named.Where(p => !declinedAtPlan.Contains(p.Title)).ToList();
+        var declinedAtPlan = new HashSet<string>(plan.CannotBeAddedTo.Select(p => p.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var labelled = plan.Named.Where(p => !declinedAtPlan.Contains(p.RelativePath)).ToList();
         using var recording = UndoHistory.Record(_undo,
             $"{(plan.Hiding ? "unpublished" : "published")} " +
             $"{Humanize((labelled.Count > 0 ? labelled : plan.Named.ToList()).Select(p => "“" + p.Title + "”"))} " +
@@ -1932,7 +1975,7 @@ public sealed partial class AssistWorkspace
         foreach (var page in unitPages)
         {
             var pagePlan = PlanPublish(
-                course.Code, section, new[] { page.Title }, draft: !publishing, publishes: publishing);
+                course.Code, section, new[] { page.RelativePath }, draft: !publishing, publishes: publishing);
             foreach (var refused in pagePlan.CannotBeAddedTo) Decline(refused.DisplayTitle);
 
             if (pagePlan.ChangesNothing) continue;
