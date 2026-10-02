@@ -158,6 +158,25 @@ public class AppUpdatesContractTests
         Assert.Contains("offered again", line);
     }
 
+    /// <summary>
+    /// Russell, 2026-10-01 (parity bundle 10, Q9): the installer installs for
+    /// ONE person only, so every copy it makes can update itself. It no longer
+    /// offers "install for all users" (that dialog was
+    /// <c>PrivilegesRequiredOverridesAllowed=dialog</c>); an all-users copy made
+    /// by an older installer can still exist, and keeps the refusal below.
+    /// </summary>
+    [Fact]
+    public void TheInstallerInstallsForOnePersonOnly()
+    {
+        string iss = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "installer.iss"));
+        var setting = iss.Split('\n').Select(line => line.Trim()).Where(line => !line.StartsWith(';')).ToList();
+        Assert.Contains("PrivilegesRequired=lowest", setting);
+        Assert.DoesNotContain(setting, line => line.StartsWith("PrivilegesRequiredOverridesAllowed", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(@"DefaultDirName={localappdata}\Programs\Plantoir", setting);
+        // What the updater calls per-user is where the installer puts it.
+        Assert.True(AppUpdates.IsPerUserInstall(@"C:\Users\t\AppData\Local\Programs\Plantoir", @"C:\Users\t\AppData\Local"));
+    }
+
     [Fact]
     public void OnlyAPerUserCopyUpdatesItself()
     {

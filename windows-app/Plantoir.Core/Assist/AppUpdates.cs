@@ -141,11 +141,13 @@ public static class AppUpdates
             : null;
 
     /// <summary>
-    /// Whether this copy may update itself (ruling 3). installer.iss allows an
-    /// all-users install into Program Files (PrivilegesRequiredOverridesAllowed=dialog);
-    /// a silent per-user update would put a SECOND copy beside it. So only a
-    /// copy under <c>%LOCALAPPDATA%\Programs</c> is updated, and an all-users
-    /// one shows the contract's needsAdministrator sentences instead.
+    /// Whether this copy may update itself (ruling 3). Only a copy under
+    /// <c>%LOCALAPPDATA%\Programs</c> is updated: a silent per-user update of
+    /// an all-users copy in Program Files would put a SECOND copy beside it, so
+    /// that one shows the contract's needsAdministrator sentences instead.
+    /// Since 2026-10-01 installer.iss installs per-user ONLY (it no longer
+    /// offers an all-users install), so every copy it makes updates itself; the
+    /// refusal stays for an all-users copy an older installer made.
     /// </summary>
     public static bool IsPerUserInstall(string executableDirectory, string localAppData)
     {
@@ -203,7 +205,7 @@ public static class UpdateWording
     public const string CouldNotCheck = "Plantoir could not find out whether a new version is ready. It will try again tomorrow.";
     public const string AssistantElsewhereWork = "helping an assistant in another app";
     public const string NeedsAdministratorExplanationOnWindows =
-        "Plantoir was installed for everyone who uses this PC, so a new version needs an administrator to install it. Whoever looks after this PC can download it from plantoir.app.";
+        "Plantoir was installed for everyone who uses this PC, so it cannot update itself. To get the new version, whoever looks after this PC can uninstall Plantoir in Windows Settings, and then you can install it again from plantoir.app. Your courses stay as they are.";
 
     /// <summary>The {work} phrase for a hold.</summary>
     public static string Work(AppUpdates.Hold hold, string theQuitQuestionsWords) => hold.NamedAs switch

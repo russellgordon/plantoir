@@ -166,7 +166,8 @@ public class AssistAgentTests
         Assert.Empty(rig.Model.Asked);
         var call = Assert.Single(rig.Tools.Calls);
         Assert.Equal("publish_pages", call.Name);
-        Assert.True(call.Arguments["includeLinked"]!.GetValue<bool>());
+        // No flag (#420): every publish takes what the page links to.
+        Assert.False(call.Arguments.ContainsKey("includeLinked"));
         Assert.Equal("Unit 2, Day 3", call.Arguments["pages"]![0]!.GetValue<string>());
         Assert.False(call.Arguments["preview"]!.GetValue<bool>());
         Assert.Contains(lines, l => l.Text.Contains("Published “Unit 2, Day 3”"));

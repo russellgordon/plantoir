@@ -192,18 +192,7 @@ public sealed class LinksChecklistDialog
                 new Dictionary<string, string> { ["course"] = course.Code });
 
         var published = workspace.PublishAndRemember(sheet);
-        var said = new List<string>
-        {
-            LinksChecklistWording.Fill(LinksChecklistWording.Published, new Dictionary<string, string>
-            {
-                ["count"] = published.Written.Count.ToString(),
-                ["pages"] = LinksChecklistWording.Pages(published.Written.Count),
-            }),
-        };
-        foreach (string changed in published.ChangedSince)
-            said.Add(LinksChecklistWording.Fill(LinksChecklistWording.PageChangedSince,
-                new Dictionary<string, string> { ["name"] = sheet.NameOf(changed) }));
-        return string.Join(" ", said);
+        return published.Reply(sheet);
     }
 
     /// <summary>Publishing pages launches nothing; anything that tries is refused.</summary>

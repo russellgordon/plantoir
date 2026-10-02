@@ -104,7 +104,41 @@ public sealed record LinksChecklistPublished(
     IReadOnlyList<string> ChangedSince,
     int CameWithAClass,
     int ClassesPublished,
-    int BroughtByClasses);
+    int BroughtByClasses)
+{
+    /// <summary>
+    /// Pages Publish would have written but the writer DECLINED (#421; no
+    /// column-0 place in their settings for a new line), by the name a teacher
+    /// reads. Left exactly as they were, never in <see cref="Written"/> and
+    /// never remembered as unticked.
+    /// </summary>
+    public IReadOnlyList<string> Declined { get; init; } = Array.Empty<string>();
+
+    /// <summary>The sentence naming <see cref="Declined"/>, or null.</summary>
+    public string? DeclinedSentence => Declined.Count == 0 ? null : AssistWording.PagesWhoseSettingsCannotBeAddedTo(Declined);
+
+    /// <summary>
+    /// What the teacher is told after Publish: how many pages were published
+    /// (what was WRITTEN), each page changed since the sheet opened, and the
+    /// pages the writer declined — named, never silently left hidden (#421).
+    /// </summary>
+    public string Reply(LinksChecklistSheet sheet)
+    {
+        var said = new List<string>
+        {
+            LinksChecklistWording.Fill(LinksChecklistWording.Published, new Dictionary<string, string>
+            {
+                ["count"] = Written.Count.ToString(),
+                ["pages"] = LinksChecklistWording.Pages(Written.Count),
+            }),
+        };
+        foreach (string changed in ChangedSince)
+            said.Add(LinksChecklistWording.Fill(LinksChecklistWording.PageChangedSince,
+                new Dictionary<string, string> { ["name"] = sheet.NameOf(changed) }));
+        if (DeclinedSentence is { } declined) said.Add(declined);
+        return string.Join(" ", said);
+    }
+}
 
 public sealed partial class AssistWorkspace
 {
@@ -188,8 +222,7 @@ public sealed partial class AssistWorkspace
         if (classes.Count == 0) return (brings, counts);
 
         var plan = PlanPublish(course.Code, section,
-            classes.Select(r => Path.GetFileNameWithoutExtension(pages[LinksChecklist.Key(r.Place)])).ToList(),
-            includeLinked: true);
+            classes.Select(r => Relative(Path.GetFullPath(pages[LinksChecklist.Key(r.Place)]))).ToList());
         var changing = plan.Changes.Where(c => c.BecauseLinked)
             .Select(c => Path.GetFullPath(PagePaths.ResolveInside(_folder, c.Page.RelativePath)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -260,8 +293,7 @@ public sealed partial class AssistWorkspace
 
         // The classes' own plan — the same planner the assistant's publish uses.
         PublishPlan? classPlan = stillHiddenClasses.Count == 0 ? null : PlanPublish(course.Code, section,
-            stillHiddenClasses.Select(r => Path.GetFileNameWithoutExtension(pages[LinksChecklist.Key(r.Place)])).ToList(),
-            includeLinked: true);
+            stillHiddenClasses.Select(r => Relative(Path.GetFullPath(pages[LinksChecklist.Key(r.Place)]))).ToList());
         var brought = classPlan?.Changing.Select(p => Path.GetFullPath(PagePaths.ResolveInside(_folder, p.RelativePath)))
                           .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -269,13 +301,21 @@ public sealed partial class AssistWorkspace
         using var recording = UndoHistory.Record(_undo, $"published pages that links lead to in {course.Code} Section {section}");
         string tail = SiblingTimeAndOffset(course, section, ClassPages(course, section));
         var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Pages the writer DECLINED (#421, the mac's #186): named in the reply,
+        // never counted as written, and never remembered as left unticked —
+        // the teacher ticked them; they stay hidden for a reason of their own.
+        var declined = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void Decline(string full, string name) => declined.TryAdd(Path.GetFullPath(full), name);
 
         if (classPlan is not null)
         {
+            foreach (var page in classPlan.CannotBeAddedTo)
+                Decline(PagePaths.ResolveInside(_folder, page.RelativePath), page.DisplayTitle);
             foreach (var page in classPlan.Changing)
             {
                 string full = PagePaths.ResolveInside(_folder, page.RelativePath);
                 var (updated, edit) = PageFrontmatter.SetDraft(File.ReadAllText(full), page.FrontmatterKey, false, section);
+                if (edit.NoRoomForAKey) { Decline(full, page.DisplayTitle); continue; }
                 if (edit.Changed) { Save(full, updated); written.Add(Path.GetFullPath(full)); }
             }
             // Each page a ticked class brings takes THAT class's date (the
@@ -314,6 +354,8 @@ public sealed partial class AssistWorkspace
             var planned = Plan(course, section, full, draft: false, viaLink: false);
             string text = File.ReadAllText(full);
             var (updated, edit) = PageFrontmatter.SetDraft(text, planned.FrontmatterKey, false, section);
+            // Declined: not even the date is written — a hidden page with a new date is no publish.
+            if (edit.NoRoomForAKey) { Decline(full, planned.DisplayTitle); continue; }
             if (row.Date is { } iso && DateOnly.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture,
                                                           System.Globalization.DateTimeStyles.None, out var day))
             {
@@ -342,6 +384,7 @@ public sealed partial class AssistWorkspace
                 continue;
             }
             if (!Hidden(key)) continue;
+            if (pages.TryGetValue(key, out var dp) && declined.ContainsKey(Path.GetFullPath(dp))) continue;
             bool ownTick = sheet.Ticks.TryGetValue(key, out bool on) && on;
             if (ownTick) leftWith.Add(row.Place); else remembered.Add(row.Place);
         }
@@ -355,7 +398,10 @@ public sealed partial class AssistWorkspace
         return new LinksChecklistPublished(
             written.Select(path => placeOrTitle(path)).ToList(), remembered, leftWith,
             changedSince.Distinct().ToList(), cameWith, stillHiddenClasses.Count,
-            classPlan?.Changing.Count(p => !stillHiddenClasses.Any(c => LinksChecklist.Key(c.Place) == LinksChecklist.Key(PlaceOf(course, p.RelativePath)))) ?? 0);
+            classPlan?.Changing.Count(p => !stillHiddenClasses.Any(c => LinksChecklist.Key(c.Place) == LinksChecklist.Key(PlaceOf(course, p.RelativePath)))) ?? 0)
+        {
+            Declined = declined.Values.ToList(),
+        };
 
         string placeOrTitle(string path) => PlaceOf(course, Relative(path));
     }
@@ -397,6 +443,7 @@ public sealed partial class AssistWorkspace
             sheet.CourseCode, sheet.Section);
         NoteLeftHidden(sheet, "Publish with some unticked", result.RememberedUnticked.Count + result.LeftWithTheirPage.Count,
                        result.LeftWithTheirPage.Count);
+        NoteSettingsLeftAsTheyWere("publishing pages that links lead to", result.Declined.Count, sheet.CourseCode, sheet.Section);
     }
 
     private static void NoteLeftHidden(LinksChecklistSheet sheet, string how, int total, int followers)
