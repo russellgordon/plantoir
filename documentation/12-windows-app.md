@@ -922,8 +922,11 @@ Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
 29–32 s; its first preview served 52–61 s after Preview was pressed;
 publishing a one-section course to a folder 1 m 52 s – 3 m 3 s per test (build
 included); the end-to-end set of 13 tests 16 m 47 s – 20 m 33 s; the whole
-suite of 40, 43 m 38 s – 48 m 43 s. After the harness lessons above, the whole
-suite ran 40 of 40 and the end-to-end set 13 of 13 twice more in a row, with no
+suite of 40, 43 m 38 s – 48 m 43 s (with the PC also busy with other work).
+After the harness lessons above and the review's fixes (absences need an
+answer; the preview pane's loaded address asserted), and on a tree merged with
+bundle 10, the end-to-end set ran 13 of 13 five times in a row (7 m 2 s –
+7 m 17 s each on a quiet PC) and the whole suite 44 of 44 (19 m 39 s), with no
 launcher left running, no new folder under the real builds root and the real
 trail untouched.
 
@@ -3693,6 +3696,10 @@ since then (see "A test that runs a launcher"), so a second fact,
 `TheFolderPublishsDonePanelStaysInsideASqueezedWindow`, publishes a course to a
 folder with a long path, squeezes the window the same way and measures every
 part of the Done panel against it (`%TEMP%\plantoir-214-donepanel.txt`).
+Measured 2026-10-01 21:53 (bundle 11, after merging bundle 10), verbatim:
+"window 900x737; taskPhaseLabel 33x20 (bottom 167); publishedFolderRenderNote
+631x32 (bottom 285); taskDetailsDisclosure 655x29 (bottom 328)" — every part
+inside the window at the narrowest width it allows.
 
 **Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
 "window 900x737; notice 631x157 (top 135 below the window's top)". The
