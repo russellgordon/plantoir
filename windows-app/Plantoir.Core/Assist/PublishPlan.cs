@@ -178,7 +178,7 @@ public sealed class PublishPlan
                 }
                 string becoming = change.WillBeVisible ? "visible" : "hidden";
                 string line = $"“{change.Page.DisplayTitle}” will become {becoming}";
-                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.Title, change.Page.Title, StringComparison.OrdinalIgnoreCase)))
+                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                 {
                     line += $", with the same date as “{move.TakenFrom}”";
                 }
@@ -223,8 +223,8 @@ public sealed class PublishPlan
             lines.Add(leftAlone);
         }
 
-        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.Title), StringComparer.OrdinalIgnoreCase);
-        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.Title)).ToList();
+        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
         if (orphaned.Count > 0)
         {
             lines.Add("");

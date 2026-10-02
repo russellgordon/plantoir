@@ -96,6 +96,54 @@ public sealed class PublishFollowsLinksTests : IDisposable
         Assert.False(Visible(ConceptPath("Worked Example")));
     }
 
+    /// <summary>
+    /// #420 review R5: two pages share a file name (every folder's landing
+    /// page is index.md) and link to DIFFERENT pages. Publishing one, named by
+    /// its path, takes ITS links and not the other's; the plan says which one
+    /// (with its folder); and the bare name, which fits both, is asked about
+    /// rather than guessed.
+    /// </summary>
+    [Fact]
+    public async Task TwoPagesWithOneNameEachBringOnlyTheirOwnLinks()
+    {
+        Directory.CreateDirectory(Path.Combine(CourseDir, "Labs"));
+        string conceptsIndex = Path.Combine(CourseDir, "Concepts", "index.md");
+        string labsIndex = Path.Combine(CourseDir, "Labs", "index.md");
+        File.WriteAllText(conceptsIndex, "---\npublishForSection1: false\n---\nStart with [[Ohm's Law]].\n");
+        File.WriteAllText(labsIndex, "---\npublishForSection1: false\n---\nToday's lab: [[Answer Key]].\n");
+        File.WriteAllText(ConceptPath("Answer Key"), "---\npublishForSection1: false\n---\nThe answers.\n");
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+        string asked = "courses/ICS3U/Concepts/index";
+
+        string plan = tools.PlanPublishPages(Course, 1, pages: new[] { asked }).Summary();
+        Assert.Contains("“Concepts” will become visible", plan);   // a landing page reads as its folder
+        Assert.DoesNotContain("Answer Key", plan);
+
+        await tools.PublishPages(Course, 1, new Progress<ProgressNotificationValue>(_ => { }), default,
+                                 new[] { asked }, preview: false);
+        Assert.True(Visible(conceptsIndex));
+        Assert.True(Visible(ConceptPath("Ohm's Law")));
+        Assert.False(Visible(ConceptPath("Answer Key")));
+        Assert.False(Visible(labsIndex));
+
+        string bare = tools.PlanPublishPages(Course, 1, pages: new[] { "index" }).Summary();
+        Assert.StartsWith(AssistWording.MorePagesThanOneAreCalled(Course, "1", "index"), bare);
+    }
+
+    /// <summary>Two pages a teacher would read by the same name are named on the plan with their folder.</summary>
+    [Fact]
+    public void ThePlanSaysWhichOfTwoSameNamedPagesGoes()
+    {
+        File.WriteAllText(Path.Combine(CourseDir, "section1", "Notes.md"), "---\npublish: false\n---\nSection notes.\n");
+        File.WriteAllText(ConceptPath("Notes"), "---\npublishForSection1: false\n---\nShared notes.\n");
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+
+        string plan = tools.PlanPublishPages(Course, 1, pages: new[] { "courses/ICS3U/section1/Notes" }).Summary();
+
+        Assert.Contains("“Notes (in section1)” will become visible", plan);
+        Assert.DoesNotContain("in Concepts", plan);
+    }
+
     /// <summary>The fixed phrasings the app answers in code carry no flag either.</summary>
     [Theory]
     [InlineData("hide unit 2, day 3", "unpublish_pages")]

@@ -222,7 +222,7 @@ public sealed partial class AssistWorkspace
         if (classes.Count == 0) return (brings, counts);
 
         var plan = PlanPublish(course.Code, section,
-            classes.Select(r => Path.GetFileNameWithoutExtension(pages[LinksChecklist.Key(r.Place)])).ToList());
+            classes.Select(r => Relative(Path.GetFullPath(pages[LinksChecklist.Key(r.Place)]))).ToList());
         var changing = plan.Changes.Where(c => c.BecauseLinked)
             .Select(c => Path.GetFullPath(PagePaths.ResolveInside(_folder, c.Page.RelativePath)))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -293,7 +293,7 @@ public sealed partial class AssistWorkspace
 
         // The classes' own plan — the same planner the assistant's publish uses.
         PublishPlan? classPlan = stillHiddenClasses.Count == 0 ? null : PlanPublish(course.Code, section,
-            stillHiddenClasses.Select(r => Path.GetFileNameWithoutExtension(pages[LinksChecklist.Key(r.Place)])).ToList());
+            stillHiddenClasses.Select(r => Relative(Path.GetFullPath(pages[LinksChecklist.Key(r.Place)]))).ToList());
         var brought = classPlan?.Changing.Select(p => Path.GetFullPath(PagePaths.ResolveInside(_folder, p.RelativePath)))
                           .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
