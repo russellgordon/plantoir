@@ -760,9 +760,11 @@ bottom, that a panel follows the course a teacher selected rather than
 going stale, and that a sentence the contract pins is actually RENDERED where
 a teacher can see it rather than merely held in a constant.
 
-**It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
-skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and
-runs none. The project is in the solution so a SOLUTION build compiles it —
+**It is opt-in and belongs to no gate.** Every test that drives the window
+carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
+`dotnet test` builds them and runs none of those — only
+`AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
+and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)

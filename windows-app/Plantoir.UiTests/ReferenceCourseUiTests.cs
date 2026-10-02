@@ -147,7 +147,7 @@ public class ReferenceCourseUiTests
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is { } d && DrivenApp.TextsUnder(d).Contains(nowhere),
                                      TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(300)).Result,
                     $"Copy a Page never said \"{nowhere}\"");
-        app.Find(CopyAPageDialogIds.Close, "Cancel").AsButton().Invoke();
+        EndToEnd.CloseCopyAPage(app);
 
         // From the reference course: offered (it only READS the course), and
         // the course being taught is where a page would go.
@@ -158,16 +158,11 @@ public class ReferenceCourseUiTests
         string[] names = offered?.Select(i => i.Text).ToArray() ?? Array.Empty<string>();
         into.Collapse();
         Assert.Equal(new[] { "ICS3U" }, names);
-        // Closing is tidying, not the claim. In runs 17 and 18 of bundle 11
-        // "copyPageClose" was never found here after the combo box had been
-        // opened and shut (the claim above had already passed), so the dialog
-        // is closed by whichever id its Cancel carries, and the test SAYS
-        // which, so the cause can be pinned if it recurs.
-        var dialog = app.OpenDialog();
-        var cancel = dialog?.FindFirstDescendant(cf => cf.ByAutomationId(CopyAPageDialogIds.Close))
-                     ?? dialog?.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"));
-        _output.WriteLine($"Copy a Page's Cancel was found as '{cancel?.AutomationId ?? "nothing"}' in dialog '{dialog?.Name ?? "none"}'");
-        cancel?.AsButton().Invoke();
+        // By its documented id only. Runs 17 and 18 of bundle 11 found this
+        // Cancel carrying the template's "CloseButton": the app set its id once
+        // at Opened, and it did not always stick. Fixed in CopyAPageDialog
+        // (re-tagged on every layout pass), so a missing id is a failure again.
+        EndToEnd.CloseCopyAPage(app);
     }
 
     [UiFact]
