@@ -895,7 +895,15 @@ these is now written into the harness rather than left to be rediscovered:
   `FindOrNull` passed whenever every query timed out, so negative checks use
   `DrivenApp.AssertAbsent`, which says "absent" only when the tree ANSWERED
   empty and fails when it never answers (`AssertAbsentRuleTests`, plain facts
-  that run without a desktop; the timeout case is the must-fail).
+  that run without a desktop; the timeout case is the must-fail). It also
+  keeps watching for 2 s after the first empty answer, so a control drawn a
+  moment late is not declared absent.
+- **An id set on a ContentDialog's TEMPLATE button once, at Opened, does not
+  always stick**: Copy a Page's Cancel was found as the template's own
+  "CloseButton" in 2 of 5 runs (17, 18). The app now re-tags its two buttons
+  on every layout pass while the dialog is up, and the tests close it by
+  `copyPageClose` only (`EndToEnd.CloseCopyAPage`, which fails when there is
+  no dialog or no id) — a "whichever id" fallback had hidden the race.
 - **Click a control only once it has a clickable point**; a dialog opened
   straight after another closed is still arriving (`NoClickablePointException`).
 - **WebView2's page text** arrives through UIA lazily, sometimes as Text and
@@ -3671,10 +3679,18 @@ teacher's run never redirects, so it never writes the file.
 **Measured, 2026-10-01 13:40 (bundle 11, run 1, unlocked desktop, Intel
 i5-8365U, Windows 11 26200), verbatim:** "F2: not delivered (the dialog kept
 it) / Ctrl+Shift+R: not delivered (the dialog kept it) / Ctrl+N: not delivered
-(the dialog kept it) / Ctrl+O: not delivered (the dialog kept it)". The test
-passed in every whole-suite run after. So WinUI does not deliver the window's
-four accelerators while a ContentDialog is up, on this build; the guard is
-belt and braces, and costs nothing.
+(the dialog kept it) / Ctrl+O: not delivered (the dialog kept it)". That
+first reading had NO control — a key missing from the held list could have
+meant only that the keystroke went to another window (fix-round review,
+ruling W2). So since bundle 11's last round `DialogGate.Holds` records every
+ARRIVAL in a `--state-dir` run (`accelerators-arrived.txt`, "<key>
+passed|held"), and the test first presses the four keys with NO dialog up and
+requires each to arrive (closing the rename dialog, the second window and the
+folder picker they open). Measured 2026-10-01 22:28, verbatim:
+"Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not delivered (the dialog kept it);
+control (no dialog): all four arrived at their handlers". So keys from the
+test DO reach the window's handlers, and under a ContentDialog the same four
+do not, on this build; the guard is belt and braces, and costs nothing.
 
 ### A wrapping panel squeezed narrow (#214, the mac's #211)
 
@@ -3696,12 +3712,20 @@ inside it. Until bundle 11 the folder publish's Done panel was left
 unmeasured because putting it on screen needs a real publish; tests may run one
 since then (see "A test that runs a launcher"), so a second fact,
 `TheFolderPublishsDonePanelStaysInsideASqueezedWindow`, publishes a course to a
-folder with a long path, squeezes the window the same way and measures every
-part of the Done panel against it (`%TEMP%\plantoir-214-donepanel.txt`).
-Measured 2026-10-01 21:53 (bundle 11, after merging bundle 10), verbatim:
-"window 900x737; taskPhaseLabel 33x20 (bottom 167); publishedFolderRenderNote
-631x32 (bottom 285); taskDetailsDisclosure 655x29 (bottom 328)" — every part
-inside the window at the narrowest width it allows.
+folder, squeezes the window the same way and measures the Done panel's five
+parts — the phase, the folder sentence (given its own id for this), Show in
+File Explorer, the render note and Show details — each an element with an
+automation peer, a missing one FAILING the test (`%TEMP%\plantoir-214-donepanel.txt`).
+Measured 2026-10-01 22:31 (bundle 11, last round), verbatim: "window 900x737;
+taskPhaseLabel 33x20 (bottom 167); publishedFolderSentence 631x19 (bottom
+209); publishedFolderButton 153x32 (bottom 247); publishedFolderRenderNote
+631x32 (bottom 285); taskDetailsDisclosure 655x29 (bottom 328)" — all inside
+the window at the narrowest width it allows. Why #214's own two methods do
+not apply here: there is no splitter to drag (the sidebar is a fixed 230 px)
+and WinUI does not measure a TextBlock at a proposed near-zero width; with a
+900 px minimum window the detail column cannot get narrower than about
+670 px. Height was not squeezed (737 of a 600 px minimum), and the lowest
+part sits at 328 px.
 
 **Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
 "window 900x737; notice 631x157 (top 135 below the window's top)". The
