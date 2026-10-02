@@ -7,8 +7,10 @@ namespace Plantoir.UiTests;
 /// <summary>
 /// End to end, ruling U2 (1): a course made with the wizard's Create button,
 /// a line written on its front page the way a teacher writes in Obsidian, then
-/// Preview pressed and the SERVED page read back over HTTP and from the
-/// window's own web view — then Stop, and the address no longer answers.
+/// Preview pressed and the SERVED page read back over HTTP, the window's
+/// preview pane shown to have LOADED that same address with status 200 (its
+/// page text is reported, not asserted — Chromium's accessibility tree is not
+/// the app's) — then Stop, and the address no longer answers.
 /// </summary>
 /// <remarks>
 /// <para>Runs the real <c>setup.ps1</c> and <c>preview.ps1</c>. The build lands

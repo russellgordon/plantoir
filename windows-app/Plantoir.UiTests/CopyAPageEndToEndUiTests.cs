@@ -63,7 +63,7 @@ public class CopyAPageEndToEndUiTests
         Assert.True(Retry.WhileFalse(() => app.OpenDialog() is { } d && DrivenApp.TextsUnder(d).Contains(expected),
                                      TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(400)).Result,
                     $"the result never said \"{expected}\"; it said: {DialogText(app)}");
-        app.Find(CopyAPageDialogIds.Close, "Done").AsButton().Invoke();
+        EndToEnd.CloseCopyAPage(app);
 
         // ---- On disk: both pages, hidden in the destination's one section, the source untouched.
         foreach (string page in new[] { "Ohms Law.md", "Wattage.md" })
@@ -104,7 +104,7 @@ public class CopyAPageEndToEndUiTests
         OpenCopyAPage(app, Nowhere);
         ExpectSentence(app, EndToEnd.Say(wording["thisCourseHasNoPagesToCopy"]!, ("course", Nowhere)));
         Assert.False(app.Find(CopyAPageDialogIds.Primary, "the Copy button").IsEnabled);
-        app.Find(CopyAPageDialogIds.Close, "Cancel").AsButton().Invoke();
+        EndToEnd.CloseCopyAPage(app);
 
         // 2. A destination whose folders are not on disk has nowhere to put it.
         OpenCopyAPage(app, Source);
@@ -128,7 +128,7 @@ public class CopyAPageEndToEndUiTests
         }
         Assert.False(File.Exists(Path.Combine(app.WorkspacePath, "courses", Destination, "Concepts", "Wattage.md")),
                      "the page was copied into a course that was being deployed");
-        app.Find(CopyAPageDialogIds.Close, "Done").AsButton().Invoke();
+        EndToEnd.CloseCopyAPage(app);
     }
 
     // ---- Driving the dialog ------------------------------------------------

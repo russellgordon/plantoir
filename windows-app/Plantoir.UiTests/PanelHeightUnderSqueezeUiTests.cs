@@ -63,9 +63,13 @@ public class PanelHeightUnderSqueezeUiTests
     }
 
     /// <summary>
-    /// #214's other half (bundle 11, V5): a REAL publish to a folder whose path
-    /// is long, then the window squeezed, then every part of the Done panel
-    /// measured against the window. Reported in
+    /// #214's other half (bundle 11, V5/W3): a REAL publish to a folder, then
+    /// the window squeezed (it goes no narrower than 900), then the five parts
+    /// of the folder publish's Done panel measured against the window — the
+    /// phase, the folder sentence, Show in File Explorer, the render note and
+    /// Show details. Each is an element WITH an automation peer (the panels
+    /// around them never reach the tree), and a part that is missing FAILS the
+    /// test rather than being skipped. Reported in
     /// <c>%TEMP%\plantoir-214-donepanel.txt</c>.
     /// </summary>
     [UiFact]
@@ -87,11 +91,11 @@ public class PanelHeightUnderSqueezeUiTests
         Thread.Sleep(1200);
         var windowBox = window.BoundingRectangle;
         var parts = new List<string>();
-        foreach (string id in new[] { "taskPhaseLabel", "destinationLinks", "publishedFolderResult", "publishedFolderRenderNote", "taskDetailsDisclosure" })
+        foreach (string id in new[] { "taskPhaseLabel", "publishedFolderSentence", "publishedFolderButton", "publishedFolderRenderNote", "taskDetailsDisclosure" })
         {
-            if (app.FindOrNull(id, TimeSpan.FromSeconds(1)) is not { } part) continue;
+            var part = app.Find(id, $"the Done panel's {id}");   // missing is a failure, not a skip
             var box = part.BoundingRectangle;
-            if (box.IsEmpty) continue;
+            Assert.False(box.IsEmpty, $"{id} is in the tree but has no size");
             parts.Add($"{id} {box.Width}x{box.Height} (bottom {box.Bottom - windowBox.Top})");
             Assert.True(box.Height < windowBox.Height, $"{id} claims more height than the window has: {box} in {windowBox}");
             Assert.True(box.Bottom <= windowBox.Bottom + 1, $"{id} runs past the window's bottom edge: {box} in {windowBox}");
@@ -99,6 +103,6 @@ public class PanelHeightUnderSqueezeUiTests
         string measured = $"window {windowBox.Width}x{windowBox.Height}; " + string.Join("; ", parts);
         _output.WriteLine("#214 Done panel measurement, " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + ": " + measured);
         File.WriteAllText(Path.Combine(Path.GetTempPath(), "plantoir-214-donepanel.txt"), measured + Environment.NewLine);
-        Assert.NotEmpty(parts);
+        Assert.Equal(5, parts.Count);
     }
 }

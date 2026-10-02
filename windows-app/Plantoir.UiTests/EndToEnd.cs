@@ -212,6 +212,24 @@ internal static class EndToEnd
         throw new Xunit.Sdk.XunitException($"the {menu} menu never offered {itemAutomationId}");
     }
 
+    /// <summary>
+    /// Press Copy a Page's own Cancel/Done — by its documented id
+    /// <c>copyPageClose</c> and nothing else — and wait for the dialog to go.
+    /// FAILS when no dialog is up or its button lacks the id (bundle 11, W1:
+    /// the "whichever id" fallback hid an app race).
+    /// </summary>
+    public static void CloseCopyAPage(DrivenApp app)
+    {
+        var dialog = Retry.WhileNull(() => app.OpenDialog(), TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result
+                     ?? throw new Xunit.Sdk.XunitException("there was no Copy a Page dialog to close");
+        var close = Retry.WhileNull(() => dialog.FindFirstDescendant(cf => cf.ByAutomationId(CopyAPageDialogIds.Close)),
+                                    TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result
+                    ?? throw new Xunit.Sdk.XunitException($"the dialog \"{dialog.Name}\" has no button with the id {CopyAPageDialogIds.Close}");
+        close.AsButton().Invoke();
+        Assert.True(Retry.WhileFalse(() => app.OpenDialog() is null, TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(200)).Result,
+                    "Copy a Page would not close");
+    }
+
     /// <summary>Whether writing to a file is refused — the reference lock, measured on disk.</summary>
     public static bool WritingIsRefused(string file)
     {

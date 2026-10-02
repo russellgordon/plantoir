@@ -242,29 +242,45 @@ public sealed class DrivenApp : IDisposable
     /// the screen showed. This one waits <paramref name="within"/> for an
     /// answering query to come back empty; an element still found then fails
     /// it, and so does a tree that never answers in that time plus 30 s.
+    ///
+    /// <para>And it does not stop at the first empty answer (W6): something
+    /// drawn a moment late would pass that. From the first empty answer it
+    /// keeps WATCHING for <paramref name="settle"/> (the 2 s the old checks
+    /// watched for); any answered look that finds the element then fails it.</para>
     /// </summary>
-    public void AssertAbsent(string automationId, string describedAs, TimeSpan? within = null) =>
+    public void AssertAbsent(string automationId, string describedAs, TimeSpan? within = null, TimeSpan? settle = null) =>
         AssertAbsentWith(() => Window.FindFirstDescendant(cf => cf.ByAutomationId(automationId)),
-                         automationId, describedAs, within ?? TimeSpan.FromSeconds(2));
+                         automationId, describedAs, within ?? TimeSpan.FromSeconds(2), settle: settle);
 
     /// <summary>The rule of <see cref="AssertAbsent"/>, with the query handed in so a plain test can pin it.</summary>
     internal static void AssertAbsentWith(Func<AutomationElement?> query, string automationId, string describedAs,
-                                          TimeSpan within, TimeSpan? noAnswerGrace = null)
+                                          TimeSpan within, TimeSpan? noAnswerGrace = null, TimeSpan? settle = null)
     {
         var start = DateTime.UtcNow;
         var giveUp = start + within + (noAnswerGrace ?? TimeSpan.FromSeconds(30));
+        var watchFor = settle ?? TimeSpan.FromSeconds(2);
+        DateTime? emptySince = null;
         string lastError = "";
         while (true)
         {
             try
             {
-                if (query() is null) return;   // the tree answered: nothing there
-                if (DateTime.UtcNow - start >= within)
+                if (query() is null)
+                {
+                    // The tree answered: nothing there. Watched a while longer.
+                    emptySince ??= DateTime.UtcNow;
+                    if (DateTime.UtcNow - emptySince >= watchFor) return;
+                }
+                else if (emptySince is not null)
+                    throw new Xunit.Sdk.XunitException($"{describedAs} appeared (automation id '{automationId}') after it had been absent, and should not be there.");
+                else if (DateTime.UtcNow - start >= within)
                     throw new Xunit.Sdk.XunitException($"{describedAs} is there (automation id '{automationId}') and should not be.");
             }
             catch (System.Runtime.InteropServices.COMException error)
             {
                 lastError = error.Message;
+                // An empty answer already given, and nothing since to say otherwise.
+                if (emptySince is not null && DateTime.UtcNow - emptySince >= watchFor) return;
                 if (DateTime.UtcNow >= giveUp)
                     throw new Xunit.Sdk.XunitException(
                         $"Could not tell whether {describedAs} is absent: UI Automation did not answer ({lastError}).");

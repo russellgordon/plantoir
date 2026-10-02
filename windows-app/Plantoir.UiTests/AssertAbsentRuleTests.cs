@@ -32,7 +32,10 @@ public class AssertAbsentRuleTests
     {
         int asked = 0;
         DrivenApp.AssertAbsentWith(() => ++asked < 3 ? throw new COMException("Operation timed out.", UiaTimeout) : null,
-                                   "deployButton", "the Deploy button", TimeSpan.FromMilliseconds(200));
-        Assert.Equal(3, asked);
+                                   "deployButton", "the Deploy button", TimeSpan.FromMilliseconds(200),
+                                   settle: TimeSpan.FromMilliseconds(600));
+        // Asked again after the first empty answer: it WATCHES for the settle
+        // window (W6) rather than stopping at the first empty look.
+        Assert.True(asked > 3, $"asked {asked} times; it stopped at the first empty answer");
     }
 }
