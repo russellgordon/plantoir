@@ -56,7 +56,10 @@
                  straight from the folder will not look right. -->
             <StackPanel x:Name="FolderResult" Visibility="Collapsed" Spacing="6"
                         AutomationProperties.AutomationId="publishedFolderResult">
-                <TextBlock Text="Your website was deployed to a folder — upload it to your web host whenever you're ready." />
+                <!-- Its own id: the panel around it is a StackPanel, which never
+                     reaches UI Automation (bundle 11, W3 — #214's measurement). -->
+                <TextBlock Text="Your website was deployed to a folder — upload it to your web host whenever you're ready."
+                           AutomationProperties.AutomationId="publishedFolderSentence" />
                 <Button x:Name="FolderResultButton" Content="Show in File Explorer"
                         AutomationProperties.AutomationId="publishedFolderButton"
                         Click="FolderResult_Click" />

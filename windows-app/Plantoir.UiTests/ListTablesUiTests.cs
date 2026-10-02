@@ -31,8 +31,7 @@ public class ListTablesUiTests
         added.AsListBoxItem().Select();
         added.Focus();
         Keyboard.Press(VirtualKeyShort.DELETE);
-        Assert.True(Retry.WhileFalse(() => app.FindOrNull("row:" + Shared + ":Projects", TimeSpan.FromMilliseconds(300)) is null,
-                                     TimeSpan.FromSeconds(5)).Result, "Delete did not remove the selected row");
+        app.AssertAbsent("row:" + Shared + ":Projects", "the deleted row", TimeSpan.FromSeconds(5));
     }
 
     [UiFact]

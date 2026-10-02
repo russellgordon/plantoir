@@ -384,7 +384,21 @@ public sealed class CourseConfiguration
         get { var raw = StringValue("deploy_target"); return raw.Length == 0 ? "netlify" : raw; }
         set
         {
-            _values["deploy_target"] = value;
+            // Choosing again what the SAVED settings already meant leaves the
+            // key as it was saved — absent stays absent — so a teacher who
+            // picks a folder and then Netlify again has nothing to save.
+            // Writing "netlify" over an absent key read as an unsaved change
+            // (Revert stayed on); found by CourseSettingsSaveUiTests on its
+            // first unlocked run, bundle 11.
+            var saved = LastReadOrWritten();
+            var savedRaw = saved?["deploy_target"];
+            string savedMeant = savedRaw?.Type == JTokenType.String && ((string)savedRaw!).Length > 0 ? (string)savedRaw! : "netlify";
+            if (saved is not null && value == savedMeant)
+            {
+                if (savedRaw is null) _values.Remove("deploy_target");
+                else _values["deploy_target"] = savedRaw.DeepClone();
+            }
+            else _values["deploy_target"] = value;
             // A destination can never be both primary and additional at
             // once — deploying to the same place twice makes no sense.
             AdditionalDeployTargets = PruningAdditionalTargets(AdditionalDeployTargets, value);

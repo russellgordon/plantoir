@@ -32,8 +32,8 @@ namespace Plantoir.UiTests;
 ///
 /// <para>Nothing here previews or schedules anything: the app is driven with
 /// <c>--state-dir</c>, and the only writes are to the run's own working folder.
-/// See <c>DrivenApp</c> for why a test that drove Preview would NOT be
-/// safe.</para>
+/// See <c>DrivenApp</c> for what a test that drives Preview owes in
+/// clean-up (bundle 11).</para>
 ///
 /// <para><b>Mutation-measured 2026-09-18, because a UI test that pins nothing
 /// is worse than none.</b> Restoring the pre-fix body in full — the walk taken
