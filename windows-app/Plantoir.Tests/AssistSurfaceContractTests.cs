@@ -188,12 +188,10 @@ public class AssistSurfaceContractTests
                 "`mac` issue so the entry is removed from the contract.");
         }
 
+        // The four `…publish_pages.includeLinked` entries left this list with
+        // #420 (parity bundle 10): the flag is gone, as on the mac.
         var notEnumeratedHere = new[]
         {
-            "publish_pages.includeLinked",
-            "unpublish_pages.includeLinked",
-            "plan_publish_pages.includeLinked",
-            "plan_unpublish_pages.includeLinked",
             "add_next_class.unit", "add_next_class.days",
             "plan_add_next_class.unit", "plan_add_next_class.days",
             "read_remembered_timetable.scope", "read_remembered_timetable.revise",
@@ -886,10 +884,14 @@ public class AssistSurfaceContractTests
     /// fourth phrasing, kept as an "agreed departure" until then, went with it,
     /// as #114's 2026-09-09 decision said it would.</para>
     /// <para>publish_pages and unpublish_pages are held at their own text
-    /// (<c>AssistAgent.StillShortened</c>): the contract's sentences say linked
-    /// pages always come along, and here they come only with includeLinked —
-    /// a behaviour difference owned by #420 and recorded in toolDescriptions.measuredDepartures. The test fails the
-    /// day one of them matches, so the hold cannot outlive its reason.</para>
+    /// (<c>AssistAgent.StillShortened</c>). The behaviour their contract
+    /// sentences promise landed with #420 step (a); the TEXT was then measured
+    /// (#420 step b, 2026-10-01) and the move failed its pre-registered
+    /// criteria, so the hold stays — a permanent measured departure by
+    /// Russell's decision (2026-10-01, #420 closed), recorded in
+    /// toolDescriptions.measuredDepartures; it changes only with a new
+    /// pre-registered measurement. The test fails the day one of them matches,
+    /// so the hold cannot outlive its record.</para>
     /// </remarks>
     [Fact]
     public void EveryDescriptionIsTheContractsOwn()

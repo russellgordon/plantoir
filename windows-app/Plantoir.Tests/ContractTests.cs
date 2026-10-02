@@ -257,6 +257,9 @@ public class ContractTests
             "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
         ["DeployToMultipleDestinationsDidNotFinish"] =
             "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
+        ["PagesAChangeCouldNotFinish"] =
+            "this app's own sentence for a make-room write that did not finish (#422); proposed to the mac as " +
+            "wording.pagesAChangeCouldNotFinish in parity bundle 10's mac issue",
     };
 
     /// <summary>The public static member a wording key names, or null.</summary>

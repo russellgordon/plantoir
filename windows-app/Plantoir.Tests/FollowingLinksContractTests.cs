@@ -66,11 +66,11 @@ public class FollowingLinksContractTests : IDisposable
         string[] named = (c[hiding ? "unpublish" : "publish"]!.AsArray()).Select(n => n!.ToString()).ToArray();
 
         string plan = (hiding
-            ? tools.PlanUnpublishPages(Course, 1, includeLinked: true, pages: named)
-            : tools.PlanPublishPages(Course, 1, includeLinked: true, pages: named)).Summary();
+            ? tools.PlanUnpublishPages(Course, 1, pages: named)
+            : tools.PlanPublishPages(Course, 1, pages: named)).Summary();
         var result = hiding
-            ? await tools.UnpublishPages(Course, 1, true, progress, default, named, preview: false)
-            : await tools.PublishPages(Course, 1, true, progress, default, named, preview: false);
+            ? await tools.UnpublishPages(Course, 1, progress, default, named, preview: false)
+            : await tools.PublishPages(Course, 1, progress, default, named, preview: false);
         Assert.DoesNotContain("couldn", result.Summary());
 
         foreach (var title in Titles(c, "expectVisible")) Assert.True(Visible(title), $"{name}: “{title}” should be visible.");
@@ -105,7 +105,7 @@ public class FollowingLinksContractTests : IDisposable
             Page("Unit 2, Day 4", true, day4Visible)));
         var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
 
-        string plan = tools.PlanPublishPages(Course, 1, includeLinked: true, pages: new[] { "Unit 2, Day 3" }).Summary();
+        string plan = tools.PlanPublishPages(Course, 1, pages: new[] { "Unit 2, Day 3" }).Summary();
 
         Assert.Equal(expected, plan.Contains(AssistWording.LinkedClassWasLeftAlone(new[] { "Unit 2, Day 4" })));
     }
@@ -133,7 +133,7 @@ public class FollowingLinksContractTests : IDisposable
         var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
 
         string[] named = c["publish"]!.AsArray().Select(n => n!.ToString()).ToArray();
-        await tools.PublishPages(Course, 1, true, new Progress<ProgressNotificationValue>(_ => { }), default,
+        await tools.PublishPages(Course, 1, new Progress<ProgressNotificationValue>(_ => { }), default,
                                  named, preview: false);
 
         foreach (var title in Titles(c, "expectNoMove"))
@@ -177,7 +177,7 @@ public class FollowingLinksContractTests : IDisposable
 
         var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
         string[] named = c["publish"]!.AsArray().Select(n => n!.ToString()).ToArray();
-        await tools.PublishPages(Course, 1, true, new Progress<ProgressNotificationValue>(_ => { }), default,
+        await tools.PublishPages(Course, 1, new Progress<ProgressNotificationValue>(_ => { }), default,
                                  named, preview: false);
 
         foreach (var title in Titles(c, "expectNoMove"))

@@ -61,8 +61,9 @@ the rebuild are **one** operation, and:
 
 - **Publishing and unpublishing are separate verbs, not one tool with a
   flag.** The one dangerous failure observed was polarity inversion: asked to
-  hide a page the model published it, `includeLinked` set — then got the same
-  prompt right on a rerun, which is worse than a deterministic bug.
+  hide a page the model published it, with the (since removed) `includeLinked`
+  flag set — then got the same prompt right on a rerun, which is worse than a
+  deterministic bug.
 - **There is no delete, archive, rename or overwrite tool, and that is the
   point.** The model declined "delete the Unit 1 folder" not from judgement
   but because it had no tool for it. Absence is the strongest guardrail there
@@ -77,9 +78,18 @@ the rebuild are **one** operation, and:
   course. Hiding stops at one hop and spares any page a still-visible class
   uses: publishing records no owner, so hiding cannot be a true inverse, but
   it can refuse to break anything still in use.
-- **`includeLinked` has no default anywhere**, deliberately. It used to
-  default one way for publishing and the other for hiding — defensible, but
-  nowhere written down. A caller has to decide.
+- **There is no `includeLinked` at all, since #420 (2026-10-01)**: publishing
+  ALWAYS takes what a page links to (stopping at a class), and hiding always
+  takes a page only the hidden pages link to — `contracts/shared-rules.json` →
+  `followingLinks`, the same as the mac, which removed the flag because it
+  asked the MODEL how far a publish should reach. It had defaulted to false on
+  Windows, so a call that left it out published a page whose links led to
+  pages students could not see. (Before that it had defaulted one way for
+  publishing and the other for hiding.) A client that still sends the key is
+  harmless: the SDK's binder drops an argument a tool does not declare.
+  "Publishing follows two hops, hiding one" above is older than both and is
+  kept for its reasoning; the rule today is the contract's: transitive, with
+  one stop.
 
 ## Frontmatter: which key
 
