@@ -128,6 +128,10 @@ public sealed class PublishFollowsLinksTests : IDisposable
 
         string bare = tools.PlanPublishPages(Course, 1, pages: new[] { "index" }).Summary();
         Assert.StartsWith(AssistWording.MorePagesThanOneAreCalled(Course, "1", "index"), bare);
+        // Each named the way it can be asked for again: a landing page by its folder.
+        Assert.Contains("• " + StartOfYearWording.PageName("Concepts"), bare);
+        Assert.Contains("• " + StartOfYearWording.PageName("Labs"), bare);
+        Assert.Contains("“Labs” will become visible", tools.PlanPublishPages(Course, 1, pages: new[] { "Labs" }).Summary());
     }
 
     /// <summary>Two pages a teacher would read by the same name are named on the plan with their folder.</summary>
@@ -140,8 +144,33 @@ public sealed class PublishFollowsLinksTests : IDisposable
 
         string plan = tools.PlanPublishPages(Course, 1, pages: new[] { "courses/ICS3U/section1/Notes" }).Summary();
 
-        Assert.Contains("“Notes (in section1)” will become visible", plan);
+        // The contract's one naming rule (startOfYear.wording.pageNameInFolder), not a second shape.
+        Assert.Contains(StartOfYearWording.PageNameInFolder("Notes", "section1") + " will become visible", plan);
         Assert.DoesNotContain("in Concepts", plan);
+
+        // The bare name is asked about, each page named with its folder, and the
+        // answer in that shape names one page.
+        string asked = tools.PlanPublishPages(Course, 1, pages: new[] { "Notes" }).Summary();
+        Assert.Contains("• " + StartOfYearWording.PageNameInFolder("Notes", "section1"), asked);
+        Assert.Contains("• " + StartOfYearWording.PageNameInFolder("Notes", "Concepts"), asked);
+        string answered = tools.PlanPublishPages(Course, 1, pages: new[] { "“Notes” (in Concepts)" }).Summary();
+        Assert.Contains(StartOfYearWording.PageNameInFolder("Notes", "Concepts") + " will become visible", answered);
+        Assert.DoesNotContain("in section1", answered);
+    }
+
+    /// <summary>
+    /// S4: a page whose OWN title ends "(in …)" is not answered to by the name
+    /// without it — only the planner's own folder shape is read that way.
+    /// </summary>
+    [Fact]
+    public void ATitleThatEndsInParenthesesIsNotShortened()
+    {
+        File.WriteAllText(ConceptPath("Review (in groups)"), "---\npublishForSection1: false\n---\nTogether.\n");
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+
+        string said = tools.PlanPublishPages(Course, 1, pages: new[] { "Review" }).Summary();
+
+        Assert.Equal(AssistWording.NoPageCalled(Course, "1", "Review"), said);
     }
 
     /// <summary>The fixed phrasings the app answers in code carry no flag either.</summary>

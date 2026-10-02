@@ -887,9 +887,11 @@ public class AssistSurfaceContractTests
     /// (<c>AssistAgent.StillShortened</c>). The behaviour their contract
     /// sentences promise landed with #420 step (a); the TEXT was then measured
     /// (#420 step b, 2026-10-01) and the move failed its pre-registered
-    /// criteria, so the hold stays, recorded in toolDescriptions.measuredDepartures
-    /// against #420. The test fails the day one of them matches, so the hold
-    /// cannot outlive its record.</para>
+    /// criteria, so the hold stays — a permanent measured departure by
+    /// Russell's decision (2026-10-01, #420 closed), recorded in
+    /// toolDescriptions.measuredDepartures; it changes only with a new
+    /// pre-registered measurement. The test fails the day one of them matches,
+    /// so the hold cannot outlive its record.</para>
     /// </remarks>
     [Fact]
     public void EveryDescriptionIsTheContractsOwn()
