@@ -101,18 +101,49 @@ drew them is gone rather than merely checked. `schedule` was the one such pictur
 same day from a native capture of Notification Center's window, and
 `DRAWN_BUT_NOT_DETECTABLE` in the test is empty and must stay so.
 
-**Windows owes the same rule.** `capture_windows.py` builds
-`light-and-dark-windows` and `colour-schemes-windows` with `composite.py`,
-which now leaves Playwright's square page screenshots square, and
-`hero_windows.py` still masks screen grabs with a drawn `rounded()`. Neither
-was edited from the mac; the gate does not judge `-windows-` pictures until
-Windows has an answer that keeps a window's own shape. Meanwhile (#375, the
-stopgap row 606 used for `courses` and `new-course`) `hero`, `colour-schemes`
-and `light-and-dark` are `windows: false` in `shots.json` and their drawn
-`-windows` files are deleted, so a Windows visitor is shown the Mac picture;
-a native retake sets `windows: true` again. `build.py --deploy` runs the same
+**Windows keeps the same rule for its three figures, and still owes it for
+the rest (#380).** Since 2026-10-03 `hero_windows.py` photographs each window
+with `website/shots/windowshot/` — a small program that asks
+Windows.Graphics.Capture for ONE window by its handle and writes the frame
+whole. The frame carries the window's own alpha, so the corners Windows 11
+rounds are already transparent: `rounded()` and the 1 DIP border crop are
+gone, and nothing is drawn. `hero-windows`, `colour-schemes-windows` and
+`light-and-dark-windows` are made only of such captures
+(`capture_windows.py --figures`), and their ids are `windows: true` again.
+
+What was measured, on this project's Windows PC (Intel i5-8365U, UHD 620,
+Windows 11 build 26200, a 3840-wide remote session at 200%):
+
+- A window's corner pixels come back at alpha 7 to 40, rising to 255 along an
+  antialiased curve; the 1 DIP border Windows 11 draws round a window is in
+  the frame at about alpha 113 and is kept, being part of the window.
+- A window that is not repainting sends ONE frame and then nothing, so
+  `windowshot` keeps the newest frame that arrives within 0.7 s of the first
+  rather than waiting for a third (the first version did, and timed out).
+- The corner radius is 8 DIPs whatever the window's size, so as a fraction of
+  the window's height it runs from 0.0142 (640 DIPs tall) down to 0.0091 in
+  the assembled figures — below the mac's floor of 0.0155. `corners.py`
+  therefore judges a `-windows` picture against `SMALLEST_REAL_WINDOWS_RADIUS`
+  (0.004), and for those pictures the gate catches a SQUARE corner and little
+  else: the masks this replaced measured 0.0099 to 0.0128, inside the real
+  range. The rule is kept by the code that no longer draws.
+- The page windows of the two colour figures are Edge `--app=<address>`
+  windows — a title bar and the page — the counterpart of the mac's
+  `webwindow.swift`. Playwright's page screenshots, which those figures used
+  before, have no window at all.
+
+Rejected: `PrintWindow` and a screen-region grab (both hand back a rectangle
+with the desktop in the corners, which is why the mask existed); a Python
+binding for Windows.Graphics.Capture (none installs on the Python 3.14 this
+PC runs, and the mac's helpers are small native programs too).
+
+Still owed: the single-window Windows shots (`assistant`, `coverage`,
+`progress`, `preview`, `search`, `site-*`, `site-phone`) are rendered content
+or page screenshots and are square. The gate judges only
+`corners.WINDOWS_FIGURES_RETAKEN` until they are retaken; then that list goes
+and `include_windows=True` takes over. `build.py --deploy` runs the same
 corner check as the test and refuses on any failing picture a Mac visitor is
-shown.
+shown, and on any failing retaken Windows figure.
 
 ---
 
@@ -161,8 +192,14 @@ The Windows capture harness is driven by Python and a built-in CLI mode in
 `Plantoir.exe`:
 
 ```powershell
-python website/shots/capture_windows.py
+python website/shots/capture_windows.py            # every Windows picture
+python website/shots/capture_windows.py --figures  # only the hero and the two colour figures
 ```
+
+`--figures` takes the desktop for about four minutes: it switches Windows
+between light and dark, opens Plantoir, Obsidian and Edge in turn, and puts
+the colour mode and Obsidian's list of vaults back. It builds `windowshot`
+the first time (.NET 9 SDK).
 
 Under the hood:
 1. **Autonomous Invocation**: Executes `Plantoir.exe --capture-marketing-shots <output-dir>`.
@@ -275,8 +312,8 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 | `site-phone` | Rendered class website on Mobile Viewport | `site-phone-light.png/.webp`<br>`site-phone-dark.png/.webp` | `site-phone-windows-light.png/.webp`<br>`site-phone-windows-dark.png/.webp` |
 | `coverage` | Curriculum expectation tag browser | `coverage-light.png/.webp`<br>`coverage-dark.png/.webp` | `coverage-windows-light.png/.webp`<br>`coverage-windows-dark.png/.webp` |
 | `search` | Quartz live search popover | `search-light.png/.webp`<br>`search-dark.png/.webp` | `search-windows-light.png/.webp`<br>`search-windows-dark.png/.webp` |
-| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | none (`windows: false` until retaken with native corners, #375) |
-| `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | none (`windows: false` until retaken with native corners, #375) |
+| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` (native captures since 2026-10-03, #380) |
+| `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` (native captures since 2026-10-03, #380) |
 
 Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
 `capture_windows.py` takes an id marked `windows: true`, and the section says

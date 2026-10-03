@@ -14,8 +14,11 @@ picture still on the site, and the rule itself lives in the code that no
 longer draws. How a corner is read, and the
 measurements behind the thresholds: `corners.py`.
 
-The Windows pictures (`-windows-`) are not judged here: they are taken on
-Windows, whose own harness owes the same rule (see website/SCREENSHOTS.md).
+Of the Windows pictures (`-windows-`), the three figures retaken as whole
+Windows.Graphics.Capture pictures are judged (#380: hero, colour-schemes,
+light-and-dark — `corners.WINDOWS_FIGURES_RETAKEN`), against Windows' own
+measurements. The single-window Windows shots are still owed the same retake
+and are not judged until they have it (see website/SCREENSHOTS.md).
 
 Stdlib and Pillow only; no app, no network.
 
@@ -51,6 +54,22 @@ class CommittedPictures(unittest.TestCase):
                 continue
             found.extend(corners.corner_problems(picture))
         self.assertEqual(found, [], "\n" + "\n".join(found))
+
+    def test_the_windows_figures_retaken_natively_keep_their_corners(self):
+        pictures = corners.windows_figures_retaken(REPO / "site" / "img")
+        # Two static figures and the hero in light and dark, each PNG and WebP.
+        self.assertEqual(len(pictures), 8, [picture.name for picture in pictures])
+        found: list[str] = []
+        for picture in pictures:
+            found.extend(corners.corner_problems(picture))
+        self.assertEqual(found, [], "\n" + "\n".join(found))
+
+    def test_a_square_windows_picture_fails_whatever_its_ratio(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as scratch:
+            square = Path(scratch) / "hero-windows-light.png"
+            Image.new("RGBA", (400, 300), (240, 240, 240, 255)).save(square)
+            self.assertTrue(corners.corner_problems(square))
 
     def test_every_named_gap_is_still_a_gap(self):
         for name, owner in NAMED_GAPS.items():

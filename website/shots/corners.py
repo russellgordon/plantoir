@@ -46,6 +46,30 @@ OPAQUE = 128
 # replaced measured 0.0099 to 0.0128. Half-way between the two groups.
 SMALLEST_REAL_RADIUS = 0.0155
 
+# Windows 11 rounds every window by the same 8 DIPs whatever its size, so the
+# ratio falls as the window grows and cannot be held to the mac's number.
+# Measured 2026-10-03 on Windows.Graphics.Capture pictures at 2x (#380):
+# 0.0142 Plantoir and Edge at 640 DIPs tall, 0.0130 Obsidian, 0.0105 a page
+# window 860 DIPs tall, and 0.0091 to 0.0136 once assembled into the figures.
+# This floor is 8 DIPs on a window 2,000 DIPs tall: below it a corner was
+# drawn, and a square one fails before the ratio is asked for. The masks
+# hero_windows.py used to draw measured 0.0099 to 0.0128 -- INSIDE the real
+# range -- so for a Windows picture this gate catches a square corner and
+# little else; the rule is kept by the code that no longer draws.
+SMALLEST_REAL_WINDOWS_RADIUS = 0.004
+
+# The Windows figures retaken as whole native captures so far (#380). The
+# single-window Windows shots are still square page and content pictures;
+# when they are retaken this list goes and `include_windows=True` takes over.
+WINDOWS_FIGURES_RETAKEN = ("hero", "colour-schemes", "light-and-dark")
+
+
+def is_windows_picture(name: str) -> bool:
+    """A picture taken on Windows: `<id>-windows.png`, `<id>-windows-dark.webp`."""
+    stem = name.rsplit(".", 1)[0]
+    return stem.endswith("-windows") or "-windows-" in stem
+
+
 # A diagonal run longer than this fraction of the shape's shorter side is not
 # a corner at all but empty canvas (the outside corner of a cascade, say), and
 # is not judged.
@@ -139,6 +163,11 @@ def problems_in_shape(name: str, alpha: Image.Image, box: tuple[int, int, int, i
     ]
     problems: list[str] = []
     judged = 0
+    system = "macOS"
+    smallest = SMALLEST_REAL_RADIUS
+    if is_windows_picture(name):
+        system = "Windows"
+        smallest = SMALLEST_REAL_WINDOWS_RADIUS
     for label, corner_x, corner_y, step_x, step_y in corners:
         diagonal = 0
         while diagonal <= corner_box and pixels[corner_x + step_x * diagonal,
@@ -150,16 +179,16 @@ def problems_in_shape(name: str, alpha: Image.Image, box: tuple[int, int, int, i
         judged += 1
         where = f"{name}: the window at {left},{top} ({right - left + 1}x{bottom - top + 1}) has a {label} corner"
         if diagonal == 0:
-            problems.append(f"{where} that is square and opaque — not a macOS window capture")
+            problems.append(f"{where} that is square and opaque — not a {system} window capture")
             continue
         radius = corner_radius(pixels, corner_x, corner_y, step_x, step_y, corner_box)
         height = window_height(pixels, alpha.size[1], corner_x + step_x * corner_box, corner_y, step_y)
         if height == 0:
             continue
         ratio = radius / height
-        if ratio < SMALLEST_REAL_RADIUS:
+        if ratio < smallest:
             problems.append(f"{where} whose curve is {ratio:.4f} of the window's height — tighter than any "
-                            f"real macOS window (at least {SMALLEST_REAL_RADIUS}); a drawn corner")
+                            f"real {system} window (at least {smallest}); a drawn corner")
     if judged == 0:
         problems.append(f"{name}: the window at {left},{top} has no corner that could be read")
     return problems
@@ -232,6 +261,18 @@ def images_the_pages_show(website: Path, image_dir: Path, include_windows: bool 
                 stems.append(f"{identifier}-windows-light")
                 stems.append(f"{identifier}-windows-dark")
         for stem in stems:
+            for suffix in (".png", ".webp"):
+                candidate = image_dir / f"{stem}{suffix}"
+                if candidate.exists():
+                    paths.append(candidate)
+    return paths
+
+
+def windows_figures_retaken(image_dir: Path) -> list[Path]:
+    """The Windows figures already retaken natively, PNG and WebP (#380)."""
+    paths: list[Path] = []
+    for identifier in WINDOWS_FIGURES_RETAKEN:
+        for stem in (f"{identifier}-windows", f"{identifier}-windows-light", f"{identifier}-windows-dark"):
             for suffix in (".png", ".webp"):
                 candidate = image_dir / f"{stem}{suffix}"
                 if candidate.exists():
