@@ -63,3 +63,12 @@
 # would have committed the exact damage this file exists to prevent.
 support/obsidian_defaults/.obsidian/themes/Minimal/manifest.json -text
 support/obsidian_defaults/.obsidian/themes/Minimal/theme.css     -text
+
+# The update feeds are SIGNED byte for byte (RELEASING.md): never convert their
+# line endings. Under `* text=auto` a Windows checkout held macos.xml with CR LF
+# (measured 2026-10-03: its SHA-256 no longer matched the live feed), so a site
+# deployed from Windows would have published a mac feed no Mac accepts; and
+# NetSparkle writes windows.xml with CR LF, which a commit would have turned
+# into LF under its signature.
+website/updates/*.xml            -text
+website/updates/*.xml.signature  -text
