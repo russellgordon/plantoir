@@ -833,6 +833,38 @@ caught by the same match because `setup.ps1` runs it as `python.exe -u
 the temporary folder, so it is on the command line even though the folder is
 otherwise only python's working directory.
 
+### Real input goes where the pointer is: click the rectangle, with the window in front (2026-10-03)
+
+Most of the suite acts through UI Automation patterns (Invoke, Toggle,
+Select), which reach the app whatever is in front of it. A few tests send
+REAL input — a mouse click and typed keys in the Copy a Page picker — and
+real input goes to whatever window is under the pointer and in front.
+
+On 2026-10-03 the suite ran 41 of 44 on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), reached over a
+3840-pixel-wide remote session at 200% scale. All three failures were Copy a
+Page tests saying Copy was never offered. What happened, measured by logging
+the front window, the pointer and Plantoir's rectangle every 150 ms:
+`picker.Click()` moved the pointer to x=3839 (the screen's edge), y=1168, for
+a search box whose middle was at y=584 — the element's "clickable point" came
+back at TWICE its real coordinates. The click landed on the terminal behind
+Plantoir, which took the focus, and "Big", "Ohms" and "Watt" were typed into
+it (and, with the terminal minimised, into Windows Search, which opened Edge).
+The dialog itself was drawn correctly; the product was not at fault. The same
+tests had passed 13 of 13 two days earlier on a smaller desktop.
+
+So: **a test that sends real input calls `DrivenApp.ClickMiddleOf(element)`,
+never `element.Click()`.** It brings the window to the front first
+(`BringToFront`, which joins the input queue of the window that is in front —
+Windows refuses a plain `SetForegroundWindow` from a process that is not —
+and throws, naming the window in the way, rather than typing into it), then
+clicks the middle of the element's bounding rectangle, which is in real
+pixels at every scale. Rejected: FlaUI's `Window.SetForeground()` and
+`Focus()` (measured: the terminal stayed in front); minimising the terminal
+from the runner (the click still went to the doubled point).
+
+Not checked: whether `RightClick()` on a sidebar row can be doubled the same
+way. It was not in these runs (the menu it opens was found each time).
+
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
 Until bundle 11 the suite drove no Preview and no Deploy, so course import,
