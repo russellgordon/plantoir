@@ -423,6 +423,9 @@ because the lessons in it are real, not because the task is still open.
 rule, and `hero`, `colour-schemes` and `light-and-dark` show Windows visitors
 the Mac picture until they are retaken — `SCREENSHOTS.md` → "The one rule",
 #375.)
+(Those three were retaken as whole native captures on 2026-10-03, #380, and
+Windows visitors see them again; the single-window Windows shots still owe
+the rule.)
 
 ### What Windows built
 

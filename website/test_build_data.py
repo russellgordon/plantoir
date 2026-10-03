@@ -265,16 +265,6 @@ class WindowsSwapTests(unittest.TestCase):
             finally:
                 build.IMAGE_DIR = saved
 
-    def test_the_three_drawn_windows_figures_are_not_offered(self):
-        # #375 stopgap (the row-606 mechanism): hero-windows, colour-schemes-
-        # windows and light-and-dark-windows had drawn corners. Until Windows
-        # retakes them natively, these ids stay `windows: false`; the retake
-        # sets `windows: true` and deletes this test.
-        shots = json.loads((Path(build.WEBSITE) / "shots.json").read_text(encoding="utf-8"))
-        for shot in shots["shots"]:
-            if shot["id"] in ("hero", "colour-schemes", "light-and-dark"):
-                self.assertIs(shot.get("windows"), False, shot["id"])
-
 
 class AwaitingCaptureTests(unittest.TestCase):
 

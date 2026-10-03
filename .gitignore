@@ -9,6 +9,8 @@ __pycache__/
 # Windows app build output
 windows-app/**/bin/
 windows-app/**/obj/
+website/shots/windowshot/bin/
+website/shots/windowshot/obj/
 
 # Repo-local Claude skills are shared content the whole team (and the
 # Windows machine) needs — un-ignore them past the global rule that
