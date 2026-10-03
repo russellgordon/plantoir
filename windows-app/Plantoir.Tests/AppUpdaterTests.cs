@@ -46,12 +46,18 @@ public class AppUpdaterTests
             feedReaderForTests: () => reader);
 
     [Fact]
+    public void TheReleasedAppReadsTheContractsFeedWithAKey()
+    {
+        Assert.Equal(AppUpdates.Feed, AppUpdates.ConfiguredFeed);
+        Assert.Equal(32, Convert.FromBase64String(AppUpdates.PublicKey).Length);   // an Ed25519 public key
+    }
+
+    [Fact]
     public async Task AnEmptyFeedNeverReachesTheNetwork()
     {
-        Assert.Equal("", AppUpdates.ConfiguredFeed);   // no release has set it yet
         var prompts = new FakePrompts();
         var reader = new FakeReader();
-        using var updater = Make(AppUpdates.ConfiguredFeed, prompts, reader);
+        using var updater = Make("", prompts, reader);
         updater.Start();
         await updater.CheckAsync(teacherAsked: true);
         await updater.CheckAsync(teacherAsked: false);

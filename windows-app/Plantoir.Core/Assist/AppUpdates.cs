@@ -10,10 +10,9 @@ namespace Plantoir.Core.Assist;
 /// Plantoir on Windows finding and installing its own updates (#337, the
 /// mac's #204) — the parts that are RULES, so they are played from
 /// <c>shared-rules.json → appUpdates</c> rather than eyeballed. The engine
-/// that fetches the feed and downloads the installer (NetSparkleUpdater, per
-/// design A in documentation/11) is NOT wired yet: no release and no feed
-/// exist, and its API was not verified against a restored package. What is
-/// here is everything that decides WHETHER an install may happen and what the
+/// that fetches the feed and downloads the installer is NetSparkleUpdater
+/// (design A in documentation/11), in <see cref="AppUpdater"/>. What is here is
+/// everything that decides WHETHER an install may happen and what the
 /// teacher is told.
 /// </summary>
 public static class AppUpdates
@@ -22,16 +21,19 @@ public static class AppUpdates
     public const string Feed = "https://plantoir.app/updates/windows.xml";
 
     /// <summary>
-    /// THE one place the engine reads its feed from, and EMPTY until a release
-    /// sets it to <see cref="Feed"/> (with <see cref="PublicKey"/>): no feed,
-    /// no key and no release exist yet, so nothing is checked. Set by the
-    /// release flow, never by a setting a teacher can reach (the contract
+    /// THE one place the engine reads its feed from. Set to <see cref="Feed"/>
+    /// (with <see cref="PublicKey"/>) by the v1.4.2 release, the first with a
+    /// feed, a key and a release; while it was empty nothing was checked. Set by
+    /// the release flow, never by a setting a teacher can reach (the contract
     /// rejects a user-settable feed).
     /// </summary>
-    public const string ConfiguredFeed = "";
+    public const string ConfiguredFeed = Feed;
 
-    /// <summary>The Ed25519 public key (base64) the feed and download must be signed with. Empty until the key exists.</summary>
-    public const string PublicKey = "";
+    /// <summary>
+    /// The Ed25519 public key (base64) the feed and download must be signed with.
+    /// Its private half lives outside the repository (documentation/11).
+    /// </summary>
+    public const string PublicKey = "qVvFX3gKFqjM//T8rpyDLOeUtU5Df4eUitT4hCrm53E=";
 
     /// <summary>A development build has no feed at all (decision 5): nothing is constructed, no menu item shows.</summary>
     public static string? FeedFor(bool developmentBuild) => developmentBuild ? null : Feed;
