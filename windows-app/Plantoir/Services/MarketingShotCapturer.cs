@@ -76,9 +76,9 @@ public static class MarketingShotCapturer
                 "start-of-year" => await StartOfYear(request),
                 "schedule-sheet" => await ScheduleSheet(request),
                 "curriculum-settings" => await CurriculumSettings(request),
-                "map-ontario" => await PreviewPage(request, "ICS3U", 1, "/curriculum-coverage", null),
-                "map-college-board" => await PreviewPage(request, "ICS3U", 1, "/college-board-curriculum-coverage", null),
-                "both-curricula" => await PreviewPage(request, "ICS3U", 1, "/explorations/the-unplugged-algorithm", "curriculum-connection"),
+                "map-ontario" => await PreviewPage(request, "ICS3U", 1, "/Curriculum-Coverage", null),
+                "map-college-board" => await PreviewPage(request, "ICS3U", 1, "/College-Board-Curriculum-Coverage", null),
+                "both-curricula" => await PreviewPage(request, "ICS3U", 1, "/Explorations/The-Unplugged-Algorithm", "curriculum-connection"),
                 "hero" => await Hero(request),
                 _ => $"refused: no scene {request.Scene}",
             };
@@ -362,8 +362,8 @@ public static class MarketingShotCapturer
         detail.StartPreviewForAutomation();
         if (!await Until(() => detail.HasPreview, TimeSpan.FromMinutes(15))) return "refused: the preview never appeared";
         await Task.Delay(TimeSpan.FromSeconds(4));
-        if (!await detail.ShowPreviewPageForCaptureAsync(path, anchor))
-            return $"refused: {path}{(anchor is null ? "" : "#" + anchor)} did not load where the caption says";
+        if (await detail.ShowPreviewPageForCaptureAsync(path, anchor) is { } problem)
+            return $"refused: {problem}";
         return Staged;
     }
 

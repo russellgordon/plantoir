@@ -1,5 +1,5 @@
 {
-  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored.",
+  "note": "One entry per screenshot on plantoir.app. `build.py` reads alt and caption to write the <picture> element; `website/shots/capture.py` reads `capture` to know how each is produced. Every shot is taken twice, once with the Mac in light appearance and once in dark, and saved as site/img/<id>-light.png and -dark.png. Paths are lowercase because Quartz serves lowercase URLs and 301s anything else — a capitalised address would be photographed mid-redirect. Since v1.4.0: `capture.scene` names the scene in capture.py that makes the shot (`capture.py --only <scene>`); `capture.workspace` says which working folder it is taken in ('marketing' = ~/Plantoir Marketing, ICS3U; 'demo' = ~/Desktop/Teaching, the three published demo courses); `expectText` lists words the finished picture must show, read back with Vision text recognition, so a picture of the wrong state fails its scene; `awaiting_capture` marks a shot the pages already name whose capture waits for the release it photographs (build.py renders nothing for it meanwhile); `waiting_on: \"#<issue>\"` beside it names the GitHub issue a capture waits on for a reason that is not the release — `--deploy` lets such a shot through, and the capture removes both flags; `windows: true` marks the ids capture_windows.py also takes; `windows: false` marks a scene Windows does not have yet, so its visitors are shown the Mac picture and any older `-windows` file is ignored (since 2026-10-04 no id is false: every picture has its Windows twin, #380). `windowsAlt` is the alt text for the Windows picture where the shared one names something only the Mac picture shows; base.html swaps it in as it swaps the image, and a Mac visitor's words never change.",
   "shots": [
     {
       "id": "hero",
@@ -25,7 +25,7 @@
       },
       "alt": "The Plantoir window: ICS3U and ICS4U in the sidebar, last year's ICS3U filed under Reference Courses, and ICS3U's settings open beside them.",
       "caption": "Every course you teach, and last year's beside them.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "ICS3U",
         "ICS4U",
@@ -44,7 +44,7 @@
       },
       "alt": "The New Course panel with TEJ3M entered and its suggested course names offered beneath.",
       "caption": "A course code is enough to start.",
-      "windows": false,
+      "windows": true,
       "expectText": [
         "TEJ3M"
       ]
@@ -216,7 +216,9 @@
             "published on its own"
           ]
         }
-      }
+      },
+      "windows": false,
+      "windowsAlt": "The Schedule a deploy sheet for ICS3U Section 1 set for a morning time, with a Windows notification above it saying the section published on its own."
     },
     {
       "id": "reference",
@@ -233,7 +235,8 @@
         "2025",
         "The Unplugged Algorithm",
         "ICS4U"
-      ]
+      ],
+      "windows": true
     },
     {
       "id": "start-of-year",
@@ -248,7 +251,8 @@
       "expectText": [
         "ICS3U",
         "Draft"
-      ]
+      ],
+      "windows": true
     },
     {
       "id": "two-maps",
@@ -280,7 +284,8 @@
             "CRD-2"
           ]
         }
-      }
+      },
+      "windows": true
     },
     {
       "id": "curriculum-settings",
@@ -295,7 +300,8 @@
       "expectText": [
         "Curriculum",
         "College Board Curriculum"
-      ]
+      ],
+      "windows": true
     },
     {
       "id": "both-curricula",
@@ -311,7 +317,8 @@
         "Curriculum connection",
         "B3.1",
         "AAP-2.A"
-      ]
+      ],
+      "windows": true
     },
     {
       "id": "how-i-teach",
@@ -325,7 +332,8 @@
       "caption": "Tell Claude or Codex how you teach, once. It is never published.",
       "expectText": [
         "How I Teach"
-      ]
+      ],
+      "windows": true
     },
     {
       "id": "club",
@@ -342,7 +350,8 @@
         "This is a club",
         "Club name",
         "Create Club"
-      ]
+      ],
+      "windows": true
     }
   ]
 }
