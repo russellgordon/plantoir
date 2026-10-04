@@ -105,6 +105,38 @@ public class ScheduleAndCancelFramesTests : IDisposable
         }
     }
 
+    /// <summary>Fix round 2, settler S1: a sentence with no later-time word behaves as before.</summary>
+    [Theory]
+    [InlineData("Deploy EXC2O section 1 at 6:30 tomorrow morning, before school starts.", true)]
+    [InlineData("Put it online tomorrow", true)]
+    [InlineData("deploy it on Friday", true)]
+    [InlineData("send it out later", true)]
+    [InlineData("deploy at 7 pm", true)]
+    [InlineData("Push EXC2O section 1 live now - the site, not just the preview.", false)]
+    [InlineData("Put it online", false)]
+    [InlineData("Deploy this section now", false)]
+    [InlineData("deploy the next section", false)]
+    public void TheLaterTimeWordsAreShortAndExact(string typed, bool later) =>
+        Assert.Equal(later, AssistAgent.SaysALaterTime(typed));
+
+    /// <summary>Fix round 2, settler S2: a teacher who SAID "unit" keeps the model's unit "next".</summary>
+    [Fact]
+    public void ANewUnitTheTeacherAskedForIsKept()
+    {
+        var call = new JsonObject
+        {
+            ["function"] = new JsonObject
+            {
+                ["name"] = "add_next_class",
+                ["arguments"] = """{"course":"ICS3U","section":1,"unit":"next","days":0}""",
+            },
+        };
+        string Kept(string typed) => AssistAgent.WithoutAnUnaskedNewUnit(call, typed)["function"]!["arguments"]!.ToString();
+        Assert.Contains("\"unit\":\"next\"", Kept("start the next unit please"));
+        Assert.DoesNotContain("unit", Kept("Add the next class"));
+        Assert.Contains("\"days\":0", Kept("Add the next class"));
+    }
+
     /// <summary>
     /// #424 item 2: every request lets the engine write for 30 seconds at most,
     /// read by llama-server as t_max_predict_ms; the cap of 512 is unchanged.
