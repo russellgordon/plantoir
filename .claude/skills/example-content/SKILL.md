@@ -1072,7 +1072,11 @@ than hand-written:
   article ("an English course", "this course" — never "a this course
   course"), and the linter refuses the misfit. "a"/"an" follows the
   first SOUND (`article_for`: "a unit", "a European", "an hour"), and the
-  linter checks every article by that rule. It tests its own rules against
+  linter checks every article by that rule. The class website is "your
+  class website", never "the published page / website / site": DEPLOY
+  puts a site online and PUBLISH only marks a page (#443), and the linter
+  refuses the phrase — a sentence about MARKING a page ("publish: true",
+  "the newest published page") is right and passes. It tests its own rules against
   `MUST_BE_ACCEPTED` / `MUST_BE_REFUSED` before every run and exits 2 if
   one misbehaves — add a shape there when widening a check.
 - The sidebar is a RULE, not a list: the `Curriculum` folder is never
