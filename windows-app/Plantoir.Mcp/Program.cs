@@ -104,6 +104,10 @@ builder.Services.AddMcpServer(options =>
             ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
         if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
             return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
+        // An outside assistant's change while the course is being BUILT is held
+        // back here, before any backup (#436): OutsideChangeGate.
+        if (context.Params?.Name is { } asked && OutsideChangeGate.Refusal(asked, arguments, workspace) is { } heldBack)
+            return new CallToolResult { Content = [new TextContentBlock { Text = heldBack }] };
         return await next(context, cancellation);
     }));
 
