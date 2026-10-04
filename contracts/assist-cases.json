@@ -3534,6 +3534,27 @@
         "name" : "getting a section ready with a code that no longer fits writes nothing",
         "when" : "prepare_for_start_of_year",
         "why" : "A code is a promise that the section is still the one the teacher was shown. A page changed between plan and write, or a code from another plan, gets the plan as it stands now and nothing written (#96). '00000000' stands for any code this platform's plan did not issue."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "assistant: wording.answerWasCutOff"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "length",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "deploy_section"
+            }
+          },
+          "saying" : [
+            "put up the class I mentioned for the day after"
+          ]
+        },
+        "name" : "an answer the engine stopped part way runs nothing",
+        "when" : "say",
+        "why" : "Proposed by Windows on #411, accepted by Russell 2026-10-03 (#196's shape in the current grammar, with one new given key, modelReply). deploy_section rather than publish_pages: it is the measured 28-token case - arguments complete and PARSING - and a deploy that ran would be visible to the runner as a launcher run, so the case cannot pass vacuously. finishReason 'length' is the engine saying it stopped; a runner scripts the whole reply, toolCall.arguments being the model's own TEXT and {course} the fixture's course."
       }
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96)."
