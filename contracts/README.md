@@ -1466,8 +1466,8 @@ with `appliesOn: ["windows"]` and `onTheMac`, one for both);
 `referenceCourses.frozen.neverLocked` 6 → **8** (D, #415). Objects, not lists:
 `specialNames.platformWording.machine`, `frozen.windowsMechanism`,
 `importing.leftBehind.linksOnTheMac` / `linksOnWindows` (D).
-`activityTrail.mustRecord` 121 → **122**: A adds "outside assistant worked
-while a preview was open"; C's "remembered timetable set aside" and A's
+`activityTrail.mustRecord` 121 → **123**: A adds "outside assistant worked
+while a preview was open" and "preview closed for a deploy"; C's "remembered timetable set aside" and A's
 "making room did not finish every page" each lost `appliesOn: ["windows"]`
 (the mac records them now) without changing the count. Rule sets 47 → **48**
 (A's `publishPlanNaming`).

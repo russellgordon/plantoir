@@ -181,6 +181,17 @@ enum WorkLeaseRegistry {
         return WorkLeaseFiles.whatAnOutsideChangeMeets(among: holdings)
     }
 
+    /// Whether ANOTHER live program holds a `build` or `publish` lease on the
+    /// course — a deploy or a preview build elsewhere; never this process's
+    /// own leases, and never a preview that is only being served. What the
+    /// section window asks when its serving preview ends (#433's stack review).
+    static func anotherProgramIsBuilding(folderPath: String, courseCode: String) -> Bool {
+        if case .building = whatAnOutsideChangeMeets(folderPath: folderPath, courseCode: courseCode) {
+            return true
+        }
+        return false
+    }
+
     /// Records a publish of one section and, with nothing awaited in
     /// between, looks at the other programs' leases — take, then check.
     ///
