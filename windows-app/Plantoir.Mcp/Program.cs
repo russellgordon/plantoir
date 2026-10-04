@@ -46,8 +46,9 @@ try
     // v1.4.3 (#430) both outside doors pass `--mcp-stdio <folder>` and name
     // the course in their greeting only (app-rules.json → outsideAgents.
     // courseIsNamedInTheGreetingOnly), so an outside session can reach every
-    // course in the folder and takes no `assist` lease below — as the Codex
-    // door never did.
+    // course in the folder. The Claude door still names its course in
+    // DoorCourseVariable, and the `assist` lease below is taken on that course
+    // without locking to it; the Codex door names none and takes none.
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
@@ -67,8 +68,12 @@ catch (Exception error)
 // Section decline while the session is open — otherwise both would build into
 // the same output folder. Only when locked to a course: an unrestricted
 // session has no single course to claim.
-IDisposable? lease = workspace.LockedCourse is { } locked
-    ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, locked,
+// The Claude door names the course it was opened from in DoorCourseVariable
+// (fix round ruling 3): held, never locked, so #283's backup protection, the
+// second-session guard and the hold on structural work survive #430.
+IDisposable? lease = workspace.CourseToHoldForTheConversation(
+        Environment.GetEnvironmentVariable(AssistWorkspace.DoorCourseVariable)) is { } held
+    ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, held,
         Plantoir.Core.Assist.WorkLease.Assisting)
     : null;
 // Its own work stops BEFORE any lease goes (#289): a build this server started

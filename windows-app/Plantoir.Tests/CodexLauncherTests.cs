@@ -81,7 +81,7 @@ public class CodexLauncherTests : IDisposable
         // Codex door's -c override. Only the greeting names the course.
         var serverArguments = section["serverArguments"]!.AsArray()
             .Select(a => a!.ToString().Replace("{folder}", folder)).ToList();
-        var written = JsonNode.Parse(ClaudeCodeLauncher.ConfigText(folder, server))!["mcpServers"]!["plantoir"]!;
+        var written = JsonNode.Parse(ClaudeCodeLauncher.ConfigText(folder, server, "ICS3U"))!["mcpServers"]!["plantoir"]!;
         Assert.Equal(server, written["command"]!.ToString());
         Assert.Equal(serverArguments, written["args"]!.AsArray().Select(a => a!.ToString()));
         string codexArgs = CodexLauncher.Arguments(server, folder, greeting)[3]["mcp_servers.plantoir.args=".Length..];

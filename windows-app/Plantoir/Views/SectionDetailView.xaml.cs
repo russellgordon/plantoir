@@ -233,7 +233,13 @@ public sealed partial class SectionDetailView : UserControl
         {
             RefreshChrome();
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
+            {
                 _ = RefreshPublishedMarker();
+                // A preview that had been serving and has ended holds the
+                // course no longer (fix round ruling 2): WorkLease.LetGoWhenAServingPreviewEnds.
+                _previewWork = WorkLease.LetGoWhenAServingPreviewEnds(_previewWork, _previewRunner.IsRunning,
+                    _previewRunner.HasBeenServing, _previewRunner.WasClosedForADeploy, _course.Code, _sectionNumber);
+            }
             // A new build asks the question again, so a problem it still finds
             // is told again — "show it once" means once per BUILD, not once
             // for the life of this view.
@@ -750,7 +756,8 @@ public sealed partial class SectionDetailView : UserControl
     private async Task OfferTodaysClassAsync(string folder)
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
-        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
+        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
+            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         TodaysClassOnTheFrontPage.Offering? offer;
         try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }

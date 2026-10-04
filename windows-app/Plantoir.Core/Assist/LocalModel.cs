@@ -501,15 +501,22 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// → "Every request caps how much the model may write", whose <c>cap</c>
     /// a test reads.
     /// </summary>
-    internal static JsonObject Request(JsonArray messages, JsonArray tools) => new()
+    internal static JsonObject Request(JsonArray messages, JsonArray tools,
+                                       AssistModelTier tier = AssistModelTier.Small)
     {
-        ["model"] = "local",
-        ["temperature"] = 0,
-        ["max_tokens"] = 512,
-        ["t_max_predict_ms"] = WritingTimeLimitMs,
-        ["messages"] = messages.DeepClone(),
-        ["tools"] = tools.DeepClone(),
-    };
+        var body = new JsonObject
+        {
+            ["model"] = "local",
+            ["temperature"] = 0,
+            ["max_tokens"] = 512,
+        };
+        // The writing limit on the SMALLER tier only, where it was measured
+        // (#424 fix round, ruling 4): see WritingTimeLimitMs.
+        if (tier == AssistModelTier.Small) body["t_max_predict_ms"] = WritingTimeLimitMs;
+        body["messages"] = messages.DeepClone();
+        body["tools"] = tools.DeepClone();
+        return body;
+    }
 
     /// <summary>
     /// How long the engine may go on WRITING one reply, in milliseconds — the
@@ -537,6 +544,12 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// The cost, said plainly: on hardware this slow a genuinely long second
     /// answer (over ~230 tokens) is now ended as cut off rather than waited
     /// for — the safe direction, since nothing runs from a cut-off reply.</para>
+    /// <para><b>The smaller assistant only</b> (bundle A fix round, ruling 4).
+    /// The limit is in milliseconds, not tokens, and the larger assistant
+    /// writes several times slower per token on this CPU, so the same 30 s
+    /// would be perhaps 70–100 tokens there — close to an ordinary prose
+    /// answer after a read. It was measured on the smaller tier only, so the
+    /// larger tier keeps the 512-token cap alone until it is measured.</para>
     /// </remarks>
     internal const int WritingTimeLimitMs = 30_000;
 
@@ -565,7 +578,7 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// </summary>
     public async Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
     {
-        var request = Request(messages, tools);
+        var request = Request(messages, tools, Tier);
 
         using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
         try
