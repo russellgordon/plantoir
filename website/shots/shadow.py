@@ -172,7 +172,13 @@ def _opened(picture: Image.Image | Path) -> Image.Image:
 # held to the edge check: nothing may be cut off.
 #   hero      — three windows cascaded on a canvas with padding round them.
 #   schedule  — the notification banner sits above the window's top edge.
-FIGURES_WITH_THEIR_OWN_MARGIN = ("hero", "schedule")
+#   colour-schemes — three windows OVERLAP: where a window's antialiased top
+#             edge (alpha just under the opaque threshold, darker in Dark
+#             Mode) lies under the next window's shadow, the two blend past
+#             it, so the dark fan read (112, 75, 112, 147) on 2026-10-04 from
+#             parts that were each exactly NATIVE_MARGINS. Nothing is cut;
+#             its parts are checked when it is built.
+FIGURES_WITH_THEIR_OWN_MARGIN = ("hero", "schedule", "colour-schemes")
 
 # Not a macOS window at all: the phone is the iOS Simulator's screen in a
 # device frame drawn by RocketSim, so it has no window shadow to keep.

@@ -298,7 +298,12 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
 
 
 def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> str:
-    """One image, served to everybody, whatever their colour scheme."""
+    """One image, served to everybody, whatever their colour scheme — or,
+    for a static shot marked `"dark": true` in shots.json, the same figure
+    taken in Dark Mode (`<id>-dark.png`/`.webp`) for a page in dark mode,
+    with `<id>.png` kept as the light one so its name never changes
+    (`colour-schemes`, Russell 2026-10-04: "It needs a dark mode version").
+    A Windows visitor still gets `<id>-windows.png` in either scheme."""
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
@@ -325,9 +330,21 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     win_webp = IMAGE_DIR / f"{identifier}-windows.webp"
 
     webp_source = ""
+    win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
+    if shot.get("dark"):
+        dark_png = IMAGE_DIR / f"{identifier}-dark.png"
+        dark_webp = IMAGE_DIR / f"{identifier}-dark.webp"
+        if not dark_png.exists() or not dark_webp.exists():
+            problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
+                            f"or .webp is missing (capture.py --colour-figures)")
+        else:
+            win_png_attr = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
+            dark_query = ' media="(prefers-color-scheme: dark)"'
+            webp_source += (f'      <source srcset="{up}img/{identifier}-dark.webp"{win_webp_attr} '
+                            f'type="image/webp"{dark_query}>\n')
+            webp_source += f'      <source srcset="{up}img/{identifier}-dark.png"{win_png_attr}{dark_query}>\n'
     if webp.exists():
-        win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
-        webp_source = f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
+        webp_source += f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
 
     win_src_attr = f' data-win-src="{up}img/{identifier}-windows.png"' if has_windows else ""
 
