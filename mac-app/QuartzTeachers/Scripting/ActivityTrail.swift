@@ -836,6 +836,14 @@ nonisolated enum ActivityTrail {
         /// too when the other program is a copy of the app; the
         /// `--mcp-stdio` and scheduled processes write no opening line.
         case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
+        /// An outside assistant (Claude or Codex) changed a course, asked for
+        /// a rebuild, or deployed, while a preview of that course was open in
+        /// Plantoir (#433). A change or a rebuild left the open preview
+        /// exactly as it was — not rebuilt; a deploy went ahead and may have
+        /// closed it. Carries the course and section and which of those it
+        /// was — never anything written on a page. It answers "Claude said it
+        /// changed the page and my preview still shows the old one".
+        case outsideChangeLeftThePreviewAlone = "outside assistant worked while a preview was open"
 
         /// A publish set for later found the course being built or published
         /// by another program and WAITED (#156): it polls every fifteen

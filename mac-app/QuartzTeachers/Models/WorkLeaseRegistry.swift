@@ -154,7 +154,8 @@ enum WorkLeaseRegistry {
     static func whatBlocksABuild(
         folderPath: String,
         courseCode: String,
-        afterTaking: Bool
+        afterTaking: Bool,
+        asker: WorkLeaseFiles.Asker = .aBuild
     ) -> WorkLeaseFiles.Holding? {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
@@ -165,7 +166,19 @@ enum WorkLeaseRegistry {
         if afterTaking {
             claim = buildClaim(folderPath: folderPath, courseCode: courseCode)
         }
-        return WorkLeaseFiles.blocking(among: holdings, asker: .aBuild, claim: claim)
+        return WorkLeaseFiles.blocking(among: holdings, asker: asker, claim: claim)
+    }
+
+    /// What an outside assistant's change to this course meets in the other
+    /// programs' leases (#433) — `WorkLeaseFiles.whatAnOutsideChangeMeets`
+    /// over the leases on disk.
+    static func whatAnOutsideChangeMeets(folderPath: String, courseCode: String) -> WorkLeaseFiles.OutsideChangeMeets {
+        let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
+            .appendingPathComponent("courses", isDirectory: true)
+        let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
+            courseCode: courseCode, coursesDirectory: coursesDirectory
+        )
+        return WorkLeaseFiles.whatAnOutsideChangeMeets(among: holdings)
     }
 
     /// Records a publish of one section and, with nothing awaited in
