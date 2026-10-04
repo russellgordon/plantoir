@@ -67,3 +67,11 @@ SAID IN ADVANCE, so the result cannot be argued with afterwards
   the model too; the settler can only make it end sooner (a MISS either way).
   A failed rule here changes nothing that ships by itself: it is reported on
   #424 for Russell, with what each remedy would cost.
+
+ADDED AFTER THE RUN (bundle A fix round, ruling 4), changing nothing above:
+  the 30 s writing limit ships on the SMALLER tier only, the one measured
+  here. The limit is in milliseconds, and the larger assistant writes several
+  times slower per token on this CPU (perhaps 70-100 tokens in 30 s, close to
+  an ordinary prose answer after a read), so it keeps the 512-token cap alone
+  until it is measured. No larger-tier run was made.
+
