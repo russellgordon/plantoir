@@ -132,6 +132,28 @@ public class OutsideAssistantWhilePreviewingTests : IDisposable
     }
 
     /// <summary>
+    /// The door holds back EVERY change, not only a publish: until #436 the
+    /// workspace refused only <c>if (plan.Publishes)</c>, so an unpublish went
+    /// ahead mid-build. Nothing is written and nothing is backed up.
+    /// </summary>
+    [Fact]
+    public async Task AnUnpublishIsHeldBackAtTheDoorWhileTheCourseIsBuilt()
+    {
+        File.WriteAllText(PagePath, "---\npublish: true\ncreated: 2026-09-08T07:00:00.000-0400\n---\nBody.\n");
+        OtherProgramHolds("build");
+        var workspace = new AssistWorkspace(_folder, _launcher);
+        var before = Snapshot();
+
+        string said = OutsideChangeGate.Refusal("unpublish_pages", Arguments(), workspace)
+                      ?? (await new PlantoirTools(workspace).UnpublishPages(Course, 1,
+                             new Progress<ProgressNotificationValue>(_ => { }), default, new[] { "Unit 1, Day 1" })).Detail();
+
+        Assert.Equal(AssistWording.CourseIsBeingBuilt(Course), said);
+        Assert.Equal(before, Snapshot());
+        Assert.Null(workspace.ConversationBackupPath);
+    }
+
+    /// <summary>
     /// The writing tools the door holds back are every non-read-only tool but
     /// the contract's six — so a NEW write tool is held back by default.
     /// </summary>
