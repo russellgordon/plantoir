@@ -509,8 +509,14 @@ enum AssistPublishPlanner {
     /// What publishing these pages would do — along with everything they link
     /// to, so no published page points at a page students cannot see, and
     /// stopping wherever a link lands on another class.
+    ///
+    /// `files` are pages named by FILE rather than by title — what a caller
+    /// that already holds a class's file passes (a whole unit, the links
+    /// checklist), so a class sharing its file name with another page is
+    /// never ambiguous to it (#425's review, stack 1 item 1).
     static func planPublishing(
         titles: [String],
+        files: [URL] = [],
         onOrAfter: CalendarDay?,
         before: CalendarDay?,
         graph: AssistSectionGraph,
@@ -525,13 +531,13 @@ enum AssistPublishPlanner {
         // on. Same teacher, same class, two different results depending on
         // which sentence they used.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages,
+            titles: titles, files: files, courseDirectoryURL: course.directoryURL, graph: graph, classPages: classPages,
             publishedBefore: PublishedPagesRecord.places(
                 courseDirectory: course.directoryURL, section: sectionNumber
             )
         )
         return plan(
-            publishes: true, titles: titles,
+            publishes: true, titles: titles, files: files,
             onOrAfter: onOrAfter, before: before, graph: graph, classPages: classPages,
             dateMoves: moves, forSection: sectionNumber, in: course
         )
@@ -541,6 +547,7 @@ enum AssistPublishPlanner {
     /// link to, and nothing else.
     static func planUnpublishing(
         titles: [String],
+        files: [URL] = [],
         onOrAfter: CalendarDay?,
         before: CalendarDay?,
         graph: AssistSectionGraph,
@@ -549,7 +556,7 @@ enum AssistPublishPlanner {
         in course: Course
     ) -> AssistPublishPlan {
         return plan(
-            publishes: false, titles: titles,
+            publishes: false, titles: titles, files: files,
             onOrAfter: onOrAfter, before: before, graph: graph, classPages: classPages,
             dateMoves: [], forSection: sectionNumber, in: course
         )
@@ -577,22 +584,25 @@ enum AssistPublishPlanner {
             return .failure(.noClassOn(day, course.code, sectionNumber))
         }
 
-        var titles: [String] = []
+        // By FILE, not by title (#425's review, stack 1 item 1): the class
+        // on that day is a file, and a title it shares with a course-level
+        // page would otherwise be asked about, or skipped.
+        var files: [URL] = []
         for summary in matching {
-            titles.append(summary.title)
+            files.append(summary.fileURL)
         }
 
         // The same one rule as the named-pages path above. It used to be a
         // second rule here with a different condition, which is how the two
         // routes to the same act came to disagree.
         let moves: [AssistPublishDateMove] = dateMovesFollowingClasses(
-            titles: titles, graph: graph, classPages: classPages,
+            titles: [], files: files, courseDirectoryURL: course.directoryURL, graph: graph, classPages: classPages,
             publishedBefore: PublishedPagesRecord.places(
                 courseDirectory: course.directoryURL, section: sectionNumber
             )
         )
         return .success(plan(
-            publishes: true, titles: titles,
+            publishes: true, titles: [], files: files,
             onOrAfter: nil, before: nil, graph: graph, classPages: classPages,
             dateMoves: moves, forSection: sectionNumber, in: course
         ))
@@ -604,6 +614,7 @@ enum AssistPublishPlanner {
     private static func plan(
         publishes: Bool,
         titles: [String],
+        files: [URL] = [],
         onOrAfter: CalendarDay?,
         before: CalendarDay?,
         graph: AssistSectionGraph,
@@ -640,11 +651,23 @@ enum AssistPublishPlanner {
             chosen.insert(page.fileURL.path)
             named.append(page)
         }
+        // Pages named by FILE: one file is one page, never a question.
+        for file in files {
+            guard let page = graph.page(atFile: file) else {
+                unknownNames.append(file.deletingPathExtension().lastPathComponent)
+                continue
+            }
+            if chosen.contains(page.fileURL.path) {
+                continue
+            }
+            chosen.insert(page.fileURL.path)
+            named.append(page)
+        }
 
         // The dates are compared here rather than by the model: "every class
         // from September 15th" is one call, and a comparison the model never
         // makes is a comparison it never gets wrong.
-        if titles.isEmpty && (onOrAfter != nil || before != nil) {
+        if titles.isEmpty && files.isEmpty && (onOrAfter != nil || before != nil) {
             for summary in classPages {
                 guard let date = summary.date else {
                     continue
@@ -655,7 +678,8 @@ enum AssistPublishPlanner {
                 if let before, !(date < before) {
                     continue
                 }
-                guard let page = graph.page(titled: summary.title) else {
+                // By file: the class is that file (#425's review).
+                guard let page = graph.page(atFile: summary.fileURL) else {
                     continue
                 }
                 if chosen.contains(page.fileURL.path) {
@@ -1307,15 +1331,42 @@ enum AssistPublishPlanner {
     /// the sign — 7,114 of 7,118 payload pages carry one.
     static func dateMovesFollowingClasses(
         titles: [String],
+        files: [URL] = [],
+        courseDirectoryURL: URL? = nil,
         graph: AssistSectionGraph,
         classPages: [ClassPageSummary],
         publishedBefore: Set<String> = []
     ) -> [AssistPublishDateMove] {
         // Only the NAMED pages that are really classes with a date. Publishing
         // an ordinary page moves nothing: there is no class day to inherit.
-        var named: [(page: AssistSectionPage, day: CalendarDay)] = []
+        // Pages named by FILE are found by their file (#425's review), and a
+        // title that fits more than one file names no class here — the plan
+        // asks about it instead.
+        var candidates: [AssistSectionPage] = []
         for title in titles {
-            guard let page = graph.page(titled: title), let day = page.date else {
+            guard let courseDirectoryURL else {
+                // A caller with no course folder: the old reading, first file
+                // of the name in path order.
+                if let page = graph.page(titled: title) {
+                    candidates.append(page)
+                }
+                continue
+            }
+            let fitting: [AssistSectionPage] = graph.pagesWhoseFileIsCalled(
+                title, courseDirectoryURL: courseDirectoryURL
+            )
+            if fitting.count == 1 {
+                candidates.append(fitting[0])
+            }
+        }
+        for file in files {
+            if let page = graph.page(atFile: file) {
+                candidates.append(page)
+            }
+        }
+        var named: [(page: AssistSectionPage, day: CalendarDay)] = []
+        for page in candidates {
+            guard let day = page.date else {
                 continue
             }
             var isAClass: Bool = page.isClassPage

@@ -44,6 +44,9 @@ struct TaskConsoleView: View {
                     if exitCode == 0 {
                         Label("Finished", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
+                    } else if runner.wasClosedForADeploy {
+                        Label(ScriptRunner.closedForADeployOutcome, systemImage: "stop.circle.fill")
+                            .foregroundStyle(.secondary)
                     } else {
                         Label("Failed (exit \(exitCode))", systemImage: "xmark.circle.fill")
                             .foregroundStyle(.red)

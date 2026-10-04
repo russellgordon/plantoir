@@ -1156,7 +1156,9 @@ final class AssistToolRunner {
         )
         var moving: [String] = []
         for summary in pages {
-            guard let page = graph.page(titled: summary.title) else {
+            // By file (#425's review): a class sharing its file name with a
+            // course-level page must be asked about as itself.
+            guard let page = graph.page(atFile: summary.fileURL) else {
                 continue
             }
             // A page whose flag this app will not read counts as moving, for
@@ -1280,13 +1282,17 @@ final class AssistToolRunner {
             let classPages: [ClassPageSummary] = ClassPages.list(
                 forSection: located.sectionNumber, in: located.course
             )
+            // By the class's FILE, never its title (#425's review, stack 1
+            // item 1): a class sharing its file name with a course-level page
+            // was otherwise dropped from the plan, and the unit reported done
+            // with that class still the way it was.
             let plan: AssistPublishPlan = publishing
                 ? AssistPublishPlanner.planPublishing(
-                    titles: [summary.title], onOrAfter: nil, before: nil,
+                    titles: [], files: [summary.fileURL], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
                 : AssistPublishPlanner.planUnpublishing(
-                    titles: [summary.title], onOrAfter: nil, before: nil,
+                    titles: [], files: [summary.fileURL], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
             for page in plan.noRoomForAKey where !leftAlone.contains(page.displayTitle) {

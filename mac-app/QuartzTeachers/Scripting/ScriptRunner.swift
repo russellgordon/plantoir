@@ -70,6 +70,19 @@ class ScriptRunner {
     /// must not be reported as one.
     var wasStoppedByUser: Bool = false
 
+    /// True when a PREVIEW ended because another program deployed (or
+    /// built) the course — an outside assistant's deploy, or a publish set
+    /// for later — whose build ends that section's serving preview
+    /// (`build_site.stop_preview_serving`). The teacher asked for that deploy,
+    /// so the end is not a failure and is not shown as one (#433's stack
+    /// review, item 6). Decided in `finishRun` by `endedForAnotherProgramsBuild`.
+    var wasClosedForADeploy: Bool = false
+
+    /// Asked when a run ends non-zero: is another program building this
+    /// course right now? Set by the section window for its preview only;
+    /// nil for every other run.
+    var endedForAnotherProgramsBuild: (@MainActor () -> Bool)?
+
     /// True for the moment a caller has this runner finish one script and
     /// immediately start another on it — a multi-destination deploy that
     /// needs a fresh build runs "preview.sh --build-only" then `deploy.sh`
@@ -266,6 +279,7 @@ class ScriptRunner {
         forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
+        wasClosedForADeploy = false
         isBetweenPhases = false
         stepDetail = ""
         waitingSentence = ""
@@ -1402,6 +1416,12 @@ class ScriptRunner {
         waitingSentence = ""
         waitingSince = nil
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
+        // Asked BEFORE `lastExitCode` is set, which is what the views watch,
+        // so they never see the end as a failure first.
+        if exitCode != 0, !wasStoppedByUser, !wasCancelled,
+           let check = endedForAnotherProgramsBuild, check() {
+            wasClosedForADeploy = true
+        }
         lastExitCode = exitCode
         isRunning = false
         ScriptRunner.forgetInFlight(self)
@@ -1420,7 +1440,8 @@ class ScriptRunner {
             + ScriptRunner.outcomeDescription(
                 exitCode: exitCode,
                 wasStoppedByUser: wasStoppedByUser,
-                wasCancelled: wasCancelled
+                wasCancelled: wasCancelled,
+                wasClosedForADeploy: wasClosedForADeploy
             ).lowercased()
             + String(format: " after %.1fs", Date().timeIntervalSince(startedAt ?? Date()))
         )
@@ -1516,7 +1537,7 @@ class ScriptRunner {
         let transcriptText: String = transcript.displayText
         let wasFailure: Bool
         if let exitCode {
-            wasFailure = exitCode != 0 && !wasStoppedByUser && !wasCancelled
+            wasFailure = exitCode != 0 && !wasStoppedByUser && !wasCancelled && !wasClosedForADeploy
         } else {
             wasFailure = false
         }
@@ -1533,7 +1554,8 @@ class ScriptRunner {
             outcome: ScriptRunner.outcomeDescription(
                 exitCode: exitCode,
                 wasStoppedByUser: wasStoppedByUser,
-                wasCancelled: wasCancelled
+                wasCancelled: wasCancelled,
+                wasClosedForADeploy: wasClosedForADeploy
             ),
             wasFailure: wasFailure,
             explanation: explanation,
@@ -1565,16 +1587,24 @@ class ScriptRunner {
     /// backing out of a question. Neither is a failure, and a record that
     /// called them one would send somebody looking for a bug that is a
     /// teacher changing their mind.
+    /// What a preview closed by another program's deploy is called — in the
+    /// console's header, the run's record and the trail (#433's stack review).
+    nonisolated static let closedForADeployOutcome: String = "Closed for a deploy"
+
     nonisolated static func outcomeDescription(
         exitCode: Int32?,
         wasStoppedByUser: Bool,
-        wasCancelled: Bool
+        wasCancelled: Bool,
+        wasClosedForADeploy: Bool = false
     ) -> String {
         guard let exitCode else {
             return ScriptRunner.stillRunningOutcome
         }
         if wasStoppedByUser {
             return "Stopped on purpose"
+        }
+        if wasClosedForADeploy {
+            return ScriptRunner.closedForADeployOutcome
         }
         if wasCancelled {
             return "Backed out of a question"

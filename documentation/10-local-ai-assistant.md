@@ -4020,6 +4020,25 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   sentence is followed by `deployClosedAnOpenPreview` — "If a preview of …
   was open in Plantoir, deploying closed it" — "if" because a lease names the
   course, not the section, and a preview of another section is left alone.
+  The window shows that end as "Closed for a deploy", not as a failure
+  (#433's stack review, item 6, traced: the killed server made the Python
+  parent raise, `preview.sh` exited 1, and the console said "Something went
+  wrong" and opened the raw output). `ScriptRunner.finishRun` asks the
+  section window's `endedForAnotherProgramsBuild` — another program holds a
+  `build` lease on the course at that moment — before it sets `lastExitCode`.
+  A publish set for later ends a preview the same way and is shown the same
+  way now.
+- **The residual, in `outsideChanges.rule`**: an outside change looks once and
+  takes no lease, so a window Deploy pressed during a multi-page outside write
+  can deploy a half-applied change. Not new with #433, and accepted.
+- **A class page is found by its FILE wherever the caller holds it** (#425's
+  stack review, item 1): a whole unit, `publish_class_on`, a date range and
+  the links checklist pass the class's file (`AssistPublishPlanner.planPublishing(titles:files:…)`,
+  `AssistSectionGraph.page(atFile:)`), so a class sharing its file name with a
+  course-level page is published or hidden like any other. Before, they asked
+  by title, the title fit two files, and the class was dropped from the plan
+  in silence — "Unit 4 was unpublished" with that class still visible. Only a
+  name the TEACHER typed can be ambiguous, and that is asked about.
 - **The trail**: a refusal writes `build declined, course busy elsewhere` with
   the tool's name ("declined an outside assistant's publish_pages"); a change,
   rebuild or deploy that met a served preview writes `outside assistant worked
