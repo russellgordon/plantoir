@@ -16,7 +16,7 @@ enum SpecialNames {
     // MARK: - Stored properties
 
     nonisolated static let excludedFolderIndexNoteBody: String =
-        "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your website. To include it again, add it back in Course Settings."
+        "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your class website. To include it again, add it back in Course Settings."
 
     nonisolated static let excludedFolderSentinelStart: String =
         "<!-- plantoir:excluded-folder-note:start -->"

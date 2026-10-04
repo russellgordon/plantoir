@@ -3299,7 +3299,7 @@ def _get_excluded_note_config() -> tuple[str, str, str]:
     except Exception:
         start = "<!-- plantoir:excluded-folder-note:start -->"
         end = "<!-- plantoir:excluded-folder-note:end -->"
-        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your website. To include it again, add it back in Course Settings."
+        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your class website. To include it again, add it back in Course Settings."
         return start, end, body
 
 
@@ -4753,7 +4753,7 @@ def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
     else:
         print("⚠️ The Explorer's hide filter is missing from quartz.layout.ts.")
         print("   Repairing it before building — without it, pages you have")
-        print("   hidden would still appear on your website.")
+        print("   hidden would still appear on your class website.")
 
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
