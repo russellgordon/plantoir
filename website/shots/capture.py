@@ -60,7 +60,7 @@ from images import (  # noqa: E402
     WIDEST_PHONE_PIXELS,
 )
 from composite import native_cascade, native_fan, native_side_by_side    # noqa: E402
-from shadow import activate_and_settle, capture_window, problems_with_shadow, NATIVE_MARGINS  # noqa: E402
+from shadow import capture_active_window, problems_with_shadow, NATIVE_MARGINS  # noqa: E402
 from corners import corner_problems, images_the_pages_show  # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
 import scenes as scene_book  # noqa: E402
@@ -843,8 +843,7 @@ def capture_obsidian(workspace: Path, suffix: str) -> None:
     window_id = result.stdout.strip()
     destination = PARTS / f"obsidian-{suffix}.png"
     # Active when photographed, so its shadow is the active window's (#434).
-    activate_and_settle("Obsidian")
-    capture_window(window_id, destination)
+    capture_active_window("Obsidian", window_id, destination)
     print(f"   part {destination.name}")
 
     subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
@@ -1359,8 +1358,7 @@ def capture_note_in_obsidian(note: Path, destination: Path) -> bool:
     if result.returncode != 0 or not result.stdout.strip():
         return False
     # Active when photographed, so its shadow is the active window's (#434).
-    activate_and_settle("Obsidian")
-    capture_window(result.stdout.strip(), destination)
+    capture_active_window("Obsidian", result.stdout.strip(), destination)
     subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
     return True
 

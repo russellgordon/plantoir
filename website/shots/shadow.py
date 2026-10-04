@@ -75,6 +75,24 @@ def capture_window(number: int | str, destination: Path) -> Path:
     return destination
 
 
+def capture_active_window(application: str, number: int | str, destination: Path, attempts: int = 3) -> Path:
+    """Activate `application`, photograph its window, and take it again if the
+    shadow came back as an INACTIVE window's.
+
+    Measured 2026-10-04 07:20: the dark how-i-teach pass photographed
+    Obsidian with grey traffic lights and a (68, 52, 68, 84) margin — after
+    the scheduled-deploy scene, something else had come forward in the
+    second between activating and capturing. The picture is retaken, never
+    adjusted; after `attempts` the last one is kept and the checks name it.
+    """
+    for _ in range(attempts):
+        activate_and_settle(application)
+        capture_window(number, destination)
+        if shadow_margins(destination) == NATIVE_MARGINS:
+            break
+    return destination
+
+
 def activate_and_settle(application: str, seconds: float = 1.0) -> None:
     """Bring an application to the front and give macOS time to redraw its
     window's shadow as the active one."""
