@@ -991,7 +991,9 @@ doubled comma, doubled spaces) stay rejected for publishing, and so does a
 course named after it, for the load-bearing reason below. `hideIsUnpublish`'s
 first refused row moved to accepted, two more spellings of it were added there
 (the shelf's capitalised card, and a trailing full stop the shared tidier has
-always removed), and fifteen near misses are new refused rows.
+always removed), and sixteen near misses are new refused rows — among them
+"publish unit  4, day 3", because the day form reads the UNTRIMMED remainder
+where the whole-unit form has always forgiven "publish unit  5".
 `testNoHideOrUnpublishSentenceEverReachesPublishPages` holds the damaging
 direction across every hide or unpublish sentence in the table. Must-fails
 run 2026-10-04 (`ready/B.md` in the v1.4.3 run has the red lines): drop the arm,
@@ -1005,7 +1007,7 @@ spellings are the whole question for a family like this — the same argument
 words are counted (`makeRoom`'s reading), so `unit 4 , day 21` and `unit 4 day
 21` are the same request and odd spacing is read the same way; a trailing `?`
 comes off; `please` is courtesy at either end; and `day21` is refused, because
-that is not a word this frame has. 16 accepted and 34 refused rows (13 and 20
+that is not a word this frame has. 16 accepted and 35 refused rows (13 and 20
 before #411) are DATA, in
 `contracts/assist-cases.json` → `hideIsUnpublish`.
 
