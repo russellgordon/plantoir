@@ -83,6 +83,26 @@ public static class ClassFolderRule
     }
 
     /// <summary>
+    /// The folder Course Settings and the wizard PROTECT as the class folder
+    /// besides the literal <see cref="FallbackName"/>: the name the course
+    /// recorded in <c>class_folder</c>, trimmed, or null when it recorded none.
+    ///
+    /// <para><b>Never the guess</b> (#431, Russell 2026-10-03: Windows matches
+    /// the mac's <c>ClassFolder.isTheAllClassesFolder(_:configured:)</c>). This
+    /// app used to protect <see cref="Name(string?, IEnumerable{string})"/>'s
+    /// answer, so a course with no record protected its FIRST per-section
+    /// folder whatever it was called ("Handouts" in
+    /// <c>gradedFolders.floor</c> F13/F14) and answered
+    /// <c>classFolderBlocked</c> before the marks floor was asked, while the
+    /// same course file on a Mac protected only "All Classes". The guess stays
+    /// where the contract keeps it — WHERE a new class page is written
+    /// (<c>classFolder.naming</c>) — because there a course must have an
+    /// answer; protecting a folder needs certainty, and a guess is not.</para>
+    /// </summary>
+    public static string? ProtectedName(string? classFolder) =>
+        string.IsNullOrWhiteSpace(classFolder) ? null : classFolder!.Trim();
+
+    /// <summary>
     /// The list's spelling of the recorded folder, or null when nothing was
     /// recorded or the record has gone stale.
     /// </summary>
