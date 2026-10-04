@@ -243,8 +243,6 @@ final class ClassPlanningTests: XCTestCase {
         XCTAssertTrue(outcome.message.hasSuffix(said), outcome.message)
         XCTAssertTrue(try text(ofClass: "Unit 1, Day 2", in: course).contains("day two"),
                       "The lesson stays under its own name.")
-        XCTAssertTrue(try text(ofClass: "Unit 1, Day 2", in: course).contains("created: 2026-09-10"),
-                      "…and on its own day.")
         XCTAssertEqual(try text(ofClass: "Unit 1, Day 3", in: course), squatterBefore,
                        "The teacher's page under the new name is neither overwritten nor re-dated.")
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)

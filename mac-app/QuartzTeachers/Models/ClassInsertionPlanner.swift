@@ -410,15 +410,8 @@ enum ClassInsertionPlanner {
             for (_, to) in renamed where to == move.title {
                 wasRenamedHere = true
             }
-            var wasToBeRenamed: Bool = false
-            for rename in plan.renames where rename.to == move.title {
-                wasToBeRenamed = true
-            }
-            // A page whose rename did not happen keeps its date too: it keeps
-            // its place, and its name already says which day it is.
-            if wasToBeRenamed && !wasRenamedHere {
-                continue
-            }
+            // A page whose rename did not happen is re-dated at its OLD path,
+            // as Windows does (#422): the move was planned for that page.
             var pageURL: URL = move.fileURL
             if wasRenamedHere {
                 pageURL = folderURL.appendingPathComponent(move.title + ".md")
