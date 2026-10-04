@@ -291,9 +291,7 @@
       "expectText": [
         "Curriculum",
         "College Board Curriculum"
-      ],
-      "awaiting_capture": true,
-      "waiting_on": "#435"
+      ]
     },
     {
       "id": "both-curricula",
