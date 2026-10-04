@@ -4744,7 +4744,7 @@ final class AssistToolRunner {
                 // a deploy walks (`allDeployDestinations`) — named by TYPE and
                 // joined "A, B and C", in the scheduled deploy card's words
                 // (`planOpening.cardNaming`, #396). This used to name the primary
-                // alone, so a course publishing to Netlify AND Cloudflare Pages
+                // alone, so a course deploying to Netlify AND Cloudflare Pages
                 // read "Netlify", and one set to a folder not chosen yet read
                 // "Netlify" too. The app's own assistant window shows this line
                 // when a teacher asks what courses they have, so it is a teacher
@@ -4754,7 +4754,7 @@ final class AssistToolRunner {
                 // that has not been chosen yet, a state the product models on
                 // purpose. Pinned by shared-rules.json →
                 // scheduledDeployRefusals.planOpening.listCoursesLine.
-                + "  publishes to: \(AssistToolRunner.everyDestination(of: course))"
+                + "  deploys to: \(AssistToolRunner.everyDestination(of: course))"
                 + howITeachLine(for: course)
             )
         }
