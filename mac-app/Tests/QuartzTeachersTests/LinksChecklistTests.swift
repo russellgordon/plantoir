@@ -274,6 +274,41 @@ final class LinksChecklistTests: XCTestCase {
         }
     }
 
+    /// A ticked page the writer declines (#186's shape: its settings' first
+    /// line indented) is recorded on the trail as "page settings left as they
+    /// were" with the act "publishing pages that links lead to" and a count —
+    /// what `activityTrail.mustRecord` says every SetDraft caller records
+    /// (#425 DO 3, the links checklist's half of #421). Never the page's name.
+    func testADeclinedTickedPageIsCountedOnTheTrail() throws {
+        let testCase: [String: Any] = try LinksChecklistTests.publishCase("iv-a.")
+        let made: AssistFixture.Made = try AssistFixture.makeRunner()
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: made.root.appendingPathComponent("trail"))
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        let urls: [String: URL] = try LinksChecklistTests.layOut(testCase, made: made)
+        let worksheet: URL = try XCTUnwrap(urls["Worksheet"])
+        try "---\n  title: Worksheet\n---\nAbout Worksheet.\n".write(to: worksheet, atomically: true, encoding: .utf8)
+        let offer: LinksChecklistOffer = try LinksChecklistTests.offer(
+            from: try XCTUnwrap(testCase["offer"] as? [[String: Any]])
+        )
+        let result: LinksChecklistPublisher.Result = LinksChecklistPublisher.publish(
+            offer: offer, ticked: ["Concepts/Worksheet", "Concepts/Published Once"], course: made.course,
+            sectionNumber: 1, workspaceURL: made.root, shownComingWith: []
+        )
+        guard case .published = result else {
+            XCTFail("Publish did not publish: \(result)")
+            return
+        }
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(ActivityTrail.pageSettingsLeftAsTheyWereLine(
+            act: "publishing pages that links lead to", pages: 1
+        )), trail)
+        XCTAssertFalse(trail.contains("Worksheet"), "never which page: \(trail)")
+    }
+
     func testTickedPagesArePublishedWithTheOffersDates() throws {
         try checkExpectations(try runPublishCase("iv-a."))
     }

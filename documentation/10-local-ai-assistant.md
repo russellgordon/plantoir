@@ -3984,36 +3984,71 @@ Now both read and write the work-lease files under `courses/.internal/activity/`
 
 What the MCP client meets:
 
-- **`deploy_section` and `rebuild_preview`** are REFUSED, with
-  `wording.courseIsBusy`, when another live program holds `build`, `publish` or
-  `preview` on the course. The check is made before anything is stopped, and
-  again by the headless deploy and rebuild right after they take their own
-  `build` lease (take, then check — only a lease taken earlier counts).
-- **`publish_pages` and `undo_last_change`** still WRITE — Markdown never
-  conflicts with a build — and leave the teacher's preview up; the note where
-  the preview would have been refreshed is `courseIsBusy`. The consequence to
-  know: with the teacher's preview open in the window, an outside assistant's
-  change reaches the page but not the preview until the teacher presses Preview
-  (a program's own lease never stands in its own way). Before #156
-  the rebuild went ahead and ended that preview instead. Windows' plantoir-mcp
-  refuses WRITES only on `build`, for the reason its
-  `RefuseIfPlantoirIsBuilding` records — refusing writes during a preview made
-  the assistant useless to a teacher watching one — and the mac agrees: only
-  the BUILD after the write is declined.
-- **Why `courseIsBusy` and not the new `courseIsBeingBuiltElsewhere`.** The
-  client is talking TO the program whose course is busy, so "busy in Plantoir —
-  a preview or a deploy is running. Wait for that to finish, then ask again" is
-  true and tells it what it can do. It reads a little loosely when the holder is
-  a SECOND outside session or a publish set for later (neither is "a preview or
-  a deploy" in the window), and that was accepted rather than adding a key
-  (plan review L1). The teacher, in the app, gets
-  `courseIsBeingBuiltElsewhere`, which says where the other work might be.
-- **Why a PREVIEW blocks it, when Windows' `plantoir-mcp` blocks only on
-  `build`.** Every `--build-only` ends that section's serving preview first
-  (`build_site.stop_preview_serving`), so an outside rebuild would take down the
-  page the teacher is reading — which the in-app assistant already refused to
-  do. The client can retry; the teacher reading the page cannot. Stricter than
-  Windows on purpose, and a red contract case there is the request.
+**Changed by #433 (2026-10-03, Russell): a preview that is only OPEN holds an
+outside assistant back from nothing.** What the MCP client meets now — the
+rule is `workLeases.declining.outsideChanges`, its cases run by
+`OutsideAssistantWhilePreviewingTests`:
+
+- **While another program is BUILDING the course** — a preview still being
+  built (it holds `build` beside `preview`) or a deploy (`build` and
+  `publish`) — every change (every tool that is not read-only except
+  `rebuild_preview`, `deploy_section`, the deploy-later pair, `back_up_course`
+  and `remember_timetable`) is REFUSED at the door of `AssistToolRunner.run`,
+  before anything is backed up or written, with `wording.courseIsBeingBuilt`
+  ("…so nothing was changed. Ask again once it has finished."). So are
+  `rebuild_preview` and `deploy_section`. This matches Windows'
+  `RefuseIfPlantoirIsBuilding`. `WorkLeaseFiles.whatAnOutsideChangeMeets`
+  decides it, and a `build` lease WINS over a `preview` lease whatever order
+  the files are read in — reading a building preview as merely served would
+  let a change and a rebuild through while a build runs.
+- **While a preview is only being SERVED** (`preview` alone): a change is
+  written, nothing is stopped, rebuilt or restarted, and the note where the
+  preview would have been refreshed is `wording.changesAreSavedPreviewShowsTheOldPages`
+  — saved, and "press Stop Preview, then Preview, to see them", the section
+  window's own labels. `rebuild_preview` builds nothing and says the same
+  sentence. Nothing said after a change that succeeded may contain "busy",
+  "couldn't" or "wait" (`testTheSavedSentencesCarryNoRefusalWord`). If a build
+  starts in the moment after the change was let through, the note is
+  `changesAreSavedWhileTheCourseIsBuilt` — still saved, never busy.
+- **`deploy_section` while a preview is only served GOES AHEAD** (Russell,
+  2026-10-03 23:00: "if the teacher asks Claude or Codex to deploy, it should
+  be allowed to go ahead, even if a preview is running"). The headless deploy
+  asks the leases with `WorkLeaseFiles.Asker.anOutsideDeploy` (build and
+  publish only; `AssistToolchainWork.aServedPreviewHoldsADeployBack` is false
+  for the `.mcp` runner). The deploy ends that section's serving preview the
+  way the window's own Deploy does, and no restart is added; the success
+  sentence is followed by `deployClosedAnOpenPreview` — "If a preview of …
+  was open in Plantoir, deploying closed it" — "if" because a lease names the
+  course, not the section, and a preview of another section is left alone.
+- **The trail**: a refusal writes `build declined, course busy elsewhere` with
+  the tool's name ("declined an outside assistant's publish_pages"); a change,
+  rebuild or deploy that met a served preview writes `outside assistant worked
+  while a preview was open`.
+- **What did not change**: the window and the in-app assistant keep #156's
+  rule exactly — a preview another program holds still declines their builds,
+  with `courseIsBeingBuiltElsewhere` (`testTheInAppAssistantSaysWhatItSaidBefore`
+  pins it). `courseIsBusy` is now said only by this copy of Plantoir about its
+  own work, where an open preview does make a course busy.
+- **Why #156 blocked on a preview, and why that was reversed for Claude and
+  Codex.** #156 (a director's ruling, 2026-09-25) declined an outside build on
+  a `preview` lease because every `--build-only` ends that section's serving
+  preview (`build_site.stop_preview_serving`), and the WRITES went ahead but
+  ended with `courseIsBusy` — "busy … wait … ask again" after a change that
+  had succeeded, which a model reads as a refusal (Russell met it on v1.4.2).
+  Browsing the preview while asking for changes is the ordinary way to work.
+  What #156 protected still holds: never two builds of one section (a
+  building preview holds `build`), and no outside door rebuilds or restarts a
+  preview the window is serving.
+- **REJECTED (#433, recorded in `workLeases.declining.rejected`)**: the outside
+  door restarting the open preview by any means — the window rebuilding its own
+  preview on request, the outside rebuild going ahead with the window bringing
+  the preview back, or Claude/Codex restarting it when asked. The outside door
+  is a second, windowless process that cannot press the window's button;
+  restarting from there means owning a preview of its own (the pre-#156 shape)
+  or a new request-file mechanism, and Russell: "That's not worth it. The
+  teacher can stop and start a preview manually." Also rejected, the same
+  night: holding an outside DEPLOY back while a preview is only served (the
+  plan's proposal, reversed by Russell before it shipped).
 - **When the client goes away mid-build**, the server stops the launchers it
   started, and the sections inside the website builder, BEFORE its leases come
   down. A client that kills the server skips that; see the known limit in 09.
@@ -4539,7 +4574,7 @@ the failure rule 5 of `CLAUDE.md` names: a line describing what did not
 happen is worse than no line, because it will be believed. The mac reaches
 the same place from the other end — `AssistToolRunner` records a whole
 `AssistChange` only after the operation returns, so a throw records nothing
-(its whole-unit publish answers "was only partly published: …" and calls
+(a publish that stops part way answers `publishStoppedPartWay` and calls
 `history.record` never) — so abandoning is also what matches.
 
 **The cost is real, and on one path it is not yet covered.** The conversation
@@ -4547,13 +4582,16 @@ backup is taken before the first write and is the way back for everything
 here. On the tools that go through `Guarded` the teacher reads a sentence and
 can be pointed at it. On the PUBLISH path they currently cannot: the
 exception leaves the tool, so no reply is built and no backup is named, and
-they are left with a failure and a half-published section. The mac says
-something there — that inline "was only partly published: …" — and Windows
-says nothing; matching it is not a wording decision this side may take alone,
-since the sentence is an inline mac literal rather than an `AssistWording`
-key, so it is written down as [issue
-#165](https://github.com/russellgordon/plantoir/issues/165) instead of
-improvised.
+they are left with a failure and a half-published section. (Since #412,
+2026-10-03, both apps say one key, `wording.publishStoppedPartWay` — "Only
+part of {what} was changed before this stopped: {problem}", for a unit and
+for a page list alike; the mac's page-list path said "Nothing was changed"
+until then, which was false of the pages before the one that failed — and
+the in-app assistant adds `wording.restoreSectionPutsItBack` when the
+conversation saved a copy, naming the banner's Restore Section button. An
+outside assistant is not pointed at it: the button is in Plantoir's
+assistant window. Originally [issue
+#165](https://github.com/russellgordon/plantoir/issues/165).)
 
 The rule both apps now follow, tool by tool:
 
