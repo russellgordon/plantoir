@@ -164,19 +164,28 @@ companions, and rebuilds the site.
 
 ### Only macOS's own window capture, kept whole
 
-Every picture is made ONLY with `screencapture -x -o -l <window id>` —
-macOS's built-in window capture, with the window's real corners transparent
-— and a figure of several windows is those captures placed WHOLE: never a
-crop through a window, never a corner re-rounded or a rounded mask drawn,
-never a drawn shadow shape (a shadow is the capture's own alpha, blurred),
-scaling only with Lanczos. A figure that must not show Safari's toolbar is
-taken in a window that has none (`shots/webwindow.swift`), not cut out.
-The page draws no corner or shadow shape either (`.shot img` uses a
-`drop-shadow` filter, which follows the picture's alpha).
-`shots/test_native_corners.py` fails on any picture the pages show whose
-corner is square or drawn tighter than a real window's; `capture.py` keeps a
-failing scene picture out of `site/img` and ends every run by naming any
-picture there that fails, with exit 1. The rule, what was removed and what Windows owes:
+Every picture is made ONLY with `screencapture -x -l <window id>` —
+macOS's built-in window capture, with the window's real corners AND its
+natural shadow, taken while its app is the ACTIVE one (macOS draws a
+smaller, lighter shadow round an inactive window) — and a figure of several
+windows is those captures placed WHOLE with `Image.alpha_composite`, on a
+canvas computed to hold every shadow in full: never `-o`, never a crop
+through a window or its shadow, never a trim, never a corner re-rounded or a
+mask drawn, never a drawn, blurred or scaled shadow, and no scaling of a Mac
+capture at all (#434, Russell 2026-10-03/04 — some shadows had been cut off
+and the windows did not match). Every Mac picture is served at its own
+pixel size and drawn at half that, the window's size in points. A figure
+that must not show Safari's toolbar is taken in a window that has none
+(`shots/webwindow.swift`), not cut out. The page draws no corner or shadow
+either (`.shot img` has no filter; only a Windows capture, which has no
+shadow of its own, keeps a `drop-shadow`). `shots/test_native_corners.py`
+fails on any picture the pages show whose corner is square or drawn tighter
+than a real window's, on any Mac picture with alpha above 1 in its outermost
+3 px (a cut-off shadow), and on any single-window picture whose shadow
+margin is not the active window's `shadow.NATIVE_MARGINS` (taken inactive,
+with `-o`, cropped or scaled); `capture.py` keeps a failing scene picture out
+of `site/img`, refuses a hero source whose margin is wrong, and ends every
+run by naming any picture there that fails, with exit 1. The rule, what was removed and what Windows owes:
 [`SCREENSHOTS.md`](SCREENSHOTS.md), "The one rule".
 
 ```bash
@@ -445,8 +454,8 @@ Three mac-specific things carry this, and each needs its own Windows answer:
 
 - **The window screenshots are native single-window captures, not test-runner
   screenshots.** The tests drive the app with XCUITest, but the pixels come
-  from `screencapture -x -o -l <window-id>` — the programmatic equivalent of
-  Command-Shift-4, Space, Option-click — because that is the only capture that
+  from `screencapture -x -l <window-id>` — the programmatic equivalent of
+  Command-Shift-4, Space, click, shadow included (#434) — because that is the only capture that
   delivers the window's rounded corners genuinely transparent, with macOS's
   own subpixel anti-aliasing. `window.screenshot()` was used first and bakes
   the desktop into the corner curves; masking the corners off afterwards
