@@ -4075,7 +4075,7 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   deploy", and the trail writes `preview closed for a deploy`. The residual,
   accepted: a lease names the course, so a deploy of Section 2 elsewhere
   coinciding with Section 1's server being SIGKILLed for another reason reads
-  as closed. A publish set for later ends a preview the same way and is shown
+  as closed. A deploy set for later ends a preview the same way and is shown
   the same way.
 - **The residual, in `outsideChanges.rule`**: an outside change looks once and
   takes no lease, so a window Deploy pressed during a multi-page outside write
@@ -6149,7 +6149,7 @@ and report success.
 
 **Rejected:** rewording the `unit` description so the models leave it out.
 That is steering with a description, which this file forbids for a measured
-reason ("Steer with code, never with a description"). **Left for Russell (#411):**
+reason ("Steer with code, never with a description"). **Left for Russell (#440; #411 is closed):**
 whether to refuse the empty call anyway, by naming `add_next_class` as needing
 more than the window supplies, which leaves the schema alone. That trades the rule's "read
 the schema, never a name" property for the outcome he asked for. Until then
@@ -6160,7 +6160,7 @@ both apps RUN an empty `add_next_class` call — Windows through
 shown this exact `unit` line all along. If its router reads it the same way,
 an ordinary "add the next class" there may already start a new unit. Only a
 measurement that prints the full arguments, rather than scoring the tool's
-name, can tell; it is asked for in the Windows hand-back for this bundle.
+name, can tell; it is asked for in the comment on #432.
 
 ### What was MEASURED for the Codex door
 
