@@ -1138,6 +1138,7 @@ public sealed partial class SectionDetailView : UserControl
             _lastLoadedUrl = null;
             _isWaitingForServer = true;
             _previewRunner.Milestones = TaskMilestones.Preview;
+            ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
@@ -1361,6 +1362,7 @@ public sealed partial class SectionDetailView : UserControl
             _lastLoadedUrl = null;
             _isWaitingForServer = true;
             _previewRunner.Milestones = TaskMilestones.Preview;
+            ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
@@ -1439,6 +1441,9 @@ public sealed partial class SectionDetailView : UserControl
                                 // stays on screen for the teacher to read.
                                 _isWaitingForServer = false;
                                 ReleaseBuildClaim();
+                                // Serving from here: a later end may be another
+                                // program's deploy closing it (#436).
+                                _previewRunner.HasBeenServing = true;
                                 _previewUrl = announced;
                                 LoadIfNeeded(announced);
                                 RefreshChrome();
@@ -1603,6 +1608,20 @@ public sealed partial class SectionDetailView : UserControl
         _isWaitingForServer = false;
         ReleaseLease();
         RefreshChrome();
+    }
+
+    /// <summary>
+    /// A deploy another program runs — an outside assistant's deploy_section,
+    /// or one set for later — ends this preview when it builds the section
+    /// (build_site.stop_preview_serving). The teacher asked for that deploy,
+    /// so the end is shown as "Closed for a deploy", not as a failure (#436,
+    /// mac #433's stack review). Asked of the leases at the moment the run
+    /// ends; ScriptRunner.EndIsAClosingForADeploy holds the other conditions.
+    /// </summary>
+    private void ShowAnotherProgramsDeployAsAClosing(string workspacePath)
+    {
+        string course = _course.Code;
+        _previewRunner.EndedForAnotherProgramsBuild = () => WorkLease.IsHeld(workspacePath, course, WorkLease.Building);
     }
 
     /// <summary>
