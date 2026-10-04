@@ -3299,7 +3299,7 @@ def _get_excluded_note_config() -> tuple[str, str, str]:
     except Exception:
         start = "<!-- plantoir:excluded-folder-note:start -->"
         end = "<!-- plantoir:excluded-folder-note:end -->"
-        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings."
+        body = "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your website. To include it again, add it back in Course Settings."
         return start, end, body
 
 
@@ -3560,7 +3560,7 @@ def _clear_a_site_this_build_cannot_replace(health_facts: dict, host_output_dir:
 def _nothing_to_publish(course_code: str, section_number, health_facts: dict,
                         front_line: int | None) -> list:
     """
-    What a publish build says when it produced no website, as printed lines.
+    What a deploy's build says when it produced no website, as printed lines.
 
     Two reasons, said differently. A front page whose settings could not be
     read is THERE and hidden (#246), so "Put the front page back" — and the
@@ -3576,13 +3576,13 @@ def _nothing_to_publish(course_code: str, section_number, health_facts: dict,
     if health_facts.get("front_page_unreadable") and health_facts.get("section_index_exists"):
         near = f" (near line {front_line})" if front_line is not None else ""
         return [
-            f"❌ Nothing to publish for {course_code} Section {section_number}: "
+            f"❌ Nothing to deploy for {course_code} Section {section_number}: "
             f"the settings at the top of its front page could not be read{near}, "
             f"so the website was left without one.",
             "   Open the front page in Obsidian, fix those lines, then build again.",
         ]
     return [
-        f"❌ Nothing to publish for {course_code} Section {section_number}: "
+        f"❌ Nothing to deploy for {course_code} Section {section_number}: "
         f"it has no front page, so no website was produced.",
         "   Put the front page back — Plantoir offers to do that for "
         "you — then build again.",
@@ -4753,7 +4753,7 @@ def ensure_quartz_layout_anchor(quartz_layout_path: Path) -> bool:
     else:
         print("⚠️ The Explorer's hide filter is missing from quartz.layout.ts.")
         print("   Repairing it before building — without it, pages you have")
-        print("   hidden would be published.")
+        print("   hidden would still appear on your website.")
 
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -5296,7 +5296,7 @@ def _clear_stale_host_site(host_output_dir: Path, course_code: str, section_numb
     try:
         shutil.rmtree(stale_public)
         print(f"🗑️  Removed the last built website for {course_code} Section {section_number}: "
-              f"{why} this build cannot replace it, and publishing "
+              f"{why} this build cannot replace it, and deploying "
               f"it again would have sent out the older pages.")
     except Exception as error:
         print(f"⚠️  Could not remove the last built website at {stale_public}: {error}")
@@ -7456,7 +7456,7 @@ def build_section_site(
         # page costs: the whole section's website, until it is fixed.
         print(f"🙈 The settings at the top of the front page of {course_code} Section "
               f"{section_number} could not be read{near}, so the website has no front "
-              f"page until they are fixed, and it cannot be published.")
+              f"page until they are fixed, and it cannot be deployed.")
     site_health.announce_or_stay_quiet(health_facts, course_code, section_number)
 
     # Clear a last built site this build cannot replace — no front page, or

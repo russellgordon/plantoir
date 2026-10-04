@@ -95,7 +95,7 @@ final class TaskMilestoneTests: XCTestCase {
         XCTAssertEqual(runner.milestonesReached, 1)
         XCTAssertEqual(runner.currentMilestoneLabel, "Copying your files…")
 
-        runner.receiveOutput("📦 Publishing ICS3U section 1 to a folder…\n")
+        runner.receiveOutput("📦 Deploying ICS3U section 1 to a folder…\n")
         XCTAssertEqual(runner.milestonesReached, 2)
 
         runner.receiveOutput("PUBLISHED_FOLDER=/Users/someone/Sites/ics3u/section1\n")

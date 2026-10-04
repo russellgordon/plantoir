@@ -63,10 +63,10 @@ NEEDS_AN_ANSWER = 3
 def refuse_to_ask(question: str, what_to_do: str) -> None:
     """Say what could not be asked, and stop. Never returns."""
     print()
-    print("This publish was set to happen on its own, so nobody is here to answer:")
+    print("This deploy was set to happen on its own, so nobody is here to answer:")
     print(f"   {question}")
     print(f" {what_to_do}")
-    print(" Nothing was published.")
+    print(" Nothing was deployed.")
     sys.exit(NEEDS_AN_ANSWER)
 
 def _is_windows(host_os: str) -> bool:
@@ -364,7 +364,7 @@ def get_or_prompt_teacher_last_name() -> str | None:
     if NON_INTERACTIVE:
         refuse_to_ask(
             "What is your last name? (it goes in the website's address)",
-            "Publish this section once from Plantoir, where you can answer it. "
+            "Deploy this section once from Plantoir, where you can answer it. "
             "It is asked once and then remembered.")
     if not sys.stdin.isatty():
         return None
@@ -414,7 +414,7 @@ def prompt(text: str, default: str | None = None) -> str:
     if NON_INTERACTIVE:
         refuse_to_ask(
             text,
-            "Publish this section once from Plantoir, where you can answer it.")
+            "Deploy this section once from Plantoir, where you can answer it.")
     if not sys.stdin.isatty():
         return default or ""
     if default is not None and default != "":
@@ -502,7 +502,7 @@ def maybe_create_netlify_site_simple(token: str, team_slug: str | None, course_c
     else:
         base = sanitize_netlify_name(f"{course_code or 'course'}-s{section or '1'}-{NOW.year}")
     print("\nChoose a Website Address.")
-    print("Every website published to Netlify (*.netlify.app) needs a unique web address.")
+    print("Every website deployed to Netlify (*.netlify.app) needs a unique web address.")
     print("This name is shared globally with all users across the world.\n")
     site_name = prompt("Enter Netlify site name", default=base).strip() or base
     path = f"/accounts/{team_slug}/sites" if team_slug else "/sites"
@@ -829,7 +829,7 @@ def publish_to_cloudflare(public_dir: Path, course_dir: Path, course_code: str,
         if len(oversized) > 10:
             print(f"   …and {len(oversized) - 10} more.")
         print(" Shorten or compress the file — a shorter or lower-resolution")
-        print(" video is usually enough — or publish this section to Netlify,")
+        print(" video is usually enough — or deploy this section to Netlify,")
         print(" which allows larger files.")
         sys.exit(1)
 
@@ -1215,18 +1215,18 @@ def record_published_pages(course_dir: Path, section_dir: Path, section, destina
 
 def main():
     p = argparse.ArgumentParser(
-        description="Publish a built section site — to Netlify by delta (file-digest) upload, or to Cloudflare Pages."
+        description="Deploy a built section site — to Netlify by delta (file-digest) upload, or to Cloudflare Pages."
     )
     p.add_argument("--host-os", choices=["windows","mac","linux","unknown"], default="unknown",
                    help="Host OS passed by deploy launchers")
     p.add_argument("--target", choices=["netlify", "cloudflare"], default="netlify",
-                   help="Where to publish. Defaults to netlify.")
+                   help="Where to deploy. Defaults to netlify.")
     p.add_argument("--course", required=True, help="Course code, e.g., ICS3U")
     p.add_argument("--section", required=True, help="Section number, e.g., 1")
     p.add_argument("--diagnose", action="store_true",
                    help="Print a breakdown of required files and save list to _required_last_deploy.txt")
     p.add_argument("--non-interactive", action="store_true",
-                   help="Refuse rather than ask. For a publish set to happen on its own, where "
+                   help="Refuse rather than ask. For a deploy set to happen on its own, where "
                         "nobody is there to answer. Exits 3 if a question comes up.")
     # optional team slug flag (advanced users only)
     p.add_argument("--team", "--team-slug", dest="team", default=None,
@@ -1254,7 +1254,7 @@ def main():
         # FAIL CLOSED, the same way the launchers do: a settings file that is
         # there and will not open is not a settings file that says no.
         print(f"❌ Plantoir cannot tell whether {args.course} is kept for reference —")
-        print(f"   {reference_course.why_cannot_tell(course_dir)}. Nothing was published.")
+        print(f"   {reference_course.why_cannot_tell(course_dir)}. Nothing was deployed.")
         sys.exit(1)
     if reference_course.is_reference(course_dir):
         print("❌ " + reference_course.refusal_sentence(
@@ -1288,7 +1288,7 @@ def main():
     if not public_dir.exists() or not any(public_dir.iterdir()):
         print(f"❌ Built site not found at: {public_dir_as_named}")
         print(" If you have just built, check this section still has its front page.")
-        print(" A section without one produces no website, so there is nothing to publish.")
+        print(" A section without one produces no website, so there is nothing to deploy.")
         print(f" Please build before deploying.\n For example:")
         print(f"{_cmd_example('preview', args.course, args.section, _HOST_OS)}")
         sys.exit(1)
@@ -1435,10 +1435,10 @@ def main():
             refuse_to_ask(
                 ("What should this section's website be called?"
                  if not marker_existed else
-                 "The website this section used to publish to no longer exists. "
+                 "The website this section used to deploy to no longer exists. "
                  "What should the new one be called?"),
-                "Publish this section once from Plantoir, where you can answer it, "
-                "and it can publish on its own after that.")
+                "Deploy this section once from Plantoir, where you can answer it, "
+                "and it can deploy on its own after that.")
 
         # A site is about to be NAMED — the one moment the surname is
         # useful. On a terminal this asks (once, then it is saved); anywhere
