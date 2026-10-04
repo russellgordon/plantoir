@@ -1042,7 +1042,11 @@ public sealed class NewCourseDialog : ContentDialog
         DeclaredPayloadFolder: ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode),
         GradedFolders: CurrentGradedFolders(),
         PerSectionFolders: _perSectionFolders,
-        ResolvedClassFolder: ClassFolderRule.Name(null, _perSectionFolders));
+        // The literal "All Classes" is always protected; besides it, only a
+        // club's folder by the name its row gives (#267/#274), as the mac's
+        // wizard does. Never the guess (#431): it protected the FIRST folder of
+        // a list with no "class" in it, and missed "All Meetings" entirely.
+        ResolvedClassFolder: IsClub ? ClassFolderRule.ProtectedName(_classFolderBox.Text) : null);
 
     /// <summary>
     /// Which province's curriculum the switch offers, so the blocked sentence
