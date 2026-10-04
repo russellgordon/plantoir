@@ -334,13 +334,16 @@ final class AssistScenarioTests: XCTestCase {
         // `pending` names the tool a card must reach. A case that says what
         // the teacher types (`saying`) and scripts the model's answer
         // (`modelReply`, #411) needs none: no card is meant to match.
+        // Relaxed ONLY when the reply is scripted: a case with `saying` and a
+        // mistyped `pending` key must still fail here, not run unchecked.
+        let scriptsTheModel: Bool = scenario.given["modelReply"] != nil && scenario.given["saying"] != nil
         var pending: String = ""
-        if let named = scenario.given["pending"] as? String {
-            pending = named
-        } else {
-            XCTAssertNotNil(
-                scenario.given["saying"], "\(scenario.name): neither a pending tool nor a sentence given"
+        if !scriptsTheModel {
+            pending = try XCTUnwrap(
+                scenario.given["pending"] as? String, "\(scenario.name): no pending tool given"
             )
+        } else if let named = scenario.given["pending"] as? String {
+            pending = named
         }
         // A plan needs something real to plan about. `makeRunner` pins today to
         // 2026-09-08, which is what makes "tomorrow" a fixed date here.
@@ -434,6 +437,7 @@ final class AssistScenarioTests: XCTestCase {
             conversation = [try AssistScenarioTests.phrasingReaching(pending)]
         }
 
+        let pagesBefore: [String: String] = AssistScenarioTests.pagesOnDisk(in: made.course.directoryURL)
         for (turn, phrasing) in conversation.enumerated() {
             await agent.say(phrasing)
             let isLastTurn: Bool = turn == conversation.count - 1
@@ -467,6 +471,10 @@ final class AssistScenarioTests: XCTestCase {
         if (scriptedReply?["finishReason"] as? String) == "length" {
             XCTAssertEqual(made.siteWork.deploys, 0, "\(scenario.name): a cut-off answer deployed")
             XCTAssertEqual(FakePreview.shared.events, [], "\(scenario.name): a cut-off answer acted")
+            XCTAssertEqual(
+                AssistScenarioTests.pagesOnDisk(in: made.course.directoryURL), pagesBefore,
+                "\(scenario.name): a cut-off answer wrote a page"
+            )
         }
 
         if let expected = scenario.expectModelRequests, let engine {
@@ -625,6 +633,19 @@ final class AssistScenarioTests: XCTestCase {
             return shape.phrasing
         }
         throw XCTSkip("No card phrasing reaches \(tool); this scenario needs a model.")
+    }
+
+    /// Every Markdown page under a folder, by path, with what it says — so a
+    /// case can assert that nothing was written, rather than say so.
+    private static func pagesOnDisk(in folder: URL) -> [String: String] {
+        var pages: [String: String] = [:]
+        let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
+        while let item = walker?.nextObject() as? URL {
+            if item.pathExtension == "md" {
+                pages[item.path] = (try? String(contentsOf: item, encoding: .utf8)) ?? ""
+            }
+        }
+        return pages
     }
 
     /// The engine's whole reply, built from a case's `given.modelReply` (#411).

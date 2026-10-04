@@ -1660,7 +1660,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         // (decided by Russell, 2026-10-03: a sentence that needs no model
         // should not be sent to one). Only after the literal "publish unit "
         // opening, never after the two #197 openings, which name a whole unit.
-        if tidied.hasPrefix("publish unit "), let page = AssistCardCommand.unitAndDay(rest) {
+        // Read from the UNTRIMMED remainder: the whole-unit form has always
+        // forgiven "publish unit  5", but the day form is exact, so "publish
+        // unit  4, day 3" goes to the model like every other doubled space
+        // (a refused row in hideIsUnpublish; stack 2 review, finding 1).
+        let untrimmed: String = String(tidied.dropFirst("publish unit ".count))
+        if tidied.hasPrefix("publish unit "), let page = AssistCardCommand.unitAndDay(untrimmed) {
             return AssistCardCommand(toolName: "publish_pages", arguments: ["pages": page])
         }
         guard !rest.contains(","), Int(rest) != nil else {
