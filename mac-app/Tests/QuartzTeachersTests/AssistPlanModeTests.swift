@@ -407,6 +407,21 @@ final class AssistPlanModeTests: XCTestCase {
                 : try AssistFixture.makeRichSection(for: self)
             defer { try? FileManager.default.removeItem(at: made.root) }
 
+            // A card that names ONE class page needs that page to exist, or
+            // the plan is refused before it can stop at Go — which would test
+            // the fixture rather than the gate. "publish unit 4, day 3" (#411)
+            // is the first such example; its page is laid out, unpublished,
+            // so there is something for the plan to propose.
+            if sentence.tool == "publish_pages",
+               let named = AssistCardCommand.matching(sentence.phrasing)?.arguments["pages"],
+               named.contains(", Day "),
+               !FileManager.default.fileExists(atPath: AssistFixture.pageURL(of: named, in: made.course).path) {
+                try AssistFixture.write(
+                    page: named, publish: "false", date: "2026-09-24", body: "The page this card names.",
+                    in: made.course
+                )
+            }
+
             let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner)
             await agent.say(sentence.phrasing)
             checked += 1
