@@ -75,6 +75,19 @@ public class CodexLauncherTests : IDisposable
             Assert.Equal(key == "claude" ? "started Claude Code for {course}" : "started Codex for {course}",
                          agent["trailLine"]!.ToString());
         }
+
+        // The SERVER each door starts, by the same substitution (#430): the
+        // folder and never a course, for the Claude door's file as for the
+        // Codex door's -c override. Only the greeting names the course.
+        var serverArguments = section["serverArguments"]!.AsArray()
+            .Select(a => a!.ToString().Replace("{folder}", folder)).ToList();
+        var written = JsonNode.Parse(ClaudeCodeLauncher.ConfigText(folder, server))!["mcpServers"]!["plantoir"]!;
+        Assert.Equal(server, written["command"]!.ToString());
+        Assert.Equal(serverArguments, written["args"]!.AsArray().Select(a => a!.ToString()));
+        string codexArgs = CodexLauncher.Arguments(server, folder, greeting)[3]["mcp_servers.plantoir.args=".Length..];
+        Assert.Equal(serverArguments, JsonSerializer.Deserialize<string[]>(codexArgs));
+        Assert.Contains("ICS3U", greeting);
+        Assert.Contains("Grade 11 Computer Science", greeting);
     }
 
     /// <summary>
