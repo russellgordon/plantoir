@@ -115,11 +115,13 @@ public class AppUpdatesContractTests
             ["upToDate"] = (ww["upToDate"]!.ToString(), UpdateWording.UpToDate),
             ["couldNotCheck"] = (ww["couldNotCheck"]!.ToString(), UpdateWording.CouldNotCheck),
             ["assistantElsewhereWork"] = (ww["assistantElsewhereWork"]!.ToString(), UpdateWording.AssistantElsewhereWork),
-            ["elsewhereWorkOnWindows"] = (ww["elsewhereWorkOnWindows"]!.ToString(), UpdateWording.ElsewhereWorkOnWindows),
             ["needsAdministratorExplanationOnWindows"] = (ww["needsAdministratorExplanationOnWindows"]!.ToString(), UpdateWording.NeedsAdministratorExplanationOnWindows),
         };
         foreach (var (key, (contract, ours)) in pinned)
             Assert.True(contract == ours, $"{key}: ours \"{ours}\", the contract's \"{contract}\"");
+        // #438: the Windows-only copy is gone; the contract's {machine} is filled instead.
+        Assert.Null(ww["elsewhereWorkOnWindows"]);
+        Assert.Equal("waiting for ICS3U to finish building somewhere else on this PC", UpdateWording.ElsewhereWork("ICS3U"));
 
         string check = w["machineryCheck"]!.ToString();
         var banned = check[(check.IndexOf(':') + 1)..].TrimEnd('.').Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
