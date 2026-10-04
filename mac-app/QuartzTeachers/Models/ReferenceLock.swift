@@ -133,6 +133,10 @@ nonisolated enum ReferenceLock {
     ///   preflight failed both its write AND its cleanup, so that course's
     ///   settings could never be reconciled again.
     /// * `.DS_Store` — Finder's own bookkeeping. Nothing a teacher wrote.
+    /// * `desktop.ini` and `Thumbs.db` — File Explorer's own bookkeeping, the
+    ///   Windows twins of `.DS_Store` (#415). Left alone here too, so the two
+    ///   apps keep one list and a course brought from Windows is not refused
+    ///   the next time Explorer touches it.
     static let neverLocked: Set<String> = [
         "course_config.json",
         "course_config.backup.json",
@@ -140,6 +144,8 @@ nonisolated enum ReferenceLock {
         ".obsidian",
         ".merged_output",
         ".DS_Store",
+        "desktop.ini",
+        "Thumbs.db",
     ]
 
     /// Suffixes never locked, whatever the rest of the name is.
