@@ -97,6 +97,32 @@ struct AssistPublishDateMove {
 /// it and stops, `publish_pages` describes it and applies it. One description
 /// of the change, in one place — two would drift, and the day they drift is the
 /// day a teacher agrees to one thing and gets another.
+/// A name the teacher gave that fits more than one page's file (#425).
+struct AssistAmbiguousName {
+
+    // MARK: - Stored properties
+
+    /// The name as given.
+    let asked: String
+
+    /// Every page it fits, in path order.
+    let pages: [AssistSectionPage]
+
+    // MARK: - Functions
+
+    /// "Notes" for "Concepts/Notes" — the name the question is about.
+    static func nameWithoutFolder(_ asked: String) -> String {
+        var name: String = asked.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let lastSlash = name.lastIndex(of: "/") {
+            name = String(name[name.index(after: lastSlash)...])
+        }
+        if name.lowercased().hasSuffix(".md") {
+            name = String(name.dropLast(3))
+        }
+        return name.trimmingCharacters(in: .whitespaces)
+    }
+}
+
 struct AssistPublishPlan {
 
     // MARK: - Stored properties
@@ -163,6 +189,18 @@ struct AssistPublishPlan {
     let linkedClassesLeftAlone: [AssistSectionPage]
 
     let dateMoves: [AssistPublishDateMove]
+
+    /// Names the teacher gave that fit more than one page's FILE, each with
+    /// the pages it fits (#425). Nothing is chosen for such a name: the
+    /// runner asks which was meant (`morePagesThanOneAreCalled`) instead of
+    /// writing the first in path order.
+    var ambiguousNames: [AssistAmbiguousName] = []
+
+    /// How the plan names a page whose title another page of the section
+    /// also has: `pageNameInFolder`, keyed by the page's path (#425, the
+    /// naming rule start of year uses). A page not in here is named by its
+    /// title alone.
+    var namesWithTheirFolder: [String: String] = [:]
 
     // MARK: - Computed properties
 
@@ -269,10 +307,14 @@ struct AssistPublishPlan {
                 // the name of a line in a file — the teacher is being shown
                 // the implementation of the thing they asked for.
                 let becoming: String = change.willBeVisible ? "visible" : "hidden"
-                var line: String = "“\(change.page.displayTitle)” will become \(becoming)"
-                // The date, said here rather than in a list of its own.
+                let shown: String = namesWithTheirFolder[change.page.fileURL.path]
+                    ?? "“\(change.page.displayTitle)”"
+                var line: String = "\(shown) will become \(becoming)"
+                // The date, said here rather than in a list of its own. Matched
+                // by PATH (#425): two pages sharing a file name must not take
+                // each other's dates.
                 for move in dateMoves
-                where move.page.lowercasedTitle == change.page.lowercasedTitle {
+                where move.page.fileURL.path == change.page.fileURL.path {
                     line += ", with the same date as “\(move.takenFrom)”"
                 }
                 lines.append(line + ".")
@@ -572,17 +614,30 @@ enum AssistPublishPlanner {
     ) -> AssistPublishPlan {
         var named: [AssistSectionPage] = []
         var unknownNames: [String] = []
+        var ambiguousNames: [AssistAmbiguousName] = []
+        // Chosen by PATH, not by file name (#425): two pages sharing a file
+        // name are two pages.
         var chosen: Set<String> = []
 
         for title in titles {
-            guard let page = graph.page(titled: title) else {
+            let fitting: [AssistSectionPage] = graph.pagesWhoseFileIsCalled(
+                title, courseDirectoryURL: course.directoryURL
+            )
+            if fitting.isEmpty {
                 unknownNames.append(title.trimmingCharacters(in: .whitespaces))
                 continue
             }
-            if chosen.contains(page.lowercasedTitle) {
+            if fitting.count > 1 {
+                ambiguousNames.append(AssistAmbiguousName(
+                    asked: title.trimmingCharacters(in: .whitespaces), pages: fitting
+                ))
                 continue
             }
-            chosen.insert(page.lowercasedTitle)
+            let page: AssistSectionPage = fitting[0]
+            if chosen.contains(page.fileURL.path) {
+                continue
+            }
+            chosen.insert(page.fileURL.path)
             named.append(page)
         }
 
@@ -603,10 +658,10 @@ enum AssistPublishPlanner {
                 guard let page = graph.page(titled: summary.title) else {
                     continue
                 }
-                if chosen.contains(page.lowercasedTitle) {
+                if chosen.contains(page.fileURL.path) {
                     continue
                 }
-                chosen.insert(page.lowercasedTitle)
+                chosen.insert(page.fileURL.path)
                 named.append(page)
             }
         }
@@ -646,7 +701,7 @@ enum AssistPublishPlanner {
         // A page whose date would move but whose visibility is already right
         // still has to be written, so the date moves are carried through whole
         // rather than filtered against the visibility changes.
-        return AssistPublishPlan(
+        var made: AssistPublishPlan = AssistPublishPlan(
             courseCode: course.code,
             sectionNumber: sectionNumber,
             publishes: publishes,
@@ -659,6 +714,54 @@ enum AssistPublishPlanner {
             linkedClassesLeftAlone: linkedClassesLeftAlone,
             dateMoves: dateMoves
         )
+        made.ambiguousNames = ambiguousNames
+        made.namesWithTheirFolder = namesWithTheirFolder(in: graph, course: course)
+        return made
+    }
+
+    /// `pageNameInFolder` for every page of the section whose title another
+    /// page of the section also has, keyed by path (#425) — the rule start of
+    /// year names pages by (`StartOfYearPageNaming.name`).
+    static func namesWithTheirFolder(in graph: AssistSectionGraph, course: Course) -> [String: String] {
+        var titles: [String] = []
+        for page in graph.pages {
+            titles.append(page.displayTitle)
+        }
+        let shared: Set<String> = StartOfYearPageNaming.titlesHeldByMoreThanOne(titles)
+        var names: [String: String] = [:]
+        for page in graph.pages where shared.contains(StartOfYearPageNaming.titleKey(page.displayTitle)) {
+            names[page.fileURL.path] = StartOfYearPageNaming.name(
+                title: page.displayTitle, fileURL: page.fileURL, sharedTitles: shared,
+                courseDirectoryURL: course.directoryURL, courseCode: course.code
+            )
+        }
+        return names
+    }
+
+    /// The question asked when a name fits more than one page (#425):
+    /// `morePagesThanOneAreCalled`, then one line per page — its name with
+    /// its folder, and the folder-and-name to ask again with, which is the
+    /// "name at the end" the sentence points at.
+    static func askingWhichPageWasMeant(
+        _ ambiguous: AssistAmbiguousName, course: Course, sectionNumber: Int
+    ) -> String {
+        var lines: [String] = [
+            AssistWording.morePagesThanOneAreCalled(
+                page: AssistAmbiguousName.nameWithoutFolder(ambiguous.asked),
+                course: course.code, section: String(sectionNumber)
+            ),
+        ]
+        for page in ambiguous.pages {
+            let folder: String = StartOfYearPageNaming.folder(
+                of: page.fileURL, courseDirectoryURL: course.directoryURL, courseCode: course.code
+            )
+            let fileName: String = page.fileURL.deletingPathExtension().lastPathComponent
+            lines.append(
+                "• " + StartOfYearWording.pageNameInFolder(page: page.displayTitle, folder: folder)
+                + " — " + folder + "/" + fileName
+            )
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// What hiding EXACTLY these pages would do — no sweep, no link
@@ -1479,6 +1582,9 @@ enum AssistToolRefusal: LocalizedError, Equatable {
     /// "Nothing needed changing." that reports success about a request that
     /// found nothing at all.
     case noPageByThatName(names: [String], course: String, section: Int)
+    /// A name fit more than one page (#425): the whole question, already
+    /// worded by `AssistPublishPlanner.askingWhichPageWasMeant`.
+    case whichPageWasMeant(String)
     case notInThisBuild(String)
     /// The course named is kept for reference, so nothing may write to it and
     /// nothing may deploy it.
@@ -1529,15 +1635,14 @@ enum AssistToolRefusal: LocalizedError, Equatable {
         case .nothingNamed:
             return "No pages and no dates were given, so there is nothing to change."
         case .openEndedPublish(let day):
-            return "That asks to publish every class from \(day.text) to the end of the course, which is "
-                 + "almost certainly not what was meant. For ONE day's class, use publish_class_on with "
-                 + "that date. For a stretch of classes, give both onOrAfter and before. To publish "
-                 + "particular pages, name them."
+            return AssistWording.openEndedPublishRefused(day: day.text)
         case .askedForEveryPage(let publishing, let example):
             if publishing {
                 return AssistWording.everyPageIsNotAPageToPublish(example: example)
             }
             return AssistWording.everyPageIsNotAPageToHide(example: example)
+        case .whichPageWasMeant(let question):
+            return question
         case .noPageByThatName(let names, let code, let number):
             // The teacher's sentences, not `noSuchPage`'s, which tells the
             // MODEL to use list_pages: a write's refusal ends the turn and is

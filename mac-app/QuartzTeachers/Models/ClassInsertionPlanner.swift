@@ -257,6 +257,41 @@ enum ClassInsertionPlanner {
         )
     }
 
+    /// The pages making room could not finish, by kind (#425) — the reply
+    /// names them, the trail counts them.
+    struct NotFinished: Equatable {
+
+        // MARK: - Stored properties
+
+        var notRenamed: [String] = []
+        var notReDated: [String] = []
+        var linksNotUpdated: [String] = []
+        var newNotAdded: [String] = []
+
+        // MARK: - Computed properties
+
+        /// Every page named once, in the order met.
+        var pages: [String] {
+            var named: [String] = []
+            for list in [notRenamed, notReDated, linksNotUpdated, newNotAdded] {
+                for name in list where !named.contains(name) {
+                    named.append(name)
+                }
+            }
+            return named
+        }
+
+        /// The contract's line: `activityTrail.mustRecord` → "making room did
+        /// not finish every page" → `line`. Counts only, never names.
+        var trailLine: String {
+            let count: Int = pages.count
+            let pageWord: String = count == 1 ? "page" : "pages"
+            return "making room for a class did not finish \(count) \(pageWord): "
+                 + "\(notRenamed.count) not renamed, \(notReDated.count) not re-dated, "
+                 + "\(linksNotUpdated.count) with links not updated, \(newNotAdded.count) new not added"
+        }
+    }
+
     /// Carry the insertion out: rename, follow the links, move the dates, then
     /// create the blanks.
     ///
@@ -294,18 +329,38 @@ enum ClassInsertionPlanner {
             forSection: plan.sectionNumber
         )
 
+        // What could not be finished, by kind (#425, adopted from Windows'
+        // #422). A write that fails part way used to THROW out of here with
+        // the earlier renames already on disk and nothing said about which;
+        // a rename whose new name was taken was skipped in silence, and so was
+        // a new class whose name was still in use. Now each is carried past,
+        // counted, named in the reply and recorded on the trail, and every
+        // count in the reply is of what was WRITTEN.
+        var notFinished: NotFinished = NotFinished()
+
         // 1. The renames, highest day first.
         var renamed: [String: String] = [:]
         for rename in plan.renames {
-            guard fileManager.fileExists(atPath: rename.fromURL.path),
-                  !fileManager.fileExists(atPath: rename.toURL.path),
-                  let text = try? String(contentsOf: rename.fromURL, encoding: .utf8) else {
+            if !fileManager.fileExists(atPath: rename.fromURL.path) {
+                continue
+            }
+            if fileManager.fileExists(atPath: rename.toURL.path) {
+                notFinished.notRenamed.append(rename.from)
+                continue
+            }
+            guard let text = try? String(contentsOf: rename.fromURL, encoding: .utf8) else {
+                notFinished.notRenamed.append(rename.from)
                 continue
             }
             // The title inside the file follows the file name: a page whose
             // name and title disagree is worse than either being wrong alone.
             let retitled: String = PageFrontmatter.settingTitle(in: text, to: rename.to)
-            try retitled.write(to: rename.toURL, atomically: true, encoding: .utf8)
+            do {
+                try retitled.write(to: rename.toURL, atomically: true, encoding: .utf8)
+            } catch {
+                notFinished.notRenamed.append(rename.from)
+                continue
+            }
             try? fileManager.removeItem(at: rename.fromURL)
             renamed[rename.from] = rename.to
         }
@@ -328,8 +383,12 @@ enum ClassInsertionPlanner {
                 }
                 let updated: String = WikiLinkRewriter.rewriting(text, renamedPages: renamed)
                 if updated != text {
-                    try updated.write(to: pageURL, atomically: true, encoding: .utf8)
-                    linksRewritten += here
+                    do {
+                        try updated.write(to: pageURL, atomically: true, encoding: .utf8)
+                        linksRewritten += here
+                    } catch {
+                        notFinished.linksNotUpdated.append(pageURL.deletingPathExtension().lastPathComponent)
+                    }
                 }
             }
         }
@@ -343,10 +402,26 @@ enum ClassInsertionPlanner {
         // it was about it.
         var notDated: [String] = []
         for move in plan.moves {
-            // A renamed page is found under its NEW name by now.
-            var pageURL: URL = folderURL.appendingPathComponent(move.title + ".md")
-            if !fileManager.fileExists(atPath: pageURL.path) {
-                pageURL = move.fileURL
+            // A renamed page is found under its NEW name by now — but only if
+            // THIS run renamed it (#425): when its rename could not be done,
+            // the page under the new name is somebody else's, and re-dating it
+            // would move a page the plan never meant.
+            var wasRenamedHere: Bool = false
+            for (_, to) in renamed where to == move.title {
+                wasRenamedHere = true
+            }
+            var wasToBeRenamed: Bool = false
+            for rename in plan.renames where rename.to == move.title {
+                wasToBeRenamed = true
+            }
+            // A page whose rename did not happen keeps its date too: it keeps
+            // its place, and its name already says which day it is.
+            if wasToBeRenamed && !wasRenamedHere {
+                continue
+            }
+            var pageURL: URL = move.fileURL
+            if wasRenamedHere {
+                pageURL = folderURL.appendingPathComponent(move.title + ".md")
             }
             guard fileManager.fileExists(atPath: pageURL.path),
                   let text = try? String(contentsOf: pageURL, encoding: .utf8) else {
@@ -356,8 +431,12 @@ enum ClassInsertionPlanner {
                 in: text, key: createdKey, to: move.to, fallbackTail: tail
             )
             if result.outcome == .written {
-                try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
-                moved += 1
+                do {
+                    try result.text.write(to: pageURL, atomically: true, encoding: .utf8)
+                    moved += 1
+                } catch {
+                    notFinished.notReDated.append(pageURL.deletingPathExtension().lastPathComponent)
+                }
             }
             if result.outcome == .noRoomForAKey {
                 notDated.append(pageURL.deletingPathExtension().lastPathComponent)
@@ -385,6 +464,7 @@ enum ClassInsertionPlanner {
         var created: [URL] = []
         for planned in plan.added {
             if fileManager.fileExists(atPath: planned.fileURL.path) {
+                notFinished.newNotAdded.append(planned.title)
                 continue
             }
             let body: String = ClassPages.skeleton(
@@ -396,13 +476,29 @@ enum ClassInsertionPlanner {
                 howMany: plan.added.count,
                 tail: tail
             )
-            try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
-            created.append(planned.fileURL)
+            do {
+                try body.write(to: planned.fileURL, atomically: true, encoding: .utf8)
+                created.append(planned.fileURL)
+            } catch {
+                notFinished.newNotAdded.append(planned.title)
+            }
         }
 
         var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
         if !notDated.isEmpty {
             message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
+        }
+        let unfinished: [String] = notFinished.pages
+        if !unfinished.isEmpty {
+            ActivityTrail.note(
+                .makingRoomDidNotFinishEveryPage,
+                notFinished.trailLine,
+                course: course.code,
+                section: plan.sectionNumber
+            )
+            message += " " + AssistWording.pagesAChangeCouldNotFinish(
+                AssistPublishPlan.listingAFew(unfinished), count: unfinished.count
+            )
         }
         return ClassChangeOutcome(message: message, created: created)
     }
