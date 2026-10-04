@@ -89,6 +89,106 @@ public sealed partial record AssistCardCommand
         return (dayWord, words);
     }
 
+    // ---- "schedule a deploy …" and "cancel the scheduled deploy" (#424) -----
+
+    /// <summary>
+    /// <c>[please] schedule a|the deploy [today|tomorrow] at|for &lt;time&gt; …</c>
+    /// read AS the deploy-at-a-time family — "schedule a deploy" for "deploy",
+    /// and "for" for "at" in that one place — or null. Everything after the
+    /// opening is then the family's own frame, so an accepted, asked and
+    /// refused time is read exactly as "deploy at …" reads it.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why (#424).</b> Measured on this PC (bundle 10, Intel UHD 620,
+    /// Qwen2.5-1.5B): with <c>includeLinked</c> gone from the local surface, a
+    /// sentence asking for a LATER deploy reached <c>deploy_section</c> 10 of
+    /// 10 — an immediate deploy behind the Deploy button. Read in code, the
+    /// canonical phrasing never reaches the model.</para>
+    /// <para><b>Tolerance is the hide frame's discipline, not more.</b> A
+    /// question mark falls through (a teacher may be ASKING whether one is
+    /// scheduled); so does a leading word other than "please" ("don't"), and
+    /// any course, section or condition named — a card binds THIS window's
+    /// course and section.</para>
+    /// </remarks>
+    internal static string? ScheduleAsDeploy(string tidied)
+    {
+        if (tidied.EndsWith('?')) return null;
+        var words = Words(tidied).ToList();
+        bool please = words.Count > 0 && words[0] == "please";
+        if (please) words.RemoveAt(0);
+        if (words.Count < 3 || words[0] != "schedule" || words[1] is not ("a" or "the") || words[2] != "deploy")
+            return null;
+        words.RemoveRange(0, 3);
+        // The day first (bundle A fix round, ruling 1a): "for tomorrow at
+        // 6:30 am" is "tomorrow at 6:30 am" — the more common order.
+        if (words.Count >= 2 && words[0] == "for" && words[1] is "today" or "tomorrow") words.RemoveAt(0);
+        int where = words.Count > 0 && words[0] is "today" or "tomorrow" ? 1 : 0;
+        if (words.Count > where && words[where] == "for") words[where] = "at";
+        var rebuilt = new List<string>();
+        if (please) rebuilt.Add("please");
+        rebuilt.Add("deploy");
+        rebuilt.AddRange(words);
+        return string.Join(' ', rebuilt);
+    }
+
+    /// <summary>
+    /// "schedule a deploy" with no time the family can set (#424): never a deploy now, and
+    /// never sent to the model, which measured 10 of 10 to an immediate deploy
+    /// for this shape of sentence. The app asks for the time instead
+    /// (<see cref="AssistWording.ScheduleADeployNeedsATime"/>), transcript only.
+    /// </summary>
+    /// <remarks>
+    /// Widened in the bundle A fix round (ruling 1b): ANY sentence that opens
+    /// "[please] schedule a|the deploy" and is not answered by the family —
+    /// "schedule a deploy tomorrow morning", "… later today", "… for Monday",
+    /// "… at 7" — is asked about, because the model it would otherwise reach
+    /// sent exactly this shape to an immediate deploy 10 of 10. Three things
+    /// still fall through to the model, as everywhere in these frames: a
+    /// question mark, a negation, and another course or section named (a
+    /// card, and this question, are about THIS window's section).
+    /// </remarks>
+    public static bool AsksWhenToSchedule(string message)
+    {
+        string tidied = TidiedForTime(message);
+        if (tidied.EndsWith('?')) return false;
+        var words = Words(tidied).ToList();
+        if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
+        if (words.Count < 3 || words[0] != "schedule" || words[1] is not ("a" or "the") || words[2] != "deploy")
+            return false;
+        foreach (string raw in words.Skip(3))
+        {
+            string word = raw.Trim(',', ';', ':');
+            if (word is "don't" or "dont" or "don’t" or "not" or "never" or "no") return false;
+            if (word.Contains("section", StringComparison.Ordinal) || word is "course" or "courses") return false;
+            if (System.Text.RegularExpressions.Regex.IsMatch(word, "^[a-z]{3}[0-9][a-z0-9-]*$")) return false;
+        }
+        // Answered already — set, asked morning-or-evening, or respelled.
+        if (Matching(message) is not null || MorningOrEvening(message) is not null || TimeToSayAs(message) is not null)
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>[please] cancel the|that|my scheduled deploy [please]</c> →
+    /// <c>cancel_scheduled_deploy</c> (#424). Measured on this PC (bundle 10):
+    /// "Don't send it in the morning after all" went from 10/10 to 0/10 —
+    /// declined, so a deploy the teacher wanted stopped still went out. The
+    /// canonical sentence (the shelf's own, "Cancel that scheduled deploy") is
+    /// answered in code; anything else — a question mark, "don't", another
+    /// course or section — reaches the model as before. Cancelling is the
+    /// SAFE direction: it stops a deploy and starts nothing.
+    /// </summary>
+    private static AssistCardCommand? CancelTheScheduledDeploy(string tidied)
+    {
+        var words = Words(tidied).ToList();
+        if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
+        if (words.Count > 0 && words[^1] == "please") words.RemoveAt(words.Count - 1);
+        return string.Join(' ', words) is "cancel the scheduled deploy" or "cancel that scheduled deploy"
+                                          or "cancel my scheduled deploy"
+            ? new AssistCardCommand("cancel_scheduled_deploy", new Dictionary<string, string>())
+            : null;
+    }
+
     private static AssistCardCommand? DeployAtATime(string tidied)
     {
         if (DeployFrame(tidied) is not { } frame) return null;
@@ -181,6 +281,7 @@ public sealed partial record AssistCardCommand
     public static AssistTimeQuestion? MorningOrEvening(string message)
     {
         string tidied = TidiedForTime(message);
+        if (ScheduleAsDeploy(tidied) is { } asDeploy) tidied = asDeploy;   // #424
         if (DeployFrame(tidied) is { } frame && AskedOutright(frame.TimeWords, frame.DayWord) is { } question)
             return question;
         return RespellingReading(tidied, message) is { Question: { } asked } ? asked : null;
@@ -190,6 +291,7 @@ public sealed partial record AssistCardCommand
     public static AssistTimeRespelling? TimeToSayAs(string message)
     {
         string tidied = TidiedForTime(message);
+        if (ScheduleAsDeploy(tidied) is { } asDeploy) tidied = asDeploy;   // #424
         return RespellingReading(tidied, message) is { Respelling: { } respelling } ? respelling : null;
     }
 

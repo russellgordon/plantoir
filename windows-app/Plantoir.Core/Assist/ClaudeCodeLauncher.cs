@@ -8,7 +8,7 @@ namespace Plantoir.Core.Assist;
 
 /// <summary>
 /// Starting a Claude Code session already connected to this working folder's
-/// Plantoir tools, locked to one course.
+/// Plantoir tools, pointed at one course by its greeting.
 ///
 /// The teacher never types a command. Everything the connection needs is
 /// written for them and thrown away with the session:
@@ -19,9 +19,17 @@ namespace Plantoir.Core.Assist;
 ///   and nothing is left behind when the session ends.
 /// * **Nothing lands in the teacher's folder.** The config sits in the app's
 ///   own data directory, not in the vault Obsidian is watching.
-/// * **The session is locked to the course it was started from.** Passed to
-///   the server rather than asked for in a prompt, so it holds however the
-///   conversation wanders.
+/// * **The server is given the working folder, never a course** (#430;
+///   <c>app-rules.json</c> → <c>outsideAgents.courseIsNamedInTheGreetingOnly</c>
+///   and <c>serverArguments</c>). The greeting names the course it was opened
+///   from, and a teacher can still ask about another course in the same
+///   folder — as on the mac, and as this app's Codex door has since #210.
+///   Until v1.4.3 this door passed <c>--course</c> and locked the session to
+///   one course, the one place the two apps disagreed. The local assistant
+///   window STILL passes <c>--course</c>, which is why nothing tells the
+///   window apart by it: <c>PLANTOIR_LOCAL_WINDOW=1</c> does that. The
+///   course is ALSO named in the server's environment
+///   (<c>PLANTOIR_DOOR_COURSE</c>, fix round ruling 3) — held, never locked.
 ///
 /// The menu item only appears when this returns true from
 /// <see cref="IsAvailable"/> — a teacher without Claude Code should not be
@@ -223,6 +231,23 @@ public static class ClaudeCodeLauncher
         string directory = Plantoir.Core.Models.AppDataRoot.Combine("assist");
         Directory.CreateDirectory(directory);
 
+        // Still named after the course (writesForTheConnection: mcp-{course}.json)
+        // so two doors opened seconds apart cannot overwrite each other's file
+        // mid-launch — although what it says no longer depends on the course.
+        string path = Path.Combine(directory, $"mcp-{courseCode}.json");
+        File.WriteAllText(path, ConfigText(workspacePath, server, courseCode));
+        return path;
+    }
+
+    /// <summary>
+    /// The configuration file's text: one server, <c>plantoir</c>, started with
+    /// <see cref="ServerArguments"/> — the folder and no course (#430) — and,
+    /// in its ENVIRONMENT, the course the door was opened from
+    /// (<see cref="AssistWorkspace.DoorCourseVariable"/>, fix round ruling 3),
+    /// which the server holds an <c>assist</c> lease on without locking to it.
+    /// </summary>
+    internal static string ConfigText(string workspacePath, string server, string courseCode)
+    {
         var config = new
         {
             mcpServers = new Dictionary<string, object>
@@ -230,14 +255,14 @@ public static class ClaudeCodeLauncher
                 ["plantoir"] = new
                 {
                     command = server,
-                    args = new[] { "--folder", workspacePath, "--course", courseCode },
+                    args = ServerArguments(workspacePath),
+                    env = new Dictionary<string, string> { [AssistWorkspace.DoorCourseVariable] = courseCode },
                 },
             },
         };
-
-        string path = Path.Combine(directory, $"mcp-{courseCode}.json");
-        File.WriteAllText(path, JsonSerializer.Serialize(config,
-            new JsonSerializerOptions { WriteIndented = true }));
-        return path;
+        return JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
     }
+
+    /// <summary><c>outsideAgents.serverArguments</c>: <c>--mcp-stdio {folder}</c>, never a course.</summary>
+    internal static string[] ServerArguments(string workspacePath) => new[] { "--mcp-stdio", workspacePath };
 }

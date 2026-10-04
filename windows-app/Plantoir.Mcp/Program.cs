@@ -41,10 +41,14 @@ if (string.IsNullOrWhiteSpace(folder))
 AssistWorkspace workspace;
 try
 {
-    // --course locks the session to one course. Plantoir passes it when a
-    // teacher starts an assistant from that course's menu: the request was
-    // about that course, so a lock is a stronger guarantee than an
-    // instruction in a prompt the model might drift from.
+    // --course locks the session to one course. Only Plantoir's OWN assistant
+    // window passes it now (McpClient, with PLANTOIR_LOCAL_WINDOW=1): since
+    // v1.4.3 (#430) both outside doors pass `--mcp-stdio <folder>` and name
+    // the course in their greeting only (app-rules.json → outsideAgents.
+    // courseIsNamedInTheGreetingOnly), so an outside session can reach every
+    // course in the folder. The Claude door still names its course in
+    // DoorCourseVariable, and the `assist` lease below is taken on that course
+    // without locking to it; the Codex door names none and takes none.
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
@@ -64,8 +68,12 @@ catch (Exception error)
 // Section decline while the session is open — otherwise both would build into
 // the same output folder. Only when locked to a course: an unrestricted
 // session has no single course to claim.
-IDisposable? lease = workspace.LockedCourse is { } locked
-    ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, locked,
+// The Claude door names the course it was opened from in DoorCourseVariable
+// (fix round ruling 3): held, never locked, so #283's backup protection, the
+// second-session guard and the hold on structural work survive #430.
+IDisposable? lease = workspace.CourseToHoldForTheConversation(
+        Environment.GetEnvironmentVariable(AssistWorkspace.DoorCourseVariable)) is { } held
+    ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, held,
         Plantoir.Core.Assist.WorkLease.Assisting)
     : null;
 // Its own work stops BEFORE any lease goes (#289): a build this server started
@@ -101,6 +109,10 @@ builder.Services.AddMcpServer(options =>
             ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
         if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
             return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
+        // An outside assistant's change while the course is being BUILT is held
+        // back here, before any backup (#436): OutsideChangeGate.
+        if (context.Params?.Name is { } asked && OutsideChangeGate.Refusal(asked, arguments, workspace) is { } heldBack)
+            return new CallToolResult { Content = [new TextContentBlock { Text = heldBack }] };
         return await next(context, cancellation);
     }));
 

@@ -99,6 +99,9 @@ COURSE = args[args.index("--course") + 1] if "--course" in args else "EXC2O"
 SECTION = 1
 PROMPT_FORM = args[args.index("--prompt") + 1] if "--prompt" in args else "hyphen"
 APP_BODY = "--app-body" in args
+# --writing-limit-ms=N (with --app-body): send t_max_predict_ms, as Windows'
+# LocalModel.Request does since #424.
+WRITING_LIMIT_MS = next((int(a.split("=", 1)[1]) for a in args if a.startswith("--writing-limit-ms=")), None)
 UNCAPPED = "--uncapped" in args
 TEMPERATURE = float(args[args.index("--temperature") + 1]) if "--temperature" in args else 0.1
 if APP_BODY:
@@ -578,6 +581,38 @@ def intercepted(message, window_course=None, window_section=None):
             return "make_room_for_classes"
     if deploy_at_a_time(tidied):
         return "schedule_deploy"
+    # #424 (Windows, v1.4.3 bundle A; contracts/assist-cases.json ->
+    # scheduleAndCancel, AUTHORED): "schedule a|the deploy ..." is read as the
+    # family above, "for" standing for "at" right after the opening (or after
+    # a day word); with no time at all it is ASKED in code; and three exact
+    # "cancel ... scheduled deploy" sentences reach cancel_scheduled_deploy.
+    # A question mark is never stripped for these.
+    if not tidied.endswith("?"):
+        opened = re.fullmatch(r"(please )?schedule (a|the) deploy(.*)", tidied)
+        if opened:
+            words = opened.group(3).split()
+            if words[:1] == ["for"] and words[1:2] in (["today"], ["tomorrow"]):
+                words = words[1:]          # fix round ruling 1a: the day first
+            if words[:1] in (["today"], ["tomorrow"]) and words[1:2] == ["for"]:
+                words[1] = "at"
+            elif words[:1] == ["for"]:
+                words[0] = "at"
+            rebuilt = ("please " if opened.group(1) else "") + " ".join(["deploy"] + words)
+            if deploy_at_a_time(rebuilt):
+                return "schedule_deploy"
+            if deploy_time_asked_about(rebuilt):
+                return ASKED_IN_CODE
+            if deploy_time_said_as(rebuilt):
+                return SAID_AS_IN_CODE
+            # Fix round ruling 1b: anything else opening this way is ASKED,
+            # unless it negates, or names another course or section.
+            if not any(w.strip(",;:") in ("don't", "dont", "not", "never", "no", "course", "courses")
+                       or "section" in w or re.fullmatch(r"[a-z]{3}[0-9][a-z0-9-]*", w.strip(",;:"))
+                       for w in opened.group(3).split()):
+                return ASKED_IN_CODE
+        bare = re.sub(r"^please |( please)$", "", tidied)
+        if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy"):
+            return "cancel_scheduled_deploy"
     if deploy_time_asked_about(tidied):
         # Not a tool: the app answers "deploy at 6:30" with a question of its
         # own and sends nothing to the model (#194), so a probe like this one
@@ -1352,6 +1387,11 @@ def ask(prompt):
         payload["stream"] = False
         if not UNCAPPED:
             payload["max_tokens"] = APP_CAP
+        # Windows' LocalModel.Request since #424 (v1.4.3 bundle A): llama-server's
+        # t_max_predict_ms. Only when asked for, so every earlier arm stays
+        # reproducible byte for byte.
+        if WRITING_LIMIT_MS is not None:
+            payload["t_max_predict_ms"] = WRITING_LIMIT_MS
     else:
         payload["max_tokens"] = 256
     request = urllib.request.Request(ENDPOINT, data=json.dumps(payload).encode(),

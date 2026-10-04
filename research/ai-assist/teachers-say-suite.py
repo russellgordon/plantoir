@@ -66,9 +66,17 @@ import time
 import urllib.request
 import urllib.error
 
-PORT = sys.argv[1] if len(sys.argv) > 1 else "8099"
-TRIALS = int(sys.argv[2]) if len(sys.argv) > 2 else 10
-TOOLS_PATH = sys.argv[3] if len(sys.argv) > 3 else "narrowed.json"
+# Flags after the three positionals (#424, v1.4.3 bundle A):
+#   --writing-limit-ms=N  send llama-server's t_max_predict_ms, as LocalModel.Request
+#                         does on Windows since #424 (30000). Without it the
+#                         body is the one this suite always sent.
+FLAGS = [a for a in sys.argv[1:] if a.startswith("--")]
+POSITIONAL = [a for a in sys.argv[1:] if not a.startswith("--")]
+WRITING_LIMIT_MS = next((int(a.split("=", 1)[1]) for a in FLAGS if a.startswith("--writing-limit-ms=")), None)
+
+PORT = POSITIONAL[0] if len(POSITIONAL) > 0 else "8099"
+TRIALS = int(POSITIONAL[1]) if len(POSITIONAL) > 1 else 10
+TOOLS_PATH = POSITIONAL[2] if len(POSITIONAL) > 2 else "narrowed.json"
 ENDPOINT = "http://127.0.0.1:%s/v1/chat/completions" % PORT
 
 COURSE = "EXC2O"
@@ -171,6 +179,8 @@ def ask(prompt):
         ],
         "tools": TOOLS,
     }
+    if WRITING_LIMIT_MS is not None:
+        payload["t_max_predict_ms"] = WRITING_LIMIT_MS
     request = urllib.request.Request(
         ENDPOINT, data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"})
@@ -183,6 +193,14 @@ def ask(prompt):
     elapsed = int((time.time() - started) * 1000)
     message = data["choices"][0]["message"]
     completion = data.get("usage", {}).get("completion_tokens", 0)
+    # A reply the engine STOPPED (the 512 cap, or the writing time limit) is
+    # a MISS whatever it names (#424): the app answers it with
+    # wording.answerWasCutOff and runs nothing, so scoring its tool name
+    # would count a turn the teacher saw fail. This suite read no
+    # finish_reason before, which is how a probe running to the cap for 61-89 s
+    # scored the same as a quick decline (bundle 10).
+    if data["choices"][0].get("finish_reason") == "length":
+        return "__CUT_OFF__", {}, completion, elapsed
     calls = message.get("tool_calls") or []
     if not calls:
         return None, {}, completion, elapsed
@@ -217,8 +235,11 @@ def main():
     wrong_values = 0
     malformed = 0
     truncated = 0
+    cut_off = 0
+    next_unit_sent = {}
     per_case = []
-    print("### tools=%s trials=%d dateline=%r" % (TOOLS_PATH, TRIALS, DATELINE.strip()))
+    print("### tools=%s trials=%d dateline=%r writing-limit-ms=%s" % (
+        TOOLS_PATH, TRIALS, DATELINE.strip(), WRITING_LIMIT_MS))
     print("%-26s %-28s %-5s %-6s %s" % ("probe", "chose", "ok", "ms", "arguments"))
     print("-" * 110)
     for group, acceptable, prompt, label in CASES:
@@ -228,6 +249,9 @@ def main():
             if name == "__MALFORMED__":
                 malformed += 1
                 name = None
+            if name == "__CUT_OFF__":
+                cut_off += 1
+                name = "(cut off)"
             if "__unparsed__" in args:
                 malformed += 1
                 truncated += 1
@@ -241,9 +265,16 @@ def main():
                 misroutes[label][name or "(declined)"] += 1
             if name is not None and wrong_course_or_section(args):
                 wrong_values += 1
+            # add_next_class's arguments IN FULL (#411 / #432 item 4): a
+            # `unit` of "next" starts a NEW unit, and 44 characters hid it.
+            if name == "add_next_class":
+                shown = json.dumps(args)
+                if str(args.get("unit", "")).lower() == "next":
+                    next_unit_sent[label] = next_unit_sent.get(label, 0) + 1
+            else:
+                shown = json.dumps(args)[:44]
             print("%-26s %-28s %-5s %-6s %s" % (
-                label[:25], name or "(declined)", "OK" if ok else "MISS", ms,
-                json.dumps(args)[:44]))
+                label[:25], name or "(declined)", "OK" if ok else "MISS", ms, shown))
         per_case.append((group, label, hits, TRIALS))
     print("-" * 110)
     for group, label, hits, trials in per_case:
@@ -261,6 +292,9 @@ def main():
     print("malformed tool calls: %d   (HTTP errors, plus arguments that did not parse)"
           % malformed)
     print("tool calls whose arguments were TRUNCATED mid-JSON: %d" % truncated)
+    print("replies the engine stopped (finish_reason length), each a MISS: %d" % cut_off)
+    print("add_next_class sent unit \"next\" (a NEW unit): %s" % (
+        ", ".join("%s x%d" % (k, v) for k, v in sorted(next_unit_sent.items())) or "never"))
     if misroutes:
         print("misroutes, by probe:")
         for label in sorted(misroutes):
