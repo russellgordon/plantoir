@@ -125,6 +125,7 @@ enum SectionTimetableStore {
         case noDatesGiven(String, Int)
         case unreadableDates(String, Int, [String])
         case halfRemembered(String, Int, [String])
+        case cannotBeClassDates(String, Int, [String])
         case couldNotWrite(String, Int, String)
 
         var errorDescription: String? {
@@ -135,13 +136,84 @@ enum SectionTimetableStore {
                 return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "isn’t a date" : "aren’t dates") written as 2026-09-08, so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with those corrected."
             case .halfRemembered(let code, let number, let offenders):
                 return "The remembered timetable for \(code) Section \(number) has \(offenders.count == 1 ? "an entry" : "entries") that cannot be read — \(SectionTimetableStore.list(offenders)). It is being ignored rather than half-trusted. Record the class dates again."
+            case .cannotBeClassDates(let code, let number, let offenders):
+                return "\(SectionTimetableStore.list(offenders)) \(offenders.count == 1 ? "is too far from today to be a class date" : "are too far from today to be class dates"), so nothing was remembered for \(code) Section \(number). A half-remembered timetable would date the wrong classes, so the whole list is refused — send it again with \(offenders.count == 1 ? "that date" : "those dates") corrected."
             case .couldNotWrite(let code, let number, let reason):
                 return "The class dates for \(code) Section \(number) could not be saved, so they are NOT remembered: \(reason)"
             }
         }
     }
 
+    // MARK: - Stored properties
+
+    /// The earliest class date a remembered timetable can hold and be
+    /// believed — `file-formats.json` → `sectionTimetable.believable.earliest`.
+    /// Generous on purpose (last year's dates are fine), and still centuries
+    /// clear of every wrong reading a calendar can produce: a Buddhist year
+    /// read as Gregorian is 2569, a Gregorian one read as Buddhist 1483, an
+    /// Umm al-Qura one 1448.
+    static let earliestBelievable: CalendarDay = CalendarDay(year: 2000, month: 1, day: 1)!
+
+    /// How many years past today a remembered class may fall and be believed
+    /// — `sectionTimetable.believable.yearsAhead`. Future class dates are the
+    /// point of the file; the nearest wrong reading is 543 years out.
+    static let yearsAheadBelievable: Int = 3
+
     // MARK: - Functions
+
+    /// The first of these dates that cannot be a class date — before
+    /// `earliestBelievable`, or more than `yearsAheadBelievable` years past
+    /// `today` — or nil when every one of them can (GitHub #377, from
+    /// Windows #144).
+    ///
+    /// Asked by the reader AND the writer, so what one accepts the other
+    /// believes: a list the writer saved and the reader then disbelieved
+    /// would be a timetable remembered and, the next moment, missing.
+    ///
+    /// Why it exists: until #144 the Windows app wrote each year in the PC's
+    /// own calendar, so a Thai-locale PC wrote `2569-09-08` for 2026-09-08.
+    /// This file travels inside the course folder — through backups,
+    /// archives, restores and shared working folders — so a mac can meet one,
+    /// and read invariantly it is the Gregorian year 2569: "when is my next
+    /// class?" answered from five centuries ahead, with nothing reporting a
+    /// fault.
+    static func firstDateThatCannotBeAClassDate(in dates: [CalendarDay], today: CalendarDay) -> CalendarDay? {
+        for date in dates {
+            if !canBeAClassDate(date, today: today) {
+                return date
+            }
+        }
+        return nil
+    }
+
+    /// Whether one date falls inside the window — both bounds inclusive.
+    static func canBeAClassDate(_ date: CalendarDay, today: CalendarDay) -> Bool {
+        if date < earliestBelievable {
+            return false
+        }
+        if latestBelievable(after: today) < date {
+            return false
+        }
+        return true
+    }
+
+    /// `today` moved `yearsAheadBelievable` years on. The 29th of February
+    /// lands on the 28th in a year without one, as .NET's `AddYears` does on
+    /// Windows, so both apps draw the ceiling on the same day.
+    static func latestBelievable(after today: CalendarDay) -> CalendarDay {
+        let year: Int = today.year + yearsAheadBelievable
+        if let sameDay = CalendarDay(year: year, month: today.month, day: today.day) {
+            return sameDay
+        }
+        return CalendarDay(year: year, month: today.month, day: 28)!
+    }
+
+    /// The trail's words when a remembered timetable is set aside — the date
+    /// that could not be a class date, and what happens next. Never a page,
+    /// never the teacher's description of where the dates came from.
+    static func setAsideTrailLine(naming impossible: CalendarDay) -> String {
+        return "remembered class dates set aside: they include \(impossible.text), which cannot be a class date, so they will be asked for again"
+    }
 
     /// Where a section's remembered timetable lives.
     static func fileURL(forSection sectionNumber: Int, in course: Course) -> URL {
@@ -156,12 +228,36 @@ enum SectionTimetableStore {
     /// Throws only when a file IS there and cannot be read whole — the caller
     /// then tells the teacher rather than silently working from a fraction of
     /// their timetable.
-    static func read(forSection sectionNumber: Int, in course: Course) throws -> SectionTimetable? {
+    ///
+    /// A file holding a date that cannot be a class date
+    /// (`firstDateThatCannotBeAClassDate`) is read as NOTHING remembered, and
+    /// says so on the trail: the teacher is asked for the dates again, and the
+    /// next write replaces the file. Not a throw, because there is nothing the
+    /// teacher can fix in the file — it was written by an older Windows app,
+    /// and asking again is the cure. `today` is for tests, which need an
+    /// answer that does not move.
+    static func read(
+        forSection sectionNumber: Int,
+        in course: Course,
+        today: CalendarDay = CalendarDay.today()
+    ) throws -> SectionTimetable? {
         let url: URL = fileURL(forSection: sectionNumber, in: course)
         guard let data = try? Data(contentsOf: url) else {
             return nil
         }
-        return try timetable(fromJSON: data, courseCode: course.code, sectionNumber: sectionNumber)
+        guard let remembered = try timetable(fromJSON: data, courseCode: course.code, sectionNumber: sectionNumber) else {
+            return nil
+        }
+        if let impossible = firstDateThatCannotBeAClassDate(in: remembered.dates, today: today) {
+            ActivityTrail.note(
+                .rememberedTimetableSetAside,
+                setAsideTrailLine(naming: impossible),
+                course: course.code,
+                section: sectionNumber
+            )
+            return nil
+        }
+        return remembered
     }
 
     /// The stored shape, read. Pure, so the refusal can be tested without a
@@ -211,7 +307,17 @@ enum SectionTimetableStore {
 
     /// Every given date read as a day, or a refusal naming the ones that could
     /// not be — never a shortened list. Pure.
-    static func checkedDates(_ given: [String], courseCode: String, sectionNumber: Int) throws -> [CalendarDay] {
+    ///
+    /// A list holding a date that cannot be a class date is refused too, and
+    /// the refusal names every such date (#377): the reader would set that
+    /// file aside, so saving it would tell the teacher their timetable was
+    /// remembered and then ask for it again.
+    static func checkedDates(
+        _ given: [String],
+        courseCode: String,
+        sectionNumber: Int,
+        today: CalendarDay = CalendarDay.today()
+    ) throws -> [CalendarDay] {
         var dates: [CalendarDay] = []
         var offenders: [String] = []
         for text in given {
@@ -234,6 +340,16 @@ enum SectionTimetableStore {
             throw Problem.noDatesGiven(courseCode, sectionNumber)
         }
         dates.sort()
+
+        var impossible: [String] = []
+        for date in dates {
+            if !canBeAClassDate(date, today: today) {
+                impossible.append("“\(date.text)”")
+            }
+        }
+        if !impossible.isEmpty {
+            throw Problem.cannotBeClassDates(courseCode, sectionNumber, impossible)
+        }
         return dates
     }
 
@@ -246,7 +362,9 @@ enum SectionTimetableStore {
         in course: Course,
         today: CalendarDay = CalendarDay.today()
     ) throws -> RememberTimetablePlan {
-        let dates: [CalendarDay] = try checkedDates(given, courseCode: course.code, sectionNumber: sectionNumber)
+        let dates: [CalendarDay] = try checkedDates(
+            given, courseCode: course.code, sectionNumber: sectionNumber, today: today
+        )
         let describedSource: String = source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "not recorded"
             : source.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -9,8 +9,11 @@
 // saw the painted corners on the live site. A crop through a window cannot
 // keep the window's real corners, so the answer is a window that never had a
 // toolbar: this one. Its edge is the window's own edge, and
-// `screencapture -x -o -l <window number>` — the Option-click window capture —
-// hands it back with macOS's real corner curve, transparent outside it.
+// `screencapture -x -l <window number>` — macOS's own window capture — hands
+// it back with the real corner curve and the window's natural shadow (#434).
+// The window is made key and this process the active app before the
+// picture, because macOS draws a smaller, lighter shadow round an inactive
+// window, and the parts of a figure must match every other window shot.
 // Safari 26 has no "Hide Toolbar" outside full screen, which is why this is
 // not simply Safari with its toolbar hidden.
 //
@@ -80,7 +83,7 @@ final class PageWindow: NSObject, WKNavigationDelegate {
             let visible = screen.visibleFrame
             window.setFrameTopLeftPoint(NSPoint(x: visible.minX + 60, y: visible.maxY - 40))
         }
-        window.orderFrontRegardless()
+        bringToFront()
         webView.load(URLRequest(url: address))
     }
 
@@ -126,13 +129,28 @@ final class PageWindow: NSObject, WKNavigationDelegate {
             }
             try? await Task.sleep(for: .seconds(1.5))
         }
-        capture()
+        await capture()
     }
 
-    func capture() {
+    /// Active app, key window: the state macOS draws the full shadow for.
+    func bringToFront() {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
+    func capture() async {
+        // Asked again just before the picture, and given a second to redraw
+        // the shadow: something else may have come forward during the settle.
+        bringToFront()
+        try? await Task.sleep(for: .seconds(1))
+        if !NSApplication.shared.isActive || !window.isKeyWindow {
+            fail("the page window was not the active window, so its shadow would not match the other shots")
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-x", "-o", "-l", String(window.windowNumber), outputPath]
+        process.arguments = ["-x", "-l", String(window.windowNumber), outputPath]
         do {
             try process.run()
             process.waitUntilExit()
@@ -178,7 +196,7 @@ let settleSeconds: Double = arguments.count >= 6 ? (Double(arguments[5]) ?? 3.5)
 // Top-level code runs on the main thread; saying so lets it build the window.
 MainActor.assumeIsolated {
     let application = NSApplication.shared
-    application.setActivationPolicy(.accessory)
+    application.setActivationPolicy(.regular)
     let pageWindow = PageWindow(
         address: address,
         width: width,

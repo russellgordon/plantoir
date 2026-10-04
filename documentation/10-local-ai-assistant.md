@@ -876,6 +876,21 @@ caught — and takes a repeated hour as its earlier instant. Both are pinned in
 `DeployAtATimeContractTests` against `America/Toronto`, and proposed back to
 the mac as `resolving` rows in the bundle's mac draft.
 
+*And both are contract rows now* ([#411](https://github.com/russellgordon/plantoir/issues/411),
+accepted by Russell 2026-10-03, landed 2026-10-04): `deployAtATime.resolving`
+11 → 13. The mac's product already settled both as the rows say — nothing in
+`AssistToolRunner.momentText` changed. What did change is how the mac's RUNNER
+reads the fall-back row's `now`, "2026-11-01 01:45", which is itself an
+ambiguous wall time: `DateFormatter` reads it as the LATER instant (06:45 UTC,
+measured on this Mac), and read that way every "01:30" is already gone, so the
+row would pass under either convention and test nothing. `ScheduleDeployCardTests.givenNow`
+reads it as the EARLIER instant, as the row says ("asked in the FIRST 01:00
+hour") and as Windows reads it. That is a statement about the given `now` only.
+Must-fails, run 2026-10-04: settling a nonexistent 02:30 onto 03:00 turns the
+spring row red ("2026-03-08 03:00" is not "2026-03-08 03:30"); taking a
+repeated hour's LATER instant turns the fall-back row red ("2026-11-01 01:30"
+is not "2026-11-02 01:30").
+
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read
 that time". That is a deliberate divergence from the `publish_class_on`
@@ -938,11 +953,11 @@ never drift apart:
 
 **THE WHOLE VERB IS GATED, not only the day arm, and that asymmetry is the
 decision.** `hide` and `unpublish` take a whole unit or one class page and
-tolerate the spellings below; `publish` is read by a frame of its own that has
-not moved — the literal opening `publish unit ` and a bare number — so `publish
-unit 4, day 3` still goes to the model, and so do `publish unit 4?`, `please
-publish unit 4`, `publish unit 4 please`, `publish  unit 5` and `publish unit,
-4`.
+tolerate the spellings below; `publish` is read by a frame of its own: the
+literal opening `publish unit ` and a bare number, or, since #411, the exact
+form `publish unit 4, day 3` (below). Every looser spelling still goes to the
+model: `publish unit 4?`, `please publish unit 4`, `publish unit 4 please`,
+`publish  unit 5` and `publish unit, 4`.
 
 **That split was made deliberately rather than inherited, and it was got wrong
 first.** The original version read the verb AFTER stripping the courtesy words
@@ -956,14 +971,35 @@ model in the loop — the same ambiguity used two paragraphs down to reject `sho
 unit 4`. Re-run after the gate on a wider 36,864-input sweep: **0 lost, 0
 changed, 0 new `publish_pages`**, 2,850 new `unpublish_pages`. Five of the 141
 are pinned as `refused` rows so the gate is data rather than a comment, and
-`HideIsUnpublishCardTests.testPublishStillTakesAWholeUnitAndNoPage` asserts the
+`HideIsUnpublishCardTests.testPublishTakesAWholeUnitOrOneExactPageAndNoWiderSpelling`
+(named `testPublishStillTakesAWholeUnitAndNoPage` until #411) asserts the
 TOLERANCE as well as the reference — a test naming only the reference did not
 catch it.
 
 The reason for the asymmetry, underneath all of that: unpublishing errs safe — a
 page nobody can see — while publishing puts a page in front of students, and
-"Publish Unit 2, Day 3" is 10/10 on this tier today, so there was nothing to
+"Publish Unit 2, Day 3" was 10/10 on this tier then, so there was nothing to
 buy by widening the dangerous direction on the same day.
+
+**#411 answered that one sentence in code, and widened nothing** (decided by
+Russell, 2026-10-03: "a sentence that needs no model should not be sent to
+one"). `wholeUnitToPublish` reads `publish unit <number>, day <number>` after
+the literal opening `"publish unit "` only — exactly a number, the six
+characters `, day ` and a number, through `AssistCardCommand.unitAndDay` — and
+nothing else: the hide arm's tolerances (a courtesy word, a `?`, a missing or
+doubled comma, doubled spaces) stay rejected for publishing, and so does a
+course named after it, for the load-bearing reason below. `hideIsUnpublish`'s
+first refused row moved to accepted, two more spellings of it were added there
+(the shelf's capitalised card, and a trailing full stop the shared tidier has
+always removed), and sixteen near misses are new refused rows — among them
+"publish unit  4, day 3", because the day form reads the UNTRIMMED remainder
+where the whole-unit form has always forgiven "publish unit  5".
+`testNoHideOrUnpublishSentenceEverReachesPublishPages` holds the damaging
+direction across every hide or unpublish sentence in the table. Must-fails
+run 2026-10-04 (`ready/B.md` in the v1.4.3 run has the red lines): drop the arm,
+swap unit and day, strip a `?`, read past the day number (which takes "… in
+ICS3U" and binds this window's course), and send the hide arm's day form to
+`publish_pages` each turn a contract row red.
 
 **What the frame tolerates was decided rather than left to taste**, because
 spellings are the whole question for a family like this — the same argument
@@ -971,7 +1007,8 @@ spellings are the whole question for a family like this — the same argument
 words are counted (`makeRoom`'s reading), so `unit 4 , day 21` and `unit 4 day
 21` are the same request and odd spacing is read the same way; a trailing `?`
 comes off; `please` is courtesy at either end; and `day21` is refused, because
-that is not a word this frame has. 13 accepted and 20 refused rows are DATA, in
+that is not a word this frame has. 16 accepted and 35 refused rows (13 and 20
+before #411) are DATA, in
 `contracts/assist-cases.json` → `hideIsUnpublish`.
 
 **The refusals are the safety half, and one of them is load-bearing.**
@@ -1001,7 +1038,8 @@ course's own word.
 `publish_pages`' description — the measured precedent is 110/110 → 90/110, with
 three previously-perfect probes broken, because a small model reads a
 description naming another tool as a recommendation rather than a boundary.
-Mirroring the frame on the publish side, for the reason above. `show` and
+Mirroring the frame on the publish side, for the reason above (#411 added the
+day form's EXACT spelling only, which is not a mirror). `show` and
 `unhide` as publish-side synonyms, which are worse again: "show unit 4" is at
 least as likely to mean "display it to me", and resolving that guess by
 publishing is the wrong way to be wrong.
@@ -1009,7 +1047,9 @@ publishing is the wrong way to be wrong.
 **The cost, said plainly.** Every phrasing answered in code leaves the routing
 denominator. The shelf's split moves 16/3 → **17/2** — "Unpublish Unit 2, Day
 3" is answered in code now, and only "Publish Unit 2, Day 3" and "Cancel
-scheduled deploy" still go to the model — and the research suites' intercepted
+scheduled deploy" still go to the model (since #411 "Publish Unit 2, Day 3" is
+answered in code too, so the split is **18/1** and the suites' "card: publish
+by name" probe is intercepted) — and the research suites' intercepted
 count moves from five of 29 probes to six, with the promise-card line they
 print dropping from 6 of 11 to 5 of 11. A score taken after this is not
 comparable to one taken before it without saying so.
@@ -3984,36 +4024,99 @@ Now both read and write the work-lease files under `courses/.internal/activity/`
 
 What the MCP client meets:
 
-- **`deploy_section` and `rebuild_preview`** are REFUSED, with
-  `wording.courseIsBusy`, when another live program holds `build`, `publish` or
-  `preview` on the course. The check is made before anything is stopped, and
-  again by the headless deploy and rebuild right after they take their own
-  `build` lease (take, then check — only a lease taken earlier counts).
-- **`publish_pages` and `undo_last_change`** still WRITE — Markdown never
-  conflicts with a build — and leave the teacher's preview up; the note where
-  the preview would have been refreshed is `courseIsBusy`. The consequence to
-  know: with the teacher's preview open in the window, an outside assistant's
-  change reaches the page but not the preview until the teacher presses Preview
-  (a program's own lease never stands in its own way). Before #156
-  the rebuild went ahead and ended that preview instead. Windows' plantoir-mcp
-  refuses WRITES only on `build`, for the reason its
-  `RefuseIfPlantoirIsBuilding` records — refusing writes during a preview made
-  the assistant useless to a teacher watching one — and the mac agrees: only
-  the BUILD after the write is declined.
-- **Why `courseIsBusy` and not the new `courseIsBeingBuiltElsewhere`.** The
-  client is talking TO the program whose course is busy, so "busy in Plantoir —
-  a preview or a deploy is running. Wait for that to finish, then ask again" is
-  true and tells it what it can do. It reads a little loosely when the holder is
-  a SECOND outside session or a publish set for later (neither is "a preview or
-  a deploy" in the window), and that was accepted rather than adding a key
-  (plan review L1). The teacher, in the app, gets
-  `courseIsBeingBuiltElsewhere`, which says where the other work might be.
-- **Why a PREVIEW blocks it, when Windows' `plantoir-mcp` blocks only on
-  `build`.** Every `--build-only` ends that section's serving preview first
-  (`build_site.stop_preview_serving`), so an outside rebuild would take down the
-  page the teacher is reading — which the in-app assistant already refused to
-  do. The client can retry; the teacher reading the page cannot. Stricter than
-  Windows on purpose, and a red contract case there is the request.
+**Changed by #433 (2026-10-03, Russell): a preview that is only OPEN holds an
+outside assistant back from nothing.** What the MCP client meets now — the
+rule is `workLeases.declining.outsideChanges`, its cases run by
+`OutsideAssistantWhilePreviewingTests`:
+
+- **While another program is BUILDING the course** — a preview still being
+  built (it holds `build` beside `preview`) or a deploy (`build` and
+  `publish`) — every change (every tool that is not read-only except
+  `rebuild_preview`, `deploy_section`, the deploy-later pair, `back_up_course`
+  and `remember_timetable`) is REFUSED at the door of `AssistToolRunner.run`,
+  before anything is backed up or written, with `wording.courseIsBeingBuilt`
+  ("…so nothing was changed. Ask again once it has finished."). So are
+  `rebuild_preview` and `deploy_section`. This matches Windows'
+  `RefuseIfPlantoirIsBuilding`. `WorkLeaseFiles.whatAnOutsideChangeMeets`
+  decides it, and a `build` lease WINS over a `preview` lease whatever order
+  the files are read in — reading a building preview as merely served would
+  let a change and a rebuild through while a build runs.
+- **While a preview is only being SERVED** (`preview` alone): a change is
+  written, nothing is stopped, rebuilt or restarted, and the note where the
+  preview would have been refreshed is `wording.changesAreSavedPreviewShowsTheOldPages`
+  — saved, and "press Stop Preview, then Preview, to see them", the section
+  window's own labels. `rebuild_preview` builds nothing and says the same
+  sentence. Nothing said after a change that succeeded may contain "busy",
+  "couldn't" or "wait" (`testTheSavedSentencesCarryNoRefusalWord`). If a build
+  starts in the moment after the change was let through, the note is
+  `changesAreSavedWhileTheCourseIsBuilt` — still saved, never busy.
+- **`deploy_section` while a preview is only served GOES AHEAD** (Russell,
+  2026-10-03 23:00: "if the teacher asks Claude or Codex to deploy, it should
+  be allowed to go ahead, even if a preview is running"). The headless deploy
+  asks the leases with `WorkLeaseFiles.Asker.anOutsideDeploy` (build and
+  publish only; `AssistToolchainWork.aServedPreviewHoldsADeployBack` is false
+  for the `.mcp` runner). The deploy ends that section's serving preview the
+  way the window's own Deploy does, and no restart is added; the success
+  sentence is followed by `deployClosedAnOpenPreview` — "If a preview of …
+  was open in Plantoir, deploying closed it" — "if" because a lease names the
+  course, not the section, and a preview of another section is left alone.
+  The window shows that end as "Closed for a deploy", not as a failure
+  (#433's stack review, item 6, traced: the killed server made the Python
+  parent raise, `preview.sh` exited 1, and the console said "Something went
+  wrong" and opened the raw output). Since the second look at that fix it
+  is narrow: `ScriptRunner.endIsAClosingForADeploy` says "closed" only when
+  ALL hold — the preview had been SERVING (`hasBeenServing`, set when it
+  answered), its output carries Python's own "died with <Signals.SIGKILL: 9>"
+  (how `stop_preview_serving` ends it; nothing added to the launchers), and
+  ANOTHER program holds a `build` lease on the course
+  (`WorkLeaseRegistry.anotherProgramIsBuilding`; a served lease never
+  counts, the app's own build never counts). Everything else is a failure as
+  before. The output stays one click away, the run record says "Closed for a
+  deploy", and the trail writes `preview closed for a deploy`. The residual,
+  accepted: a lease names the course, so a deploy of Section 2 elsewhere
+  coinciding with Section 1's server being SIGKILLed for another reason reads
+  as closed. A deploy set for later ends a preview the same way and is shown
+  the same way.
+- **The residual, in `outsideChanges.rule`**: an outside change looks once and
+  takes no lease, so a window Deploy pressed during a multi-page outside write
+  can deploy a half-applied change. Not new with #433, and accepted.
+- **A class page is found by its FILE wherever the caller holds it** (#425's
+  stack review, item 1): a whole unit, `publish_class_on`, a date range and
+  the links checklist pass the class's file (`AssistPublishPlanner.planPublishing(titles:files:…)`,
+  `AssistSectionGraph.page(atFile:)`), so a class sharing its file name with a
+  course-level page is published or hidden like any other. Before, they asked
+  by title, the title fit two files, and the class was dropped from the plan
+  in silence — "Unit 4 was unpublished" with that class still visible. Only a
+  name the TEACHER typed can be ambiguous, and that is asked about.
+- **The trail**: a refusal writes `build declined, course busy elsewhere` with
+  the tool's name ("declined an outside assistant's publish_pages"); a change,
+  rebuild or deploy that met a served preview writes `outside assistant worked
+  while a preview was open`.
+- **What did not change**: the window and the in-app assistant keep #156's
+  rule exactly — a preview another program holds still declines their builds,
+  with `courseIsBeingBuiltElsewhere` (`testTheInAppAssistantSaysWhatItSaidBefore`
+  pins it). `courseIsBusy` is now said only by this copy of Plantoir about its
+  own work, where an open preview does make a course busy.
+- **Why #156 blocked on a preview, and why that was reversed for Claude and
+  Codex.** #156 (a director's ruling, 2026-09-25) declined an outside build on
+  a `preview` lease because every `--build-only` ends that section's serving
+  preview (`build_site.stop_preview_serving`), and the WRITES went ahead but
+  ended with `courseIsBusy` — "busy … wait … ask again" after a change that
+  had succeeded, which a model reads as a refusal (Russell met it on v1.4.2).
+  Browsing the preview while asking for changes is the ordinary way to work.
+  What #156 protected still holds: never two builds of one section (a
+  building preview holds `build`), and no outside door rebuilds or restarts a
+  preview the window is serving.
+- **REJECTED (#433, recorded in `workLeases.declining.rejected`)**: the outside
+  door restarting the open preview by any means — the window rebuilding its own
+  preview on request, the outside rebuild going ahead with the window bringing
+  the preview back, or Claude/Codex restarting it when asked. The outside door
+  is a second, windowless process that cannot press the window's button;
+  restarting from there means owning a preview of its own (the pre-#156 shape)
+  or a new request-file mechanism, and Russell: "That's not worth it. The
+  teacher can stop and start a preview manually." Also rejected, the same
+  night: holding an outside DEPLOY back while a preview is only served (the
+  plan's proposal, reversed by Russell before it shipped).
 - **When the client goes away mid-build**, the server stops the launchers it
   started, and the sections inside the website builder, BEFORE its leases come
   down. A client that kills the server skips that; see the known limit in 09.
@@ -4539,7 +4642,7 @@ the failure rule 5 of `CLAUDE.md` names: a line describing what did not
 happen is worse than no line, because it will be believed. The mac reaches
 the same place from the other end — `AssistToolRunner` records a whole
 `AssistChange` only after the operation returns, so a throw records nothing
-(its whole-unit publish answers "was only partly published: …" and calls
+(a publish that stops part way answers `publishStoppedPartWay` and calls
 `history.record` never) — so abandoning is also what matches.
 
 **The cost is real, and on one path it is not yet covered.** The conversation
@@ -4547,13 +4650,16 @@ backup is taken before the first write and is the way back for everything
 here. On the tools that go through `Guarded` the teacher reads a sentence and
 can be pointed at it. On the PUBLISH path they currently cannot: the
 exception leaves the tool, so no reply is built and no backup is named, and
-they are left with a failure and a half-published section. The mac says
-something there — that inline "was only partly published: …" — and Windows
-says nothing; matching it is not a wording decision this side may take alone,
-since the sentence is an inline mac literal rather than an `AssistWording`
-key, so it is written down as [issue
-#165](https://github.com/russellgordon/plantoir/issues/165) instead of
-improvised.
+they are left with a failure and a half-published section. (Since #412,
+2026-10-03, both apps say one key, `wording.publishStoppedPartWay` — "Only
+part of {what} was changed before this stopped: {problem}", for a unit and
+for a page list alike; the mac's page-list path said "Nothing was changed"
+until then, which was false of the pages before the one that failed — and
+the in-app assistant adds `wording.restoreSectionPutsItBack` when the
+conversation saved a copy, naming the banner's Restore Section button. An
+outside assistant is not pointed at it: the button is in Plantoir's
+assistant window. Originally [issue
+#165](https://github.com/russellgordon/plantoir/issues/165).)
 
 The rule both apps now follow, tool by tool:
 
@@ -6014,6 +6120,48 @@ out — that would mean running the tool while a context menu is being drawn. A
 teacher who is signed out meets their assistant's own sign-in step in the
 terminal.
 
+### #411: `add_next_class` with `unit` and `days`, measured and parked
+
+**Decided by Russell, 2026-10-03:** the mac's local `add_next_class` should
+declare `unit` and `days`, as Windows' does, so that an EMPTY model call is
+refused (`answerLeftOutWhatItWasFor`) on both apps by the schema-reading rule
+in `AssistToolCall.needsMoreThanTheWindowSupplies`. That moves the local tool
+surface, so it was built on a side branch (`issue/411-add-next-class-unit-days`:
+the two properties in Windows' words, the twin likewise, and an
+`app-rules.json` → `modelTiers.requirements` case for the empty call) and
+measured on BOTH tiers before it could land. The pass rule was written down
+before anything ran: zero polarity inversions, and no probe that was 10/10
+losing a trial, on each tier.
+
+**It failed on both tiers, and is parked.** Conditions, numbers and raw output
+are in `research/ai-assist/add-next-class-unit-days-411-results.txt` (M4 Pro,
+b10435 on Metal, the app's flags, both suites, 10 trials). No inversions on
+either tier. On the smaller assistant "HIDE - the inversion case" went from
+10/10 to 0/10, and a teachers-say control went from 10/10 to 0/10. **The number
+that matters is not a score, though.** The suites score `add_next_class` by its
+name, and every "add the next class" probe stayed "OK". With the arguments
+printed in full, the smaller assistant sent `"unit": "next"` on all six
+phrasings, and the larger one sent it on five of six. The schema line says
+`Pass "next" to start a new unit`, and both models read the NEXT in "add the
+next class" as that instruction. So the runner would start a new unit — Unit
+N+1, Day 1 — for a teacher who asked for the next day of the unit they are in,
+and report success.
+
+**Rejected:** rewording the `unit` description so the models leave it out.
+That is steering with a description, which this file forbids for a measured
+reason ("Steer with code, never with a description"). **Left for Russell (#440; #411 is closed):**
+whether to refuse the empty call anyway, by naming `add_next_class` as needing
+more than the window supplies, which leaves the schema alone. That trades the rule's "read
+the schema, never a name" property for the outcome he asked for. Until then
+both apps RUN an empty `add_next_class` call — Windows through
+`AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
+
+**For Windows, by inference and not measured:** Windows' local model has been
+shown this exact `unit` line all along. If its router reads it the same way,
+an ordinary "add the next class" there may already start a new unit. Only a
+measurement that prints the full arguments, rather than scoring the tool's
+name, can tell; it is asked for in the comment on #432.
+
 ### What was MEASURED for the Codex door
 
 On Russell's Mac, 2026-09-19, **codex-cli 0.155.1** installed with Homebrew and
@@ -6674,7 +6822,15 @@ nothing the model reads moves.
 **How the two audiences are kept apart.** `AssistToolOutcome` already had
 them: `detail` goes to the model (and is the only thing `--mcp-stdio` returns
 to Claude Code), while `summary`, `forTheCard` and `teacherDetail` are the
-teacher's. Every sentence that says "class" and that a club teacher can reach
+teacher's. **What "what the model reads" covers, on both platforms** is written down
+in `file-formats.json` → `courseConfigKeys` → `class_noun.whatTheModelReads`
+(Russell, 2026-10-01): the TEXT a tool result gives a model or an outside
+assistant stays in the class form byte for byte, and a summary shown only to the
+teacher — Windows' `_meta` teacher summary, which its window shows and never
+forwards — may say "meeting" and is not "what plantoir-mcp returns" in #274's
+sense. The mac never had the question (`--mcp-stdio` returns `detail` alone, and
+the window's card and runner share a process), and no mac test or page read
+#274's parenthetical more widely; this pointer is so none does (#425 DO 2). Every sentence that says "class" and that a club teacher can reach
 now takes a `noun:` (`ClassNoun`, default `.class`), and the runner renders it
 TWICE where both audiences read the same text:
 
@@ -7276,11 +7432,31 @@ one line. `LocalModel.ReadReply` is the body reader, testable without a
 server. A #159 test that pinned unreadable arguments REACHING a tool was
 changed on purpose: they no longer do.
 
+*The scripted cut-off case is shared now* ([#411](https://github.com/russellgordon/plantoir/issues/411),
+accepted by Russell 2026-10-03, landed on the mac 2026-10-04):
+`assist-cases.json` → `scenarios.cases` "an answer the engine stopped part way
+runs nothing", with one new `given` key, `modelReply` (the engine's whole
+reply: `finishReason`, and a `toolCall` whose `arguments` are the model's own
+text, `{course}` for the fixture's course). The mac's runner
+(`AssistScenarioTests.engineReply(scriptedBy:)`) serves it from a `StubEngine`,
+no longer requires `pending` when `saying` is given, and for a `"length"` reply
+also asserts no launcher run and no window action — so the case cannot pass
+vacuously. Must-fail, run 2026-10-04: with `AssistAgent`'s `answer.wasCutOff`
+branch disabled, the case goes red three ways — a card was put up, the deploy
+RAN once it was pressed ("a cut-off answer deployed": 1, not 0), and no line
+says `wording.answerWasCutOff`. Windows wires `given.modelReply` into its
+`AssistScenarioTests`' `ScriptedModel` (#432).
+
 **#262 — the same rule as the mac, after a fix round.** The rule reads each tool's
 own schema. Windows' local `add_next_class` first declared `unit` and `days`
 where the mac's declares only course and section, so an EMPTY model call to it
 was refused here and ran there; the fix round made it run as on the mac, so
-there is no difference left to know. "Add the next class page" is a card and
+there is no difference left to know. *(#411: Russell decided on 2026-10-03
+that the mac should match Windows' ORIGINAL schema instead — declare both, and
+refuse the empty call. It was built and measured on 2026-10-04 and failed the
+pre-registered routing rule, so it is PARKED on the branch
+`issue/411-add-next-class-unit-days` and nothing changed on either app; see
+"#411: `add_next_class` with `unit` and `days`, measured and parked" above.)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.

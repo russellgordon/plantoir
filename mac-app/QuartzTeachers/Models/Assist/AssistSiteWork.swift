@@ -22,8 +22,8 @@ struct AssistSiteWorkResult {
     /// Whether what stopped it was ANOTHER program building or previewing the
     /// same course (#156). The message is then
     /// `AssistWording.courseIsBeingBuiltElsewhere`; `AssistToolRunner` swaps
-    /// it for `courseIsBusy` when the one asking is an assistant working from
-    /// another app, since the program that is busy is the one it talks to.
+    /// it for `courseIsBeingBuilt` when the one asking is an assistant working
+    /// from another app, since the program building is the one it talks to.
     let wasBuiltElsewhere: Bool
 
     // MARK: - Initializer
@@ -98,10 +98,19 @@ final class AssistToolchainWork: AssistSiteWork {
     /// arguments` itself once warned against.
     private(set) var deployRunner: MultiDestinationDeployRunner = MultiDestinationDeployRunner()
 
+    /// Whether another program's SERVED preview of the course holds a deploy
+    /// from here back. True for the in-app assistant (#156, unchanged);
+    /// false for an outside assistant (#433, Russell 2026-10-03: "if the
+    /// teacher asks Claude or Codex to deploy, it should be allowed to go
+    /// ahead, even if a preview is running"). Either way a site actually
+    /// being BUILT elsewhere declines it.
+    let aServedPreviewHoldsADeployBack: Bool
+
     // MARK: - Initializer
 
-    init(workspace: WorkspaceModel) {
+    init(workspace: WorkspaceModel, aServedPreviewHoldsADeployBack: Bool = true) {
         self.workspace = workspace
+        self.aServedPreviewHoldsADeployBack = aServedPreviewHoldsADeployBack
     }
 
     // MARK: - Functions
@@ -266,9 +275,14 @@ final class AssistToolchainWork: AssistSiteWork {
 
         // The same take-then-check as the rebuild above (#156). Synchronous
         // from the busy check to here, so nothing of this process's own can
-        // have started in between.
+        // have started in between. An outside assistant's deploy asks only
+        // about building (#433): a served preview does not hold it back.
+        var asker: WorkLeaseFiles.Asker = .aBuild
+        if !aServedPreviewHoldsADeployBack {
+            asker = .anOutsideDeploy
+        }
         if let holding = WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true
+            folderPath: workspaceURL.path, courseCode: course.code, afterTaking: true, asker: asker
         ) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: course.code,

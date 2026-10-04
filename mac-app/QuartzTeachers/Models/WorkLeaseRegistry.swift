@@ -154,7 +154,8 @@ enum WorkLeaseRegistry {
     static func whatBlocksABuild(
         folderPath: String,
         courseCode: String,
-        afterTaking: Bool
+        afterTaking: Bool,
+        asker: WorkLeaseFiles.Asker = .aBuild
     ) -> WorkLeaseFiles.Holding? {
         let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
             .appendingPathComponent("courses", isDirectory: true)
@@ -165,7 +166,30 @@ enum WorkLeaseRegistry {
         if afterTaking {
             claim = buildClaim(folderPath: folderPath, courseCode: courseCode)
         }
-        return WorkLeaseFiles.blocking(among: holdings, asker: .aBuild, claim: claim)
+        return WorkLeaseFiles.blocking(among: holdings, asker: asker, claim: claim)
+    }
+
+    /// What an outside assistant's change to this course meets in the other
+    /// programs' leases (#433) — `WorkLeaseFiles.whatAnOutsideChangeMeets`
+    /// over the leases on disk.
+    static func whatAnOutsideChangeMeets(folderPath: String, courseCode: String) -> WorkLeaseFiles.OutsideChangeMeets {
+        let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
+            .appendingPathComponent("courses", isDirectory: true)
+        let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
+            courseCode: courseCode, coursesDirectory: coursesDirectory
+        )
+        return WorkLeaseFiles.whatAnOutsideChangeMeets(among: holdings)
+    }
+
+    /// Whether ANOTHER live program holds a `build` or `publish` lease on the
+    /// course — a deploy or a preview build elsewhere; never this process's
+    /// own leases, and never a preview that is only being served. What the
+    /// section window asks when its serving preview ends (#433's stack review).
+    static func anotherProgramIsBuilding(folderPath: String, courseCode: String) -> Bool {
+        if case .building = whatAnOutsideChangeMeets(folderPath: folderPath, courseCode: courseCode) {
+            return true
+        }
+        return false
     }
 
     /// Records a publish of one section and, with nothing awaited in

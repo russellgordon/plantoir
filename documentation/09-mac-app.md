@@ -2656,7 +2656,7 @@ so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
 Russell's decision: **both ways** — the mac READS the leases other programs
 write and WRITES its own. The rules are `contracts/shared-rules.json` →
-`workLeases.declining` (29 cases); the format is `contracts/file-formats.json`
+`workLeases.declining` (32 cases, and `outsideChanges`' 10 since #433); the format is `contracts/file-formats.json`
 → `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
 "Who counts as alive". This section is why it is shaped the way it is.
 
@@ -2708,8 +2708,9 @@ another live program holds `build`, `publish` or `preview` on the course:
 | Preview (button, repair dialog, Course Settings' restart, the assistant's restart) | `startPreview()`, after its own build lease and THEN its preview lease are on disk (that order is load-bearing — below) | `wording.courseIsBeingBuiltElsewhere` in the Cannot Preview Yet alert |
 | Deploy (button, and the assistant pressing it) | `deployAndWait()` — `WorkLeaseRegistry.claimAPublish` (`beginPublish`, then the look) BEFORE the preview is stopped, so the window's `build` lease is up through the stop | the same sentence, in the Cannot Deploy Yet alert (#156's M5: `isAboutTheDestination`, as the reference-course refusal uses it — nothing ran, so the console has nothing to say) |
 | the in-app assistant's rebuild and deploy | `AssistToolRunner`, before any window is opened or preview stopped | `courseIsBeingBuiltElsewhere` |
-| an outside assistant's rebuild and deploy | the same, and the headless backstops `AssistToolchainWork.rebuildPreview` / `.deploy` after taking | `wording.courseIsBusy` — the existing key: the client is talking to the program that is busy, and that sentence tells it to wait and ask again |
-| `publish_pages` / `undo_last_change` | the write goes ahead (Markdown never conflicts with a build); the stop before it and the restart after it do not | the preview note is the sentence above for the surface |
+| an outside assistant's rebuild and deploy | the same, and the headless backstops `AssistToolchainWork.rebuildPreview` / `.deploy` after taking — since #433 only a BUILD or PUBLISH lease holds them back; a served preview answers a rebuild with `changesAreSavedPreviewShowsTheOldPages` and lets a deploy go ahead (`Asker.anOutsideDeploy`) | `wording.courseIsBeingBuilt` (`courseIsBusy` until #433) |
+| an outside assistant's CHANGE (every writing tool but the build, deploy, backup and timetable ones) | `AssistToolRunner.outsideChangeHeldBack`, at the door, before any backup or write (#433) | refused with `courseIsBeingBuilt` while the course is BUILT elsewhere; with a preview only served it is written and the note is `changesAreSavedPreviewShowsTheOldPages` — `10-local-ai-assistant.md` → the #156 section |
+| the in-app assistant's `publish_pages` / `undo_last_change` | the write goes ahead (Markdown never conflicts with a build); the stop before it and the restart after it do not | the preview note is `courseIsBeingBuiltElsewhere` (unchanged by #433) |
 
 Every decline writes `build declined, course busy elsewhere` on the trail, with
 what was asked for and the other program's process id — from whichever process
@@ -2817,6 +2818,12 @@ build of Section 2 from here too. What the window shows if its preview dies
 anyway (a build started by something that does not read leases) stays what
 #235 made it.
 
+**Reversed for outside assistants by #433 (2026-10-03):** Claude and Codex
+are held back only by `build` or `publish`; with a preview only served, a
+change is written, a rebuild builds nothing, and a deploy goes ahead. The
+paragraph above still holds for the window and the in-app assistant. See
+`10-local-ai-assistant.md` → the #156 section.
+
 **A publish set for later WAITS** (ruling (a)). In `runScheduled`, after the
 lateness check and before `process.run()`: it holds nothing while it waits,
 looks every **15 s**, and gives up at **10 minutes** measured on the WALL clock
@@ -2878,7 +2885,7 @@ starts it again when it builds.
 with `HOME` pointed at a scratch home so nothing reached Russell's trail, since
 deleted): a three-line Windows-shaped `ICS3U.build.<pid>.lease` naming a live
 `/bin/sleep`, then `deploy_section` and `rebuild_preview` over
-`Plantoir --mcp-stdio` — both answered `courseIsBusy`, nothing ran, and the
+`Plantoir --mcp-stdio` — both answered `courseIsBusy` (the sentence is `courseIsBeingBuilt` since #433), nothing ran, and the
 scratch trail read "declined an outside assistant's deploy — the course is
 being built by process 82863 somewhere else on this Mac". Windows' reader
 tolerating the mac's FOUR-line lease was confirmed by reading `WorkLease.cs`:
@@ -2942,11 +2949,24 @@ mac writes.
   alert is the truth.
 - A lease synced in from another Mac or a Windows PC through a cloud-synced
   working folder names a pid that means nothing here. #245's liveness limit;
-  a Windows lease has no line 4, so a match rests on the name alone.
+  a Windows lease has no line 4 (except its import lease, since parity bundle
+  6b, #415), so a match rests on the name alone.
 - `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
   purpose — declining at the press is the guarantee, not the menu's grey.
 
-**Tests.** `WorkLeaseDecliningTests` (25): the contract's 29 cases through the
+**A copy lease is Windows' alone (#413, 2026-10-03).** Windows' plantoir-mcp
+holds a `copy` lease while it zips a course for an assistant backup, and its
+builds decline on it. The mac writes none and reads none: a course being zipped
+is marked inside the program doing it (`CourseActivity.courseIsBeingCopied`,
+#351), which every reader in that program asks first. The two Windows cases in
+`workLeases.declining` carry `appliesOn: ["windows"]` and an `onTheMac` sentence
+saying so, and `WorkLeaseDecliningTests` skips such a case only when that
+sentence is there. What this leaves open, said plainly: a zip made by ANOTHER
+program on the mac — a `--mcp-stdio` session's `back_up_course` — is not seen
+by the window. Not built (Russell, 2026-10-03): the case records the difference
+rather than a lease reader being invented to make it pass.
+
+**Tests.** `WorkLeaseDecliningTests` (28): the contract's 32 cases through the
 pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
 `/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
 the race, pure and on files, and the two orders the review measured; the Deploy's claim and the window's lease ORDER (read from the source, which the suite cannot construct); every door; the scheduled wait with an injected
@@ -3660,7 +3680,12 @@ kill the preview a reference course exists to give.
 `course_config.json` (the school year can be changed, and the build's preflight
 rewrites it), `course_config.backup.json` (written beside it by that same
 preflight, with `shutil.copy2`, which raises on a locked destination),
-`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store`.
+`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store` — and,
+since 2026-10-03 (#415), `desktop.ini` and `Thumbs.db`, File Explorer's twins of
+`.DS_Store`, proposed from Windows. They are left alone on the mac too so the two
+apps keep ONE `neverLocked` list (`ReferenceCourseTests` pins it equal to the
+contract's), and so a course brought from Windows is not refused the next time
+Explorer rewrites them.
 
 **Obsidian writes four files into `.obsidian/` within seconds of opening a
 vault** — measured on a throwaway vault, 2026-09-20: `app.json`,
@@ -6345,6 +6370,16 @@ for the wording pass (Russell, Q5); `heldExplanation` was rewritten after the
 review (H1) because the draft promised "nothing changes until that is
 finished" while a quit installed anyway.
 
+`elsewhereWork` is written in the contract as "…somewhere else on this
+{machine}" since 2026-10-03 (#418): the machine's name comes from
+`specialNames.platformWording.machine`, so Windows says the same sentence with
+"PC" instead of keeping its own copy. The mac's word is `MachineWord`, and
+`AppUpdatesContractTests` fills the contract's sentence with the contract's own
+word before comparing. `needsAdministratorExplanation` was NOT given the
+placeholder: Windows' sentence for an all-users copy says something else
+entirely (uninstall and install again, `windowsWording`), so there is no one
+sentence for the two to share.
+
 **Sparkle's own windows are Sparkle's words** — "A new version of Plantoir is
 available!", its buttons, the progress and error windows — localized by it
 into 35 languages, and not changeable without a fork. OURS never use a word on
@@ -6848,7 +6883,9 @@ longer reaches the model at all and the measured misroute is unreachable from
 the shelf; then
 [#215](https://github.com/russellgordon/plantoir/issues/215) made "hide" and
 "unpublish" one frame that takes a class page, which did the same for
-"Unpublish Unit 2, Day 3". Count it in
+"Unpublish Unit 2, Day 3". It went to **18 and 1** on 2026-10-04, when
+[#411](https://github.com/russellgordon/plantoir/issues/411) answered "Publish
+Unit 2, Day 3" in code, exact form only. Count it in
 `AssistPromptShelfTests.testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel`
 rather than from this prose. The model itself is
 unchanged and still gets that sentence wrong when it is phrased in a way the

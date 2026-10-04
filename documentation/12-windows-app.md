@@ -39,7 +39,10 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   explains it — accepted rather than adding a third stop path), then the alert.
   Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
   anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
-  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac;
+  since 2026-10-03 the contract writes `theSiteNeverAnswered`'s sentence with
+  `{machine}`, filled from `specialNames.platformWording.machine`, #410/#418, so
+  the substitution becomes a fill driven by `machine.usedIn`).
 - **A typed publish folder (#304, review L1).** `deploy.ps1`'s
   `Resolve-PublishFolder` takes a plain relative name from the working folder
   (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
@@ -2657,18 +2660,22 @@ and this piece had two of those:
   `contracts/file-formats.json` → `sectionTimetable.believable` (the two
   bounds and eight cases, run here by `DateTextTests`) — because a working
   folder travels, so a file written by a pre-#144 Windows on a Thai PC can be
-  restored on a mac, whose `SectionTimetable` reads it just as invariantly;
-  the `mac` issue opened with this piece says so. The floor is 2000, not
+  restored on a mac, whose `SectionTimetable` reads it just as invariantly.
+  The mac adopted the same window on 2026-10-03 (#377,
+  `SectionTimetableStore.firstDateThatCannotBeAClassDate`, asked by its
+  reader and its writer, run against the eight cases by
+  `FileFormatsContractTests.testARememberedTimetableIsBelievedOnlyInsideTheWindow`). The floor is 2000, not
   `ArchiveStamp`'s 2025, because a teacher may keep last year's timetable;
   it is still centuries clear of every wrong reading (2569, 1483, 1448). The
   ceiling is three years, not two days, because future class dates are the
   point of the file. **It leaves a trail line** — `remembered timetable set
-  aside`, `appliesOn: ["windows"]` in `shared-rules.json` → `activityTrail.mustRecord`,
-  carrying the date it refused — written by the reader, once per read of
-  such a file until the teacher answers and the file is replaced. Windows
-  only because only this app ever wrote such a file; the mac's guard, when
-  it adopts one, meets a file that arrived rather than one it wrote, and
-  can decide its own line then.
+  aside` in `shared-rules.json` → `activityTrail.mustRecord`, carrying the
+  date it refused — written by the reader, once per read of such a file
+  until the teacher answers and the file is replaced. It was
+  `appliesOn: ["windows"]` until 2026-10-03, because only this app ever
+  wrote such a file; the mac then adopted the line with the window (#377),
+  since a file that arrives through a restore or a shared folder is just as
+  invisible without it, and the `appliesOn` was dropped.
 
 **What is deliberately left in the machine's culture**, so nobody "fixes"
 it: `TaskScheduling.All` parses the `Next Run Time` column of `schtasks /Query

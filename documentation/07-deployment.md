@@ -2829,6 +2829,61 @@ run follows `theDestination` (11 of its 12 cases; the twelfth is mac-only), with
 the kind, the event and the two Save sentences — see "On Windows since bundle 3"
 below.
 
+### Set again while the run works (#409)
+
+Asked from Windows on 2026-09-30: there is one job per section per working
+folder (#237), so setting a section again while its run is still working — a
+long deploy, or the ten-minute wait for the course — makes a NEW job under the
+SAME name. Windows' run cleared its task by name when it finished and when it
+stood down, which would have deleted the deploy just set; it now clears only
+while the task still names this run's moment (`ScheduledRun.ClearIfStillMine`).
+
+**On the mac the run cannot do that, checked 2026-10-03, and the reason is
+structural rather than a check.** The run removes the job in three places, all
+by label: the wrapper's FIRST line (`rm -f` of the plist), `standDown` (plist,
+then boot-out), and `bootOutAgent` once its work is done. But
+`scheduleDeploy` boots that label out BEFORE it writes the new plist, and does
+so whether or not a plist is on disk — and a working run's plist is never on
+disk, because the wrapper's first line took it. The launchd job IS the running
+app (`--run-scheduled-deploy`), so that boot-out ends the run there and then: a
+set made during the wait ends it before `jobStillStands`, a set made during the
+deploy ends it before `bootOutAgent`, and an ended run removes nothing. The
+wrapper it started is a `Process` child in a process group of its own, so it
+SURVIVES and finishes the old deploy as an orphan. It cannot remove the new
+deploy — its only plist line has already run and it boots nothing out — but it
+is NOT harmless (see "What this costs" below). `jobStillStands` and
+`leaveQuietly` stay as the second line of defence they were written as.
+
+Measured on an Apple M4 Pro, macOS 26.6, with a throwaway agent shaped like the
+run (a Swift binary waiting on a `Process` running `sleep`): `launchctl bootout`
+returned exit 0 in 0.02 s; the job read as unloaded and the binary was gone at
+once; the child was still running six seconds later, in its own process group
+(PGID = its own pid). A bash script whose child shares its process group lost
+both at once.
+
+**What this costs, and was left:** the old run's own after-work (recording that
+the section was deployed, the trail line for a stopped run, the notification) does not
+happen, and its leases name a process that is gone, so they read as stale while
+the orphaned wrapper is still deploying. **That last part can make two deploys of
+one section overlap.** A lease whose owner is gone is ignored
+(`shared-rules.json` → `workLeases.liveness`), so the window's Deploy, an
+outside assistant's `deploy_section`, or the newly set run firing soon all go
+ahead while the orphan is still building and uploading. `deploy.sh` has no
+same-section guard of its own (`a_deploy_is_running_for` is only named in a
+comment there), and `preview.sh`'s #381 guard is asked on a SERVING run only, so
+a deploy's `--build-only` leg is not refused either. The result is two builds
+and uploads of one section at once, which is the fault #156's leases exist to
+prevent. Nothing on `dev` is worse than before #409 was checked. A guard is a
+decision for Russell, #439: a deploy refuses while that
+section's scheduled wrapper is still working. Rejected for now: letting the run
+survive a re-set and comparing moments at the end as Windows does, because the
+boot-out-first order is what keeps "never briefly two agents" true (#237) and
+changing it reopens that. Pinned by
+`ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`
+(the boot-out is asked with no plist on disk, and before the new one exists).
+No contract case: the guard is in the order of two `launchctl` calls on the
+mac and in Task Scheduler on Windows, which no shared case can express.
+
 ### The window's acts read the saved settings too (#335)
 
 **What was wrong, read from the code.** Course Settings keeps its edits in the

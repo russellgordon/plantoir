@@ -28,10 +28,10 @@ WIDEST_PHONE_PIXELS = 720
 # that bakes the corner curves against whatever was behind them and hands back
 # opaque black specks.
 #
-# Every shot is now taken with `screencapture -o -l <window number>` — macOS's
-# own window capture — and that already returns the curve antialiased with the
-# corners at alpha 0. Measured, rather than assumed: the four corner pixels of
-# such a capture read (0, 0, 0, 0). Masking a correct capture is not harmless,
+# Every shot is now taken with `screencapture -x -l <window number>` — macOS's
+# own window capture, with the window's natural shadow (#434; it was `-o`,
+# shadow off, until 2026-10-04) — and that already returns the curve
+# antialiased, with everything outside the window and its shadow at alpha 0. Masking a correct capture is not harmless,
 # either: it multiplies a GUESSED radius over a real one, which erodes the
 # curve when the guess is generous and leaves a fringe when it is mean.
 #
@@ -39,8 +39,32 @@ WIDEST_PHONE_PIXELS = 720
 # not go through `screencapture -l` instead of painting over it here.
 
 
+def serve_as_captured(path: Path) -> Path:
+    """Write the WebP beside a Mac window capture, and leave the capture's
+    pixels exactly as `screencapture -x -l` made them.
+
+    Every Mac window shot is served at its own size since #434 (2026-10-04).
+    Scaling it would scale its shadow, and Russell's rule is the natural
+    shadow with no post-processing — and pictures of different widths scaled
+    to one width end up with different shadow margins, which is the
+    inconsistency that rule was written about. The page draws each picture
+    at half its pixel size (build.py), which for a 2x capture is the window's
+    own size in points. The PNG is re-saved losslessly (optimize) and the
+    WebP is the same picture compressed.
+    """
+    with Image.open(path) as opened:
+        image = opened.convert("RGBA")
+    image.save(path, format="PNG", optimize=True)
+    image.save(path.with_suffix(".webp"), format="WEBP", quality=88, method=6)
+    return path
+
+
 def prepare(path: Path, widest: int = WIDEST_WINDOW_PIXELS) -> Path:
-    """Scale a capture down if it is oversized, then write PNG and WebP."""
+    """Scale a capture down if it is oversized, then write PNG and WebP.
+
+    For the PHONE picture and the Windows pictures only. A Mac window capture
+    goes through `serve_as_captured`, which never scales (#434).
+    """
     with Image.open(path) as opened:
         image = opened.convert("RGBA")
 

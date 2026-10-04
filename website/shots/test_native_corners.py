@@ -2,7 +2,8 @@
 """Every picture on plantoir.app keeps its window's own corners.
 
 Russell's rule, 2026-09-27: the pictures are made ONLY with macOS's own window
-capture (`screencapture -x -o -l <window id>`, the Option-click capture),
+capture (`screencapture -x -l <window id>` since #434, shadow included —
+`NaturalShadows` below holds that shadow whole and the same everywhere),
 kept whole. No crop through a window, no corner painted back on, no rounded
 mask drawn by hand. This test opens every picture the pages show a Mac
 visitor — read from `shots.json` and the pages, both PNG and WebP — and fails
@@ -36,6 +37,7 @@ sys.path.insert(1, str(HERE.parent))  # build.py, for the deploy's own check
 from PIL import Image, ImageDraw  # noqa: E402
 
 import corners  # noqa: E402
+import shadow  # noqa: E402
 
 # Pictures the pages show that are known to be wrong and are somebody's work
 # in flight, each with who owns it. A gap listed here must STILL be failing:
@@ -143,6 +145,123 @@ class TheCheckItself(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
+
+
+class NaturalShadows(unittest.TestCase):
+    """Every Mac window keeps its whole natural shadow (#434, Russell
+    2026-10-03/04): exactly what `screencapture -x -l` writes with the window
+    active — never cut off, never `-o`, never scaled, and the same on every
+    picture. Checked on the PNGs the pages show; `shadow.py` says which
+    figures are judged on their edge only, and why."""
+
+    def test_no_shadow_on_the_site_is_cut_off_or_mismatched(self):
+        problems = shadow.shadow_problems_on_the_site(REPO / "website", REPO / "site" / "img")
+        self.assertEqual(problems, [], "\n" + "\n".join(problems))
+
+    def test_every_single_window_picture_has_one_and_the_same_margin(self):
+        margins_seen: dict[tuple, list[str]] = {}
+        for picture, expected in shadow.mac_pictures_to_check(REPO / "website", REPO / "site" / "img"):
+            if expected is None:
+                continue
+            margins_seen.setdefault(shadow.shadow_margins(picture), []).append(picture.name)
+        self.assertEqual(len(margins_seen), 1, margins_seen)
+        self.assertEqual(list(margins_seen), [shadow.NATIVE_MARGINS])
+
+    def test_every_exemption_names_a_shot_that_exists(self):
+        # An exemption from the margin rule for a shot that no longer exists
+        # would be one nobody reads again.
+        import json
+        manifest = json.loads((REPO / "website" / "shots.json").read_text(encoding="utf-8"))
+        identifiers = [shot["id"] for shot in manifest["shots"]]
+        for identifier in shadow.FIGURES_WITH_THEIR_OWN_MARGIN + shadow.NOT_A_MAC_WINDOW:
+            self.assertIn(identifier, identifiers)
+
+    def test_the_hero_has_clear_canvas_all_round(self):
+        # Russell's check for the hero is strict: its padding means the
+        # outermost pixels are exactly transparent, not merely dithered.
+        for suffix in ("light", "dark"):
+            picture = REPO / "site" / "img" / f"hero-{suffix}.png"
+            self.assertEqual(shadow.edge_alpha(picture), 0, picture.name)
+            margins = shadow.shadow_margins(picture)
+            for side in range(4):
+                self.assertGreater(margins[side], shadow.NATIVE_MARGINS[side], picture.name)
+
+
+class TheShadowCheckItself(unittest.TestCase):
+    """Proved against pictures made here from a real capture, so a threshold
+    that drifts cannot quietly pass everything."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        for name in ("courses-light.png", "preview-light.png", "site-eng2d-light.png"):
+            path = REPO / "site" / "img" / name
+            if path.exists():
+                with Image.open(path) as opened:
+                    self.capture = opened.convert("RGBA")
+                return
+        self.skipTest("no single-window capture in site/img")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def saved(self, image: Image.Image, name: str) -> Path:
+        path = self.tmp / name
+        image.save(path)
+        return path
+
+    def test_a_real_capture_passes(self):
+        self.assertEqual(shadow.problems_with_shadow(self.saved(self.capture, "real.png")), [])
+
+    def test_a_shadow_cut_off_at_the_bottom_fails_the_edge(self):
+        cut = self.capture.crop((0, 0, self.capture.width, self.capture.height - 60))
+        problems = shadow.problems_with_shadow(self.saved(cut, "cut.png"), expected_margins=None)
+        self.assertTrue(problems)
+        self.assertIn("cut off", problems[0])
+
+    def test_a_capture_taken_with_minus_o_fails_the_margin(self):
+        margins = shadow.shadow_margins(self.capture)
+        window_only = self.capture.crop((margins[0], margins[1], self.capture.width - margins[2],
+                                         self.capture.height - margins[3]))
+        self.assertTrue(shadow.problems_with_shadow(self.saved(window_only, "no-shadow.png")))
+
+    def test_a_scaled_capture_fails_the_margin(self):
+        smaller = self.capture.resize((self.capture.width * 2 // 3, self.capture.height * 2 // 3),
+                                      Image.Resampling.LANCZOS)
+        problems = shadow.problems_with_shadow(self.saved(smaller, "scaled.png"))
+        self.assertTrue(problems)
+        self.assertIn("margins", problems[-1])
+
+    def test_a_trimmed_capture_fails_the_margin_even_with_a_clean_edge(self):
+        # Trimmed by 20 px all round: the edge is still transparent, but the
+        # margin is no longer the active window's.
+        trimmed = self.capture.crop((20, 20, self.capture.width - 20, self.capture.height - 20))
+        problems = shadow.problems_with_shadow(self.saved(trimmed, "trimmed.png"))
+        self.assertTrue(problems)
+
+    def test_no_alpha_at_all_fails(self):
+        self.assertTrue(shadow.problems_with_shadow(self.saved(self.capture.convert("RGB"), "flat.png")))
+
+    def test_a_cascade_of_whole_captures_keeps_every_shadow(self):
+        import composite
+        parts = [self.saved(self.capture, f"part{index}.png") for index in range(3)]
+        figure = composite.native_cascade(parts, self.tmp / "hero.png")
+        self.assertEqual(shadow.problems_with_shadow(figure, expected_margins=None), [])
+        with Image.open(figure) as opened:
+            margins = shadow.shadow_margins(opened)
+        # Padding outside each window's whole shadow, on every side.
+        native = shadow.shadow_margins(self.capture)
+        for side in range(4):
+            self.assertGreater(margins[side], native[side])
+
+    def test_a_fan_and_a_pair_keep_one_windows_margin_outside(self):
+        import composite
+        parts = [self.saved(self.capture, f"card{index}.png") for index in range(3)]
+        native = shadow.shadow_margins(self.capture)
+        for figure in (composite.native_fan(parts, self.tmp / "fan.png"),
+                       composite.native_side_by_side(parts[:2], self.tmp / "pair.png")):
+            self.assertEqual(shadow.problems_with_shadow(figure, native), [], figure.name)
 
 
 class TheDeployRefuses(unittest.TestCase):

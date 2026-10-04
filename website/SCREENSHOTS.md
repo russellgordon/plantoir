@@ -56,17 +56,21 @@ Furthermore, **screenshots are platform-aware**:
 
 ## The one rule: only macOS's own window capture, kept whole
 
-Russell's rule, stated more than once and last on 2026-09-27: **every picture
+Russell's rule, stated more than once and last on 2026-10-03/04: **every picture
 on plantoir.app is made ONLY with macOS's built-in window capture** —
-`screencapture -x -o -l <window id>`, the programmatic Option-click capture —
-which returns the window with its own rounded corners, transparent outside
-the curve. Figures made of several windows are built from those captures
-WHOLE:
+`screencapture -x -l <window id>`, never `-o` — which returns the window with
+its own rounded corners and its NATURAL shadow, transparent round them, taken
+while its app is active (an inactive window's shadow is smaller and lighter).
+Figures made of several windows are built from those captures WHOLE, with
+`Image.alpha_composite` so overlapping shadows blend:
 
-- no crop that passes through a window, and no re-rounding of a corner;
-- no rounded mask, corner or shadow shape drawn in Pillow — a shadow, where
-  there is one, is the capture's own alpha channel, blurred;
-- scaling with Lanczos, of the whole image only;
+- no crop that passes through a window or its shadow, no trim, and no
+  re-rounding of a corner;
+- no mask, corner or shadow drawn, generated, blurred or retouched — the
+  shadow is exactly what `screencapture` wrote;
+- no scaling of a Mac capture: it is served at its own pixel size (#434;
+  until 2026-10-04 every picture was scaled to 1700 px, which gave pictures of
+  different widths different shadows);
 - if a figure must not show the browser's toolbar, the picture is taken in a
   window that never had one (`website/shots/webwindow.swift`: a class site in
   a plain macOS window drawn by WebKit), never cut out of a Safari capture.
@@ -81,10 +85,23 @@ corners. A banner is now cropped only to the edge of its own shadow, which
 never passes through the card.
 
 The page adds none either: `.shot img` in `assets/style.css` has no
-`border-radius` and no `box-shadow` — its shadow is a `drop-shadow` filter,
-which follows the picture's alpha (until 2026-09-27 a 10px rounded
-box-shadow was drawn round every shot, and round each PAIR as one
-rectangle).
+`border-radius`, no `box-shadow` and, since #434, no filter — the shadow is
+the capture's own. Only a Windows capture (an img with `data-win-src`, on a
+Windows visitor's page) keeps the `drop-shadow` filter, because those arrive
+without a shadow of their own. (Until 2026-10-04 that filter was on every
+shot; until 2026-09-27 a 10px rounded box-shadow was drawn round every shot,
+and round each PAIR as one rectangle.)
+
+**The shadow gate (#434):** `test_native_corners.py` also fails on any Mac
+picture whose outermost 3 px carry alpha above 1 (a cut-off shadow; a whole
+capture carries a few isolated pixels of alpha 1 there, its dithering), and
+on any single-window picture whose shadow margin — edge to first opaque
+pixel — is not `shadow.NATIVE_MARGINS`, the margin of an ACTIVE window's
+`screencapture -x -l` at 2x: (112, 76, 112, 148) px left, top, right,
+bottom, measured 2026-10-04 on Safari, Plantoir, Obsidian, iTerm and the
+page window alike. `hero` and `schedule` are judged on their edge only (a
+padded canvas; a banner above the window), and `site-phone` is a device
+frame, not a window.
 
 **The gate:** `website/shots/test_native_corners.py` opens every picture the
 pages show a Mac visitor (from `shots.json` and the pages, PNG and WebP) and
@@ -162,8 +179,9 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
 
 - **App Windows**: Driven by `MarketingScreenshotTests.swift` in
   `mac-app/Tests/QuartzTeachersUITests/`, and photographed with macOS's own
-  window capture (`screencapture -o -l <window number>`), which returns the
-  real rounded corners already transparent. (XCUITest's `window.screenshot()`
+  window capture (`screencapture -x -l <window number>`, shadow included,
+  the app active), which returns the real rounded corners and the natural
+  shadow, transparent round them. (XCUITest's `window.screenshot()`
   was used once and baked the corners black; it is gone, with no fallback.)
 - **The v1.4.0 scenes** are taken in a kept working folder of their own
   (`~/Plantoir Marketing`, ICS3U and ICS4U). `website/shots/scenes.py` lists
@@ -225,7 +243,8 @@ Every captured PNG is processed by `website/shots/images.py`:
 
 1. **Resolution & Sizing**:
    - Captures are taken at 2x HiDPI resolution (e.g. 2560×1600 for a 1280×800 window).
-   - Images exceeding `WIDEST_WINDOW_PIXELS` (1700px) are scaled proportionally.
+   - A Mac window capture is NOT scaled (`images.serve_as_captured`, #434): scaling would scale
+     its shadow. Only the phone and the Windows pictures are scaled to `WIDEST_*_PIXELS`.
    - HTML `<img width="..." height="...">` attributes are set to **half the pixel dimensions**,
      reserving crisp 1x logical CSS dimensions while displaying sharp 2x bitmaps on high-DPI displays.
 2. **WebP Generation**:

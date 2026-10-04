@@ -348,7 +348,8 @@ as it is. Every OTHER remake, since #94, looks at what is running first and
 removes by id: "Before a workspace is remade" below.
 
 **When all forty are taken.** Exit 1, and
-`previewPorts.whenNoBlockIsFree.sentence` word for word. It names the two
+`previewPorts.whenNoBlockIsFree.sentence` word for word, its `{machine}` said
+as "Mac" (`specialNames.platformWording.machine`, #410). It names the two
 remedies that are true: closing Plantoir's windows for the other folders
 (the app stops a folder's workspace when its last window closes, and at quit),
 and restarting the Mac (workspaces are made with no restart policy, so after a
@@ -2272,7 +2273,9 @@ and what was measured.
   `Get-NetTCPConnection -State Listen`; a block is the site port and its
   websocket (+1000), because the native path binds one pair, not a published
   block of four. None free: the two `whenNoBlockIsFree` lines with "restart this
-  PC" (proposed as `sentenceOnWindows`, not reworded locally), exit 1, and the
+  PC" (proposed as `sentenceOnWindows`, not reworded locally; since 2026-10-03
+  the contract says `restart this {machine}` for both apps and
+  `sentenceOnWindows` is superseded, #410/#418), exit 1, and the
   launcher trail line written by `Write-TrailLine` — the same file, stamp and
   named mutex (`Local\PlantoirActivityTrail`) as the app's writer. Exercised:
   40 loopback listeners held, exit 1 in 2.0 s.

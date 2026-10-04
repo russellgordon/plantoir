@@ -753,13 +753,13 @@ if [[ -f "$_course_config" ]]; then
   # launcher, deploy.ps1, the shared Python and the app) must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   #
-  # "Nothing was published." is deliberate, in the launchers only. A site is
-  # DEPLOYED and a page is PUBLISHED (Russell, 2026-09-20), and every sentence
-  # the APP says follows that — but this is the launchers own long-standing
-  # house sentence, said five times in each of them and asserted by two shared
-  # Python tests, and one run saying both words for the same act would be
-  # worse than one word that is old. A launcher vocabulary sweep is its own
-  # piece of work.
+  # "Nothing was published." is OLD, and stays only because it is pinned. A
+  # site is DEPLOYED and a page is PUBLISHED (Russell, 2026-09-20; every line
+  # is to use each word only in its own sense, 2026-10-03), but this sentence
+  # is asserted by two shared Python tests, a contract case and Windows' own
+  # tests, so it moves in one change with Windows rather than here alone —
+  # contracts/shared-rules.json -> whyTheLaunchersStillSayPublished names
+  # every such line.
   _reference_code="$COURSE_CODE"
   # A marker that is THERE with a value that is neither true nor false — `1`,
   # `"true"`, a key written with \u escapes. Somebody plainly meant it, and
@@ -1038,7 +1038,7 @@ if [[ -n "$TO_FOLDER" ]]; then
   esac
   TARGET_DIR="${TO_FOLDER%/}/section${SECTION_NUM}"
   mkdir -p "$TARGET_DIR" || {
-    echo "❌ Cannot create the publish folder:"
+    echo "❌ Cannot create the folder to deploy to:"
     echo "   $TARGET_DIR"
     exit 1
   }
@@ -1067,8 +1067,12 @@ if [[ -n "$TO_FOLDER" ]]; then
   # written up as real in the documentation without anyone noticing the
   # trigger could not see it.
   if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
-    echo "🔁 This site was built by a preview, which bakes in a live-reload script"
-    echo "   that students' browsers would ask about. Rebuilding it for publishing…"
+    # Plain words (rule 1, #407): this said "bakes in a live-reload script".
+    # deploy.ps1 took "adds live updating" first (#296); "before it is
+    # deployed" rather than "for publishing", because publishing is marking a
+    # page for the website, and this is the deploy.
+    echo "🔁 This site was built by a preview, which adds live updating"
+    echo "   that students' browsers would ask about. Rebuilding it before it is deployed…"
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
     # publish can meet a question nobody is there to answer: preview.sh has its
     # own course-code guard, and preview.sh has no `set -e`, so unattended it
@@ -1101,10 +1105,10 @@ if [[ -n "$TO_FOLDER" ]]; then
     "${PREVIEW_CMD}" "$COURSE_CODE" "$SECTION_NUM" --build-only "${_PREVIEW_EXTRA[@]+"${_PREVIEW_EXTRA[@]}"}" || _rc=$?
     if [[ $_rc -ne 0 ]]; then
       if [[ $_rc -eq 3 ]]; then
-        echo "❌ Could not rebuild this site for publishing: it needed an answer."
+        echo "❌ Could not rebuild this site before deploying it: it needed an answer."
         exit 3
       fi
-      echo "❌ Could not rebuild this site for publishing."
+      echo "❌ Could not rebuild this site before deploying it."
       exit 1
     fi
     # Without waiting here the publish ran against a directory that did not
@@ -1143,13 +1147,13 @@ if [[ -n "$TO_FOLDER" ]]; then
       sleep 0.2
     done
     if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
-      echo "❌ The rebuilt site still carries the preview's live-reload script."
-      echo "   Nothing was published, rather than publishing pages students'"
+      echo "❌ The rebuilt site still carries the preview's live updating."
+      echo "   Nothing was deployed, rather than deploying pages students'"
       echo "   browsers would ask about."
       exit 1
     fi
     if [[ ! -f "${PUBLIC_DIR_HOST}/index.html" ]]; then
-      echo "❌ The rebuilt site has not appeared. Nothing was published."
+      echo "❌ The rebuilt site has not appeared. Nothing was deployed."
       exit 1
     fi
   fi

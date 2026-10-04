@@ -109,11 +109,14 @@ class MarketingScreenshotCase: XCTestCase {
             parkPointer(in: window)
         }
 
-        // ONE way of taking a picture, and this is it: `screencapture -o -l`,
-        // the programmatic form of Command-Shift-4, Space, Option-click. It
-        // asks CoreGraphics for the WINDOW, so what comes back has the real
-        // rounded corners already transparent and antialiased, whatever is in
-        // front of it and whatever is behind it.
+        // ONE way of taking a picture, and this is it: `screencapture -x -l`,
+        // macOS's own window capture WITH the window's natural shadow (#434,
+        // 2026-10-04; it was `-o`, shadow off, before). It asks CoreGraphics
+        // for the WINDOW, so what comes back has the real rounded corners and
+        // the whole shadow, transparent round them, whatever is in front of
+        // it and whatever is behind it. The app must be the ACTIVE one: macOS
+        // draws a smaller, lighter shadow round an inactive window, and the
+        // pictures would not match one another.
         //
         // **There is deliberately no fallback.** There used to be: any
         // stumble here — no window number, the process throwing, the PNG not
@@ -137,11 +140,20 @@ class MarketingScreenshotCase: XCTestCase {
             return
         }
 
+        // Active before the picture (#434). The app that owns THIS window is
+        // asked, by its process id — not a new XCUIApplication, which would
+        // be a second way into the app beside the one door every UI test
+        // launches through (UITestLaunchTripwireTests).
+        if let owner: NSRunningApplication = owningApplication(ofWindow: windowNumber), !owner.isActive {
+            owner.activate()
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+
         let temporaryURL: URL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("plantoir-shot-\(UUID().uuidString).png")
         let process: Process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-x", "-o", "-l", "\(windowNumber)", temporaryURL.path]
+        process.arguments = ["-x", "-l", "\(windowNumber)", temporaryURL.path]
         // Its own words, kept: "status 1" alone sent one investigation looking
         // at window numbers when the answer was a permission.
         let complaints: Pipe = Pipe()
@@ -164,16 +176,33 @@ class MarketingScreenshotCase: XCTestCase {
             return
         }
         guard let data: Data = try? Data(contentsOf: temporaryURL),
-              let image: NSImage = NSImage(data: data) else {
+              NSImage(data: data) != nil else {
             XCTFail("screencapture wrote nothing readable for the \"\(name)\" shot.")
             return
         }
         try? FileManager.default.removeItem(at: temporaryURL)
 
-        let attachment: XCTAttachment = XCTAttachment(image: image)
+        // The PNG screencapture wrote, byte for byte. An NSImage attachment is
+        // re-encoded by XCTest at whatever size it decides, and a re-encode
+        // that scales the picture scales its shadow (#434).
+        let attachment: XCTAttachment = XCTAttachment(data: data, uniformTypeIdentifier: "public.png")
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// The running application that owns a CoreGraphics window, or nil.
+    func owningApplication(ofWindow number: Int) -> NSRunningApplication? {
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        for window in windows {
+            let listed: Int = window[kCGWindowNumber as String] as? Int ?? -1
+            if listed == number, let pid = window[kCGWindowOwnerPID as String] as? Int {
+                return NSRunningApplication(processIdentifier: pid_t(pid))
+            }
+        }
+        return nil
     }
 
     /// Parks the pointer over the empty part of the sidebar, below the last
@@ -910,8 +939,33 @@ final class MarketingScenes: MarketingScreenshotCase {
         // list uses the same row identifiers, so every row is looked up INSIDE
         // the curriculum table, never across the window.
         let tableIdentifier: String = "table-Curriculum folders"
-        XCTAssertTrue(scrollSettings(in: application, to: tableIdentifier),
-                      "Course Settings should offer College Board Curriculum as a curriculum folder (#128)")
+        // The form has grown (Settings — Overall and Deploying come first),
+        // and on 2026-10-04 no scroll-wheel event moved it from a test
+        // runner built in a worktree's own DerivedData: the table sat 680
+        // points below the window through all forty (a posted CGEvent needs
+        // the runner to hold the Accessibility grant, which a runner at a
+        // new path does not). XCUITest's own scroll, aimed at the scroll
+        // view that HOLDS the curriculum table, goes through the test
+        // daemon instead and needs no grant of the runner's.
+        let formScroll: XCUIElement = application.scrollViews
+            .containing(.any, identifier: tableIdentifier).firstMatch
+        if formScroll.exists {
+            for _ in 0..<12 {
+                let probe: XCUIElement = application.descendants(matching: .any)
+                    .matching(identifier: tableIdentifier).firstMatch
+                if probe.exists && probe.frame.maxY <= window.frame.maxY - 140 {
+                    break
+                }
+                formScroll.scroll(byDeltaX: 0, deltaY: -200)
+                settle(0.4)
+            }
+        }
+        let reached: Bool = scrollSettings(in: application, to: tableIdentifier)
+        let tableProbe: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: tableIdentifier).firstMatch
+        XCTAssertTrue(reached,
+                      "Course Settings should offer College Board Curriculum as a curriculum folder (#128)"
+                      + " — table exists: \(tableProbe.exists), at \(tableProbe.frame), window \(window.frame)")
         let table: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: tableIdentifier).firstMatch
         let toggle: XCUIElement = table.descendants(matching: .any)

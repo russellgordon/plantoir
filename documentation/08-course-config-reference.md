@@ -911,10 +911,14 @@ separately from the reader:
   written and not counted in "Made room for N" (the sentence is left out
   when none was); and every page a write did not finish — a rename, a
   date, a page of links, a blank class — is NAMED with Windows' own
-  sentence `AssistWording.PagesAChangeCouldNotFinish` (no contract key
-  yet; proposed to the mac as `pagesAChangeCouldNotFinish`), and the trail
-  records `making room did not finish every page` with counts by kind
-  (`appliesOn: ["windows"]` until the mac records it). The bare `catch { }`
+  sentence `AssistWording.PagesAChangeCouldNotFinish` (since #425 on
+  2026-10-03 the generated key `wording.pagesAChangeCouldNotFinish`, whose
+  MAC words are now the source — "…before it goes on your website" rather
+  than "before you publish"), and the trail records `making room did not
+  finish every page` with counts by kind (no `appliesOn` since #425: the
+  mac's `ClassInsertionPlanner.apply` records it too, carries past a failed
+  write instead of throwing, and re-dates a class whose rename did not
+  happen at its OLD path, as Windows does). The bare `catch { }`
   that swallowed a failed date write is gone. And `PlanPublish` now leaves a
   declined page out of the pages the front page and dates are worked out
   from by PATH (`AssistWorkspace.WithoutDeclined`), not by file name, so a

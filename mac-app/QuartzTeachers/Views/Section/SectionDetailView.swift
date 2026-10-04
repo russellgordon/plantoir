@@ -1710,6 +1710,18 @@ struct SectionDetailView: View {
             // and the teacher is shown the previous build. Waiting for the
             // value to change asks nothing of either clock.
             let siteAsItWas: Date? = builtIndexWrittenAt()
+            // A deploy another program runs — an outside assistant's, or one
+            // set for later — ends this preview when it builds the section.
+            // The teacher asked for that deploy, so the end is shown as
+            // "Closed for a deploy", not as a failure (#433's stack review,
+            // item 6). Asked of the leases at the moment the run ends.
+            let folderPathForLeases: String = workspaceURL.path
+            let courseCodeForLeases: String = course.code
+            previewRunner.endedForAnotherProgramsBuild = {
+                return WorkLeaseRegistry.anotherProgramIsBuilding(
+                    folderPath: folderPathForLeases, courseCode: courseCodeForLeases
+                )
+            }
             previewRunner.run(
                 scriptNamed: "preview.sh",
                 arguments: [course.code, String(sectionNumber), "--port", String(lease.port)],
@@ -2433,6 +2445,9 @@ struct SectionDetailView: View {
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
                         previewBuildWait.end()
+                        // Serving from here: a later end may be a deploy
+                        // elsewhere closing it (#433's stack review).
+                        previewRunner.hasBeenServing = true
                         previewURL = addressToOpen
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.

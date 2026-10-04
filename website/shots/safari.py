@@ -470,9 +470,12 @@ class SafariWindow:
     def capture(self, destination: Path) -> Path:
         """Save the window itself, by window number.
 
-        `screencapture -l` grabs that WINDOW's contents — the same thing the
-        Option-click window capture gives: no shadow, transparent corners, and
-        crucially independent of what is in front of it.
+        `screencapture -x -l` grabs that WINDOW's contents with its natural
+        shadow (#434), transparent outside the window and its shadow, and
+        crucially independent of what is in front of it. Safari is made the
+        active app first, and this window its front window, because macOS
+        draws a smaller, lighter shadow round an inactive window and the
+        pictures would not match.
 
         The region capture this replaces photographed a RECTANGLE OF SCREEN. It
         depended on Safari having finished coming to the front, and when that
@@ -481,15 +484,16 @@ class SafariWindow:
         like a right one is the worst failure this harness has, so the mechanism
         that allows it is gone.
         """
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        number = self.window_number()
-        subprocess.run(
-            ["screencapture", "-x", "-o", "-l", str(number), str(destination)],
-            check=True,
+        from shadow import capture_window
+        osascript(
+            f'tell application "Safari"\n'
+            f'  set index of window id {self.window_id} to 1\n'
+            f'  activate\n'
+            f'end tell'
         )
-        if not destination.exists() or destination.stat().st_size == 0:
-            raise SystemExit(f"screencapture wrote nothing for window {number}.")
-        return destination
+        time.sleep(1.0)
+        number = self.window_number()
+        return capture_window(number, destination)
 
     def window_number(self) -> int:
         """The CoreGraphics window number for THIS Safari window.

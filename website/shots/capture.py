@@ -56,10 +56,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from appearance import Appearance          # noqa: E402
 from images import (  # noqa: E402
     prepare,
+    serve_as_captured,
     WIDEST_PHONE_PIXELS,
-    WIDEST_WINDOW_PIXELS,
 )
-from composite import fan, side_by_side, diagonal_hero, FIGURE_WIDTH    # noqa: E402
+from composite import native_cascade, native_fan, native_side_by_side    # noqa: E402
+from shadow import capture_active_window, problems_with_shadow, NATIVE_MARGINS  # noqa: E402
 from corners import corner_problems, images_the_pages_show  # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
 import scenes as scene_book  # noqa: E402
@@ -70,6 +71,17 @@ IMAGE_DIR = REPO / "site" / "img"
 SCRATCH = Path(os.environ.get("TMPDIR", "/tmp")) / "plantoir-marketing-shots"
 
 MAC_APP = REPO / "mac-app"
+
+# A DerivedData folder of the run's own, when a worktree must not build into
+# the shared ~/Library/Developer/Xcode/DerivedData (where Russell's Dock icon
+# points). Unset, xcodebuild uses its default per-project folder, as before.
+DERIVED_DATA = os.environ.get("PLANTOIR_DERIVED_DATA", "")
+
+
+def derived_data_flags() -> list[str]:
+    if DERIVED_DATA:
+        return ["-derivedDataPath", DERIVED_DATA]
+    return []
 APP_BUNDLE_DEFAULTS_DOMAIN = "ca.russellgordon.Plantoir"
 
 # The Debug build wears the "BETA" ribbon icon so Russell can tell it from the
@@ -269,6 +281,7 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
             "-project", str(MAC_APP / "Plantoir.xcodeproj"),
             "-scheme", "Plantoir",
             "-configuration", "Debug",
+            *derived_data_flags(),
             PLAIN_APP_ICON,
             "test",
             *only_flags,
@@ -332,11 +345,11 @@ def export_attachments(bundle: Path, suffix: str, parts: set[str] | None = None,
                 staging.mkdir(parents=True, exist_ok=True)
                 destination = staging / f"{shot_name}-{suffix}.png"
             shutil.copy2(source, destination)
-            # No corner masking: the attachment came from `screencapture -l`,
-            # which hands back the real curve with the corners already
-            # transparent. See the note at the top of images.py.
+            # No corner masking and no scaling: the attachment came from
+            # `screencapture -x -l`, which hands back the real curve and the
+            # window's natural shadow. See images.py and shadow.py (#434).
             if staging is None and destination.parent == IMAGE_DIR:
-                prepare(destination, WIDEST_WINDOW_PIXELS)
+                serve_as_captured(destination)
             saved.append(destination.name)
     return saved
 
@@ -353,6 +366,11 @@ def app_bundle_resources() -> Path:
     test did not carry.
     """
     import plistlib
+    if DERIVED_DATA:
+        resources = Path(DERIVED_DATA) / "Build/Products/Debug/Plantoir.app/Contents/Resources"
+        if resources.is_dir():
+            return resources
+        raise SystemExit(f"No built Plantoir.app in PLANTOIR_DERIVED_DATA ({DERIVED_DATA}).")
     project = (MAC_APP / "Plantoir.xcodeproj").resolve()
     for derived in sorted((Path.home() / "Library/Developer/Xcode/DerivedData").glob("Plantoir-*")):
         try:
@@ -824,33 +842,45 @@ def capture_obsidian(workspace: Path, suffix: str) -> None:
 
     window_id = result.stdout.strip()
     destination = PARTS / f"obsidian-{suffix}.png"
-    subprocess.run(["screencapture", "-x", "-o", "-l", window_id, str(destination)], check=True)
+    # Active when photographed, so its shadow is the active window's (#434).
+    capture_active_window("Obsidian", window_id, destination)
     print(f"   part {destination.name}")
 
     subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
 
 
 def build_hero_figures() -> None:
-    """Assemble the diagonal hero composite images for light and dark appearances."""
+    """Assemble the diagonal hero for light and dark: Obsidian at the back,
+    Plantoir in the middle, Safari in front, each a whole capture with its
+    natural shadow (#434).
+
+    A source whose shadow margin is not an active window's is refused rather
+    than placed: it was taken inactive (a smaller, lighter shadow), with -o,
+    or cropped, and the three windows would not match.
+    """
     announce("Assembling the hero figures")
     for suffix in ("light", "dark"):
-        obsidian = PARTS / f"obsidian-{suffix}.png"
-        plantoir = IMAGE_DIR / f"hero-plantoir-{suffix}.png"
-        safari = IMAGE_DIR / f"site-eng2d-{suffix}.png"
-
-        if not obsidian.exists():
-            print(f"   Missing Obsidian capture for {suffix} ({obsidian.name})", file=sys.stderr)
+        sources = [
+            PARTS / f"obsidian-{suffix}.png",
+            IMAGE_DIR / f"hero-plantoir-{suffix}.png",
+            IMAGE_DIR / f"site-eng2d-{suffix}.png",
+        ]
+        missing = [path.name for path in sources if not path.exists()]
+        if missing:
+            print(f"   Missing hero part(s) for {suffix}: {', '.join(missing)}", file=sys.stderr)
             continue
-        if not plantoir.exists():
-            print(f"   Missing Plantoir capture for {suffix} ({plantoir.name})", file=sys.stderr)
+        refused: list[str] = []
+        for path in sources:
+            refused.extend(problems_with_shadow(path))
+        if refused:
+            for problem in refused:
+                print(f"   ✗ hero-{suffix} not built: {problem}", file=sys.stderr)
             continue
-        if not safari.exists():
-            print(f"   Missing Safari capture for {suffix} ({safari.name})", file=sys.stderr)
-            continue
-
         dest = IMAGE_DIR / f"hero-{suffix}.png"
-        diagonal_hero(obsidian, plantoir, safari, dest, stagger_ratio=0.20, figure_width=FIGURE_WIDTH)
-        print(f"   saved {dest.name}")
+        native_cascade(sources, dest, stagger_ratio=0.20)
+        for problem in problems_with_shadow(dest, expected_margins=None):
+            print(f"   ✗ {problem}", file=sys.stderr)
+        print(f"   saved {dest.name} (sources' margins {NATIVE_MARGINS})")
 
 
 def build_static_figures() -> None:
@@ -860,19 +890,20 @@ def build_static_figures() -> None:
 
 
 def build_colour_figures() -> None:
-    """The fanned colour schemes and the light/dark pair, from whole captures."""
+    """The fanned colour schemes and the light/dark pair, from whole captures
+    with their natural shadows, placed whole (#434)."""
     announce("Assembling the colour figures")
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
     missing = [path.name for path in fanned if not path.exists()]
     if missing:
         print(f"   Missing parts: {', '.join(missing)} — run --sites first.", file=sys.stderr)
     else:
-        fan(fanned, IMAGE_DIR / "colour-schemes.png")
+        native_fan(fanned, IMAGE_DIR / "colour-schemes.png")
         print("   saved colour-schemes.png")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
     if all(path.exists() for path in pair):
-        side_by_side(pair, IMAGE_DIR / "light-and-dark.png")
+        native_side_by_side(pair, IMAGE_DIR / "light-and-dark.png")
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
@@ -893,7 +924,7 @@ def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
     window.capture(destination)
     verify_appearance(destination, suffix == "dark", shot["id"])
     verify_address_bar(destination, shot["id"])
-    prepare(destination, WIDEST_WINDOW_PIXELS)
+    serve_as_captured(destination)
     print(f"   saved {destination.name}")
 
 
@@ -946,7 +977,7 @@ def capture_browser_shots(identifiers: list[str]) -> None:
                     window.capture(destination)
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
-                    prepare(destination, WIDEST_WINDOW_PIXELS)
+                    serve_as_captured(destination)
                     print(f"   saved {destination.name}")
 
 
@@ -981,7 +1012,7 @@ def capture_sites(workspace: Path) -> None:
                     # Before the resize, while the page is still full size.
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
-                    prepare(destination, WIDEST_WINDOW_PIXELS)
+                    serve_as_captured(destination)
                     print(f"   saved {destination.name}")
 
                 for shot in search_shots():
@@ -1170,7 +1201,7 @@ def preflight_permissions() -> None:
 
     smoke_command: list[str] = [
         "xcodebuild", "-project", str(MAC_APP / "Plantoir.xcodeproj"),
-        "-scheme", "Plantoir", "-configuration", "Debug", PLAIN_APP_ICON, "test",
+        "-scheme", "Plantoir", "-configuration", "Debug", *derived_data_flags(), PLAIN_APP_ICON, "test",
         "-only-testing:QuartzTeachersUITests/QuartzTeachersUITests/testSidebarShowsExampleCourse",
     ]
     print(f"   $ {' '.join(smoke_command)}  (in the background)")
@@ -1326,8 +1357,8 @@ def capture_note_in_obsidian(note: Path, destination: Path) -> bool:
                             capture_output=True, text=True)
     if result.returncode != 0 or not result.stdout.strip():
         return False
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["screencapture", "-x", "-o", "-l", result.stdout.strip(), str(destination)], check=True)
+    # Active when photographed, so its shadow is the active window's (#434).
+    capture_active_window("Obsidian", result.stdout.strip(), destination)
     subprocess.run(["osascript", "-e", 'tell application "iTerm" to activate'], capture_output=True)
     return True
 
@@ -1371,6 +1402,7 @@ def plain_icon_problem(app_binary: Path) -> str | None:
             "-project", str(MAC_APP / "Plantoir.xcodeproj"),
             "-scheme", "Plantoir",
             "-configuration", "Debug",
+            *derived_data_flags(),
             PLAIN_APP_ICON,
             "build",
         ],
@@ -1466,6 +1498,15 @@ def run_scenes(folder: Path, chosen: list) -> int:
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} is not a whole window "
                                                 f"capture with its own corners — {drawn[0]}")
                                 continue
+                            # Every scene picture but the banner is one whole
+                            # window, so it must carry an active window's whole
+                            # shadow (#434). The banner is Notification Center's
+                            # card, whose shadow is its own.
+                            if name != "notification-banner":
+                                shadow = problems_with_shadow(picture)
+                                if shadow:
+                                    failures.append(f"{scene.name} ({suffix}): {shadow[0]}")
+                                    continue
                             missing = scene_book.missing_words(picture, scene_book.expected_text(name))
                             if missing:
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing} "
@@ -1475,7 +1516,7 @@ def run_scenes(folder: Path, chosen: list) -> int:
                             final.parent.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(picture, final)
                             if final.parent == IMAGE_DIR:
-                                prepare(final, WIDEST_WINDOW_PIXELS)
+                                serve_as_captured(final)
                             passed.append(f"{name}-{suffix}")
     finally:
         kill_orphaned_model_servers()
@@ -1502,7 +1543,7 @@ def run_scenes(folder: Path, chosen: list) -> int:
 
 def compose_scene_figures(passed: list[str]) -> None:
     """Assemble each composite whose parts ALL passed this run, per appearance."""
-    from composite import pair_of_windows, banner_over_window
+    from composite import banner_over_window
     for name, composite in scene_book.COMPOSITES.items():
         for suffix in ("light", "dark"):
             if not all(f"{part}-{suffix}" in passed for part in composite["of"]):
@@ -1512,8 +1553,7 @@ def compose_scene_figures(passed: list[str]) -> None:
             if composite["arrange"] == "banner":
                 banner_over_window(sources[0], sources[1], destination)
             else:
-                pair_of_windows(sources, destination)
-            prepare(destination, WIDEST_WINDOW_PIXELS)
+                native_side_by_side(sources, destination)
             drawn = corner_problems(destination)
             if drawn:
                 print(f"   ✗ {destination.name}: {drawn[0]}", file=sys.stderr)
@@ -1543,17 +1583,22 @@ def refuse_drawn_corners(only_ids: list[str] | None = None) -> int:
     and the exit code says so. Scene pictures are checked earlier, in
     staging, and a failing one never reaches site/img.
     """
+    from shadow import shadow_problems_on_the_site
     problems: list[str] = []
-    for problem in pictures_with_drawn_corners():
+    found: list[str] = pictures_with_drawn_corners()
+    # And every Mac window's natural shadow: whole, never cut off, and the
+    # same margin on every single-window picture (#434).
+    found.extend(shadow_problems_on_the_site(WEBSITE, IMAGE_DIR))
+    for problem in found:
         if only_ids is None or any(problem.startswith(f"{identifier}-") for identifier in only_ids):
             problems.append(problem)
     for problem in problems:
         print(f"   ✗ {problem}", file=sys.stderr)
     if problems:
-        print(f"\n   {len(problems)} corner(s) on the site's pictures are not a real window's. "
-              "Re-take them; do not commit them.", file=sys.stderr)
+        print(f"\n   {len(problems)} picture problem(s): a corner that is not a real window's, or a shadow "
+              "that is cut off or not an active window's. Re-take them; do not commit them.", file=sys.stderr)
         return 1
-    print("   Every picture the pages show has its window's own corners.")
+    print("   Every picture the pages show has its window's own corners and whole natural shadow.")
     return 0
 
 
