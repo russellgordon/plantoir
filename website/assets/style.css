@@ -316,8 +316,12 @@ ol.steps li::before {
    carries data-win-src). Those still arrive without a shadow of their own,
    so they keep the drop-shadow filter, which follows the picture's alpha.
    A shot with no Windows capture shows the Mac picture, shadow included, and
-   gets no filter. */
-.is-windows .shot img[data-win-src] {
+   gets no filter. The composite, static and device figures are named out of
+   the selector rather than overridden below, because this rule's specificity
+   (0,3,1 before the :not()s) beats any plain "filter: none" written for them,
+   whatever the order: those figures arrive with their shadows already drawn
+   (composite.py) or inside a bezel, and a filter would add a second one. */
+.is-windows .shot:not(.shot-composite):not(.shot-static):not(.shot-device) img[data-win-src] {
   filter: drop-shadow(0 1px 2px var(--shot-shadow-near)) drop-shadow(0 8px 16px var(--shot-shadow-far));
 }
 
@@ -334,8 +338,6 @@ ol.steps li::before {
 /* The composite and static figures are flat on every platform: the Mac
    ones carry each window's natural shadow, and the Windows ones are
    assembled with theirs (composite.py). */
-.is-windows .shot-composite img,
-.is-windows .shot-static img,
 .shot-composite img,
 .shot-static img { filter: none; }
 
