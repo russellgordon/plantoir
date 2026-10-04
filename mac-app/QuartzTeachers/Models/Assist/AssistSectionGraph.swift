@@ -335,6 +335,39 @@ nonisolated struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
+    /// Every page whose FILE is called `title` — not only the first in path
+    /// order, which is what `page(titled:)` answers (#425, adopted from
+    /// Windows' bundle 10). A name with a folder in front of it ("Concepts/
+    /// Notes", the form `morePagesThanOneAreCalled`'s list offers) keeps only
+    /// the pages in that folder, the folder written the way
+    /// `StartOfYearPageNaming.folder(of:)` writes it — within the course, from
+    /// its own end. For a caller that must ask rather than guess: publishing
+    /// and hiding by name.
+    func pagesWhoseFileIsCalled(_ title: String, courseDirectoryURL: URL) -> [AssistSectionPage] {
+        let tidied: String = normalized(title)
+        if tidied.isEmpty {
+            return []
+        }
+        var folderAsked: String = ""
+        let trimmed: String = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let lastSlash = trimmed.lastIndex(of: "/") {
+            folderAsked = String(trimmed[..<lastSlash]).trimmingCharacters(in: .whitespaces).lowercased()
+        }
+        var found: [AssistSectionPage] = []
+        for page in pages where page.lowercasedTitle == tidied {
+            if !folderAsked.isEmpty {
+                let folder: String = StartOfYearPageNaming.folder(
+                    of: page.fileURL, courseDirectoryURL: courseDirectoryURL, courseCode: courseCode
+                ).lowercased()
+                if folder != folderAsked && !folder.hasSuffix("/" + folderAsked) {
+                    continue
+                }
+            }
+            found.append(page)
+        }
+        return found
+    }
+
     /// The page a link leads to, the way the site resolves it: by file name,
     /// whatever the capitals — and, failing that, a folder named that whose
     /// landing page (`index.md`) is in this section, since "[[Unit 2]]"

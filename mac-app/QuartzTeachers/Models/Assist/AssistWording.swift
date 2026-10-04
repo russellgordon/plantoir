@@ -267,6 +267,53 @@ nonisolated enum AssistWording {
              + "Wait for that to finish, then ask again."
     }
 
+    /// Pages a change could not finish writing (#425, adopted from Windows'
+    /// `PagesAChangeCouldNotFinish`; the mac's words are now the source).
+    /// Said after making room for a class when a rename, a date, a page's
+    /// links or a new class could not be written. "Before it goes on your
+    /// website", not Windows' "before you publish": publishing marks a page,
+    /// and what the teacher should check before is the deploy.
+    static func pagesAChangeCouldNotFinish(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "I couldn’t finish changing \(listing), so look it over in Obsidian before it goes on your website."
+        }
+        return "I couldn’t finish changing \(listing), so look them over in Obsidian before they go on your website."
+    }
+
+    /// Said when a publish or a hide (marking pages, not a deploy) stopped
+    /// part way — a page Obsidian moved between the plan and the write, a
+    /// locked file, a permission change (#412, from Windows' #165). Some
+    /// pages may already be written, so "nothing was changed" would be
+    /// untrue; the undo entry is abandoned on a throw, so when the
+    /// conversation saved a copy, `restoreSectionPutsItBack` follows.
+    /// `what` is "Unit 3" or "the pages you named"; `problem` is the system's
+    /// own sentence about what went wrong.
+    static func publishStoppedPartWay(what: String, problem: String) -> String {
+        return "Only part of \(what) was changed before this stopped: \(problem)"
+    }
+
+    /// Follows `publishStoppedPartWay` in the in-app assistant when this
+    /// conversation saved a copy of the course (#412). Names the banner's own
+    /// button (`AssistSectionRestore.buttonTitle`). Not said to an outside
+    /// assistant: the button is in Plantoir's assistant window, which a
+    /// Claude or Codex session does not have.
+    static func restoreSectionPutsItBack(section: String) -> String {
+        // The button's own title, spelled out so the contract can show
+        // {section}; a test pins it to `AssistSectionRestore.buttonTitle`.
+        return "A copy from before this conversation changed anything is saved — "
+             + "Restore Section \(section)… puts the section back."
+    }
+
+    /// The refusal of an open-ended publish — a start date with no end, which
+    /// would mark every class from that day to the end of the course (#352,
+    /// #412). Read by the model, which then asks again in a narrower way.
+    static func openEndedPublishRefused(day: String) -> String {
+        return "That asks to publish every class from \(day) to the end of the course, which is "
+             + "almost certainly not what was meant. For ONE day's class, use publish_class_on with "
+             + "that date. For a stretch of classes, give both onOrAfter and before. To publish "
+             + "particular pages, name them."
+    }
+
     /// Said to an outside assistant (Claude or Codex) whose change, rebuild
     /// or deploy was held back because Plantoir is BUILDING the course's
     /// website — a preview that is still being built, or a deploy (#433).

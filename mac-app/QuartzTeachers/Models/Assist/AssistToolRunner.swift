@@ -1307,11 +1307,11 @@ final class AssistToolRunner {
                     changedAnything = true
                 }
             } catch {
-                return AssistToolOutcome.refused(
-                    "\(located.course.configuration.unitWord) \(unit) was only partly "
-                    + "\(publishing ? "published" : "unpublished"): "
-                    + error.localizedDescription
-                )
+                return AssistToolOutcome.refused(publishStoppedPartWay(
+                    what: "\(located.course.configuration.unitWord) \(unit)",
+                    problem: error.localizedDescription,
+                    sectionNumber: located.sectionNumber
+                ))
             }
         }
 
@@ -1523,6 +1523,16 @@ final class AssistToolRunner {
                 graph: graph, classPages: classPages,
                 forSection: located.sectionNumber, in: located.course
             )
+        }
+
+        // A name that fits more than one page's file is ASKED about, never
+        // guessed (#425, adopted from Windows): nothing is written, not even
+        // the pages named unambiguously beside it, because the teacher's
+        // answer may change what they wanted together.
+        if let ambiguous = plan.ambiguousNames.first {
+            return .failure(.whichPageWasMeant(AssistPublishPlanner.askingWhichPageWasMeant(
+                ambiguous, course: located.course, sectionNumber: located.sectionNumber
+            )))
         }
 
         // Names were given and NONE of them is a page (#197). This used to be
@@ -1836,9 +1846,13 @@ final class AssistToolRunner {
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
-            return AssistToolOutcome.refused(
-                "Nothing was changed: \(error.localizedDescription)"
-            )
+            // Not "Nothing was changed" (said here until #412): the write is
+            // page by page, so pages before the one that failed are written.
+            return AssistToolOutcome.refused(publishStoppedPartWay(
+                what: "the pages you named",
+                problem: error.localizedDescription,
+                sectionNumber: sectionNumber
+            ))
         }
         history.record(change)
 
@@ -1933,6 +1947,18 @@ final class AssistToolRunner {
             for: located.course, sectionNumber: located.sectionNumber, afterAChange: false
         )
         return AssistToolOutcome.wrote(message, detail: message)
+    }
+
+    /// What is said when a publish or a hide stopped part way (#412): one
+    /// key, and — in the in-app assistant, when this conversation saved a copy
+    /// — the pointer to the banner's Restore Section button, because the undo
+    /// entry is abandoned on a throw and that copy is the way back.
+    private func publishStoppedPartWay(what: String, problem: String, sectionNumber: Int) -> String {
+        let said: String = AssistWording.publishStoppedPartWay(what: what, problem: problem)
+        if surface == .local && hasConversationBackup {
+            return said + " " + AssistWording.restoreSectionPutsItBack(section: String(sectionNumber))
+        }
+        return said
     }
 
     /// What another program on this Mac holds that stands in the way of

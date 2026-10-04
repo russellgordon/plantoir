@@ -228,9 +228,7 @@
         "event": "making room did not finish every page",
         "carries": "which course and section, how many pages making room for a class could not finish, and how many of each kind: not renamed (the new name was already taken, or the save failed), not re-dated (the save failed), pages whose links to the renamed classes could not be saved, and new classes not added (their name was still taken, by a class whose rename did not happen) - never which pages, which are the teacher's own names",
         "line": "making room for a class did not finish {N page|N pages}: {N} not renamed, {N} not re-dated, {N} with links not updated, {N} new not added",
-        "why": "Added from Windows with #422 (parity bundle 10, 2026-10-01). Making room renames later classes, moves their dates and follows every link to them; a write in the middle that fails used to be swallowed by a bare catch on Windows, and the reply still counted it from the plan ('Renamed 3') - a section half renamed with nothing saying so. Now the reply counts what was written and names the pages it could not finish (Windows' own sentence, AssistWording.PagesAChangeCouldNotFinish, proposed to the mac as wording.pagesAChangeCouldNotFinish); this line is what is still there next week when 'two of my classes have the same name' arrives. One line per act, none when nothing failed.",
-        "appliesOn": ["windows"],
-        "appliesOnWhy": "PENDING the mac: its ClassInsertionPlanner reports a failed write in its reply; whether it also records one is the mac's to say, and the line is proposed to it in parity bundle 10's mac issue. When the mac records it, the appliesOn goes."
+        "why": "Added from Windows with #422 (parity bundle 10, 2026-10-01). Making room renames later classes, moves their dates and follows every link to them; a write in the middle that fails used to be swallowed by a bare catch on Windows, and the reply still counted it from the plan ('Renamed 3') - a section half renamed with nothing saying so. Now the reply counts what was written and names the pages it could not finish (Windows' own sentence, AssistWording.PagesAChangeCouldNotFinish, proposed to the mac as wording.pagesAChangeCouldNotFinish); this line is what is still there next week when 'two of my classes have the same name' arrives. One line per act, none when nothing failed. Adopted on the mac with #425 (2026-10-03, Russell's decision): ClassInsertionPlanner.apply now carries past a failed write instead of throwing with earlier renames already on disk, counts what was written, names the pages with wording.pagesAChangeCouldNotFinish (whose mac words became the source), and writes this line - so it is no longer Windows-only."
       },
       {
         "carries": "which course and section, how many pages shared by every section were given a date and a published-or-hidden setting for the new section, and how many of those were kept hidden because the setting they would copy cannot be read - its value runs onto the next line, it is not complete on its own line, or it is a legacy draft value the reader cannot tell - never which pages",
@@ -20818,5 +20816,102 @@
       "windows"
     ],
     "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows owes the same guard in preview.ps1 (its own process table, never a remembered process id). Until Windows implements it, its cases are a named gap against the windows issue opened with #381."
+  },
+  "publishPlanNaming": {
+    "rule": "Publishing or hiding pages BY NAME (publish_pages, unpublish_pages and their plan_ twins) finds pages by FILE name and keys them by PATH. A name that fits more than one page's file is never guessed: nothing is written, and the answer is wording.morePagesThanOneAreCalled followed by one line per page - '• ', the page as startOfYear.wording.pageNameInFolder names it, ' — ', then its folder and file name joined by '/', which is the 'name at the end' the sentence asks for and which, given back, fits that page alone. A plan names a page whose shown title another page of the section also has with pageNameInFolder (the rule start of year uses, startOfYear.planShows), and every other page with pageName.",
+    "why": "Adopted on the mac with #425 (Russell, 2026-10-03), from Windows' parity bundle 10 (#420). Until then the mac's planner resolved a name to the first file of that name in path order and keyed what it had chosen, and the date each page took, by file name - so two pages sharing a file name, a section's own 'Notes' and a course-wide 'Notes', were one page to it: the wrong one could be published, and two could swap dates. The listing gives folder/name rather than the bare name Windows first used, because on a file-name collision every bare name is the same and asking again with it would ask the same question again.",
+    "howToRunACase": "Make course ICS3U with one section. Each entry of `pages` is a page written unpublished for section 1: `file` is its file name without .md, `folder` is 'Concepts' (a course-level folder) or 'classes' (section 1's classes folder, 'section1/All Classes' within the course), and `shownAs`, when given, is written as its title: line. Then call `asked` (plan_publish_pages or publish_pages) with `pages`. expect.asks true: the answer is morePagesThanOneAreCalled with {page} = expect.name, then exactly expect.lines in order, and no file changed. expect.asks false: every name in expect.planNames appears in the plan's text as '<name> will become visible', and only the files in expect.written (folder/file) changed when asked was publish_pages.",
+    "cases": [
+      {
+        "name": "two files called Notes: asked, not guessed",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          },
+          {
+            "file": "Notes",
+            "folder": "classes"
+          }
+        ],
+        "asked": "publish_pages",
+        "pagesArgument": "Notes",
+        "expect": {
+          "asks": true,
+          "name": "Notes",
+          "lines": [
+            "• “Notes” (in Concepts) — Concepts/Notes",
+            "• “Notes” (in section1/All Classes) — section1/All Classes/Notes"
+          ],
+          "written": []
+        }
+      },
+      {
+        "name": "the folder and name from the list fits one page, which the plan names with its folder",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          },
+          {
+            "file": "Notes",
+            "folder": "classes"
+          }
+        ],
+        "asked": "publish_pages",
+        "pagesArgument": "Concepts/Notes",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes” (in Concepts)"
+          ],
+          "written": [
+            "Concepts/Notes"
+          ]
+        }
+      },
+      {
+        "name": "one page called Notes is named by its title alone",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          }
+        ],
+        "asked": "plan_publish_pages",
+        "pagesArgument": "Notes",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes”"
+          ],
+          "written": []
+        }
+      },
+      {
+        "name": "two files that SHOW the same title are both named with their folder",
+        "pages": [
+          {
+            "file": "Notes A",
+            "folder": "Concepts",
+            "shownAs": "Notes"
+          },
+          {
+            "file": "Notes B",
+            "folder": "classes",
+            "shownAs": "Notes"
+          }
+        ],
+        "asked": "plan_publish_pages",
+        "pagesArgument": "Notes A",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes” (in Concepts)"
+          ],
+          "written": []
+        }
+      }
+    ]
   }
 }

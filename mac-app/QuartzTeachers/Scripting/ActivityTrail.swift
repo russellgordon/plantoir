@@ -969,6 +969,11 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// Making room for a class could not finish some of its writes — a
+        /// rename whose new name was taken or whose save failed, a date, a
+        /// page's links, a new class whose name was still taken (#425,
+        /// adopted from Windows' #422). Counts by kind, never names.
+        case makingRoomDidNotFinishEveryPage = "making room did not finish every page"
         /// The assistant asked to publish or hide pages and named none this
         /// section has (#197): only a word meaning every page ("all"), or
         /// names that match no page. Nothing was changed and the teacher was

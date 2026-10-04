@@ -237,6 +237,15 @@ enum AssistContract {
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
             "courseIsBeingBuilt": AssistWording.courseIsBeingBuilt(course: course),
+            "pagesAChangeCouldNotFinish": AssistWording.pagesAChangeCouldNotFinish(
+                AssistPublishPlan.listingAFew(["Unit 1, Day 3"]), count: 1
+            ),
+            "pagesAChangeCouldNotFinishNamingSeveral": AssistWording.pagesAChangeCouldNotFinish(
+                AssistPublishPlan.listingAFew(["Unit 1, Day 3", "Unit 1, Day 4"]), count: 2
+            ),
+            "publishStoppedPartWay": AssistWording.publishStoppedPartWay(what: "{what}", problem: "{problem}"),
+            "restoreSectionPutsItBack": AssistWording.restoreSectionPutsItBack(section: section),
+            "openEndedPublishRefused": AssistWording.openEndedPublishRefused(day: "{day}"),
             "changesAreSavedPreviewShowsTheOldPages": AssistWording.changesAreSavedPreviewShowsTheOldPages(
                 course: course, section: section
             ),
