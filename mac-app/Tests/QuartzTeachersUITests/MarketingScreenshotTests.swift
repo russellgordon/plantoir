@@ -922,8 +922,33 @@ final class MarketingScenes: MarketingScreenshotCase {
         // list uses the same row identifiers, so every row is looked up INSIDE
         // the curriculum table, never across the window.
         let tableIdentifier: String = "table-Curriculum folders"
-        XCTAssertTrue(scrollSettings(in: application, to: tableIdentifier),
-                      "Course Settings should offer College Board Curriculum as a curriculum folder (#128)")
+        // The form has grown (Settings — Overall and Deploying come first),
+        // and on 2026-10-04 no scroll-wheel event moved it from a test
+        // runner built in a worktree's own DerivedData: the table sat 680
+        // points below the window through all forty (a posted CGEvent needs
+        // the runner to hold the Accessibility grant, which a runner at a
+        // new path does not). XCUITest's own scroll, aimed at the scroll
+        // view that HOLDS the curriculum table, goes through the test
+        // daemon instead and needs no grant of the runner's.
+        let formScroll: XCUIElement = application.scrollViews
+            .containing(.any, identifier: tableIdentifier).firstMatch
+        if formScroll.exists {
+            for _ in 0..<12 {
+                let probe: XCUIElement = application.descendants(matching: .any)
+                    .matching(identifier: tableIdentifier).firstMatch
+                if probe.exists && probe.frame.maxY <= window.frame.maxY - 140 {
+                    break
+                }
+                formScroll.scroll(byDeltaX: 0, deltaY: -200)
+                settle(0.4)
+            }
+        }
+        let reached: Bool = scrollSettings(in: application, to: tableIdentifier)
+        let tableProbe: XCUIElement = application.descendants(matching: .any)
+            .matching(identifier: tableIdentifier).firstMatch
+        XCTAssertTrue(reached,
+                      "Course Settings should offer College Board Curriculum as a curriculum folder (#128)"
+                      + " — table exists: \(tableProbe.exists), at \(tableProbe.frame), window \(window.frame)")
         let table: XCUIElement = application.descendants(matching: .any)
             .matching(identifier: tableIdentifier).firstMatch
         let toggle: XCUIElement = table.descendants(matching: .any)
