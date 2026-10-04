@@ -39,10 +39,10 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   explains it — accepted rather than adding a third stop path), then the alert.
   Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
   anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
-  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac;
-  since 2026-10-03 the contract writes `theSiteNeverAnswered`'s sentence with
-  `{machine}`, filled from `specialNames.platformWording.machine`, #410/#418, so
-  the substitution becomes a fill driven by `machine.usedIn`).
+  first verdict. `theSiteNeverAnswered`'s sentence is the contract's with its
+  `{machine}` filled "PC" (`specialNames.platformWording.machine`, #410/#418;
+  since v1.4.3 a fill driven by `machine.usedIn` in `MachineWordContractTests`,
+  #438, where it used to be a "your Mac" → "your PC" substitution).
 - **A typed publish folder (#304, review L1).** `deploy.ps1`'s
   `Resolve-PublishFolder` takes a plain relative name from the working folder
   (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
@@ -969,6 +969,29 @@ report — a `Progress<T>` made inside `Task.Run` reports on a pool thread
 folder and then Netlify again in Course Settings left Revert on
 (`CourseConfiguration.DeployTarget` now restores the saved spelling); and
 every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
+
+**What a screen reader hears for an icon-only button (#426, v1.4.3).** The same
+runs measured the sidebar's Add and Remove with an EMPTY automation Name, so
+Narrator said only "button". Every icon-only button in the main window now
+carries `AutomationProperties.Name` in the words its tooltip already shows: the
+sidebar's Add and Remove, the section toolbar's back, forward, reload, Obsidian
+and Open in Browser, Course Settings' Obsidian, and a list row's rename
+(`FormBuilders`; the row's ⓘ and the lists' + and − were already named).
+Preview and Deploy show text beside their icon and are left to be named by it
+(not yet measured: the UiFact below is what will say, and it fails by
+AutomationId if either comes back empty). A reference
+course's row SHOWS its code, which is the live course's code too, so its Name is
+fuller — `ReferenceCourse.SpokenRowName`, "ICS3U, kept for reference, 2025–26"
+(or without the year when none is set) — through `SidebarRow.SpokenName`, which
+is the Title for every other row. Windows' own: VoiceOver reads SwiftUI buttons
+by their labels, so the mac owes nothing. Pinned by two UiFacts in
+`SidebarNamesUiTests` (no Button in the main window with an empty Name, asked on
+the sidebar, a course's settings and a section; the reference row's Name) and by
+`ReferenceCourseTests.AReferenceRowIsSpokenWithItsYear`. Rejected (reasoned, not
+measured): a HelpText on the reference row instead of a fuller Name (the Name is
+what is announced first, so the two ICS3U rows would still start identically); naming
+Preview/Deploy explicitly (their label changes to Stop and to "Available in a
+moment", and a static Name would go stale).
 
 Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
 29–32 s; its first preview served 52–61 s after Preview was pressed;
@@ -3100,14 +3123,33 @@ Settings was open would then ask about the wrong thing. Rejected: a walk per
 row (the mac measured 53 ms per walk on a 400-folder course, ten-plus rows per
 drawing).
 
-One difference the runner absorbs rather than hides: with no `class_folder`
-recorded, Windows protects the first per-section folder as the class folder
-(`ClassFolderRule.Name`'s guess), where the mac protects only the literal "All
-Classes" or a recorded name. `floor`'s per-section fixtures say none of their
-folders is the class folder, so `MarksFloorContractTests` sets the resolved
-class folder to null for those cases. Whether the two apps should agree on
-which folder an unrecorded course protects is a separate question and was not
-taken here.
+**Which folder is protected as the class folder (#431, Russell 2026-10-03:
+Windows matches the mac).** With no `class_folder` recorded, only the literal
+"All Classes" is protected from removal; with one recorded, that name as well
+(`ClassFolderRule.ProtectedName`, the mac's
+`ClassFolder.isTheAllClassesFolder(_:configured:)`). Until v1.4.3 Windows
+protected `ClassFolderRule.Name`'s GUESS — the first folder whose name says
+"class", else the first per-section folder — so the same course file answered
+`classFolderBlocked` for "Handouts" here and reached the marks floor on the mac,
+and `MarksFloorContractTests` nulled the resolved class folder for F13/F14 to
+get round it. Both are gone; the floor cases run through the real resolution.
+The New Course wizard matches the mac's too: the literal, plus a club's folder
+by the name its row gives (the guess never found "All Meetings").
+
+What did NOT change, on purpose: the guess still decides WHERE a new class page
+is written (`class-planning.json → classFolder.naming`, shared with the mac and
+`build_site.py`), and what the wizard RECORDS as `class_folder`. Writing needs
+an answer for every course; protecting needs certainty, and a guess is not.
+Measured before the change (#431's own ask): of the 39 example payloads and 50
+skeleton families, NONE records a class folder and none has a first
+per-section folder other than "All Classes" (every skeleton lists exactly
+`["All Classes"]`), so no course made from them changes. The courses that do
+are ones with no `class_folder` key — made before the key existed, or
+hand-edited — whose per-section list's guess is not "All Classes": such a
+course can now remove that folder, as it always could on a Mac. Rejected:
+keeping the guess and asking the mac to adopt it (a first-folder guess would
+protect "Handouts" for no reason the teacher can see, and the mac never shipped
+it).
 
 ### Reopening the last working folder: a path, not a bookmark
 
