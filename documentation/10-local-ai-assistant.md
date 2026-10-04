@@ -953,11 +953,11 @@ never drift apart:
 
 **THE WHOLE VERB IS GATED, not only the day arm, and that asymmetry is the
 decision.** `hide` and `unpublish` take a whole unit or one class page and
-tolerate the spellings below; `publish` is read by a frame of its own that has
-not moved — the literal opening `publish unit ` and a bare number — so `publish
-unit 4, day 3` still goes to the model, and so do `publish unit 4?`, `please
-publish unit 4`, `publish unit 4 please`, `publish  unit 5` and `publish unit,
-4`.
+tolerate the spellings below; `publish` is read by a frame of its own: the
+literal opening `publish unit ` and a bare number, or, since #411, the exact
+form `publish unit 4, day 3` (below). Every looser spelling still goes to the
+model: `publish unit 4?`, `please publish unit 4`, `publish unit 4 please`,
+`publish  unit 5` and `publish unit, 4`.
 
 **That split was made deliberately rather than inherited, and it was got wrong
 first.** The original version read the verb AFTER stripping the courtesy words
@@ -4075,7 +4075,7 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   deploy", and the trail writes `preview closed for a deploy`. The residual,
   accepted: a lease names the course, so a deploy of Section 2 elsewhere
   coinciding with Section 1's server being SIGKILLed for another reason reads
-  as closed. A publish set for later ends a preview the same way and is shown
+  as closed. A deploy set for later ends a preview the same way and is shown
   the same way.
 - **The residual, in `outsideChanges.rule`**: an outside change looks once and
   takes no lease, so a window Deploy pressed during a multi-page outside write
@@ -6149,7 +6149,7 @@ and report success.
 
 **Rejected:** rewording the `unit` description so the models leave it out.
 That is steering with a description, which this file forbids for a measured
-reason ("Steer with code, never with a description"). **Left for Russell (#411):**
+reason ("Steer with code, never with a description"). **Left for Russell (#440; #411 is closed):**
 whether to refuse the empty call anyway, by naming `add_next_class` as needing
 more than the window supplies, which leaves the schema alone. That trades the rule's "read
 the schema, never a name" property for the outcome he asked for. Until then
@@ -6160,7 +6160,7 @@ both apps RUN an empty `add_next_class` call — Windows through
 shown this exact `unit` line all along. If its router reads it the same way,
 an ordinary "add the next class" there may already start a new unit. Only a
 measurement that prints the full arguments, rather than scoring the tool's
-name, can tell; it is asked for in the Windows hand-back for this bundle.
+name, can tell; it is asked for in the comment on #432.
 
 ### What was MEASURED for the Codex door
 
