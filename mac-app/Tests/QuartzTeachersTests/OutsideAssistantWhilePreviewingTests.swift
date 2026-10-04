@@ -187,7 +187,10 @@ final class OutsideAssistantWhilePreviewingTests: XCTestCase {
                            "\(name): \(outcome.detail)")
             if let key = expect["said"] as? String {
                 let said: String = try XCTUnwrap(sentence(forKey: key), "\(name): unknown key \(key)")
-                XCTAssertTrue(outcome.detail.hasSuffix(said), "\(name): said \(outcome.detail)")
+                XCTAssertTrue(outcome.detail.contains(said), "\(name): said \(outcome.detail)")
+                if key == "courseIsBeingBuilt" {
+                    XCTAssertEqual(outcome.detail, said, "\(name): a refusal is the whole answer")
+                }
             }
             ran += 1
             if let other, other.isRunning {
@@ -265,7 +268,8 @@ final class OutsideAssistantWhilePreviewingTests: XCTestCase {
         let published: AssistToolOutcome = await AssistFixture.run(
             "publish_pages", with: ["pages": "Unit 1, Day 1"], on: made.runner
         )
-        XCTAssertTrue(published.detail.hasSuffix("\n\n" + before), published.detail)
-        XCTAssertFalse(trailText(in: made.root).contains("outside assistant worked while a preview was open"))
+        XCTAssertTrue(published.detail.contains("\n\n" + before + "\n\n"), published.detail)
+        XCTAssertTrue(published.detail.contains("their PREVIEW"), published.detail)
+        XCTAssertFalse(trailText(in: made.root).contains("left the preview open in Plantoir as it was"))
     }
 }
