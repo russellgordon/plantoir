@@ -2,9 +2,9 @@
 """Tell a window's REAL corner from a drawn one, by reading the pixels.
 
 Every picture on plantoir.app is made from whole macOS window captures —
-`screencapture -x -o -l <window id>`, the Option-click window capture — which
-hand back the window with its own rounded corners, the pixels outside the
-curve genuinely transparent. Nothing is cropped through a corner and nothing
+`screencapture -x -l <window id>`, the window capture with its natural shadow
+(#434) — which hand back the window with its own rounded corners, the pixels
+outside the curve transparent but for the shadow (well under OPAQUE). Nothing is cropped through a corner and nothing
 re-draws one. This module is how that is CHECKED rather than hoped for: the
 gate in `test_native_corners.py` and the check `capture.py` runs before it
 calls a picture finished both use it.
