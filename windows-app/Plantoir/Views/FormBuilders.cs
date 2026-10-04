@@ -244,6 +244,8 @@ public static class FormBuilders
                     };
                     ToolTipService.SetToolTip(rename, $"Rename {display}…");
                     AutomationProperties.SetAutomationId(rename, "rename:" + display);
+                    // Icon-only, so a screen reader needs the tooltip's words (#426).
+                    AutomationProperties.SetName(rename, $"Rename {display}…");
                     string toRename = item;
                     rename.Click += (_, _) => onRenameRequested(toRename);
                     trailing.Children.Add(rename);
