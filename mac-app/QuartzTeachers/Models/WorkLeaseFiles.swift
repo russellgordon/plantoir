@@ -60,7 +60,37 @@ nonisolated enum WorkLeaseFiles {
 
         /// A publish set for later, which waits rather than declines.
         case aScheduledPublish
+
+        /// A deploy asked for by an outside assistant (#433, Russell
+        /// 2026-10-03): declined only while a site is being BUILT. A preview
+        /// the teacher is merely reading does not hold it back — the deploy
+        /// ends that section's preview, as the window's own Deploy does.
+        case anOutsideDeploy
     }
+
+    /// What a CHANGE asked for by an outside assistant (Claude or Codex,
+    /// through `Plantoir --mcp-stdio`) meets in the other programs' leases
+    /// (#433). Not a question about building: the change writes pages, and
+    /// what it is held back by is a site actually being built.
+    enum OutsideChangeMeets: Equatable, Sendable {
+
+        /// Nothing in the way.
+        case clear
+
+        /// Another program is building the course — a preview that is still
+        /// being built (it holds `build` beside `preview`), or a deploy
+        /// (`build` and `publish`). The change is held back.
+        case building(Holding)
+
+        /// Another program has a preview of the course up and has FINISHED
+        /// building it — `preview` with no `build` beside it. The teacher is
+        /// reading it; the change goes ahead and the preview is left alone.
+        case previewServed(Holding)
+    }
+
+    /// The kinds that mean a site is being built right now (#433). A served
+    /// preview holds `preview` only, so it is not here.
+    static let kindsThatMeanBuilding: [String] = ["build", "publish"]
 
     // MARK: - Stored properties
 
@@ -257,6 +287,8 @@ nonisolated enum WorkLeaseFiles {
             kinds = WorkLeaseFiles.kindsThatBlockABuild
         case .aScheduledPublish:
             kinds = WorkLeaseFiles.kindsAScheduledPublishWaitsFor
+        case .anOutsideDeploy:
+            kinds = WorkLeaseFiles.kindsThatMeanBuilding
         }
         for holding in holdings {
             if !kinds.contains(holding.kind.lowercased()) {
@@ -270,6 +302,31 @@ nonisolated enum WorkLeaseFiles {
             }
         }
         return nil
+    }
+
+    /// What an outside assistant's change meets among the other programs'
+    /// leases (#433).
+    ///
+    /// A building lease WINS over a preview lease, whatever order the files
+    /// were read in: an app preview that is still building holds both, and
+    /// reading it as merely served would let a change through — and a
+    /// rebuild be answered as if nothing were building — while a build runs.
+    /// No claim is compared: an outside change takes no lease of its own.
+    static func whatAnOutsideChangeMeets(among holdings: [Holding]) -> OutsideChangeMeets {
+        var served: Holding? = nil
+        for holding in holdings {
+            let kind: String = holding.kind.lowercased()
+            if WorkLeaseFiles.kindsThatMeanBuilding.contains(kind) {
+                return .building(holding)
+            }
+            if kind == WorkLeaseFiles.previewKind && served == nil {
+                served = holding
+            }
+        }
+        if let served {
+            return .previewServed(served)
+        }
+        return .clear
     }
 
     /// Whether another process's lease was taken before this process's claim.

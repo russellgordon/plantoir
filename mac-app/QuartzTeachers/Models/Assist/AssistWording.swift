@@ -258,9 +258,53 @@ nonisolated enum AssistWording {
     /// "Available once preview completed", which is written to sit under a
     /// greyed-out menu item and says nothing about what was asked for when it
     /// is read out on its own in a conversation.
+    ///
+    /// Since #433 this is said only by THIS copy of Plantoir about its own
+    /// work (where an open preview does make the course busy); an outside
+    /// assistant held back by ANOTHER program is told `courseIsBeingBuilt`.
     static func courseIsBusy(course: String) -> String {
         return "\(course) is busy in Plantoir — a preview or a deploy is running. "
              + "Wait for that to finish, then ask again."
+    }
+
+    /// Said to an outside assistant (Claude or Codex) whose change, rebuild
+    /// or deploy was held back because Plantoir is BUILDING the course's
+    /// website — a preview that is still being built, or a deploy (#433).
+    /// Nothing was written, and it says so: a preview that is only open does
+    /// not hold anything back, so "a preview is running" would be untrue.
+    static func courseIsBeingBuilt(course: String) -> String {
+        return "Plantoir is building the \(course) website right now, for a preview or a deploy, "
+             + "so nothing was changed. Ask again once it has finished."
+    }
+
+    /// Said to an outside assistant after its change was SAVED while a
+    /// preview of the course is open in Plantoir, and when it asks for the
+    /// preview to be rebuilt then (#433, Russell 2026-10-03). The open preview
+    /// is left exactly as it is; the teacher sees the change by stopping and
+    /// starting it. The controls are named as the section window labels them
+    /// (`SectionDetailView`: "Stop Preview", then "Preview"). Never a refusal
+    /// word: the change succeeded (a test pins that).
+    static func changesAreSavedPreviewShowsTheOldPages(course: String, section: String) -> String {
+        return "Your changes to \(course) Section \(section) are saved. The preview open in Plantoir "
+             + "still shows the pages as they were — press Stop Preview, then Preview, to see them."
+    }
+
+    /// Said to an outside assistant after its change was SAVED, when Plantoir
+    /// started building the course in the moment after the change was let
+    /// through (#433). Saved, never "busy": the change succeeded.
+    static func changesAreSavedWhileTheCourseIsBuilt(course: String, section: String) -> String {
+        return "Your changes to \(course) Section \(section) are saved. Plantoir is building the "
+             + "\(course) website right now; press Preview once that has finished to see them."
+    }
+
+    /// Added to an outside assistant's successful deploy when a preview of
+    /// the course was open in Plantoir (#433, Russell 2026-10-03: the deploy
+    /// goes ahead). Deploying a section ends that section's preview, as the
+    /// window's own Deploy does; "if" because Plantoir's record names the
+    /// course and not the section, and a preview of another section stays.
+    static func deployClosedAnOpenPreview(course: String, section: String) -> String {
+        return "If a preview of \(course) Section \(section) was open in Plantoir, deploying closed it — "
+             + "press Preview there to open it again."
     }
 
     /// Said when a copy of the course is being saved in Plantoir (#351) — a

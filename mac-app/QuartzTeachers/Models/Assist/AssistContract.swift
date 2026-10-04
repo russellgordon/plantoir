@@ -236,6 +236,14 @@ enum AssistContract {
             "previewBuildNeedsAnAnswer": AssistWording.previewBuildNeedsAnAnswer(course: course, section: section),
             "sectionIsBusy": AssistWording.sectionIsBusy(course: course, section: section),
             "courseIsBusy": AssistWording.courseIsBusy(course: course),
+            "courseIsBeingBuilt": AssistWording.courseIsBeingBuilt(course: course),
+            "changesAreSavedPreviewShowsTheOldPages": AssistWording.changesAreSavedPreviewShowsTheOldPages(
+                course: course, section: section
+            ),
+            "changesAreSavedWhileTheCourseIsBuilt": AssistWording.changesAreSavedWhileTheCourseIsBuilt(
+                course: course, section: section
+            ),
+            "deployClosedAnOpenPreview": AssistWording.deployClosedAnOpenPreview(course: course, section: section),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
