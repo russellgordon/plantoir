@@ -8,11 +8,15 @@ file in the branch that ships Windows 1.4.3; the issues stay the record.
 
 ---
 
-You are the DIRECTOR of the Windows half of Plantoir v1.4.3. The mac cut
-v1.4.3 on its own the night before (check: `git tag` has `v1.4.3`, and
-`website/site.json` shows version 1.4.3 with the Windows download card pinned
-to 1.4.2). If the tag is not there, the mac cut did not finish: say so to
-Russell before anything else, and do the issue work but not the release.
+You are the DIRECTOR of the Windows half of Plantoir v1.4.3. The mac was to
+cut v1.4.3 on its own the night before. **If the hand-over says the cut
+stopped, read `CUT-STOPPED.md` first** (the mac run writes it beside its
+hand-over): it names the failed step and what is left. Otherwise check that
+the cut happened: `git tag` has `v1.4.3`, and `website/site.json` shows version
+1.4.3 with the Windows download card pinned to 1.4.2. If the tag is not there,
+the mac cut did not finish: say so to Russell before anything else, and do the
+issue work but not the release. Everything below about the tag, the pinned
+card and the test to change back holds only once the cut has happened.
 
 Your job is the open `windows` issues on the milestone **v1.4.3**, then
 Windows JOINING the existing v1.4.3 release. Russell is at the PC for this
@@ -54,7 +58,13 @@ edited; do not rewrite them.
 - **Words:** DEPLOY means putting a site on Netlify, Cloudflare or a local
   folder. PUBLISH means marking a page so that it is included in a deploy;
   nothing leaves the PC. Use each only in its own sense, in briefs, issues,
-  documentation and teacher-facing sentences.
+  documentation and teacher-facing sentences. `deploy.ps1:550` and `:595`
+  take `deploy.sh`'s two new lines word for word ("Rebuilding it before it is
+  deployed…", "Nothing was deployed, rather than deploying pages students'"),
+  per #438 and GUI row 708; the release-hygiene branch moved three more
+  (`deploy.ps1:571`, `:575`, `:604`: "Could not rebuild this site before
+  deploying it" and "Nothing was deployed."), and the lines still pinned to
+  "published" move together across both apps in the issue it opened.
 - **GitHub:** check how `gh` is authenticated on this PC first. Use the
   `russellgordon` login per command
   (`$env:GH_TOKEN = gh auth token --user russellgordon`), never
@@ -113,8 +123,8 @@ bundle whose files it shares when you write the plan.
 
 | | Bundle | Issues known on 2026-10-03 | Notes |
 |---|---|---|---|
-| A | The assistant | #424, #432, #430, and the mac's hand-backs about what an outside assistant is told and the typed shortcuts | #432 needs the mac's new `hideIsUnpublish` rows on `dev`; if they are not there, the mac parked or missed it, so leave #432 open and say so. |
-| B | Rules, writers and wording | #431, and the mac's hand-backs about the `{machine}` placeholder, the contract cases it added, and writers and dates | Mostly MATCH. |
+| A | The assistant | #424, #432, #430, #436 (the mac's bundle A: #433, #412, #425) | #432 is unblocked: the rows, the scripted cut-off case (`given.modelReply`) and the two daylight-saving rows are on `dev`. Read the mac's comment on #432. |
+| B | Rules, writers and wording | #431, #437 (the mac's bundle C: #408, #377), #438 (the mac's bundle D: `{machine}`, the contract cases, `deploy.ps1`'s lines) | Mostly MATCH. |
 | C | The updater and the release | #428, then joining the release | The release steps wait for Russell's word. |
 | – | Loose ends | #426, #427, #380, #370 | See below. |
 
@@ -131,15 +141,41 @@ What was decided on the mac side that you need in order to brief:
   local window apart by `--course` afterwards; the window still passes it.
 - **#431.** No guessing a class folder. Check every caller of that
   resolution, and say how many example payloads change behaviour.
-- **An outside assistant and an open preview (mac #433).** Russell's rule: an
-  outside assistant is held back only while a site is actually being BUILT.
-  A preview being served blocks nothing, the preview is left as it is, and
-  the assistant is told the change is saved and the teacher will see it after
-  stopping and starting the preview. `plantoir-mcp` already refuses writes
-  only on `build`; what it SAYS after a write, and the reworded
-  `courseIsBusy`, follow the mac's new cases and keys.
-- **`{machine}`.** Once the mac's placeholder is on `dev`, drop Windows'
-  stop-gap `windowsWording` variants and fill the one sentence.
+- **An outside assistant and an open preview (mac #433, #436).** Russell's
+  rule: an outside assistant is held back only while a site is actually being
+  BUILT. A preview being served blocks nothing, the preview is left as it is,
+  and the assistant is told the change is saved and the teacher will see it
+  after stopping and starting the preview. `plantoir-mcp` already refuses
+  writes only on `build`. Three things to brief:
+  (a) `courseIsBusy` was NOT reworded and keeps its words. A NEW key,
+  `courseIsBeingBuilt`, is said when something is held back, and
+  `changesAreSavedPreviewShowsTheOldPages`, `changesAreSavedWhileTheCourseIsBuilt`
+  and `deployClosedAnOpenPreview` are new too (`assist-wording.json`).
+  (b) The damaging direction: an outside `deploy_section` GOES AHEAD past a
+  served preview (Russell, 2026-10-03 23:00), and an outside `rebuild_preview`
+  builds nothing and says the saved sentence. Windows declines both on a
+  served preview today (#289) and must stop.
+  (c) Two new `activityTrail.mustRecord` events with no `appliesOn`:
+  "outside assistant worked while a preview was open" and "preview closed for
+  a deploy". #436 names only the first, so `SharedRules_ActivityTrailEvents_Exist`
+  goes red for both on pull.
+- **`{machine}` (#438).** There are THREE sentences (`machine.usedIn`). The
+  stop-gaps to drop are `appUpdates.windowsWording.elsewhereWorkOnWindows` AND
+  `previewPorts.whenNoBlockIsFree.sentenceOnWindows` (not under
+  `windowsWording`), plus the "your PC" substitution for
+  `theSiteNeverAnswered`. Fill all three from
+  `specialNames.platformWording.machine`, driven off `usedIn`.
+- **#411 part 1 is PARKED (#440), not landed.** `AssistAgent.OptionalExtras`
+  and the empty `add_next_class` call stay as they are. The mac asks Windows
+  to measure, with the arguments printed in full, whether its local model
+  sends `unit: "next"` for a plain "add the next class"
+  (`research/ai-assist/add-next-class-unit-days-411-results.txt`; the ask is
+  in the mac's comment on #432).
+- **#431.** Cases F13 and F14 in `gradedFolders.floor` now LIST "All Classes",
+  so the runner's null-the-class-folder workaround goes (#438).
+- **Decisions waiting on Russell, not work:** #439 (an orphaned scheduled
+  deploy after a re-set, mac) and #440 (`add_next_class` `unit`/`days`).
+  #435 is two Mac pictures awaiting capture and owes Windows nothing.
 - **Loose ends.** #380 and #370 were part done with Windows 1.4.2: read each
   one's last comment, finish what is left or say on the issue why it is
   done, and close it; when the milestone "Windows: parity with mac v1.4.0"
@@ -147,7 +183,10 @@ What was decided on the mac side that you need in order to brief:
   pointers to it as its header says. #426 (accessible names for the
   sidebar's icon-only buttons) goes into bundle B if it is small. #427 is a
   test that went red once: watch for it in the stack gates and record what
-  you see; do not chase it.
+  you see; do not chase it. For #380/#370: the page's CSS gives a
+  `drop-shadow` only to a Windows single-window capture now — never to the
+  composite, static or phone figures (`website/test_shot_shadows.py`) — so a
+  new Windows single-window capture must arrive WITHOUT a shadow of its own.
 
 Damaging directions to name to the reviewers: a page shown to students that
 the teacher hid; a deploy that runs when one was only asked to be scheduled,
@@ -215,3 +254,19 @@ release branch, and tell Russell plainly: what landed with its gate lines,
 what was left open and why, what the mac now owes (each as a `mac` issue),
 what you closed or borrowed on the PC and put back, and that "PT - Dev" is
 built and not launched.
+
+## What the mac run of 2026-10-03/04 changed
+
+Written 2026-10-04 by the mac's release-hygiene branch, after the run landed.
+
+- Bundles A, C, D and B and the screenshots landed on `dev`.
+- #432 is unblocked: the mac's rows landed as `d83fb50d`.
+- Hand-backs: **#436** (bundle A; it also owes the "preview closed for a
+  deploy" trail event, which its body does not name), **#437** (bundle C),
+  **#438** (bundle D).
+- Decision issues: **#439** and **#440**. `add_next_class` `unit`/`days` is
+  PARKED, not landed, and Windows is asked to measure whether its model sends
+  `unit: "next"`.
+- **#435**: two scenes (`schedule`, `how-i-teach`) awaiting capture on the mac.
+- The mac cut pins the Windows download card to 1.4.2 until Windows joins
+  the release. On joining: unpin it and change its test back (above).
