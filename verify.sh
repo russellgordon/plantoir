@@ -398,6 +398,13 @@ else
   cat /tmp/verify_preview_while_deploying_test.log
 fi
 
+if (cd scripts && python3 test_deploy_while_its_section_deploys.py) >/tmp/verify_deploy_while_its_section_deploys_test.log 2>&1; then
+  pass "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
+else
+  fail "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
+  cat /tmp/verify_deploy_while_its_section_deploys_test.log
+fi
+
 if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then
   pass "a colour scheme's name never names the machinery (scripts/test_colour_scheme_names.py, #383)"
 else

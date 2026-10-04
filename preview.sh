@@ -658,7 +658,14 @@ say_this_folder_cannot_be_reached() {
 #   program  1 when the launcher is the PROGRAM — the first word, or the
 #            script a shell was handed before any word starting with "-" —
 #            and 0 when the line merely names it (a `claude -p` prompt, a
-#            `bash -c` wrapper whose own child is the launcher).
+#            `bash -c` wrapper whose own child is the launcher). For a
+#            publish set for later, 1 when its SCRIPT is the program the same
+#            way — the wrapper the run started, `/bin/bash …/<label>.sh`,
+#            which outlives a run ended by a re-set (#439) — and 0 for the
+#            app's own `Plantoir --run-scheduled-deploy <script> …` line, an
+#            editor, or `bash -x <script>`. The script's path may hold a
+#            space ("Application Support"), so the word that ends in the
+#            name is looked for, never word 2.
 #   flags    the launcher's OWN words among --stop, --build-only,
 #            --builder-tag, --reset-token, --logout and --help (-h), without
 #            their dashes, ","-joined; "-" when none.
@@ -823,7 +830,22 @@ the_launchers_running() {
           for (j = 1; j <= asked; j++) {
             if (usable[j] && wanted_code[j] == code && wanted_section[j] == label_section) for_places = joined(for_places, j)
           }
-          print pid, origin_of(pid), "scheduled", 0, "-", folder, or_dash(for_places)
+          # Is the script the PROGRAM? The word that ENDS in its name (a path
+          # with a space splits into several words, so not word 2), as the
+          # first word or as the script a shell was handed before any "-" word.
+          program = 0
+          for (w = 1; w <= n; w++) {
+            if (word[w] !~ /ca\.russellgordon\.Plantoir\.deploy\.[A-Za-z0-9-]+\.section[0-9]+(\.[0-9a-f]+)?\.sh$/) continue
+            program = (w == 1)
+            if (w > 1 && word[1] ~ /(^|\/)(ba|z|da|k)?sh$/) {
+              program = 1
+              for (v = 2; v < w; v++) {
+                if (word[v] ~ /^-/) program = 0
+              }
+            }
+            break
+          }
+          print pid, origin_of(pid), "scheduled", program, "-", folder, or_dash(for_places)
         }
         # A docker exec aimed at this website builder, by its name or its id.
         if (name != "" || id != "") {
@@ -969,6 +991,123 @@ refuse_a_preview_while_its_section_deploys() {
 
 if [[ -z "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then
   refuse_a_preview_while_its_section_deploys
+fi
+
+# >>> DEPLOY WHILE ITS SECTION DEPLOYS GUARD >>> — identical in deploy.sh and
+# preview.sh; scripts/test_deploy_while_its_section_deploys.py checks that the
+# two copies match and runs every case against them. Keep the markers.
+# ---- A section still being deployed is not deployed again (GitHub #439) ----
+# Russell's decision on #439, 2026-10-04: a deploy of a section refuses while
+# that section is still being deployed — including by a deploy set for later
+# whose run was ended by setting the section again. Setting a section again
+# boots its job out FIRST (#237's "never briefly two agents"; #409), and the
+# job is the running app, so the run ends there; but the wrapper it started
+# (`/bin/bash …/<label>.sh`) is a process group of its own and goes on building
+# and uploading as a leftover. The ended run's work leases name a process that
+# is gone, so they read as stale (workLeases.liveness) and nothing else stops a
+# second deploy of the section overlapping it. This is the layer every caller
+# reaches: the window's Deploy and an assistant's deploy (their build leg is
+# `preview.sh --build-only`, then `deploy.sh`), the newly set run's own legs,
+# and a deploy typed in Terminal. The rule and its cases are
+# contracts/shared-rules.json -> deployWhileItsSectionDeploys.
+#
+# Asked by deploy.sh (not with --reset-token or --logout, which deploy
+# nothing) and by preview.sh on a --build-only run only — a serving preview has
+# #381's own guard, which counts every deploy — after the arguments are
+# checked and before anything is changed.
+#
+# What counts, read from the LIVE process table, never a remembered process id
+# or a lease file — so nothing left on disk can refuse a deploy for ever:
+#   - "later": a deploy set for later of C/S whose SCRIPT is running as the
+#     program (`/bin/bash …/<label>.sh`; the reader's `program` field), with
+#     this folder's id in its label or none (a label from before #237). A label
+#     carrying ANOTHER folder's id is that folder's deploy (#237). The app's own
+#     `Plantoir --run-scheduled-deploy …` line does NOT count on its own: a run
+#     still WAITING for the course (up to ten minutes) has not started its
+#     script, and counting it would refuse the window's own deploy leg half way
+#     through while that run waits for the window. A run that is working holds
+#     its leases as well, and its script is in the table.
+#   - "another": `deploy.sh C S` as the program, working in THIS folder (its
+#     working directory, asked of lsof; one that cannot be asked counts, as in
+#     #381), and not only clearing a token or printing its help.
+# This run, its ancestors and its descendants never count (the reader's
+# family rule), so a scheduled run's own legs are never refused by its own
+# wrapper, and deploy.sh's own rebuild (`preview.sh --build-only` under a
+# folder deploy) is never refused by the deploy.sh that started it.
+#
+# A process table that cannot be read — `ps` fails, or its answer does not
+# list this run — lets the deploy THROUGH. Not because something else covers
+# it: for a leftover run nothing does, its leases name a process that is gone.
+# Through because failing closed would refuse EVERY deploy, and every scheduled
+# run's own legs, for as long as `ps` fails, which costs more than the rare
+# overlap this guard exists for.
+#
+# Prints "later" or "another" and returns 0 when the section is being
+# deployed; returns 1, printing nothing, otherwise. "later" wins when both are
+# seen: a leftover run's own deploy.sh is in the table beside its script.
+what_is_deploying_this_section() {
+  local course="$1" section="$2" folder_id here records pid origin what program flags folder places cwd seen=""
+  here="$(/bin/pwd -P)"
+  folder_id="$(printf '%s\n' "$here" | shasum -a 256 | cut -c1-8)"
+  # One place is asked about, so a record for it says "1".
+  records="$(the_launchers_running "${course// /+} ${section}")" || return 1
+  while read -r pid origin what program flags folder places; do
+    [ "$places" = "1" ] || continue
+    [ "$program" = "1" ] || continue
+    case "$what" in
+      scheduled)
+        if [ "$folder" = "-" ] || [ "$folder" = "$folder_id" ]; then
+          echo "later"
+          return 0
+        fi ;;
+      deploy.sh)
+        case ",$flags," in
+          *,reset-token,*|*,logout,*|*,help,*) continue ;;
+        esac
+        cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)"
+        if [[ -z "$cwd" || "$cwd" == "$here" ]]; then
+          seen="another"
+        fi ;;
+    esac
+  done <<< "$records"
+  if [ -n "$seen" ]; then
+    echo "$seen"
+    return 0
+  fi
+  return 1
+}
+
+# refuse_while_this_section_deploys COURSE SECTION LEG — LEG is "deploy"
+# (deploy.sh) or "build" (preview.sh --build-only). The sentences are
+# contracts/shared-rules.json -> deployWhileItsSectionDeploys.sentences, and
+# the trail lines that entry's launcherLines — both checked by
+# scripts/test_deploy_while_its_section_deploys.py. Exit 1, as #381's.
+refuse_while_this_section_deploys() {
+  local course="$1" section="$2" leg="$3" who what_stops not_again
+  who="$(what_is_deploying_this_section "$course" "$section")" || return 0
+  if [ "$leg" = "build" ]; then
+    what_stops="build"; not_again="built"
+  else
+    what_stops="deploy"; not_again="deployed again"
+  fi
+  echo ""
+  if [ "$who" = "later" ]; then
+    echo "❌ ${course} section ${section} is still being deployed by a deploy that was set for later, so it cannot be ${not_again} until that has finished."
+    echo "   Nothing was changed."
+    echo ""
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was still being deployed by a deploy that was set for later"
+  else
+    echo "❌ ${course} section ${section} is already being deployed, so it cannot be ${not_again} until that has finished."
+    echo "   Nothing was changed."
+    echo ""
+    note_on_the_trail "${course}/${section} · the ${what_stops} stopped before it started — this section was already being deployed"
+  fi
+  exit 1
+}
+# <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<
+
+if [[ -n "$BUILD_ONLY" && -z "${STOP_MODE:-}" ]]; then
+  refuse_while_this_section_deploys "$COURSE" "$SECTION" build
 fi
 
 # -------------------- Stop mode ----------------------------------------
