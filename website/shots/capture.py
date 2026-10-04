@@ -900,6 +900,21 @@ def build_colour_figures() -> None:
     else:
         native_fan(fanned, IMAGE_DIR / "colour-schemes.png")
         print("   saved colour-schemes.png")
+    # The same fan taken in Dark Mode, for a page in dark mode (shots.json
+    # "dark": true). colour-schemes.png keeps its name as the light one.
+    fanned_dark = [PARTS / f"home-{course['code'].lower()}-dark.png" for course in DEMO_COURSES]
+    missing_dark = [path.name for path in fanned_dark if not path.exists()]
+    if missing_dark:
+        print(f"   Missing parts: {', '.join(missing_dark)} — run --colour-figures.", file=sys.stderr)
+    elif any(problems_with_shadow(path) for path in fanned + fanned_dark if path.exists()):
+        # The fan is judged on its edge only (its windows overlap), so its
+        # parts are held to an active window's margin here instead.
+        for path in fanned + fanned_dark:
+            for problem in problems_with_shadow(path):
+                print(f"   ✗ colour-schemes part: {problem}", file=sys.stderr)
+    else:
+        native_fan(fanned_dark, IMAGE_DIR / "colour-schemes-dark.png")
+        print("   saved colour-schemes-dark.png")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
     if all(path.exists() for path in pair):
@@ -907,6 +922,23 @@ def build_colour_figures() -> None:
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
+
+
+def refuse_a_missed_anchor(picture: Path, path: str, what: str) -> None:
+    """Stop the run when a page photographed for an anchor (`…#diagrams`)
+    does not show that heading near the top of the page column.
+
+    v1.4.3 shipped site-sch3u and site-sch3u-chemistry both showing the
+    page's "Backlinks" end instead of the chemistry and the flowchart their
+    captions promise; every other check passed. The photograph itself is
+    read, so nothing between the scroll and the shutter can move it unseen.
+    """
+    if "#" not in path:
+        return
+    from safari import anchor_heading_problem
+    problem = anchor_heading_problem(picture, path.split("#", 1)[1])
+    if problem is not None:
+        raise SystemExit(f"{what}: {problem}. Nothing past this point was taken.")
 
 
 def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
@@ -975,6 +1007,7 @@ def capture_browser_shots(identifiers: list[str]) -> None:
                     window.load(site_address(capture["course"]) + capture.get("path", "/"), settle_seconds=3.5)
                     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
                     window.capture(destination)
+                    refuse_a_missed_anchor(destination, capture.get("path", "/"), shot["id"])
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
                     serve_as_captured(destination)
@@ -1009,6 +1042,7 @@ def capture_sites(workspace: Path) -> None:
                     window.load(url, settle_seconds=3.5)
                     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
                     window.capture(destination)
+                    refuse_a_missed_anchor(destination, capture.get("path", "/"), shot["id"])
                     # Before the resize, while the page is still full size.
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
