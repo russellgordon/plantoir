@@ -526,6 +526,12 @@
           "after": "---\ntitle: Loops\npublishForSection1: false\n  ---\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
           "before": "---\ntitle: Loops\npublishForSection1: false\n  ---\n---\nBody line one.\n",
           "shape": "issue #188: section 1's value runs into a line of INDENTED dashes, which is part of it rather than the closing fence (the site reads \"false ---\" and PUBLISHES section 1): the pair goes after the dashes and is held back, because a value that runs onto the next line is not copied. Measured 2026-09-25: before #188 the pair went ABOVE the dashes, so section 1 turned HIDDEN and section 2 read \"false ---\" and was PUBLISHED; now section 1 is unchanged (visible) and section 2 is hidden"
+        },
+        {
+          "after": "---\ntitle: Loops\n\"createdSection1\": 2026-09-08T07:00:00.000-0400\n\"publishForSection1\": false\ncreatedSection2: 2026-09-25T07:00:00.000-0400\npublishForSection2: false\n---\nBody line one.\n",
+          "before": "---\ntitle: Loops\n\"createdSection1\": 2026-09-08T07:00:00.000-0400\n\"publishForSection1\": false\n---\nBody line one.\n",
+          "shape": "the per-section keys written with quotes, on a page hidden in section 1",
+          "why": "A quoted key is the same key to YAML and to the reader. Matched by prefix, the page was skipped, section 2 had no key, and a page hidden in section 1 was SHOWN in section 2. The new pair is written unquoted, as every pair the adder writes."
         }
       ],
       "created": "2026-09-25T07:00:00.000-0400",

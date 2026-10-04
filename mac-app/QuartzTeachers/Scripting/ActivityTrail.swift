@@ -1093,6 +1093,11 @@ nonisolated enum ActivityTrail {
         /// The front page was offered today's class and not changed (#397):
         /// Not Today, already right, changed while asked, or not saved.
         case frontPageLeftAsItWas = "left the front page as it was"
+        /// A remembered timetable holding a date that cannot be a class date
+        /// was read as nothing remembered (#377, from Windows #144): the
+        /// course, the section and that date. Without it, a problem report
+        /// shows class dates on disk and an app that asked for them anyway.
+        case rememberedTimetableSetAside = "remembered timetable set aside"
     }
 
     // MARK: - Stored properties
