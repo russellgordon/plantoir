@@ -1383,6 +1383,23 @@ enum ScheduledDeploy {
         // replacement is never briefly a second agent. Booted out only: the
         // plists stay on disk until the new job is ACCEPTED, so a failure
         // below can hand them straight back to macOS (#237's review, M1).
+        //
+        // ALWAYS by this label, plist or no plist (GitHub #409). A run that is
+        // working right now has already removed its own plist (the wrapper's
+        // first line), yet its job is still loaded under this label — and the
+        // job IS the running app, so this boot-out ends that run before the
+        // new plist exists. That is what stops a run that finishes, or stands
+        // down, after this point from booting out or deleting the deploy being
+        // set now: it is no longer running. Asking only when a plist is found
+        // would leave it alive. (The wrapper it started outlives it — a
+        // `Process` child has a process group of its own — and finishes the
+        // old deploy. It cannot remove the new deploy — its only plist line
+        // is its first and it boots nothing out — but it is NOT harmless: the
+        // ended run's leases read as stale while it works, so a second deploy
+        // of the section can overlap it. See doc 07.) Pinned by
+        // `testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`;
+        // measured in documentation/07-deployment.md → "Set again while the
+        // run works (#409)".
         runner.bootOut(label: label)
         for agent in existing where agent.label != label {
             runner.bootOut(label: agent.label)

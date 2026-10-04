@@ -163,6 +163,30 @@ final class CourseRestorerTests: XCTestCase {
         )
     }
 
+    /// A QUOTED per-section key is the key it is to YAML, on either side of a
+    /// restore (#408). Before the lines were asked of the reader's matcher, a
+    /// backup holding `"publishForSection1": false` gave the restore nothing
+    /// to put back, the live `publishForSection1: true` was dropped as this
+    /// section's own line, and a page the backup HID came back with no key —
+    /// shown to students.
+    @MainActor
+    func testAQuotedKeyIsRestoredAndReplacedLikeAnyOther() {
+        checkRestore(
+            live: "---\ntitle: x\npublishForSection1: true\n---\nBody.\n",
+            backup: "---\n\"publishForSection1\": false\ntitle: x\n---\nBody.\n",
+            expected: "---\ntitle: x\n\"publishForSection1\": false\n---\nBody.\n",
+            sectionOne: .hidden, sectionTwo: .saysNothing,
+            "The backup's quoted key comes back, so the page stays hidden"
+        )
+        checkRestore(
+            live: "---\ntitle: x\n\"publishForSection1\": true\n---\nBody.\n",
+            backup: "---\npublishForSection1: false\ntitle: x\n---\nBody.\n",
+            expected: "---\ntitle: x\npublishForSection1: false\n---\nBody.\n",
+            sectionOne: .hidden, sectionTwo: .saysNothing,
+            "The live quoted key is replaced, not left beside a second copy"
+        )
+    }
+
     /// Restoring section 1 never moves section 2 — the finding the plan for
     /// #182 added: placed after the last line that merely NAMES a key,
     /// section 1's line split section 2's `>-` from its `  false` and section
