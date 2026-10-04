@@ -39,7 +39,10 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   explains it — accepted rather than adding a third stop path), then the alert.
   Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
   anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
-  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac;
+  since 2026-10-03 the contract writes `theSiteNeverAnswered`'s sentence with
+  `{machine}`, filled from `specialNames.platformWording.machine`, #410/#418, so
+  the substitution becomes a fill driven by `machine.usedIn`).
 - **A typed publish folder (#304, review L1).** `deploy.ps1`'s
   `Resolve-PublishFolder` takes a plain relative name from the working folder
   (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
