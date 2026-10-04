@@ -2861,8 +2861,8 @@ once; the child was still running six seconds later, in its own process group
 (PGID = its own pid). A bash script whose child shares its process group lost
 both at once.
 
-**What this costs, and was left:** the old run's own after-work (marking the
-section published, the trail line for a stopped run, the notification) does not
+**What this costs, and was left:** the old run's own after-work (recording that
+the section was deployed, the trail line for a stopped run, the notification) does not
 happen, and its leases name a process that is gone, so they read as stale while
 the orphaned wrapper is still deploying. **That last part can make two deploys of
 one section overlap.** A lease whose owner is gone is ignored
@@ -2874,7 +2874,7 @@ comment there), and `preview.sh`'s #381 guard is asked on a SERVING run only, so
 a deploy's `--build-only` leg is not refused either. The result is two builds
 and uploads of one section at once, which is the fault #156's leases exist to
 prevent. Nothing on `dev` is worse than before #409 was checked. A guard is a
-decision for Russell, drafted as an issue: a deploy refuses while that
+decision for Russell, #439: a deploy refuses while that
 section's scheduled wrapper is still working. Rejected for now: letting the run
 survive a re-set and comparing moments at the end as Windows does, because the
 boot-out-first order is what keeps "never briefly two agents" true (#237) and

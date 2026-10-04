@@ -1674,7 +1674,7 @@ class ScriptRunner {
         // Exit 3 means one thing in both launchers and deploy.py: run with
         // --non-interactive, it reached a question and refused rather than
         // wait for an answer nobody could give (#378 — an assistant's deploy
-        // from another app, or a publish set for later).
+        // from another app, or a deploy set for later).
         if exitCode == 3 {
             return "Stopped at a question nobody was there to answer (exit 3)"
         }
