@@ -190,7 +190,7 @@ final class ScheduleDeployCardTests: XCTestCase {
             let today: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(row["today"] as? String)))
             let zone: TimeZone = try XCTUnwrap(TimeZone(identifier: try XCTUnwrap(row["timeZone"] as? String)))
             let now: Date = try XCTUnwrap(
-                ScheduleDeployCardTests.moment(try XCTUnwrap(row["now"] as? String), in: zone)
+                ScheduleDeployCardTests.givenNow(try XCTUnwrap(row["now"] as? String), in: zone)
             )
 
             let settled: String? = AssistToolRunner.momentText(
@@ -212,11 +212,11 @@ final class ScheduleDeployCardTests: XCTestCase {
     /// INSTANT is what makes "a settled moment always reads back" true rather
     /// than intended.
     ///
-    /// A mac test rather than a contract row: the shift is what this
-    /// platform's calendar does, and .NET throws on an invalid wall time
-    /// instead — so the rule is named in the Windows handover as a trap for
-    /// them to meet deliberately, rather than asserted as agreed behaviour
-    /// before they have seen it.
+    /// A contract row as well since #411 (`deployAtATime.resolving`), once
+    /// Windows had met it: .NET throws on an invalid wall time, so Windows
+    /// does the shift itself — and its first draft moved the time to 03:00,
+    /// the first minute that exists, which a test caught. This test keeps the
+    /// two spellings the row does not carry ("today 02:30", "tomorrow 02:30").
     func testATimeThatDoesNotExistThatNightSettlesOntoOneThatDoes() throws {
         let zone: TimeZone = try XCTUnwrap(TimeZone(identifier: "America/Toronto"))
         let springForward: CalendarDay = try XCTUnwrap(CalendarDay(text: "2026-03-08"))
@@ -263,7 +263,7 @@ final class ScheduleDeployCardTests: XCTestCase {
             let today: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(row["today"] as? String)))
             let zone: TimeZone = try XCTUnwrap(TimeZone(identifier: try XCTUnwrap(row["timeZone"] as? String)))
             let now: Date = try XCTUnwrap(
-                ScheduleDeployCardTests.moment(try XCTUnwrap(row["now"] as? String), in: zone)
+                ScheduleDeployCardTests.givenNow(try XCTUnwrap(row["now"] as? String), in: zone)
             )
             guard let settled = AssistToolRunner.momentText(
                 forTimeOfDay: when, today: today, now: now, timeZone: zone
@@ -608,6 +608,31 @@ final class ScheduleDeployCardTests: XCTestCase {
                 .appendingPathComponent(AssistContract.casesFileName)
         )
         return try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    /// A row's `now`, read as its EARLIER instant when the wall time happens
+    /// twice (#411).
+    ///
+    /// **A statement about the given `now`, not about the product.** The
+    /// fall-back row's `now` is "2026-11-01 01:45" in Toronto, which happens
+    /// twice. `DateFormatter` — and `moment` below — reads it as the LATER
+    /// instant (06:45 UTC, measured 2026-10-04); the row says "asked in the
+    /// FIRST 01:00 hour", and Windows reads it that way. Read as the later
+    /// one, every reading of "01:30" is already gone and the row would pass
+    /// under either convention for the REQUESTED time, testing nothing. The
+    /// product's own resolution of the requested time is not touched here:
+    /// `AssistToolRunner.momentText` gets this instant and decides for itself.
+    /// `Calendar.date(from:)` is what picks the earlier instant.
+    private static func givenNow(_ text: String, in zone: TimeZone) -> Date? {
+        guard let anyInstant = moment(text, in: zone) else {
+            return nil
+        }
+        var calendar: Calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let wallTime: DateComponents = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute], from: anyInstant
+        )
+        return calendar.date(from: wallTime)
     }
 
     /// "2026-09-19 09:00" in a named zone — the contract's own spelling, read
