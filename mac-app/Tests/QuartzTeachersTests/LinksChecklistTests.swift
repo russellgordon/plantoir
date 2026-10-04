@@ -290,7 +290,7 @@ final class LinksChecklistTests: XCTestCase {
         }
         let urls: [String: URL] = try LinksChecklistTests.layOut(testCase, made: made)
         let worksheet: URL = try XCTUnwrap(urls["Worksheet"])
-        try "---\n  title: Worksheet\n---\nAbout Worksheet.\n".write(to: worksheet, atomically: true, encoding: .utf8)
+        try "---\n  publish: false\n---\n\nAbout Worksheet.\n".write(to: worksheet, atomically: true, encoding: .utf8)
         let offer: LinksChecklistOffer = try LinksChecklistTests.offer(
             from: try XCTUnwrap(testCase["offer"] as? [[String: Any]])
         )

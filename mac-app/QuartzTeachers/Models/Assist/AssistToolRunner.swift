@@ -1887,8 +1887,22 @@ final class AssistToolRunner {
             for: course, sectionNumber: sectionNumber
         )
         detail += "\n\n" + previewNote
-        detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
-                + "of students — deploying does that, and only when they ask."
+        // Not "and their PREVIEW" when an outside assistant's change left the
+        // open preview as it was (#433): that would be false.
+        let previewLeftAsItWas: Bool =
+            previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
+                course: course.code, section: String(sectionNumber)
+            )
+            || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
+                course: course.code, section: String(sectionNumber)
+            )
+        if previewLeftAsItWas {
+            detail += "\n\nThis changed the teacher's files. It did not put anything in front "
+                    + "of students — deploying does that, and only when they ask."
+        } else {
+            detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
+                    + "of students — deploying does that, and only when they ask."
+        }
 
         return AssistToolOutcome.wrote(
             AssistToolRunner.whatWasDone(

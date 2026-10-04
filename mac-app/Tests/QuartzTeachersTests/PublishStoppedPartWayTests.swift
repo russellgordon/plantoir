@@ -60,7 +60,7 @@ final class PublishStoppedPartWayTests: XCTestCase {
     func testAPageListThatStopsPartWayIsSaidAsPartlyChangedWithTheWayBack() async throws {
         let made: AssistFixture.Made = try makeLockedCourse(surface: .local)
         let outcome: AssistToolOutcome = await AssistFixture.run(
-            "publish_pages", with: ["pages": "Unit 1, Day 1, Unit 1, Day 2"], on: made.runner
+            "publish_pages", with: ["pages": ["Unit 1, Day 1", "Unit 1, Day 2"]], on: made.runner
         )
         XCTAssertTrue(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
         XCTAssertFalse(outcome.detail.contains("Nothing was changed"), outcome.detail)
@@ -86,7 +86,7 @@ final class PublishStoppedPartWayTests: XCTestCase {
     func testAnOutsideAssistantIsNotPointedAtAButtonItCannotSee() async throws {
         let made: AssistFixture.Made = try makeLockedCourse(surface: .mcp)
         let outcome: AssistToolOutcome = await AssistFixture.run(
-            "publish_pages", with: ["pages": "Unit 1, Day 1, Unit 1, Day 2"], on: made.runner
+            "publish_pages", with: ["pages": ["Unit 1, Day 1", "Unit 1, Day 2"]], on: made.runner
         )
         XCTAssertTrue(outcome.detail.hasPrefix(prefixForPages), outcome.detail)
         XCTAssertFalse(outcome.detail.contains("Restore Section"), outcome.detail)

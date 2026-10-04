@@ -643,7 +643,9 @@ final class WorkLeaseDecliningTests: XCTestCase {
             deployed.detail.hasSuffix(AssistWording.deployClosedAnOpenPreview(course: "ICS3U", section: "1")),
             deployed.detail
         )
-        XCTAssertTrue(trailText().contains("outside assistant worked while a preview was open"), trailText())
+        XCTAssertTrue(trailText().contains(
+            "an outside assistant deployed while a preview of the course was open in Plantoir"
+        ), trailText())
     }
 
     /// The real headless deploy an outside assistant takes asks only about
