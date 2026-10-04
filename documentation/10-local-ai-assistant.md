@@ -6674,7 +6674,15 @@ nothing the model reads moves.
 **How the two audiences are kept apart.** `AssistToolOutcome` already had
 them: `detail` goes to the model (and is the only thing `--mcp-stdio` returns
 to Claude Code), while `summary`, `forTheCard` and `teacherDetail` are the
-teacher's. Every sentence that says "class" and that a club teacher can reach
+teacher's. **What "what the model reads" covers, on both platforms** is written down
+in `file-formats.json` → `courseConfigKeys` → `class_noun.whatTheModelReads`
+(Russell, 2026-10-01): the TEXT a tool result gives a model or an outside
+assistant stays in the class form byte for byte, and a summary shown only to the
+teacher — Windows' `_meta` teacher summary, which its window shows and never
+forwards — may say "meeting" and is not "what plantoir-mcp returns" in #274's
+sense. The mac never had the question (`--mcp-stdio` returns `detail` alone, and
+the window's card and runner share a process), and no mac test or page read
+#274's parenthetical more widely; this pointer is so none does (#425 DO 2). Every sentence that says "class" and that a club teacher can reach
 now takes a `noun:` (`ClassNoun`, default `.class`), and the runner renders it
 TWICE where both audiences read the same text:
 

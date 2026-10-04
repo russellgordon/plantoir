@@ -2942,9 +2942,22 @@ mac writes.
   alert is the truth.
 - A lease synced in from another Mac or a Windows PC through a cloud-synced
   working folder names a pid that means nothing here. #245's liveness limit;
-  a Windows lease has no line 4, so a match rests on the name alone.
+  a Windows lease has no line 4 (except its import lease, since parity bundle
+  6b, #415), so a match rests on the name alone.
 - `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
   purpose — declining at the press is the guarantee, not the menu's grey.
+
+**A copy lease is Windows' alone (#413, 2026-10-03).** Windows' plantoir-mcp
+holds a `copy` lease while it zips a course for an assistant backup, and its
+builds decline on it. The mac writes none and reads none: a course being zipped
+is marked inside the program doing it (`CourseActivity.courseIsBeingCopied`,
+#351), which every reader in that program asks first. The two Windows cases in
+`workLeases.declining` carry `appliesOn: ["windows"]` and an `onTheMac` sentence
+saying so, and `WorkLeaseDecliningTests` skips such a case only when that
+sentence is there. What this leaves open, said plainly: a zip made by ANOTHER
+program on the mac — a `--mcp-stdio` session's `back_up_course` — is not seen
+by the window. Not built (Russell, 2026-10-03): the case records the difference
+rather than a lease reader being invented to make it pass.
 
 **Tests.** `WorkLeaseDecliningTests` (25): the contract's 29 cases through the
 pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
@@ -3660,7 +3673,12 @@ kill the preview a reference course exists to give.
 `course_config.json` (the school year can be changed, and the build's preflight
 rewrites it), `course_config.backup.json` (written beside it by that same
 preflight, with `shutil.copy2`, which raises on a locked destination),
-`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store`.
+`.obsidian/` and everything under it, `.merged_output`, and `.DS_Store` — and,
+since 2026-10-03 (#415), `desktop.ini` and `Thumbs.db`, File Explorer's twins of
+`.DS_Store`, proposed from Windows. They are left alone on the mac too so the two
+apps keep ONE `neverLocked` list (`ReferenceCourseTests` pins it equal to the
+contract's), and so a course brought from Windows is not refused the next time
+Explorer rewrites them.
 
 **Obsidian writes four files into `.obsidian/` within seconds of opening a
 vault** — measured on a throwaway vault, 2026-09-20: `app.json`,
@@ -6344,6 +6362,16 @@ both ways: `menuItem`, `heldTitle` with `scheduledWork`,
 for the wording pass (Russell, Q5); `heldExplanation` was rewritten after the
 review (H1) because the draft promised "nothing changes until that is
 finished" while a quit installed anyway.
+
+`elsewhereWork` is written in the contract as "…somewhere else on this
+{machine}" since 2026-10-03 (#418): the machine's name comes from
+`specialNames.platformWording.machine`, so Windows says the same sentence with
+"PC" instead of keeping its own copy. The mac's word is `MachineWord`, and
+`AppUpdatesContractTests` fills the contract's sentence with the contract's own
+word before comparing. `needsAdministratorExplanation` was NOT given the
+placeholder: Windows' sentence for an all-users copy says something else
+entirely (uninstall and install again, `windowsWording`), so there is no one
+sentence for the two to share.
 
 **Sparkle's own windows are Sparkle's words** — "A new version of Plantoir is
 available!", its buttons, the progress and error windows — localized by it
