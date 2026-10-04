@@ -13,6 +13,7 @@ and the application that was in front beforehand is put back in front.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -282,6 +283,59 @@ def verify_appearance(path: Path, expect_dark: bool, what: str) -> None:
     )
 
 
+def heading_words(fragment: str) -> str:
+    """The heading a Quartz anchor names: `mathematics-and-chemistry` is the
+    heading "Mathematics and chemistry", compared without case or spaces."""
+    return re.sub(r"[^a-z0-9]", "", fragment.lower())
+
+
+def anchor_heading_in_view(boxes: list[tuple[int, int, int, int, str]], fragment: str,
+                           width: int, height: int) -> bool:
+    """Whether the heading `fragment` names is in view near the TOP of the
+    page COLUMN, read from text-recognition boxes (x, y, w, h, text) in a
+    shadowed window capture of `width` x `height` pixels.
+
+    The same words also appear in the page's own table of contents, in the
+    right-hand column and near the top whatever the scroll — so a match only
+    counts when it starts in the left 60% of the picture. "Near the top" is
+    the upper 30% of the picture: under the toolbar, where a scroll to an
+    anchor puts its heading.
+    """
+    wanted = heading_words(fragment)
+    for left, top, box_width, box_height, text in boxes:
+        if heading_words(text) != wanted:
+            continue
+        if left < width * 0.6 and top < height * 0.30:
+            return True
+    return False
+
+
+def recognised_boxes(picture: Path) -> list[tuple[int, int, int, int, str]]:
+    result = subprocess.run(["swift", str(Path(__file__).resolve().parent / "ocr.swift"), "--boxes", str(picture)],
+                            capture_output=True, text=True)
+    boxes: list[tuple[int, int, int, int, str]] = []
+    for line in result.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        numbers, text = line.split("\t", 1)
+        parts = numbers.split()
+        if len(parts) != 4:
+            continue
+        boxes.append((int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]), text))
+    return boxes
+
+
+def anchor_heading_problem(picture: Path, fragment: str) -> str | None:
+    """None when the photographed page shows `fragment`'s heading near the
+    top of its column; otherwise a sentence saying it does not."""
+    with Image.open(picture) as opened:
+        width, height = opened.size
+    if anchor_heading_in_view(recognised_boxes(picture), fragment, width, height):
+        return None
+    return (f"the heading #{fragment} names is not in view near the top of the page — the scroll to it "
+            "did not land, or the page moved after it")
+
+
 class SafariWindow:
     """One throwaway Safari window, used for a run of captures."""
 
@@ -374,30 +428,81 @@ class SafariWindow:
     def load(self, url: str, settle_seconds: float = 3.0) -> None:
         """Load a page, and land anchors where they claim to point.
 
-        A URL with a fragment is loaded in two stages: the page first, so
-        diagrams and mathematics finish rendering and the layout stops
-        moving, then the fragment, so the scroll happens against the final
-        layout. Scrolled in one step, Safari jumps to where the anchor WAS
-        before the diagrams above it reflowed the page — the capture then
-        shows the section above the one the caption names.
+        A URL with a fragment is loaded in stages, each checked rather than
+        timed:
+
+        1. the page alone, until its picture stops changing — mathematics and
+           diagrams are drawn by scripts after the load, and they reflow the
+           page (`wait_until_still`);
+        2. focus taken out of the address field (`unfocus_address_bar`)
+           BEFORE the anchor, never after: measured 2026-10-04 07:56, the
+           fragment navigation put "Mathematics and chemistry" at the top
+           (y = 189 px), and the find-bar dance that unfocuses the field then
+           moved the page to its "Backlinks" section — which is what
+           site-sch3u and site-sch3u-chemistry shipped showing in v1.4.3;
+        3. the fragment, and then the heading is FOUND on the screen by text
+           recognition, near the top of the page column
+           (`anchor_heading_in_view`); a miss navigates to it again, and
+           still missing after that is a refusal, not a picture.
         """
         if "#" in url:
-            page = url.split("#")[0]
-            osascript(
-                f'tell application "Safari" to set URL of document of window id {self.window_id} to "{page}"'
-            )
-            time.sleep(settle_seconds)
-            osascript(
-                f'tell application "Safari" to set URL of document of window id {self.window_id} to "{url}"'
-            )
-            time.sleep(1.5)
+            page, fragment = url.split("#", 1)
+            self.navigate(page)
+            self.wait_until_still(timeout_seconds=max(settle_seconds * 4, 15.0))
             self.unfocus_address_bar()
+            for _ in range(3):
+                self.navigate(url)
+                self.wait_until_still(timeout_seconds=10.0)
+                if self.anchor_problem(fragment) is None:
+                    return
+            problem = self.anchor_problem(fragment)
+            if problem is not None:
+                raise SystemExit(f"{url}: {problem}")
             return
+        self.navigate(url)
+        time.sleep(settle_seconds)
+        self.unfocus_address_bar()
+
+    def navigate(self, url: str) -> None:
         osascript(
             f'tell application "Safari" to set URL of document of window id {self.window_id} to "{url}"'
         )
-        time.sleep(settle_seconds)
-        self.unfocus_address_bar()
+
+    def snapshot(self, destination: Path) -> Path:
+        """A picture of the window as it stands, for the checks only (no
+        activation: this is not the photograph)."""
+        number = self.window_number()
+        subprocess.run(["screencapture", "-x", "-l", str(number), str(destination)],
+                       capture_output=True, check=True)
+        return destination
+
+    def wait_until_still(self, timeout_seconds: float, interval: float = 0.7) -> bool:
+        """Wait until two pictures of the window in a row are identical: the
+        page has finished drawing and moving. True when it settled."""
+        import tempfile
+        deadline = time.time() + timeout_seconds
+        previous: bytes | None = None
+        with tempfile.TemporaryDirectory() as scratch:
+            picture = Path(scratch) / "still.png"
+            while time.time() < deadline:
+                time.sleep(interval)
+                self.snapshot(picture)
+                with Image.open(picture) as opened:
+                    pixels = opened.convert("RGBA").tobytes()
+                if previous is not None and pixels == previous:
+                    return True
+                previous = pixels
+        return False
+
+    def anchor_problem(self, fragment: str, picture: Path | None = None) -> str | None:
+        """None when the fragment's heading is in view near the top of the
+        page column; otherwise what is wrong. Reads `picture` if given (the
+        photograph itself), or a fresh snapshot."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as scratch:
+            if picture is None:
+                picture = self.snapshot(Path(scratch) / "anchor.png")
+            return anchor_heading_problem(picture, fragment)
 
     def unfocus_address_bar(self) -> None:
         """Take focus OUT of the address field, so it is not selected in the

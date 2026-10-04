@@ -271,6 +271,43 @@ class WindowsSwapTests(unittest.TestCase):
                 build.IMAGE_DIR = saved
 
 
+class DarkStaticFigureTests(unittest.TestCase):
+    """A static figure marked `dark: true` gives a dark page its Dark Mode
+    file, keeps `<id>.png` as the light one, and is a PROBLEM when the dark
+    file is missing (colour-schemes, Russell 2026-10-04)."""
+
+    def test_the_real_manifest_marks_colour_schemes_dark_and_its_files_exist(self):
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        shot = [entry for entry in manifest["shots"] if entry["id"] == "colour-schemes"][0]
+        self.assertTrue(shot.get("static"))
+        self.assertTrue(shot.get("dark"))
+        problems: list = []
+        html = build.picture_element(shot, problems, "", "./")
+        self.assertEqual(problems, [])
+        self.assertIn('srcset="./img/colour-schemes-dark.webp"', html)
+        self.assertIn('media="(prefers-color-scheme: dark)"', html)
+        self.assertIn('src="./img/colour-schemes.png"', html)
+
+    def test_a_missing_dark_file_is_a_problem(self):
+        import shutil
+        real = build.IMAGE_DIR / "colour-schemes.png"
+        with tempfile.TemporaryDirectory() as scratch:
+            folder = Path(scratch)
+            shutil.copy(real, folder / "colour-schemes.png")
+            shutil.copy(real.with_suffix(".webp"), folder / "colour-schemes.webp")
+            saved = build.IMAGE_DIR
+            build.IMAGE_DIR = folder
+            try:
+                problems: list = []
+                shot = {"id": "colour-schemes", "alt": "a", "caption": "c", "static": True, "dark": True}
+                html = build.picture_element(shot, problems, "", "./")
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("colour-schemes-dark.png", problems[0])
+                self.assertNotIn("prefers-color-scheme", html)
+            finally:
+                build.IMAGE_DIR = saved
+
+
 class AwaitingCaptureTests(unittest.TestCase):
 
     def test_a_shot_awaiting_capture_renders_nothing_and_is_not_a_problem(self):
