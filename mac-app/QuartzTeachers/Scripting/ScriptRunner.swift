@@ -70,6 +70,62 @@ class ScriptRunner {
     /// must not be reported as one.
     var wasStoppedByUser: Bool = false
 
+    /// True when a PREVIEW ended because another program deployed (or
+    /// built) the course — an outside assistant's deploy, or a publish set
+    /// for later — whose build ends that section's serving preview
+    /// (`build_site.stop_preview_serving`). The teacher asked for that deploy,
+    /// so the end is not a failure and is not shown as one (#433's stack
+    /// review, item 6). Decided in `finishRun` by `endedForAnotherProgramsBuild`.
+    var wasClosedForADeploy: Bool = false
+
+    /// Asked when a run ends non-zero: is another program building this
+    /// course right now? Set by the section window for its preview only
+    /// (`WorkLeaseRegistry.anotherProgramIsBuilding`); nil for every other run.
+    var endedForAnotherProgramsBuild: (@MainActor () -> Bool)?
+
+    /// Set by the section window once its preview has finished building and
+    /// answers — the moment it shows the site. A preview that ends BEFORE
+    /// this is a failed build, whatever else is happening on the Mac.
+    var hasBeenServing: Bool = false
+
+    /// What `build_site.stop_preview_serving` leaves in a serving preview's
+    /// output when it SIGKILLs the server: Python's own CalledProcessError
+    /// sentence for a child killed by that signal, in the traceback the
+    /// uncaught error prints. Read, not added — the launchers are unchanged.
+    nonisolated static let killedServerMarker: String = "died with <Signals.SIGKILL: 9>"
+
+    /// Whether a preview's end is "Closed for a deploy" rather than a failure
+    /// (#433's stack review, the bb8fbe12 ruling). ALL of: it ended non-zero
+    /// and not by the teacher; it had been SERVING; its output shows the
+    /// server killed the way `stop_preview_serving` kills it; and another
+    /// program holds a build lease on the course.
+    ///
+    /// The residual, accepted: a lease names the course and not the section,
+    /// so a section-2 deploy elsewhere coinciding with a section-1 preview
+    /// whose server was SIGKILLed for some other reason reads as closed. It
+    /// needs a serving preview's server killed by that exact signal while
+    /// another program builds the same course; and even then the output stays
+    /// one click away and the trail says what was decided.
+    nonisolated static func endIsAClosingForADeploy(
+        exitCode: Int32,
+        wasStoppedByUser: Bool,
+        wasCancelled: Bool,
+        hasBeenServing: Bool,
+        output: String,
+        anotherProgramIsBuilding: Bool
+    ) -> Bool {
+        if exitCode == 0 || wasStoppedByUser || wasCancelled {
+            return false
+        }
+        if !hasBeenServing {
+            return false
+        }
+        if !output.contains(ScriptRunner.killedServerMarker) {
+            return false
+        }
+        return anotherProgramIsBuilding
+    }
+
     /// True for the moment a caller has this runner finish one script and
     /// immediately start another on it — a multi-destination deploy that
     /// needs a fresh build runs "preview.sh --build-only" then `deploy.sh`
@@ -266,6 +322,8 @@ class ScriptRunner {
         forgetWhatThePreviousRunSaid(keepingTranscript: keepingTranscript)
         wasCancelled = false
         wasStoppedByUser = false
+        wasClosedForADeploy = false
+        hasBeenServing = false
         isBetweenPhases = false
         stepDetail = ""
         waitingSentence = ""
@@ -1402,6 +1460,27 @@ class ScriptRunner {
         waitingSentence = ""
         waitingSince = nil
         AppLog.output.info("Finished with exit code \(exitCode), transcript \(self.transcript.lines.count) lines")
+        // Asked BEFORE `lastExitCode` is set, which is what the views watch,
+        // so they never see the end as a failure first.
+        if let check = endedForAnotherProgramsBuild,
+           ScriptRunner.endIsAClosingForADeploy(
+               exitCode: exitCode, wasStoppedByUser: wasStoppedByUser, wasCancelled: wasCancelled,
+               hasBeenServing: hasBeenServing, output: transcript.displayText,
+               anotherProgramIsBuilding: check()
+           ) {
+            wasClosedForADeploy = true
+            var course: String = ""
+            var section: Int = 0
+            if runArguments.count >= 2 {
+                course = runArguments[0]
+                section = Int(runArguments[1]) ?? 0
+            }
+            ActivityTrail.note(
+                .previewClosedForADeploy,
+                "the preview closed — another program on this Mac was building the course for a deploy",
+                course: course, section: section
+            )
+        }
         lastExitCode = exitCode
         isRunning = false
         ScriptRunner.forgetInFlight(self)
@@ -1420,7 +1499,8 @@ class ScriptRunner {
             + ScriptRunner.outcomeDescription(
                 exitCode: exitCode,
                 wasStoppedByUser: wasStoppedByUser,
-                wasCancelled: wasCancelled
+                wasCancelled: wasCancelled,
+                wasClosedForADeploy: wasClosedForADeploy
             ).lowercased()
             + String(format: " after %.1fs", Date().timeIntervalSince(startedAt ?? Date()))
         )
@@ -1516,7 +1596,7 @@ class ScriptRunner {
         let transcriptText: String = transcript.displayText
         let wasFailure: Bool
         if let exitCode {
-            wasFailure = exitCode != 0 && !wasStoppedByUser && !wasCancelled
+            wasFailure = exitCode != 0 && !wasStoppedByUser && !wasCancelled && !wasClosedForADeploy
         } else {
             wasFailure = false
         }
@@ -1533,7 +1613,8 @@ class ScriptRunner {
             outcome: ScriptRunner.outcomeDescription(
                 exitCode: exitCode,
                 wasStoppedByUser: wasStoppedByUser,
-                wasCancelled: wasCancelled
+                wasCancelled: wasCancelled,
+                wasClosedForADeploy: wasClosedForADeploy
             ),
             wasFailure: wasFailure,
             explanation: explanation,
@@ -1565,16 +1646,24 @@ class ScriptRunner {
     /// backing out of a question. Neither is a failure, and a record that
     /// called them one would send somebody looking for a bug that is a
     /// teacher changing their mind.
+    /// What a preview closed by another program's deploy is called — in the
+    /// console's header, the run's record and the trail (#433's stack review).
+    nonisolated static let closedForADeployOutcome: String = "Closed for a deploy"
+
     nonisolated static func outcomeDescription(
         exitCode: Int32?,
         wasStoppedByUser: Bool,
-        wasCancelled: Bool
+        wasCancelled: Bool,
+        wasClosedForADeploy: Bool = false
     ) -> String {
         guard let exitCode else {
             return ScriptRunner.stillRunningOutcome
         }
         if wasStoppedByUser {
             return "Stopped on purpose"
+        }
+        if wasClosedForADeploy {
+            return ScriptRunner.closedForADeployOutcome
         }
         if wasCancelled {
             return "Backed out of a question"

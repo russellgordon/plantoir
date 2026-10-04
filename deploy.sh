@@ -1067,8 +1067,12 @@ if [[ -n "$TO_FOLDER" ]]; then
   # written up as real in the documentation without anyone noticing the
   # trigger could not see it.
   if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
-    echo "🔁 This site was built by a preview, which bakes in a live-reload script"
-    echo "   that students' browsers would ask about. Rebuilding it for publishing…"
+    # Plain words (rule 1, #407): this said "bakes in a live-reload script".
+    # deploy.ps1 took "adds live updating" first (#296); "before it is
+    # deployed" rather than "for publishing", because publishing is marking a
+    # page for the website, and this is the deploy.
+    echo "🔁 This site was built by a preview, which adds live updating"
+    echo "   that students' browsers would ask about. Rebuilding it before it is deployed…"
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
     # publish can meet a question nobody is there to answer: preview.sh has its
     # own course-code guard, and preview.sh has no `set -e`, so unattended it
@@ -1143,8 +1147,8 @@ if [[ -n "$TO_FOLDER" ]]; then
       sleep 0.2
     done
     if site_carries_preview_client "${PUBLIC_DIR_HOST}"; then
-      echo "❌ The rebuilt site still carries the preview's live-reload script."
-      echo "   Nothing was published, rather than publishing pages students'"
+      echo "❌ The rebuilt site still carries the preview's live updating."
+      echo "   Nothing was deployed, rather than deploying pages students'"
       echo "   browsers would ask about."
       exit 1
     fi

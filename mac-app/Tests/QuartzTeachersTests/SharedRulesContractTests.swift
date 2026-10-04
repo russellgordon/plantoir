@@ -2056,6 +2056,63 @@ final class SharedRulesContractTests: XCTestCase {
         }
     }
 
+    // MARK: - The machine's name (#418, #410)
+
+    /// The mac's word for the machine is the contract's, so a sentence written
+    /// with `{machine}` comes out the same here as it is written there.
+    func testTheMachineWordIsTheContracts() throws {
+        let machine: [String: Any] = try MachineWordContract.machineRecord()
+        XCTAssertEqual(MachineWord.placeholder, machine["placeholder"] as? String)
+        XCTAssertEqual(MachineWord.onThisPlatform, machine["mac"] as? String)
+        XCTAssertEqual(MachineWord.filling("on this {machine}"), "on this Mac")
+    }
+
+    /// `machine.usedIn` names EVERY string in `contracts/` that carries the
+    /// placeholder, and nothing else — both ways, so a sentence that gains
+    /// `{machine}` without being recorded, or a record left behind after a
+    /// sentence lost it, is red. Windows drives its fill off this list, so a
+    /// sentence missing from it would reach a Windows teacher as "{machine}".
+    func testEveryMachinePlaceholderIsRecorded() throws {
+        let machine: [String: Any] = try MachineWordContract.machineRecord()
+        let placeholder: String = try XCTUnwrap(machine["placeholder"] as? String)
+        var recorded: [String] = try XCTUnwrap(machine["usedIn"] as? [String])
+        recorded.sort()
+
+        let contractsURL: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts")
+        let fileNames: [String] = try FileManager.default.contentsOfDirectory(atPath: contractsURL.path)
+        var found: [String] = []
+        var filesRead: Int = 0
+        for fileName in fileNames.sorted() where fileName.hasSuffix(".json") {
+            let data: Data = try Data(contentsOf: contractsURL.appendingPathComponent(fileName))
+            let contents: Any = try JSONSerialization.jsonObject(with: data)
+            var inThisFile: [String] = []
+            collectKeyPaths(saying: placeholder, inValue: contents, path: "", into: &inThisFile)
+            for path in inThisFile {
+                // The record itself quotes the placeholder; it is not a sentence.
+                if path.hasPrefix("specialNames.platformWording.") {
+                    continue
+                }
+                found.append(fileName + ":" + path)
+            }
+            filesRead += 1
+        }
+        found.sort()
+
+        XCTAssertGreaterThanOrEqual(filesRead, 10, "The walk did not read the contract files.")
+        XCTAssertEqual(
+            found,
+            recorded,
+            "The strings in contracts/ that carry \(placeholder) are not the ones "
+            + "specialNames.platformWording.machine.usedIn names."
+        )
+        for entry in recorded {
+            XCTAssertTrue(entry.contains(".json:"), "\(entry) is not written file:path")
+        }
+    }
+
     func testSpecialNamesSentencesMatchContract() throws {
         let section: [String: Any] = try SharedRulesContractTests.section("specialNames")
 
@@ -3394,5 +3451,39 @@ final class SharedRulesContractTests: XCTestCase {
             XCTFail("\(caseName): unknown list symbol \"\(symbol)\" for \(slot)")
             return []
         }
+    }
+}
+
+/// The contract's record of the machine's name
+/// (`specialNames.platformWording.machine`, #418), read for any test that
+/// compares one of the app's sentences with a contract sentence written with
+/// `{machine}`. Not isolated to the main actor, so every test can use it.
+nonisolated enum MachineWordContract {
+
+    // MARK: - Functions
+
+    /// A contract sentence with the CONTRACT's word for this machine put in —
+    /// what a test compares the app's own sentence with. Read from the
+    /// contract rather than from `MachineWord`, so a wrong word in the app is
+    /// red rather than agreed with.
+    static func filledWithTheMachine(_ template: String) throws -> String {
+        let machine: [String: Any] = try machineRecord()
+        let placeholder: String = try XCTUnwrap(machine["placeholder"] as? String)
+        let word: String = try XCTUnwrap(machine["mac"] as? String)
+        return template.replacingOccurrences(of: placeholder, with: word)
+    }
+
+    /// `specialNames.platformWording.machine`.
+    static func machineRecord() throws -> [String: Any] {
+        let url: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("contracts/shared-rules.json")
+        let all: [String: Any] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try Data(contentsOf: url)) as? [String: Any]
+        )
+        let specialNames: [String: Any] = try XCTUnwrap(all["specialNames"] as? [String: Any])
+        let platformWording: [String: Any] = try XCTUnwrap(specialNames["platformWording"] as? [String: Any])
+        return try XCTUnwrap(platformWording["machine"] as? [String: Any], "No platformWording.machine")
     }
 }

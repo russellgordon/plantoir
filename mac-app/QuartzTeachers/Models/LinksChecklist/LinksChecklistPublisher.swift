@@ -5,7 +5,7 @@ import Foundation
 /// **One plan for the whole press** (the director's ruling F2): the ticked
 /// pages go through `AssistPublishPlanner.planPublishing(exactly:dateMoves:)`
 /// with the dates the offer gave, each ticked class through the assistant's
-/// own `planPublishing(titles:)` so it brings its pages the way publishing it
+/// own `planPublishing(titles:files:)`, by FILE, so it brings its pages the way publishing it
 /// by name would (`followingLinks.publishing`, `bothRoutesAgree`), and the
 /// two are merged BEFORE anything is written — one write per page. Where a
 /// page is both a row and brought by a ticked class, the class's date wins:
@@ -182,7 +182,7 @@ enum LinksChecklistPublisher {
     /// (#398, `linksChecklist.comingWithAClass`).
     ///
     /// **The same planner Publish uses, called once for every class.** Every
-    /// class row's title goes through `planPublishing(titles:)` together — the
+    /// class row's FILE goes through `planPublishing(titles:files:)` together — the
     /// call `plan` makes for the ticked ones — and the pages it would change
     /// because they are linked are shared out among the classes by each
     /// class's own reach. That is exact: the reach of several classes is the
@@ -206,21 +206,23 @@ enum LinksChecklistPublisher {
         forSection sectionNumber: Int,
         in course: Course
     ) -> ClassBrings {
-        var classes: [(place: String, title: String)] = []
-        var titles: [String] = []
+        // By FILE, not title (#425's review, stack 1 item 1): a class sharing
+        // its file name with another page must still be found.
+        var classes: [(place: String, file: URL)] = []
+        var files: [URL] = []
         for row in rows where row.group == .aClass {
             guard let page = pages[row.place.precomposedStringWithCanonicalMapping] else {
                 continue
             }
-            classes.append((place: row.place, title: page.title))
-            titles.append(page.title)
+            classes.append((place: row.place, file: page.fileURL))
+            files.append(page.fileURL)
         }
         var brings: ClassBrings = ClassBrings()
         if classes.isEmpty {
             return brings
         }
         let whole: AssistPublishPlan = AssistPublishPlanner.planPublishing(
-            titles: titles, onOrAfter: nil, before: nil, graph: graph,
+            titles: [], files: files, onOrAfter: nil, before: nil, graph: graph,
             classPages: classPages, forSection: sectionNumber, in: course
         )
         var broughtPaths: Set<String> = []
@@ -228,8 +230,9 @@ enum LinksChecklistPublisher {
             broughtPaths.insert(change.page.fileURL.path)
         }
         for entry in classes {
-            // By title, exactly as the planner finds a class (N9).
-            guard let start = graph.page(titled: entry.title) else {
+            // By file, exactly as the planner finds a class (N9; by file since
+            // #425's review).
+            guard let start = graph.page(atFile: entry.file) else {
                 continue
             }
             var count: Int = 0
@@ -296,7 +299,7 @@ enum LinksChecklistPublisher {
         var followingPages: [(place: String, path: String)] = []
         var comingWithPages: [(place: String, path: String)] = []
         var rowMoves: [String: AssistPublishDateMove] = [:]
-        var classTitles: [String] = []
+        var classFiles: [URL] = []
         for row in offer.rows {
             let key: String = row.place.precomposedStringWithCanonicalMapping
             guard let page = pages[key] else {
@@ -329,7 +332,7 @@ enum LinksChecklistPublisher {
                 continue
             }
             if row.group == .aClass {
-                classTitles.append(page.title)
+                classFiles.append(page.fileURL)
                 continue
             }
             rowPages.append(page)
@@ -357,9 +360,10 @@ enum LinksChecklistPublisher {
         var classChanges: [AssistPublishChange] = []
         var classMoves: [AssistPublishDateMove] = []
         var classNoRoom: [AssistSectionPage] = []
-        if !classTitles.isEmpty {
+        // By FILE (#425's review, stack 1 item 1), as `classBrings` does.
+        if !classFiles.isEmpty {
             let classPlan: AssistPublishPlan = AssistPublishPlanner.planPublishing(
-                titles: classTitles, onOrAfter: nil, before: nil, graph: graph,
+                titles: [], files: classFiles, onOrAfter: nil, before: nil, graph: graph,
                 classPages: classPages, forSection: sectionNumber, in: course
             )
             classChanges = classPlan.changes
