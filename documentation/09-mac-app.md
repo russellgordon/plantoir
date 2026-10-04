@@ -6877,7 +6877,9 @@ longer reaches the model at all and the measured misroute is unreachable from
 the shelf; then
 [#215](https://github.com/russellgordon/plantoir/issues/215) made "hide" and
 "unpublish" one frame that takes a class page, which did the same for
-"Unpublish Unit 2, Day 3". Count it in
+"Unpublish Unit 2, Day 3". It went to **18 and 1** on 2026-10-04, when
+[#411](https://github.com/russellgordon/plantoir/issues/411) answered "Publish
+Unit 2, Day 3" in code, exact form only. Count it in
 `AssistPromptShelfTests.testEveryCardIsEitherMatchedInCodeOrKnownToGoToTheModel`
 rather than from this prose. The model itself is
 unchanged and still gets that sentence wrong when it is phrased in a way the

@@ -552,9 +552,10 @@ def intercepted(message, window_course=None, window_section=None):
     Widened 2026-09-19 with issue #215: "hide" means what "unpublish" means and
     is answered in code, and both verbs take a class page as well as a whole
     unit. The WHOLE VERB is gated, not only the day arm — publish keeps the
-    frame it shipped with, so `publish unit 4, day 3`, `publish unit 4?` and
-    `please publish unit 4` all still go to the model. That asymmetry is what
-    the Swift argues for and the contract carries as five refused rows.
+    frame it shipped with, so `publish unit 4?` and `please publish unit 4`
+    still go to the model. (Since #411 the EXACT `publish unit 4, day 3` is
+    answered in code, and every looser spelling of it is a refused row.) That
+    asymmetry is what the Swift argues for and the contract carries as rows.
     """
     with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
         phrasings = json.load(handle)["cardPhrasings"]["matches"]
@@ -810,7 +811,8 @@ def unit_or_class_page(tidied):
     arm drops commas before counting words, takes a trailing question mark off
     and allows "please" at either end (so "day21" is refused, not being a word
     this frame has). The PUBLISH arm gets none of that: a literal opening
-    `"publish unit "` and a bare number, exactly as it shipped, because
+    `"publish unit "` and a bare number, exactly as it shipped (plus, since
+    #411, the exact "publish unit 4, day 3" and nothing looser), because
     publishing is the direction that reaches students and "publish unit 4?" is
     plausibly a teacher asking. Both are pinned by
     `assert_hide_is_unpublish_matches_contract()` below, whose refused rows
@@ -828,7 +830,17 @@ def whole_unit_to_publish(tidied):
     if not tidied.startswith(opening):
         return None
     rest = tidied[len(opening):].strip(" \t")
-    if not rest or "," in rest or not swift_int(rest):
+    if not rest:
+        return None
+    # "publish unit 4, day 3" since #411 (`AssistCardCommand.unitAndDay`):
+    # EXACTLY a number, ", day " and a number - none of the hide arm's
+    # tolerance.
+    # Read from the UNTRIMMED remainder, as the Swift does: "publish unit  4,
+    # day 3" goes to the model, although "publish unit  5" never has.
+    unit, separator, day = tidied[len(opening):].partition(", day ")
+    if separator and swift_int(unit) and swift_int(day):
+        return "publish_pages"
+    if "," in rest or not swift_int(rest):
         return None
     return "publish_pages"
 
@@ -1250,8 +1262,10 @@ def assert_hide_is_unpublish_matches_contract():
     would be SENT to the model and scored as a routing result for a sentence
     the app answers itself, which is exactly the number nobody should quote.
     Each accepted row carries the tool it must reach, so the verb gating is
-    checked too — `publish unit 4, day 3` is a REFUSED row, and a guard that
-    let it through would be describing a frame the app does not have.
+    checked too — `publish unit 4, day 3` is an ACCEPTED row reaching
+    publish_pages since #411 while `publish unit 4, day 3?` and its other
+    loose spellings are REFUSED, and a guard that got either wrong would be
+    describing a frame the app does not have.
     """
     with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
         family = json.load(handle).get("hideIsUnpublish")
