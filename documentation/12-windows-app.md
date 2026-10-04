@@ -866,14 +866,24 @@ pixels at every scale. Rejected: FlaUI's `Window.SetForeground()` and
 `Focus()` (measured: the terminal stayed in front); minimising the terminal
 from the runner (the click still went to the doubled point).
 
-**Only the two Copy a Page pickers were changed.** About twenty other
-`Click()` and `RightClick()` calls remain (the helpers in `DrivenApp.cs`,
-`AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`, `EndToEnd.cs` and
-others), none with `BringToFront`. They passed in the 44 of 44 run on the same
-200% session, so the doubled point is not general — it was measured on the
-picker (an AutoSuggestBox inside a dialog) and nowhere else — but nothing
-proves the others cannot meet it. Moving them to `ClickMiddleOf` is owed
-(#428).
+**Since #428 item 4 (2026-10-04) no real click in the suite asks for a
+clickable point.** At first only the two Copy a Page pickers were changed;
+the twenty-odd other `Click()` / `RightClick()` calls (the helpers in
+`DrivenApp.cs`, `AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`,
+`EndToEnd.cs`, `ReferenceCourseUiTests`, `LinksChecklistUiTests`,
+`PanelHeightUnderSqueezeUiTests`, `ImportForReferenceUiTests`,
+`CopyAPageDialogUiTests`) had passed 44 of 44 on the same 200% session, but
+nothing proved they could not meet the doubled point. Now: a row, the menu
+bar or anything else in the window → `ClickMiddleOf` / `RightClickMiddleOf`;
+an item of a menu that is already OPEN → `DrivenApp.PressMenuItem` (its
+Invoke pattern, else a click in the middle of its box WITHOUT `BringToFront`,
+which could dismiss the menu that is already in front); a dialog's button →
+`AsButton().Invoke()`. The Ctrl+click in `AllBackupsUiTests` releases Ctrl
+in a `finally`, so a failed click cannot leave the key down for the next
+test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
+find only the comment in `DrivenApp.cs` that explains why. Built, NOT run
+through the window when this was written (the UI suite needs the whole
+machine; the director schedules it).
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
@@ -899,10 +909,19 @@ runs `preview.ps1 CODE N --stop` for every section the test declared with
 `WillServe` (the launcher's own sweep, by the directories the build and serve
 work in); ends any process whose command line still names the run's
 temporary folder or that builds folder (a deploy's launcher, its python);
-deletes that builds folder; and unlocks the working folder's courses so a
-reference course the app locked can be deleted with it. (Before bundle 11 the
+deletes that builds folder; and deletes the run folder with
+`DrivenApp.DeleteRunFolder`, which lifts the reference lock first so a
+reference course the app locked can go with it. (Before bundle 11 the
 reference tests' temporary folders outlived their runs for exactly that
-reason.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
+reason, and two still did after the 44-of-44 run of 2026-10-03 — `rmdir`
+"Access is denied" on `courses\ICS3U-…\section1\index.md`, removed by hand
+with `icacls /reset /T`. Since #428 item 5 the unlock covers the WHOLE run
+folder rather than only `workspace\courses` — the import test keeps last
+year's working folder in a scratch folder beside it — Dispose waits for the
+app's pid to be gone first, and the unlock is asked again between delete
+attempts. The two days' leftover was never reproduced, so which of those it
+was is not known; `RunFolderTeardownTests`, two plain facts, pin the
+behaviour without a desktop.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
 launchers would build under the state folder — it would have stopped the
 tests exercising the real path the ruling asked for, and node and npm resolve
 caches from the same variable.
@@ -1616,10 +1635,11 @@ the same day.)
   install while this app is publishing or building a preview, or a scheduled
   publish of this install is running — Task Scheduler's run is the counterpart
   of the mac's launchd one; never refuse a quit), and the eight trail events it
-  added to `activityTrail.mustRecord`. NetSparkle gathers the notes of every
-  newer release itself, so a skipped release's warning is not lost the way it
-  would be on the mac without the cumulative notes; each Windows item carries
-  only its own. The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
+  added to `activityTrail.mustRecord`. The app gathers the notes of every newer
+  feed item itself (`AppUpdates.NotesFor`, #428: NetSparkle hands it the newer
+  items but, with no UI of its own here, shows none), so a skipped release's
+  warning is not lost; each Windows item carries only its own. (This said
+  NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
   `site/appcast-windows.xml`, and before that one shared appcast.)
 - **Stable code signing** (entry from the signing fix): sign dev builds

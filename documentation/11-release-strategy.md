@@ -146,7 +146,7 @@ still holds, with the names it finally took:
   deploy — `RELEASING.md` → "The update feed (macOS)". Teachers on v1.3.1 or
   earlier — the last release without an updater — have no updater, and install the first release that carries one by hand.
 
-### Updating itself on Windows (#337) — built; waiting for a feed, a key and a release
+### Updating itself on Windows (#337) — switched on with v1.4.2
 
 **Built (bundle 8, 2026-10-01), all tested from the contract:**
 `Plantoir.Core/Assist/AppUpdates.cs` — the install gate
@@ -154,8 +154,9 @@ still holds, with the names it finally took:
 (`FeedFor(developmentBuild: true)` is null: a Debug build constructs nothing),
 the wording (`UpdateWording`, every sentence pinned and walked against
 `machineryCheck`), the per-user check, the installer arguments, and
-`app updated` on the trail at the first launch of a new version (always "by
-hand" until the engine exists). `installer.iss` reads two new parameters.
+`app updated` on the trail at the first launch of a new version ("by hand"
+always until 1.4.3; since then "by its own updater" when the installer's
+marker says so — below). `installer.iss` reads two new parameters.
 
 **The engine** (`Plantoir.Core/Assist/AppUpdater.cs`, NetSparkleUpdater 3.1.0
 core, API checked against the restored package): no UI factory; our own
@@ -212,7 +213,14 @@ pre-commit hook still remarks on the CR in `windows.xml`; there it is correct
 to leave them. Git does not rewrite a file because its attribute changed, so
 any OTHER Windows clone keeps its CR LF `macos.xml` until it is checked out
 again: `git checkout -- website/updates/macos.xml`, then compare its SHA-256
-with the live feed's before deploying from that clone.
+with the live feed's before deploying from that clone. **Since #428 item 7
+`build.py --deploy` REFUSES** when any `website/updates/*.xml` or `*.signature`
+is not byte for byte `git show HEAD:<path>` (or is not committed at all), and
+names the fix that worked: delete the file and check it out again
+(`build.committed_feed_bytes_refusal`, `website/test_windows_feed.py`). And
+`build.py` in every mode checks `windows.xml.signature` against the feed's
+bytes with `AppUpdates.PublicKey` (`website/windows_feed.py`), so a CR LF
+change to the Windows feed fails before anything is deployed.
 
 **The committed feed, read by the engine itself** (the Opus review's probe,
 2026-10-03: NetSparkle 3.1.0 from the package cache, the real public key,
@@ -223,14 +231,39 @@ and INVALID once they are converted to LF. Versions compare the way a teacher
 expects (1.4.3 above 1.4.2, 1.4.10 above 1.4.9). The check fetches two files,
 `windows.xml` and `windows.xml.signature`.
 
-**Owed in the next version, found by the same review:** `App.xaml.cs` writes
-the `app updated` trail line with `byItsOwnUpdater: false` always, which was
-true while no updater ran. The first update the app installs itself would be
-recorded as "by hand". It has to be put right in the version that is
-INSTALLED by the updater (1.4.3), which is the one that writes the line;
-#428 says how, and names three comments in `AppUpdater.cs`, `App.xaml.cs`
-that still say the feed is empty (left as they are in 1.4.2 so the sources
-are the signed installer's).
+**"By its own updater" on the trail (#428 item 1, for 1.4.3).** Until 1.4.3
+`App.xaml.cs` wrote the `app updated` line with `byItsOwnUpdater: false`
+always, true while no updater ran. The line is written by the version that
+was INSTALLED, so 1.4.3 puts it right on its own: its installer, run with
+`/PLANTOIRUPDATE=1`, writes `%LOCALAPPDATA%\Plantoir\installed-by-its-own-updater.txt`
+holding the version it installed, and the app reads AND removes it at every
+launch (`AppUpdates.ConsumeUpdatedByItselfMarker`). Why a refused or failed
+update cannot make a later hand install read as the updater's, in three
+parts: the file is written at `ssPostInstall`, after every file is in place,
+so a refusal (`InitializeSetup`) or a failed copy writes nothing; EVERY
+install, hand-run or not, deletes it at `ssInstall`, so it describes only
+the last install to finish; and the app believes it only when it names the
+version now running. A file, not an argument, because the at-quit install
+does not reopen Plantoir, so the next launch is the teacher's own and
+carries none. **Rejected:** the running app recording "about to install X"
+in Settings before it quits — written BEFORE the install, so a refused or
+failed one would still read as the updater's, and it helps only from the
+version that writes it. Pinned by `AppUpdatesContractTests.TheUpdatersMarkerSpeaksOnlyForTheVersionItInstalled`
+and `.TheInstallerLeavesTheMarkerOnlyAfterAFinishedUpdate` (which reads
+installer.iss). **Unproven until the first real update** (1.4.2 → 1.4.3 on
+this PC): that Inno runs `ssPostInstall` before the `[Run]` entry that
+reopens the app (its documented order; were it ever the other way round, the
+line would say "by hand" and the next launch would discard the marker).
+
+**The offer carries every newer release's notes** (#428 item 2,
+`appUpdates.notes.cumulative`). The feed keeps one item per release, each
+with only its own notes, so `AppUpdates.NotesFor` gathers the
+`<description>` of every item newer than the running version, newest first,
+each under its version when there is more than one; the offer shows them as
+plain text (a `TextBlock`). Rejected: writing cumulative notes into each new
+item at the cut — every old note repeated in every item, and correct only
+while whoever cuts remembers. The release side is RELEASING.md → "The update
+feed (Windows)".
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|
