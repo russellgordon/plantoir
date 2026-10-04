@@ -1,0 +1,119 @@
+using System.Text.Json.Nodes;
+using Plantoir.Core.Assist;
+using Plantoir.Core.Scripting;
+using Xunit;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// #424: "schedule a deploy …" and "cancel the scheduled deploy" answered in
+/// code, from <c>contracts/assist-cases.json → scheduleAndCancel</c> (AUTHORED
+/// from Windows; the mac implements it from the mac issue) — and the settler
+/// that ends a reply the engine is still writing after 30 seconds.
+/// </summary>
+[Collection(SharedActivityState.Name)]
+public class ScheduleAndCancelFramesTests : IDisposable
+{
+    private readonly string _trail = Path.Combine(Path.GetTempPath(), "plantoir-schedule-" + Guid.NewGuid().ToString("N") + ".txt");
+
+    public ScheduleAndCancelFramesTests() => ActivityTrail.SetCustomLogPathForTesting(_trail);
+
+    public void Dispose()
+    {
+        ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        try { File.Delete(_trail); } catch { }
+        GC.SuppressFinalize(this);
+    }
+
+    private static JsonObject Rows => ContractLoader.LoadJson("assist-cases.json")["scheduleAndCancel"]!.AsObject();
+
+    private static AssistAgent Agent(WindowBindingContractTests.ScriptedModel model, WindowBindingContractTests.RecordingTools tools) =>
+        new(model, tools, ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+
+    [Fact]
+    public void EveryAcceptedRowReachesItsToolWithItsWhen()
+    {
+        var accepted = Rows["accepted"]!.AsArray();
+        Assert.True(accepted.Count >= 7, "scheduleAndCancel.accepted has lost rows");
+        foreach (var row in accepted)
+        {
+            string input = row!["input"]!.ToString();
+            var matched = AssistCardCommand.Matching(input);
+            Assert.True(matched is not null, $"“{input}” matched nothing: {row["why"]}");
+            Assert.Equal(row["expectTool"]!.ToString(), matched!.ToolName);
+            if (row["expectWhen"] is JsonValue when)
+                Assert.Equal(when.ToString(), matched.Arguments["when"]);
+        }
+    }
+
+    [Fact]
+    public void EveryRefusedRowMatchesNothingAndAsksNothing()
+    {
+        var refused = Rows["refused"]!.AsArray();
+        Assert.True(refused.Count >= 11, "scheduleAndCancel.refused has lost rows");
+        var wrongly = refused.Select(row => row!["input"]!.ToString())
+            .Where(input => AssistCardCommand.Matching(input) is not null || AssistCardCommand.AsksToScheduleWithNoTime(input))
+            .ToList();
+        Assert.True(wrongly.Count == 0, "answered in code, and the contract refuses: " + string.Join(" | ", wrongly));
+    }
+
+    /// <summary>A schedule phrasing with no time is NEVER a deploy now: asked, in code, and the model is never sent it.</summary>
+    [Fact]
+    public async Task ASchedulePhrasingWithNoTimeIsAskedAndNothingRuns()
+    {
+        foreach (var row in Rows["asksForTheTime"]!.AsArray())
+        {
+            string input = row!["input"]!.ToString();
+            Assert.Null(AssistCardCommand.Matching(input));
+            var model = new WindowBindingContractTests.ScriptedModel();
+            var tools = new WindowBindingContractTests.RecordingTools();
+            var agent = Agent(model, tools);
+            var lines = await agent.Say(input, CancellationToken.None);
+            Assert.Equal(AssistWording.ScheduleADeployNeedsATime, Assert.Single(lines).Text);
+            Assert.Empty(model.Asked);
+            Assert.Empty(tools.Calls);
+            Assert.False(agent.IsAwaitingApproval, $"“{input}” put up a card");
+        }
+    }
+
+    /// <summary>The question names a sentence that schedules when typed back.</summary>
+    [Fact]
+    public void TheQuestionsExampleIsASentenceThatSchedules() =>
+        Assert.Equal("schedule_deploy", AssistCardCommand.Matching("deploy tomorrow at 6:30 am")?.ToolName);
+
+    /// <summary>Through the agent: a schedule is held behind the button; a cancel runs; the model is never asked.</summary>
+    [Fact]
+    public async Task TheAcceptedRowsNeverReachTheModel()
+    {
+        foreach (var row in Rows["accepted"]!.AsArray())
+        {
+            var model = new WindowBindingContractTests.ScriptedModel();
+            var tools = new WindowBindingContractTests.RecordingTools();
+            var agent = Agent(model, tools);
+            await agent.Say(row!["input"]!.ToString(), CancellationToken.None);
+            Assert.Empty(model.Asked);
+            if (row["expectTool"]!.ToString() == "schedule_deploy")
+            {
+                Assert.True(agent.IsAwaitingApproval);
+                Assert.Equal("schedule_deploy", agent.PendingTool);
+                Assert.DoesNotContain(tools.Calls, call => call.Name == "deploy_section");
+            }
+            else
+            {
+                Assert.Contains(tools.Calls, call => call.Name == "cancel_scheduled_deploy");
+            }
+        }
+    }
+
+    /// <summary>
+    /// #424 item 2: every request lets the engine write for 30 seconds at most,
+    /// read by llama-server as t_max_predict_ms; the cap of 512 is unchanged.
+    /// </summary>
+    [Fact]
+    public void EveryRequestCarriesTheWritingTimeLimit()
+    {
+        var body = LocalModel.Request(new JsonArray(), new JsonArray());
+        Assert.Equal(30_000, body["t_max_predict_ms"]!.GetValue<int>());
+        Assert.Equal(512, body["max_tokens"]!.GetValue<int>());
+    }
+}

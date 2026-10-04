@@ -3579,6 +3579,110 @@
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96). `given.modelReply`, when present (#411), is the engine's WHOLE reply to every request: `finishReason` (e.g. \"length\", the engine saying it stopped at the cap) and either `toolCall` - `name`, and `arguments` as the model's own TEXT so a half-written call can be scripted, `{course}` standing for the fixture's course - or `content`. With `saying` and no card meant to match, such a case names no `pending`. A runner that can see launcher runs and window actions asserts none happened for a \"length\" reply, so the case cannot pass vacuously."
   },
+  "scheduleAndCancel" : {
+    "accepted" : [
+      {
+        "expectTool" : "schedule_deploy",
+        "expectWhen" : "06:30",
+        "input" : "schedule a deploy at 6:30 am",
+        "why" : "The canonical sentence: the opening read as 'deploy', the time read by deployAtATime."
+      },
+      {
+        "expectTool" : "schedule_deploy",
+        "expectWhen" : "tomorrow 06:30",
+        "input" : "Schedule a deploy for 6:30 am tomorrow",
+        "why" : "'for' stands for 'at' directly after the opening; the day word is the family's own."
+      },
+      {
+        "expectTool" : "schedule_deploy",
+        "expectWhen" : "tomorrow 18:00",
+        "input" : "schedule the deploy tomorrow at 18:00",
+        "why" : "'the' as well as 'a'; a two-digit 24-hour time is the family's own."
+      },
+      {
+        "expectTool" : "schedule_deploy",
+        "expectWhen" : "19:00",
+        "input" : "please schedule a deploy at 7 pm",
+        "why" : "Courtesy at the front, as the family allows."
+      },
+      {
+        "expectTool" : "cancel_scheduled_deploy",
+        "input" : "cancel that scheduled deploy",
+        "why" : "The prompt shelf's own sentence, 'Cancel that scheduled deploy', case-folded."
+      },
+      {
+        "expectTool" : "cancel_scheduled_deploy",
+        "input" : "Cancel the scheduled deploy.",
+        "why" : "'the', and a full stop the shared tidier removes."
+      },
+      {
+        "expectTool" : "cancel_scheduled_deploy",
+        "input" : "please cancel my scheduled deploy",
+        "why" : "'my', and courtesy at the front."
+      }
+    ],
+    "asksForTheTime" : [
+      {
+        "input" : "schedule a deploy",
+        "why" : "No time at all: asked, never a deploy now, never the model."
+      },
+      {
+        "input" : "Schedule a deploy for tomorrow",
+        "why" : "A day and no time: the same question."
+      },
+      {
+        "input" : "please schedule the deploy",
+        "why" : "Courtesy and 'the': the same question."
+      }
+    ],
+    "note" : "AUTHORED, not generated - proposed from Windows with #424 (v1.4.3 bundle A); the mac suite has no reader for it until it implements it, and a mac issue says so. Two typed frames answered in CODE, never by the model, with the hide frame's discipline: exact openings, 'please' at either end, a trailing . or ! removed by the shared tidier, and NOTHING else - a question mark, a leading word such as \"don't\", a course or section named, or any other words fall through to the model, because a matched card binds THIS window's course and section. WHY: measured on Windows (bundle 10, Intel i5-8365U, 16 GB, Intel UHD 620, Windows 11 Pro 26200, llama-server b10435, Qwen2.5-1.5B Q4_K_M, 10 greedy trials) on the local surface that ships since #420: a sentence asking for a LATER deploy reached deploy_section 10 of 10 (an immediate deploy behind the Deploy button), and a teacher asking to call off a scheduled deploy was declined 10 of 10 (the deploy still went out). SCHEDULE: '[please] schedule a|the deploy' is read AS the deployAtATime family - the opening stands for 'deploy', and 'for' may stand for 'at' directly after it (or after a day word) - so every time it accepts, asks about or refuses is read exactly as 'deploy at ...' reads it; nothing new is learned about times. A schedule phrasing with NO time ('schedule a deploy', with at most today/tomorrow/for today/for tomorrow after it) is NEVER a deploy now: it is answered in code with a question asking for the time (Windows' sentence, AssistWording.ScheduleADeployNeedsATime, proposed as a key), transcript only, nothing set. CANCEL: '[please] cancel the|that|my scheduled deploy [please]' reaches cancel_scheduled_deploy; cancelling is the safe direction (it stops a deploy and starts nothing). REJECTED: rewording schedule_deploy's or cancel_scheduled_deploy's description (#424 candidate b) - a description change needs its own pre-registered measurement and a sentence naming another tool is read by a small model as a recommendation (doc 10); widening either frame to 'don't send it ...' or to sentences naming a course - a frame that guesses is what these tables exist to avoid.",
+    "refused" : [
+      {
+        "input" : "schedule a deploy at 6:30 am?",
+        "why" : "A question mark: the teacher may be ASKING. Falls through to the model."
+      },
+      {
+        "input" : "don't schedule a deploy at 6:30 am",
+        "why" : "A negation, the one failure that would act against the teacher."
+      },
+      {
+        "input" : "schedule a deploy for ICS3U at 6:30 am",
+        "why" : "A course named: a card binds this window's course."
+      },
+      {
+        "input" : "schedule a deploy of section 2 at 6:30 am",
+        "why" : "A section named: the same fault from the other side."
+      },
+      {
+        "input" : "schedule a deploy at 7",
+        "why" : "deployAtATime's own refusal: a bare number is not a time."
+      },
+      {
+        "input" : "can you schedule a deploy at 6:30 am",
+        "why" : "Asking about ability as much as instructing, as deployAtATime rules for 'can you deploy at ...'."
+      },
+      {
+        "input" : "cancel the scheduled deploy?",
+        "why" : "A question mark: the teacher may be asking whether one is set."
+      },
+      {
+        "input" : "don't cancel the scheduled deploy",
+        "why" : "A negation."
+      },
+      {
+        "input" : "cancel the scheduled deploy for ICS3U",
+        "why" : "A course named."
+      },
+      {
+        "input" : "cancel the deploy",
+        "why" : "Not 'scheduled': it may mean a deploy that is running now, which this tool does not stop."
+      },
+      {
+        "input" : "Don't send it in the morning after all",
+        "why" : "The measured probe itself (teachers-say 'ctl cancel_scheduled'): conversational, and it begins with \"don't\". It stays with the model, and the measurement says how the model does."
+      }
+    ]
+  },
   "toolDescriptions" : {
     "descriptions" : {
       "add_classes" : "TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, dated to the days this section actually meets, continuing from the last day that unit already has. Call plan_add_classes first and show the teacher what it said.\n\nThe pages arrive UNPUBLISHED — empty skeletons for the teacher to write, which stay out of the site until they publish them. An existing page is never written over, the course is backed up first, and undo_last_change takes back what this created.",
