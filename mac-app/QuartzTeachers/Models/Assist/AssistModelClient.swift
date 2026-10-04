@@ -141,8 +141,10 @@ struct AssistToolCall: Codable, Equatable, Sendable, Identifiable {
     ///
     /// Everything else RUNS on an empty call, because the window supplies the
     /// rest: undo (no arguments at all), rebuild, deploy (still behind its
-    /// button), check, add the next class, and a read like `list_pages` whose
-    /// extra argument only narrows it. REJECTED on review: refusing every
+    /// button), check, and a read like `list_pages` whose extra argument only
+    /// narrows it. (Add the next class ran too until #411 gave its schema
+    /// `unit` and `days`; it is refused now, as on Windows, by this same rule
+    /// rather than by a name — decided by Russell.) REJECTED on review: refusing every
     /// tool with a `required` list (`required` is exactly course and section
     /// for nine of the thirteen local tools, so it refused "rebuild the
     /// preview" when the model wrote nothing, although the window supplies

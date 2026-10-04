@@ -600,9 +600,13 @@ extension AssistToolRunner {
         description: "TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", "
                    + "\"show me before you add it\". Work out which page adding the next class would create "
                    + "and which day it would fall on, WITHOUT changing anything.",
+        // The twin declares what `add_next_class` declares (#411), so a plan
+        // proposed for an MCP client takes the same arguments the write will.
         parameters: [
             "course": courseHelp,
             "section": sectionHelp,
+            "unit": nextClassUnitHelp,
+            "days": nextClassDaysHelp,
         ],
         required: ["course", "section"],
         readOnly: true,
@@ -665,6 +669,19 @@ extension AssistToolRunner {
         needsApproval: false
     )
 
+    /// `unit` on the next-class pair, in Windows' words verbatim
+    /// (`PlantoirTools.AddNextClass`), so the two local surfaces read alike.
+    private static let nextClassUnitHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .string,
+        description: "Pass \"next\" to start a new unit. Leave empty to continue the current unit."
+    )
+
+    /// `days` on the next-class pair, in Windows' words verbatim.
+    private static let nextClassDaysHelp: AssistSchemaProperty = AssistSchemaProperty(
+        kind: .integer,
+        description: "Pass a number to add that many days to the specified unit number. Leave 0 for a single class."
+    )
+
     private static let addNextClassTool: AssistToolDefinition = AssistToolDefinition(
         name: "add_next_class",
         description: "TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", "
@@ -673,9 +690,23 @@ extension AssistToolRunner {
                    + "the unit the last class was in, and takes its date from the section's remembered "
                    + "timetable. Work out no numbers and no dates yourself — this tool does both. It starts "
                    + "unpublished, so students see nothing until the teacher publishes it.",
+        // `unit` and `days` are DECLARED since #411 (decided by Russell,
+        // 2026-10-03): the mac matches Windows, whose local `add_next_class`
+        // has always declared both. Two consequences, both chosen. The local
+        // model can ask for "add five more days to Unit 4" itself rather than
+        // only through the card, which is a routing change and was measured
+        // on both tiers before it landed (research/ai-assist/
+        // add-next-class-unit-days-411-results.txt). And an EMPTY model call
+        // is now refused with `answerLeftOutWhatItWasFor`, because the #198
+        // rule reads the schema: a write declaring anything beyond course and
+        // section has nothing to act on when told only its section. The card
+        // phrasing "add the next class page" never meets that rule — a card
+        // is matched in code, not judged as a model's answer.
         parameters: [
             "course": courseHelp,
             "section": sectionHelp,
+            "unit": nextClassUnitHelp,
+            "days": nextClassDaysHelp,
         ],
         required: ["course", "section"],
         readOnly: false,
@@ -738,9 +769,12 @@ extension AssistToolRunner {
     /// **The engine already shipped; only the door was missing.** "Add five
     /// more days to Unit 4" has reached `NextClassPlanner.plan(addingDays:
     /// toUnit:)` through a card phrasing since that phrasing was written — but
-    /// `unit` and `days` are card-only keys, absent from `add_next_class`'
-    /// schema, so no MCP client could ask for it. This publishes the same
-    /// capability under a name of its own, which is how Windows has it.
+    /// `unit` and `days` were card-only keys then, absent from
+    /// `add_next_class`' schema, so no MCP client could ask for it. This
+    /// publishes the same capability under a name of its own, which is how
+    /// Windows has it. (`add_next_class` declares both since #411 as well;
+    /// this tool stays, because "howMany" is the clearer word for an MCP
+    /// client and both read the same planner.)
     ///
     /// **No `firstDay`, and both platforms now agree.** Windows used to take
     /// one, defaulting to 1, described as "1 unless the earlier days already

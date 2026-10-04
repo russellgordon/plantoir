@@ -2662,6 +2662,24 @@
 
             ],
             "tool" : "undo_last_change"
+          },
+          {
+            "arguments" : "",
+            "name" : "nothing written for add_next_class, which declares unit and days (#411)",
+            "properties" : [
+              "course",
+              "days",
+              "section",
+              "unit"
+            ],
+            "readable" : false,
+            "readOnly" : false,
+            "required" : [
+              "course",
+              "section"
+            ],
+            "tool" : "add_next_class",
+            "why" : "Decided by Russell, 2026-10-03 (#411): the mac matches Windows. add_next_class declares unit and days on both apps, so by this rule an EMPTY model call has nothing to act on and is refused with wording.answerLeftOutWhatItWasFor rather than adding a page nobody described. The card phrasing 'add the next class page' never meets this rule: a card is matched in code, not judged as a model's answer. A platform that exempts these two arguments by name (Windows' AssistAgent.OptionalExtras, from its bundle 5a fix round) fails this case."
           }
         ],
         "detail" : "A reply that finished normally and named a tool but wrote NO arguments for it - nothing, only whitespace, or an object with no keys - runs only when the section window can supply everything the tool needs. The window supplies course and section. A tool needs more than that when its schema REQUIRES any other argument (a date, a page, a time), or when it changes pages (readOnly false) and its schema declares any other argument at all (which pages, which dates, which unit) - a write told only its section has nothing to act on. Otherwise it runs: undo (no arguments), rebuilding the preview, the deploy (still behind its own button), and a read whose other argument only narrows it. Refused, nothing runs, and the teacher is answered with wording.answerLeftOutWhatItWasFor - NOT wording.answerWasCutOff, whose advice is about the teacher's request - and the trail says the assistant wrote nothing for that tool. A schema with NO required key (undo_last_change's has none) requires nothing, the same as an empty list; each case's required, properties and readOnly are the tool's own. Written arguments of any kind are readable, however little they say - binding the window's course and section, and the tool's own refusals, decide what happens next.",

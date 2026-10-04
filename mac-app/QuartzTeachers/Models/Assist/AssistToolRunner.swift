@@ -3417,9 +3417,11 @@ final class AssistToolRunner {
         }
         do {
             // "Start a new unit for the next class" is a fixed phrasing the
-            // window offers, so the word arrives here literally. The model is
-            // never told these keys exist, which keeps the tool's schema — and
-            // the routing measured against it — unchanged.
+            // window offers, so the word arrives here literally. Since #411 the
+            // model is told both keys exist too (`add_next_class` declares
+            // them, as Windows' always has), and the routing was re-measured
+            // on both tiers for it — so a model may send either, a number as
+            // `unit` included, and they are read the same way.
             let unitAsked: String = text("unit", in: arguments).lowercased()
             let howMany: Int = number("days", in: arguments) ?? 0
 
