@@ -250,8 +250,9 @@ def verify_feeds_live() -> str:
     # Both feeds since Windows 1.4.2 (#337), each by its own checker since
     # #428: the mac's compares the bytes and the newest download's length;
     # the Windows one also verifies the live windows.xml.signature against the
-    # live feed, picks the newest item by real version order, and READS the
-    # newest installer to verify its signature (about 240 MB).
+    # live feed, picks the newest item by real version order, and — on Windows,
+    # or anywhere with PLANTOIR_VERIFY_WINDOWS_INSTALLER=1 — READS the newest
+    # installer to verify its signature (about 240 MB); elsewhere its length.
     feeds = [SITE_DIR / "updates" / "macos.xml", SITE_DIR / "updates" / "windows.xml"]
     for feed in feeds:
         if not feed.is_file():
