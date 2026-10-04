@@ -142,6 +142,12 @@ public class AssistScenarioTests : IDisposable
             foreach (var title in visibleClasses)
                 Class(title!.ToString(), $"2026-09-{day++:00}", published: true);
         }
+        // `given.rememberedDates` (bundle A fix round 2): the section's class
+        // dates, remembered as if the teacher had typed them in.
+        if (given?["rememberedDates"] is JsonArray rememberedDates)
+            TimetableMemory.Write(_folder, Course, SectionNumber,
+                rememberedDates.Select(d => DateOnly.Parse(d!.ToString(), System.Globalization.CultureInfo.InvariantCulture)).ToList(),
+                "typed in by hand", DateOnly.Parse(rememberedDates[0]!.ToString(), System.Globalization.CultureInfo.InvariantCulture));
 
         // ONE workspace and one tool server for the whole case, because that is
         // what the window holds for a conversation: the backup taken before the
@@ -336,7 +342,9 @@ public class AssistScenarioTests : IDisposable
             // Which tool a turn's answer came from, for the transcript's
             // speaker: a fixed phrasing IS its tool, and no model runs here to
             // choose a different one.
-            string answering = AssistCardCommand.Matching(phrasing)?.ToolName ?? "";
+            // …or, when the case scripts the engine's reply, the tool it named.
+            string answering = AssistCardCommand.Matching(phrasing)?.ToolName
+                               ?? given?["modelReply"]?["toolCall"]?["name"]?.ToString() ?? "";
             Render(transcript, answering, await agent.Say(phrasing, CancellationToken.None));
 
             if (!agent.IsAwaitingApproval)

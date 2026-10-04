@@ -3228,6 +3228,57 @@
   "scenarios" : {
     "cases" : [
       {
+        "expectEvents" : [],
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "assistant: What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to."
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "deploy_section"
+            }
+          },
+          "saying" : [
+            "Deploy this section at 6:30 tomorrow morning, before school starts."
+          ]
+        },
+        "name" : "a deploy-now answer to a request that named a later time is asked about, never offered",
+        "when" : "say",
+        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#424, settler S1). Measured on Windows (Intel i5-8365U, UHD 620, b10435, Qwen2.5-1.5B, 10 greedy trials): \"Deploy ICS3U section 1 at 6:30 tomorrow morning, before school starts.\" reached deploy_section 10 of 10 - a Deploy-NOW card for a teacher who asked for a later deploy. Settled in CODE on what the model sent: when the call is deploy_section and the teacher's own sentence carries a later-time word (schedule, scheduled, later, tonight, tomorrow, morning, afternoon, evening, noon, midnight, a weekday) or 'at' and a clock, no card is shown, nothing runs, and the time is asked for with the sentence 'schedule a deploy' with no time already gets (Windows' AssistWording.ScheduleADeployNeedsATime, proposed as wording.scheduleADeployNeedsATime - matched here as written until the key exists). No window action and no launcher run (expectEvents empty), and the engine is asked once."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "Unit 1, Day 2"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1,\"unit\":\"next\",\"days\":0}",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14"
+          ],
+          "saying" : [
+            "Add the next class"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "a model-sent unit 'next' on add_next_class is ignored unless the teacher said unit",
+        "when" : "decline",
+        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#411/#440, settler S2). Measured on Windows (as above): five ordinary 'add the next class' phrasings sent unit \"next\" 50 of 50, and unit \"next\" starts a NEW unit (Unit 2, Day 1) for a teacher who wanted the next day of the unit they are in. The model's unit \"next\" is dropped in code unless the teacher's own sentence says 'unit'; the call then runs as if no unit were given, so the plan names Unit 1, Day 2. days 0 is kept and means nothing (days is read only when > 0 beside a numbered unit). The plan is declined, so nothing is written. given.rememberedDates (new with this case) writes the section's remembered class dates before the turn. On the mac, whose local add_next_class declares no unit, the model cannot send one: the case should already pass there."
+      },
+      {
         "expectTranscriptContains" : [
           "tool(re_date_classes): wording.rolloverWebsiteQuestion",
           "tool(re_date_classes): wording.rolloverWebsiteNotDecided"
