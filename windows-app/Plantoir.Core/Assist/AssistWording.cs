@@ -208,6 +208,47 @@ public static partial class AssistWording
     public static string CourseIsBusy(string course) =>
         $"{course} is busy in Plantoir — a preview or a deploy is running. Wait for that to finish, then ask again.";
 
+    // ---- What an OUTSIDE assistant meets (#436, mac #433) -----------------
+    // shared-rules.json → workLeases.declining.outsideChanges.whatIsSaid. The
+    // mac owns these words; copied, and pinned by ContractTests.
+
+    /// <summary>Anything an outside assistant asked for, held back because a site of the course is being BUILT.</summary>
+    public static string CourseIsBeingBuilt(string course) =>
+        $"Plantoir is building the {course} website right now, for a preview or a deploy, so nothing was changed. Ask again once it has finished.";
+
+    /// <summary>
+    /// A change written (or a rebuild asked for) while a preview is only being
+    /// SERVED: never a refusal word — the change succeeded, and the open
+    /// preview was left exactly as it was.
+    /// </summary>
+    public static string ChangesAreSavedPreviewShowsTheOldPages(string course, string section) =>
+        $"Your changes to {course} Section {section} are saved. The preview open in Plantoir still shows the pages as they were — press Stop Preview, then Preview, to see them.";
+
+    /// <summary>A change written, and a build of the course started between the check at the door and the write.</summary>
+    public static string ChangesAreSavedWhileTheCourseIsBuilt(string course, string section) =>
+        $"Your changes to {course} Section {section} are saved. Plantoir is building the {course} website right now; press Preview once that has finished to see them.";
+
+    /// <summary>Appended to an outside deploy's success sentence when a preview of the course was being served ("if": leases name the course, not the section).</summary>
+    public static string DeployClosedAnOpenPreview(string course, string section) =>
+        $"If a preview of {course} Section {section} was open in Plantoir, deploying closed it — press Preview there to open it again.";
+
+    // ---- A publish that stops part way (#436 item 2, mac #412) ------------
+
+    /// <summary>
+    /// A publish (marking pages) that stopped part way. <paramref name="what"/>
+    /// is "Unit 1" or "the pages you named".
+    /// </summary>
+    public static string PublishStoppedPartWay(string what, string problem) =>
+        $"Only part of {what} was changed before this stopped: {problem}";
+
+    /// <summary>The pointer to Restore Section — said only in Plantoir's OWN assistant window, which has the button.</summary>
+    public static string RestoreSectionPutsItBack(string section) =>
+        $"A copy from before this conversation changed anything is saved — Restore Section {section}… puts the section back.";
+
+    /// <summary>A publish by date with a start and no end, refused.</summary>
+    public static string OpenEndedPublishRefused(string day) =>
+        $"That asks to publish every class from {day} to the end of the course, which is almost certainly not what was meant. For ONE day's class, use publish_class_on with that date. For a stretch of classes, give both onOrAfter and before. To publish particular pages, name them.";
+
     /// <summary>
     /// Added after a sentence saying some destinations were not reached, when
     /// the others DID go out, so a teacher is not left thinking nothing happened
@@ -295,12 +336,18 @@ public static partial class AssistWording
     /// <summary>
     /// Pages a make-room could not finish writing (#422) — a rename whose new
     /// name was taken, a save that failed (read-only, open elsewhere). Named by
-    /// the name each page has NOW. Windows' own sentence: the contract has no
-    /// key for it yet (proposed to the mac as <c>pagesAChangeCouldNotFinish</c>).
+    /// the name each page has NOW. Proposed from here (#422); the mac adopted
+    /// it as <c>wording.pagesAChangeCouldNotFinish</c> (#425) and its words are
+    /// the source now: "…before it goes on your website", because publishing
+    /// marks a page and what the teacher checks before is the DEPLOY (#436).
     /// </summary>
     public static string PagesAChangeCouldNotFinish(IReadOnlyList<string> pages) => pages.Count == 1
-        ? $"I couldn’t finish changing “{pages[0]}”, so look it over in Obsidian before you publish."
-        : $"I couldn’t finish changing {NamedFew(pages)}, so look them over in Obsidian before you publish.";
+        ? $"I couldn’t finish changing “{pages[0]}”, so look it over in Obsidian before it goes on your website."
+        : PagesAChangeCouldNotFinishNamingSeveral(pages);
+
+    /// <summary>The same, for several pages: three named, then how many more.</summary>
+    public static string PagesAChangeCouldNotFinishNamingSeveral(IReadOnlyList<string> pages) =>
+        $"I couldn’t finish changing {NamedFew(pages)}, so look them over in Obsidian before they go on your website.";
 
     /// <summary>“a”, “a” and “b”, “a”, “b” and “c”, then “a”, “b”, “c” and 2 more.</summary>
     private static string NamedFew(IReadOnlyList<string> pages, int most = 3) =>
