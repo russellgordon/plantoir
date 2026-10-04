@@ -87,7 +87,8 @@
         "path": "/"
       },
       "alt": "A Grade 10 English class website in a browser, with a navigation sidebar, a search field and a page of class notes.",
-      "caption": "What a class sees."
+      "caption": "What a class sees.",
+      "windows": true
     },
     {
       "id": "site-mcv4u",
@@ -97,7 +98,8 @@
         "path": "/concepts/derivative-rules"
       },
       "alt": "A Grade 12 Calculus and Vectors page opening with typeset mathematics: a displayed definition and a table of derivative rules.",
-      "caption": "The preview is the real site — equations and all."
+      "caption": "The preview is the real site — equations and all.",
+      "windows": true
     },
     {
       "id": "site-sch3u-chemistry",
@@ -108,7 +110,7 @@
       },
       "alt": "A Grade 11 Chemistry class page with two balanced reactions set on lines of their own, states in brackets and subscripts set low, and the sulfate and ammonium ions written with their charges.",
       "caption": "Chemistry too: formulas, charges, states and reaction arrows, set the way a textbook sets them.",
-      "windows": false
+      "windows": true
     },
     {
       "id": "site-sch3u",
@@ -118,7 +120,8 @@
         "path": "/style/what-this-site-can-do#diagrams"
       },
       "alt": "A Grade 11 Chemistry page showing a flowchart beside the few lines of text that produced it.",
-      "caption": "Diagrams are written, not drawn — and edited in seconds."
+      "caption": "Diagrams are written, not drawn — and edited in seconds.",
+      "windows": true
     },
     {
       "id": "site-phone",
@@ -128,7 +131,8 @@
         "path": "/"
       },
       "alt": "The same class website at phone width, with the navigation collapsed behind a button.",
-      "caption": "The same site on a phone."
+      "caption": "The same site on a phone.",
+      "windows": true
     },
     {
       "id": "coverage",
@@ -138,7 +142,8 @@
         "path": "/curriculum-coverage"
       },
       "alt": "A grid of every curriculum expectation in a course, each square shaded by how many pages address it, with pale squares showing the gaps.",
-      "caption": "Every expectation in the course, shaded by how well it is covered."
+      "caption": "Every expectation in the course, shaded by how well it is covered.",
+      "windows": true
     },
     {
       "id": "search",
@@ -149,7 +154,8 @@
         "query": "thesis"
       },
       "alt": "A search panel open over a class website, listing matching pages with the search term highlighted in context.",
-      "caption": "One box, the whole course."
+      "caption": "One box, the whole course.",
+      "windows": true
     },
     {
       "id": "colour-schemes",

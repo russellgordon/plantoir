@@ -252,8 +252,11 @@ def images_the_pages_show(website: Path, image_dir: Path, include_windows: bool 
         stems: list[str] = []
         if shot.get("static"):
             stems.append(identifier)
+            if shot.get("dark"):
+                stems.append(f"{identifier}-dark")
             if include_windows:
                 stems.append(f"{identifier}-windows")
+                stems.append(f"{identifier}-windows-dark")
         else:
             stems.append(f"{identifier}-light")
             stems.append(f"{identifier}-dark")

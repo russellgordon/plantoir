@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -70,12 +71,16 @@ def site_address(code: str) -> str:
 
 def find_or_build_plantoir_exe() -> Path:
     candidates = [
+        REPO / "windows-app" / "Plantoir" / "bin" / "x64" / "Debug" / "net9.0-windows10.0.19041.0" / "win-x64" / "Plantoir.exe",
         REPO / "windows-app" / "Plantoir" / "bin" / "Release" / "net9.0-windows10.0.19041.0" / "win-x64" / "publish" / "Plantoir.exe",
         REPO / "windows-app" / "Plantoir" / "bin" / "Debug" / "net9.0-windows10.0.19041.0" / "win-x64" / "publish" / "Plantoir.exe",
     ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
+    # The NEWEST build of this tree: the staging mode the app scenes need is
+    # only in a build made since it was written, and an old publish folder
+    # left beside a fresh Debug build would photograph the old app.
+    built = [candidate for candidate in candidates if candidate.exists()]
+    if built:
+        return max(built, key=lambda candidate: candidate.stat().st_mtime)
 
     announce("Building Plantoir Windows application (Release)")
     subprocess.run([
@@ -124,100 +129,69 @@ def capture_app_windows(plantoir_exe: Path) -> None:
         print("   Windows colour mode put back")
 
 
-def capture_browser_sites() -> None:
-    announce("Photographing Class Websites in Microsoft Edge on Windows")
+# The class-site shots, by `capture.kind` in shots.json. Each is a page of a
+# demo site in an Edge `--app` window, photographed whole by windowshot (#380):
+# the window's own corners, no browser toolbar, no shadow of its own (the
+# page's stylesheet gives a single Windows window its drop-shadow).
+SITE_KINDS = ("browser", "browser-search", "browser-phone")
+
+
+def site_shots(only: list[str] | None = None) -> list[dict]:
+    manifest = json.loads((WEBSITE / "shots.json").read_text(encoding="utf-8"))
+    chosen = []
+    for shot in manifest["shots"]:
+        if shot.get("capture", {}).get("kind") not in SITE_KINDS:
+            continue
+        if only and shot["id"] not in only:
+            continue
+        chosen.append(shot)
+    return chosen
+
+
+def open_search(query: str):
+    """The site's own search, opened the way a student opens it (Ctrl+K) and
+    typed into; refused when no result appears, because a picture of an empty
+    panel is the wrong state with nothing to say so."""
+    def prepare_page(page) -> None:
+        page.keyboard.press("Control+k")
+        page.wait_for_selector("#search-container.active, .search-container.active", timeout=10000)
+        page.keyboard.type(query, delay=60)
+        page.wait_for_selector(".result-card", timeout=10000)
+        time.sleep(1.0)
+    return prepare_page
+
+
+def capture_browser_sites(only: list[str] | None = None) -> None:
+    """Every class-site shot, in Windows' light and then dark colour mode."""
+    from hero_windows import (PHONE_HEIGHT_DIP, PHONE_WIDTH_DIP, capture_page, make_dpi_aware,
+                              read_theme, write_theme)
+    announce("Photographing the class websites in Edge windows")
+    make_dpi_aware()
     PARTS.mkdir(parents=True, exist_ok=True)
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(channel="msedge", headless=True)
-
-        for dark in (False, True):
-            theme = "dark" if dark else "light"
-            print(f"   --- Edge {theme} theme ---", flush=True)
-
-            context = browser.new_context(
-                color_scheme=theme,
-                viewport={"width": 1280, "height": 860},
-                device_scale_factor=2,
-            )
-            page = context.new_page()
-
-            # 1. site-eng2d
-            url = site_address("ENG2D") + "/"
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(1.0)
-            eng2d_path = IMAGE_DIR / f"site-eng2d-windows-{theme}.png"
-            page.screenshot(path=str(eng2d_path))
-            prepare(eng2d_path, WIDEST_WINDOW_PIXELS)
-            print(f"   ✓ saved {eng2d_path.name}")
-
-            # 2. site-mcv4u
-            url = site_address("MCV4U") + "/concepts/derivative-rules"
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(1.0)
-            mcv4u_path = IMAGE_DIR / f"site-mcv4u-windows-{theme}.png"
-            page.screenshot(path=str(mcv4u_path))
-            prepare(mcv4u_path, WIDEST_WINDOW_PIXELS)
-            print(f"   ✓ saved {mcv4u_path.name}")
-
-            # 3. site-sch3u
-            url = site_address("SCH3U") + "/style/what-this-site-can-do#diagrams"
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(1.0)
-            sch3u_path = IMAGE_DIR / f"site-sch3u-windows-{theme}.png"
-            page.screenshot(path=str(sch3u_path))
-            prepare(sch3u_path, WIDEST_WINDOW_PIXELS)
-            print(f"   ✓ saved {sch3u_path.name}")
-
-            # 4. coverage
-            url = site_address("ENG2D") + "/curriculum-coverage"
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(1.0)
-            cov_path = IMAGE_DIR / f"coverage-windows-{theme}.png"
-            page.screenshot(path=str(cov_path))
-            prepare(cov_path, WIDEST_WINDOW_PIXELS)
-            print(f"   ✓ saved {cov_path.name}")
-
-            # 5. search popover
-            url = site_address("ENG2D") + "/"
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(0.8)
-            page.keyboard.press("Control+k")
-            time.sleep(0.4)
-            page.keyboard.type("thesis")
-            time.sleep(1.0)
-            search_path = IMAGE_DIR / f"search-windows-{theme}.png"
-            page.screenshot(path=str(search_path))
-            prepare(search_path, WIDEST_WINDOW_PIXELS)
-            print(f"   ✓ saved {search_path.name}")
-
-            # 6. site-phone (Mobile Edge viewport)
-            phone_context = browser.new_context(
-                color_scheme=theme,
-                viewport={"width": 390, "height": 844},
-                is_mobile=True,
-                has_touch=True,
-                device_scale_factor=2,
-            )
-            phone_page = phone_context.new_page()
-            phone_page.goto(site_address("ENG2D") + "/")
-            phone_page.wait_for_load_state("networkidle")
-            time.sleep(1.0)
-            phone_path = IMAGE_DIR / f"site-phone-windows-{theme}.png"
-            phone_page.screenshot(path=str(phone_path))
-            prepare(phone_path, WIDEST_PHONE_PIXELS)
-            print(f"   ✓ saved {phone_path.name}")
-            phone_context.close()
-
-            context.close()
-
-        browser.close()
+    shots = site_shots(only)
+    was_apps, was_system = read_theme()
+    try:
+        for theme in ("light", "dark"):
+            write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+            for shot in shots:
+                capture = shot["capture"]
+                url = site_address(capture["course"]) + capture.get("path", "/")
+                part = PARTS / f"{shot['id']}-windows-{theme}.png"
+                announce(f"{shot['id']}, {theme}")
+                if capture["kind"] == "browser-phone":
+                    capture_page(url, "", part, size_dip=(PHONE_WIDTH_DIP, PHONE_HEIGHT_DIP))
+                elif capture["kind"] == "browser-search":
+                    capture_page(url, "", part, prepare_page=open_search(capture["query"]))
+                else:
+                    capture_page(url, "", part)
+                destination = IMAGE_DIR / part.name
+                shutil.copyfile(part, destination)
+                widest = WIDEST_PHONE_PIXELS if capture["kind"] == "browser-phone" else WIDEST_WINDOW_PIXELS
+                prepare(destination, widest)
+                print(f"   saved {destination.name} + WebP")
+    finally:
+        write_theme(was_apps, was_system)
+        print("   Windows colour mode put back")
 
 
 def build_windows_static_figures() -> None:
@@ -237,6 +211,12 @@ def build_windows_static_figures() -> None:
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
     fan(fanned, IMAGE_DIR / "colour-schemes-windows.png")
     print("   ✓ saved colour-schemes-windows.png + WebP")
+    # The same fan taken in Dark Mode, for a page in dark mode (Russell
+    # 2026-10-04, "It needs a dark mode version"; the mac's is
+    # colour-schemes-dark.png). The light one keeps its name.
+    fanned_dark = [PARTS / f"home-{course['code'].lower()}-dark.png" for course in DEMO_COURSES]
+    fan(fanned_dark, IMAGE_DIR / "colour-schemes-windows-dark.png")
+    print("   ✓ saved colour-schemes-windows-dark.png + WebP")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
     side_by_side(pair, IMAGE_DIR / "light-and-dark-windows.png")
@@ -253,44 +233,43 @@ def windows_shot_ids() -> list:
 
 
 def main() -> int:
-    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    plantoir_exe = find_or_build_plantoir_exe()
+    """Every Windows picture, or one pass of them:
 
-    # Only the three figures made of whole window captures (#380): the hero
-    # and the two colour figures. Takes the desktop for a few minutes.
-    if "--figures" in sys.argv:
+        --sites [id,id]    the class-site shots, in Edge windows
+        --figures          the hero and the two colour figures
+        --app [scene,...]  the app's own windows, each scene staged by
+                           Plantoir.exe --stage-scene and photographed whole
+                           (app_scenes_windows.py)
+
+    Each pass takes the desktop: it switches Windows between light and dark
+    and puts the colour mode back afterwards.
+    """
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    arguments = sys.argv[1:]
+
+    def listed_after(flag: str) -> list[str] | None:
+        index = arguments.index(flag)
+        if index + 1 < len(arguments) and not arguments[index + 1].startswith("--"):
+            return arguments[index + 1].split(",")
+        return None
+
+    everything = not any(flag in arguments for flag in ("--sites", "--figures", "--app"))
+    if everything or "--sites" in arguments:
+        capture_browser_sites(listed_after("--sites") if "--sites" in arguments else None)
+    if everything or "--figures" in arguments:
+        # The hero is part of a full run (#428 item 6: it used to be taken
+        # only by --figures, so a full run left the oldest picture in place).
         from hero_windows import build as build_hero
         announce("Photographing the hero, in light and dark")
-        build_hero(plantoir_exe)
+        build_hero(find_or_build_plantoir_exe())
         build_windows_static_figures()
-        return 0
+    if everything or "--app" in arguments:
+        from app_scenes_windows import capture_app_scenes
+        capture_app_scenes(find_or_build_plantoir_exe(),
+                           listed_after("--app") if "--app" in arguments else None)
 
-    announce("Photographing Full Windows Suite (App + Edge Browser)")
-
-    # 1. Browser Sites in Edge (so preview screenshot can embed real site capture)
-    capture_browser_sites()
-
-    # 2. App Windows (uses C:\Users\russellgordon\Teaching and embeds site capture)
-    capture_app_windows(plantoir_exe)
-
-    # 3. Optimize App Windows
-    # The ids Windows takes are marked `windows: true` in shots.json, the one
-    # list both harnesses read — this used to be a list of its own here.
-    shot_ids = windows_shot_ids()
-    for shot_id in shot_ids:
-        for theme in ("light", "dark"):
-            png_path = IMAGE_DIR / f"{shot_id}-windows-{theme}.png"
-            if png_path.exists():
-                prepare(png_path, WIDEST_WINDOW_PIXELS)
-
-    # 4. Static Figures
-    build_windows_static_figures()
-
-    # 5. Rebuild site
     announce("Rebuilding plantoir.app")
     subprocess.run([sys.executable, str(WEBSITE / "build.py")], cwd=REPO, check=True)
-
-    print("\n✅ Every screenshot now has an authentic Windows twin captured in Edge and Plantoir on Windows!")
     return 0
 
 

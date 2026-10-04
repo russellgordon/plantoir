@@ -135,25 +135,43 @@ def windows_of_process(pid: int) -> list[int]:
     return found
 
 
-def window_titled(fragment: str) -> int | None:
-    """The first visible top-level window whose title contains `fragment`."""
+def window_title(hwnd: int) -> str:
+    length = user32.GetWindowTextLengthW(hwnd)
+    buffer = ctypes.create_unicode_buffer(length + 1)
+    user32.GetWindowTextW(hwnd, buffer, length + 1)
+    return buffer.value
+
+
+def window_titled(fragment: str, pid: int | None = None) -> int | None:
+    """The ONE visible top-level window whose title contains `fragment`.
+
+    With `pid`, only that process's windows are asked: the window a capture
+    launched is the one it photographs, never another window that happens to
+    show the same page (#428 item 6). Without it, a SECOND window with the
+    same title is a refusal rather than a coin toss — the first version
+    returned whichever one EnumWindows met first.
+    """
     match: list[int] = []
     proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.POINTER(ctypes.c_int))
 
     def callback(hwnd, _lparam):
         if not user32.IsWindowVisible(hwnd):
             return True
-        length = user32.GetWindowTextLengthW(hwnd)
-        if length == 0:
+        if user32.GetWindowTextLengthW(hwnd) == 0:
             return True
-        buffer = ctypes.create_unicode_buffer(length + 1)
-        user32.GetWindowTextW(hwnd, buffer, length + 1)
-        if fragment.lower() in buffer.value.lower():
+        if pid is not None:
+            owner = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+            if owner.value != pid:
+                return True
+        if fragment.lower() in window_title(hwnd).lower():
             match.append(hwnd)
-            return False
         return True
 
     user32.EnumWindows(proc(callback), None)
+    if len(match) > 1:
+        raise SystemExit(f"{len(match)} windows are titled like {fragment!r}; close the others so the "
+                         "capture cannot photograph the wrong one.")
     return match[0] if match else None
 
 
@@ -435,8 +453,11 @@ def capture_obsidian(theme: str, x: int, y: int, w: int, h: int) -> Path:
     note = f"section{SECTION}/All Classes/{most_recent_class()}"
     address = ("obsidian://open?vault=" + urllib.parse.quote(VAULT.name)
                + "&file=" + urllib.parse.quote(note))
-    subprocess.Popen([str(OBSIDIAN_EXE), address])
-    hwnd = wait_for_window(lambda: window_titled("Obsidian"), seconds=45)
+    # Any Obsidian already open would take the address and show it in ITS
+    # window; the one photographed must be the one launched here (#428 item 6).
+    stop("Obsidian.exe")
+    process = subprocess.Popen([str(OBSIDIAN_EXE), address])
+    hwnd = wait_for_window(lambda: window_titled("Obsidian", pid=process.pid), seconds=45)
     time.sleep(3.5)
     place(hwnd, x, y, w, h)
     time.sleep(1.5)
@@ -459,95 +480,211 @@ def capture_plantoir(exe: Path, theme: str, x: int, y: int, w: int, h: int) -> P
     return destination
 
 
-def capture_edge(theme: str, x: int, y: int, w: int, h: int) -> Path:
-    announce(f"Edge on the published site, {theme}")
-    # A fresh profile every time. Reusing it across the two themes let Edge
-    # restore the previous pass's tab after being force-killed, so the dark
-    # card came back with the same page open twice.
+# Edge, as this side's stand-in for Safari and for the mac's page window. A
+# scratch profile of its own every time (reusing it let Edge restore the
+# previous pass's tab after being force-killed, so the dark card came back
+# with the same page open twice), and these switches, because Edge signs a
+# fresh profile in from the Windows account by itself and then announces it --
+# "we've also signed you in", over the real email address, straight across the
+# middle of the card.
+EDGE_FLAGS = [
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-sync",
+    "--disable-search-engine-choice-screen",
+    "--disable-features=msImplicitSignin,msSyncPromo,msEdgeSplitScreen,"
+    "msUndersideButton,msEdgeShoppingAssist",
+]
+# The page is driven over the DevTools protocol (Playwright's connect_over_cdp)
+# in the very window that is photographed: scrolled to an anchor, the search
+# opened, and -- the part a timer cannot do -- CHECKED before the shutter.
+CDP_PORT = 9339
+
+
+def launch_edge(target: list[str], x: int, y: int, w: int, h: int) -> subprocess.Popen:
     shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
     EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
-    subprocess.Popen([
+    return subprocess.Popen([
         str(EDGE_EXE),
         f"--user-data-dir={EDGE_PROFILE}",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-sync",
-        "--disable-search-engine-choice-screen",
-        # Edge signs a fresh profile in from the Windows account by itself and
-        # then announces it -- "we've also signed you in", over the real email
-        # address, straight across the middle of the card.
-        "--disable-features=msImplicitSignin,msSyncPromo,msEdgeSplitScreen,"
-        "msUndersideButton,msEdgeShoppingAssist",
+        f"--remote-debugging-port={CDP_PORT}",
+        *EDGE_FLAGS,
         f"--window-position={x},{y}",
         f"--window-size={w},{h}",
-        SITE_URL,
+        *target,
     ])
-    hwnd = wait_for_window(lambda: window_titled("Grade 10 English"), seconds=60)
-    time.sleep(4.0)
-    place(hwnd, x, y, w, h)
-    press_escape()   # belt and braces: any promo bubble that opened anyway
-    time.sleep(2.5)
-    destination = photograph(hwnd, PARTS / f"edge-{theme}.png")
-    stop_matching("msedge.exe", str(EDGE_PROFILE))
-    return destination
+
+
+def edge_window(process: subprocess.Popen, title_fragment: str, seconds: float = 60) -> int:
+    """The window of the Edge THIS capture launched, never another one showing
+    the same page (#428 item 6): asked by the launched process's id. Edge on a
+    profile no other Edge has open keeps its windows in that process."""
+    return wait_for_window(lambda: window_titled(title_fragment, pid=process.pid), seconds=seconds)
+
+
+def capture_edge(theme: str, x: int, y: int, w: int, h: int) -> Path:
+    announce(f"Edge on the published site, {theme}")
+    process = launch_edge([SITE_URL], x, y, w, h)
+    try:
+        hwnd = edge_window(process, "Grade 10 English")
+        time.sleep(4.0)
+        place(hwnd, x, y, w, h)
+        press_escape()   # belt and braces: any promo bubble that opened anyway
+        time.sleep(2.5)
+        return photograph(hwnd, PARTS / f"edge-{theme}.png")
+    finally:
+        stop_matching("msedge.exe", str(EDGE_PROFILE))
 
 
 PAGE_WIDTH_DIP = 1280
 PAGE_HEIGHT_DIP = 860
+PHONE_WIDTH_DIP = 390
+PHONE_HEIGHT_DIP = 844
+
+# What "the page has stopped moving" is measured by: the document's height,
+# the scroll position, where the anchor's heading sits, and how many drawings
+# there are. Mathematics and diagrams are drawn by scripts after the load and
+# reflow the page, so an anchor scrolled to before they finish lands on the
+# wrong section -- which is what the mac's v1.4.3 site-sch3u pictures shipped
+# showing.
+LAYOUT_SIGNATURE = """(fragment) => {
+  const target = fragment ? document.getElementById(fragment) : null;
+  const box = target ? target.getBoundingClientRect() : null;
+  return JSON.stringify([document.documentElement.scrollHeight, window.scrollY,
+                         box ? Math.round(box.top) : null, document.querySelectorAll('svg').length]);
+}"""
 
 
-def capture_page(url: str, title_fragment: str, destination: Path) -> Path:
+def wait_until_still(page, fragment: str | None = None, timeout: float = 20.0) -> bool:
+    """Three identical layout signatures 0.5 s apart; True when it settled."""
+    deadline = time.time() + timeout
+    seen: list[str] = []
+    while time.time() < deadline:
+        seen.append(page.evaluate(LAYOUT_SIGNATURE, fragment))
+        if len(seen) >= 3 and seen[-1] == seen[-2] == seen[-3]:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def anchor_problem(page, fragment: str) -> str | None:
+    """None when the heading `fragment` names is at the top of the page column:
+    in the upper 30% of the viewport and in its left 60% (the page's own table
+    of contents, on the right, carries the same words) -- the mac's rule
+    (`safari.anchor_heading_in_view`), read from the page rather than by OCR."""
+    found = page.evaluate("""(fragment) => {
+      const target = document.getElementById(fragment);
+      if (!target) return null;
+      const box = target.getBoundingClientRect();
+      return [box.left, box.top, window.innerWidth, window.innerHeight, target.textContent.trim()];
+    }""", fragment)
+    if found is None:
+        return f"the page has no heading #{fragment}"
+    left, top, width, height, text = found
+    if -2 <= top < height * 0.30 and left < width * 0.6:
+        return None
+    return f"the heading #{fragment} ({text!r}) is at {top:.0f} of {height} px, not near the top of the page"
+
+
+def land_on_anchor(page, fragment: str) -> None:
+    """Scroll the finished page to `fragment`'s heading, and refuse a picture
+    whose heading is not where the caption says it is."""
+    for _ in range(3):
+        # To the heading, then a little back, so it does not sit flush against
+        # the title bar (the mac's lands under Safari's toolbar the same way).
+        page.evaluate("(f) => { document.getElementById(f)?.scrollIntoView({block: 'start'});"
+                      " window.scrollBy(0, -24); }", fragment)
+        wait_until_still(page, fragment, timeout=10.0)
+        if anchor_problem(page, fragment) is None:
+            return
+    raise SystemExit(f"#{fragment}: {anchor_problem(page, fragment)}. Nothing past this point was taken.")
+
+
+def capture_page(url: str, title_fragment: str, destination: Path, *,
+                 size_dip: tuple[int, int] = (PAGE_WIDTH_DIP, PAGE_HEIGHT_DIP), prepare_page=None) -> Path:
     """One page of a class site in a window with no browser round it.
 
-    The colour figures are about the SITES, and three toolbars read as three
-    browsers -- the mac uses a plain window for the same reason
-    (`webwindow.swift`). The window is FOUND by the page's title, so close any
-    other window showing the same page first, or it may be the one photographed. Edge's `--app=` window is this side's: a title bar and
-    the page, nothing else, and its own edge is the picture's edge. The
-    appearance is the machine's, so the caller switches Windows first.
+    Edge's `--app=` window is this side's counterpart of the mac's page window
+    (`webwindow.swift`): a title bar and the page, nothing else, and its own
+    edge is the picture's edge. The window photographed is the one THIS call
+    launched (`edge_window`). An address with a fragment is loaded without it,
+    left to finish drawing, then scrolled and checked (`land_on_anchor`).
+    `prepare_page(page)` does anything else the picture needs (the search).
+    The appearance is the machine's, so the caller switches Windows first.
     """
-    shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
-    EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
+    from playwright.sync_api import sync_playwright
+
     left, top, right, bottom = work_area()
     scale = scale_factor()
-    width = min(round(PAGE_WIDTH_DIP * scale), right - left - 40)
-    height = min(round(PAGE_HEIGHT_DIP * scale), bottom - top - 40)
+    width = min(round(size_dip[0] * scale), right - left - 40)
+    height = min(round(size_dip[1] * scale), bottom - top - 40)
     x, y = left + 20, top + 20
-    subprocess.Popen([
-        str(EDGE_EXE),
-        f"--user-data-dir={EDGE_PROFILE}",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-sync",
-        "--disable-search-engine-choice-screen",
-        "--disable-features=msImplicitSignin,msSyncPromo,msEdgeSplitScreen,"
-        "msUndersideButton,msEdgeShoppingAssist",
-        f"--window-position={x},{y}",
-        f"--window-size={width},{height}",
-        f"--app={url}",
-    ])
+    page_address, _, fragment = url.partition("#")
+    process = launch_edge([f"--app={page_address}"], x, y, width, height)
     try:
-        hwnd = wait_for_window(lambda: window_titled(title_fragment), seconds=60)
-        time.sleep(4.0)
+        hwnd = edge_window(process, "")
         place(hwnd, x, y, width, height)
         press_escape()
-        time.sleep(2.5)
-        return photograph(hwnd, destination)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{CDP_PORT}")
+            page = browser.contexts[0].pages[0]
+            page.wait_for_load_state("networkidle")
+            # The page must be in the colour mode Windows is in. Edge's `--app`
+            # window on a fresh profile drew its title bar dark and the page
+            # LIGHT while Windows was dark (measured 2026-10-04: every dark
+            # site picture of the first run; `--force-dark-mode` changed
+            # nothing). So the machine's scheme is handed to the page and the
+            # page loaded again -- from the top, with the browser's scroll
+            # restoration off: a plain reload kept the scroll it had and the
+            # site's own opening scroll (the sidebar bringing the current page
+            # into view, 300 px on derivative-rules) ran again on top of it, so
+            # site-mcv4u came out 300 px further down in one scheme than the
+            # other. Rejected too: opening on about:blank and navigating, which
+            # turned the app window into an ordinary browser window, tabs and
+            # address bar included. Then the site's own theme is CHECKED.
+            dark = read_theme()[0] == 0
+            page.emulate_media(color_scheme="dark" if dark else "light")
+            page.evaluate("history.scrollRestoration = 'manual'; window.scrollTo(0, 0)")
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            drawn = page.evaluate("document.documentElement.getAttribute('saved-theme')")
+            if drawn != ("dark" if dark else "light"):
+                raise SystemExit(f"{url}: the page drew itself {drawn!r} while Windows is "
+                                 f"{'dark' if dark else 'light'}")
+            page.evaluate("document.fonts.ready.then(() => true)")
+            if title_fragment and title_fragment.lower() not in window_title(hwnd).lower():
+                raise SystemExit(f"{url}: the window says {window_title(hwnd)!r}, not {title_fragment!r}")
+            if not wait_until_still(page, fragment or None):
+                raise SystemExit(f"{url}: the page never stopped moving")
+            if fragment:
+                land_on_anchor(page, fragment)
+            if prepare_page is not None:
+                prepare_page(page)
+                wait_until_still(page, fragment or None, timeout=10.0)
+            else:
+                # Nothing the picture is about has focus; a focused search box
+                # photographs with a heavy outline round it.
+                page.evaluate("document.activeElement && document.activeElement.blur()")
+            time.sleep(1.0)
+            place(hwnd, x, y, width, height)   # in front, so its title bar is the active one
+            if fragment and anchor_problem(page, fragment) is not None:
+                raise SystemExit(f"{url}: {anchor_problem(page, fragment)} (it moved before the shutter)")
+            return photograph(hwnd, destination)
     finally:
         stop_matching("msedge.exe", str(EDGE_PROFILE))
 
 
 def capture_colour_parts(parts: Path, courses: list[dict]) -> None:
     """The home pages the two colour figures are made of: every course in
-    light, and the first course in dark as well."""
+    light AND dark -- the fan has a Dark Mode version too (shots.json
+    `dark: true`, Russell 2026-10-04) -- and the light/dark pair is the first
+    course's two."""
     make_dpi_aware()
     was_apps, was_system = read_theme()
     try:
         for theme in ("light", "dark"):
             write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
             for course in courses:
-                if theme == "dark" and course is not courses[0]:
-                    continue
                 announce(f"{course['code']} home page, {theme}")
                 capture_page(f"https://{course['site']}.netlify.app/", course["title"],
                              parts / f"home-{course['code'].lower()}-{theme}.png")

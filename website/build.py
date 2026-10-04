@@ -298,7 +298,10 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
 
 
 def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> str:
-    """One image, served to everybody, whatever their colour scheme."""
+    """One image, served to everybody, whatever their colour scheme -- or,
+    where the figure was also taken in Dark Mode, that one for a page in dark
+    mode (the mac's `<id>-dark.png` when shots.json says `"dark": true`,
+    Windows' `<id>-windows-dark.png` whenever it exists)."""
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
@@ -325,9 +328,35 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     win_webp = IMAGE_DIR / f"{identifier}-windows.webp"
 
     webp_source = ""
+    win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
+    # A Dark Mode version of a static figure (colour-schemes, Russell
+    # 2026-10-04). The mac's is `<id>-dark.png`, offered when shots.json says
+    # `"dark": true` (the mac's website branch adds that, with its picture);
+    # Windows' is `<id>-windows-dark.png`, offered to a Windows visitor in dark
+    # mode whenever it exists. `<id>.png` and `<id>-windows.png` stay the light
+    # ones, so neither name ever changes. Until the mac's dark picture lands,
+    # a dark page's Mac visitor is given the light figure, as before.
+    mac_dark = shot.get("dark") and (IMAGE_DIR / f"{identifier}-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-dark.webp").exists()
+    if shot.get("dark") and not mac_dark:
+        problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
+                        f"or .webp is missing (capture.py --colour-figures)")
+    win_dark = has_windows and (IMAGE_DIR / f"{identifier}-windows-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-windows-dark.webp").exists()
+    if mac_dark or win_dark:
+        dark_stem = f"{identifier}-dark" if mac_dark else identifier
+        if win_dark:
+            win_dark_webp = f' data-win-srcset="{up}img/{identifier}-windows-dark.webp"'
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows-dark.png"'
+        else:
+            win_dark_webp = win_webp_attr
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
+        dark_query = ' media="(prefers-color-scheme: dark)"'
+        webp_source += (f'      <source srcset="{up}img/{dark_stem}.webp"{win_dark_webp} '
+                        f'type="image/webp"{dark_query}>\n')
+        webp_source += f'      <source srcset="{up}img/{dark_stem}.png"{win_dark_png}{dark_query}>\n'
     if webp.exists():
-        win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
-        webp_source = f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
+        webp_source += f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
 
     win_src_attr = f' data-win-src="{up}img/{identifier}-windows.png"' if has_windows else ""
 
