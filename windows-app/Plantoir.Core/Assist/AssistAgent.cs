@@ -993,10 +993,11 @@ public sealed class AssistAgent
                                     cancellation);
         }
         // The old "publish|unpublish Unit N, Day M" shape lived here and was
-        // deleted in bundle 5a's fix round: it answered "publish unit 4, day
-        // 3" in code, where hideIsUnpublish.refused sends that sentence to the
-        // model (publishing is the direction the contract deliberately did not
-        // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
+        // deleted in bundle 5a's fix round. It was LOOSER than the contract:
+        // measured against hideIsUnpublish.refused (#432) it took four refused
+        // spellings ("publish unit 4,day 3", doubled spaces in three places).
+        // Both verbs are AssistCardCommand's now — HideOrUnpublish, and
+        // UnitAndDay for the exact "publish unit N, day M" (#411/#432).
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
                                     PageArguments(planned.Groups["title"].Value),

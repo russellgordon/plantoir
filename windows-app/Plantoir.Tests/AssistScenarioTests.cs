@@ -148,7 +148,7 @@ public class AssistScenarioTests : IDisposable
         // first change is per-server, so a fresh one per call would back the
         // course up again on every turn.
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
-        var model = new ScriptedModel();
+        var model = new ScriptedModel(given?["modelReply"] as JsonObject);
         var agent = new AssistAgent(model, tools, new JsonArray(), Course, SectionNumber)
         {
             PreviewIsShowing = () => previewRunning,
@@ -198,6 +198,13 @@ public class AssistScenarioTests : IDisposable
         if (scenario["expectModelRequests"] is JsonValue requests)
             Assert.True(requests.GetValue<int>() == model.Requests,
                 $"{scenarioName}: the engine was asked {model.Requests} time(s), and the case says {requests}.");
+        // A reply the engine stopped part way must have RUN nothing, or the
+        // case could pass on its sentence alone (scenarios.note, #411).
+        if (given?["modelReply"]?["finishReason"]?.ToString() == "length")
+        {
+            Assert.True(_launcher.Runs.Count == 0, $"{scenarioName}: a cut-off reply ran a launcher.");
+            Assert.True(_window.Events.Count == 0, $"{scenarioName}: a cut-off reply acted on the window.");
+        }
     }
 
     // ---- What a case needs on disk ---------------------------------------
@@ -635,9 +642,19 @@ public class AssistScenarioTests : IDisposable
         }
     }
 
-    /// <summary>Never answers: every message a scenario sends is a card phrasing, matched in code.</summary>
+    /// <summary>
+    /// Never answers, unless the case scripts <c>given.modelReply</c> (#411):
+    /// then that WHOLE reply answers every request — <c>finishReason</c> plus
+    /// either a <c>toolCall</c> (its <c>arguments</c> as the model's own TEXT,
+    /// so a half-written call can be scripted; "{course}" is the fixture's
+    /// course) or <c>content</c>.
+    /// </summary>
     private sealed class ScriptedModel : IChatModel
     {
+        private readonly JsonObject? _reply;
+
+        public ScriptedModel(JsonObject? modelReply = null) => _reply = modelReply;
+
         /// <summary>
         /// How many requests reached the engine over the whole conversation —
         /// the contract's <c>expectModelRequests</c>. A transcript cannot show
@@ -648,7 +665,25 @@ public class AssistScenarioTests : IDisposable
         public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
         {
             Requests++;
-            return Task.FromResult<ModelReply?>(null);
+            if (_reply is null) return Task.FromResult<ModelReply?>(null);
+
+            var message = new JsonObject { ["role"] = "assistant" };
+            if (_reply["toolCall"] is JsonObject call)
+            {
+                message["tool_calls"] = new JsonArray(new JsonObject
+                {
+                    ["id"] = "call-scripted",
+                    ["type"] = "function",
+                    ["function"] = new JsonObject
+                    {
+                        ["name"] = call["name"]!.ToString(),
+                        ["arguments"] = call["arguments"]!.ToString().Replace("{course}", Course, StringComparison.Ordinal),
+                    },
+                });
+            }
+            if (_reply["content"] is JsonNode content) message["content"] = content.ToString();
+            string finish = _reply["finishReason"]?.ToString() ?? "stop";
+            return Task.FromResult<ModelReply?>(new ModelReply(message, finish));
         }
     }
 
