@@ -204,6 +204,10 @@ struct TaskProgressView: View {
                                 Label("Stopped", systemImage: "stop.circle.fill")
                                     .foregroundStyle(.secondary)
                                     .accessibilityIdentifier("stoppedNotice")
+                            } else if runner.wasClosedForADeploy {
+                                Label(ScriptRunner.closedForADeployOutcome, systemImage: "stop.circle.fill")
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("closedForADeployNotice")
                             } else if exitCode == 0 {
                                 Label("Done", systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
@@ -220,7 +224,8 @@ struct TaskProgressView: View {
 
                         // Say what went wrong in words, so the output
                         // underneath is there to consult, not to decode.
-                        if !runner.wasCancelled, !runner.wasStoppedByUser, exitCode != 0, let explanation = runner.failureExplanation {
+                        if !runner.wasCancelled, !runner.wasStoppedByUser, !runner.wasClosedForADeploy,
+                           exitCode != 0, let explanation = runner.failureExplanation {
                             Text(explanation)
                                 .foregroundStyle(.secondary)
                                 .accessibilityIdentifier("failureExplanation")
@@ -384,7 +389,8 @@ struct TaskProgressView: View {
             if let exitCode = runner.lastExitCode {
                 // Only fall back to the raw output when the app has
                 // nothing better to say.
-                if exitCode != 0 && !runner.wasCancelled && !runner.wasStoppedByUser && runner.failureExplanation == nil {
+                if exitCode != 0 && !runner.wasCancelled && !runner.wasStoppedByUser && !runner.wasClosedForADeploy
+                    && runner.failureExplanation == nil {
                     isShowingDetails = true
                 }
             }

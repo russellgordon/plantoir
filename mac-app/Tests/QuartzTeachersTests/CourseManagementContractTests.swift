@@ -203,7 +203,8 @@ final class CourseManagementContractTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
 
         let cases: [[String: Any]] = try XCTUnwrap(rule["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 8)
+        // Nine since #408 added the quoted-keys case.
+        XCTAssertGreaterThanOrEqual(cases.count, 9, "sectionNumbers.addingKeysToAPage has shrunk")
         for testCase in cases {
             let shape: String = try XCTUnwrap(testCase["shape"] as? String)
             let before: String = try XCTUnwrap(testCase["before"] as? String)
@@ -226,13 +227,15 @@ final class CourseManagementContractTests: XCTestCase {
     /// room for a new key left exactly as it is and counted (#186's shape).
     ///
     /// Compared as BYTES, whole file, for the reason the adding-keys cases
-    /// give above. Windows' restore does not read this list yet; it is owed
-    /// with #177.
+    /// give above. Windows runs the same list (it read it from its parity
+    /// bundle 2, and added the seventh case in bundle 10, #425).
     func testRestoringOneSectionsKeysIsWhatTheContractSays() throws {
         let backups: [String: Any] = try CourseManagementContractTests.section("backups")
         let group: [String: Any] = try XCTUnwrap(backups["restoringOneSectionsKeys"] as? [String: Any])
         let cases: [[String: Any]] = try XCTUnwrap(group["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 6, "backups.restoringOneSectionsKeys has shrunk")
+        // Seven since Windows bundle 10 added the blank-line-before-the-fence
+        // case (#425 DO 1).
+        XCTAssertGreaterThanOrEqual(cases.count, 7, "backups.restoringOneSectionsKeys has shrunk")
         for testCase in cases {
             let name: String = try XCTUnwrap(testCase["name"] as? String)
             let sectionNumber: Int = try XCTUnwrap(testCase["section"] as? Int)

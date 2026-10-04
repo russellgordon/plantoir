@@ -213,6 +213,46 @@ final class ClassPlanningTests: XCTestCase {
         XCTAssertFalse(trail.contains("Day 3"), "never which page: \(trail)")
     }
 
+    /// Making room that cannot finish a rename — its new name was taken in
+    /// Obsidian after the plan was made — and so cannot add the new class
+    /// either, NAMES the page and records the contract's line (#425, adopted
+    /// from Windows' #422). MUST FAIL before #425: both were skipped in
+    /// silence, the reply said only "Made room for 0 classes", and the
+    /// teacher's page under the new name was re-dated as if it had moved.
+    @MainActor
+    func testMakingRoomNamesThePagesItCouldNotFinish() throws {
+        let (root, _, course) = try makeWorkspace()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
+        defer { ActivityTrail.store = previousStore }
+
+        try writeClass("Unit 1, Day 1", on: "2026-09-08", body: "day one", in: course)
+        try writeClass("Unit 1, Day 2", on: "2026-09-10", body: "day two", in: course)
+        let plan: ClassInsertionPlan = try ClassInsertionPlanner.plan(
+            unit: 1, atDay: 2, count: 1, forSection: 1, in: course
+        )
+        // Written in Obsidian after the plan was made.
+        try writeClass("Unit 1, Day 3", on: "2026-09-30", body: "a page of the teacher's", in: course)
+        let squatterBefore: String = try text(ofClass: "Unit 1, Day 3", in: course)
+
+        let outcome: ClassChangeOutcome = try ClassInsertionPlanner.apply(plan, in: course)
+        let said: String = AssistWording.pagesAChangeCouldNotFinish(
+            AssistPublishPlan.listingAFew(["Unit 1, Day 2"]), count: 1
+        )
+        XCTAssertTrue(outcome.message.hasSuffix(said), outcome.message)
+        XCTAssertTrue(try text(ofClass: "Unit 1, Day 2", in: course).contains("day two"),
+                      "The lesson stays under its own name.")
+        XCTAssertEqual(try text(ofClass: "Unit 1, Day 3", in: course), squatterBefore,
+                       "The teacher's page under the new name is neither overwritten nor re-dated.")
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertTrue(trail.contains(
+            "making room for a class did not finish 1 page: 1 not renamed, 0 not re-dated, "
+            + "0 with links not updated, 1 new not added"
+        ), trail)
+        XCTAssertFalse(trail.contains("Day 2"), "never which page: \(trail)")
+    }
+
     @MainActor
     func testRenamesRunHighestDayFirst() throws {
         let (root, _, course) = try makeWorkspace()

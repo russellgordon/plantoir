@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 """Assemble the figures that are made of more than one window.
 
-**Every part is a whole macOS window capture, and stays whole.** Each comes
-from `screencapture -x -o -l <window id>` — the Option-click window capture —
-with the window's own rounded corners, transparent outside the curve. This
-module only PLACES them: it never crops through a window, never re-rounds a
-corner, and never draws a shape. Scaling is Lanczos, of a whole image. A
-shadow, where there is one, is made from the capture's own alpha channel, so
-it follows the real curve. (Until 2026-09-27 this file cut Safari's toolbar
+**The Mac figures (since #434, 2026-10-04) are built only by the `native_`
+functions and `banner_over_window` below.** Each part is a whole
+`screencapture -x -l` capture WITH the window's natural shadow, placed whole
+with `Image.alpha_composite` so overlapping shadows blend the way they do on
+a desktop: never scaled, never trimmed, never cropped, and no shadow drawn.
+The canvas is computed to hold every capture in full, so no shadow can be
+cut off. `fan`, `side_by_side`, `with_shadow` and `diagonal_hero` are what
+the WINDOWS harness (capture_windows.py, hero_windows.py) still uses; the
+Mac no longer calls them.
+
+**Every part is a whole window capture, and stays whole.** On the Mac each
+comes from `screencapture -x -l <window id>`, with the window's own rounded
+corners and its natural shadow. This module only PLACES them: it never crops
+through a window, never re-rounds a corner, and never draws a shape. The
+Windows-only functions scale with Lanczos, of a whole image, and give a
+Windows capture (which has no shadow) one made from its own alpha channel. (Until 2026-09-27 this file cut Safari's toolbar
 off the class-site captures and painted an 18 px rounded mask over the cut;
 Russell saw the painted corners on the live site, and the code is gone.
 `test_native_corners.py` fails on a square corner, or one drawn tighter than
@@ -28,6 +37,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL import Image, ImageFilter
+
+from shadow import shadow_margins
 
 # The finished figures are the same width as every other screenshot on the
 # page, so the column edges line up down the whole site.
@@ -195,30 +206,109 @@ def diagonal_hero(
 # composite only places them, it never paints over one.
 
 
-def pair_of_windows(sources: list[Path], destination: Path, gap: int = 40) -> Path:
-    """Two window captures side by side, tops aligned, same height.
+def window_body(card: Image.Image) -> tuple[int, int, int, int]:
+    """Where the window itself sits inside a shadowed capture: its left and
+    top offset, and its width and height. The shadow margin round it is the
+    capture's own."""
+    margins = shadow_margins(card)
+    if margins is None:
+        raise SystemExit("A part has no opaque window in it; it cannot be placed.")
+    left, top, right, bottom = margins
+    return (left, top, card.width - left - right, card.height - top - bottom)
 
-    Like every figure here, nothing is cropped and nothing is drawn.
-    """
+
+def open_whole(sources: list[Path]) -> list[Image.Image]:
+    """Each capture exactly as it was taken: not scaled, not trimmed."""
     cards: list[Image.Image] = []
     for path in sources:
         with Image.open(path) as opened:
             cards.append(opened.convert("RGBA"))
-    height = min(card.height for card in cards)
-    scaled: list[Image.Image] = []
+    if not cards:
+        raise SystemExit("Nothing to assemble.")
+    return cards
+
+
+def place_whole(cards: list[Image.Image], window_positions: list[tuple[int, int]],
+                destination: Path, padding: int = 0) -> Path:
+    """Lay whole shadowed captures out, back to front, and save the figure.
+
+    `window_positions` says where each WINDOW's top-left corner goes (its
+    shadow extends round it by the capture's own margin). The canvas is the
+    union of every whole capture plus `padding` on each side, so every shadow
+    is on it in full; nothing is trimmed afterwards. PNG and WebP, at the
+    captures' own size.
+    """
+    placed: list[tuple[Image.Image, int, int]] = []
+    smallest_x = None
+    smallest_y = None
+    largest_x = None
+    largest_y = None
+    index = 0
     for card in cards:
-        if card.height != height:
-            card = card.resize((round(card.width * height / card.height), height), Image.LANCZOS)
-        scaled.append(card)
-    total = sum(card.width for card in scaled) + gap * (len(scaled) - 1)
-    canvas = Image.new("RGBA", (total, height), (0, 0, 0, 0))
-    offset = 0
-    for card in scaled:
-        canvas.alpha_composite(card, (offset, 0))
-        offset += card.width + gap
+        body_left, body_top, body_width, body_height = window_body(card)
+        window_x, window_y = window_positions[index]
+        card_x = window_x - body_left
+        card_y = window_y - body_top
+        placed.append((card, card_x, card_y))
+        if smallest_x is None or card_x < smallest_x:
+            smallest_x = card_x
+        if smallest_y is None or card_y < smallest_y:
+            smallest_y = card_y
+        if largest_x is None or card_x + card.width > largest_x:
+            largest_x = card_x + card.width
+        if largest_y is None or card_y + card.height > largest_y:
+            largest_y = card_y + card.height
+        index += 1
+    canvas = Image.new("RGBA", (largest_x - smallest_x + padding * 2, largest_y - smallest_y + padding * 2),
+                       (0, 0, 0, 0))
+    for card, card_x, card_y in placed:
+        canvas.alpha_composite(card, (card_x - smallest_x + padding, card_y - smallest_y + padding))
     destination.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(destination, format="PNG", optimize=True)
+    canvas.save(destination.with_suffix(".webp"), format="WEBP", quality=88, method=6)
     return destination
+
+
+def native_cascade(sources: list[Path], destination: Path, stagger_ratio: float = 0.20,
+                   padding: int = 48) -> Path:
+    """The hero: windows cascaded diagonally, back to front, each whole with
+    its own natural shadow, on a canvas that holds every shadow plus padding.
+
+    The stagger is the same across and down, a fifth of the middle window's
+    width, as the cascade has been since GUI-IMPROVEMENTS row 280.
+    """
+    cards = open_whole(sources)
+    middle = cards[len(cards) // 2]
+    stagger = round(window_body(middle)[2] * stagger_ratio)
+    positions: list[tuple[int, int]] = []
+    for index in range(len(cards)):
+        positions.append((stagger * index, stagger * index))
+    return place_whole(cards, positions, destination, padding)
+
+
+def native_fan(sources: list[Path], destination: Path, visible_fraction: float = 0.42) -> Path:
+    """Overlap whole captures left to right, the left one behind; tops of the
+    windows aligned. Each shows `visible_fraction` of its window before the
+    next covers it."""
+    cards = open_whole(sources)
+    step = round(window_body(cards[0])[2] * visible_fraction)
+    positions: list[tuple[int, int]] = []
+    for index in range(len(cards)):
+        positions.append((step * index, 0))
+    return place_whole(cards, positions, destination)
+
+
+def native_side_by_side(sources: list[Path], destination: Path, gap: int = 96) -> Path:
+    """Whole captures next to each other, windows top-aligned, `gap` pixels
+    between one window and the next. The shadows between them overlap and
+    blend, as two windows' shadows do on a desktop."""
+    cards = open_whole(sources)
+    positions: list[tuple[int, int]] = []
+    window_x = 0
+    for card in cards:
+        positions.append((window_x, 0))
+        window_x += window_body(card)[2] + gap
+    return place_whole(cards, positions, destination)
 
 
 def banner_over_window(window: Path, banner: Path, destination: Path, margin_fraction: float = 0.012) -> Path:
@@ -226,22 +316,21 @@ def banner_over_window(window: Path, banner: Path, destination: Path, margin_fra
 
     macOS draws the banner at the top right of the SCREEN; placing it at the
     window's top right keeps the figure the size of the window while reading
-    the way a teacher sees it. Both parts keep their own transparent corners.
+    the way a teacher sees it. Both parts are whole: the window with its
+    natural shadow, the banner as Notification Center drew it, its own shadow
+    included; neither is scaled. The canvas holds both in full.
     """
-    with Image.open(window) as opened:
-        base = opened.convert("RGBA")
-    with Image.open(banner) as opened:
-        card = opened.convert("RGBA")
-    widest = round(base.width * 0.42)
-    if card.width > widest:
-        card = card.resize((widest, round(card.height * widest / card.width)), Image.LANCZOS)
-    margin = max(8, round(base.width * margin_fraction))
+    cards = open_whole([window, banner])
+    base = cards[0]
+    card = cards[1]
+    body_left, body_top, body_width, body_height = window_body(base)
+    banner_left, banner_top, banner_width, banner_height = window_body(card)
+    margin = max(8, round(body_width * margin_fraction))
     # Room above the window for the banner to sit partly outside it, so it
     # reads as something on top of the window rather than part of it.
-    lift = round(card.height * 0.35)
-    canvas = Image.new("RGBA", (base.width, base.height + lift), (0, 0, 0, 0))
-    canvas.alpha_composite(base, (0, lift))
-    canvas.alpha_composite(card, (base.width - card.width - margin, 0))
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(destination, format="PNG", optimize=True)
-    return destination
+    lift = round(banner_height * 0.35)
+    positions = [
+        (0, lift),
+        (body_width - banner_width - margin, 0),
+    ]
+    return place_whole(cards, positions, destination)

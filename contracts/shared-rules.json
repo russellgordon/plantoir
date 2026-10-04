@@ -228,9 +228,7 @@
         "event": "making room did not finish every page",
         "carries": "which course and section, how many pages making room for a class could not finish, and how many of each kind: not renamed (the new name was already taken, or the save failed), not re-dated (the save failed), pages whose links to the renamed classes could not be saved, and new classes not added (their name was still taken, by a class whose rename did not happen) - never which pages, which are the teacher's own names",
         "line": "making room for a class did not finish {N page|N pages}: {N} not renamed, {N} not re-dated, {N} with links not updated, {N} new not added",
-        "why": "Added from Windows with #422 (parity bundle 10, 2026-10-01). Making room renames later classes, moves their dates and follows every link to them; a write in the middle that fails used to be swallowed by a bare catch on Windows, and the reply still counted it from the plan ('Renamed 3') - a section half renamed with nothing saying so. Now the reply counts what was written and names the pages it could not finish (Windows' own sentence, AssistWording.PagesAChangeCouldNotFinish, proposed to the mac as wording.pagesAChangeCouldNotFinish); this line is what is still there next week when 'two of my classes have the same name' arrives. One line per act, none when nothing failed.",
-        "appliesOn": ["windows"],
-        "appliesOnWhy": "PENDING the mac: its ClassInsertionPlanner reports a failed write in its reply; whether it also records one is the mac's to say, and the line is proposed to it in parity bundle 10's mac issue. When the mac records it, the appliesOn goes."
+        "why": "Added from Windows with #422 (parity bundle 10, 2026-10-01). Making room renames later classes, moves their dates and follows every link to them; a write in the middle that fails used to be swallowed by a bare catch on Windows, and the reply still counted it from the plan ('Renamed 3') - a section half renamed with nothing saying so. Now the reply counts what was written and names the pages it could not finish (Windows' own sentence, AssistWording.PagesAChangeCouldNotFinish, proposed to the mac as wording.pagesAChangeCouldNotFinish); this line is what is still there next week when 'two of my classes have the same name' arrives. One line per act, none when nothing failed. Adopted on the mac with #425 (2026-10-03, Russell's decision): ClassInsertionPlanner.apply now carries past a failed write instead of throwing with earlier renames already on disk, counts what was written, names the pages with wording.pagesAChangeCouldNotFinish (whose mac words became the source), and writes this line - so it is no longer Windows-only."
       },
       {
         "carries": "which course and section, how many pages shared by every section were given a date and a published-or-hidden setting for the new section, and how many of those were kept hidden because the setting they would copy cannot be read - its value runs onto the next line, it is not complete on its own line, or it is a legacy draft value the reader cannot tell - never which pages",
@@ -487,7 +485,17 @@
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
       {
-        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
+        "event": "preview closed for a deploy",
+        "carries": "the course and section of the preview that ended - never anything on a page",
+        "why": "Added with #433's stack review (2026-10-04). A deploy run by ANOTHER program - an outside assistant's deploy_section, or a deploy set for later - stops the serving preview of the section it builds (build_site.stop_preview_serving). The window shows that end as 'Closed for a deploy', not as a failure, only when ALL hold: the preview had been serving; its output shows the server killed the way that stop kills it; and another program holds a build lease on the course. This line is what says the end was read that way, so 'my preview closed by itself' is answered, and a misread can be found. Residual: a lease names the course, not the section, so a coinciding deploy of another section could mask a section's own serving failure of that exact shape; accepted, and the output stays one click away."
+      },
+      {
+        "event": "outside assistant worked while a preview was open",
+        "carries": "which course and section, and which of three things an outside assistant (Claude or Codex) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
+        "why": "Added with #433 (2026-10-03). An outside assistant's change while the teacher reads the preview is written and the preview left alone, so the page on screen is the page as it was until the teacher presses Stop Preview, then Preview. 'Claude said it changed the page and my preview still shows the old one', or 'my preview closed by itself', arrives next week with the conversation long closed; this line is what says the preview was left alone on purpose, or closed by a deploy that was asked for. The 'assistant chose a tool' line carries the tool, not what it met."
+      },
+      {
+        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy, or - since #433 - an outside assistant's change, named by its tool, held back while the course was being built), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
         "event": "build declined, course busy elsewhere",
         "lineWhenItsSectionIsBeingDeployed": "declined Preview — this section is being deployed by this copy of Plantoir",
         "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
@@ -809,10 +817,7 @@
       {
         "event": "remembered timetable set aside",
         "carries": "course, section, the date that could not be a class date",
-        "appliesOn": [
-          "windows"
-        ],
-        "why": "Only the Windows app ever wrote a timetable in the PC's own calendar (#144), so only it meets its own old files. When one is set aside the teacher sees the assistant ask for a timetable it already had, once; without this line a problem report would show a remembered timetable on disk and an assistant that asked anyway, with nothing between the two. Recorded by the reader, which is the one place that knows the date it refused."
+        "why": "Only the Windows app ever wrote a timetable in the PC's own calendar (#144), but the file lives inside the course folder and travels with it through backups, archives, restores and shared working folders, so either app can meet one. When one is set aside the teacher is asked for class dates they had already given; without this line a problem report would show a remembered timetable on disk and an app that asked anyway, with nothing between the two. Recorded by the reader, which is the one place that knows the date it refused. Windows-only until 2026-10-03, when the mac adopted the window and the line (#377)."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
@@ -1990,7 +1995,7 @@
     },
     "floor": {
       "rule": "While the curriculum coverage map is on, Course Settings REFUSES a removal from a folder list, or an untick in the Marks checklist, when BEFORE it at least one name in the course's marks pool names a folder found on disk, and AFTER it none does. \"Found on disk\" means found by the checklist's own walk (`gradedFolders.choices.walk`: four levels, the skip list, `excluded_items` applied), compared the way the build compares, case ignored — and the walk keeps EVERY occurrence of a name, each with the course-level folder it was found under and the folder directly inside a section folder it was found under, so a name found in two places is still found when one of them goes. \"After\" is the removal rule's own answer: for a removal, the same walk without every occurrence found under the removed folder — its course-level folder for a shared removal, its folder inside a section for a per-section one, compared EXACTLY, because `excluded_items` matches exactly — and the pool as `removingAFolder` leaves it; for an untick, the pool without that name. A course never asked about marks has the pool the historical rule infers from what is offered, before and after. When the walk finds no folder at all, every pooled name counts as found, before and after: that is the old rule, kept so that an unreadable or empty course folder cannot switch the floor off. The same comparison decides whether a removal is ASKED about: it is when the removal changes the pool or takes a pooled name from found to not found, and it is not otherwise. The New Course wizard is out of scope: it has no disk, and its pool is reconciled again on every removal, so it has no names without folders.",
-      "outcomes": "`refused` is a block with the sentence `specialNames.lastGradedFolderBlocked`, and a runner asserts that SENTENCE, not merely that something refused: a per-section fixture with one per-section folder would otherwise pass on `lastPerSectionFolderBlocked`. `confirmed` is the graded removal confirmation, `specialNames.removeGradedFolderConfirmation`. `ordinary` is neither: the gesture simply happens. An untick is never `confirmed`. The blocks Course Settings asks BEFORE the floor are kept out of every fixture: no case has a curriculum folder, and every per-section case has at least two per-section folders, none of them the class folder.",
+      "outcomes": "`refused` is a block with the sentence `specialNames.lastGradedFolderBlocked`, and a runner asserts that SENTENCE, not merely that something refused: a per-section fixture with one per-section folder would otherwise pass on `lastPerSectionFolderBlocked`. `confirmed` is the graded removal confirmation, `specialNames.removeGradedFolderConfirmation`. `ordinary` is neither: the gesture simply happens. An untick is never `confirmed`. The blocks Course Settings asks BEFORE the floor are kept out of every fixture: no case has a curriculum folder, and every per-section case has at least two per-section folders besides the class folder, which each one LISTS by its literal name \"All Classes\" so that no runner has to decide which folder it is (#413). That is the rule both apps follow for a course that recorded no class_folder (decided by Russell 2026-10-03: only a folder literally named \"All Classes\", or a recorded name, is protected as the class folder; nothing is guessed), and the gesture never names it.",
       "howToRunACase": "Make a course folder holding `directories` (and a `section1` inside it: the course has one section), with `sharedFolders`, `perSectionFolders`, `graded` as `graded_folders` (null: the key is ABSENT, never asked) and `include_curriculum_coverage` = `coverage` (true when the field is absent). Then ask the protection Course Settings uses for the gesture at the moment it is made: `{\"untick\": name}` is the Marks checklist's; `{\"remove\": {\"name\", \"scope\"}}` is that row's in the shared (`shared`) or per-section (`per_section`) folder list.",
       "why": "GitHub issue #152, from #80's second item. The floor used to ask whether the folder was the LAST NAME in the pool, without looking at the disk, and that cut both ways: a pooled name whose folder had been deleted refused its own removal on the strength of a folder that was not there (F4, F14), and it let the last REAL folder go while it sat in the pool beside it (F5, F6), leaving every expectation reading as never evaluated. `removingAFolder` case 8's kept name is the same phantom, reached by removing its parent (F8). Asking whether the pool would SURVIVE the gesture, rather than whether this is the last name, is the sharpening documentation/04 had already predicted, and it fixes the edge recorded there as conservative (F7). THE CONFIRMATION follows the same comparison so that its sentence stays true: removing `Portfolios` while a pooled `Tests` holds the floor up takes `Portfolios/Tasks` out of the marks, and is now asked about (F9); removing a top-level `Tasks` that `Portfolios/Tasks` keeps changes nothing about the marks and leaves the name in the pool, so it is not (F7, F16), where it used to show 'Removing it will take it out of your course's marks pool' about a name that stayed. WHEN THE WALK IS TAKEN: once per drawing of the page, shared by the checklist and all three lists; again when the window becomes key; and afresh for the row a teacher acts on. The last is not optional: the floor now depends on the disk, and a teacher who deletes a folder in Finder with Settings open — #80's own scenario — would otherwise be answered from a walk taken before the deletion. What is still open, and recorded: a course folder that is readable but whose every folder is hidden, skipped or excluded walks as empty, so the floor falls back to counting the declared pool, phantoms included — which is the old behaviour, not a new fault.",
       "rejected": [
@@ -2070,14 +2075,14 @@
           "gesture": {"remove": {"name": "tasks", "scope": "shared"}}, "expect": "refused",
           "why": "The build counts `tasks` for a pooled `Tasks`, so the floor must too." },
         { "name": "F13: a per-section pooled folder found in a section is floored",
-          "sharedFolders": ["Concepts"], "perSectionFolders": ["Handouts", "Labs"],
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes", "Handouts", "Labs"],
           "graded": ["Handouts"],
-          "directories": ["Concepts", "section1/Handouts", "section1/Labs"],
+          "directories": ["Concepts", "section1/All Classes", "section1/Handouts", "section1/Labs"],
           "gesture": {"remove": {"name": "Handouts", "scope": "per_section"}}, "expect": "refused" },
         { "name": "F14: a per-section pooled folder deleted from every section does not block its own removal",
-          "sharedFolders": ["Concepts"], "perSectionFolders": ["Handouts", "Labs"],
+          "sharedFolders": ["Concepts"], "perSectionFolders": ["All Classes", "Handouts", "Labs"],
           "graded": ["Handouts"],
-          "directories": ["Concepts", "section1/Labs"],
+          "directories": ["Concepts", "section1/All Classes", "section1/Labs"],
           "gesture": {"remove": {"name": "Handouts", "scope": "per_section"}}, "expect": "confirmed" },
         { "name": "F15: a pooled folder deeper than the walk sees counts as gone",
           "sharedFolders": ["Concepts", "Tasks", "Units"], "perSectionFolders": [],
@@ -8607,6 +8612,55 @@
           "why": "Typed words are the teacher's; only the untouched heading and noun follow the box."
         },
         {
+          "name": "a heading the teacher typed stays when the box goes off, while the club's own words leave",
+          "isClub": false,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Meetings"
+            ],
+            "classFolder": "All Meetings",
+            "unitWord": "Week",
+            "frontPageHeading": "This Week in Coding",
+            "noun": "meeting"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Classes"
+            ],
+            "classFolder": "All Classes",
+            "unitWord": "Unit",
+            "frontPageHeading": "This Week in Coding",
+            "noun": "class"
+          },
+          "why": "Proposed from Windows (#416 DO 1, measured by mutation there): a fill that always took the arriving heading passed every earlier case, because the only case with typed words kept the heading at the club default. Here the heading is the teacher's own and every other field is the club's, so the heading must stay while the rest follow the box."
+        },
+        {
           "name": "the class folder keeps its place in the list",
           "isClub": true,
           "usesLCSTerminology": false,
@@ -9354,6 +9408,18 @@
       ],
       "mac": "on your Mac",
       "windows": "on this PC",
+      "machine": {
+        "placeholder": "{machine}",
+        "mac": "Mac",
+        "windows": "PC",
+        "usedIn": [
+          "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
+          "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
+          "shared-rules.json:appUpdates.wording.elsewhereWork"
+        ],
+        "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",
+        "why": "GitHub #418 (DO 1) and #410 (DO 1, DO 2), decided by Russell 2026-10-03. Before it, Windows carried its own copy of each such sentence (appUpdates.windowsWording.elsewhereWorkOnWindows; previewPorts.whenNoBlockIsFree.sentenceOnWindows) or compared with a substitution of its own (#233's 'your PC'), and a reworded sentence on one side would leave the other copy standing. REJECTED: a separate Windows key per sentence (two copies of every sentence, which is the drift this replaces); 'this Mac'/'this PC' as the placeholder's value (the sentences say 'your Mac' as well as 'this Mac', and changing either to fit would reword a sentence teachers already read); reusing the keys list above, whose substitution is 'on your Mac' -> 'on this PC' and changes the determiner as well as the noun."
+      },
       "note": "These sentences name the machine — four since 2026-09-10, when renameUnitWord.explanation joined the three the rest of this note was written about — and the two apps deliberately say it differently — the same choice already recorded for the launcher markers in app-rules.json → markerOrigins.knownDivergence. The contract stores the MAC spelling because the contract is written here; Windows says 'on this PC' and is not drifting by doing so. There are THREE, and which record missed which is worth being exact about, because two passes at this paragraph got it wrong in opposite directions. Issue #102 named two of them — renameFolder.explanation and doneNothingWasThere — and not removeLeavesTheFolderOnDisk.message. The mac's OWN log had all three from 2026-09-01 (GUI-IMPROVEMENTS.md rows 388 and 389, which name explanation with removeLeavesTheFolderOnDisk and then doneNothingWasThere), six days before Windows' FolderRenameApplyTests began substituting on the third. So nothing here was behind the code: one Windows-authored issue body was incomplete, and this block is simply the first place all three are named together as a rule rather than as log entries.",
       "whyThisIsHere": "Two failures, both already met elsewhere in these contracts — app-rules.json → markerOrigins.knownDivergence records exactly this kind of deliberate platform difference, and is READ by MilestoneContractTests on Windows rather than merely written down. Without a record, the next reader compares the two apps, finds a difference, concludes one of them drifted, and 'fixes' it. And a contract-driven test asserting the stored sentence verbatim would put the word Mac in front of a Windows teacher — a test enforcing a bug, which is the one outcome nobody wants. A suite asserting these keys must compare everything EXCEPT the platform word, or assert its own platform's spelling. That is a proven pattern rather than a proposal: SpecialFolderRenamerTests.TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac and FolderRenameApplyTests both do it on Windows, comparing against this file with .Replace(\"on your Mac\", \"on this PC\"). On the mac, SharedRulesContractTests.testPlatformWordedKeysAreComplete pins the keys list itself: a fourth specialNames sentence containing the mac's platform word cannot be added without this record going red. It pins the RECORD rather than the behaviour. Windows has read the list since 2026-09-09 (SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc drives itself off `keys`), so a new key reds BOTH suites: the mac until the list names it, Windows until its substitution map carries it — which is what happened with renameUnitWord.explanation on 2026-09-10, and is the list being load-bearing rather than a fault. ONE SANCTIONED EXCEPTION to 'a new key reds BOTH suites until it is implemented', added 2026-09-18 and changing nothing in this file: when the feature a key belongs to is owned by an OPEN issue milestoned for a LATER release than the one being cut, the side that owes it may hold the key open in a NAMED GAP on its own side. windows-app/Plantoir.Tests/NamedGapLedger.cs does exactly that for renameUnitWord.explanation against GitHub issue #158 (v1.3.0), so the v1.2.0 gate is green with this list untouched and the mac still asserting all of it. It is not a softening: the ledger entry FAILS on Windows the moment the sentence starts existing there, and FAILS if this list stops naming it, so it cannot outlive either the fix or the requirement. What was REJECTED is doing it in this file — dropping the key from the list, or (for the matching activityTrail.mustRecord event) writing appliesOn: [mac] on it. Both would be false, since Windows owes both at v1.3.0, and appliesOn has no mend-check, so the day Windows built them both suites would have stayed green and nothing would have noticed. contracts/README.md, under 'Named gaps', says when a named gap is allowed and when it is not: never for a difference a teacher can see at the current milestone."
     },
@@ -11980,14 +12046,20 @@
       "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything. Plantoir DOES copy pages between courses since issue #207 - 'Copy a Page from This Course...', on this course's own row - and the sentence still does not mention it: it is a refusal about changing THIS course, and naming a different feature inside it is a non-sequitur. A page a teacher takes out BY HAND in Finder still arrives locked; the sentence that said so (\"A file you copy out of it stays locked until you untick Locked in Get Info.\") was RETIRED by Russell on 2026-09-22 - a hand copy is unlikely now that the copy feature exists and unlocks what it copies, and 'Get Info' without 'Finder' told a teacher nothing. If a sentence about the Finder ever returns, it names the Finder.",
       "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file.",
       "theCannotTellSentence": "Said by the LAUNCHERS only, as 'cannotTellHeadline - <one of the two reasons>. Nothing was published.' Both launchers carry it as a constant and a test compares them against these keys, the same arrangement refusal.sentence has. app-rules.json -> failureExplanations turns it back into the teacher's sentence when a deploy set to happen on its own hits it, which is the population it exists for: that one runs with the app closed, and the app reads such a course as ORDINARY, so the teacher can schedule it and only the launcher will refuse.",
-      "whyTheLaunchersStillSayPublished": "'Nothing was published.' is the launchers' own long-standing house sentence - five times in each of them on dev, asserted by two shared Python tests - and it is deliberately NOT changed to 'deployed' here. Russell's decision (r) governs the APP's sentences and every new key name, and every sentence in this block follows it; one launcher run saying both words for the same act would be worse than one word that is old. A launcher vocabulary sweep is its own piece of work."
+      "whyTheLaunchersStillSayPublished": "Russell's rule of 2026-10-03, for v1.4.3: DEPLOY (a site sent to Netlify, Cloudflare or a folder) and PUBLISH (a page marked so a deploy includes it) are each used only in their own sense - in the app, the launchers, code comments, tests and docs alike. That replaces the reason this note used to give (that one launcher run saying both words for the same act would be worse than one old word), which #407 had already contradicted. The launcher lines are being moved to it: since #407 deploy.sh's rebuild-before-a-folder-deploy block says 'Rebuilding it before it is deployed' and 'Nothing was deployed, rather than deploying', and since the v1.4.3 release-hygiene branch 'Cannot create the folder to deploy to', 'Could not rebuild this site before deploying it' (both forms) and 'The rebuilt site has not appeared. Nothing was deployed.' Lines that still say published for a deploy, because a contract, a test, the apps or a Windows twin pins them: ' Nothing was published.' after a scheduled run's unanswerable question (the shared Python tests test_deploy_sh_questions.py and test_deploy_non_interactive.py; deploy.ps1 and deploy.py say it too); the two reference-course refusals ending 'Nothing was published.' (app-rules.json failureExplanations, this file's theCannotTellSentence, Windows ReferenceRefusalTests); 'Publishing <course> section <n> to a folder' and 'Not every page could be copied into the publishing folder' (app-rules.json failureExplanations, read by FailureExplainer on both apps); and '...stops your publishing working...' (app-rules.json credential requests, CredentialRequest.swift, CredentialRequests.cs). Those move together with Windows, in one change across the contract, both apps and both launchers (issue opened from the v1.4.3 release-hygiene branch). Also still old and pinned by nothing but a twin: 'This publish was set to happen on its own', 'so there is nothing to publish' (deploy.py says the same words) and 'Published: N file(s) updated.' (the PUBLISHED_FOLDER= marker after it is parsed by both apps and must never change). The key keeps its name: Windows' ReferenceCourseTests names it as a note, not a sentence."
     },
     "frozen": {
       "theWalk": "Every content FILE, at every depth. skipDescendants() is for a never-locked FOLDER and must never be called for a never-locked FILE: the enumerator applies the skip to the next directory it has not descended into, so the folder AFTER course_config.json - which every course has at its top level - was never walked and never locked. Measured on a real course: 842 of 934 files walked, 27 real pages left editable, and WHICH folder was lost moved between passes with readdir order, so the course came out mostly locked and never entirely locked. Counting what the pass WALKED against what is locked afterwards does NOT catch this - a walk that skips a folder never counts that folder, so the two numbers agree and the fault reports success (it did: nine pages editable, everything-is-locked true). What catches it is an independent CENSUS taken after the pass: a plain full listing of the course with no skip logic at all, each regular file classified by the never-locked rule alone, and the number that SHOULD be locked compared with the number whose flag says locked. A mismatch is put on the trail with both numbers, and the sentence that says the pages are kept locked is not shown. Measured with the old fault put back: 13 of 16.",
       "offTheMainActor": "The walk runs off the caller's actor - measured at ~24 ms with nothing to do and ~80 ms for a full pass on 1,220 files, which is not a teacher's click to wait for after every sheet. On the mac that takes @concurrent, not merely `nonisolated async`: the target builds with SWIFT_APPROACHABLE_CONCURRENCY, under which a nonisolated async function runs on its CALLER's actor - so the obvious spelling would have kept every stat on the main actor while reading as though it did not. A test asserts the work is not on the main thread rather than trusting the annotation. No DispatchQueue and no sleeps anywhere.",
       "rule": "The pages of a reference course are LOCKED ON DISK - Finder's Locked, the user-immutable flag - on every content FILE and on no directory. Plantoir itself offers nothing that changes a page, a setting or the shape of the course.",
       "mechanism": "chflags uchg, and only that. Modes are left exactly as they are.",
-      "whyNotPermissions": "Measured twice over. (1) chmod a-w does not stop a RENAME-OVER, which is how every serious editor saves: the measurement replaced a page's contents at exit 0, and rm -f deleted it. The immutable flag refuses both, and refuses a rename and a delete as well. (2) Mode 444 BREAKS THE PREVIEW BUILD, which is the finding that settled it: build_site.py copies each page into the build tree with shutil.copy2 (mode and flags travel), then rewrites the copy's frontmatter, which is where draft: true becomes publish: false. The build tree in THAT measurement was a host bind mount, where the container's root does NOT get its usual permission override - measured inside the real image - so the rewrite fails with one warning per page, the copy keeps draft: true and gains no publish key, and the Explorer publishes anything that does not say publish: false. Every page the teacher had HIDDEN would have appeared in the preview of their frozen course. With the flag alone and the mode left at 644, the same build writes publish: false correctly AND the source is still refused even to container root. WHERE THE MAC ACTUALLY BUILDS, said so that reason is not read as a description of the shipping pipeline: toolchain_paths.WORK_DIR, the container's own /tmp/quartz-builds, with only public/ synced out - so on the mac the rewrite happens on container-local storage where root CAN write a 444 file, and the must-fail does not reproduce through the launcher. Reason (1), that chmod a-w does not stop a rename-over, carries the decision on its own and is untouched by this. ON WINDOWS THE FAULT IS REACHABLE: preview.ps1 and deploy.ps1 point PLANTOIR_WORK_DIR at a HOST folder under %LOCALAPPDATA% and build natively rather than as root, so a read-only attribute travels into the build tree, the frontmatter rewrite would fail, and a page the teacher HID would be published. Whatever mechanism Windows chooses, run a real build of a locked course and check that a hidden page is still hidden.",
+      "windowsMechanism": {
+        "appliesOn": ["windows"],
+        "rule": "NTFS has no user-immutable flag, so Windows locks a reference course with DENY entries for this account: on every content file WriteData, AppendData, WriteExtendedAttributes, WriteAttributes and Delete; on every folder holding a locked file DeleteSubdirectoriesAndFiles, for that folder only. Unlock removes those bits from any explicit deny carrying all of them, whoever it names, because Windows merges two deny entries for one account into one.",
+        "measured": "Proposed from Windows (parity bundle 6b, #415; i5-8365U, 16 GB, Samsung 980 NVMe, Windows 11 26200): refuses a write, a rename-over, a rename and a delete (Explorer and Remove-Item -Force included); allows reading, adding a file, replacing the unlocked course_config.json from its .tmp, and making or removing the .merged_output junction. 1,200 files: lock about 0.81 s, nothing to do about 0.12 s, unlock about 0.44 s (the mac: 59.5 and 23 ms), so it runs off the window's thread and never on a timer. robocopy /SEC and /COPYALL carry the lock and then stall retrying on it, and Windows' tests forbid both flags. Not measured there: OneDrive with locked files, an elevated token, and what Obsidian for Windows shows on a page it cannot save.",
+        "whyNotTheReadOnlyAttribute": "It travels: shutil.copy2 carries it into the build's own copy of a page, the native build then cannot rewrite that copy's frontmatter, and a page the teacher HID is published - reproduced with a real native build of a locked course (ReferenceBuildKeepsHiddenPagesHiddenTests). build_site._writable now clears it before every write the build makes to its OWN copy (a no-op on the mac)."
+      },
+      "whyNotPermissions": "Measured twice over. (1) chmod a-w does not stop a RENAME-OVER, which is how every serious editor saves: the measurement replaced a page's contents at exit 0, and rm -f deleted it. The immutable flag refuses both, and refuses a rename and a delete as well. (2) Mode 444 BREAKS THE PREVIEW BUILD, which is the finding that settled it: build_site.py copies each page into the build tree with shutil.copy2 (mode and flags travel), then rewrites the copy's frontmatter, which is where draft: true becomes publish: false. The build tree in THAT measurement was a host bind mount, where the container's root does NOT get its usual permission override - measured inside the real image - so the rewrite fails with one warning per page, the copy keeps draft: true and gains no publish key, and the Explorer publishes anything that does not say publish: false. Every page the teacher had HIDDEN would have appeared in the preview of their frozen course. With the flag alone and the mode left at 644, the same build writes publish: false correctly AND the source is still refused even to container root. WHERE THE MAC ACTUALLY BUILDS, said so that reason is not read as a description of the shipping pipeline: toolchain_paths.WORK_DIR, the container's own /tmp/quartz-builds, with only public/ synced out - so on the mac the rewrite happens on container-local storage where root CAN write a 444 file, and the must-fail does not reproduce through the launcher. Reason (1), that chmod a-w does not stop a rename-over, carries the decision on its own and is untouched by this. ON WINDOWS THE FAULT IS REACHABLE: preview.ps1 and deploy.ps1 point PLANTOIR_WORK_DIR at a HOST folder under %LOCALAPPDATA% and build natively rather than as root, so a read-only attribute travels into the build tree, the frontmatter rewrite would fail, and a page the teacher HID would be published. Whatever mechanism Windows chooses, run a real build of a locked course and check that a hidden page is still hidden. Windows chose deny entries and ran that build (windowsMechanism, #415). MEASURED ON NTFS, so reason (1) is not read as true there: the read-only attribute DOES refuse a rename-over (os.replace and File.Replace both refused); what it does not stop is a rename, or a delete that clears the bit first - and it travels into a copy, which is reason (2).",
       "whyNotDirectories": "Measured: with the course folder locked, creating the .merged_output symlink inside it fails - and BuildOutputLocation has to create that link on every reload, as do the launchers before every build. Locking the folders would kill the preview a reference course exists to give.",
       "neverLocked": [
         {
@@ -12013,6 +12085,14 @@
         {
           "name": ".DS_Store",
           "why": "Finder's own bookkeeping. Nothing a teacher wrote."
+        },
+        {
+          "name": "desktop.ini",
+          "why": "File Explorer's own bookkeeping for a folder's look - Windows' .DS_Store. Nothing a teacher wrote, and Explorer rewrites it when a folder's view changes (#415). Left alone on the mac too, so the two lists stay one list: a course brought from Windows can carry it."
+        },
+        {
+          "name": "Thumbs.db",
+          "why": "File Explorer's picture-preview cache, rewritten whenever a folder of pictures is shown. Nothing a teacher wrote (#415). Left alone on the mac too, for the same reason as desktop.ini."
         }
       ],
       "whatPlantoirStillWrites": [
@@ -12537,7 +12617,15 @@
         ]
       },
       "leftBehind": {
-        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside, at any depth. The Obsidian add-ons are NOT on this list, because they are a place rather than a name: referenceCourses.obsidianAddOns. On this route a symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
+        "rule": "Composed from the lists that already exist rather than written out again: what an archive leaves behind, plus what a reference copy leaves behind, plus what only an import meets. A name in the list is skipped WITHOUT being looked inside, at any depth. The Obsidian add-ons are NOT on this list, because they are a place rather than a name: referenceCourses.obsidianAddOns. What happens to a LINK on this route differs by platform and is written per platform below (linksOnTheMac, linksOnWindows). The older-layout route never copies a link at all: olderLayout.placement.whyNoLinkComesAcross.",
+        "linksOnTheMac": {
+          "appliesOn": ["mac"],
+          "rule": "A symlink is copied as a link and never followed - the only one a modern course holds is .merged_output, which is left behind by name anyway; changing that here was rejected (olderLayout.rejected)."
+        },
+        "linksOnWindows": {
+          "appliesOn": ["windows"],
+          "rule": "Every reparse point is left behind (proposed from Windows, parity bundle 6b, #415): making a symlink there needs a privilege a teacher's account may not hold, and a junction cannot be copied faithfully."
+        },
         "why": "On a folder made by an older Plantoir, .merged_output is a real directory holding last year's entire built website - measured at 1.9 GB per course against 489 MB of course, four fifths of what is on disk. Walking it to not copy it would cost more time than copying the course. On a folder made by a current Plantoir it is a symlink pointing out of the working folder, and following it would copy the built site back into the course it came from.",
         "names": [
           {"name": ".merged_output", "why": "Last year's built website. Rebuilt on demand; a real directory in an old folder, a symlink in a new one, skipped either way."},
@@ -17879,15 +17967,15 @@
       ]
     },
     "declining": {
-      "rule": "A build of a course from THIS program - Preview or Deploy in the window, the in-app assistant's rebuild or deploy, an outside assistant's rebuild or deploy (the mac's --mcp-stdio process) - is DECLINED when another live program holds a build, publish or preview lease on the same course. A publish set for later WAITS instead, and only for build and publish. Leases name the COURSE, not the section, so a build of Section 1 elsewhere declines Section 2 here too. This program's own leases are never in its way (the in-process rules decide that), a lease whose owner is gone is ignored (workLeases.liveness), and assist and import leases never decline a build.",
+      "rule": "A build of a course from THIS program - Preview or Deploy in the window, the in-app assistant's rebuild or deploy, an outside assistant's rebuild or deploy (the mac's --mcp-stdio process) - is DECLINED when another live program holds a build, publish or preview lease on the same course. A publish set for later WAITS instead, and only for build and publish. Leases name the COURSE, not the section, so a build of Section 1 elsewhere declines Section 2 here too. This program's own leases are never in its way (the in-process rules decide that), a lease whose owner is gone is ignored (workLeases.liveness), and assist and import leases never decline a build. Since #433 (Russell, 2026-10-03) an OUTSIDE assistant's own acts follow outsideChanges below instead: it is held back only while a site of the course is being BUILT (another program holds build or publish), and a preview that is only being served holds back none of its changes, rebuilds or deploys.",
       "why": "Two builds of one section clear and rewrite the same folder, so the loser serves a half-written site or publishes files the other has just deleted, and nothing fails loudly. Until #156 the mac's rules were in-process only, so an outside assistant (Claude Code or Codex reaching Plantoir --mcp-stdio), a publish set for later and the window could all build one course at once; Windows' plantoir-mcp and app already read each other's leases.",
-      "whyAPreviewBlocks": "Decided by the director on #156's plan review (2026-09-25, reversible, recorded on the issue), STRICTER than Windows, whose only blocking kind is build. Every build of a section first ends that section's serving preview (build_site.stop_preview_serving), so an outside assistant's rebuild or deploy would take down the page the teacher is reading - which the in-app assistant already refused to do - and an outside assistant can retry where a teacher reading a page cannot. A red case on Windows is the request.",
+      "whyAPreviewBlocks": "A preview lease declines a build from the WINDOW and the IN-APP assistant, as #156 decided (director's ruling on #156's plan review, 2026-09-25): every build of a section first ends that section's serving preview (build_site.stop_preview_serving). For an OUTSIDE assistant that ruling was REVERSED by Russell on #433 (2026-10-03): browsing the preview while asking Claude or Codex for changes is the ordinary way to work, and an outside assistant told 'busy' for the whole time the teacher was reading was useless to exactly the teacher it exists for. So for Claude and Codex a served preview holds nothing back: a change is written and the open preview left exactly as it is (the teacher stops and starts it to see the change); rebuild_preview builds nothing and says so; deploy_section goes ahead and ends that section's preview the way the window's own Deploy does ('if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running'). What #156 protected - never two builds of one section, and no outside door rebuilding or restarting the page being read - still holds: a building preview holds a build lease, which declines all of it. Windows' plantoir-mcp writes already refuse on build only (RefuseIfPlantoirIsBuilding); its rebuild and deploy still decline on preview (#289) - see outsideChanges.",
       "whyTheScheduledPublishWaits": "Director's ruling (a), 2026-09-25, reversible. Going ahead anyway was REJECTED: two builds on one workspace is the fault being fixed. Standing down at once was REJECTED: a thirty-second build would cost a night's publish. So it waits - wall clock, so a Mac that sleeps does not pause the count - looking again every fifteen seconds for up to ten minutes, holding nothing while it waits; then takes its own build and publish leases and looks once more. Still busy at ten minutes, it stands down: deploys nothing, clears the job so it cannot recur, and leaves scheduledPublishStopped kind courseWasBusy for the section to show. It does not wait for a PREVIEW, because a preview left open overnight would otherwise cost the morning's publish; its build ends that preview, as it always has.",
       "takeThenCheck": "Every door writes its own build lease FIRST and then looks, with nothing awaited in between, and then counts only a lease taken BEFORE its own build lease: an earlier moment (line 3), or the same moment and a lower process id. Two programs that each take a build and look at once therefore cannot BOTH go ahead - exactly one sees the other as earlier - and never both go ahead is the guarantee. The CLAIM is this program's build moment, not the earliest of its leases: a publish set for later does not wait for previews, so a window whose old preview lease predates such a publish's build must still decline its own Deploy, and an earliest-lease claim would let it go ahead (the review of #156 proposed that claim; the case above shows the two builds it allows). A Preview writes its build lease BEFORE its preview lease, so a Preview and an outside build that race cannot both back off either. What remains is one harmless shape: a Deploy pressed while this window already has a preview up, racing an outside build that lands between the two - both back off, nothing runs, and a retry works. The moments are compared as text, exact for the one fixed 28-character shape both apps write (UTC, seven fractional digits, of which the mac's DateFormatter fills three - millisecond resolution, so a same-moment tie is ordinary and goes to the lower pid); anything not in that shape counts as earlier. The window's Deploy takes its claim BEFORE it stops the teacher's preview, so its build lease is up for the whole of that stop: the stop (preview.sh --stop) ends builds as well as servers by working directory, and no other program may be told the course is free while it runs. The residual: a program that looks BEFORE it takes (Windows today, an older mac) can start in the instant between another's take and its own look; that is Windows' own shape and is recorded rather than closed.",
       "whatIsSaid": {
         "window": "wording.courseIsBeingBuiltElsewhere, in the window's Cannot Preview Yet or Cannot Deploy Yet alert - nothing has run, so the console has nothing to show",
         "inAppAssistant": "wording.courseIsBeingBuiltElsewhere",
-        "outsideAssistant": "wording.courseIsBusy - it is talking to the program whose course is busy, and that sentence tells it to wait and ask again. publish_pages and undo_last_change still WRITE (Markdown never conflicts with a build) and leave the teacher's preview up; the note where the preview would have been refreshed is this sentence",
+        "outsideAssistant": "outsideChanges.whatIsSaid (#433). Until #433 it was wording.courseIsBusy for every decline, and publish_pages and undo_last_change wrote and then appended that same sentence where the preview would have been refreshed - so a change that SUCCEEDED ended with 'busy ... wait ... ask again', which a model reads as a refusal",
         "scheduledPublish": "nothing while it waits; scheduledPublishStopped.sentences.courseWasBusy if it stands down",
         "trail": "activityTrail.mustRecord 'build declined, course busy elsewhere' for every decline, and 'scheduled publish waited for the course' for a publish set for later that waited"
       },
@@ -17898,9 +17986,159 @@
         "CHECK-THEN-TAKE with no tiebreak (the plan's first shape, and Windows' today) - the window's Deploy awaits a preview stop between any early check and its own lease, so an outside build could start in that gap; the plan review measured the window, and the director ruled for take-then-check.",
         "A SECTION in the lease name - Windows parses the kind as the third-last dot-separated part, so any extra part is a format change on both sides; course-level declines Section 2 for the length of a build of Section 1, and the sentence says which course.",
         "A SWEEP of dead leases when a folder is opened - WorkLease's own design is no cleanup pass: a reader's liveness rule already ignores them, and the start time on line 4 settles the recycled-pid case the sweep was proposed for.",
-        "Greying the Deploy button while another program builds (Windows does) - a view cannot observe a file without a watcher, and declining at the press is the whole guarantee; a difference to know, not an obligation."
+        "Greying the Deploy button while another program builds (Windows does) - a view cannot observe a file without a watcher, and declining at the press is the whole guarantee; a difference to know, not an obligation.",
+        "#433, rejected by Russell 2026-10-03: an outside assistant RESTARTING the open preview by any means - the app's window rebuilding its own preview when the outside door asks, the outside door's rebuild going ahead with the window bringing the preview back, or Claude or Codex restarting it when asked. The outside door is a second, windowless Plantoir process that shares files with the app and nothing else, so it cannot press the window's button: restarting from there means either owning a preview of its own (the pre-#156 shape) or a new request-file mechanism. 'That's not worth it. The teacher can stop and start a preview manually.' A single Plantoir the assistant attaches to was set aside as far too large for what it buys.",
+        "#433, proposed in the plan and accepted by the director, then REVERSED by Russell 2026-10-03 23:00: holding an outside deploy_section back while a preview is only being served (because the deploy ends that section's open preview). His words: 'if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running.' The deploy goes ahead and the success sentence says the preview may have closed (wording.deployClosedAnOpenPreview)."
       ],
-      "howToRunACase": "The asking program is course ICS3U with process id me.pid. me.claim is null for a look made BEFORE this program has taken its own build lease (every blocking lease counts), or {moment, pid} for the look made right after (only leases taken earlier count). others are the lease files in the folder: keep those whose course matches ICS3U without regard to case, whose pid is not me.pid, and whose alive is true (liveness is its own case list), then apply the rule for the asker - aBuild blocks on build, publish, preview; aScheduledPublish on build, publish. expect declined means the first blocking lease found stands in the way (for aScheduledPublish: it waits); allowed means nothing does. An entry with nameLine false is a lease file with no name on line 2: drop it too, for every kind but import (the liveness rule names an import lease itself); nameLine absent means the lease has one.",
+      "outsideChanges": {
+        "rule": "What an OUTSIDE assistant (Claude or Codex, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases. THE RESIDUAL, named the way takeThenCheck names its own: an outside change looks at the leases ONCE, at the door, and takes no lease of its own, so nothing it writes is visible to another program. A Deploy pressed in the window while a multi-page outside change is still being written can therefore build and deploy a half-applied change (some pages written, others not yet). Not new with #433: an outside write took no lease before it either. Accepted rather than closed, because a page write lasts milliseconds against a deploy's minutes and closing it means a new lease kind both apps would have to read; a deploy run again after the change has finished carries all of it.",
+        "whatIsSaid": {
+          "changeHeldBack": "wording.courseIsBeingBuilt - nothing was written, and it says so",
+          "changeWrittenWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages, where the preview would have been refreshed - never a refusal word (busy, couldn't, wait): the change succeeded",
+          "changeWrittenAndABuildStartedMeanwhile": "wording.changesAreSavedWhileTheCourseIsBuilt",
+          "rebuildWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages - nothing is built, because nothing is going to finish that waiting would help",
+          "rebuildOrDeployHeldBack": "wording.courseIsBeingBuilt",
+          "deployWhileAPreviewIsServed": "the deploy's own success sentence, then wording.deployClosedAnOpenPreview ('if': leases name the course, not the section)"
+        },
+        "trail": "activityTrail.mustRecord 'build declined, course busy elsewhere' for everything held back; 'outside assistant worked while a preview was open' for a change, rebuild or deploy that met a served preview",
+        "howToRunACase": "One course ICS3U with one section; `others` are live leases another program holds on it (kinds only). `asked` is `change` (publish a page through publish_pages), `rebuild` (rebuild_preview) or `deploy` (deploy_section), from an outside assistant. expect.written: the page's file changed; expect.built: a rebuild of the preview ran; expect.deployed: a deploy ran; expect.said: the wording key the answer ends with (for a deploy that went ahead, the key appended to its success sentence; null for 'whatever the rebuild or deploy itself says'). A held-back change leaves every file byte for byte as it was.",
+        "cases": [
+          {
+            "name": "nothing held: a change is written and the preview rebuilt",
+            "others": [],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": true,
+              "deployed": false,
+              "said": null
+            }
+          },
+          {
+            "name": "a preview only being SERVED: the change is written, nothing is built, and it is said as saved",
+            "others": [
+              "preview"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": false,
+              "deployed": false,
+              "said": "changesAreSavedPreviewShowsTheOldPages"
+            }
+          },
+          {
+            "name": "a preview still BUILDING (build beside preview): the change is held back and nothing is written",
+            "others": [
+              "preview",
+              "build"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy running (build and publish): the change is held back and nothing is written",
+            "others": [
+              "build",
+              "publish"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "an assist lease holds nothing back",
+            "others": [
+              "assist"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": true,
+              "deployed": false,
+              "said": null
+            }
+          },
+          {
+            "name": "a rebuild asked while a preview is only served builds nothing and says the change is saved",
+            "others": [
+              "preview"
+            ],
+            "asked": "rebuild",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "changesAreSavedPreviewShowsTheOldPages"
+            }
+          },
+          {
+            "name": "a rebuild asked while a preview is building is held back",
+            "others": [
+              "build",
+              "preview"
+            ],
+            "asked": "rebuild",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy asked while a preview is only served goes ahead and says the preview may have closed (Russell, 2026-10-03)",
+            "others": [
+              "preview"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": true,
+              "said": "deployClosedAnOpenPreview"
+            }
+          },
+          {
+            "name": "a deploy asked while another deploy runs is held back",
+            "others": [
+              "publish",
+              "build"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy asked while a preview is building is held back",
+            "others": [
+              "preview",
+              "build"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          }
+        ]
+      },
+      "howToRunACase": "The asking program is course ICS3U with process id me.pid. me.claim is null for a look made BEFORE this program has taken its own build lease (every blocking lease counts), or {moment, pid} for the look made right after (only leases taken earlier count). others are the lease files in the folder: keep those whose course matches ICS3U without regard to case, whose pid is not me.pid, and whose alive is true (liveness is its own case list), then apply the rule for the asker - aBuild blocks on build, publish, preview; aScheduledPublish on build, publish. expect declined means the first blocking lease found stands in the way (for aScheduledPublish: it waits); allowed means nothing does. An entry with nameLine false is a lease file with no name on line 2: drop it too, for every kind but import (the liveness rule names an import lease itself); nameLine absent means the lease has one. A case with appliesOn is run only on the platforms it names, and one that leaves a platform out says in onTheMac (or onWindows) what that platform does instead - a skipped case with no such sentence is a gap, not a decision. On Windows, aBuild and aScheduledPublish also block on copy (#413).",
       "cases": [
         {"name": "nothing is held: a build goes ahead", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [], "expect": "allowed"},
         {"name": "another program is building the course: a build is declined", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
@@ -17930,7 +18168,10 @@
         {"name": "PAIR 1 of 2 - a Deploy pressed with a preview ALREADY up: window preview t1 < outside build t2 < window build t3. The window (claim t3) sees the outside build as earlier and declines", "asker": "aBuild", "me": {"pid": 100, "claim": {"moment": "2026-09-25T06:30:00.3000000Z", "pid": 100}}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.2000000Z", "alive": true}], "expect": "declined"},
         {"name": "PAIR 2 of 2 - the outside program (claim t2) sees the window's older preview and declines too: BOTH back off. The harmless direction (nothing runs, a retry works) and kept rather than closed, because the one rule that closes it lets two builds run at once - see the next case", "asker": "aBuild", "me": {"pid": 4321, "claim": {"moment": "2026-09-25T06:30:00.2000000Z", "pid": 4321}}, "others": [{"course": "ICS3U", "kind": "preview", "pid": 100, "moment": "2026-09-25T06:30:00.1000000Z", "alive": true}, {"course": "ICS3U", "kind": "build", "pid": 100, "moment": "2026-09-25T06:30:00.3000000Z", "alive": true}], "expect": "declined"},
         {"name": "WHY the claim is this program's BUILD moment and not the earliest of its leases: a publish set for later took build and publish at t2 while the window's preview (t1) was up - it does not wait for previews - and the window's Deploy (build t3) must decline. Claimed from its preview (t1) instead, the window would read t2 as LATER and go ahead: two builds at once", "asker": "aBuild", "me": {"pid": 100, "claim": {"moment": "2026-09-25T06:30:00.3000000Z", "pid": 100}}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.2000000Z", "alive": true}, {"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.2000000Z", "alive": true}], "expect": "declined"},
-        {"name": "a build lease with NO name line (or an empty one) is treated as gone, even with a live owner - neither app writes one, Windows' reader calls fewer than two lines stale, and judged on its id alone it could hold a course for the whole life of whatever was handed that id (#156; an import lease with no name is judged as Plantoir's instead - liveness)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true, "nameLine": false}], "expect": "allowed"}
+        {"name": "a build lease with NO name line (or an empty one) is treated as gone, even with a live owner - neither app writes one, Windows' reader calls fewer than two lines stale, and judged on its id alone it could hold a course for the whole life of whatever was handed that id (#156; an import lease with no name is judged as Plantoir's instead - liveness)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true, "nameLine": false}], "expect": "allowed"},
+        {"name": "another program is copying the course (Windows' plantoir-mcp zipping it for an assistant backup): a build is declined", "appliesOn": ["windows"], "onTheMac": "The mac writes no copy lease and reads none: a course being zipped is marked inside the program doing the zipping (CourseActivity.courseIsBeingCopied, #351), which every reader in that program asks first (CourseActivity.busyDescription, the assistant's AssistSiteWork) and which declines a build there with assist-wording.json courseIsBeingCopied. What that does NOT cover, said plainly: a zip made by ANOTHER program on the mac (a Plantoir --mcp-stdio session's back_up_course) is not seen by the window. Not built here on purpose (Russell, 2026-10-03, #413): the case records the difference rather than a mac lease reader being invented to make it pass.", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "copy", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
+        {"name": "another program is copying the course: a deploy set for later waits for it", "appliesOn": ["windows"], "onTheMac": "As above: the mac has no copy lease, and a scheduled deploy is a separate run that does not see another program's zip.", "asker": "aScheduledPublish", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "copy", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
+        {"name": "a program's own copy lease never declines its own build - the in-process rules decide that", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "copy", "pid": 100, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed", "why": "#413's proposal, in the half that holds on both platforms: a lease is never in its own owner's way, whatever its kind."}
       ]
     }
   },
@@ -18466,7 +18707,7 @@
       "heldTitle": "Plantoir will finish updating once it is done {work}.",
       "scheduledWork": "publishing Section {section} of {course} on its schedule",
       "scheduledWorkUnnamed": "publishing on its schedule",
-      "elsewhereWork": "waiting for {course} to finish building somewhere else on this Mac",
+      "elsewhereWork": "waiting for {course} to finish building somewhere else on this {machine}",
       "heldExplanation": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.",
       "heldExplanationOnceInstalling": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, it finishes updating as it quits.",
       "okButton": "OK",
@@ -18488,7 +18729,7 @@
       "assistantElsewhereWork": "helping an assistant in another app",
       "assistantElsewhereWorkWhy": "The {work} for heldTitle when the only thing holding the install is a running plantoir-mcp (bundle-8 ruling 2): the Windows installer replaces plantoir-mcp.exe, so any running one holds the install - it may be publishing in a folder this app has never opened. The mac's server IS the app, so the mac has no such case.",
       "elsewhereWorkOnWindows": "waiting for {course} to finish building somewhere else on this PC",
-      "elsewhereWorkOnWindowsWhy": "elsewhereWork says 'on this Mac'. Until the contract carries a {machine} placeholder (proposed to the mac), Windows says this.",
+      "elsewhereWorkOnWindowsWhy": "SUPERSEDED 2026-10-03 (#418, Russell's decision): elsewhereWork now names the machine through the placeholder in specialNames.platformWording.machine, so this copy is no longer needed. Kept only until Windows fills the placeholder; Windows deletes this key and its sentence in the same change. Before: elsewhereWork said 'on this Mac', and Windows said this instead.",
       "needsAdministratorExplanationOnWindows": "Plantoir was installed for everyone who uses this PC, so it cannot update itself. To get the new version, whoever looks after this PC can uninstall Plantoir in Windows Settings, and then you can install it again from plantoir.app. Your courses stay as they are.",
       "needsAdministratorExplanationOnWindowsWhy": "Bundle-8 ruling 3: an all-users copy (in Program Files) is not updated, because a silent per-user update would put a second copy beside it; it says so with needsAdministratorTitle and this sentence. The mac's explanation names a Mac and a menu Windows does not have. Since 2026-10-01 (parity bundle 10; Russell) installer.iss installs per-user ONLY - it no longer offers an all-users install (PrivilegesRequiredOverridesAllowed=dialog is gone) - so every copy it makes updates itself, and this sentence is said only by an all-users copy an older installer made. That is also why the sentence changed the same day: the new installer can never update such a copy (it installs only for the person running it, even when an administrator runs it), so 'download it from plantoir.app' would have made a second, per-user copy beside the old one; the way out is to uninstall the copy installed for everyone, then install again."
     },
@@ -20663,5 +20904,102 @@
       "windows"
     ],
     "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows owes the same guard in preview.ps1 (its own process table, never a remembered process id). Until Windows implements it, its cases are a named gap against the windows issue opened with #381."
+  },
+  "publishPlanNaming": {
+    "rule": "Publishing or hiding pages BY NAME (publish_pages, unpublish_pages and their plan_ twins) finds pages by FILE name and keys them by PATH. A name that fits more than one page's file is never guessed: nothing is written, and the answer is wording.morePagesThanOneAreCalled followed by one line per page - '• ', the page as startOfYear.wording.pageNameInFolder names it, ' — ', then its folder and file name joined by '/', which is the 'name at the end' the sentence asks for and which, given back, fits that page alone. A plan names a page whose shown title another page of the section also has with pageNameInFolder (the rule start of year uses, startOfYear.planShows), and every other page with pageName.",
+    "why": "Adopted on the mac with #425 (Russell, 2026-10-03), from Windows' parity bundle 10 (#420). Until then the mac's planner resolved a name to the first file of that name in path order and keyed what it had chosen, and the date each page took, by file name - so two pages sharing a file name, a section's own 'Notes' and a course-wide 'Notes', were one page to it: the wrong one could be published, and two could swap dates. The listing gives folder/name rather than the bare name Windows first used, because on a file-name collision every bare name is the same and asking again with it would ask the same question again.",
+    "howToRunACase": "Make course ICS3U with one section. Each entry of `pages` is a page written unpublished for section 1: `file` is its file name without .md, `folder` is 'Concepts' (a course-level folder) or 'classes' (section 1's classes folder, 'section1/All Classes' within the course), and `shownAs`, when given, is written as its title: line. Then call `asked` (plan_publish_pages or publish_pages) with `pages`. expect.asks true: the answer is morePagesThanOneAreCalled with {page} = expect.name, then exactly expect.lines in order, and no file changed. expect.asks false: every name in expect.planNames appears in the plan's text as '<name> will become visible', and only the files in expect.written (folder/file) changed when asked was publish_pages.",
+    "cases": [
+      {
+        "name": "two files called Notes: asked, not guessed",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          },
+          {
+            "file": "Notes",
+            "folder": "classes"
+          }
+        ],
+        "asked": "publish_pages",
+        "pagesArgument": "Notes",
+        "expect": {
+          "asks": true,
+          "name": "Notes",
+          "lines": [
+            "• “Notes” (in Concepts) — Concepts/Notes",
+            "• “Notes” (in section1/All Classes) — section1/All Classes/Notes"
+          ],
+          "written": []
+        }
+      },
+      {
+        "name": "the folder and name from the list fits one page, which the plan names with its folder",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          },
+          {
+            "file": "Notes",
+            "folder": "classes"
+          }
+        ],
+        "asked": "publish_pages",
+        "pagesArgument": "Concepts/Notes",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes” (in Concepts)"
+          ],
+          "written": [
+            "Concepts/Notes"
+          ]
+        }
+      },
+      {
+        "name": "one page called Notes is named by its title alone",
+        "pages": [
+          {
+            "file": "Notes",
+            "folder": "Concepts"
+          }
+        ],
+        "asked": "plan_publish_pages",
+        "pagesArgument": "Notes",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes”"
+          ],
+          "written": []
+        }
+      },
+      {
+        "name": "two files that SHOW the same title are both named with their folder",
+        "pages": [
+          {
+            "file": "Notes A",
+            "folder": "Concepts",
+            "shownAs": "Notes"
+          },
+          {
+            "file": "Notes B",
+            "folder": "classes",
+            "shownAs": "Notes"
+          }
+        ],
+        "asked": "plan_publish_pages",
+        "pagesArgument": "Notes A",
+        "expect": {
+          "asks": false,
+          "planNames": [
+            "“Notes” (in Concepts)"
+          ],
+          "written": []
+        }
+      }
+    ]
   }
 }

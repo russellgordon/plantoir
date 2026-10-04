@@ -2336,9 +2336,11 @@ final class AssistToolRunnerTests: XCTestCase {
                 AssistCardCommand.matching("Publish Unit \(unit)")?.toolName, "publish_pages"
             )
         }
-        // One page, not a unit — this must still go to the model, which has a
-        // page title to read out of it.
-        XCTAssertNil(AssistCardCommand.matching("Publish Unit 4, Day 3"))
+        // One page, not a unit — answered in code since #411, as that page
+        // and no other.
+        XCTAssertEqual(
+            AssistCardCommand.matching("Publish Unit 4, Day 3")?.arguments["pages"], "Unit 4, Day 3"
+        )
     }
 
     /// "Unpublish Unit 4" takes every class in the unit down and says one

@@ -60,7 +60,15 @@ BASH = "/bin/bash" if Path("/bin/bash").exists() else "bash"
 
 
 def the_rules() -> dict:
-    return json.loads((REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8"))["previewPorts"]
+    """`previewPorts`, with every sentence's `{machine}` filled with the mac's
+    word (`specialNames.platformWording.machine`, #410): the launchers here are
+    the mac's, so they say the mac's word, and the contract writes the
+    sentence once for both apps."""
+    text = (REPOSITORY_ROOT / "contracts" / "app-rules.json").read_text(encoding="utf-8")
+    shared = json.loads((REPOSITORY_ROOT / "contracts" / "shared-rules.json").read_text(encoding="utf-8"))
+    machine = shared["specialNames"]["platformWording"]["machine"]
+    text = text.replace(machine["placeholder"], machine["mac"])
+    return json.loads(text)["previewPorts"]
 
 
 def the_trail_line() -> str:

@@ -1167,6 +1167,12 @@ not walked from; the walk does not go through a folder index or Key Links.
   that ruling ("a page a hidden class links directly") would ALSO have
   unticked a visible class's own material when a later class links it too, so
   the rule is "and no visible class does" (plan review, finding 5; cases j, k).
+  **This narrowing is Russell's decision now, not only the run's.** His
+  original decision (decision 1) was that every page in the two page groups
+  stays ticked; the v1.4.1 run narrowed it unattended and listed it as a
+  ruling he might reverse. Asked on 2026-10-03, with the measurement above in
+  front of him, he chose to KEEP the page unticked. Do not propose ticking it
+  by default again without a new measurement.
 - **Dates are days.** The offer carries `YYYY-MM-DD` as the class's value
   writes it, never converted to another time zone, because the app writes a
   `CalendarDay` exactly as the assistant's date moves do (ruling N9).
