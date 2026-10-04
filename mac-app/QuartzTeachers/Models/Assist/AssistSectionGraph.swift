@@ -335,6 +335,19 @@ nonisolated struct AssistSectionGraph {
         return pagesByTitle[tidied]
     }
 
+    /// The page whose file is this one, compared by standardized path — or
+    /// nil when the section has no such page (#425's review, stack 1 item 1).
+    /// For a caller that already holds the class's FILE: a title would fit
+    /// two pages when a class shares its file name with a course-level page,
+    /// and the file never does.
+    func page(atFile url: URL) -> AssistSectionPage? {
+        let wanted: String = url.standardizedFileURL.path
+        for page in pages where page.fileURL.standardizedFileURL.path == wanted {
+            return page
+        }
+        return nil
+    }
+
     /// Every page whose FILE is called `title` — not only the first in path
     /// order, which is what `page(titled:)` answers (#425, adopted from
     /// Windows' bundle 10). A name with a folder in front of it ("Concepts/
