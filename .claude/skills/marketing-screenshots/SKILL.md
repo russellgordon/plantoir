@@ -280,11 +280,17 @@ they cannot drift.
 | `Lost connection to the application` | Somebody used the Mac, or a second `xcodebuild` started. |
 | Five of six saved, no obvious error | Read the `✗` lines. The run keeps going on purpose. |
 
-**Do not add a shot that needs a form scrolled.** XCUITest cannot scroll these
-SwiftUI forms — neither `scroll(byDeltaX:deltaY:)` nor `swipeUp()` — so
-anything below the fold is unreachable. If a capture needs it, change the
-subject instead: a published class site usually makes the same point better
-than the controls that produced it.
+**Scrolling a settings form is fragile; avoid a shot that needs it.**
+`swipeUp()` does nothing to these SwiftUI forms, and `scroll(byDeltaX:deltaY:)`
+aimed at the window or at `scrollViews.firstMatch` does nothing either. Two
+things DO work: `scroll(byDeltaX:deltaY:)` on the scroll view that CONTAINS the
+target (`application.scrollViews.containing(.any, identifier: …)`, what
+`testDeclareSecondCurriculum` does since 2026-10-04), and a posted
+scroll-wheel CGEvent (`scrollWheel`) — but the latter only from a test runner
+holding the Accessibility grant, which a runner built at a new path (a
+worktree's own DerivedData) does not: there it silently moves nothing. When a
+capture can make its point without a form, prefer that: a published class
+site usually makes the same point better than the controls that produced it.
 
 ## Put the machine back
 
