@@ -87,14 +87,14 @@ public sealed class DrivenApp : IDisposable
     public void ClickMiddleOf(AutomationElement element)
     {
         BringToFront();
-        FlaUI.Core.Input.Mouse.Click(MiddleOf(element));
+        FlaUI.Core.Input.Mouse.Click(MiddleOf(element, Window.BoundingRectangle));
     }
 
     /// <summary>The right-click twin of <see cref="ClickMiddleOf"/> (#428 item 4), for a row's menu.</summary>
     public void RightClickMiddleOf(AutomationElement element)
     {
         BringToFront();
-        FlaUI.Core.Input.Mouse.RightClick(MiddleOf(element));
+        FlaUI.Core.Input.Mouse.RightClick(MiddleOf(element, Window.BoundingRectangle));
     }
 
     /// <summary>
@@ -110,11 +110,41 @@ public sealed class DrivenApp : IDisposable
         else FlaUI.Core.Input.Mouse.Click(MiddleOf(item));
     }
 
-    /// <summary>The middle of an element's bounding rectangle, which is in real pixels at every scale.</summary>
-    public static System.Drawing.Point MiddleOf(AutomationElement element)
+    /// <summary>
+    /// The middle of an element's bounding rectangle, which is in real pixels
+    /// at every scale — or a <see cref="ClickWouldMissException"/> when a click
+    /// there would land on something else (#428 review, ruling 1).
+    /// <paramref name="within"/>: the main window's box, for anything inside
+    /// it; null for an item of an OPEN menu, a popup that may sit outside it.
+    /// </summary>
+    public static System.Drawing.Point MiddleOf(AutomationElement element, System.Drawing.Rectangle? within = null)
     {
-        var box = element.BoundingRectangle;
-        return new System.Drawing.Point(box.Left + box.Width / 2, box.Top + box.Height / 2);
+        bool offscreen;
+        try { offscreen = element.IsOffscreen; } catch { offscreen = false; }
+        string name;
+        try { name = element.AutomationId is { Length: > 0 } id ? id : element.Name ?? "an element"; } catch { name = "an element"; }
+        return MiddleWithin(element.BoundingRectangle, offscreen, within, name);
+    }
+
+    /// <summary>
+    /// The rule of <see cref="MiddleOf"/>, apart from UI Automation so a plain
+    /// test can pin it. The old <c>element.Click()</c> threw
+    /// <c>NoClickablePointException</c> in each of these cases; the middle of
+    /// a box does not, and FlaUI neither clamps the box of a row scrolled out
+    /// of view nor refuses an empty one (whose middle is 0,0) — so without
+    /// this a real click would go to the taskbar, the desktop or another app.
+    /// </summary>
+    internal static System.Drawing.Point MiddleWithin(System.Drawing.Rectangle box, bool offscreen,
+                                                      System.Drawing.Rectangle? within, string describedAs)
+    {
+        if (offscreen)
+            throw new ClickWouldMissException($"{describedAs} is off screen, so a click on it would land somewhere else.");
+        if (box.Width <= 0 || box.Height <= 0)
+            throw new ClickWouldMissException($"{describedAs} has an empty box ({box}), so a click on it would land somewhere else.");
+        var middle = new System.Drawing.Point(box.Left + box.Width / 2, box.Top + box.Height / 2);
+        if (within is { } window && !window.Contains(middle))
+            throw new ClickWouldMissException($"The middle of {describedAs} ({middle.X},{middle.Y}) is outside Plantoir's window ({window}), so a click there would land somewhere else.");
+        return middle;
     }
 
     /// <summary>
@@ -468,9 +498,13 @@ public sealed class DrivenApp : IDisposable
             // A dialog that is still closing covers the window with its
             // smoke layer, and the row then has no clickable point
             // (NoClickablePointException, run 8 of bundle 11): wait it out.
-            Retry.WhileFalse(() => { try { return row.TryGetClickablePoint(out _); } catch { return false; } },
-                             TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250));
-            RightClickMiddleOf(row);
+            // Skipped and retried when the wait runs out, as before #428: the
+            // click must not go ahead whatever the wait found.
+            if (!Retry.WhileFalse(() => { try { return row.TryGetClickablePoint(out _); } catch { return false; } },
+                                  TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250)).Result)
+                continue;
+            try { RightClickMiddleOf(row); }
+            catch (ClickWouldMissException) { Thread.Sleep(1000); continue; }
             // The app's own window first — its menus are popups inside it, and
             // a whole-desktop query is the one that timed out (COMException
             // 0x80131505, run 5 of bundle 11); a timeout is "not yet".
@@ -706,4 +740,10 @@ public sealed class DrivenApp : IDisposable
         }
         return !Directory.Exists(root);
     }
+}
+
+/// <summary>A real click that would not land on the element it was meant for (#428 review, ruling 1).</summary>
+public sealed class ClickWouldMissException : InvalidOperationException
+{
+    public ClickWouldMissException(string message) : base(message) { }
 }
