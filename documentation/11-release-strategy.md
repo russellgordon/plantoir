@@ -209,7 +209,26 @@ have published a mac feed no Mac accepts, and the deploy's own check would have
 passed it, because it compares the live feed with `site/`. `.gitattributes`
 now marks `website/updates/*.xml` and `*.xml.signature` `-text`. The
 pre-commit hook still remarks on the CR in `windows.xml`; there it is correct
-to leave them.
+to leave them. Git does not rewrite a file because its attribute changed, so
+any OTHER Windows clone keeps its CR LF `macos.xml` until it is checked out
+again: `git checkout -- website/updates/macos.xml`, then compare its SHA-256
+with the live feed's before deploying from that clone.
+
+**The committed feed, read by the engine itself** (the Opus review's probe,
+2026-10-03: NetSparkle 3.1.0 from the package cache, the real public key,
+`SecurityMode.Strict`, the committed `windows.xml` and `.signature`): running
+as 1.4.2 it answers `UpdateNotAvailable`; as 1.4.1 or 1.1.0,
+`UpdateAvailable [1.4.2]`. The feed's signature is valid on the CR LF bytes
+and INVALID once they are converted to LF. Versions compare the way a teacher
+expects (1.4.3 above 1.4.2, 1.4.10 above 1.4.9). The check fetches two files,
+`windows.xml` and `windows.xml.signature`.
+
+**Owed in the next version, found by the same review:** `App.xaml.cs` writes
+the `app updated` trail line with `byItsOwnUpdater: false` always, which was
+true while no updater ran. The first update the app installs itself would be
+recorded as "by hand". It has to be put right in the version that is
+INSTALLED by the updater (1.4.3), which is the one that writes the line; the
+`windows` issue opened with this release says how.
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|

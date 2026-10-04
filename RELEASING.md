@@ -498,6 +498,11 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   complete until both lines are ✅. Then open the installed app and choose
   File ▸ Check for Updates…: it must say Plantoir is up to date, which is the
   only end-to-end proof that the app accepts the live feed and its signature.
+  The deploy's check compares the download's LENGTH, not its signature, picks
+  the "newest" item as the FIRST one in the file (a Windows item's version is
+  not a whole number), and does not compare the feed's version with the
+  csproj: with more than one item in the feed, read those three by hand until
+  `windows.xml` has a checker of its own.
 - **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)

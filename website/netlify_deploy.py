@@ -256,7 +256,10 @@ def verify_feeds_live() -> str:
             continue
         result = update_feeds.verify_live(base_url, feed)
         signature = feed.with_name(feed.name + ".signature")
-        if result == "match" and signature.is_file():
+        if feed.name == "windows.xml" and not signature.is_file():
+            print(f"❌ site/updates/{signature.name} is missing: the Windows app refuses a feed with no signature file.")
+            result = "mismatch"
+        elif result == "match" and signature.is_file():
             result = update_feeds.verify_file_live(base_url, signature)
         if result == "mismatch":
             outcome = "mismatch"
