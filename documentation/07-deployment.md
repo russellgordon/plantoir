@@ -2849,8 +2849,9 @@ app (`--run-scheduled-deploy`), so that boot-out ends the run there and then: a
 set made during the wait ends it before `jobStillStands`, a set made during the
 deploy ends it before `bootOutAgent`, and an ended run removes nothing. The
 wrapper it started is a `Process` child in a process group of its own, so it
-SURVIVES and finishes the old deploy as an orphan — harmless, since its only
-plist line has already run and it boots nothing out. `jobStillStands` and
+SURVIVES and finishes the old deploy as an orphan. It cannot remove the new
+deploy — its only plist line has already run and it boots nothing out — but it
+is NOT harmless (see "What this costs" below). `jobStillStands` and
 `leaveQuietly` stay as the second line of defence they were written as.
 
 Measured on an Apple M4 Pro, macOS 26.6, with a throwaway agent shaped like the
@@ -2863,7 +2864,18 @@ both at once.
 **What this costs, and was left:** the old run's own after-work (marking the
 section published, the trail line for a stopped run, the notification) does not
 happen, and its leases name a process that is gone, so they read as stale while
-the orphaned wrapper is still deploying. Rejected for now: letting the run
+the orphaned wrapper is still deploying. **That last part can make two deploys of
+one section overlap.** A lease whose owner is gone is ignored
+(`shared-rules.json` → `workLeases.liveness`), so the window's Deploy, an
+outside assistant's `deploy_section`, or the newly set run firing soon all go
+ahead while the orphan is still building and uploading. `deploy.sh` has no
+same-section guard of its own (`a_deploy_is_running_for` is only named in a
+comment there), and `preview.sh`'s #381 guard is asked on a SERVING run only, so
+a deploy's `--build-only` leg is not refused either. The result is two builds
+and uploads of one section at once, which is the fault #156's leases exist to
+prevent. Nothing on `dev` is worse than before #409 was checked. A guard is a
+decision for Russell, drafted as an issue: a deploy refuses while that
+section's scheduled wrapper is still working. Rejected for now: letting the run
 survive a re-set and comparing moments at the end as Windows does, because the
 boot-out-first order is what keeps "never briefly two agents" true (#237) and
 changing it reopens that. Pinned by
