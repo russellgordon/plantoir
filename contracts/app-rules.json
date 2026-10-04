@@ -3453,13 +3453,13 @@
       "exitCode" : 1,
       "sentence" : [
         "Every address Plantoir can use for a preview is taken.",
-        "Close Plantoir's windows for your other working folders, or restart this Mac, then try again."
+        "Close Plantoir's windows for your other working folders, or restart this {machine}, then try again."
       ],
       "sentenceOnWindows" : [
         "Every address Plantoir can use for a preview is taken.",
         "Close Plantoir's windows for your other working folders, or restart this PC, then try again."
       ],
-      "sentenceOnWindowsWhy" : "PROPOSED from Windows (GitHub #286, 2026-09-30) as an authored case rather than a local rewording: the same two lines with the machine named the way specialNames.platformWording names it there ('this PC'). preview.ps1 prints it word for word and exits exitCode; windows-app/test_launcher_rules.ps1 pins it against this key. On Windows a block is held only by a preview that is LISTENING (there are no workspaces), so both remedies the sentence names are true there too: closing a folder's windows stops its previews, and a restart stops every one. A mac-side test that pins this object's keys will want the key named. Proposed from Windows; the mac issue for bundle 4 carries the request.",
+      "sentenceOnWindowsWhy" : "SUPERSEDED 2026-10-03 (#410, #418, Russell's decision): `sentence` now says 'restart this {machine}', filled from shared-rules.json specialNames.platformWording.machine, so this copy is no longer needed; it is kept only until Windows fills the placeholder, and Windows deletes this key and sentenceOnWindows in the same change. Its history: PROPOSED from Windows (GitHub #286, 2026-09-30) as an authored case rather than a local rewording: the same two lines with the machine named the way specialNames.platformWording names it there ('this PC'). preview.ps1 prints it word for word and exits exitCode; windows-app/test_launcher_rules.ps1 pins it against this key. On Windows a block is held only by a preview that is LISTENING (there are no workspaces), so both remedies the sentence names are true there too: closing a folder's windows stops its previews, and a restart stops every one. A mac-side test that pins this object's keys will want the key named. Proposed from Windows; the mac issue for bundle 4 carries the request.",
       "why" : "The old advice - 'stop another preview (or another app using ports 8081+)' - was false: a block belongs to a workspace that EXISTS, running a preview or not, and six idle workspaces held all six blocks on the development Mac. Closing a folder's last window stops its workspace, and a restart stops every workspace (they are made with no restart policy); the second pass of the walk (hostBlockPasses) then counts a stopped workspace's block as free, so both remedies the sentence names really do free room - a window closes for a folder open now, a restart for workspaces left running by a scheduled publish, the command line or a Plantoir from before 2026-09-19. What is left after both is ports other APPS are listening on. Printed by all three launchers - a PUBLISH that cannot get a workspace prints it too, which is why it says 'a preview' rather than naming what was pressed. Written on the trail as the launcher line of the existing 'preview did not appear' event (shared-rules.json -> activityTrail.mustRecord), not as a new event. No machinery words (rule 1)."
     },
     "whenThePreviewNeverAppears" : {
@@ -3473,7 +3473,7 @@
         },
         {
           "answer" : "the builder replied and nothing was serving the site inside it",
-          "sentence" : "Your website did not come up, so Plantoir stopped waiting for it.\n\nNothing has been lost. Press Preview to try again — and if it happens again, restarting your Mac usually puts it right.",
+          "sentence" : "Your website did not come up, so Plantoir stopped waiting for it.\n\nNothing has been lost. Press Preview to try again — and if it happens again, restarting your {machine} usually puts it right.",
           "verdict" : "theSiteNeverAnswered",
           "why" : "The builder was reached and answered about a port with nothing on it, so the site really was not being served. Only a REPLY counts here - an answer that never arrived is the third case, not this one."
         },

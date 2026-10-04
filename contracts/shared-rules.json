@@ -9358,7 +9358,11 @@
         "placeholder": "{machine}",
         "mac": "Mac",
         "windows": "PC",
-        "usedIn": [],
+        "usedIn": [
+          "app-rules.json:previewPorts.whenNoBlockIsFree.sentence[1]",
+          "app-rules.json:previewPorts.whenThePreviewNeverAppears.cases[1].sentence",
+          "shared-rules.json:appUpdates.wording.elsewhereWork"
+        ],
         "rule": "A sentence outside specialNames that names the teacher's computer is written ONCE, with {machine} where the computer's name goes, and each app puts in its own word: the mac 'Mac', Windows 'PC'. The placeholder is the bare NOUN and the sentence keeps its own determiner ('on this {machine}', 'restarting your {machine}'), because every such sentence Windows had reworded kept the determiner and swapped only the noun - so filling it changes no sentence on either platform. usedIn names every string in contracts/ that carries the placeholder, as file:path with array positions in brackets; SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded walks every contract file and goes red when the two differ, so a reader on either side can drive its fill off this list.",
         "why": "GitHub #418 (DO 1) and #410 (DO 1, DO 2), decided by Russell 2026-10-03. Before it, Windows carried its own copy of each such sentence (appUpdates.windowsWording.elsewhereWorkOnWindows; previewPorts.whenNoBlockIsFree.sentenceOnWindows) or compared with a substitution of its own (#233's 'your PC'), and a reworded sentence on one side would leave the other copy standing. REJECTED: a separate Windows key per sentence (two copies of every sentence, which is the drift this replaces); 'this Mac'/'this PC' as the placeholder's value (the sentences say 'your Mac' as well as 'this Mac', and changing either to fit would reword a sentence teachers already read); reusing the keys list above, whose substitution is 'on your Mac' -> 'on this PC' and changes the determiner as well as the noun."
       },
@@ -18474,7 +18478,7 @@
       "heldTitle": "Plantoir will finish updating once it is done {work}.",
       "scheduledWork": "publishing Section {section} of {course} on its schedule",
       "scheduledWorkUnnamed": "publishing on its schedule",
-      "elsewhereWork": "waiting for {course} to finish building somewhere else on this Mac",
+      "elsewhereWork": "waiting for {course} to finish building somewhere else on this {machine}",
       "heldExplanation": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.",
       "heldExplanationOnceInstalling": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, it finishes updating as it quits.",
       "okButton": "OK",
@@ -18496,7 +18500,7 @@
       "assistantElsewhereWork": "helping an assistant in another app",
       "assistantElsewhereWorkWhy": "The {work} for heldTitle when the only thing holding the install is a running plantoir-mcp (bundle-8 ruling 2): the Windows installer replaces plantoir-mcp.exe, so any running one holds the install - it may be publishing in a folder this app has never opened. The mac's server IS the app, so the mac has no such case.",
       "elsewhereWorkOnWindows": "waiting for {course} to finish building somewhere else on this PC",
-      "elsewhereWorkOnWindowsWhy": "elsewhereWork says 'on this Mac'. Until the contract carries a {machine} placeholder (proposed to the mac), Windows says this.",
+      "elsewhereWorkOnWindowsWhy": "SUPERSEDED 2026-10-03 (#418, Russell's decision): elsewhereWork now says 'on this {machine}', filled from specialNames.platformWording.machine, so this copy is no longer needed. Kept only until Windows fills the placeholder; Windows deletes this key and its sentence in the same change. Before: elsewhereWork said 'on this Mac', and Windows said this instead.",
       "needsAdministratorExplanationOnWindows": "Plantoir was installed for everyone who uses this PC, so it cannot update itself. To get the new version, whoever looks after this PC can uninstall Plantoir in Windows Settings, and then you can install it again from plantoir.app. Your courses stay as they are.",
       "needsAdministratorExplanationOnWindowsWhy": "Bundle-8 ruling 3: an all-users copy (in Program Files) is not updated, because a silent per-user update would put a second copy beside it; it says so with needsAdministratorTitle and this sentence. The mac's explanation names a Mac and a menu Windows does not have. Since 2026-10-01 (parity bundle 10; Russell) installer.iss installs per-user ONLY - it no longer offers an all-users install (PrivilegesRequiredOverridesAllowed=dialog is gone) - so every copy it makes updates itself, and this sentence is said only by an all-users copy an older installer made. That is also why the sentence changed the same day: the new installer can never update such a copy (it installs only for the person running it, even when an administrator runs it), so 'download it from plantoir.app' would have made a second, per-user copy beside the old one; the way out is to uninstall the copy installed for everyone, then install again."
     },
