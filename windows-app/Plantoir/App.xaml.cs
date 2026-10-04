@@ -16,9 +16,8 @@ public partial class App : Application
 
     /// <summary>
     /// The update engine (#337), or null in a development build (no feed at
-    /// all, decision 5). Constructed in a Release build, but INACTIVE — it
-    /// fetches nothing and shows no menu item — while AppUpdates.ConfiguredFeed
-    /// is empty, which it is until a release sets it.
+    /// all, decision 5). Constructed and started in every Release build since
+    /// v1.4.2, the first release to set AppUpdates.ConfiguredFeed and its key.
     /// </summary>
     public static Plantoir.Core.Assist.AppUpdater? Updater { get; private set; }
 
@@ -128,11 +127,15 @@ public partial class App : Application
         }
 
         // `app updated` (#337): the first launch of a new version, whoever
-        // installed it. No updater runs yet, so it is always "by hand".
+        // installed it. "By its own updater" when the installer left its
+        // marker for THIS version (#428 item 1); the marker is read and
+        // removed at every launch, so it can never speak for a later one.
         try
         {
             string running = Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion;
-            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: false) is { } line)
+            var runningVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0);
+            bool byItself = Plantoir.Core.Assist.AppUpdates.ConsumeUpdatedByItselfMarker(AppDataRoot.Current, runningVersion);
+            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: byItself) is { } line)
                 Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AppUpdated, line);
             if (Settings.LastLaunchedVersion != running)
             {

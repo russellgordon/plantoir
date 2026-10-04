@@ -193,5 +193,82 @@ public class AppUpdatesContractTests
         Assert.Null(AppUpdates.AppUpdatedLine("1.2.0", "1.2.0", false));
         Assert.Equal("updated from 1.1.0 to 1.2.0, by hand (a new copy installed some other way)",
                      AppUpdates.AppUpdatedLine("1.1.0", "1.2.0", false));
+        Assert.Equal("updated from 1.1.0 to 1.2.0, by its own updater",
+                     AppUpdates.AppUpdatedLine("1.1.0", "1.2.0", true));
+    }
+
+    /// <summary>
+    /// appUpdates.notes.cumulative (#428 item 2): a teacher offered 1.4.4 who
+    /// skipped 1.4.3 still reads 1.4.3's notes, newest first.
+    /// </summary>
+    [Fact]
+    public void TheOfferCarriesTheNotesOfEveryNewerRelease()
+    {
+        Assert.True(Updates["notes"]!["cumulative"]!.GetValue<bool>());
+
+        Assert.Equal("", AppUpdates.NotesFor(Array.Empty<(string?, string?)>()));
+        Assert.Equal("Only this.", AppUpdates.NotesFor(new (string?, string?)[] { ("1.4.3", " Only this.\n") }));
+        Assert.Equal("", AppUpdates.NotesFor(new (string?, string?)[] { ("1.4.3", null) }));
+
+        string both = AppUpdates.NotesFor(new (string?, string?)[] { ("1.4.4", "Newer."), ("1.4.3", "Back up first.") });
+        Assert.Equal("1.4.4\nNewer.\n\n1.4.3\nBack up first.", both);
+
+        // A release with no notes adds nothing, and does not hide another's.
+        Assert.Equal("1.4.3\nBack up first.",
+                     AppUpdates.NotesFor(new (string?, string?)[] { ("1.4.4", ""), ("1.4.3", "Back up first.") }));
+    }
+
+    /// <summary>
+    /// #428 item 1: the installer's marker says "by its own updater" for the
+    /// version it installed, once, and never for any other version.
+    /// </summary>
+    [Fact]
+    public void TheUpdatersMarkerSpeaksOnlyForTheVersionItInstalled()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "plantoir-marker-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            string marker = Path.Combine(folder, AppUpdates.UpdatedByItselfMarker);
+            var running = new Version(1, 4, 3, 0);
+
+            Assert.False(AppUpdates.ConsumeUpdatedByItselfMarker(folder, running));      // no marker: by hand
+
+            File.WriteAllText(marker, "1.4.3");
+            Assert.True(AppUpdates.ConsumeUpdatedByItselfMarker(folder, running));
+            Assert.False(File.Exists(marker));                                            // read AND removed
+            Assert.False(AppUpdates.ConsumeUpdatedByItselfMarker(folder, running));      // so once only
+
+            // A marker left for another version (an update whose app was never
+            // opened, then a hand install of something else) is not believed,
+            // and is still removed.
+            File.WriteAllText(marker, "1.4.2");
+            Assert.False(AppUpdates.ConsumeUpdatedByItselfMarker(folder, running));
+            Assert.False(File.Exists(marker));
+
+            File.WriteAllText(marker, "not a version");
+            Assert.False(AppUpdates.ConsumeUpdatedByItselfMarker(folder, running));
+            Assert.False(File.Exists(marker));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    /// <summary>
+    /// The installer half of the marker: every install deletes it before
+    /// copying, and only an update that finished writes it, with the version
+    /// it installed, where the app looks.
+    /// </summary>
+    [Fact]
+    public void TheInstallerLeavesTheMarkerOnlyAfterAFinishedUpdate()
+    {
+        string iss = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "installer.iss"));
+        Assert.Contains(@"{localappdata}\Plantoir\" + AppUpdates.UpdatedByItselfMarker, iss);
+        string code = iss[iss.IndexOf("procedure CurStepChanged", StringComparison.Ordinal)..];
+        int install = code.IndexOf("CurStep = ssInstall", StringComparison.Ordinal);
+        int delete = code.IndexOf("DeleteFile(UpdatedByItselfMarker)", StringComparison.Ordinal);
+        int taskkill = code.IndexOf("if not IsUpdate then", StringComparison.Ordinal);
+        Assert.True(install >= 0 && delete > install && delete < taskkill, "every install deletes the marker at ssInstall, outside the update-only branch");
+        Assert.Contains("(CurStep = ssPostInstall) and IsUpdate", code);
+        Assert.Contains("SaveStringToFile(UpdatedByItselfMarker, '{#AppVersion}'", code);
     }
 }
