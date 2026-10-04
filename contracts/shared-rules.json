@@ -18652,7 +18652,7 @@
     "notes": {
       "cumulative": true,
       "requiredWarningMarksTheUpdateImportant": true,
-      "why": "The update window shows the notes of the version offered. A teacher who skipped a release must still see the warning written for it, so the notes carry every release newer than theirs, and a release with a REQUIRED warning is marked important (no Skip, no Remind Me Later). The mechanism is platform code - on the mac one section per release in the feed's own notes, hidden once installed; NetSparkleUpdater gathers the notes of every newer release itself - the promise is shared."
+      "why": "The update window shows the notes of the version offered. A teacher who skipped a release must still see the warning written for it, so the notes carry every release newer than theirs, and a release with a REQUIRED warning is marked important (no Skip, no Remind Me Later). The mechanism is platform code - on the mac one section per release in the feed's own notes, hidden once installed; on Windows the app gathers the <description> of every newer feed item itself (AppUpdates.NotesFor, #428), since it draws its own offer and NetSparkle only hands it the newer items. The CUMULATIVE half of the promise is shared; the important mark (no Skip, offered again when skipped) is not yet honoured on Windows, which only notes it on the trail - owed there."
     },
     "mayNotInstallWhile": {
       "counts": [

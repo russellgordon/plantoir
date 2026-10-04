@@ -67,7 +67,7 @@ public class AcceleratorUnderDialogUiTests
         int pid = app.Window.Properties.ProcessId.Value;
         int windowsBefore = desktop.FindAllChildren(cf => cf.ByProcessId(pid)).Length;
 
-        app.Find("sidebar-ICS3U", "the ICS3U row").Click();       // F2 renames the SELECTED course
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));       // F2 renames the SELECTED course
 
         // ---- The positive control: no dialog up, each key arrives, and what it opens is shut.
         foreach (string key in Pressed)
@@ -82,12 +82,12 @@ public class AcceleratorUnderDialogUiTests
         }
 
         // ---- The measurement, under a confirmation.
-        app.Find("sidebar-ICS3U", "the ICS3U row").RightClick();
+        app.RightClickMiddleOf(app.Find("sidebar-ICS3U", "the ICS3U row"));
         var backUp = Retry.WhileNull(
             () => desktop.FindFirstDescendant(cf => cf.ByName("Back Up Now").And(cf.ByControlType(ControlType.MenuItem))),
             TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
         Assert.NotNull(backUp);
-        backUp!.Click();     // its "saved" note is a ContentDialog
+        DrivenApp.PressMenuItem(backUp!);     // its "saved" note is a ContentDialog
 
         var ok = Retry.WhileNull(
             () => desktop.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("OK"))),
@@ -115,7 +115,7 @@ public class AcceleratorUnderDialogUiTests
         Assert.Null(desktop.FindFirstDescendant(cf => cf.ByName("Rename ICS3U")));   // the rename dialog's title
         Assert.Equal(windowsBefore, desktop.FindAllChildren(cf => cf.ByProcessId(pid)).Length);   // no new window, no picker
         Assert.NotNull(desktop.FindFirstDescendant(cf => cf.ByControlType(ControlType.Button).And(cf.ByName("OK"))));
-        ok!.Click();
+        ok!.AsButton().Invoke();
     }
 
     /// <summary>Shut whatever the key opened in the control, and wait until it has gone.</summary>
