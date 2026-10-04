@@ -2656,7 +2656,7 @@ so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 Written 2026-09-25 for [issue #156](https://github.com/russellgordon/plantoir/issues/156).
 Russell's decision: **both ways** — the mac READS the leases other programs
 write and WRITES its own. The rules are `contracts/shared-rules.json` →
-`workLeases.declining` (29 cases); the format is `contracts/file-formats.json`
+`workLeases.declining` (32 cases, and `outsideChanges`' 10 since #433); the format is `contracts/file-formats.json`
 → `workLease`; who counts as alive is #245's `workLeases.liveness`, above under
 "Who counts as alive". This section is why it is shaped the way it is.
 
@@ -2818,6 +2818,12 @@ build of Section 2 from here too. What the window shows if its preview dies
 anyway (a build started by something that does not read leases) stays what
 #235 made it.
 
+**Reversed for outside assistants by #433 (2026-10-03):** Claude and Codex
+are held back only by `build` or `publish`; with a preview only served, a
+change is written, a rebuild builds nothing, and a deploy goes ahead. The
+paragraph above still holds for the window and the in-app assistant. See
+`10-local-ai-assistant.md` → the #156 section.
+
 **A publish set for later WAITS** (ruling (a)). In `runScheduled`, after the
 lateness check and before `process.run()`: it holds nothing while it waits,
 looks every **15 s**, and gives up at **10 minutes** measured on the WALL clock
@@ -2879,7 +2885,7 @@ starts it again when it builds.
 with `HOME` pointed at a scratch home so nothing reached Russell's trail, since
 deleted): a three-line Windows-shaped `ICS3U.build.<pid>.lease` naming a live
 `/bin/sleep`, then `deploy_section` and `rebuild_preview` over
-`Plantoir --mcp-stdio` — both answered `courseIsBusy`, nothing ran, and the
+`Plantoir --mcp-stdio` — both answered `courseIsBusy` (the sentence is `courseIsBeingBuilt` since #433), nothing ran, and the
 scratch trail read "declined an outside assistant's deploy — the course is
 being built by process 82863 somewhere else on this Mac". Windows' reader
 tolerating the mac's FOUR-line lease was confirmed by reading `WorkLease.cs`:
@@ -2960,7 +2966,7 @@ program on the mac — a `--mcp-stdio` session's `back_up_course` — is not see
 by the window. Not built (Russell, 2026-10-03): the case records the difference
 rather than a lease reader being invented to make it pass.
 
-**Tests.** `WorkLeaseDecliningTests` (25): the contract's 29 cases through the
+**Tests.** `WorkLeaseDecliningTests` (28): the contract's 32 cases through the
 pure `WorkLeaseFiles.blocking`; the bytes written; the derivation; a real
 `/bin/sleep` as the other program (held, recycled name ignored, gone ignored);
 the race, pure and on files, and the two orders the review measured; the Deploy's claim and the window's lease ORDER (read from the source, which the suite cannot construct); every door; the scheduled wait with an injected

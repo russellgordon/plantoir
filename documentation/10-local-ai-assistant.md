@@ -953,11 +953,11 @@ never drift apart:
 
 **THE WHOLE VERB IS GATED, not only the day arm, and that asymmetry is the
 decision.** `hide` and `unpublish` take a whole unit or one class page and
-tolerate the spellings below; `publish` is read by a frame of its own that has
-not moved — the literal opening `publish unit ` and a bare number — so `publish
-unit 4, day 3` still goes to the model, and so do `publish unit 4?`, `please
-publish unit 4`, `publish unit 4 please`, `publish  unit 5` and `publish unit,
-4`.
+tolerate the spellings below; `publish` is read by a frame of its own: the
+literal opening `publish unit ` and a bare number, or, since #411, the exact
+form `publish unit 4, day 3` (below). Every looser spelling still goes to the
+model: `publish unit 4?`, `please publish unit 4`, `publish unit 4 please`,
+`publish  unit 5` and `publish unit, 4`.
 
 **That split was made deliberately rather than inherited, and it was got wrong
 first.** The original version read the verb AFTER stripping the courtesy words
