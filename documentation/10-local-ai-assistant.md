@@ -1001,6 +1001,18 @@ swap unit and day, strip a `?`, read past the day number (which takes "… in
 ICS3U" and binds this window's course), and send the hide arm's day form to
 `publish_pages` each turn a contract row red.
 
+**On Windows (#432, v1.4.3 bundle A)** the arm is `AssistCardCommand.UnitAndDay`:
+the UNTRIMMED remainder after `"publish unit "` must be ASCII digits, `, day `,
+ASCII digits. Before it landed, the older regex in `AssistAgent.CardCommand`
+that bundle 5a deleted was run against every refused row: it would have taken
+FOUR of the 35 — "publish unit 4,day 3", "publish  unit 4, day 3", "publish
+unit 4, day  3" and "publish unit  4, day 3" — all publishing with no model in
+the loop, so it is not restored. `HideAndEchoContractTests` reads each row's
+`expectTool` and runs all 16 accepted rows through the agent as well (the
+model never asked, the tool bound to the window's course and section), and
+the scenario runner scripts `given.modelReply`, so "an answer the engine
+stopped part way runs nothing" runs there too.
+
 **What the frame tolerates was decided rather than left to taste**, because
 spellings are the whole question for a family like this — the same argument
 `deployAtATime` won. The comma is frame punctuation and is dropped before the
@@ -2988,8 +3000,9 @@ mistake that shipped from v1.1.0 to 2026-09-19** (issue #202, the mac half of
 a VVH2O window, published a VVH2O class and told the teacher it had. **A
 failure that reports success is the one kind a teacher cannot catch**, and it
 is worse than the lost turn the binding was invented to prevent. Windows never
-had it: each of its assistant sessions is locked to one course
-(`AssistWorkspace.Course` throws an `AssistRefusal`), and Russell decided on
+had it: each of its IN-APP assistant sessions is locked to one course
+(`AssistWorkspace.Course` throws an `AssistRefusal`; the outside doors are not,
+since #430 — `courseIsNamedInTheGreetingOnly`), and Russell decided on
 2026-09-19 that Windows' answer is the one both apps should have.
 
 **What is BOUND, and what is GUARDED.**
@@ -4036,8 +4049,9 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   and `remember_timetable`) is REFUSED at the door of `AssistToolRunner.run`,
   before anything is backed up or written, with `wording.courseIsBeingBuilt`
   ("…so nothing was changed. Ask again once it has finished."). So are
-  `rebuild_preview` and `deploy_section`. This matches Windows'
-  `RefuseIfPlantoirIsBuilding`. `WorkLeaseFiles.whatAnOutsideChangeMeets`
+  `rebuild_preview` and `deploy_section`. Windows does the same at its
+  server's door since v1.4.3 (`OutsideChangeGate`, below — until then it
+  refused only a publish, inside the workspace). `WorkLeaseFiles.whatAnOutsideChangeMeets`
   decides it, and a `build` lease WINS over a `preview` lease whatever order
   the files are read in — reading a building preview as merely served would
   let a change and a rebuild through while a build runs.
@@ -4120,6 +4134,39 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
 - **When the client goes away mid-build**, the server stops the launchers it
   started, and the sections inside the website builder, BEFORE its leases come
   down. A client that kills the server skips that; see the known limit in 09.
+- **On Windows (#436, v1.4.3 bundle A), matched case for case.** The ten
+  `outsideChanges` cases and the four `publishPlanNaming` cases run in
+  `OutsideAssistantWhilePreviewingTests` and `PublishPlanNamingContractTests`
+  (Windows had no reader for either before). Where it lives: the hold-back is
+  `Plantoir.Mcp/OutsideChangeGate.cs`, a call-tool filter in `Program.cs`
+  beside `ReferenceWriteGate` — asked before the tool is dispatched, so before
+  any backup — gated on each tool's own `ReadOnly` flag minus the contract's
+  six, so a new write tool is held back by default. `WorkLease.OutsideMeets`
+  is the pure decision (a HashSet of kinds, so `build` wins whatever the read
+  order — `ABuildWinsWhateverOrderTheLeasesAreReadIn`). Before #436 Windows'
+  writes refused only `if (plan.Publishes)`: an unpublish, a re-date or a new
+  class went ahead mid-build (`AnUnpublishIsHeldBackAtTheDoorWhileTheCourseIsBuilt`
+  pins the difference). The served-preview notes, the rebuild that builds
+  nothing and the deploy that goes ahead (`WorkLease.Asker.AnOutsideDeploy`)
+  are in `AssistWorkspace` (`ClaimTheRebuildAfterAWrite`, `RebuildPreview`,
+  `Deploy`). Three Windows-side decisions, each the easiest to undo:
+  (1) Plantoir's OWN assistant window keeps #289's rule and its words
+  (director's ruling; it is told apart by `PLANTOIR_LOCAL_WINDOW=1`, never by
+  `--course`), as the mac's in-app assistant keeps #156's;
+  (2) the Restore Section pointer (`restoreSectionPutsItBack`) is said only to
+  that window, never to an outside assistant, which has no such button;
+  (3) an outside deploy runs NO separate stop sweep before it builds — the
+  build's own `stop_preview_serving` ends the serving preview to completion
+  before anything is built, which is what the mac's outside deploy and every
+  deploy set for later rely on. A `preview.ps1 --stop` sweep from the server
+  was REJECTED: it ends the window's whole preview chain by command line, so
+  the window's output would carry no mark of the stop and read as a failure.
+  The window's "Closed for a deploy" reads `returned non-zero exit status 15.`
+  — MEASURED on this PC (Python 3.14, Windows 11 26200) by killing a
+  `check=True` child the way `stop_preview.stop_one` does: Windows has no
+  SIGKILL, so it is `os.kill(pid, SIGTERM)`, TerminateProcess with exit code
+  15 (`ScriptRunner.KilledServerMarker`, `ClosedForADeployTests`). Not
+  measured end to end through a real preview and a real deploy.
 
 None of this touches the tool surface: no description, schema or prompt byte
 moved (local 13 `46b96562…2cd96cb6`, MCP 32 `9bcc7eb7…9cef36f7`, hashed before
@@ -6237,9 +6284,17 @@ Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
 contract's argv exactly — which needed `plantoir-mcp.exe` to accept
 `--mcp-stdio <folder>` (an alias of `--folder`; Windows' server took only
 `--folder` until now). So a Codex session reaches the whole working folder, as
-the contract says (`courseIsNamedInTheGreetingOnly`) — where Windows' CLAUDE
-door still passes `--course` and is locked to one course, a difference the
-contract does not describe; see the questions in `ready/bundle5b.md`.
+the contract says (`courseIsNamedInTheGreetingOnly`). Windows' CLAUDE door
+passed `--course` and was locked to one course until v1.4.3; since #430 it
+passes `--mcp-stdio <folder>` too (`ClaudeCodeLauncher.ServerArguments`, its
+`mcp-<CODE>.json` still named after the course so two launches cannot race),
+names the course in its greeting only, and still writes `started Claude Code
+for <CODE>` on the trail. `CodexLauncherTests.TheOutsideDoorsPassWhatTheContractSays`
+now compares BOTH doors' server argv with `serverArguments` by substitution.
+One consequence to know: an unlocked server takes no `assist` lease (it has no
+single course to claim — `Program.cs`), so "Available once you finish revising
+with Claude" no longer appears while a Claude session is open — as it never
+did for Codex, and as on the mac.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6643,8 +6698,10 @@ before changing it:
   reaches `list_courses` through a fixed phrasing over the SAME server binary,
   so the window's `McpClient` sets `PLANTOIR_LOCAL_WINDOW=1` and the server
   leaves the line out. Rejected: keying it on `--course` (both the window and
-  the Claude door pass it), and stripping it in `AssistAgent` (the window would
-  then have to know a sentence it never says).
+  the Claude door passed it then; since #430 only the window does, and it is
+  still not the test — a flag one door drops and another keeps is not an
+  identity), and stripping it in `AssistAgent` (the window would then have to
+  know a sentence it never says).
 - **A backup that cannot be made does not stop the save** — the mac's choice,
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is
