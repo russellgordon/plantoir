@@ -469,15 +469,23 @@ def capture_obsidian(theme: str, x: int, y: int, w: int, h: int) -> Path:
 
 
 def capture_plantoir(exe: Path, theme: str, x: int, y: int, w: int, h: int) -> Path:
+    """Plantoir's window, staged mid-deploy by the app's own "hero" scene
+    (MarketingShotCapturer.cs) on the demo folder, at the card's size."""
+    from app_scenes_windows import end_everything_naming, stage
     announce(f"Plantoir, staged mid-deploy, {theme}")
-    process = subprocess.Popen([str(exe), "--hero-window", theme])
-    hwnd = wait_for_window(lambda: (windows_of_process(process.pid) or [None])[0], seconds=60)
-    time.sleep(3.0)
-    place(hwnd, x, y, w, h)
-    time.sleep(1.5)
-    destination = photograph(hwnd, PARTS / f"plantoir-{theme}.png")
-    stop("Plantoir.exe")
-    return destination
+    pid, outcome, state = stage(exe, "hero", theme, WORKSPACE)
+    try:
+        if outcome != "staged":
+            raise SystemExit(f"The hero's Plantoir window was not staged: {outcome}")
+        hwnd = (windows_of_process(pid) or [None])[0]
+        if hwnd is None:
+            raise SystemExit("The hero's Plantoir window did not appear.")
+        place(hwnd, x, y, w, h)
+        time.sleep(1.5)
+        return photograph(hwnd, PARTS / f"plantoir-{theme}.png")
+    finally:
+        end_everything_naming(WORKSPACE, pid)
+        shutil.rmtree(state, ignore_errors=True)
 
 
 # Edge, as this side's stand-in for Safari and for the mac's page window. A
@@ -696,6 +704,9 @@ def capture_colour_parts(parts: Path, courses: list[dict]) -> None:
 
 def build(exe: Path, themes=("light", "dark")) -> None:
     make_dpi_aware()
+    # The demo folder the hero shows, made by the app when it is not whole.
+    from app_scenes_windows import DEMO, ensure_folders
+    ensure_folders(exe, {DEMO})
     PARTS.mkdir(parents=True, exist_ok=True)
     x, y, w, h = card_geometry()
     print(f"   cards are {w}x{h} real pixels at {scale_factor():.2f}x")
