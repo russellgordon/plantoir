@@ -6,8 +6,9 @@ that have one the teacher declined — so a mistake here is a mistake in
 about 1,900 courses. The checks
 are deliberately blunt: every link resolves, every page is titled, every
 sentinel is where the installer expects it, no template token — %PERCENT% or
-{brace} — survived into the output, and the subject never lands in front of a
-noun it does not fit ("a this course course", #328).
+{brace} — survived into the output, the subject never lands in front of a
+noun it does not fit ("a this course course", #328), and the class website is
+never called "the published website" (#443).
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -57,6 +58,18 @@ ARTICLE_LOWER = re.compile(r"\b(a|an) ([A-Za-z][A-Za-z-]*)")
 ARTICLE_UPPER = re.compile(r"(?<![A-Za-z,] )\b(A|An) ([A-Za-z][A-Za-z-]*)")
 UPPER_START_OF_THIS_OR_THE = re.compile(r"(?<![A-Za-z,] )\bA (this|the)\b")
 
+# The site students see is never "the published page / website / site" (#443,
+# decided by Russell 2026-10-04): DEPLOY is what puts a site online, and
+# PUBLISH only marks a page so a deploy includes it. A sentence about the
+# website says "your class website"; a sentence about marking a page
+# ("publish: true", "the newest published page", "never published") is
+# right and stays — which is why the rule names the SITE, and a page only
+# straight after "the" or "your". `[\s>]` lets the phrase wrap inside a callout.
+SITE_CALLED_PUBLISHED = re.compile(
+    r"\bpublished[\s>]+(?:web\s*)?sites?\b|\b(?:the|your)[\s>]+published[\s>]+pages?\b",
+    re.IGNORECASE,
+)
+
 # Shapes the checks must accept and refuse, run before every lint so a
 # widened rule cannot start biting real prose (or stop catching the #328
 # shapes) unnoticed. A failure here is a broken LINTER, not a broken page.
@@ -73,6 +86,10 @@ MUST_BE_ACCEPTED = [
     "Units: \\mathrm {kg} per \\text {m}.",
     "$$\\begin{aligned} x &= \\frac{a}{b} \\\\ y^{2} \\end{aligned}$$",
     "written for this course. This class asks people to try things.",
+    "It starts at Unit 4, Day 21 because that is the newest PUBLISHED page in All Classes.",
+    "it stays strictly on your computer and is never published or uploaded anywhere.",
+    "on the right side of the page on your class website.",
+    "A shared page can be published to one section and held back from another.",
 ]
 MUST_BE_REFUSED = [
     "When an idea in {subject} needs explaining",
@@ -85,6 +102,10 @@ MUST_BE_REFUSED = [
     "a urban studies course",
     "an unit",
     "an one-page summary",
+    "the table of contents on the right side of the published page.",
+    "a clickable link on the right side of your published\n> website!",
+    "How it looks to your students on the published website:",
+    "never exists on the published site!",
 ]
 
 
@@ -122,6 +143,12 @@ def prose_problems(prose: str) -> list:
             if article.lower() != article_for(word):
                 problems.append(f'"{article}" in front of {word!r}: {match.group(0)!r}')
                 break
+    published = SITE_CALLED_PUBLISHED.search(text)
+    if published:
+        problems.append(
+            f'the class website called "published" (#443 — say "your class website"): '
+            f"{published.group(0)!r}"
+        )
     return problems
 
 
