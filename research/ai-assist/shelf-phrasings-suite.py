@@ -44,13 +44,15 @@ SYSTEM = ("You are Plantoir's assistant, helping a teacher with ICS3U section 1.
 # which had become code-answered without this list being touched: "Deploy at
 # 6:30 AM" with issue #168 (it had already been wrong for a day), and
 # "Unpublish Unit 2, Day 3" with issue #215, where "hide" and "unpublish"
-# became one frame that takes a class page as well as a whole unit.
+# became one frame that takes a class page as well as a whole unit. And again
+# on 2026-10-04 for "Publish Unit 2, Day 3", answered in code (exact form only)
+# since #411.
 # `trimmed-surface-suite.py` reads the answer from `contracts/assist-cases.json`
 # instead, and checks its reading against the contract's own rows before it
 # measures anything; that is the arrangement to copy if this column ever
 # starts deciding something.
 CASES = [
-    ("publish_pages",              "Publish Unit 2, Day 3",                        False, "Unit 2, Day 3"),
+    ("publish_pages",              "Publish Unit 2, Day 3",                        True,  "Unit 2, Day 3"),
     ("publish_class_on",           "Publish tomorrow's class",                     True,  "2026-08-17"),
     ("publish_class_on",           "Publish the class on Monday",                  False, "2026-08-17"),
     ("unpublish_pages",            "Unpublish Unit 2, Day 3",                      True,  "Unit 2, Day 3"),

@@ -331,9 +331,20 @@ final class AssistScenarioTests: XCTestCase {
     }
 
     private func runApproval(_ scenario: Scenario, made: AssistFixture.Made) async throws {
-        let pending: String = try XCTUnwrap(
-            scenario.given["pending"] as? String, "\(scenario.name): no pending tool given"
-        )
+        // `pending` names the tool a card must reach. A case that says what
+        // the teacher types (`saying`) and scripts the model's answer
+        // (`modelReply`, #411) needs none: no card is meant to match.
+        // Relaxed ONLY when the reply is scripted: a case with `saying` and a
+        // mistyped `pending` key must still fail here, not run unchecked.
+        let scriptsTheModel: Bool = scenario.given["modelReply"] != nil && scenario.given["saying"] != nil
+        var pending: String = ""
+        if !scriptsTheModel {
+            pending = try XCTUnwrap(
+                scenario.given["pending"] as? String, "\(scenario.name): no pending tool given"
+            )
+        } else if let named = scenario.given["pending"] as? String {
+            pending = named
+        }
         // A plan needs something real to plan about. `makeRunner` pins today to
         // 2026-09-08, which is what makes "tomorrow" a fixed date here.
         if pending == "publish_class_on" {
@@ -395,11 +406,16 @@ final class AssistScenarioTests: XCTestCase {
         // answers anything, so a lap nobody should have taken is counted
         // rather than left waiting on a connection that never opens.
         var engine: StubEngine? = nil
-        if scenario.expectModelRequests != nil {
+        let scriptedReply: [String: Any]? = scenario.given["modelReply"] as? [String: Any]
+        if scenario.expectModelRequests != nil || scriptedReply != nil {
             let started: StubEngine = try StubEngine()
-            started.serve(
-                #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
-            )
+            if let scriptedReply {
+                started.serve(try AssistScenarioTests.engineReply(scriptedBy: scriptedReply))
+            } else {
+                started.serve(
+                    #"{"choices":[{"message":{"role":"assistant","content":"Here it is."}}],"usage":{"completion_tokens":4}}"#
+                )
+            }
             engine = started
         }
         defer {
@@ -421,6 +437,7 @@ final class AssistScenarioTests: XCTestCase {
             conversation = [try AssistScenarioTests.phrasingReaching(pending)]
         }
 
+        let pagesBefore: [String: String] = AssistScenarioTests.pagesOnDisk(in: made.course.directoryURL)
         for (turn, phrasing) in conversation.enumerated() {
             await agent.say(phrasing)
             let isLastTurn: Bool = turn == conversation.count - 1
@@ -446,6 +463,19 @@ final class AssistScenarioTests: XCTestCase {
         }
 
         try assertTranscript(of: agent, matches: scenario)
+
+        // A reply the engine STOPPED ran nothing, and the runner can see it
+        // directly rather than only through the transcript: no launcher run,
+        // no window action, no page written. That is what keeps the cut-off
+        // case from passing vacuously (#411).
+        if (scriptedReply?["finishReason"] as? String) == "length" {
+            XCTAssertEqual(made.siteWork.deploys, 0, "\(scenario.name): a cut-off answer deployed")
+            XCTAssertEqual(FakePreview.shared.events, [], "\(scenario.name): a cut-off answer acted")
+            XCTAssertEqual(
+                AssistScenarioTests.pagesOnDisk(in: made.course.directoryURL), pagesBefore,
+                "\(scenario.name): a cut-off answer wrote a page"
+            )
+        }
 
         if let expected = scenario.expectModelRequests, let engine {
             XCTAssertEqual(
@@ -603,6 +633,48 @@ final class AssistScenarioTests: XCTestCase {
             return shape.phrasing
         }
         throw XCTSkip("No card phrasing reaches \(tool); this scenario needs a model.")
+    }
+
+    /// Every Markdown page under a folder, by path, with what it says — so a
+    /// case can assert that nothing was written, rather than say so.
+    private static func pagesOnDisk(in folder: URL) -> [String: String] {
+        var pages: [String: String] = [:]
+        let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil)
+        while let item = walker?.nextObject() as? URL {
+            if item.pathExtension == "md" {
+                pages[item.path] = (try? String(contentsOf: item, encoding: .utf8)) ?? ""
+            }
+        }
+        return pages
+    }
+
+    /// The engine's whole reply, built from a case's `given.modelReply` (#411).
+    ///
+    /// The grammar is the one Windows proposed: `finishReason`, and either a
+    /// `toolCall` (`name` plus `arguments` as the model's own TEXT, so a
+    /// half-written one can be scripted) or `content`. `{course}` in the
+    /// arguments is the fixture's course, the placeholder the wording file
+    /// uses, so a case names no real course.
+    private static func engineReply(scriptedBy scripted: [String: Any]) throws -> String {
+        let finishReason: String = try XCTUnwrap(
+            scripted["finishReason"] as? String, "modelReply has no finishReason"
+        )
+        var message: [String: Any] = ["role": "assistant", "content": scripted["content"] as? String ?? ""]
+        if let toolCall = scripted["toolCall"] as? [String: Any] {
+            let name: String = try XCTUnwrap(toolCall["name"] as? String, "modelReply.toolCall has no name")
+            let written: String = toolCall["arguments"] as? String ?? ""
+            let arguments: String = written.replacingOccurrences(of: "{course}", with: "ICS3U")
+            message["tool_calls"] = [[
+                "id": "call-1", "type": "function",
+                "function": ["name": name, "arguments": arguments],
+            ]]
+        }
+        let reply: [String: Any] = [
+            "choices": [["finish_reason": finishReason, "message": message]],
+            "usage": ["completion_tokens": 512],
+        ]
+        let encoded: Data = try JSONSerialization.data(withJSONObject: reply)
+        return String(decoding: encoded, as: UTF8.self)
     }
 
     private static func call(_ name: String, arguments: [String: Any]) -> AssistToolCall {
