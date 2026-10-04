@@ -878,7 +878,17 @@ bar or anything else in the window → `ClickMiddleOf` / `RightClickMiddleOf`;
 an item of a menu that is already OPEN → `DrivenApp.PressMenuItem` (its
 Invoke pattern, else a click in the middle of its box WITHOUT `BringToFront`,
 which could dismiss the menu that is already in front); a dialog's button →
-`AsButton().Invoke()`. The Ctrl+click in `AllBackupsUiTests` releases Ctrl
+`AsButton().Invoke()`. Every one of those real clicks goes through
+`DrivenApp.MiddleOf`, which REFUSES (`ClickWouldMissException`) an element
+that is off screen, has an empty box (whose middle is 0,0), or — for
+anything in the main window — whose middle lies outside the window's box:
+the old `element.Click()` threw `NoClickablePointException` in those cases,
+and FlaUI clamps neither a row scrolled out of view nor an empty box, so
+without the refusal the click would land on the taskbar, the desktop or
+another app (the stack review's finding; `ClickRefusalRuleTests`, plain
+facts). An open menu's item may lie outside the window, so only the first
+two refusals apply to it. `PressRowMenuItem` again skips and retries when
+the clickable-point wait runs out. The Ctrl+click in `AllBackupsUiTests` releases Ctrl
 in a `finally`, so a failed click cannot leave the key down for the next
 test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
 find only the comment in `DrivenApp.cs` that explains why. Built, NOT run

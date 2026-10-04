@@ -265,6 +265,15 @@ item at the cut — every old note repeated in every item, and correct only
 while whoever cuts remembers. The release side is RELEASING.md → "The update
 feed (Windows)".
 
+**Not yet honoured on Windows: the important mark.**
+`appUpdates.notes.requiredWarningMarksTheUpdateImportant` says an update
+with a required warning offers no Skip and no Remind Me Later. The Windows
+app reads `IsCriticalUpdate` only to add "; marked important" to the
+`update found` trail line: Skip This Version is still offered, and the daily
+check returns early for a skipped version, so a skipped important release is
+never offered again by it. Owed in v1.4.4 (its own `windows` issue); 1.4.3 is
+not marked, so nothing changes for it.
+
 | Decision | Choice | Rejected, and why |
 |---|---|---|
 | Engine | NetSparkleUpdater core, **no UI factory**; our own `ContentDialog`s | Its WinForms/WPF/Avalonia UIs: a second UI stack in a WinUI app, English-only, and they say "app cast". |

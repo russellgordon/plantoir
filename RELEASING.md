@@ -503,8 +503,16 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     said "An app cast item with version 1.4.2 is already in the file". (The
     rehearsal put the stand-in in a `1.4.3\` folder and passed `-f` instead,
     which reads the version from the path; a real cut needs neither.)
-  - A release that must not be skipped: add `--critical-versions <version>`
-    (marks the item `sparkle:criticalUpdate="true"`; not rehearsed).
+  - **The Windows app does NOT yet honour an important ("critical") mark.**
+    `--critical-versions <version>` marks the item
+    `sparkle:criticalUpdate="true"`, but all the app does with it is add
+    "; marked important" to the `update found` trail line: the offer still
+    shows Skip This Version, and a version the teacher skipped is not offered
+    again by the daily check. So a warning that must not be skipped CANNOT be
+    made so on Windows today — `appUpdates.notes.requiredWarningMarksTheUpdateImportant`
+    is owed there (its own `windows` issue, v1.4.4). Do not rely on the mark;
+    put the warning in the notes, which every later offer carries. Not
+    rehearsed, and 1.4.3 is not marked.
 
   Check before committing: `python website/build.py --check` runs
   `website/windows_feed.py`'s checker — the feed's signature against
@@ -541,11 +549,17 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   only end-to-end proof that the app accepts the live feed and its signature.
   Since #428 the deploy's check is `website/windows_feed.py`'s own: it
   verifies the live `.signature` against the live feed, takes the newest item
-  by real version order, and READS that installer (about 240 MB, so allow a
-  minute or two) to verify its Ed25519 signature, not only its length.
+  by real version order, and — on Windows, where the installer is cut, or
+  anywhere with `PLANTOIR_VERIFY_WINDOWS_INSTALLER=1` — READS that installer
+  (about 240 MB, so allow a minute or two) to verify its Ed25519 signature,
+  not only its length. From the mac it compares the length, as before, and
+  its line says the signature was not read.
   Before uploading anything, `build.py --deploy` also refuses a working copy
   whose feed files are not byte for byte the committed ones.
-- **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card.
+- **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card
+  — and the deploy is REFUSED if `<Version>` in `Plantoir.csproj` was raised
+  without its feed (`windows_feed.version_refusal`): raise it only in the
+  Windows cut that also rebuilds `windows.xml`.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)
 
