@@ -429,7 +429,7 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
     08:13 on 2026-09-27, with Focus off and the notification delivered, were
     reported as "no banner appeared".
 
-    So the window is photographed as it stands — `screencapture -x -o -l`,
+    So the window is photographed as it stands — `screencapture -x -l`,
     which returns the layer mostly transparent with each banner's REAL
     corners in its alpha — Vision finds the line that names the course, and
     the banner is the opaque card around that line:
@@ -442,7 +442,7 @@ def banner_in_window(number: int, needle: str, destination: Path) -> bool:
 
     with tempfile.TemporaryDirectory() as scratch:
         whole = Path(scratch) / "notification-center.png"
-        taken = subprocess.run(["screencapture", "-x", "-o", "-l", str(number), str(whole)],
+        taken = subprocess.run(["screencapture", "-x", "-l", str(number), str(whole)],
                                capture_output=True)
         if taken.returncode != 0 or not whole.exists():
             return False
@@ -629,7 +629,7 @@ def capture_notification(app_binary: Path, working_folder: Path, destination: Pa
                 # A banner before the record is somebody else's notification.
                 before.add(number)
                 continue
-            subprocess.run(["screencapture", "-x", "-o", "-l", str(number), str(destination)], check=True)
+            subprocess.run(["screencapture", "-x", "-l", str(number), str(destination)], check=True)
             captured = True
             break
         if captured:
