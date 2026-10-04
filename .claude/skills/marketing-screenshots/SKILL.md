@@ -7,7 +7,7 @@ description: Re-shoot the screenshots on plantoir.app — drive the real app and
 
 **This is an agentic task, not a scheduled one.** `website/shots/capture.py`
 does the mechanics — launching the app, switching appearance, exporting the
-images, scaling them for the web. It cannot do the part that matters: deciding
+images and writing the WebP beside each (never scaling a Mac window, #434). It cannot do the part that matters: deciding
 whether what came out is a good picture of the product. Four passes were
 needed the first time, and every failure looked like success until somebody
 opened the images.
@@ -60,12 +60,21 @@ Then check, in this order:
 Both were paid for in ugly screenshots that shipped, and neither is a
 preference to be weighed against convenience.
 
-**1. One capture method, and it is `screencapture -o -l <window number>`.**
-That is macOS's own window capture — the programmatic form of
-Command-Shift-4, Space, Option-click. It asks CoreGraphics for the WINDOW, so
-what comes back has the real rounded corners already transparent and
-antialiased, independent of what is in front of or behind it. Measured: the
-four corner pixels of such a capture read `(0, 0, 0, 0)`.
+**1. One capture method, and it is `screencapture -x -l <window number>` —
+never `-o` — with the window's app ACTIVE.** That is macOS's own window
+capture — the programmatic form of Command-Shift-4, Space, click — and it
+keeps the window's NATURAL shadow (Russell, 2026-10-03/04, #434: "the
+natural shadow that would be captured using the built-in tool"; the release
+before had shadows cut off and windows that did not match). It asks
+CoreGraphics for the WINDOW, so what comes back has the real rounded corners
+and the whole shadow, transparent round them, independent of what is in
+front of or behind it. Activate the app and wait about a second first:
+macOS draws a smaller, lighter shadow round an inactive window. Measured on
+2026-10-04 at 2x: an active window's shadow margin is (112, 76, 112, 148) px
+left, top, right, bottom, whatever the window's size —
+`shadow.NATIVE_MARGINS`. **A Mac capture is never scaled, trimmed or
+cropped**: it is served at its own size, so every single-window picture has
+that same margin, and the test fails one that does not.
 
 There used to be a second method. `MarketingScreenshotTests.save` fell
 through to XCUITest's `window.screenshot()` whenever the window number could
@@ -83,19 +92,23 @@ having if it is the wrong picture.
 
 **The same rule covers every figure assembled from captures** (Russell,
 2026-09-27, angry, and not the first time he said it). A figure is built
-ONLY from whole `screencapture -x -o -l` captures, kept intact with their
-own alpha: no crop through a window, no re-rounding, no rounded mask drawn
-in Pillow, no shape drawn for a shadow (a shadow is the capture's own alpha,
-blurred). Scaling is Lanczos, of a whole image. If a figure must not show
+ONLY from whole `screencapture -x -l` captures, kept intact with their
+own alpha and shadow and placed with `Image.alpha_composite` on a canvas
+that holds every shadow in full (`composite.native_*`): no crop through a
+window or its shadow, no trim, no re-rounding, no mask drawn in Pillow, no
+shadow drawn, blurred or scaled, no scaling at all. If a figure must not show
 the browser's toolbar, the answer is a window that never had one
 (`website/shots/webwindow.swift`), never a crop. `composite.py` used to cut
 Safari's toolbar off and paint 18 px corners back on for `colour-schemes`
 and `light-and-dark`, and the schedule scene cut the notification banner out
 and drew its corners; that code is gone, and `schedule` was retaken from a
 native capture of Notification Center's window. The
-page's own CSS no longer draws a rounded box-shadow round a shot either. `website/shots/test_native_corners.py`
+page's own CSS draws no shadow round a Mac shot either (only a Windows
+capture keeps a `drop-shadow` filter). `website/shots/test_native_corners.py`
 reads every picture the pages show and fails on a square corner or one
-drawn tighter than a real window's, and `capture.py` and `build.py --deploy`
+drawn tighter than a real window's, on a shadow cut off at the edge (alpha
+above 1 in the outermost 3 px), and on a single-window margin that is not
+`NATIVE_MARGINS`; and `capture.py` and `build.py --deploy`
 run the same check (the deploy refuses on a failing picture). A
 mask drawn at the REAL radius passes it, so the test is a guard, not a proof. **Open
 the corners of every image you are about to commit and look** — a native
@@ -267,11 +280,17 @@ they cannot drift.
 | `Lost connection to the application` | Somebody used the Mac, or a second `xcodebuild` started. |
 | Five of six saved, no obvious error | Read the `✗` lines. The run keeps going on purpose. |
 
-**Do not add a shot that needs a form scrolled.** XCUITest cannot scroll these
-SwiftUI forms — neither `scroll(byDeltaX:deltaY:)` nor `swipeUp()` — so
-anything below the fold is unreachable. If a capture needs it, change the
-subject instead: a published class site usually makes the same point better
-than the controls that produced it.
+**Scrolling a settings form is fragile; avoid a shot that needs it.**
+`swipeUp()` does nothing to these SwiftUI forms, and `scroll(byDeltaX:deltaY:)`
+aimed at the window or at `scrollViews.firstMatch` does nothing either. Two
+things DO work: `scroll(byDeltaX:deltaY:)` on the scroll view that CONTAINS the
+target (`application.scrollViews.containing(.any, identifier: …)`, what
+`testDeclareSecondCurriculum` does since 2026-10-04), and a posted
+scroll-wheel CGEvent (`scrollWheel`) — but the latter only from a test runner
+holding the Accessibility grant, which a runner built at a new path (a
+worktree's own DerivedData) does not: there it silently moves nothing. When a
+capture can make its point without a form, prefer that: a published class
+site usually makes the same point better than the controls that produced it.
 
 ## Put the machine back
 

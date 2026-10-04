@@ -992,6 +992,7 @@ Re-taken at the merge into `dev`: **281** lists on the merged tree, `activityTra
 Re-taken at the merge into `dev`: **283** lists on the merged tree, `activityTrail.mustRecord` **117**.
 Re-taken at the merge into `dev`: **284** lists on the merged tree, `activityTrail.mustRecord` **117**.
 Re-taken at the merge into `dev`: **285** lists on the merged tree, `activityTrail.mustRecord` **119**.
+Re-taken at the merge into `dev`: **289** lists on the merged tree, `activityTrail.mustRecord` **123**.
 
 **Re-taken 2026-09-26 with [#301](https://github.com/russellgordon/plantoir/issues/301)**
 (the trail read back leniently), counted ON THIS BRANCH (on `dev` cf80225a): **212**
