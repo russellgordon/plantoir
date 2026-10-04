@@ -19,10 +19,12 @@ last year's ICS3U):
 - DEMO, ``~/Teaching`` -- ENG2D, MCV4U and SCH3U, the demo courses the hero,
   the preview, the progress and the assistant pictures show. Disposable:
   it is deleted and made again whenever it is missing a course.
-- MARKETING, ``~/Desktop/Teaching/School Web Space`` -- ICS3U, ICS4U and last
-  year's ICS3U, the v1.4.0 scenes' folder. Kept. Its name is what a picture's
-  path bar shows, so nothing like a "marketing" folder is ever in frame
-  (Russell, 2026-10-04).
+- MARKETING, ``~/School Web Space`` -- ICS3U, ICS4U and last year's ICS3U, the
+  v1.4.0 scenes' folder. Kept.
+
+Every picture's path bar shows ``~/Desktop/Teaching``, as the mac's do: each
+folder's courses are put there for its scenes (``ShownAsTeaching``), so
+nothing like a "marketing" folder is ever in frame (Russell, 2026-10-04).
 
 Every run starts the app with ``--state-dir`` pointing at a temporary
 folder, so no setting, window list or trail line of a teacher's is touched.
@@ -55,10 +57,62 @@ from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
 import hero_windows as desk  # noqa: E402
 
 DEMO = Path.home() / "Teaching"
-MARKETING = Path.home() / "Desktop" / "Teaching" / "School Web Space"
+MARKETING = Path.home() / "School Web Space"
+# Every picture shows ONE teacher's folder, ~/Desktop/Teaching, as the mac's
+# do (its capture.py, MarketingFolderShownAsTeaching; Russell 2026-10-04: no
+# picture may show "Plantoir Marketing"). Each folder's courses are put there
+# for its scenes, with whatever is there set aside, and both are put back.
+SHOWN = Path.home() / "Desktop" / "Teaching"
+COURSES_SET_ASIDE = SHOWN / ".courses set aside for the pictures"
 DEMO_COURSES = "ENG2D:1, 2;MCV4U:1, 2;SCH3U:1, 2"
 MARKETING_COURSES = "ICS3U:1, 2;ICS4U:1"
 MARKETING_REFERENCE = "ICS3U:2025"
+
+
+class ShownAsTeaching:
+    """`folder`'s courses at SHOWN for the scenes, SHOWN's own courses set
+    aside beside them, both put back, and every course's absolute paths
+    rewritten there and back.
+
+    The COURSES are swapped, not the folder: renaming ~/Desktop/Teaching
+    itself was refused ("Access is denied") while a File Explorer window had
+    it open — which on a teacher's or a developer's machine is the ordinary
+    case. A working folder is its launchers and its `courses`, and the app
+    refreshes the launchers itself, so the window shows exactly the folder
+    the scene needs, at SHOWN's path."""
+
+    def __init__(self, folder: Path) -> None:
+        self.folder = folder
+
+    @staticmethod
+    def rewrite(courses: Path, old: Path, new: Path) -> None:
+        for config in courses.glob("*/course_config.json"):
+            text = config.read_text(encoding="utf-8")
+            escaped_old, escaped_new = json.dumps(str(old))[1:-1], json.dumps(str(new))[1:-1]
+            if escaped_old in text:
+                try:
+                    config.write_text(text.replace(escaped_old, escaped_new), encoding="utf-8")
+                except PermissionError:
+                    pass   # a reference course is locked, and deploys nowhere
+
+    def __enter__(self) -> Path:
+        if COURSES_SET_ASIDE.exists():
+            raise SystemExit(f"{COURSES_SET_ASIDE} is still there from an earlier run: put it back first.")
+        if (SHOWN / "courses").exists():
+            (SHOWN / "courses").rename(COURSES_SET_ASIDE)
+        (self.folder / "courses").rename(SHOWN / "courses")
+        self.rewrite(SHOWN / "courses", self.folder, SHOWN)
+        print(f"   {self.folder.name}'s courses are at {SHOWN} for their pictures")
+        return SHOWN
+
+    def __exit__(self, *_) -> bool:
+        self.rewrite(SHOWN / "courses", SHOWN, self.folder)
+        (SHOWN / "courses").rename(self.folder / "courses")
+        if COURSES_SET_ASIDE.exists():
+            COURSES_SET_ASIDE.rename(SHOWN / "courses")
+        print(f"   {self.folder.name}'s courses and {SHOWN}'s own put back")
+        return False
+
 
 # id in shots.json -> (scene, folder). One picture per scene and appearance.
 SCENES: dict[str, tuple[str, Path]] = {
@@ -219,7 +273,9 @@ def builds_folder_of(folder: Path) -> Path | None:
 
 
 def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Path:
-    scene, folder = SCENES[identifier]
+    """One scene, in its folder already moved to SHOWN (ShownAsTeaching)."""
+    scene, _ = SCENES[identifier]
+    folder = SHOWN
     if scene == "progress":
         # The progress picture is a build caught part-way, and the build is
         # then ended; a scaffold ended part-way refuses the next build ("the
@@ -269,17 +325,22 @@ def capture_app_scenes(exe: Path, only: list[str] | None = None, parts: Path | N
     ensure_folders(exe, {SCENES[identifier][1] for identifier in chosen})
     was_apps, was_system = desk.read_theme()
     try:
-        for theme in ("light", "dark"):
-            desk.write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
-            for identifier in chosen:
-                part = photograph_scene(exe, identifier, theme, parts)
-                if identifier in PARTS_ONLY:
-                    continue
-                destination = IMAGE_DIR / part.name
-                shutil.copyfile(part, destination)
-                prepare(destination, WIDEST_WINDOW_PIXELS)
-                print(f"   saved {destination.name} + WebP")
-            assemble(parts, theme)
+        for source in (MARKETING, DEMO):
+            group = [identifier for identifier in chosen if SCENES[identifier][1] == source]
+            if not group:
+                continue
+            with ShownAsTeaching(source):
+                for theme in ("light", "dark"):
+                    desk.write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+                    for identifier in group:
+                        part = photograph_scene(exe, identifier, theme, parts)
+                        if identifier in PARTS_ONLY:
+                            continue
+                        destination = IMAGE_DIR / part.name
+                        shutil.copyfile(part, destination)
+                        prepare(destination, WIDEST_WINDOW_PIXELS)
+                        print(f"   saved {destination.name} + WebP")
+                    assemble(parts, theme)
     finally:
         desk.write_theme(was_apps, was_system)
         print("   Windows colour mode put back")
@@ -508,7 +569,8 @@ def retake(exe: Path, pairs: list[tuple[str, str]], parts: Path | None = None) -
     try:
         for identifier, theme in pairs:
             desk.write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
-            part = photograph_scene(exe, identifier, theme, parts)
+            with ShownAsTeaching(SCENES[identifier][1]):
+                part = photograph_scene(exe, identifier, theme, parts)
             if identifier not in PARTS_ONLY:
                 destination = IMAGE_DIR / part.name
                 shutil.copyfile(part, destination)

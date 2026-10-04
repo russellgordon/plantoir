@@ -128,9 +128,12 @@ single-window shot carries no shadow of its own (the page's stylesheet gives
 a Windows single-window picture its drop-shadow; `website/test_shot_shadows.py`).
 The figures (`hero`, `colour-schemes` and its dark version, `light-and-dark`,
 `two-maps`) are such captures placed whole. **One picture is still owed:**
-`schedule` — a Windows scheduled deploy posts no notification (the run deletes
-the job file its toast reads; measured on the installed 1.4.2 as well), and
-Windows' notifications are not windows Windows.Graphics.Capture can be given.
+`schedule` — Windows' notification is not a window Windows.Graphics.Capture
+can be given: during a real scheduled deploy's toast (2026-10-04 12:07, with
+#448's fix, which makes the toast appear at all) EnumWindows showed no new,
+visible or uncloaked window and UI Automation's desktop root no notification
+element. The route (a person picking the surface in `GraphicsCapturePicker`,
+or a screen crop the rule forbids) is Russell's to choose.
 It stays `windows: false`, named in `test_build_data.py` →
 `WINDOWS_PICTURE_OWED`, until both are settled. The gate judges every
 `-windows` picture (`corners.images_the_pages_show(..., include_windows=True)`

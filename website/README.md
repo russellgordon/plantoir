@@ -190,12 +190,15 @@ mode back, and it ends every process it started.
   `RenderTargetBitmap` — no window, square corners, bubbles typed by hand.
 - **Two working folders, both made by the app** (`--stage-scene provision`,
   the New Course panel for each course): `~/Teaching` (ENG2D, MCV4U, SCH3U —
-  the demo, disposable) and `~/Desktop/Teaching/School Web Space` (the v1.4.0
-  scenes' folder: ICS3U, ICS4U and last year's ICS3U; for the College Board
-  scenes, the mac's own ICS3U, ICS4U and ICS3U-2025, copied in, because
-  their College Board pages are extracted from the Course and Exam
-  Description by a macOS-only helper, `ced_statements.swift`). The path bar
-  shows "School Web Space", never a marketing folder (Russell, 2026-10-04).
+  the demo, disposable) and `~/School Web Space` (the v1.4.0 scenes' folder:
+  the mac's own ICS3U, ICS4U and ICS3U-2025, copied in, because their College
+  Board pages are extracted from the Course and Exam Description by a
+  macOS-only helper, `ced_statements.swift`). **Every picture shows
+  `~/Desktop/Teaching`**, as the mac's do: for each set of scenes the folder's
+  `courses` are put in `~/Desktop/Teaching` and that folder's own courses set
+  aside beside them, then both put back (`ShownAsTeaching`). The COURSES are
+  swapped rather than the folder because renaming the folder itself was
+  refused ("Access is denied") while a File Explorer window had it open.
 - **The class sites** are Edge `--app` windows, driven over the DevTools
   protocol in the window photographed: an anchor is scrolled to once the page
   stops moving and CHECKED near the top of the page column, the search is

@@ -3831,9 +3831,13 @@ window of that process and ends it, and everything still naming the folder
   real scheduled deploys (the Debug build, then the installed 1.4.2) both
   succeeded and posted nothing, because `ScheduledRun.Execute`'s one-shot
   clearing (`TaskScheduling.Cancel`) deletes the job file before
-  `ScheduledPublishNotifier.PostFor` reads it — and a toast is not a window
-  Windows.Graphics.Capture can be given in any case (EnumWindows finds none,
-  cloaked or not, while one shows).
+  `ScheduledPublishNotifier.PostFor` reads it (fixed by #448 on its own
+  branch). With that fix the toast appeared (2026-10-04 12:07), and it is
+  still not a window Windows.Graphics.Capture can be given: EnumWindows found
+  no new, visible or uncloaked window, FindWindowEx by
+  `Windows.UI.Core.CoreWindow` and UI Automation's desktop root found no
+  notification. The route is Russell's to choose (a person picking it in
+  `GraphicsCapturePicker`, or a screen crop the picture rule forbids).
 - **Staged in one place only:** the hero's middle card is a deploy in
   progress, staged with `ScriptRunner.StageAsRunningForCapture`, because a
   real deploy would put a site online to take a photograph.
@@ -3849,7 +3853,11 @@ window of that process and ends it, and everything still naming the folder
   filled in as typed, so the course gets the name a teacher is offered — the
   first folder made without that was called "Course Website"), then keeps a
   reference copy with Keep a Copy for Reference's own `ReferenceCopier`. The
-  College Board scenes use the mac's ICS3U, ICS4U and ICS3U-2025, copied in:
+  College Board scenes use the mac's ICS3U, ICS4U and ICS3U-2025, copied in
+  (every picture's path bar shows `~/Desktop/Teaching`, as the mac's do: the
+  scene folder's `courses` are swapped into it for the run and back after,
+  `app_scenes_windows.ShownAsTeaching` — the folder itself could not be
+  renamed while a File Explorer window had it open), because
   their College Board pages come from the Course and Exam Description through
   a macOS-only PDFKit helper (`website/shots/ced_statements.swift`).
 

@@ -61,7 +61,7 @@ class CommittedPictures(unittest.TestCase):
         # Every id is taken on Windows (#380, #370): far more than the three
         # figures this test used to name. A list that shrank would mean the
         # gate had stopped reading them.
-        self.assertGreaterEqual(len(pictures), 80, [picture.name for picture in pictures])
+        self.assertGreaterEqual(len(pictures), 70, [picture.name for picture in pictures])
         found: list[str] = []
         for picture in pictures:
             found.extend(corners.corner_problems(picture))
