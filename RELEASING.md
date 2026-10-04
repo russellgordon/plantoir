@@ -146,7 +146,10 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
-   (and `Plantoir-win-x64.zip`).
+   (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
+   from that exact installer, and commit it** ("The update feed (Windows)",
+   below) — the `cut-release` skill does not do this for you, and a Windows
+   release whose feed was not rebuilt is one no installed copy is offered.
 4. **Build the signed & notarized macOS bundle**:
    `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
    Since #204 it also signs the updater inside the app item by item and REFUSES
@@ -491,6 +494,9 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   never let the feed's line endings change: `.gitattributes` marks
   `website/updates/*.xml` and `*.xml.signature` `-text` for that reason
   (documentation/11 has what happened without it).
+- **When the installer JOINS a release that already exists** (as it did for
+  v1.4.2), edit that release's notes in the same step: its first line says
+  which platforms it carries, and its Downloads table needs the Windows rows.
 - **Order is load-bearing**, as on the mac: upload the installer to the
   release first, then deploy the site. `build.py --deploy` follows the Windows
   feed's download and checks `windows.xml.signature` is live as built

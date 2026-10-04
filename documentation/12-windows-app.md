@@ -870,7 +870,7 @@ others), none with `BringToFront`. They passed in the 44 of 44 run on the same
 200% session, so the doubled point is not general — it was measured on the
 picker (an AutoSuggestBox inside a dialog) and nowhere else — but nothing
 proves the others cannot meet it. Moving them to `ClickMiddleOf` is owed
-(the `windows` issue opened with this release).
+(#428).
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
@@ -1596,7 +1596,11 @@ the same day.)
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
-- **Updates** (#204): **NetSparkleUpdater**, not WinSparkle — corrected
+- **Updates** (#204, #337): **switched on with v1.4.2, 2026-10-03** — what
+  was built, measured and rejected is `11-release-strategy.md` → the Windows
+  updater, and the release side is `RELEASING.md` → "The update feed
+  (Windows)". What follows is the brief it was built from, kept for its
+  reasoning. **NetSparkleUpdater**, not WinSparkle — corrected
   2026-09-25, when the mac shipped Sparkle and the Windows half was drafted as
   its own `windows` issue (milestone v1.4.0). NetSparkle reads the same feed
   format and can run the per-user Inno installer silently

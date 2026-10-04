@@ -227,8 +227,10 @@ expects (1.4.3 above 1.4.2, 1.4.10 above 1.4.9). The check fetches two files,
 the `app updated` trail line with `byItsOwnUpdater: false` always, which was
 true while no updater ran. The first update the app installs itself would be
 recorded as "by hand". It has to be put right in the version that is
-INSTALLED by the updater (1.4.3), which is the one that writes the line; the
-`windows` issue opened with this release says how.
+INSTALLED by the updater (1.4.3), which is the one that writes the line;
+#428 says how, and names three comments in `AppUpdater.cs`, `App.xaml.cs`
+that still say the feed is empty (left as they are in 1.4.2 so the sources
+are the signed installer's).
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|
