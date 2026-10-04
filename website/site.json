@@ -1,6 +1,6 @@
 {
   "name": "Plantoir",
-  "headline": "Plan the plot. Plant your notes. Grow a class website you own.",
+  "headline": "Plan the plot. Plant your notes. Grow a class website.",
   "tagline": "Turns a folder of Markdown notes into a fast, searchable class website.",
   "base_url": "https://plantoir.app",
   "repo_url": "https://github.com/russellgordon/plantoir",
