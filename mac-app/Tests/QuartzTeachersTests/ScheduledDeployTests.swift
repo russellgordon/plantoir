@@ -700,9 +700,12 @@ final class ScheduledDeployTests: XCTestCase {
     /// agent shaped like the run — a Swift binary waiting on a `Process`:
     /// `launchctl bootout` returned in 0.02 s, exit 0, the job unloaded and
     /// the binary gone. Its `Process` child SURVIVED, in a process group of
-    /// its own — so the wrapper finishes the old deploy as an orphan — and
-    /// that is harmless here, because the wrapper's only plist line is its
-    /// first, long since run, and it boots nothing out.
+    /// its own — so the wrapper finishes the old deploy as an orphan. It
+    /// cannot remove the new deploy (its only plist line is its first, long
+    /// since run, and it boots nothing out), but it is not harmless: the
+    /// ended run's leases read as stale while it works, so a second deploy
+    /// of the section can overlap it (doc 07, "Set again while the run
+    /// works (#409)"). This test pins only the boot-out order.
     func testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst() throws {
         try prepare()
         let course: Course = try makeCourse()
