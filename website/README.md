@@ -129,6 +129,13 @@ There are two working folders, and each picture is taken in one of them:
   new in v1.4.0: ICS3U (sections 1 and 2) and ICS4U (section 1) from their
   ready-made content, a reference copy of ICS3U, and ICS3U and ICS4U revised to
   answer to AP Computer Science Principles as well. See "Regenerating every image".
+  **Every picture shows one path, `~/Desktop/Teaching`** (Russell, 2026-10-04: the
+  name "Plantoir Marketing" read as the product's machinery in nine scenes'
+  path bar and in the schedule sheet's folder destination): for the scenes,
+  `capture.py` MOVES the marketing folder to `~/Desktop/Teaching` with the demo
+  folder set aside, rewrites the courses' absolute paths, and puts both back
+  (`MarketingFolderShownAsTeaching`; a move, because the app resolves a link to
+  its real path). A scene picture that shows "Plantoir Marketing" is refused.
 - **`~/Desktop/Teaching`** — the demo folder: ENG2D, MCV4U and SCH3U, whose
   sections are published as the live example sites. The hero, the class-site
   shots, search, the phone and the colour figures come from here, because a

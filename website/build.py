@@ -304,10 +304,13 @@ def awaiting_capture_notes(shots: dict) -> list[str]:
 
 
 def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> str:
-    """One image, served to everybody, whatever their colour scheme -- or,
-    where the figure was also taken in Dark Mode, that one for a page in dark
-    mode (the mac's `<id>-dark.png` when shots.json says `"dark": true`,
-    Windows' `<id>-windows-dark.png` whenever it exists)."""
+    """One image, served to everybody, whatever their colour scheme — or,
+    for a static shot marked `"dark": true` in shots.json, the same figure
+    taken in Dark Mode (`<id>-dark.png`/`.webp`) for a page in dark mode,
+    with `<id>.png` kept as the light one so its name never changes
+    (`colour-schemes`, Russell 2026-10-04: "It needs a dark mode version").
+    A Windows visitor gets `<id>-windows.png`, and `<id>-windows-dark.png`
+    for a page in dark mode whenever it exists (#380)."""
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"

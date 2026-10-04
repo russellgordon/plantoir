@@ -219,7 +219,9 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
   shadow, transparent round them. (XCUITest's `window.screenshot()`
   was used once and baked the corners black; it is gone, with no fallback.)
 - **The v1.4.0 scenes** are taken in a kept working folder of their own
-  (`~/Plantoir Marketing`, ICS3U and ICS4U). `website/shots/scenes.py` lists
+  (`~/Plantoir Marketing`, ICS3U and ICS4U), moved to `~/Desktop/Teaching` for
+  the run so every picture shows the same ordinary path (`capture.py`,
+  `MarketingFolderShownAsTeaching`). `website/shots/scenes.py` lists
   the eleven — courses, new-course, schedule-sheet, notification-banner,
   reference, start-of-year, curriculum-settings, two-maps, both-curricula,
   how-i-teach, club — with the state each sets up, and every picture is read
