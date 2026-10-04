@@ -6118,6 +6118,48 @@ out — that would mean running the tool while a context menu is being drawn. A
 teacher who is signed out meets their assistant's own sign-in step in the
 terminal.
 
+### #411: `add_next_class` with `unit` and `days`, measured and parked
+
+**Decided by Russell, 2026-10-03:** the mac's local `add_next_class` should
+declare `unit` and `days`, as Windows' does, so that an EMPTY model call is
+refused (`answerLeftOutWhatItWasFor`) on both apps by the schema-reading rule
+in `AssistToolCall.needsMoreThanTheWindowSupplies`. That moves the local tool
+surface, so it was built on a side branch (`issue/411-add-next-class-unit-days`:
+the two properties in Windows' words, the twin likewise, and an
+`app-rules.json` → `modelTiers.requirements` case for the empty call) and
+measured on BOTH tiers before it could land. The pass rule was written down
+before anything ran: zero polarity inversions, and no probe that was 10/10
+losing a trial, on each tier.
+
+**It failed on both tiers, and is parked.** Conditions, numbers and raw output
+are in `research/ai-assist/add-next-class-unit-days-411-results.txt` (M4 Pro,
+b10435 on Metal, the app's flags, both suites, 10 trials). No inversions on
+either tier. On the smaller assistant "HIDE - the inversion case" went from
+10/10 to 0/10, and a teachers-say control went from 10/10 to 0/10. **The number
+that matters is not a score, though.** The suites score `add_next_class` by its
+name, and every "add the next class" probe stayed "OK". With the arguments
+printed in full, the smaller assistant sent `"unit": "next"` on all six
+phrasings, and the larger one sent it on five of six. The schema line says
+`Pass "next" to start a new unit`, and both models read the NEXT in "add the
+next class" as that instruction. So the runner would start a new unit — Unit
+N+1, Day 1 — for a teacher who asked for the next day of the unit they are in,
+and report success.
+
+**Rejected:** rewording the `unit` description so the models leave it out.
+That is steering with a description, which this file forbids for a measured
+reason ("Steer with code, never with a description"). **Left for Russell (#411):**
+whether to refuse the empty call anyway, by naming `add_next_class` as needing
+more than the window supplies, which leaves the schema alone. That trades the rule's "read
+the schema, never a name" property for the outcome he asked for. Until then
+both apps RUN an empty `add_next_class` call — Windows through
+`AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
+
+**For Windows, by inference and not measured:** Windows' local model has been
+shown this exact `unit` line all along. If its router reads it the same way,
+an ordinary "add the next class" there may already start a new unit. Only a
+measurement that prints the full arguments, rather than scoring the tool's
+name, can tell; it is asked for in the Windows hand-back for this bundle.
+
 ### What was MEASURED for the Codex door
 
 On Russell's Mac, 2026-09-19, **codex-cli 0.155.1** installed with Homebrew and
