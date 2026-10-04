@@ -1517,7 +1517,13 @@ delivery is theirs: their run is PowerShell under Task Scheduler with no app
 process alive, so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
-it; GitHub #212 carries the ask.
+it; GitHub #212 carries the ask. Windows' toast shipped with #324 and **posted
+nothing until #448** (2026-10-04): its toast step read the job file after the
+run, and the run's own one-shot clearing had deleted it. What the toast needs
+is now read before the run; `documentation/12-windows-app.md` → "The
+scheduled-publish toast (#324)" has the measurement and the fix. The mac's
+`announceThenLeave` posts before the job is booted out, so it never had this
+shape.
 
 ### Clicking the notification opens the section (#306)
 
