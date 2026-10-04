@@ -300,15 +300,24 @@ ol.steps li::before {
   text-align: center;
 }
 
-/* No corner and no shadow SHAPE is drawn round a picture: every capture
-   arrives with its window's own rounded corners, transparent outside the
-   curve. The shadow is a drop-shadow FILTER, which follows the picture's
-   alpha — so it has the window's real curve, and falls round each window of
-   a pair rather than round the rectangle holding both. (Until 2026-09-27 a
-   10px border-radius and a box-shadow drew a rectangle round every shot.) */
+/* No corner and no shadow is drawn round a picture. Every Mac capture
+   arrives with its window's own rounded corners AND its natural macOS shadow,
+   exactly as `screencapture -x -l` wrote it (#434, 2026-10-04), so the page
+   adds nothing: a filter here would lay a second, drawn shadow over the real
+   one. (Until 2026-10-04 a drop-shadow filter stood in for the shadow the
+   `-o` captures left out; until 2026-09-27 a border-radius and a box-shadow
+   drew a rectangle round every shot.) */
 .shot img {
   max-width: 100%;
   height: auto;
+}
+
+/* A Windows visitor is shown a Windows capture where one exists (the img
+   carries data-win-src). Those still arrive without a shadow of their own,
+   so they keep the drop-shadow filter, which follows the picture's alpha.
+   A shot with no Windows capture shows the Mac picture, shadow included, and
+   gets no filter. */
+.is-windows .shot img[data-win-src] {
   filter: drop-shadow(0 1px 2px var(--shot-shadow-near)) drop-shadow(0 8px 16px var(--shot-shadow-far));
 }
 
@@ -322,9 +331,11 @@ ol.steps li::before {
 .shot-device { width: 100%; margin-left: 0; transform: none; }
 .shot-device img { max-width: 290px; filter: none; }
 
-/* The hero and the fanned colour figure carry shadows made from each
-   window's own alpha when they are assembled; a second one here would
-   double them. The light-and-dark pair is static and stays flat. */
+/* The composite and static figures are flat on every platform: the Mac
+   ones carry each window's natural shadow, and the Windows ones are
+   assembled with theirs (composite.py). */
+.is-windows .shot-composite img,
+.is-windows .shot-static img,
 .shot-composite img,
 .shot-static img { filter: none; }
 
