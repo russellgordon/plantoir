@@ -91,9 +91,10 @@ public sealed record ProtectionContext(
     IReadOnlyList<string> GradedFolders,
     IReadOnlyList<string> PerSectionFolders,
     /// <summary>
-    /// The folder this course actually uses for class pages — the recorded
-    /// <c>class_folder</c> where there is one, otherwise the guess. Optional
-    /// so every existing caller keeps its behaviour.
+    /// The class folder protected besides the literal "All Classes": the
+    /// recorded <c>class_folder</c> (in the wizard, a club's own row), or null.
+    /// Never the first-per-section-folder guess (#431,
+    /// <see cref="ClassFolderRule.ProtectedName"/>).
     /// </summary>
     string? ResolvedClassFolder = null,
     /// <summary>
@@ -149,7 +150,8 @@ public static class CourseSettingsProtection
         GradedFolders: config.MaterializedGradedFolders(
             GradedFolderChoices.For(config, GradedFolderChoices.NamesIn(walk))),
         PerSectionFolders: config.PerSectionFolders,
-        ResolvedClassFolder: ClassFolderRule.Name(config.ClassFolder, config.PerSectionFolders),
+        // The recorded name only, never the guess (#431).
+        ResolvedClassFolder: ClassFolderRule.ProtectedName(config.ClassFolder),
         Walk: walk,
         SharedFolders: config.SharedFolders,
         PoolWasAsked: config.GradedFolders is not null,

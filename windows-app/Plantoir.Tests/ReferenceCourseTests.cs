@@ -20,6 +20,21 @@ public class ReferenceCourseTests
 
     private static DateOnly Day(JsonNode node) => DateOnly.Parse(node.ToString());
 
+    /// <summary>
+    /// #426: what a screen reader says for a reference course's sidebar row,
+    /// so it is told from the live row of the same code. The year is the
+    /// contract's label; no year leaves the year off rather than saying "Other".
+    /// </summary>
+    [Fact]
+    public void AReferenceRowIsSpokenWithItsYear()
+    {
+        Assert.Equal("ICS3U, kept for reference, 2025–26", ReferenceCourse.SpokenRowName("ICS3U", 2025));
+        Assert.Equal("ICS3U, kept for reference", ReferenceCourse.SpokenRowName("ICS3U", null));
+        string source = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot,
+            "windows-app", "Plantoir", "Views", "SidebarPane.Reference.cs"));
+        Assert.Contains("SpokenName = ReferenceCourse.SpokenRowName(", source);
+    }
+
     [Fact]
     public void TheSchoolYearLabelsAreTheContracts()
     {

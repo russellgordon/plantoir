@@ -184,11 +184,14 @@ public static class UpdateWording
     public const string HeldTitle = "Plantoir will finish updating once it is done {work}.";
     public const string ScheduledWork = "publishing Section {section} of {course} on its schedule";
     public const string ScheduledWorkUnnamed = "publishing on its schedule";
-    /// <summary>The contract's words, which name a Mac.</summary>
-    public const string ElsewhereWorkContract = "waiting for {course} to finish building somewhere else on this Mac";
-    /// <summary>What Windows says until the contract carries a {machine} placeholder (proposed to the mac): windowsWording.elsewhereWorkOnWindows.</summary>
-    public const string ElsewhereWorkOnWindows = "waiting for {course} to finish building somewhere else on this PC";
-    public static string ElsewhereWork(string course) => ElsewhereWorkOnWindows.Replace("{course}", course);
+    /// <summary>
+    /// The contract's words, <c>{machine}</c> and all (#438): said with
+    /// <see cref="Plantoir.Core.Models.MachineWord"/>'s "PC", which replaced the
+    /// Windows-only copy <c>windowsWording.elsewhereWorkOnWindows</c>.
+    /// </summary>
+    public const string ElsewhereWorkContract = "waiting for {course} to finish building somewhere else on this {machine}";
+    public static string ElsewhereWork(string course) =>
+        Plantoir.Core.Models.MachineWord.Fill(ElsewhereWorkContract).Replace("{course}", course);
     public const string HeldExplanation =
         "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.";
     public const string HeldExplanationOnceInstalling =
