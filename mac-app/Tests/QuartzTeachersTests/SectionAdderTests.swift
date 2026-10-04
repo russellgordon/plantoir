@@ -648,6 +648,49 @@ final class SectionAdderTests: XCTestCase {
                         "\(stamp) should match the wizard's created: form")
     }
 
+    // MARK: - Quoted per-section keys (GitHub #408)
+
+    /// Which lines are per-section keys is the READER's answer: a quoted key
+    /// counts, and so does a key with nothing after it on a page saved with
+    /// Windows line endings. The shared contract case
+    /// (`sectionNumbers.addingKeysToAPage`, "the per-section keys written with
+    /// quotes") runs the whole page; this pins the matcher itself.
+    @MainActor
+    func testAQuotedKeyIsAPerSectionKey() {
+        XCTAssertEqual(SectionAdder.perSectionKeyNumber(in: "\"publishForSection1\": false"), 1)
+        XCTAssertEqual(SectionAdder.perSectionKeyNumber(in: "'createdSection12': 2026-09-08"), 12)
+        XCTAssertEqual(SectionAdder.perSectionKeyNumber(in: "draftSection3: true"), 3)
+        XCTAssertEqual(SectionAdder.perSectionKeyNumber(in: "publishForSection1:\r"), 1)
+        XCTAssertEqual(SectionAdder.perSectionKeyNumber(in: "publishForSection2 : false"), 2)
+        XCTAssertNil(SectionAdder.perSectionKeyNumber(in: "publishForSection1:false"), "not a key to YAML")
+        XCTAssertNil(SectionAdder.perSectionKeyNumber(in: "  publishForSection1: false"), "nested, not top level")
+        XCTAssertNil(SectionAdder.perSectionKeyNumber(in: "publishForSection: false"))
+        XCTAssertNil(SectionAdder.perSectionKeyNumber(in: "publish: false"))
+    }
+
+    /// A page that already carries the new section's keys QUOTED is left
+    /// alone, rather than given a second, unquoted copy of each.
+    @MainActor
+    func testAPageAlreadyCarryingTheNewSectionsQuotedKeysIsLeftAlone() throws {
+        let folder: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("quoted-keys-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let before: String = "---\ntitle: Loops\ncreatedSection1: 2026-09-08T07:00:00.000-0400\n"
+            + "publishForSection1: false\n\"createdSection2\": 2026-09-20T07:00:00.000-0400\n"
+            + "\"publishForSection2\": false\n---\nBody.\n"
+        let pageURL: URL = folder.appendingPathComponent("Loops.md")
+        try Data(before.utf8).write(to: pageURL)
+
+        SectionAdder.extendFrontmatter(
+            ofPageAt: pageURL, toInclude: 2, created: "2026-09-25T07:00:00.000-0400"
+        )
+
+        let written: Data = try Data(contentsOf: pageURL)
+        XCTAssertEqual(written, Data(before.utf8), String(decoding: written, as: UTF8.self))
+    }
+
     // MARK: - However the frontmatter is fenced (GitHub #175)
 
     /// The whole road, through `addSection`: a course-level page HIDDEN in

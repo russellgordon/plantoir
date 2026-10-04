@@ -338,6 +338,95 @@ final class FileFormatsContractTests: XCTestCase {
         XCTAssertTrue(DeployCommand.hasDeployedBefore(section: 1, in: toFolder))
     }
 
+    // MARK: - Which remembered class dates are believed (#377)
+
+    /// `sectionTimetable.believable`: the two bounds, and every case asked of
+    /// the READER and of the WRITER separately — never a round trip alone,
+    /// because a writer and a reader that both forgot the window would agree
+    /// with each other and pass. A case not believed must be read as nothing
+    /// remembered (with a line on the trail naming the date), and refused by
+    /// the writer; a case believed must be read back and accepted.
+    func testARememberedTimetableIsBelievedOnlyInsideTheWindow() throws {
+        let section: [String: Any] = try FileFormatsContractTests.section("sectionTimetable")
+        let believable: [String: Any] = try XCTUnwrap(section["believable"] as? [String: Any])
+        XCTAssertEqual(believable["earliest"] as? String, SectionTimetableStore.earliestBelievable.text)
+        XCTAssertEqual(believable["yearsAhead"] as? Int, SectionTimetableStore.yearsAheadBelievable)
+
+        let root: URL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("believable-\(UUID().uuidString)")
+        let courseURL: URL = root.appendingPathComponent("courses/ICS3U")
+        try FileManager.default.createDirectory(at: courseURL, withIntermediateDirectories: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: root.appendingPathComponent("trail"))
+        defer {
+            ActivityTrail.store = previousStore
+            try? FileManager.default.removeItem(at: root)
+        }
+        let values: [String: Any] = ["course_code": "ICS3U", "section_numbers": [1]]
+        try JSONSerialization.data(withJSONObject: values)
+            .write(to: courseURL.appendingPathComponent("course_config.json"))
+        let course: Course = Course(
+            code: "ICS3U",
+            directoryURL: courseURL,
+            configuration: try CourseConfiguration(
+                contentsOf: courseURL.appendingPathComponent("course_config.json")
+            )
+        )
+
+        let cases: [[String: Any]] = try XCTUnwrap(believable["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 8, "sectionTimetable.believable has shrunk")
+        for testCase in cases {
+            let why: String = try XCTUnwrap(testCase["why"] as? String)
+            let datesText: [String] = try XCTUnwrap(testCase["dates"] as? [String])
+            let today: CalendarDay = try XCTUnwrap(CalendarDay(text: try XCTUnwrap(testCase["today"] as? String)))
+            let believed: Bool = try XCTUnwrap(testCase["believed"] as? Bool)
+
+            // The READER, given the file as another machine left it.
+            let fileURL: URL = SectionTimetableStore.fileURL(forSection: 1, in: course)
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            let stored: [String: Any] = [
+                "section": 1, "dates": datesText, "source": "block H", "recorded": today.text,
+            ]
+            try JSONSerialization.data(withJSONObject: stored).write(to: fileURL)
+            let trailBefore: String = ActivityTrail.store.activityText(includingPrompts: true)
+            let read: SectionTimetable? = try SectionTimetableStore.read(forSection: 1, in: course, today: today)
+            let trailAfter: String = ActivityTrail.store.activityText(includingPrompts: true)
+            let newTrail: String = String(trailAfter.dropFirst(trailBefore.count))
+            if believed {
+                XCTAssertNotNil(read, "reader, \(why): should be believed")
+                XCTAssertFalse(newTrail.contains("set aside"), "reader, \(why): \(newTrail)")
+            } else {
+                XCTAssertNil(read, "reader, \(why): should be read as nothing remembered")
+                var sortedDays: [CalendarDay] = []
+                for text in datesText {
+                    sortedDays.append(try XCTUnwrap(CalendarDay(text: text)))
+                }
+                sortedDays.sort()
+                let impossible: CalendarDay = try XCTUnwrap(
+                    SectionTimetableStore.firstDateThatCannotBeAClassDate(in: sortedDays, today: today),
+                    "reader, \(why)"
+                )
+                XCTAssertTrue(
+                    newTrail.contains("ICS3U/1 · " + SectionTimetableStore.setAsideTrailLine(naming: impossible)),
+                    "reader, \(why): the trail should say the dates were set aside, got \(newTrail.debugDescription)"
+                )
+            }
+            try FileManager.default.removeItem(at: fileURL)
+
+            // The WRITER, asked to remember the same list with nothing on disk.
+            do {
+                let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+                    dates: datesText, source: "block H", forSection: 1, in: course, today: today
+                )
+                XCTAssertTrue(believed, "writer, \(why): should have been refused, planned \(plan.dates)")
+            } catch SectionTimetableStore.Problem.cannotBeClassDates(_, _, let offenders) {
+                XCTAssertFalse(believed, "writer, \(why): refused \(offenders)")
+            }
+        }
+    }
+
     // MARK: - Private
 
     private func documentedKeys() throws -> [String] {
