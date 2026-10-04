@@ -14,7 +14,8 @@ this module is the one place that knows them:
   after, silently, on every teacher's daily check.
 - **Each item carries its download's signature** as an attribute. The deploy's
   live check READS the newest download and verifies that signature, where the
-  mac's compares only its length.
+  mac's compares only its length — on Windows, or when asked for with
+  ``PLANTOIR_VERIFY_WINDOWS_INSTALLER=1``; from the mac it stays the length.
 
 Pure standard library — Ed25519 verification included (RFC 8032 section 6,
 below), since ``cryptography`` is not installed on either machine and a check
@@ -28,7 +29,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import re
+import sys
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ElementTree
@@ -288,8 +291,21 @@ def _stream(url: str) -> tuple[int, Iterable[bytes]]:
     return response.status, chunks()
 
 
+READ_INSTALLER_VARIABLE = "PLANTOIR_VERIFY_WINDOWS_INSTALLER"
+
+
+def reads_the_installer() -> bool:
+    """Whether the live check downloads the newest installer to verify its
+    signature: on Windows, where the installer is cut, or anywhere when
+    ``PLANTOIR_VERIFY_WINDOWS_INSTALLER=1`` asks for it (#428 review, ruling 3).
+    A deploy from the mac — a mac-only cut included — would otherwise pull
+    about 240 MB from GitHub every time, for a feed it did not change."""
+    return sys.platform == "win32" or os.environ.get(READ_INSTALLER_VARIABLE, "") == "1"
+
+
 def verify_live(base_url: str, local_feed: Path, key: str | None = None,
-                fetch: Callable | None = None, stream: Callable | None = None) -> str:
+                fetch: Callable | None = None, stream: Callable | None = None,
+                read_installer: bool | None = None) -> str:
     """The live Windows feed is these bytes, its live signature file signs
     them, and its NEWEST download (by version) is there, is as long as the
     feed says, and is signed by the key the app carries.
@@ -297,7 +313,9 @@ def verify_live(base_url: str, local_feed: Path, key: str | None = None,
     "match", "mismatch" or "unknown", as ``update_feeds.verify_live``. Reads
     the whole installer (about 240 MB) to check its signature: that is the
     part the length could not prove — a re-built installer of the same size
-    passes a length check and is refused by every installed copy."""
+    passes a length check and is refused by every installed copy. Only where
+    ``reads_the_installer()`` says so (or ``read_installer``); elsewhere the
+    download's check is its length, as before #428, and the line says so."""
     fetch = fetch or _fetch
     stream = stream or _stream
     key = key or public_key()
@@ -336,6 +354,13 @@ def verify_live(base_url: str, local_feed: Path, key: str | None = None,
     if length and newest["length"] and length != newest["length"]:
         print(f"❌ {newest['url']} is {length} bytes; the feed says {newest['length']}.")
         return "mismatch"
+    if read_installer is None:
+        read_installer = reads_the_installer()
+    if not read_installer:
+        print(f"✅ {feed_url} is live, signed as committed, and its newest download ({newest['version']}) "
+              f"is there at the length the feed says. Its signature was NOT read (length only; "
+              f"set {READ_INSTALLER_VARIABLE}=1 to read the installer).")
+        return "match"
     print(f"   Reading {newest['url']} to check its signature…")
     try:
         status, chunks = stream(newest["url"])

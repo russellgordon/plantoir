@@ -189,7 +189,8 @@ class CheckerTests(unittest.TestCase):
 
 class LiveCheckTests(unittest.TestCase):
 
-    def _run(self, feed_bytes: bytes, installer: bytes, signature_of: bytes | None = None, length=None):
+    def _run(self, feed_bytes: bytes, installer: bytes, signature_of: bytes | None = None, length=None,
+             read_installer: bool = True):
         with _Folder() as folder:
             local = folder.write(feed_bytes, signature_of=signature_of)
             signature = (folder.path / "windows.xml.signature").read_bytes()
@@ -205,7 +206,8 @@ class LiveCheckTests(unittest.TestCase):
                 return 200, iter([installer[:10], installer[10:]])
 
             with redirect_stdout(io.StringIO()) as said:
-                outcome = windows_feed.verify_live("https://plantoir.app", local, PUBLIC, fetch, stream)
+                outcome = windows_feed.verify_live("https://plantoir.app", local, PUBLIC, fetch, stream,
+                                                   read_installer=read_installer)
             return outcome, said.getvalue()
 
     def test_a_live_feed_with_its_signed_installer_matches(self):
@@ -228,6 +230,32 @@ class LiveCheckTests(unittest.TestCase):
         outcome, said = self._run(feed_bytes, INSTALLERS["1.4.3"], signature_of=b"something else")
         self.assertEqual("mismatch", outcome)
         self.assertIn("does not sign the live feed", said)
+
+    def test_where_the_installer_is_not_read_the_check_is_the_length_and_says_so(self):
+        # A mac deploy (ruling 3): no 240 MB download; same-length other bytes pass, and the line says why.
+        other = bytes(len(INSTALLERS["1.4.3"]))
+        outcome, said = self._run(_feed(_item("1.4.3")), other, read_installer=False)
+        self.assertEqual("match", outcome)
+        self.assertIn("NOT read (length only", said)
+        outcome, _ = self._run(_feed(_item("1.4.3")), INSTALLERS["1.4.3"], length=5, read_installer=False)
+        self.assertEqual("mismatch", outcome)
+
+    def test_the_installer_is_read_on_windows_or_when_asked(self):
+        import os
+        saved_platform, saved = sys.platform, os.environ.pop(windows_feed.READ_INSTALLER_VARIABLE, None)
+        try:
+            windows_feed.sys.platform = "darwin"
+            self.assertFalse(windows_feed.reads_the_installer())
+            os.environ[windows_feed.READ_INSTALLER_VARIABLE] = "1"
+            self.assertTrue(windows_feed.reads_the_installer())
+            del os.environ[windows_feed.READ_INSTALLER_VARIABLE]
+            windows_feed.sys.platform = "win32"
+            self.assertTrue(windows_feed.reads_the_installer())
+        finally:
+            windows_feed.sys.platform = saved_platform
+            os.environ.pop(windows_feed.READ_INSTALLER_VARIABLE, None)
+            if saved is not None:
+                os.environ[windows_feed.READ_INSTALLER_VARIABLE] = saved
 
     def test_a_length_that_disagrees_is_a_mismatch(self):
         outcome, _ = self._run(_feed(_item("1.4.3")), INSTALLERS["1.4.3"], length=5)

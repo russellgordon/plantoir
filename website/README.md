@@ -57,8 +57,10 @@ is not `<Version>` in `Plantoir.csproj`; afterwards — like `--verify-deploy`
 — it fetches each live feed, compares it with `site/`, and follows its newest
 download to a 200 of the right length: the check for a feed deployed before
 its release was published. For the Windows feed it also verifies the live
-`windows.xml.signature` against the live feed and reads the newest installer
-(about 240 MB) to verify its signature. `website/test_windows_feed.py`
+`windows.xml.signature` against the live feed and, on Windows (or anywhere
+with `PLANTOIR_VERIFY_WINDOWS_INSTALLER=1`), reads the newest installer
+(about 240 MB) to verify its signature; from the mac it compares the length
+and says so. `website/test_windows_feed.py`
 covers all of that with a throwaway key.
 
 `updates/macos-notes.html` is the cumulative release notes the feed is built
