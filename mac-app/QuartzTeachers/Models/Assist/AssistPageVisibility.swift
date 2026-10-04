@@ -314,9 +314,10 @@ nonisolated enum AssistPageVisibility {
     /// Any section's number, not just one: a page copied out of a shared
     /// folder carries a key for every section the course has. Confirmed with
     /// the READER's own matcher once the name is known, so a quoted
-    /// `"publishForSection2": true` is found — `SectionAdder.perSectionKeyNumber`
-    /// answers the same question with a plain prefix test and misses that
-    /// spelling, which is why this does not call it.
+    /// `"publishForSection2": true` is found. `SectionAdder.perSectionKeyNumber`
+    /// asks THIS function since #408 (it was a plain prefix test that missed
+    /// that spelling), so the section adder, the restore and the duplicate's
+    /// strip share one answer about which lines are per-section keys.
     static func perSectionKey(namedIn line: String) -> String? {
         var name: Substring = Substring(line)
         if name.hasPrefix("\"") || name.hasPrefix("'") {

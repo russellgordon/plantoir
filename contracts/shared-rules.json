@@ -809,10 +809,7 @@
       {
         "event": "remembered timetable set aside",
         "carries": "course, section, the date that could not be a class date",
-        "appliesOn": [
-          "windows"
-        ],
-        "why": "Only the Windows app ever wrote a timetable in the PC's own calendar (#144), so only it meets its own old files. When one is set aside the teacher sees the assistant ask for a timetable it already had, once; without this line a problem report would show a remembered timetable on disk and an assistant that asked anyway, with nothing between the two. Recorded by the reader, which is the one place that knows the date it refused."
+        "why": "Only the Windows app ever wrote a timetable in the PC's own calendar (#144), but the file lives inside the course folder and travels with it through backups, archives, restores and shared working folders, so either app can meet one. When one is set aside the teacher is asked for class dates they had already given; without this line a problem report would show a remembered timetable on disk and an app that asked anyway, with nothing between the two. Recorded by the reader, which is the one place that knows the date it refused. Windows-only until 2026-10-03, when the mac adopted the window and the line (#377)."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
