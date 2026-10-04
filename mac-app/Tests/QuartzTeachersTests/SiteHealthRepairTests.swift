@@ -344,7 +344,7 @@ final class SiteHealthRepairTests: XCTestCase {
         let said: String = (outcome?.detail ?? "").lowercased()
         XCTAssertTrue(said.contains("students"),
                       "it must say who this does not reach yet")
-        XCTAssertTrue(said.contains("publish again"), "and what changes that")
+        XCTAssertTrue(said.contains("deploy again"), "and what changes that")
         XCTAssertTrue(said.contains("preview"), "and that a preview is available")
 
         // It must NOT assert a publish that may never have happened. This same

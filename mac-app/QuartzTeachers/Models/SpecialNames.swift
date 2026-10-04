@@ -16,7 +16,7 @@ enum SpecialNames {
     // MARK: - Stored properties
 
     nonisolated static let excludedFolderIndexNoteBody: String =
-        "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings."
+        "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your website. To include it again, add it back in Course Settings."
 
     nonisolated static let excludedFolderSentinelStart: String =
         "<!-- plantoir:excluded-folder-note:start -->"
@@ -25,13 +25,13 @@ enum SpecialNames {
         "<!-- plantoir:excluded-folder-note:end -->"
 
     nonisolated static let curriculumFolderBlockedByCoverageSetting: String =
-        "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Publish the curriculum coverage map” in Settings first."
+        "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Include the curriculum coverage map” in Settings first."
 
     nonisolated static let curriculumFolderBlockedByCoverageMap: String =
         "This folder holds your curriculum expectations for the coverage map. To remove it, turn off “Include the curriculum coverage map” first."
 
     nonisolated static let lastGradedFolderBlocked: String =
-        "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Publish the curriculum coverage map”."
+        "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”."
 
     nonisolated static let lastGradedFolderBlockedWizard: String =
         "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”."
@@ -43,7 +43,7 @@ enum SpecialNames {
         "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one."
 
     nonisolated static let sectionIndexFileBlocked: String =
-        "Every section needs an index.md page for its home page. Without it, the section cannot be published."
+        "Every section needs an index.md page for its home page. Without it, the section cannot be deployed."
 
     nonisolated static let removeGradedFolderMessage: String =
         "This folder holds work that counts for marks. Removing it will take it out of your course’s marks pool."
@@ -119,7 +119,7 @@ enum SpecialNames {
     /// rather than blocked: the Save itself is right.
     /// `specialNames.settingsSavedWhilePublishing`.
     nonisolated static let settingsSavedWhilePublishing: String =
-        "This course is being published right now, and that publish uses the settings from before this save. Publish again once it has finished to send what you just saved."
+        "This course is being deployed right now, and that deploy uses the settings from before this save. Deploy again once it has finished to send what you just saved."
 
     /// After a Save that found the sidebar list had ALSO been changed in the
     /// file since this window read it — another window on the same folder,

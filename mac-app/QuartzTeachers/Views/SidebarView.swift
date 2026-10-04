@@ -1090,7 +1090,7 @@ struct SidebarView: View {
     /// dismisses it, and a hover that said "on Tuesday" would have to be right
     /// about WHICH Tuesday; the section's own notice carries the date in full.
     static func stoppedPublishTooltip() -> String {
-        return "A publish that was set to happen on its own did not get through. "
+        return "A deploy that was set to happen on its own did not get through. "
              + "Open this section to see what happened."
     }
 
