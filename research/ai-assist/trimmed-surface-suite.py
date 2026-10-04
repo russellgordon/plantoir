@@ -588,19 +588,28 @@ def intercepted(message, window_course=None, window_section=None):
     # "cancel ... scheduled deploy" sentences reach cancel_scheduled_deploy.
     # A question mark is never stripped for these.
     if not tidied.endswith("?"):
-        sched = re.fullmatch(r"(please )?schedule (a|the) deploy( (today|tomorrow))?( (for|at) (.+))?", tidied)
-        if sched:
-            rest = (sched.group(7) or "").strip()
-            day = sched.group(4)
-            if not rest or (sched.group(6) == "for" and rest in ("today", "tomorrow")):
-                return ASKED_IN_CODE
-            rebuilt = ("please " if sched.group(1) else "") + "deploy " + (day + " " if day else "") + "at " + rest
+        opened = re.fullmatch(r"(please )?schedule (a|the) deploy(.*)", tidied)
+        if opened:
+            words = opened.group(3).split()
+            if words[:1] == ["for"] and words[1:2] in (["today"], ["tomorrow"]):
+                words = words[1:]          # fix round ruling 1a: the day first
+            if words[:1] in (["today"], ["tomorrow"]) and words[1:2] == ["for"]:
+                words[1] = "at"
+            elif words[:1] == ["for"]:
+                words[0] = "at"
+            rebuilt = ("please " if opened.group(1) else "") + " ".join(["deploy"] + words)
             if deploy_at_a_time(rebuilt):
                 return "schedule_deploy"
             if deploy_time_asked_about(rebuilt):
                 return ASKED_IN_CODE
             if deploy_time_said_as(rebuilt):
                 return SAID_AS_IN_CODE
+            # Fix round ruling 1b: anything else opening this way is ASKED,
+            # unless it negates, or names another course or section.
+            if not any(w.strip(",;:") in ("don't", "dont", "not", "never", "no", "course", "courses")
+                       or "section" in w or re.fullmatch(r"[a-z]{3}[0-9][a-z0-9-]*", w.strip(",;:"))
+                       for w in opened.group(3).split()):
+                return ASKED_IN_CODE
         bare = re.sub(r"^please |( please)$", "", tidied)
         if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy"):
             return "cancel_scheduled_deploy"

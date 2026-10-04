@@ -6203,11 +6203,60 @@ the schema, never a name" property for the outcome he asked for. Until then
 both apps RUN an empty `add_next_class` call — Windows through
 `AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
 
-**For Windows, by inference and not measured:** Windows' local model has been
-shown this exact `unit` line all along. If its router reads it the same way,
-an ordinary "add the next class" there may already start a new unit. Only a
-measurement that prints the full arguments, rather than scoring the tool's
-name, can tell; it is asked for in the comment on #432.
+**For Windows, MEASURED (v1.4.3 bundle A, 2026-10-04):** Windows' local model
+has been shown this exact `unit` line all along, and it does read it that way.
+With the full arguments printed (`teachers-say-suite.py`, smaller tier, i5-8365U
+/ UHD 620, b10435, 10 trials), all five ordinary phrasings that reached
+`add_next_class` — "Add the next class", "Add an entry for the next class",
+"Add tomorrow's class page", "Start the next class", "Make a page for our next
+class" — sent `"unit": "next", "days": 0` in 50 of 50 calls, and
+`AssistWorkspace` reads unit "next" as the first day of a NEW unit. So on
+Windows today a routed "add the next class" starts Unit N+1 and reports
+success. The fixed phrasing "add the next class page" (code, no `unit`) is
+not affected. Nothing changed in bundle A; it is for Russell (#440), with the
+numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+
+### #424: schedule, cancel, and a reply that runs to the cap
+
+Windows, v1.4.3 bundle A. Found by #420's measurement on Windows (bundle 10):
+on the local surface that ships, a sentence asking for a LATER deploy reached
+`deploy_section` 10/10, a request to call off a scheduled deploy was declined
+10/10, and "Set up next day's lesson" wrote prose to the 512 cap, 61–89 s.
+All three fixes are CODE; no description moved.
+
+- **"schedule a|the deploy …"** is read as the deploy-at-a-time family
+  (`AssistCardCommand.ScheduleAsDeploy`: "for" may stand for "at"; "for
+  today|tomorrow at <time>" is the day first). Any OTHER sentence opening that
+  way — no time, "tomorrow morning", "for Monday", "at 7" — is ASKED in code
+  (`AsksWhenToSchedule`, `AssistWording.ScheduleADeployNeedsATime`, Windows'
+  sentence proposed as a key), never a deploy now and never the model. A
+  question mark, a negation, or another course or section named still falls
+  through, as in every frame here. The fix round widened the ask (ruling 1)
+  after review traced "Schedule a deploy for tomorrow at 6:30 am" past both
+  first-cut frames to the model.
+- **"[please] cancel the|that|my scheduled deploy [please]"** reaches
+  `cancel_scheduled_deploy` (the safe direction).
+- Rows: `assist-cases.json` → `scheduleAndCancel` (AUTHORED from Windows),
+  run by `ScheduleAndCancelFramesTests`; the mac is asked to implement them.
+- **The settler** is llama-server's own `t_max_predict_ms` = 30000, on the
+  SMALLER tier only (`LocalModel.WritingTimeLimitMs`): a reply still being
+  written 30 s after its first token ends as "length" and takes the #196
+  cut-off path. MEASURED: it fires only once the reply has written a line
+  break — 5 of 10 "next day's lesson" trials ended at ~30 s of writing, the
+  other 5 still ran to the 512 cap (61–82 s). REJECTED: lowering max_tokens
+  (contract-pinned; cuts tool calls everywhere), a streaming early stop (the
+  shape that would close the other half, but a new path and a threshold to
+  measure), a fixed phrasing for the one sentence. The larger tier was not
+  measured and keeps the cap alone: a limit in milliseconds is far fewer of
+  its slower tokens.
+- **The pre-registered rule FAILED, as it said it would**
+  (`schedule-and-settler-424-preregistration.txt`, `-results.txt`): the
+  measured sentences are conversational ("Deploy EXC2O section 1 at 6:30
+  tomorrow morning, before school starts." — ICS3U 0/10; "Don't send it in the
+  morning after all." — 0/10), so they still reach a model shown the same
+  surface. Zero polarity inversions; every other probe equal to MIDDLE but one
+  the app answers in code. What remains is Russell's on #424: a pre-registered
+  description change, or a broader code rule.
 
 ### What was MEASURED for the Codex door
 
@@ -6291,10 +6340,18 @@ passes `--mcp-stdio <folder>` too (`ClaudeCodeLauncher.ServerArguments`, its
 names the course in its greeting only, and still writes `started Claude Code
 for <CODE>` on the trail. `CodexLauncherTests.TheOutsideDoorsPassWhatTheContractSays`
 now compares BOTH doors' server argv with `serverArguments` by substitution.
-One consequence to know: an unlocked server takes no `assist` lease (it has no
-single course to claim — `Program.cs`), so "Available once you finish revising
-with Claude" no longer appears while a Claude session is open — as it never
-did for Codex, and as on the mac.
+Without `--course` the server would take no `assist` lease, which the stack
+review showed costs three protections 1.4.2 had: the conversation's backup
+(#283's `BackupDeleter` honours a held backup only for a pid with an `assist`
+lease), the guard against a second session on the same course, and the hold on
+structural work ("Available once you finish revising with Claude"). So the
+door ALSO names its course in the server's ENVIRONMENT
+(`PLANTOIR_DOOR_COURSE`, in the config's `env`; argv stays folder-only) and
+the server takes an `assist` lease on that course WITHOUT locking to it
+(`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
+as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
+and the mac is asked what it does). The Codex door names none and holds none,
+as before.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting

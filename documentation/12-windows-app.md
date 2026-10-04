@@ -23,6 +23,17 @@ One place for what changed on the preview and publish path in bundle 4, so a
 reader of the code finds the reasons. Hardware for every number: Intel Core
 i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
 
+- **"Closed for a deploy" (#436, v1.4.3).** A serving preview that another
+  program's deploy ended reads "Closed for a deploy", not "Something went
+  wrong" (`ScriptRunner.EndIsAClosingForADeploy`; the stop's mark here is
+  `returned non-zero exit status 15.`, measured — TerminateProcess(15), since
+  Windows has no SIGKILL). It asks the leases of OTHER processes only, so a
+  deploy of the same course from another window of the SAME Plantoir (one
+  process, its own build lease excluded) still ends the preview as "Something
+  went wrong". That is deliberate, the safe direction — an end is never hidden
+  — not a bug. Once a serving preview ends, the window also gives up its
+  `preview` work lease (`WorkLease.LetGoWhenAServingPreviewEnds`), so an
+  outside assistant is no longer told a preview is open.
 - **The address (#278).** `ScriptRunner.CapturePreviewAddress` reads COMPLETE
   lines only: the unfinished tail waits for the next piece, colour codes come out
   per line, the carry is flushed when the run ends, and nothing is read back off
