@@ -87,8 +87,34 @@ public sealed class DrivenApp : IDisposable
     public void ClickMiddleOf(AutomationElement element)
     {
         BringToFront();
+        FlaUI.Core.Input.Mouse.Click(MiddleOf(element));
+    }
+
+    /// <summary>The right-click twin of <see cref="ClickMiddleOf"/> (#428 item 4), for a row's menu.</summary>
+    public void RightClickMiddleOf(AutomationElement element)
+    {
+        BringToFront();
+        FlaUI.Core.Input.Mouse.RightClick(MiddleOf(element));
+    }
+
+    /// <summary>
+    /// Presses an item of a menu that is OPEN (#428 item 4): through its Invoke
+    /// pattern when it has one, which is not real input and so cannot land
+    /// anywhere else; otherwise a real click in the middle of its box. Not
+    /// <see cref="ClickMiddleOf"/>: bringing the main window forward first can
+    /// dismiss the open menu, which is in front already.
+    /// </summary>
+    public static void PressMenuItem(AutomationElement item)
+    {
+        if (item.Patterns.Invoke.IsSupported) item.Patterns.Invoke.Pattern.Invoke();
+        else FlaUI.Core.Input.Mouse.Click(MiddleOf(item));
+    }
+
+    /// <summary>The middle of an element's bounding rectangle, which is in real pixels at every scale.</summary>
+    public static System.Drawing.Point MiddleOf(AutomationElement element)
+    {
         var box = element.BoundingRectangle;
-        FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(box.Left + box.Width / 2, box.Top + box.Height / 2));
+        return new System.Drawing.Point(box.Left + box.Width / 2, box.Top + box.Height / 2);
     }
 
     /// <summary>
@@ -375,7 +401,7 @@ public sealed class DrivenApp : IDisposable
         // where the problem was.
         for (int attempt = 1; attempt <= 3; attempt++)
         {
-            node.Click();
+            ClickMiddleOf(node);
             var arrived = Retry.WhileNull(
                 () => Window.FindFirstDescendant(cf => cf.ByAutomationId("openFoldersHelpButton")),
                 TimeSpan.FromSeconds(6), TimeSpan.FromMilliseconds(250)).Result;
@@ -444,8 +470,7 @@ public sealed class DrivenApp : IDisposable
             // (NoClickablePointException, run 8 of bundle 11): wait it out.
             Retry.WhileFalse(() => { try { return row.TryGetClickablePoint(out _); } catch { return false; } },
                              TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(250));
-            try { row.RightClick(); }
-            catch (FlaUI.Core.Exceptions.NoClickablePointException) { Thread.Sleep(1000); continue; }
+            RightClickMiddleOf(row);
             // The app's own window first — its menus are popups inside it, and
             // a whole-desktop query is the one that timed out (COMException
             // 0x80131505, run 5 of bundle 11); a timeout is "not yet".
@@ -459,8 +484,7 @@ public sealed class DrivenApp : IDisposable
                 catch (System.Runtime.InteropServices.COMException) { return null; }
             }, TimeSpan.FromSeconds(8), TimeSpan.FromMilliseconds(250)).Result;
             if (item is null) continue;
-            if (item.Patterns.Invoke.IsSupported) item.Patterns.Invoke.Pattern.Invoke();
-            else item.Click();
+            PressMenuItem(item);
             return;
         }
         throw new InvalidOperationException($"The menu of {rowAutomationId} never offered \"{itemName}\".");
@@ -475,7 +499,7 @@ public sealed class DrivenApp : IDisposable
         string title = $"{shownCode ?? code}-S{section}";
         for (int attempt = 1; attempt <= 3; attempt++)
         {
-            node.Click();
+            ClickMiddleOf(node);
             var arrived = Retry.WhileFalse(
                 () => (Window.FindFirstDescendant(cf => cf.ByAutomationId("SectionTitle"))?.Name ?? "").StartsWith(title, StringComparison.Ordinal),
                 TimeSpan.FromSeconds(6), TimeSpan.FromMilliseconds(250)).Result;
@@ -624,12 +648,15 @@ public sealed class DrivenApp : IDisposable
             if (_app is not null && !_app.HasExited) _app.Kill();   // Kill waits for exit
         }
         catch { }
+        // And waited for by pid as well: the app locks a reference course OFF
+        // its UI thread, so a lock pass still finishing as it dies must be over
+        // before the unlock below, or it re-locks what was just unlocked.
+        try
+        {
+            if (_app is not null) Process.GetProcessById(_app.ProcessId).WaitForExit(10_000);
+        }
+        catch { /* already gone */ }
         CleanUpAfterTheLaunchers();
-        // A course kept for reference is LOCKED by the app (deny entries) the
-        // moment the folder is read, and a locked tree refuses to be deleted —
-        // which is why the temporary folders of the reference tests outlived
-        // their runs before bundle 11.
-        try { Plantoir.Core.Models.ReferenceLock.Unlock(Path.Combine(WorkspacePath, "courses")); } catch { }
         // Deleted last, and never fatally: a locked file must not turn a
         // passing test red, and the folder is under TEMP either way.
         //
@@ -649,6 +676,34 @@ public sealed class DrivenApp : IDisposable
             Console.WriteLine($"PLANTOIR_UI_KEEP: leaving this run's files at {_root}");
             return;
         }
-        try { Directory.Delete(_root, recursive: true); } catch { }
+        if (!DeleteRunFolder(_root))
+            Console.WriteLine($"Could not delete this run's files at {_root}.");
+    }
+
+    /// <summary>
+    /// Deletes a run's temporary folder, LIFTING THE REFERENCE LOCK FIRST
+    /// (#428 item 5). A course kept for reference is locked by the app (deny
+    /// entries) the moment the folder is read, and a locked tree refuses to be
+    /// deleted: after the 44-of-44 run of 2026-10-03 two
+    /// <c>%TEMP%\plantoir-ui-&lt;run&gt;-*</c> folders remained, <c>rmdir</c>
+    /// refused "Access is denied" on <c>courses\ICS3U-…\section1\index.md</c>,
+    /// and <c>icacls /reset /T</c> removed them by hand.
+    ///
+    /// <para>The unlock covers the WHOLE run folder, not only
+    /// <c>workspace\courses</c> as it did before: an import test keeps last
+    /// year's working folder in a scratch folder beside it, which the app reads
+    /// too. And it is asked again between attempts, so a lock written late
+    /// (by a pass still finishing when the app died) is lifted as well. Never
+    /// throws; says whether the folder is gone.</para>
+    /// </summary>
+    internal static bool DeleteRunFolder(string root)
+    {
+        for (int attempt = 1; attempt <= 3 && Directory.Exists(root); attempt++)
+        {
+            try { Plantoir.Core.Models.ReferenceLock.Unlock(root); } catch { }
+            try { Directory.Delete(root, recursive: true); }
+            catch { Thread.Sleep(500); }
+        }
+        return !Directory.Exists(root);
     }
 }
