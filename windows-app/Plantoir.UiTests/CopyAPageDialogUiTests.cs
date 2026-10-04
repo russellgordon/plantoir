@@ -81,7 +81,9 @@ public class CopyAPageDialogUiTests
         item!.Click();
 
         var picker = app.Find("copyPagePicker", "the page picker");
-        picker.Click();
+        // The click and the typing below are REAL input, which goes to whatever
+        // is under the pointer and in front: see DrivenApp.ClickMiddleOf.
+        app.ClickMiddleOf(picker);
         Keyboard.Type("Big");
         Thread.Sleep(500);
         Keyboard.Press(VirtualKeyShort.DOWN);

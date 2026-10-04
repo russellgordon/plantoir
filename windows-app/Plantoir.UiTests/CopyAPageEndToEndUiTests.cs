@@ -161,7 +161,9 @@ public class CopyAPageEndToEndUiTests
             catch { return false; }
         }, TimeSpan.FromSeconds(15), TimeSpan.FromMilliseconds(250)).Result, "the page picker never came on screen");
         Thread.Sleep(400);
-        picker!.Click();
+        // The click and the typing below are REAL input, which goes to whatever
+        // is under the pointer and in front: see DrivenApp.ClickMiddleOf.
+        app.ClickMiddleOf(picker!);
         Keyboard.Type(typed);
         Thread.Sleep(600);
         Keyboard.Press(VirtualKeyShort.DOWN);

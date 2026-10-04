@@ -105,8 +105,8 @@ newest published release — and 404s when the newest release does not carry it.
 (This paragraph used to say it found "the newest release carrying that asset
 name"; it does not, which is why a platform that lags a release has its card
 PINNED to `releases/download/v<version>/<filename>` by setting `pinned` in
-`site.json`, and un-pinned when it catches up. Windows is pinned to 1.1.0 as
-of v1.2.0.)
+`site.json`, and un-pinned when it catches up. Windows was pinned to 1.1.0
+from v1.2.0 until its installer joined v1.4.2 on 2026-10-03.)
 
 **The names are frozen, and renaming one breaks the site's download button
 silently** — the evergreen URL keeps resolving, to nothing. `Plantoir-macOS.dmg`
@@ -164,20 +164,73 @@ daily check plus File ▸ Check for Updates…; Install downloads, then asks
 `EvaluateForInstall` with a FRESH snapshot, and a held install goes ahead by
 itself fifteen seconds after the work ends; the quit path calls `AtQuit`.
 All eight update trail events have call sites. **The feed is read from ONE
-place, `AppUpdates.ConfiguredFeed`, and it is EMPTY**, as is
-`AppUpdates.PublicKey`: while it is, no `SparkleUpdater` is constructed,
-nothing is fetched and the menu item is hidden
-(`AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork`). A Debug build
+place, `AppUpdates.ConfiguredFeed`**, set with `AppUpdates.PublicKey` since
+v1.4.2 (`AppUpdaterTests.TheReleasedAppReadsTheContractsFeedWithAKey`). An
+updater given an empty feed constructs no `SparkleUpdater`, fetches nothing
+and hides the menu item (`AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork`),
+which is how it shipped inert until then. A Debug build
 constructs nothing at all. The verifier is Ed25519 in `SecurityMode.Strict`,
 which refuses an unsigned feed or download (pinned by
 `TheVerifierRequiresEd25519AndRefusesAnUnsignedFeed`).
 
-**What is not done is only this: no feed, no key, no release.** The first
-release that ships it sets `ConfiguredFeed` to `Feed` and `PublicKey` to the
-key's public half, publishes `website/updates/windows.xml` and its
-`.signature`, and adds the RELEASING steps (proposed in the bundle-8 ready
-note). Measured nowhere yet: a real download, a real silent install, a real
-reopen.
+**Switched on with v1.4.2, 2026-10-03.** `ConfiguredFeed` is `Feed`,
+`PublicKey` is the public half of an Ed25519 pair Russell made with
+`netsparkle-generate-appcast --generate-keys` into
+`%USERPROFILE%\.plantoir-release\` (the private half is there and in his
+Keychain on the mac, and nowhere else), and `website/updates/windows.xml` with
+its `.signature` is committed. How the feed is made at a cut is in
+`RELEASING.md` → "The update feed (Windows)".
+
+What was measured with the signed 1.4.2 installer, on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), over a real
+per-user 1.1.0:
+
+| Run | Result |
+|---|---|
+| `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCLOSEAPPLICATIONS /PLANTOIRUPDATE=1 /RELAUNCH=1`, nothing running | Installed 1.4.2 over 1.1.0 in about 3 minutes and reopened Plantoir by itself. |
+| The same without `/RELAUNCH`, while a `plantoir-mcp --folder <working folder>` was serving | Setup exited 1 within a second, installed nothing, and plantoir-mcp was still running. |
+| The same with `/RETURNTO=<installed Plantoir.exe>` | Setup exited 1; Plantoir reopened with `--update-not-installed` and the trail recorded "the new version was not installed: helping an assistant in another app had started; it will be offered again". |
+| The installed 1.4.2's first launch, before the feed was live | The trail recorded "a new version: could not reach plantoir.app" — the engine is constructed and does fetch. |
+
+Not measured: a real download and install offered BY the app (there is nothing
+newer than 1.4.2 to offer until the next release); the refusal while
+plantoir-mcp is actually publishing, as against serving (the installer's test
+is the process's name, so the two are the same to it); a file still in use at
+copy time under `/NORESTART`; and an all-users copy made by the 1.1.0
+installer meeting the per-user 1.4.2 installer, which needs an administrator
+at the PC.
+
+**A trap at the cut: the feed files must never have their line endings
+changed.** NetSparkle writes `windows.xml` with CR LF, and this repository is
+`* text=auto`, so a plain commit would have stored it with LF — different
+bytes under the same signature. The same setting had already given the Windows
+checkout a CR LF copy of the mac's `macos.xml` (measured: SHA-256 `63026ebf…`
+against the live feed's `ecb57d48…`), so a site deployed from Windows would
+have published a mac feed no Mac accepts, and the deploy's own check would have
+passed it, because it compares the live feed with `site/`. `.gitattributes`
+now marks `website/updates/*.xml` and `*.xml.signature` `-text`. The
+pre-commit hook still remarks on the CR in `windows.xml`; there it is correct
+to leave them. Git does not rewrite a file because its attribute changed, so
+any OTHER Windows clone keeps its CR LF `macos.xml` until it is checked out
+again: `git checkout -- website/updates/macos.xml`, then compare its SHA-256
+with the live feed's before deploying from that clone.
+
+**The committed feed, read by the engine itself** (the Opus review's probe,
+2026-10-03: NetSparkle 3.1.0 from the package cache, the real public key,
+`SecurityMode.Strict`, the committed `windows.xml` and `.signature`): running
+as 1.4.2 it answers `UpdateNotAvailable`; as 1.4.1 or 1.1.0,
+`UpdateAvailable [1.4.2]`. The feed's signature is valid on the CR LF bytes
+and INVALID once they are converted to LF. Versions compare the way a teacher
+expects (1.4.3 above 1.4.2, 1.4.10 above 1.4.9). The check fetches two files,
+`windows.xml` and `windows.xml.signature`.
+
+**Owed in the next version, found by the same review:** `App.xaml.cs` writes
+the `app updated` trail line with `byItsOwnUpdater: false` always, which was
+true while no updater ran. The first update the app installs itself would be
+recorded as "by hand". It has to be put right in the version that is
+INSTALLED by the updater (1.4.3), which is the one that writes the line;
+#428 says how, and names three comments in `AppUpdater.cs`, `App.xaml.cs`
+that still say the feed is empty (left as they are in 1.4.2 so the sources
+are the signed installer's).
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|

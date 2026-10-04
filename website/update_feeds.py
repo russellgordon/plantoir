@@ -173,6 +173,30 @@ def problems_with(feed: Path) -> list[str]:
     return problems
 
 
+def verify_file_live(base_url: str, local_file: Path, fetch=None) -> str:
+    """Confirm one file under updates/ is live with exactly these bytes.
+
+    For NetSparkle's detached `windows.xml.signature` (#337): the Windows app
+    reads it beside the feed and refuses a feed it does not sign.
+    """
+    if fetch is None:
+        fetch = _fetch
+    url = f"{base_url.rstrip('/')}/updates/{local_file.name}"
+    try:
+        status, _, body = fetch(url, "GET")
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        print(f"⚠️ Could not fetch {url} ({error}); check it by hand.")
+        return "unknown"
+    if status != 200:
+        print(f"❌ {url} answered {status}.")
+        return "mismatch"
+    if body != local_file.read_bytes():
+        print(f"❌ {url} is not the file in site/. The Windows app will refuse the feed.")
+        return "mismatch"
+    print(f"✅ {url} is live as built.")
+    return "match"
+
+
 def verify_live(base_url: str, local_feed: Path, fetch=None) -> str:
     """Confirm the live feed is these bytes and its newest download is there.
 

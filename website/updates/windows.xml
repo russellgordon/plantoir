@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Plantoir</title>
+    <description>Plantoir for Windows</description>
+    <language>en</language>
+    <item>
+      <title>Plantoir 1.4.2</title>
+      <pubDate>Sat, 03 Oct 2026 18:10:12 -04:00</pubDate>
+      <sparkle:version>1.4.2</sparkle:version>
+      <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.2/PlantoirSetup.exe" sparkle:version="1.4.2" sparkle:shortVersionString="1.4.2" length="237391016" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="6JSIKNASw+Oo7yXJfpKQi99fVvcHCLGF6TTFg0inW73MLztRqBaO/cvzA56hFXv50LfawlFOEHlEkgoqUehjCQ==" />
+    </item>
+  </channel>
+</rss>

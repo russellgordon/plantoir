@@ -202,6 +202,19 @@ gh release edit v<version> --draft=false -R <owner/repo>
    the git tag; if the other machine needs a real tag to build or verify
    against, push an annotated one yourself and target the draft at it.
 
+1w. **The Windows update feed — when this cut attaches `PlantoirSetup.exe`.**
+   Since Windows 1.4.2 an installed copy asks
+   `plantoir.app/updates/windows.xml` for new versions (#337). The feed is
+   built and signed ON THE WINDOWS PC, from the exact installer being
+   uploaded, with `netsparkle-generate-appcast` and the key in
+   `%USERPROFILE%\.plantoir-release` — the command, the two signature checks
+   and what the next feed still owes (notes, earlier items) are in
+   `RELEASING.md` → "The update feed (Windows)". Confirm
+   `website/updates/windows.xml` names THIS version and this installer's
+   length before deploying; if it does not, stop — a Windows release with a
+   stale feed is offered to nobody. Never print the private key, and never let
+   the feed's line endings change (`.gitattributes` keeps them).
+
 1a. **Build the mac's update feed — only when this cut attached a mac DMG,
    and only NOW, after the release is published** (a feed deployed before its
    download exists offers every teacher an update that 404s):
@@ -289,13 +302,15 @@ python3 website/build.py --check
 # so pushing publishes nothing; the deploy is its own explicit step
 git add website/site.json site/ brand/
 git add website/updates/macos.xml website/updates/macos-notes.html   # only when step 1a ran
+git add website/updates/windows.xml website/updates/windows.xml.signature   # only when step 1w ran
 git commit -m "Update website for v<version> release"
 git push origin main
 python3 website/build.py --deploy
 ```
 
-Before publishing, `--deploy` refuses if any picture a Mac visitor is shown
-lacks its window's own corners (#375); that is a stop — retake the picture
+Before publishing, `--deploy` refuses if any picture a Mac visitor is shown,
+or any of the Windows figures retaken natively (#380), lacks its window's own
+corners (#375); that is a stop — retake the picture
 (`marketing-screenshots` skill), never mask or crop it to pass.
 
 `--deploy` fetches `https://plantoir.app` afterward on its own and confirms
