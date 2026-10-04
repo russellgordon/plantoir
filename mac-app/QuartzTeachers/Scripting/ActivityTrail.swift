@@ -844,6 +844,12 @@ nonisolated enum ActivityTrail {
         /// was — never anything written on a page. It answers "Claude said it
         /// changed the page and my preview still shows the old one".
         case outsideChangeLeftThePreviewAlone = "outside assistant worked while a preview was open"
+        /// A preview that was serving ended because another program on this
+        /// Mac built the course for a deploy — its server killed the way a
+        /// deploy's build stops a section's preview — and was shown as
+        /// "Closed for a deploy", not as a failure (#433's stack review).
+        /// Carries the course and section; never anything on a page.
+        case previewClosedForADeploy = "preview closed for a deploy"
 
         /// A publish set for later found the course being built or published
         /// by another program and WAITED (#156): it polls every fifteen

@@ -1718,12 +1718,9 @@ struct SectionDetailView: View {
             let folderPathForLeases: String = workspaceURL.path
             let courseCodeForLeases: String = course.code
             previewRunner.endedForAnotherProgramsBuild = {
-                if case .building = WorkLeaseRegistry.whatAnOutsideChangeMeets(
+                return WorkLeaseRegistry.anotherProgramIsBuilding(
                     folderPath: folderPathForLeases, courseCode: courseCodeForLeases
-                ) {
-                    return true
-                }
-                return false
+                )
             }
             previewRunner.run(
                 scriptNamed: "preview.sh",
@@ -2448,6 +2445,9 @@ struct SectionDetailView: View {
                 if let httpResponse = response as? HTTPURLResponse {
                     if httpResponse.statusCode == 200 {
                         previewBuildWait.end()
+                        // Serving from here: a later end may be a deploy
+                        // elsewhere closing it (#433's stack review).
+                        previewRunner.hasBeenServing = true
                         previewURL = addressToOpen
                         // Load the fresh site EXPLICITLY, rather than trusting
                         // the mounting web view's `loadIfNeeded` to do it.

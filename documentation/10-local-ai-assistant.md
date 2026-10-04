@@ -4023,11 +4023,20 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   The window shows that end as "Closed for a deploy", not as a failure
   (#433's stack review, item 6, traced: the killed server made the Python
   parent raise, `preview.sh` exited 1, and the console said "Something went
-  wrong" and opened the raw output). `ScriptRunner.finishRun` asks the
-  section window's `endedForAnotherProgramsBuild` — another program holds a
-  `build` lease on the course at that moment — before it sets `lastExitCode`.
-  A publish set for later ends a preview the same way and is shown the same
-  way now.
+  wrong" and opened the raw output). Since the second look at that fix it
+  is narrow: `ScriptRunner.endIsAClosingForADeploy` says "closed" only when
+  ALL hold — the preview had been SERVING (`hasBeenServing`, set when it
+  answered), its output carries Python's own "died with <Signals.SIGKILL: 9>"
+  (how `stop_preview_serving` ends it; nothing added to the launchers), and
+  ANOTHER program holds a `build` lease on the course
+  (`WorkLeaseRegistry.anotherProgramIsBuilding`; a served lease never
+  counts, the app's own build never counts). Everything else is a failure as
+  before. The output stays one click away, the run record says "Closed for a
+  deploy", and the trail writes `preview closed for a deploy`. The residual,
+  accepted: a lease names the course, so a deploy of Section 2 elsewhere
+  coinciding with Section 1's server being SIGKILLed for another reason reads
+  as closed. A publish set for later ends a preview the same way and is shown
+  the same way.
 - **The residual, in `outsideChanges.rule`**: an outside change looks once and
   takes no lease, so a window Deploy pressed during a multi-page outside write
   can deploy a half-applied change. Not new with #433, and accepted.
