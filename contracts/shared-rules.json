@@ -8607,6 +8607,55 @@
           "why": "Typed words are the teacher's; only the untouched heading and noun follow the box."
         },
         {
+          "name": "a heading the teacher typed stays when the box goes off, while the club's own words leave",
+          "isClub": false,
+          "usesLCSTerminology": false,
+          "given": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Meetings"
+            ],
+            "classFolder": "All Meetings",
+            "unitWord": "Week",
+            "frontPageHeading": "This Week in Coding",
+            "noun": "meeting"
+          },
+          "expect": {
+            "sharedFolders": [
+              "Concepts",
+              "Discussions",
+              "Examples",
+              "Exercises",
+              "Ontario Curriculum",
+              "Portfolios",
+              "Recaps",
+              "Setup",
+              "Style",
+              "Tasks",
+              "Tutorials"
+            ],
+            "perSectionFolders": [
+              "All Classes"
+            ],
+            "classFolder": "All Classes",
+            "unitWord": "Unit",
+            "frontPageHeading": "This Week in Coding",
+            "noun": "class"
+          },
+          "why": "Proposed from Windows (#416 DO 1, measured by mutation there): a fill that always took the arriving heading passed every earlier case, because the only case with typed words kept the heading at the club default. Here the heading is the teacher's own and every other field is the club's, so the heading must stay while the rest follow the box."
+        },
+        {
           "name": "the class folder keeps its place in the list",
           "isClub": true,
           "usesLCSTerminology": false,
