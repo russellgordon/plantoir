@@ -140,9 +140,12 @@ class MarketingScreenshotCase: XCTestCase {
             return
         }
 
-        let frontmost: String = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
-        if frontmost != "Plantoir" {
-            XCUIApplication().activate()
+        // Active before the picture (#434). The app that owns THIS window is
+        // asked, by its process id — not a new XCUIApplication, which would
+        // be a second way into the app beside the one door every UI test
+        // launches through (UITestLaunchTripwireTests).
+        if let owner: NSRunningApplication = owningApplication(ofWindow: windowNumber), !owner.isActive {
+            owner.activate()
             Thread.sleep(forTimeInterval: 1.0)
         }
 
@@ -186,6 +189,20 @@ class MarketingScreenshotCase: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// The running application that owns a CoreGraphics window, or nil.
+    func owningApplication(ofWindow number: Int) -> NSRunningApplication? {
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        for window in windows {
+            let listed: Int = window[kCGWindowNumber as String] as? Int ?? -1
+            if listed == number, let pid = window[kCGWindowOwnerPID as String] as? Int {
+                return NSRunningApplication(processIdentifier: pid_t(pid))
+            }
+        }
+        return nil
     }
 
     /// Parks the pointer over the empty part of the sidebar, below the last
