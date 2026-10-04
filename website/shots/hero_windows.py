@@ -2,11 +2,12 @@
 """Photograph the three windows the hero composite is made of, on Windows.
 
 The mac takes this picture with ``screencapture -l <window id>``, which hands
-back one window with its rounded corners already transparent. Windows has no
-equivalent, so every card here is a REGION of the screen: each window is put
-at a known place, brought to the front, and the rectangle DWM reports as its
-visible frame is grabbed. The corners are masked afterwards, because a screen
-grab includes whatever was behind the window at each corner.
+back one window with its rounded corners already transparent. Windows' answer
+is Windows.Graphics.Capture, asked for ONE window by its handle: the frame it
+returns carries the window's own alpha, so the corners Windows 11 rounds are
+already transparent. ``windowshot`` (beside this file) is that capture, and
+every card here is one whole picture from it -- nothing cropped, nothing
+masked, no corner drawn (website/SCREENSHOTS.md, "The one rule"; #380).
 
 The three cards, left to right, are the same three the mac uses -- the notes,
 the app publishing them, and the finished site -- with Edge standing in for
@@ -35,8 +36,6 @@ import time
 import urllib.parse
 import winreg
 from pathlib import Path
-
-from PIL import Image, ImageDraw
 
 REPO = Path(__file__).resolve().parent.parent.parent
 IMAGE_DIR = REPO / "site" / "img"
@@ -67,20 +66,6 @@ EDGE_PROFILE = SCRATCH / "edge-profile"
 
 THEME_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
 
-# Windows 11 rounds a top-level window by 8 device-independent pixels. The grab
-# is in real pixels, so the mask has to follow the display's scale or the
-# corners keep a crescent of desktop.
-CORNER_DIPS = 8
-
-# DWMWA_EXTENDED_FRAME_BOUNDS excludes the invisible resize border, but it
-# still includes the thin accent border Windows 11 draws directly on the
-# window -- so the raw grab keeps a hairline of that border colour on all
-# four edges. Measured on Obsidian, Plantoir and Edge alike, in both
-# appearances: exactly 1 DIP (2 real pixels at 2x scale). Crop it off before
-# masking, or it survives as stray dark pixels once composited onto the
-# page's own background.
-BORDER_DIPS = 1
-
 # A window sized in real pixels doesn't scale with the display: the original
 # 1680x960 cap was tuned on a 1920x1080-at-150% machine (a work area of
 # 1920x1008 real pixels, 1280x672 DIPs), where it read as "almost the whole
@@ -104,7 +89,6 @@ dwmapi = ctypes.windll.dwmapi
 
 SWP_SHOWWINDOW = 0x0040
 SW_RESTORE = 9
-DWMWA_EXTENDED_FRAME_BOUNDS = 9
 SPI_GETWORKAREA = 0x0030
 HWND_BROADCAST = 0xFFFF
 WM_SETTINGCHANGE = 0x001A
@@ -248,28 +232,6 @@ def reveal_active_file() -> None:
     time.sleep(1.2)
 
 
-def frame_bounds(hwnd: int) -> tuple[int, int, int, int]:
-    """The VISIBLE frame. GetWindowRect includes an invisible resize border."""
-    rect = wintypes.RECT()
-    dwmapi.DwmGetWindowAttribute(
-        wintypes.HWND(hwnd),
-        wintypes.DWORD(DWMWA_EXTENDED_FRAME_BOUNDS),
-        ctypes.byref(rect),
-        ctypes.sizeof(rect),
-    )
-    return rect.left, rect.top, rect.right, rect.bottom
-
-
-def rounded(image: Image.Image, radius: int) -> Image.Image:
-    mask = Image.new("L", image.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [(0, 0), (image.width - 1, image.height - 1)], radius=radius, fill=255
-    )
-    result = image.convert("RGBA")
-    result.putalpha(mask)
-    return result
-
-
 def park_pointer() -> None:
     """Get the pointer out of the frame before the shutter.
 
@@ -283,18 +245,45 @@ def park_pointer() -> None:
     time.sleep(1.4)
 
 
-def photograph(hwnd: int, destination: Path) -> Path:
-    from PIL import ImageGrab
+WINDOWSHOT = Path(__file__).resolve().parent / "windowshot"
+WINDOWSHOT_EXE = (WINDOWSHOT / "bin" / "x64" / "Release" / "net9.0-windows10.0.22621.0"
+                  / "win-x64" / "windowshot.exe")
 
+
+def windowshot_exe() -> Path:
+    """The window-capture tool, built when it is missing or older than its source."""
+    sources = [WINDOWSHOT / "Program.cs", WINDOWSHOT / "windowshot.csproj"]
+    newest = max(source.stat().st_mtime for source in sources)
+    if not WINDOWSHOT_EXE.exists() or WINDOWSHOT_EXE.stat().st_mtime < newest:
+        print("   building windowshot")
+        built = subprocess.run(["dotnet", "build", "-c", "Release", "-p:Platform=x64", str(WINDOWSHOT)],
+                               capture_output=True, text=True)
+        if built.returncode != 0 or not WINDOWSHOT_EXE.exists():
+            raise SystemExit("windowshot did not build:\n" + built.stdout[-2000:])
+    return WINDOWSHOT_EXE
+
+
+def photograph(hwnd: int, destination: Path) -> Path:
+    """One window, whole, with the corners and the alpha Windows gave it.
+
+    Measured 2026-10-03 on a Plantoir window at 2x: the corner pixels come
+    back at alpha 7 to 40 and rise to 255 along an antialiased curve, and the
+    1 DIP accent border Windows 11 draws round a window is in the picture at
+    about alpha 113 -- part of the window, so it is kept. The display scale
+    the window was drawn at is written beside the picture (`<name>.json`),
+    because a corner is 8 DIPs and only the scale says how many pixels that was.
+    """
     park_pointer()
-    left, top, right, bottom = frame_bounds(hwnd)
-    image = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
-    border = max(1, round(BORDER_DIPS * scale_factor()))
-    image = image.crop((border, border, image.width - border, image.height - border))
-    radius = max(1, round((CORNER_DIPS - BORDER_DIPS) * scale_factor()))
     destination.parent.mkdir(parents=True, exist_ok=True)
-    rounded(image, radius).save(destination, format="PNG")
-    print(f"   part {destination.name} ({image.width}x{image.height})")
+    if destination.exists():
+        destination.unlink()
+    taken = subprocess.run([str(windowshot_exe()), str(hwnd), str(destination)],
+                           capture_output=True, text=True)
+    if taken.returncode != 0 or not destination.exists():
+        raise SystemExit(f"Could not photograph the window for {destination.name}: {taken.stderr.strip()}")
+    facts = json.loads(taken.stdout)
+    destination.with_suffix(".json").write_text(json.dumps(facts), encoding="utf-8")
+    print(f"   part {destination.name} ({facts['width']}x{facts['height']} at {facts['scale']}x)")
     return destination
 
 
@@ -501,6 +490,71 @@ def capture_edge(theme: str, x: int, y: int, w: int, h: int) -> Path:
     destination = photograph(hwnd, PARTS / f"edge-{theme}.png")
     stop_matching("msedge.exe", str(EDGE_PROFILE))
     return destination
+
+
+PAGE_WIDTH_DIP = 1280
+PAGE_HEIGHT_DIP = 860
+
+
+def capture_page(url: str, title_fragment: str, destination: Path) -> Path:
+    """One page of a class site in a window with no browser round it.
+
+    The colour figures are about the SITES, and three toolbars read as three
+    browsers -- the mac uses a plain window for the same reason
+    (`webwindow.swift`). The window is FOUND by the page's title, so close any
+    other window showing the same page first, or it may be the one photographed. Edge's `--app=` window is this side's: a title bar and
+    the page, nothing else, and its own edge is the picture's edge. The
+    appearance is the machine's, so the caller switches Windows first.
+    """
+    shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
+    EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
+    left, top, right, bottom = work_area()
+    scale = scale_factor()
+    width = min(round(PAGE_WIDTH_DIP * scale), right - left - 40)
+    height = min(round(PAGE_HEIGHT_DIP * scale), bottom - top - 40)
+    x, y = left + 20, top + 20
+    subprocess.Popen([
+        str(EDGE_EXE),
+        f"--user-data-dir={EDGE_PROFILE}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-sync",
+        "--disable-search-engine-choice-screen",
+        "--disable-features=msImplicitSignin,msSyncPromo,msEdgeSplitScreen,"
+        "msUndersideButton,msEdgeShoppingAssist",
+        f"--window-position={x},{y}",
+        f"--window-size={width},{height}",
+        f"--app={url}",
+    ])
+    try:
+        hwnd = wait_for_window(lambda: window_titled(title_fragment), seconds=60)
+        time.sleep(4.0)
+        place(hwnd, x, y, width, height)
+        press_escape()
+        time.sleep(2.5)
+        return photograph(hwnd, destination)
+    finally:
+        stop_matching("msedge.exe", str(EDGE_PROFILE))
+
+
+def capture_colour_parts(parts: Path, courses: list[dict]) -> None:
+    """The home pages the two colour figures are made of: every course in
+    light, and the first course in dark as well."""
+    make_dpi_aware()
+    was_apps, was_system = read_theme()
+    try:
+        for theme in ("light", "dark"):
+            write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+            for course in courses:
+                if theme == "dark" and course is not courses[0]:
+                    continue
+                announce(f"{course['code']} home page, {theme}")
+                capture_page(f"https://{course['site']}.netlify.app/", course["title"],
+                             parts / f"home-{course['code'].lower()}-{theme}.png")
+    finally:
+        write_theme(was_apps, was_system)
+        shutil.rmtree(EDGE_PROFILE, ignore_errors=True)
+        print("   colour mode and scratch profile put back")
 
 
 def build(exe: Path, themes=("light", "dark")) -> None:

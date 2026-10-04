@@ -64,6 +64,65 @@ public sealed class DrivenApp : IDisposable
     private readonly string _root;
 
     public Window Window { get; } = null!;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr window);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr window, System.Text.StringBuilder text, int count);
+
+    /// <summary>
+    /// A real mouse click in the middle of an element's bounding rectangle.
+    /// Not <c>element.Click()</c>, which asks the element for its "clickable
+    /// point": at 200% display scale the page picker answered with a point at
+    /// TWICE its real coordinates (measured 2026-10-03 on a 3840-wide remote
+    /// session: the pointer went to x=3839, the screen's edge, and y=1168 for a
+    /// box whose middle was at y=584), so the click landed on whatever was
+    /// behind the window and the typing followed it there. The bounding
+    /// rectangle is in real pixels at every scale.
+    /// </summary>
+    public void ClickMiddleOf(AutomationElement element)
+    {
+        BringToFront();
+        var box = element.BoundingRectangle;
+        FlaUI.Core.Input.Mouse.Click(new System.Drawing.Point(box.Left + box.Width / 2, box.Top + box.Height / 2));
+    }
+
+    /// <summary>
+    /// Puts the app's window in front, for a test about to send REAL input (a
+    /// mouse click, typed keys), which goes to whatever is in front. Windows
+    /// refuses SetForegroundWindow from a process that is not itself in front,
+    /// and this suite is started from a terminal that is. Joining the input queue of the
+    /// window that IS in front is what lets the request through. Throws,
+    /// naming the window in the way, rather than letting a test type into it.
+    /// </summary>
+    public void BringToFront()
+    {
+        IntPtr window = Window.Properties.NativeWindowHandle.Value;
+        for (int attempt = 0; attempt < 5 && GetForegroundWindow() != window; attempt++)
+        {
+            uint front = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+            uint mine = GetCurrentThreadId();
+            bool joined = front != 0 && front != mine && AttachThreadInput(mine, front, true);
+            try
+            {
+                BringWindowToTop(window);
+                SetForegroundWindow(window);
+            }
+            finally { if (joined) AttachThreadInput(mine, front, false); }
+            Thread.Sleep(200);
+        }
+        if (GetForegroundWindow() != window)
+        {
+            var title = new System.Text.StringBuilder(200);
+            GetWindowText(GetForegroundWindow(), title, title.Capacity);
+            throw new InvalidOperationException(
+                $"Plantoir could not be brought in front of \"{title}\", so a click or typed keys would go there instead.");
+        }
+    }
     public string WorkspacePath { get; }
 
     /// <summary>The folder this run's <c>--state-dir</c> points at — where the

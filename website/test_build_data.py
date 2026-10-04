@@ -175,13 +175,16 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
-    def test_the_windows_card_is_pinned_until_its_installer_ships_again(self):
+    def test_neither_card_is_pinned_while_the_newest_release_has_both_installers(self):
+        # Windows was pinned to 1.1.0 from v1.2.0 until PlantoirSetup.exe
+        # joined v1.4.2 (2026-10-03). A release that lacks one platform's
+        # installer pins that card again, and this test changes with it.
         site = build.read_json(build.WEBSITE / "site.json")
         pins: dict = {}
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        self.assertEqual(pins["Windows"], "1.1.0")
+        self.assertIsNone(pins["Windows"])
 
 
 class NewInTests(unittest.TestCase):
@@ -264,16 +267,6 @@ class WindowsSwapTests(unittest.TestCase):
                 self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
             finally:
                 build.IMAGE_DIR = saved
-
-    def test_the_three_drawn_windows_figures_are_not_offered(self):
-        # #375 stopgap (the row-606 mechanism): hero-windows, colour-schemes-
-        # windows and light-and-dark-windows had drawn corners. Until Windows
-        # retakes them natively, these ids stay `windows: false`; the retake
-        # sets `windows: true` and deletes this test.
-        shots = json.loads((Path(build.WEBSITE) / "shots.json").read_text(encoding="utf-8"))
-        for shot in shots["shots"]:
-            if shot["id"] in ("hero", "colour-schemes", "light-and-dark"):
-                self.assertIs(shot.get("windows"), False, shot["id"])
 
 
 class AwaitingCaptureTests(unittest.TestCase):

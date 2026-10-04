@@ -141,11 +141,15 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    ships nothing in this cut keeps its lower number (see "Two platforms, one
    version series" above, and the `cut-release` skill's step 5). For v1.4.0,
    a mac-only cut: `MARKETING_VERSION` goes to 1.4.0 before `publish.sh
-   -Sign`, and the csproj stays at 1.1.0.
+   -Sign`, and the csproj stays at 1.1.0. (The csproj went to 1.4.2 on
+   2026-10-03, when the Windows installer joined that release.)
 3. **Build the signed Windows bundle**: `az login`, then
    `cd windows-app; powershell -File publish.ps1 -Sign`. It fails fast with the
    remedy if anything is missing. Output lands in `windows-app\dist\PlantoirSetup.exe`
-   (and `Plantoir-win-x64.zip`).
+   (and `Plantoir-win-x64.zip`). **Then build and sign the Windows update feed
+   from that exact installer, and commit it** ("The update feed (Windows)",
+   below) — the `cut-release` skill does not do this for you, and a Windows
+   release whose feed was not rebuilt is one no installed copy is offered.
 4. **Build the signed & notarized macOS bundle**:
    `cd mac-app; ./publish.sh -Sign`. Output lands in `mac-app/dist/Plantoir-macOS.dmg`.
    Since #204 it also signs the updater inside the app item by item and REFUSES
@@ -359,8 +363,8 @@ the release side.
 
 - **Where it lives:** `website/updates/macos.xml`, committed, copied into
   `site/updates/` byte for byte by `website/build.py`. One file per platform
-  (Windows adds `updates/windows.xml` with NetSparkleUpdater, and its own
-  `.signature` file), never a GitHub release asset — `releases/latest/download`
+  (Windows has `updates/windows.xml` with NetSparkleUpdater, and its own
+  `.signature` file — "The update feed (Windows)", below), never a GitHub release asset — `releases/latest/download`
   404s whenever a platform lags.
 - **Signed with the `plantoir-macos` key**, the feed AND each download. The key
   lives in this Mac's Keychain (backed up in Russell's Passwords app); Sparkle's
@@ -449,6 +453,63 @@ the release side.
 - **A release that publishes a DMG without updating the feed ships an update
   nobody is offered.** Teachers on v1.3.1 or earlier — the last release without an updater — have no updater at all and
   install the first release that carries one by hand.
+
+## The update feed (Windows)
+
+Since v1.4.2 a released Plantoir on Windows asks
+`https://plantoir.app/updates/windows.xml` once a day (#337). The app's side,
+what was measured and what was not is `documentation/11-release-strategy.md`
+→ the Windows updater; this is the release side.
+
+- **Signed with the Windows key**, an Ed25519 pair of its own (one key per
+  platform). The private half is in `%USERPROFILE%\.plantoir-release\` on the
+  Windows PC and in Russell's Keychain on the mac; `.gitignore` refuses
+  `*.priv`. The public half is `AppUpdates.PublicKey`. **Losing the private
+  half means no installed copy can ever accept another update.** Never print
+  it: `netsparkle-generate-appcast --export` does.
+- **Built at the cut, from the EXACT `PlantoirSetup.exe` being uploaded**, on
+  the Windows PC, after `publish.ps1 -Sign`:
+
+      dotnet tool install --global NetSparkleUpdater.Tools.AppCastGenerator   # once
+      netsparkle-generate-appcast --single-file windows-app/dist/PlantoirSetup.exe `
+        --file-version <version> --os windows --product-name Plantoir `
+        --description-tag "Plantoir for Windows" `
+        --base-url "https://github.com/russellgordon/plantoir/releases/download/v<version>/" `
+        --appcast-output-directory website/updates --output-file-name windows `
+        --key-path "$env:USERPROFILE\.plantoir-release"
+
+  It writes `website/updates/windows.xml` and `windows.xml.signature`. Check
+  both signatures before committing: `--verify <the installer> --signature
+  <the item's sparkle:signature>` and `--verify website/updates/windows.xml
+  --signature <the contents of the .signature file>` must each say
+  "Signature valid".
+- **As run for v1.4.2 it REPLACES the feed with one item.** That was right for
+  the first feed. From the next release the item needs its notes — the app
+  shows the item's `<description>` in its offer, and the contract promises a
+  skipped release's warning is not lost — and the earlier items should stay:
+  look at the generator's `--reparse-existing` and change-log options then,
+  and write down here what was used. Nothing has been offered through this
+  feed yet, so none of that has been exercised.
+- **Do not rebuild or re-sign the installer after the feed is made**, and
+  never let the feed's line endings change: `.gitattributes` marks
+  `website/updates/*.xml` and `*.xml.signature` `-text` for that reason
+  (documentation/11 has what happened without it).
+- **When the installer JOINS a release that already exists** (as it did for
+  v1.4.2), edit that release's notes in the same step: its first line says
+  which platforms it carries, and its Downloads table needs the Windows rows.
+- **Order is load-bearing**, as on the mac: upload the installer to the
+  release first, then deploy the site. `build.py --deploy` follows the Windows
+  feed's download and checks `windows.xml.signature` is live as built
+  (`netlify_deploy.verify_feeds_live`); do not report a Windows release
+  complete until both lines are ✅. Then open the installed app and choose
+  File ▸ Check for Updates…: it must say Plantoir is up to date, which is the
+  only end-to-end proof that the app accepts the live feed and its signature.
+  The deploy's check compares the download's LENGTH, not its signature, picks
+  the "newest" item as the FIRST one in the file (a Windows item's version is
+  not a whole number), and does not compare the feed's version with the
+  csproj: with more than one item in the feed, read those three by hand until
+  `windows.xml` has a checker of its own.
+- **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)
 
