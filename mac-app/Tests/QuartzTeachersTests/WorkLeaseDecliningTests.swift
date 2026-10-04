@@ -184,11 +184,21 @@ final class WorkLeaseDecliningTests: XCTestCase {
     func testTheDeclineRuleIsTheContracts() throws {
         let block: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["workLeases", "declining"])
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 29, "Cases went missing from the contract.")
+        XCTAssertGreaterThanOrEqual(cases.count, 32, "Cases went missing from the contract.")
 
         var ran: Int = 0
+        var notForTheMac: Int = 0
         for item in cases {
             let name: String = item["name"] as? String ?? "?"
+            // A case for another platform only (#413's copy lease) is skipped
+            // here — but only when it says what the mac does instead, so a
+            // skip is a recorded difference rather than a quiet gap.
+            if let platforms = item["appliesOn"] as? [String], !platforms.contains("mac") {
+                let onTheMac: String = item["onTheMac"] as? String ?? ""
+                XCTAssertFalse(onTheMac.isEmpty, "Not run on the mac, and does not say what the mac does: \(name)")
+                notForTheMac += 1
+                continue
+            }
             let askerWord: String = try XCTUnwrap(item["asker"] as? String, name)
             let asker: WorkLeaseFiles.Asker
             if askerWord == "aBuild" {
@@ -242,7 +252,8 @@ final class WorkLeaseDecliningTests: XCTestCase {
             XCTAssertEqual(blocking == nil ? "allowed" : "declined", expect, name)
             ran += 1
         }
-        XCTAssertEqual(ran, cases.count, "A case was not run.")
+        XCTAssertEqual(ran + notForTheMac, cases.count, "A case was not run.")
+        XCTAssertGreaterThanOrEqual(ran, 30, "Cases the mac runs went missing from the contract.")
     }
 
     func testTheScheduledWaitIsTheContracts() throws {

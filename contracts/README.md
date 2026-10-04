@@ -1451,12 +1451,26 @@ Rows, not lists: `course-management.json` → `backups.restoringOneSectionsKeys.
 Windows matched it). `activityTrail.mustRecord` 120 → **121** ("making room did not
 finish every page", `appliesOn: ["windows"]` until the mac records it; #422).
 
-**Re-taken 2026-10-03 with v1.4.3 bundle C** (#408, #377, #425 DO 1), on
-`issue/408-writers-and-dates` off `dev` b50084d5: **287** lists, unchanged.
-Rows, not lists: `course-management.json` → `sectionNumbers.addingKeysToAPage.cases`
-8 → **9** (quoted per-section keys, #408). `activityTrail.mustRecord` stays
-**121**: "remembered timetable set aside" lost its `appliesOn: ["windows"]`
-because the mac now records it too (#377).
+**Re-taken 2026-10-03 once for v1.4.3 bundles A, C and D together** (A:
+#433, #412, #425 DO 3 and same-named pages; C: #408, #377, #425 DO 1; D: #418,
+#410, #413, #415, #416), on `issue/433-outside-assistant-busy` with C
+(26d5f70f) and D (b60747f3) merged in, off `dev` b50084d5, which read
+**287**: **289**. The two new lists are A's —
+`workLeases.declining.outsideChanges.cases` (10) and `publishPlanNaming.cases`
+(4). C and D add rows and objects, not lists (the separate paragraphs each
+said "287, unchanged", true of each branch alone and not of the merge). Rows:
+`course-management.json` → `sectionNumbers.addingKeysToAPage.cases` 8 → **9**
+(C, #408); `workLeases.declining.cases` 29 → **32** (D, #413: two `copy` cases
+with `appliesOn: ["windows"]` and `onTheMac`, one for both);
+`wizard.clubToggle.cases` 4 → **5** (D, #416);
+`referenceCourses.frozen.neverLocked` 6 → **8** (D, #415). Objects, not lists:
+`specialNames.platformWording.machine`, `frozen.windowsMechanism`,
+`importing.leftBehind.linksOnTheMac` / `linksOnWindows` (D).
+`activityTrail.mustRecord` 121 → **122**: A adds "outside assistant worked
+while a preview was open"; C's "remembered timetable set aside" and A's
+"making room did not finish every page" each lost `appliesOn: ["windows"]`
+(the mac records them now) without changing the count. Rule sets 47 → **48**
+(A's `publishPlanNaming`).
 
 **Re-take it rather than trusting this paragraph** — a census nobody can repeat
 is a number that rots. A case list is *an array of objects reached through
@@ -1561,7 +1575,7 @@ entries above rather than in this table. Re-derive it; do not subtract.
 | `course-management.json` → `backups.pruneCases`, `.sizeCases`, `.deleteCases` | 3 + 2 + 3 | **Owed**, the `windows` issue drafted from [#242](https://github.com/russellgordon/plantoir/issues/242). AUTHORED, arrived 2026-09-25. **Unrun rather than red** there: nothing on that side enumerates the top-level keys of `course-management.json` that it does not name. `pruneCases` describes behaviour Windows should already have (its archiver prunes only the assistant's backups, per `documentation/12-windows-app.md`) and is runnable at once against a temp folder; `sizeCases` needs the LOGICAL size (`FileInfo.Length`, never an allocation size — the second case is a sparse file, the shape of a cloud-evicted one); `deleteCases` needs a seam saying which backups an open assistant conversation holds. What DOES go red on pull is `SharedRules_ActivityTrailEvents_Exist`, for `backups deleted`. |
 | `app-rules.json` → `previewPorts.whenThisMacCannotReachTheBuilder.cases` | 10 | **Exempt, by construction.** Arrived 2026-09-25 with [#234](https://github.com/russellgordon/plantoir/issues/234). The cases describe `preview.sh`'s check of the forward from this Mac into the builder's virtual machine; `preview.ps1` serves on the PC itself, so there is no forward to lose and nothing for these to be run against. `scripts/test_preview_reach.py` does run under `PythonToolchainTests` there, and only its text half — which reads the numbers, not the cases — can run without a bash. |
 | `shared-rules.json` → `workLeases.liveness.cases`, `referenceCourses.importing.oneImportPerCourseAtATime.cases`; `file-formats.json` → `workLease.bodyCases` | 19 + 9 + 7 | Partly run on Windows since 2026-09-30 (bundle 3, #289): `liveness.cases` 17 of 19 (the two `appliesOn: ["mac"]` import cases are the rest) through the pure `WorkLease.IsAlive`, and all seven `bodyCases` through `WorkLease.ReadBody`; the import claim cases still wait for #244. Before that: **Owed**, the `windows` issue drafted from [#245](https://github.com/russellgordon/plantoir/issues/245), folded into [#244](https://github.com/russellgordon/plantoir/issues/244) (Windows' import). AUTHORED, arrived 2026-09-25. Not counted in the `referenceCourses.*` row's thirty-four. **`liveness.cases` and `bodyCases` are PURE** — the signal and table answers and a lease's recorded name and start in, alive or gone out; a body in, a name and start out — but `WorkLease.IsAlive` takes a file and a pid, not those answers, so running them needs a SEAM that exposes the decision first. Two liveness cases carry `appliesOn: ["mac"]` and would be RED against today's `IsAlive` if run anyway: the one-line import lease (their reader treats fewer than two lines as stale, and reads no import leases at all); the sixteen-character name prefix is a mac process-table limit with no Windows meaning, though it passes either way. What does carry over unchanged is erring alive on can't-tell. The claim cases need the import's staging, which Windows does not have yet; `howToRunACase` says how the mac drives the real claim through them. Unrun rather than red: nothing there enumerates these files' top-level keys. |
-| `shared-rules.json` → `workLeases.declining.cases` | 29 | Run on Windows since 2026-09-30 (bundle 3, #289), all 29, through the pure `WorkLease.FirstInTheWay` (`WorkLeaseContractTests`). Before that: **Owed**, the `windows` issue drafted from [#156](https://github.com/russellgordon/plantoir/issues/156). AUTHORED, arrived 2026-09-25. **PURE** — the asker, its own claim (or none) and the other programs' leases in, declined or allowed out — so runnable at once against `WorkLease.HeldBy`'s output. **Nine cases describe behaviour Windows does NOT have yet** (counted by running each case under Windows' rule, "declined iff another program holds `build`"): another program's `publish` or `preview` alone declining a build (3, one of them after taking — theirs blocks on `build` only, and must NOT add `preview` to its write refusals, whose comment explains why); take-then-check, where a lease taken LATER, or at the same moment by a higher pid, does not decline (3, one of them a Preview racing an outside build — theirs checks, then takes, so it declines both); and a publish set for later that waits (3 — theirs reads no lease). Unrun rather than red: nothing there enumerates `shared-rules.json`'s top-level keys. What DOES go red on pull: `SharedRules_ActivityTrailEvents_Exist` (two new events), the wording runner (`courseIsBeingBuiltElsewhere`), and the stopped-publish kinds test if it walks `scheduledPublishStopped.kinds` (`courseWasBusy`). |
+| `shared-rules.json` → `workLeases.declining.cases` | 32 | **32 since 2026-10-03** (#413): two `copy` cases are `appliesOn: ["windows"]` with an `onTheMac` sentence, which the mac's `WorkLeaseDecliningTests` skips only when that sentence is there; the third holds on both. Run on Windows since 2026-09-30 (bundle 3, #289), all 29 then, through the pure `WorkLease.FirstInTheWay` (`WorkLeaseContractTests`). Before that: **Owed**, the `windows` issue drafted from [#156](https://github.com/russellgordon/plantoir/issues/156). AUTHORED, arrived 2026-09-25. **PURE** — the asker, its own claim (or none) and the other programs' leases in, declined or allowed out — so runnable at once against `WorkLease.HeldBy`'s output. **Nine cases describe behaviour Windows does NOT have yet** (counted by running each case under Windows' rule, "declined iff another program holds `build`"): another program's `publish` or `preview` alone declining a build (3, one of them after taking — theirs blocks on `build` only, and must NOT add `preview` to its write refusals, whose comment explains why); take-then-check, where a lease taken LATER, or at the same moment by a higher pid, does not decline (3, one of them a Preview racing an outside build — theirs checks, then takes, so it declines both); and a publish set for later that waits (3 — theirs reads no lease). Unrun rather than red: nothing there enumerates `shared-rules.json`'s top-level keys. What DOES go red on pull: `SharedRules_ActivityTrailEvents_Exist` (two new events), the wording runner (`courseIsBeingBuiltElsewhere`), and the stopped-publish kinds test if it walks `scheduledPublishStopped.kinds` (`courseWasBusy`). |
 | `shared-rules.json` → `scheduledPublishStopped.whichKind.cases` | 6 | Run on Windows since 2026-09-30 (bundle 3, #297), all six, through the REAL generated wrapper with stand-in launchers (`ScheduledPublishOutcomeTests.EveryWhichKindCaseIsRecordedAsTheContractSays`). Before that: **Owed**, the `windows` issue drafted from [#137](https://github.com/russellgordon/plantoir/issues/137). AUTHORED, arrived 2026-09-25. **Unrun rather than red**: nothing on that side walks a `scheduledPublishStopped` key it does not name. What IS red there is `ScheduledPublishOutcomeTests`' kinds and sentence checks against `buildDidNotFinish`. Each case is a leg and an exit code played through the real scheduled wrapper with stand-in launchers — their `Runnable`/`Run` harness already does exactly that — and the 127 row exists to catch a wrapper that tests for 1 rather than for not-3. |
 | `assist-cases.json` → `linksQuestion.accepted`, `.anotherCourse`, `.onlyIfAPageIsCalled`, `.refused`, `.answering.section`, `.answering.cases`, `.answering.lookup` | 33 + 10 + 5 + 34 + 9 + 13 + 9 | **Run on Windows since 2026-09-30** (parity bundle 5b, [#305](https://github.com/russellgordon/plantoir/issues/305)): `LinksQuestionContractTests` runs every phrasing row against the contract's window and the answering rows against a real section written from `answering.section` and `sectionFiles`; the scenario is run by `AssistScenarioTests` with `expectModelRequests`. |
 | `shared-rules.json` → `scheduledPublishStopped.notification.announcing.cases` | 5 | **Owed**, the `windows` comment drafted on [#212](https://github.com/russellgordon/plantoir/issues/212). AUTHORED, arrived 2026-09-25. Unrun rather than red. Each row is played once per kind for `everyKind`, against a stand-in for the system's notifications: whether a notification is posted, that its text is the kind's own sentence, that the run never asks for permission, and the trail line. A platform with no permission prompt (Windows toasts) plays only the `allowed` and `notAllowed` rows — the `notAskedYet` row carries `onlyWhereThereIsAPrompt`. |
@@ -1705,6 +1719,24 @@ Windows substitutes "on this PC", the same way it already does for `app-rules.js
 "this Mac" — `contracts/README.md` documents that substitution. Your contract
 test must compare on the substituted form or it will fail on a difference that
 is correct.
+
+**Outside `specialNames`, a sentence that names the machine says `{machine}`**
+(since 2026-10-03, [#418](https://github.com/russellgordon/plantoir/issues/418)
+and [#410](https://github.com/russellgordon/plantoir/issues/410), Russell's
+decision). `specialNames.platformWording.machine` holds the placeholder and each
+platform's NOUN — `Mac`, `PC` — and the sentence keeps its own determiner ("on
+this {machine}", "restarting your {machine}"), because every such sentence
+Windows had reworded swapped only the noun. `machine.usedIn` lists every string
+in `contracts/` that carries it (three today: `appUpdates.wording.elsewhereWork`,
+`previewPorts.whenNoBlockIsFree.sentence[1]` and the `theSiteNeverAnswered`
+sentence of `whenThePreviewNeverAppears`), and
+`SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded` walks every
+file so the list cannot fall behind. Fill from the record and drive the fill off
+`usedIn`; do not add a second, per-platform copy of the sentence — that is what
+`elsewhereWorkOnWindows` and `sentenceOnWindows` were, and both are marked
+superseded for Windows to delete when its fill lands. The mac's word lives in
+`MachineWord`; the bash launchers print it literally, and
+`scripts/test_port_blocks.py` fills the contract before comparing.
 ## The scripts can read the contract — and it travels differently on Windows
 
 `contracts/` used to be readable only by the two test suites. It is now readable
