@@ -354,7 +354,7 @@ public sealed partial class AssistWindow : Window
             return;
         }
 
-        if (!_model.IsInstalled())
+        if (_stagedModel is null && !_model.IsInstalled())
         {
             // Shared with Settings' own housekeeping list through
             // AssistModelStores, rather than downloaded straight into
@@ -458,7 +458,7 @@ public sealed partial class AssistWindow : Window
             note.Text.Text = "The assistant is downloaded.";
         }
 
-        if (!await _model.Start(null, _closing.Token))
+        if (_stagedModel is null && !await _model.Start(null, _closing.Token))
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,
                 "the assistant’s engine would not start", _course.Code, _section);
@@ -486,7 +486,7 @@ public sealed partial class AssistWindow : Window
         var served = await _tools.Tools(_closing.Token);
         var schemas = AssistAgent.NarrowToLocal(served, _course.Code);
 
-        _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
+        _agent = new AssistAgent(_stagedModel ?? _model, _tools, schemas, _course.Code, _section)
         {
             // A club's "make room for one meeting at Week 5" matches only in
             // a numbered course, on its own page word (#274).
@@ -598,6 +598,16 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.AssistantReady,
             $"the assistant was ready after {(DateTime.UtcNow - startingAt).TotalSeconds:F1}s",
             _course.Code, _section);
+        if (_stagedModel is not null)
+        {
+            // A marketing scene: the request is typed and sent the way a
+            // teacher sends it, and nothing else of the engine's is started.
+            Input.IsEnabled = true;
+            SendButton.IsEnabled = true;
+            Input.Text = _stagedRequest ?? "";
+            await SendWhatIsTyped();
+            return;
+        }
         WatchWhatTheEngineSays();
         // Typing is available from here.
         Input.IsEnabled = true;
@@ -830,26 +840,32 @@ public sealed partial class AssistWindow : Window
         }
     }
 
+    // ---- Marketing scenes ---------------------------------------------------
+
+    /// <summary>Set only by <see cref="StageForCapture"/>; null for every teacher's window.</summary>
+    private IChatModel? _stagedModel;
+    private string? _stagedRequest;
+
     /// <summary>
-    /// Mount the prompt shelf for a marketing capture, as though a teacher had
-    /// typed it.
-    ///
-    /// The shelf is normally mounted on the path that runs once the local
-    /// assistant is ready, and a capture never starts one -- so the window
-    /// photographed with the top third of it blank, and the Windows shot
-    /// omitted a feature the mac's twin leads with. The cards do nothing
-    /// here: tapping one is what a teacher does, and nothing is tapped.
+    /// For the marketing pictures only (<c>--stage-scene assistant</c>): open
+    /// this window the way a teacher's opens, with Plantoir's real tools, and
+    /// send <paramref name="request"/> as though it had been typed. The
+    /// request must be one of the promise card's phrasings, which are matched
+    /// in code and never reach the model (<c>AssistAgent.CardCommand</c>), so
+    /// the plan and its Go and Cancel buttons are the app's own words and no
+    /// assistant has to be downloaded or started. <paramref name="model"/>
+    /// answers nothing: were the request ever sent to it, the window would say
+    /// the engine could not be reached, and the scene refuses that picture.
+    /// Called before the window is shown.
     /// </summary>
-    public void ShowPromptShelfForCapture()
+    public void StageForCapture(IChatModel model, string request)
     {
-        PromptShelfHost.Content = new AssistPromptShelfView(_ => { });
-        PromptShelfArea.Visibility = Visibility.Visible;
+        _stagedModel = model;
+        _stagedRequest = request;
     }
 
-    public void AddStagedBubbleForCapture(string speaker, bool fromTeacher, params UIElement[] contents)
-    {
-        AddCard(speaker, contents);
-    }
+    /// <summary>The plan has been shown and Go is waiting — what the scene photographs.</summary>
+    public bool IsWaitingForApproval => _agent?.IsAwaitingApproval == true;
 
     /// <summary>
     /// The one place a turn is built, so every bubble is the same bubble.
