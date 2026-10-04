@@ -900,6 +900,21 @@ def build_colour_figures() -> None:
     else:
         native_fan(fanned, IMAGE_DIR / "colour-schemes.png")
         print("   saved colour-schemes.png")
+    # The same fan taken in Dark Mode, for a page in dark mode (shots.json
+    # "dark": true). colour-schemes.png keeps its name as the light one.
+    fanned_dark = [PARTS / f"home-{course['code'].lower()}-dark.png" for course in DEMO_COURSES]
+    missing_dark = [path.name for path in fanned_dark if not path.exists()]
+    if missing_dark:
+        print(f"   Missing parts: {', '.join(missing_dark)} — run --colour-figures.", file=sys.stderr)
+    elif any(problems_with_shadow(path) for path in fanned + fanned_dark if path.exists()):
+        # The fan is judged on its edge only (its windows overlap), so its
+        # parts are held to an active window's margin here instead.
+        for path in fanned + fanned_dark:
+            for problem in problems_with_shadow(path):
+                print(f"   ✗ colour-schemes part: {problem}", file=sys.stderr)
+    else:
+        native_fan(fanned_dark, IMAGE_DIR / "colour-schemes-dark.png")
+        print("   saved colour-schemes-dark.png")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
     if all(path.exists() for path in pair):
@@ -907,6 +922,33 @@ def build_colour_figures() -> None:
         print("   saved light-and-dark.png")
     else:
         print("   Missing the dark half of the light/dark pair.", file=sys.stderr)
+
+
+def shows_any(picture: Path, words: list[str]) -> list[str]:
+    """Which of `words` text recognition FINDS on the picture."""
+    seen = scene_book.recognised_text(picture).replace(" ", "").lower()
+    found: list[str] = []
+    for word in words:
+        if word.replace(" ", "").lower() in seen:
+            found.append(word)
+    return found
+
+
+def refuse_a_missed_anchor(picture: Path, path: str, what: str) -> None:
+    """Stop the run when a page photographed for an anchor (`…#diagrams`)
+    does not show that heading near the top of the page column.
+
+    v1.4.3 shipped site-sch3u and site-sch3u-chemistry both showing the
+    page's "Backlinks" end instead of the chemistry and the flowchart their
+    captions promise; every other check passed. The photograph itself is
+    read, so nothing between the scroll and the shutter can move it unseen.
+    """
+    if "#" not in path:
+        return
+    from safari import anchor_heading_problem
+    problem = anchor_heading_problem(picture, path.split("#", 1)[1])
+    if problem is not None:
+        raise SystemExit(f"{what}: {problem}. Nothing past this point was taken.")
 
 
 def capture_search(window: "SafariWindow", shot: dict, suffix: str) -> None:
@@ -975,6 +1017,7 @@ def capture_browser_shots(identifiers: list[str]) -> None:
                     window.load(site_address(capture["course"]) + capture.get("path", "/"), settle_seconds=3.5)
                     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
                     window.capture(destination)
+                    refuse_a_missed_anchor(destination, capture.get("path", "/"), shot["id"])
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
                     serve_as_captured(destination)
@@ -1009,6 +1052,7 @@ def capture_sites(workspace: Path) -> None:
                     window.load(url, settle_seconds=3.5)
                     destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
                     window.capture(destination)
+                    refuse_a_missed_anchor(destination, capture.get("path", "/"), shot["id"])
                     # Before the resize, while the page is still full size.
                     verify_appearance(destination, dark, shot["id"])
                     verify_address_bar(destination, shot["id"])
@@ -1418,7 +1462,102 @@ def plain_icon_problem(app_binary: Path) -> str | None:
     return None
 
 
+# Every Mac picture shows ONE ordinary teacher's working folder: the demo
+# folder's ~/Desktop/Teaching ("Desktop > Teaching" in the window's path bar,
+# /Users/<you>/Desktop/Teaching/School Web Space as a folder destination).
+# Russell, 2026-10-04: "I also want a better path than one that says
+# 'Plantoir Marketing'" — that name read as the product's own machinery, and
+# showed in nine scenes and in the schedule sheet's sentence and banner. The
+# marketing folder keeps its own home between runs; for the scenes it is
+# moved to this path, and put back after (MarketingFolderShownAsTeaching).
+SHOWN_FOLDER = Path.home() / "Desktop" / "Teaching"
+DEMO_SET_ASIDE = Path.home() / "Desktop" / ".Teaching (demo folder, set aside by capture.py)"
+
+# Words no picture may show: the marketing folder's own name.
+WORDS_NO_PICTURE_SHOWS = ["Plantoir Marketing"]
+
+
+class MarketingFolderShownAsTeaching:
+    """Move the marketing folder to ~/Desktop/Teaching for the scenes, with
+    the demo folder that lives there set aside, and put both back.
+
+    A MOVE, not a symlink: the app resolves a folder to its canonical path
+    (FolderIdentity.canonicalPath), so a link would still read "Plantoir
+    Marketing". The courses' own absolute paths (a folder destination) are
+    rewritten to the shown path once and kept there (`rewrite` says why). A run killed half-way leaves the
+    set-aside folder behind, and the next run refuses until it is put back
+    by hand — the message says how.
+    """
+
+    def __init__(self, marketing: Path) -> None:
+        self.marketing = marketing
+        self.moved = False
+
+    def configs(self, root: Path) -> list[Path]:
+        found: list[Path] = []
+        courses = root / "courses"
+        if courses.is_dir():
+            for entry in sorted(courses.iterdir()):
+                for name in ("course_config.json", "course_config.backup.json"):
+                    candidate = entry / name
+                    if candidate.is_file():
+                        found.append(candidate)
+        return found
+
+    def rewrite(self, root: Path, old: str, new: str) -> None:
+        """Point the courses' absolute paths at the shown folder, ONCE.
+
+        They are left pointing there afterwards, never rewritten back: a
+        section's "— Edited" marker compares a fingerprint of its files'
+        sizes and modification times with the one recorded at its last
+        deploy, so a config rewritten on every run made ICS3U section 1
+        read "ICS3U-S1 — Edited" in every light picture (measured
+        2026-10-04: the light pass before the scene's own deploy, never the
+        dark one after it). Kept at the shown path, the config changes once,
+        the next deploy records it, and every later run is clean. Outside a
+        run the marketing folder is only provisioned, never deployed from.
+        """
+        for config in self.configs(root):
+            text = config.read_text(encoding="utf-8")
+            if old in text:
+                config.write_text(text.replace(old, new), encoding="utf-8")
+
+    def __enter__(self) -> Path:
+        if self.marketing == SHOWN_FOLDER:
+            return SHOWN_FOLDER
+        if DEMO_SET_ASIDE.exists():
+            raise SystemExit(
+                f"A previous run left the demo folder set aside at {DEMO_SET_ASIDE}. Put things back by hand: "
+                f"if {SHOWN_FOLDER} holds the marketing courses (ICS3U), move it to {self.marketing}; then move "
+                f"the set-aside folder to {SHOWN_FOLDER}.")
+        if not (self.marketing / ".plantoir-marketing-folder").exists():
+            raise SystemExit(f"{self.marketing} is not the marketing folder (no .plantoir-marketing-folder).")
+        if SHOWN_FOLDER.exists():
+            if (SHOWN_FOLDER / ".plantoir-marketing-folder").exists() or not (SHOWN_FOLDER / "courses" / "ENG2D").is_dir():
+                raise SystemExit(f"{SHOWN_FOLDER} is not the demo folder this harness keeps there; "
+                                 "refusing to move it.")
+            SHOWN_FOLDER.rename(DEMO_SET_ASIDE)
+        self.marketing.rename(SHOWN_FOLDER)
+        self.moved = True
+        self.rewrite(SHOWN_FOLDER, str(self.marketing), str(SHOWN_FOLDER))
+        print(f"   The marketing folder is at {SHOWN_FOLDER} for the scenes; the demo folder is set aside.")
+        return SHOWN_FOLDER
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        if self.moved:
+            SHOWN_FOLDER.rename(self.marketing)
+            if DEMO_SET_ASIDE.exists():
+                DEMO_SET_ASIDE.rename(SHOWN_FOLDER)
+            print(f"   Put the marketing folder back at {self.marketing}, and the demo folder at {SHOWN_FOLDER}.")
+        return False
+
+
 def run_scenes(folder: Path, chosen: list) -> int:
+    with MarketingFolderShownAsTeaching(folder) as shown:
+        return run_scenes_in(shown, chosen)
+
+
+def run_scenes_in(folder: Path, chosen: list) -> int:
     """Photograph the chosen scenes in both appearances, then check them.
 
     A scene FAILS, and is named, when a picture it should make is missing or
@@ -1507,6 +1646,11 @@ def run_scenes(folder: Path, chosen: list) -> int:
                                 if shadow:
                                     failures.append(f"{scene.name} ({suffix}): {shadow[0]}")
                                     continue
+                            shown = shows_any(picture, WORDS_NO_PICTURE_SHOWS)
+                            if shown:
+                                failures.append(f"{scene.name} ({suffix}): {picture.name} shows {shown} — the "
+                                                f"scene was not taken in {SHOWN_FOLDER}")
+                                continue
                             missing = scene_book.missing_words(picture, scene_book.expected_text(name))
                             if missing:
                                 failures.append(f"{scene.name} ({suffix}): {picture.name} does not show {missing} "

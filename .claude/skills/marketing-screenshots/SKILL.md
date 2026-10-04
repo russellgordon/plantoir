@@ -335,7 +335,11 @@ first and fall back to the PNG.
 
 ## Provisioning, and when you need it
 
-**The marketing folder** (`~/Plantoir Marketing`), for the v1.4.0 scenes:
+**The marketing folder** (`~/Plantoir Marketing`), for the v1.4.0 scenes. It is
+kept there, but every scene is photographed with it MOVED to `~/Desktop/Teaching`
+(the demo folder set aside, both put back after), so no picture says "Plantoir
+Marketing". If a run dies mid-way, `~/Desktop/.Teaching (demo folder, set aside
+by capture.py)` is left behind and the next run refuses and says how to put it back:
 
 ```bash
 python3 website/shots/capture.py --provision   # makes it when absent, reuses it when present
