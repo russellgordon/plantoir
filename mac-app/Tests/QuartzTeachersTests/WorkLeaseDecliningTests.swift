@@ -610,33 +610,61 @@ final class WorkLeaseDecliningTests: XCTestCase {
         XCTAssertFalse(exists(leaseURL(kind: "publish")))
     }
 
-    /// An outside assistant is told `courseIsBusy`, and nothing reaches the
-    /// launcher. MUST FAIL before #156.
-    func testAnOutsideAssistantIsRefusedWithCourseIsBusy() async throws {
+    /// An outside assistant is told `courseIsBeingBuilt` while another
+    /// program BUILDS the course, and nothing reaches the launcher. MUST FAIL
+    /// before #156 (and, for the sentence, before #433, when it was
+    /// `courseIsBusy`).
+    func testAnOutsideAssistantIsRefusedWhileAnotherProgramBuilds() async throws {
         let pid: Int32 = try startTheOtherProgram()
         try writeOthersLease(kind: "build", pid: pid)
         let mcp: AssistToolRunner = runner(surface: .mcp)
 
         let deployed: AssistToolOutcome = await mcp.run(call: call("deploy_section", ["course": "ICS3U", "section": 1]))
-        XCTAssertEqual(deployed.detail, AssistWording.courseIsBusy(course: "ICS3U"))
+        XCTAssertEqual(deployed.detail, AssistWording.courseIsBeingBuilt(course: "ICS3U"))
         XCTAssertEqual(siteWork.deploys, 0)
 
         let rebuilt: AssistToolOutcome = await mcp.run(call: call("rebuild_preview", ["course": "ICS3U", "section": 1]))
-        XCTAssertEqual(rebuilt.detail, AssistWording.courseIsBusy(course: "ICS3U"))
+        XCTAssertEqual(rebuilt.detail, AssistWording.courseIsBeingBuilt(course: "ICS3U"))
         XCTAssertEqual(siteWork.previewRebuilds, 0)
         XCTAssertTrue(trailText().contains("declined the assistant's deploy"), trailText())
     }
 
-    /// The window's own PREVIEW, held by another copy of Plantoir, refuses an
-    /// outside assistant's build (#156's M2 ruling, stricter than Windows).
-    /// MUST FAIL before #156.
-    func testAnotherProgramsPreviewRefusesAnOutsideBuild() async throws {
+    /// Another program's SERVED preview no longer refuses an outside
+    /// assistant's deploy (#433, Russell 2026-10-03, reversing #156's M2
+    /// ruling for Claude and Codex): it goes ahead, and the answer says the
+    /// open preview may have closed. MUST FAIL before #433.
+    func testAnotherProgramsServedPreviewLetsAnOutsideDeployGoAhead() async throws {
         let pid: Int32 = try startTheOtherProgram()
         try writeOthersLease(kind: "preview", pid: pid)
         let mcp: AssistToolRunner = runner(surface: .mcp)
         let deployed: AssistToolOutcome = await mcp.run(call: call("deploy_section", ["course": "ICS3U", "section": 1]))
-        XCTAssertEqual(deployed.detail, AssistWording.courseIsBusy(course: "ICS3U"))
-        XCTAssertEqual(siteWork.deploys, 0)
+        XCTAssertEqual(siteWork.deploys, 1, deployed.detail)
+        XCTAssertTrue(
+            deployed.detail.hasSuffix(AssistWording.deployClosedAnOpenPreview(course: "ICS3U", section: "1")),
+            deployed.detail
+        )
+        XCTAssertTrue(trailText().contains("outside assistant worked while a preview was open"), trailText())
+    }
+
+    /// The real headless deploy an outside assistant takes asks only about
+    /// building (#433): past a served preview, held back by a build. The
+    /// in-app assistant's (the default) is still held back by the preview.
+    /// MUST FAIL with `.anOutsideDeploy` reading `kindsThatBlockABuild`.
+    func testTheOutsideDeploysLeaseQuestionIsOnlyAboutBuilding() throws {
+        let pid: Int32 = try startTheOtherProgram()
+        let previewURL: URL = try writeOthersLease(kind: "preview", pid: pid)
+        let folder: String = root.path
+        XCTAssertNil(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folder, courseCode: "ICS3U", afterTaking: false, asker: .anOutsideDeploy
+        ))
+        XCTAssertNotNil(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folder, courseCode: "ICS3U", afterTaking: false
+        ), "The window and the in-app assistant keep #156's rule.")
+        try FileManager.default.removeItem(at: previewURL)
+        try writeOthersLease(kind: "build", pid: pid)
+        XCTAssertNotNil(WorkLeaseRegistry.whatBlocksABuild(
+            folderPath: folder, courseCode: "ICS3U", afterTaking: false, asker: .anOutsideDeploy
+        ))
     }
 
     /// The in-app assistant says the teacher's sentence. MUST FAIL before #156.

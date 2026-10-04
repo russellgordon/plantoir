@@ -487,7 +487,12 @@
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
       {
-        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
+        "event": "outside assistant worked while a preview was open",
+        "carries": "which course and section, and which of three things an outside assistant (Claude or Codex) did while a preview of the course was open in Plantoir: a change it made, a rebuild it asked for (both left the open preview exactly as it was - not rebuilt), or a deploy (which went ahead and may have closed that section's preview). Never anything written on a page.",
+        "why": "Added with #433 (2026-10-03). An outside assistant's change while the teacher reads the preview is written and the preview left alone, so the page on screen is the page as it was until the teacher presses Stop Preview, then Preview. 'Claude said it changed the page and my preview still shows the old one', or 'my preview closed by itself', arrives next week with the conversation long closed; this line is what says the preview was left alone on purpose, or closed by a deploy that was asked for. The 'assistant chose a tool' line carries the tool, not what it met."
+      },
+      {
+        "carries": "the course, the section asked about, what was asked for (Preview, Deploy, the assistant's rebuild or deploy, an outside assistant's rebuild or deploy, or - since #433 - an outside assistant's change, named by its tool, held back while the course was being built), what the other program holds (building, publishing or previewing) and its process id - never anything written on a page. Or (GitHub #381) that a PREVIEW was refused because that same section was being deployed: by the window, when this copy of the app was deploying it (lineWhenItsSectionIsBeingDeployed), or by preview.sh, when the process table showed a deploy of it (launcherLineWhenItsSectionIsBeingDeployed)",
         "event": "build declined, course busy elsewhere",
         "lineWhenItsSectionIsBeingDeployed": "declined Preview — this section is being deployed by this copy of Plantoir",
         "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
@@ -17879,15 +17884,15 @@
       ]
     },
     "declining": {
-      "rule": "A build of a course from THIS program - Preview or Deploy in the window, the in-app assistant's rebuild or deploy, an outside assistant's rebuild or deploy (the mac's --mcp-stdio process) - is DECLINED when another live program holds a build, publish or preview lease on the same course. A publish set for later WAITS instead, and only for build and publish. Leases name the COURSE, not the section, so a build of Section 1 elsewhere declines Section 2 here too. This program's own leases are never in its way (the in-process rules decide that), a lease whose owner is gone is ignored (workLeases.liveness), and assist and import leases never decline a build.",
+      "rule": "A build of a course from THIS program - Preview or Deploy in the window, the in-app assistant's rebuild or deploy, an outside assistant's rebuild or deploy (the mac's --mcp-stdio process) - is DECLINED when another live program holds a build, publish or preview lease on the same course. A publish set for later WAITS instead, and only for build and publish. Leases name the COURSE, not the section, so a build of Section 1 elsewhere declines Section 2 here too. This program's own leases are never in its way (the in-process rules decide that), a lease whose owner is gone is ignored (workLeases.liveness), and assist and import leases never decline a build. Since #433 (Russell, 2026-10-03) an OUTSIDE assistant's own acts follow outsideChanges below instead: it is held back only while a site of the course is being BUILT (another program holds build or publish), and a preview that is only being served holds back none of its changes, rebuilds or deploys.",
       "why": "Two builds of one section clear and rewrite the same folder, so the loser serves a half-written site or publishes files the other has just deleted, and nothing fails loudly. Until #156 the mac's rules were in-process only, so an outside assistant (Claude Code or Codex reaching Plantoir --mcp-stdio), a publish set for later and the window could all build one course at once; Windows' plantoir-mcp and app already read each other's leases.",
-      "whyAPreviewBlocks": "Decided by the director on #156's plan review (2026-09-25, reversible, recorded on the issue), STRICTER than Windows, whose only blocking kind is build. Every build of a section first ends that section's serving preview (build_site.stop_preview_serving), so an outside assistant's rebuild or deploy would take down the page the teacher is reading - which the in-app assistant already refused to do - and an outside assistant can retry where a teacher reading a page cannot. A red case on Windows is the request.",
+      "whyAPreviewBlocks": "A preview lease declines a build from the WINDOW and the IN-APP assistant, as #156 decided (director's ruling on #156's plan review, 2026-09-25): every build of a section first ends that section's serving preview (build_site.stop_preview_serving). For an OUTSIDE assistant that ruling was REVERSED by Russell on #433 (2026-10-03): browsing the preview while asking Claude or Codex for changes is the ordinary way to work, and an outside assistant told 'busy' for the whole time the teacher was reading was useless to exactly the teacher it exists for. So for Claude and Codex a served preview holds nothing back: a change is written and the open preview left exactly as it is (the teacher stops and starts it to see the change); rebuild_preview builds nothing and says so; deploy_section goes ahead and ends that section's preview the way the window's own Deploy does ('if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running'). What #156 protected - never two builds of one section, and no outside door rebuilding or restarting the page being read - still holds: a building preview holds a build lease, which declines all of it. Windows' plantoir-mcp writes already refuse on build only (RefuseIfPlantoirIsBuilding); its rebuild and deploy still decline on preview (#289) - see outsideChanges.",
       "whyTheScheduledPublishWaits": "Director's ruling (a), 2026-09-25, reversible. Going ahead anyway was REJECTED: two builds on one workspace is the fault being fixed. Standing down at once was REJECTED: a thirty-second build would cost a night's publish. So it waits - wall clock, so a Mac that sleeps does not pause the count - looking again every fifteen seconds for up to ten minutes, holding nothing while it waits; then takes its own build and publish leases and looks once more. Still busy at ten minutes, it stands down: deploys nothing, clears the job so it cannot recur, and leaves scheduledPublishStopped kind courseWasBusy for the section to show. It does not wait for a PREVIEW, because a preview left open overnight would otherwise cost the morning's publish; its build ends that preview, as it always has.",
       "takeThenCheck": "Every door writes its own build lease FIRST and then looks, with nothing awaited in between, and then counts only a lease taken BEFORE its own build lease: an earlier moment (line 3), or the same moment and a lower process id. Two programs that each take a build and look at once therefore cannot BOTH go ahead - exactly one sees the other as earlier - and never both go ahead is the guarantee. The CLAIM is this program's build moment, not the earliest of its leases: a publish set for later does not wait for previews, so a window whose old preview lease predates such a publish's build must still decline its own Deploy, and an earliest-lease claim would let it go ahead (the review of #156 proposed that claim; the case above shows the two builds it allows). A Preview writes its build lease BEFORE its preview lease, so a Preview and an outside build that race cannot both back off either. What remains is one harmless shape: a Deploy pressed while this window already has a preview up, racing an outside build that lands between the two - both back off, nothing runs, and a retry works. The moments are compared as text, exact for the one fixed 28-character shape both apps write (UTC, seven fractional digits, of which the mac's DateFormatter fills three - millisecond resolution, so a same-moment tie is ordinary and goes to the lower pid); anything not in that shape counts as earlier. The window's Deploy takes its claim BEFORE it stops the teacher's preview, so its build lease is up for the whole of that stop: the stop (preview.sh --stop) ends builds as well as servers by working directory, and no other program may be told the course is free while it runs. The residual: a program that looks BEFORE it takes (Windows today, an older mac) can start in the instant between another's take and its own look; that is Windows' own shape and is recorded rather than closed.",
       "whatIsSaid": {
         "window": "wording.courseIsBeingBuiltElsewhere, in the window's Cannot Preview Yet or Cannot Deploy Yet alert - nothing has run, so the console has nothing to show",
         "inAppAssistant": "wording.courseIsBeingBuiltElsewhere",
-        "outsideAssistant": "wording.courseIsBusy - it is talking to the program whose course is busy, and that sentence tells it to wait and ask again. publish_pages and undo_last_change still WRITE (Markdown never conflicts with a build) and leave the teacher's preview up; the note where the preview would have been refreshed is this sentence",
+        "outsideAssistant": "outsideChanges.whatIsSaid (#433). Until #433 it was wording.courseIsBusy for every decline, and publish_pages and undo_last_change wrote and then appended that same sentence where the preview would have been refreshed - so a change that SUCCEEDED ended with 'busy ... wait ... ask again', which a model reads as a refusal",
         "scheduledPublish": "nothing while it waits; scheduledPublishStopped.sentences.courseWasBusy if it stands down",
         "trail": "activityTrail.mustRecord 'build declined, course busy elsewhere' for every decline, and 'scheduled publish waited for the course' for a publish set for later that waited"
       },
@@ -17898,8 +17903,158 @@
         "CHECK-THEN-TAKE with no tiebreak (the plan's first shape, and Windows' today) - the window's Deploy awaits a preview stop between any early check and its own lease, so an outside build could start in that gap; the plan review measured the window, and the director ruled for take-then-check.",
         "A SECTION in the lease name - Windows parses the kind as the third-last dot-separated part, so any extra part is a format change on both sides; course-level declines Section 2 for the length of a build of Section 1, and the sentence says which course.",
         "A SWEEP of dead leases when a folder is opened - WorkLease's own design is no cleanup pass: a reader's liveness rule already ignores them, and the start time on line 4 settles the recycled-pid case the sweep was proposed for.",
-        "Greying the Deploy button while another program builds (Windows does) - a view cannot observe a file without a watcher, and declining at the press is the whole guarantee; a difference to know, not an obligation."
+        "Greying the Deploy button while another program builds (Windows does) - a view cannot observe a file without a watcher, and declining at the press is the whole guarantee; a difference to know, not an obligation.",
+        "#433, rejected by Russell 2026-10-03: an outside assistant RESTARTING the open preview by any means - the app's window rebuilding its own preview when the outside door asks, the outside door's rebuild going ahead with the window bringing the preview back, or Claude or Codex restarting it when asked. The outside door is a second, windowless Plantoir process that shares files with the app and nothing else, so it cannot press the window's button: restarting from there means either owning a preview of its own (the pre-#156 shape) or a new request-file mechanism. 'That's not worth it. The teacher can stop and start a preview manually.' A single Plantoir the assistant attaches to was set aside as far too large for what it buys.",
+        "#433, proposed in the plan and accepted by the director, then REVERSED by Russell 2026-10-03 23:00: holding an outside deploy_section back while a preview is only being served (because the deploy ends that section's open preview). His words: 'if the teacher asks Claude or Codex to deploy, it should be allowed to go ahead, even if a preview is running.' The deploy goes ahead and the success sentence says the preview may have closed (wording.deployClosedAnOpenPreview)."
       ],
+      "outsideChanges": {
+        "rule": "What an OUTSIDE assistant (Claude or Codex, through Plantoir --mcp-stdio) meets when it asks for a change to a course, a rebuild of a section's preview, or a deploy (#433). Read the other programs' live leases on the course: build or publish means a site is being BUILT (a preview still building holds build beside preview; a deploy holds build and publish) and holds every one of them back before anything is backed up, written or started; preview alone means a preview that has finished building and is only being SERVED, and holds nothing back - a change is written and the open preview left exactly as it is, a rebuild builds nothing, a deploy goes ahead; assist and import hold nothing. A change is every tool that is not read-only except rebuild_preview, deploy_section, schedule_deploy, cancel_scheduled_deploy, back_up_course and remember_timetable. The in-app assistant and the window are NOT covered: they keep declining.cases.",
+        "whatIsSaid": {
+          "changeHeldBack": "wording.courseIsBeingBuilt - nothing was written, and it says so",
+          "changeWrittenWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages, where the preview would have been refreshed - never a refusal word (busy, couldn't, wait): the change succeeded",
+          "changeWrittenAndABuildStartedMeanwhile": "wording.changesAreSavedWhileTheCourseIsBuilt",
+          "rebuildWhileAPreviewIsServed": "wording.changesAreSavedPreviewShowsTheOldPages - nothing is built, because nothing is going to finish that waiting would help",
+          "rebuildOrDeployHeldBack": "wording.courseIsBeingBuilt",
+          "deployWhileAPreviewIsServed": "the deploy's own success sentence, then wording.deployClosedAnOpenPreview ('if': leases name the course, not the section)"
+        },
+        "trail": "activityTrail.mustRecord 'build declined, course busy elsewhere' for everything held back; 'outside assistant worked while a preview was open' for a change, rebuild or deploy that met a served preview",
+        "howToRunACase": "One course ICS3U with one section; `others` are live leases another program holds on it (kinds only). `asked` is `change` (publish a page through publish_pages), `rebuild` (rebuild_preview) or `deploy` (deploy_section), from an outside assistant. expect.written: the page's file changed; expect.built: a rebuild of the preview ran; expect.deployed: a deploy ran; expect.said: the wording key the answer ends with (for a deploy that went ahead, the key appended to its success sentence; null for 'whatever the rebuild or deploy itself says'). A held-back change leaves every file byte for byte as it was.",
+        "cases": [
+          {
+            "name": "nothing held: a change is written and the preview rebuilt",
+            "others": [],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": true,
+              "deployed": false,
+              "said": null
+            }
+          },
+          {
+            "name": "a preview only being SERVED: the change is written, nothing is built, and it is said as saved",
+            "others": [
+              "preview"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": false,
+              "deployed": false,
+              "said": "changesAreSavedPreviewShowsTheOldPages"
+            }
+          },
+          {
+            "name": "a preview still BUILDING (build beside preview): the change is held back and nothing is written",
+            "others": [
+              "preview",
+              "build"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy running (build and publish): the change is held back and nothing is written",
+            "others": [
+              "build",
+              "publish"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "an assist lease holds nothing back",
+            "others": [
+              "assist"
+            ],
+            "asked": "change",
+            "expect": {
+              "written": true,
+              "built": true,
+              "deployed": false,
+              "said": null
+            }
+          },
+          {
+            "name": "a rebuild asked while a preview is only served builds nothing and says the change is saved",
+            "others": [
+              "preview"
+            ],
+            "asked": "rebuild",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "changesAreSavedPreviewShowsTheOldPages"
+            }
+          },
+          {
+            "name": "a rebuild asked while a preview is building is held back",
+            "others": [
+              "build",
+              "preview"
+            ],
+            "asked": "rebuild",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy asked while a preview is only served goes ahead and says the preview may have closed (Russell, 2026-10-03)",
+            "others": [
+              "preview"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": true,
+              "said": "deployClosedAnOpenPreview"
+            }
+          },
+          {
+            "name": "a deploy asked while another deploy runs is held back",
+            "others": [
+              "publish",
+              "build"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          },
+          {
+            "name": "a deploy asked while a preview is building is held back",
+            "others": [
+              "preview",
+              "build"
+            ],
+            "asked": "deploy",
+            "expect": {
+              "written": false,
+              "built": false,
+              "deployed": false,
+              "said": "courseIsBeingBuilt"
+            }
+          }
+        ]
+      },
       "howToRunACase": "The asking program is course ICS3U with process id me.pid. me.claim is null for a look made BEFORE this program has taken its own build lease (every blocking lease counts), or {moment, pid} for the look made right after (only leases taken earlier count). others are the lease files in the folder: keep those whose course matches ICS3U without regard to case, whose pid is not me.pid, and whose alive is true (liveness is its own case list), then apply the rule for the asker - aBuild blocks on build, publish, preview; aScheduledPublish on build, publish. expect declined means the first blocking lease found stands in the way (for aScheduledPublish: it waits); allowed means nothing does. An entry with nameLine false is a lease file with no name on line 2: drop it too, for every kind but import (the liveness rule names an import lease itself); nameLine absent means the lease has one.",
       "cases": [
         {"name": "nothing is held: a build goes ahead", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [], "expect": "allowed"},
