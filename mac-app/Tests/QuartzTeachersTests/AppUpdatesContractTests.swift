@@ -146,7 +146,14 @@ final class AppUpdatesContractTests: XCTestCase {
         }
         XCTAssertEqual(contractKeys.sorted(), ours.keys.sorted(), "A sentence is on one side only")
         for (key, sentence) in ours {
-            XCTAssertEqual(wording[key], sentence, "appUpdates.wording.\(key) and UpdateWording disagree")
+            // `{machine}` is filled with the contract's own word for a Mac
+            // (#418), so the contract can say one sentence for both apps.
+            let written: String = try XCTUnwrap(wording[key], key)
+            XCTAssertEqual(
+                try MachineWordContract.filledWithTheMachine(written),
+                sentence,
+                "appUpdates.wording.\(key) and UpdateWording disagree"
+            )
         }
     }
 
