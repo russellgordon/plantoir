@@ -48,7 +48,16 @@ public class SidebarNamesUiTests
 
         void NoneUnnamed(string screen)
         {
-            var buttons = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Button));
+            // Not the preview's web page (ruling 4, v1.4.3 stack review finding
+            // 4): a site shown in the WebView2 (Quartz's search or dark-mode
+            // buttons) is not Plantoir's to name, so its subtree is left out.
+            // Compared with Equals (UI Automation's own CompareElements), not
+            // a hash set: an element's hash code is not its identity.
+            var inThePage = app.Window.FindAllDescendants(cf => cf.ByAutomationId("previewWebView"))
+                .SelectMany(view => view.FindAllDescendants(cf => cf.ByControlType(ControlType.Button)))
+                .ToList();
+            var buttons = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
+                .Where(b => !inThePage.Any(page => page.Equals(b))).ToList();
             Assert.NotEmpty(buttons);
             var unnamed = buttons.Where(b => string.IsNullOrWhiteSpace(b.Name))
                 .Select(b => string.IsNullOrEmpty(b.AutomationId) ? b.ClassName : b.AutomationId).ToList();
