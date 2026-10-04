@@ -519,7 +519,11 @@ final class PreviewReachabilityTests: XCTestCase {
         var sentences: [String: String] = [:]
         for entry in cases {
             let verdict: String = try XCTUnwrap(entry["verdict"] as? String)
-            sentences[verdict] = try XCTUnwrap(entry["sentence"] as? String)
+            // `{machine}` is filled with the contract's own word for a Mac
+            // (#410), so the contract can say one sentence for both apps.
+            sentences[verdict] = try MachineWordContract.filledWithTheMachine(
+                try XCTUnwrap(entry["sentence"] as? String)
+            )
         }
         let everyVerdict: [PreviewReachability.Verdict] = [
             .thisMacCannotReachIt, .theSiteNeverAnswered, .plantoirCouldNotTell
