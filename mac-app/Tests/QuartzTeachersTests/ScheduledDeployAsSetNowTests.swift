@@ -451,7 +451,7 @@ final class ScheduledDeployAsSetNowTests: XCTestCase {
         let moved: ScheduledDeploy.RunReading = .deploy(command: "x", destinations: ["/f"], scheduledTo: ["Netlify"])
         XCTAssertEqual(
             ScheduledDeploy.trailLineAtTheRun(step: .run, reading: moved),
-            "a scheduled deploy was set to go to Netlify; the course deploys to /f now, so it is deploying there"
+            "a scheduled deploy was set to deploy to Netlify; the course deploys to /f now, so it is deploying there"
         )
         let refusal: ScheduledDeploy.RunRefusal = .refused(.neverDeployed(destination: "Cloudflare Pages"))
         let refused: ScheduledDeploy.RunReading = .refuse(refusal, destinationsNow: ["Cloudflare Pages"], scheduledTo: ["Netlify"])

@@ -2157,7 +2157,7 @@ enum ScheduledDeploy {
                   let scheduledTo, scheduledTo != destinations else {
                 return nil
             }
-            return "a scheduled deploy was set to go to " + scheduledTo.joined(separator: ", ")
+            return "a scheduled deploy was set to deploy to " + scheduledTo.joined(separator: ", ")
                 + "; the course deploys to " + destinations.joined(separator: ", ")
                 + " now, so it is deploying there"
         case .standDown(let refusal):

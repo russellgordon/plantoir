@@ -250,7 +250,7 @@ final class SiteHealthRepairTests: XCTestCase {
 
         // The other half of the same pair, which had no guard at all.
         let published: String = SiteHealthRepair.notPublishedYet
-        XCTAssertTrue(published.lowercased().contains("publish"), published)
+        XCTAssertTrue(published.lowercased().contains("deploy"), published)
         for word in ["container", "script", "toolchain", "quartz", "config", "json"] {
             XCTAssertFalse(published.lowercased().contains(word),
                            "says \"\(word)\" to a teacher")
