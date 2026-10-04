@@ -77,13 +77,15 @@ final class HideIsUnpublishCardTests: XCTestCase {
         }
     }
 
-    /// And publishing keeps the narrower frame it has always had — the
-    /// REFERENCE and the TOLERANCE both.
+    /// And publishing keeps the narrower TOLERANCE it has always had, though
+    /// since #411 it reads one more REFERENCE: the exact "publish unit 4, day
+    /// 3".
     ///
     /// The asymmetry is the decision, not an oversight: unpublishing errs safe
     /// — a page nobody can see — while publishing puts a page in front of
-    /// students, and the smaller assistant answers "Publish Unit 2, Day 3"
-    /// correctly anyway.
+    /// students. Russell's decision on #411 (2026-10-03) answered the one exact
+    /// sentence in code, because a sentence that needs no model should not be
+    /// sent to one, and kept the #215 widening rejected.
     ///
     /// **The tolerance half is asserted because it was got wrong once.** The
     /// first version of this frame read the verb AFTER stripping the courtesy
@@ -91,15 +93,18 @@ final class HideIsUnpublishCardTests: XCTestCase {
     /// adversarial differential fuzz of 13,464 sentences found 0 matches lost
     /// and **141 new `publish_pages` matches**, none of them asked for. A test
     /// naming only the reference would not have caught it, and did not.
-    func testPublishStillTakesAWholeUnitAndNoPage() throws {
+    func testPublishTakesAWholeUnitOrOneExactPageAndNoWiderSpelling() throws {
         let whole: AssistCardCommand = try XCTUnwrap(AssistCardCommand.matching("publish unit 5"))
         XCTAssertEqual(whole.toolName, "publish_pages")
         XCTAssertEqual(whole.arguments["pages"], "Unit 5")
 
-        XCTAssertNil(
-            AssistCardCommand.matching("publish unit 4, day 3"),
-            "The day arm is not gated on the verb, so the publish family widened too."
-        )
+        // The unit first and the day second, never the other way round: a
+        // swapped pair publishes a different page and reports success.
+        let page: AssistCardCommand = try XCTUnwrap(AssistCardCommand.matching("publish unit 4, day 3"))
+        XCTAssertEqual(page.toolName, "publish_pages")
+        XCTAssertEqual(page.arguments["pages"], "Unit 4, Day 3")
+
+        // The hide arm's tolerances are NOT the publish arm's.
         XCTAssertNil(AssistCardCommand.matching("publish unit 4 day 3"))
         XCTAssertNil(AssistCardCommand.matching("please publish unit 4, day 3 please"))
 
@@ -116,6 +121,37 @@ final class HideIsUnpublishCardTests: XCTestCase {
         // because that is shipped behaviour rather than a new tolerance.
         XCTAssertNotNil(AssistCardCommand.matching("publish unit 5."))
         XCTAssertNotNil(AssistCardCommand.matching("Publish Unit 5!"))
+    }
+
+    /// A HIDE sentence never publishes, whatever form it takes (#411).
+    ///
+    /// The damaging direction for the new day arm: a teacher asking to take a
+    /// page down, answered by putting it up. Checked over every sentence the
+    /// contract accepts or refuses whose verb is hide or unpublish, and over
+    /// the day form #411 added, rather than over one example.
+    func testNoHideOrUnpublishSentenceEverReachesPublishPages() throws {
+        var sentences: [String] = ["hide unit 4, day 3", "unpublish unit 4, day 3",
+                                   "Hide Unit 4, Day 3", "please unpublish unit 4, day 3"]
+        for key in ["accepted", "refused"] {
+            for row in try HideIsUnpublishCardTests.rows(named: key) {
+                let input: String = try XCTUnwrap(row["input"] as? String)
+                let lowered: String = input.lowercased()
+                if lowered.contains("hide") || lowered.contains("unpublish") {
+                    sentences.append(input)
+                }
+            }
+        }
+        for sentence in sentences {
+            if let command = AssistCardCommand.matching(sentence) {
+                XCTAssertNotEqual(
+                    command.toolName, "publish_pages",
+                    "\"\(sentence)\" asks for a page to be taken down and was answered by publishing it"
+                )
+            }
+        }
+        let hidden: AssistCardCommand = try XCTUnwrap(AssistCardCommand.matching("hide unit 4, day 3"))
+        XCTAssertEqual(hidden.toolName, "unpublish_pages")
+        XCTAssertEqual(hidden.arguments["pages"], "Unit 4, Day 3")
     }
 
     // MARK: - What the shelf promises

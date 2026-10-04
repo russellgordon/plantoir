@@ -1562,10 +1562,10 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// deliberate.** `hide` and `unpublish` take a whole unit or one class
     /// page, and tolerate a "please" at either end, a trailing question mark,
     /// a stray comma and odd spacing. `publish` is read by
-    /// `wholeUnitToPublish` below, which is the shipped code unchanged: the
-    /// literal prefix `"publish unit "` and a bare number, so "publish unit 4,
-    /// day 3" still goes to the model and so do "publish unit 4?", "please
-    /// publish unit 4" and "publish  unit 5".
+    /// `wholeUnitToPublish` below: the literal prefix `"publish unit "` and a
+    /// bare number, or — since #411 — the exact form "publish unit 4, day 3";
+    /// "publish unit 4?", "please publish unit 4", "publish  unit 5" and every
+    /// looser spelling of the day form still go to the model.
     ///
     /// The split was made deliberately rather than inherited. The first
     /// version of this frame read the verb AFTER stripping the courtesy words
@@ -1577,9 +1577,11 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// would have published a whole unit with no model in the loop, which is
     /// the exact ambiguity used two paragraphs down to reject "show unit 4".
     /// Unpublishing errs safe — a page nobody can see — while publishing puts
-    /// a page in front of students, and "Publish Unit 2, Day 3" is 10/10 on
-    /// the smaller assistant today, so there is nothing to buy by widening the
-    /// dangerous direction on the same day. Five of those 141 are pinned as
+    /// a page in front of students, and "Publish Unit 2, Day 3" was 10/10 on
+    /// the smaller assistant then, so there was nothing to buy by widening the
+    /// dangerous direction on the same day. (#411 later answered that exact
+    /// sentence in code — on the ground that a sentence needing no model
+    /// should not be sent to one — and kept every widening out.) Five of those 141 are pinned as
     /// `refused` rows in `hideIsUnpublish`, so the gate is data rather than a
     /// comment somebody deletes. `show` and `unhide` are out for a nearer
     /// reason: "show unit 4" is at least as likely to mean "display it to me",
@@ -1612,16 +1614,16 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     }
 
     /// "Publish Unit 5", read exactly as it has been read since the family
-    /// shipped.
+    /// shipped — and, since #411, "Publish Unit 4, Day 3" in its exact form.
     ///
     /// **Kept as its own function so the publish surface cannot move by
-    /// accident.** A literal prefix, a bare number, no comma — so "publish
-    /// unit 4, day 3" goes to the model (it names one page, which has a title
-    /// in it to read out), and so does every sentence the hide frame beside it
-    /// now tolerates: a courtesy word, a question mark, a doubled space, a
-    /// stray comma. Verified by differential fuzz rather than by reading:
-    /// 36,864 generated sentences through this matcher and `dev`'s, **0
-    /// matches gained and 0 lost on `publish_pages`**.
+    /// accident.** A literal prefix, a bare number, no comma — and every
+    /// sentence the hide frame beside it tolerates still goes to the model: a
+    /// courtesy word, a question mark, a doubled space, a stray comma. The one
+    /// comma this frame reads is the one in a class page's own title, through
+    /// `unitAndDay`. Verified by differential fuzz before #411: 36,864
+    /// generated sentences through this matcher and `dev`'s, **0 matches
+    /// gained and 0 lost on `publish_pages`**.
     ///
     /// The `.` and `!` a teacher types at the end are still accepted, because
     /// the shared tidier at the top of this file strips them before anything
@@ -1651,12 +1653,51 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         for opening in openings where tidied.hasPrefix(opening) {
             rest = String(tidied.dropFirst(opening.count)).trimmingCharacters(in: .whitespaces)
         }
-        guard let rest, !rest.isEmpty, !rest.contains(","), Int(rest) != nil else {
+        guard let rest, !rest.isEmpty else {
+            return nil
+        }
+        // "Publish Unit 4, Day 3" — one class page, answered here since #411
+        // (decided by Russell, 2026-10-03: a sentence that needs no model
+        // should not be sent to one). Only after the literal "publish unit "
+        // opening, never after the two #197 openings, which name a whole unit.
+        if tidied.hasPrefix("publish unit "), let page = AssistCardCommand.unitAndDay(rest) {
+            return AssistCardCommand(toolName: "publish_pages", arguments: ["pages": page])
+        }
+        guard !rest.contains(","), Int(rest) != nil else {
             return nil
         }
         return AssistCardCommand(
             toolName: "publish_pages", arguments: ["pages": "Unit \(rest)"]
         )
+    }
+
+    /// "4, day 3" read as "Unit 4, Day 3" — and nothing else is.
+    ///
+    /// **The EXACT form, with no more tolerance than "publish unit 5" has.**
+    /// The #215 widening the hide arm has (a courtesy word, a question mark,
+    /// a missing or doubled comma, doubled spaces) STAYS REJECTED for
+    /// publishing, the direction that reaches students: what follows the
+    /// opening must be exactly a number, the six characters ", day " and a
+    /// number. So "publish unit 4, day 3?", "please publish unit 4, day 3",
+    /// "publish unit 4 day 3", "publish unit 4,day 3" and "publish unit 4,
+    /// day 3 in ICS3U" all go to the model, each pinned in
+    /// `hideIsUnpublish.refused`. The last is the one that matters: a matched
+    /// card binds THIS window's course, and the guard against a sentence
+    /// naming another course runs only on the model's answers.
+    ///
+    /// The numbers travel as the teacher typed them, accepted by `Int(...)`,
+    /// the test "publish unit <number>" and the hide arm already use.
+    private static func unitAndDay(_ rest: String) -> String? {
+        let separator: String = ", day "
+        guard let found = rest.range(of: separator) else {
+            return nil
+        }
+        let unit: String = String(rest[rest.startIndex..<found.lowerBound])
+        let day: String = String(rest[found.upperBound...])
+        guard Int(unit) != nil, Int(day) != nil else {
+            return nil
+        }
+        return "Unit \(unit), Day \(day)"
     }
 
     /// "Hide Unit 4, Day 21" and "Unpublish Unit 4" — the widened arm, and the
@@ -1814,17 +1855,32 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 tool: "publish_pages",
                 fills: ["pages": "Unit <number>"],
                 example: "publish unit 5",
-                notThis: "publish unit 4, day 3",
+                notThis: "publish unit 4?",
                 becauseNotThis: "Publishing is the direction that reaches students, so this verb is "
-                              + "read by a frame of its own that has not moved: the literal opening "
-                              + "'publish unit ' and a bare number. A comma means one PAGE was named, "
-                              + "and that request goes to the model — and so does every spelling the "
-                              + "hide and unpublish family beside it tolerates, so 'publish unit 4?', "
-                              + "'please publish unit 4' and 'publish  unit 5' are refused too, each "
-                              + "pinned in hideIsUnpublish.refused. The asymmetry is the decision: "
-                              + "unpublishing errs safe, a question mark on a publish request is "
-                              + "plausibly a teacher ASKING, and this phrasing is answered correctly "
-                              + "by the model anyway, so there is nothing to buy by widening it."
+                              + "read by a frame of its own: the literal opening 'publish unit ' and a "
+                              + "bare number. Every spelling the hide and unpublish family beside it "
+                              + "tolerates goes to the model, so 'publish unit 4?', 'please publish "
+                              + "unit 4' and 'publish  unit 5' are refused, each pinned in "
+                              + "hideIsUnpublish.refused. The asymmetry is the decision: unpublishing "
+                              + "errs safe, and a question mark on a publish request is plausibly a "
+                              + "teacher ASKING."
+            ),
+            // #411 (decided by Russell, 2026-10-03): the day form, answered in
+            // code because a sentence that needs no model should not be sent
+            // to one — with no more tolerance than the entry above.
+            ParsedShape(
+                shape: "publish unit <number>, day <number>",
+                tool: "publish_pages",
+                fills: ["pages": "Unit <number>, Day <number>"],
+                example: "publish unit 4, day 3",
+                notThis: "publish unit 4, day 3 in ICS3U",
+                becauseNotThis: "The EXACT form only: a number, ', day ' and a number, after the "
+                              + "literal opening 'publish unit '. A matched card binds THIS window's "
+                              + "course and section into the call, and the guard against a request "
+                              + "naming another course runs only on the model's answers, so any extra "
+                              + "word falls through. The #215 widening stays rejected for publishing: "
+                              + "a question mark, a 'please', a missing comma and doubled spaces all go "
+                              + "to the model. Every accepted and refused spelling is in hideIsUnpublish."
             ),
             ParsedShape(
                 shape: "publish all the classes in unit <number> | publish everything in unit <number>",
