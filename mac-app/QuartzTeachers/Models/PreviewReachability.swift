@@ -449,6 +449,11 @@ nonisolated enum PreviewReachability {
     /// whether restarting it even replaces the stale plumbing underneath was
     /// never measured — so the button would risk somebody else's publish to
     /// deliver a cure nobody had seen work.
+    ///
+    /// `theSiteNeverAnswered` is the one of the three Windows says too, so its
+    /// machine is `MachineWord`'s: the contract writes it as `{machine}` for
+    /// both apps to fill (#410). The other two name this Mac on purpose — one
+    /// is mac-only (Windows has no builder to ask), the other names no machine.
     static func sentence(for verdict: Verdict) -> String {
         switch verdict {
         case .thisMacCannotReachIt:
@@ -459,7 +464,7 @@ nonisolated enum PreviewReachability {
         case .theSiteNeverAnswered:
             return "Your website did not come up, so Plantoir stopped waiting for it.\n\n"
                  + "Nothing has been lost. Press Preview to try again — and if it "
-                 + "happens again, restarting your Mac usually puts it right."
+                 + "happens again, restarting your \(MachineWord.onThisPlatform) usually puts it right."
         case .plantoirCouldNotTell:
             return "Plantoir could not get your website to appear, and could not tell why.\n\n"
                  + "Nothing has been lost. Press Preview to try again — and if it happens "

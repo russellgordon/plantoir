@@ -836,6 +836,20 @@ nonisolated enum ActivityTrail {
         /// too when the other program is a copy of the app; the
         /// `--mcp-stdio` and scheduled processes write no opening line.
         case buildDeclinedBusyElsewhere = "build declined, course busy elsewhere"
+        /// An outside assistant (Claude or Codex) changed a course, asked for
+        /// a rebuild, or deployed, while a preview of that course was open in
+        /// Plantoir (#433). A change or a rebuild left the open preview
+        /// exactly as it was — not rebuilt; a deploy went ahead and may have
+        /// closed it. Carries the course and section and which of those it
+        /// was — never anything written on a page. It answers "Claude said it
+        /// changed the page and my preview still shows the old one".
+        case outsideChangeLeftThePreviewAlone = "outside assistant worked while a preview was open"
+        /// A preview that was serving ended because another program on this
+        /// Mac built the course for a deploy — its server killed the way a
+        /// deploy's build stops a section's preview — and was shown as
+        /// "Closed for a deploy", not as a failure (#433's stack review).
+        /// Carries the course and section; never anything on a page.
+        case previewClosedForADeploy = "preview closed for a deploy"
 
         /// A publish set for later found the course being built or published
         /// by another program and WAITED (#156): it polls every fifteen
@@ -961,6 +975,11 @@ nonisolated enum ActivityTrail {
         /// in the same breath, and this is the line that is still there next
         /// week, when "why is this page still showing?" arrives.
         case pageSettingsLeftAsTheyWere = "page settings left as they were"
+        /// Making room for a class could not finish some of its writes — a
+        /// rename whose new name was taken or whose save failed, a date, a
+        /// page's links, a new class whose name was still taken (#425,
+        /// adopted from Windows' #422). Counts by kind, never names.
+        case makingRoomDidNotFinishEveryPage = "making room did not finish every page"
         /// The assistant asked to publish or hide pages and named none this
         /// section has (#197): only a word meaning every page ("all"), or
         /// names that match no page. Nothing was changed and the teacher was

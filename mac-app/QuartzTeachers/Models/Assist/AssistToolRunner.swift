@@ -244,7 +244,9 @@ final class AssistToolRunner {
         )
         self.surface = surface
         self.workspace = workspace
-        self.siteWork = siteWork ?? AssistToolchainWork(workspace: workspace)
+        self.siteWork = siteWork ?? AssistToolchainWork(
+            workspace: workspace, aServedPreviewHoldsADeployBack: surface != .mcp
+        )
         self.readToday = today
         self.launchControl = launchControl
         self.openMainWindow = openMainWindow
@@ -472,6 +474,13 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(
                 AssistToolRefusal.keptForReference(reference.displayCode).message
             )
+        }
+
+        // A change from an outside assistant while a site of the course is
+        // being built elsewhere (#433) — refused here, before anything is
+        // backed up or written, so a refusal never follows a change.
+        if let heldBack = outsideChangeHeldBack(call) {
+            return heldBack
         }
 
         switch call.function.name {
@@ -1147,7 +1156,9 @@ final class AssistToolRunner {
         )
         var moving: [String] = []
         for summary in pages {
-            guard let page = graph.page(titled: summary.title) else {
+            // By file (#425's review): a class sharing its file name with a
+            // course-level page must be asked about as itself.
+            guard let page = graph.page(atFile: summary.fileURL) else {
                 continue
             }
             // A page whose flag this app will not read counts as moving, for
@@ -1271,13 +1282,17 @@ final class AssistToolRunner {
             let classPages: [ClassPageSummary] = ClassPages.list(
                 forSection: located.sectionNumber, in: located.course
             )
+            // By the class's FILE, never its title (#425's review, stack 1
+            // item 1): a class sharing its file name with a course-level page
+            // was otherwise dropped from the plan, and the unit reported done
+            // with that class still the way it was.
             let plan: AssistPublishPlan = publishing
                 ? AssistPublishPlanner.planPublishing(
-                    titles: [summary.title], onOrAfter: nil, before: nil,
+                    titles: [], files: [summary.fileURL], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
                 : AssistPublishPlanner.planUnpublishing(
-                    titles: [summary.title], onOrAfter: nil, before: nil,
+                    titles: [], files: [summary.fileURL], onOrAfter: nil, before: nil,
                     graph: graph, classPages: classPages,
                     forSection: located.sectionNumber, in: located.course)
             for page in plan.noRoomForAKey where !leftAlone.contains(page.displayTitle) {
@@ -1298,11 +1313,11 @@ final class AssistToolRunner {
                     changedAnything = true
                 }
             } catch {
-                return AssistToolOutcome.refused(
-                    "\(located.course.configuration.unitWord) \(unit) was only partly "
-                    + "\(publishing ? "published" : "unpublished"): "
-                    + error.localizedDescription
-                )
+                return AssistToolOutcome.refused(publishStoppedPartWay(
+                    what: "\(located.course.configuration.unitWord) \(unit)",
+                    problem: error.localizedDescription,
+                    sectionNumber: located.sectionNumber
+                ))
             }
         }
 
@@ -1514,6 +1529,16 @@ final class AssistToolRunner {
                 graph: graph, classPages: classPages,
                 forSection: located.sectionNumber, in: located.course
             )
+        }
+
+        // A name that fits more than one page's file is ASKED about, never
+        // guessed (#425, adopted from Windows): nothing is written, not even
+        // the pages named unambiguously beside it, because the teacher's
+        // answer may change what they wanted together.
+        if let ambiguous = plan.ambiguousNames.first {
+            return .failure(.whichPageWasMeant(AssistPublishPlanner.askingWhichPageWasMeant(
+                ambiguous, course: located.course, sectionNumber: located.sectionNumber
+            )))
         }
 
         // Names were given and NONE of them is a page (#197). This used to be
@@ -1827,9 +1852,13 @@ final class AssistToolRunner {
             change = applied.change
             leftAlone = applied.leftAlone
         } catch {
-            return AssistToolOutcome.refused(
-                "Nothing was changed: \(error.localizedDescription)"
-            )
+            // Not "Nothing was changed" (said here until #412): the write is
+            // page by page, so pages before the one that failed are written.
+            return AssistToolOutcome.refused(publishStoppedPartWay(
+                what: "the pages you named",
+                problem: error.localizedDescription,
+                sectionNumber: sectionNumber
+            ))
         }
         history.record(change)
 
@@ -1864,8 +1893,22 @@ final class AssistToolRunner {
             for: course, sectionNumber: sectionNumber
         )
         detail += "\n\n" + previewNote
-        detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
-                + "of students — deploying does that, and only when they ask."
+        // Not "and their PREVIEW" when an outside assistant's change left the
+        // open preview as it was (#433): that would be false.
+        let previewLeftAsItWas: Bool =
+            previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
+                course: course.code, section: String(sectionNumber)
+            )
+            || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
+                course: course.code, section: String(sectionNumber)
+            )
+        if previewLeftAsItWas {
+            detail += "\n\nThis changed the teacher's files. It did not put anything in front "
+                    + "of students — deploying does that, and only when they ask."
+        } else {
+            detail += "\n\nThis changed the teacher's files and their PREVIEW. It did not put anything in front "
+                    + "of students — deploying does that, and only when they ask."
+        }
 
         return AssistToolOutcome.wrote(
             AssistToolRunner.whatWasDone(
@@ -1921,34 +1964,119 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(refusal(from: found).message)
         }
         let message: String = await bringThePreviewUpToDate(
-            for: located.course, sectionNumber: located.sectionNumber
+            for: located.course, sectionNumber: located.sectionNumber, afterAChange: false
         )
         return AssistToolOutcome.wrote(message, detail: message)
+    }
+
+    /// What is said when a publish or a hide stopped part way (#412): one
+    /// key, and — in the in-app assistant, when this conversation saved a copy
+    /// — the pointer to the banner's Restore Section button, because the undo
+    /// entry is abandoned on a throw and that copy is the way back.
+    private func publishStoppedPartWay(what: String, problem: String, sectionNumber: Int) -> String {
+        let said: String = AssistWording.publishStoppedPartWay(what: what, problem: problem)
+        if surface == .local && hasConversationBackup {
+            return said + " " + AssistWording.restoreSectionPutsItBack(section: String(sectionNumber))
+        }
+        return said
     }
 
     /// What another program on this Mac holds that stands in the way of
     /// building this course — the EARLY look, before anything is stopped
     /// (#156). Nil when the way is clear or there is no working folder.
-    private func whatBlocksABuild(of course: Course) -> WorkLeaseFiles.Holding? {
+    private func whatBlocksABuild(
+        of course: Course, asker: WorkLeaseFiles.Asker = .aBuild
+    ) -> WorkLeaseFiles.Holding? {
         guard let folder = workspace.workspaceURL else {
             return nil
         }
         return WorkLeaseRegistry.whatBlocksABuild(
-            folderPath: folder.path, courseCode: course.code, afterTaking: false
+            folderPath: folder.path, courseCode: course.code, afterTaking: false, asker: asker
         )
+    }
+
+    /// What an outside assistant's change to this course meets (#433):
+    /// clear, a site being built elsewhere, or a preview elsewhere that is
+    /// only being served. `.clear` with no working folder.
+    private func outsideChangeMeets(_ course: Course) -> WorkLeaseFiles.OutsideChangeMeets {
+        guard let folder = workspace.workspaceURL else {
+            return .clear
+        }
+        return WorkLeaseRegistry.whatAnOutsideChangeMeets(folderPath: folder.path, courseCode: course.code)
+    }
+
+    /// The tools that are not page changes, or that decide about building
+    /// themselves, and so are not held back by `outsideChangeHeldBack`
+    /// (#433). `rebuild_preview` and `deploy_section` answer for themselves;
+    /// a deploy set for later waits for a build when its time comes; a
+    /// backup is a copy; the timetable is a note about the teacher's week.
+    static let writingToolsTheBuildingGateLeavesAlone: Set<String> = [
+        "rebuild_preview", "deploy_section", "schedule_deploy", "cancel_scheduled_deploy",
+        "back_up_course", "remember_timetable",
+    ]
+
+    /// An outside assistant's CHANGE to a course while a site of that course
+    /// is being BUILT elsewhere is refused before anything is backed up or
+    /// written (#433, Russell 2026-10-03; the same rule as Windows'
+    /// `RefuseIfPlantoirIsBuilding`). A preview that is only being served
+    /// holds nothing back. Nil — go ahead — for the in-app assistant, for a
+    /// read, and for anything not held back.
+    ///
+    /// At the door, on the tool's own `readOnly` flag, for the same reason as
+    /// the reference-course gate above it: a list of the writing tools kept
+    /// by hand is the list somebody forgets to extend.
+    private func outsideChangeHeldBack(_ call: AssistToolCall) -> AssistToolOutcome? {
+        if surface != .mcp {
+            return nil
+        }
+        guard let tool = definition(named: call.function.name), !tool.readOnly else {
+            return nil
+        }
+        if AssistToolRunner.writingToolsTheBuildingGateLeavesAlone.contains(tool.name) {
+            return nil
+        }
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        var code: String = AssistToolRunner.text("course", in: call.argumentValues)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if code.isEmpty, let pending = history.nextToUndo {
+            code = pending.courseCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        var course: Course? = nil
+        for candidate in coursesAsSavedNow where candidate.code.lowercased() == code.lowercased() {
+            course = candidate
+        }
+        // A course that cannot be found is the tool's own refusal to give.
+        guard let course else {
+            return nil
+        }
+        guard case .building(let holding) = WorkLeaseRegistry.whatAnOutsideChangeMeets(
+            folderPath: folder.path, courseCode: course.code
+        ) else {
+            return nil
+        }
+        let section: Int = number("section", in: call.argumentValues) ?? 0
+        WorkLeaseRegistry.noteDeclined(
+            act: "an outside assistant's \(tool.name)", courseCode: course.code,
+            sectionNumber: section, holding: holding
+        )
+        return AssistToolOutcome.refused(AssistWording.courseIsBeingBuilt(course: course.code))
     }
 
     /// What is said when another program is in the way (#156).
     ///
-    /// An assistant working from another app is told `courseIsBusy`: it is
-    /// talking to the program whose course is busy, and that sentence tells
-    /// it to wait and ask again, which is what it can do. The teacher, in the
+    /// An assistant working from another app is told `courseIsBeingBuilt`
+    /// (#433; `courseIsBusy` until then): it is talking to the program that
+    /// is building, nothing was changed, and it can ask again once the build
+    /// has finished. Since #433 only a site being BUILT reaches here for it —
+    /// a preview that is only open is answered before. The teacher, in the
     /// app, is told `courseIsBeingBuiltElsewhere`, which says where the other
     /// work might be — somewhere they cannot see from this window.
     func builtElsewhereSentence(for course: Course) -> String {
         switch surface {
         case .mcp:
-            return AssistWording.courseIsBusy(course: course.code)
+            return AssistWording.courseIsBeingBuilt(course: course.code)
         case .local:
             return AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
         }
@@ -2127,8 +2255,12 @@ final class AssistToolRunner {
     ///   out in time. Nobody can be shown anything, so the site is brought
     ///   up to date on disk and the answer says so plainly rather than
     ///   claiming a preview that does not exist.
+    ///
+    /// `afterAChange` is false only for `rebuild_preview` itself: everywhere
+    /// else this runs after a change that has ALREADY been written, so
+    /// nothing it says to an outside assistant may read as a refusal (#433).
     private func bringThePreviewUpToDate(
-        for course: Course, sectionNumber: Int
+        for course: Course, sectionNumber: Int, afterAChange: Bool = true
     ) async -> String {
         // Before anything is stopped (#351's second review, SF1): while a copy
         // of the course is being zipped the window's own Preview refuses, so
@@ -2155,6 +2287,34 @@ final class AssistToolRunner {
                 course: course.code, section: String(sectionNumber)
             )
         }
+        // An outside assistant (#433, Russell 2026-10-03). It has no window,
+        // so whatever it does here is the headless rebuild, which would end
+        // the preview the teacher is reading. So a preview another program is
+        // SERVING is left exactly as it is, nothing is built, and the answer
+        // is that the change is saved and the teacher will see it after
+        // stopping and starting their preview. A site being BUILT elsewhere
+        // refuses `rebuild_preview` as before; after a change that has been
+        // written it is said as saved, never as busy.
+        if surface == .mcp {
+            switch outsideChangeMeets(course) {
+            case .previewServed:
+                return leftTheOpenPreviewAlone(course: course, sectionNumber: sectionNumber, afterAChange: afterAChange)
+            case .building(let holding):
+                if afterAChange {
+                    return AssistWording.changesAreSavedWhileTheCourseIsBuilt(
+                        course: course.code, section: String(sectionNumber)
+                    )
+                }
+                WorkLeaseRegistry.noteDeclined(
+                    act: WorkLeaseRegistry.assistantsAct("rebuild"), courseCode: course.code,
+                    sectionNumber: sectionNumber, holding: holding
+                )
+                return AssistWording.courseIsBeingBuilt(course: course.code)
+            case .clear:
+                break
+            }
+        }
+
         // FIRST, before a window is opened or a preview stopped (#156): a
         // build another program is running, or a preview it is showing, is
         // not this conversation's to end.
@@ -2193,11 +2353,40 @@ final class AssistToolRunner {
         )
         if !rebuild.succeeded {
             if rebuild.wasBuiltElsewhere {
+                // Another program started in the moment between the look
+                // above and the rebuild's own lease. After a change an outside
+                // assistant has made, still said as saved (#433).
+                if surface == .mcp && afterAChange {
+                    if case .previewServed = outsideChangeMeets(course) {
+                        return leftTheOpenPreviewAlone(course: course, sectionNumber: sectionNumber, afterAChange: true)
+                    }
+                    return AssistWording.changesAreSavedWhileTheCourseIsBuilt(
+                        course: course.code, section: String(sectionNumber)
+                    )
+                }
                 return builtElsewhereSentence(for: course)
             }
             return rebuild.message
         }
         return AssistWording.builtWithNoWindowOpen(
+            course: course.code, section: String(sectionNumber)
+        )
+    }
+
+    /// An outside assistant's change, or its rebuild, left another program's
+    /// open preview exactly as it was (#433): recorded on the trail, and
+    /// answered with the plain sentence — saved; stop and start the preview.
+    private func leftTheOpenPreviewAlone(course: Course, sectionNumber: Int, afterAChange: Bool) -> String {
+        var asked: String = "a change"
+        if !afterAChange {
+            asked = "a rebuild"
+        }
+        ActivityTrail.note(
+            .outsideChangeLeftThePreviewAlone,
+            "an outside assistant's \(asked) left the preview open in Plantoir as it was — not rebuilt",
+            course: course.code, section: sectionNumber
+        )
+        return AssistWording.changesAreSavedPreviewShowsTheOldPages(
             course: course.code, section: String(sectionNumber)
         )
     }
@@ -2635,7 +2824,20 @@ final class AssistToolRunner {
         // here for the same reason, before anything is stopped. The window's
         // Deploy and the headless deploy each check again after taking their
         // own lease; this look only spares the preview.
-        if let holding = whatBlocksABuild(of: located.course) {
+        //
+        // An outside assistant asks only about BUILDING (#433, Russell
+        // 2026-10-03): a preview the teacher is reading does not hold its
+        // deploy back. The deploy ends that section's preview the way the
+        // window's own Deploy does, and the answer says so.
+        var asker: WorkLeaseFiles.Asker = .aBuild
+        var aPreviewWasOpenElsewhere: Bool = false
+        if surface == .mcp {
+            asker = .anOutsideDeploy
+            if case .previewServed = outsideChangeMeets(located.course) {
+                aPreviewWasOpenElsewhere = true
+            }
+        }
+        if let holding = whatBlocksABuild(of: located.course, asker: asker) {
             WorkLeaseRegistry.noteDeclined(
                 act: WorkLeaseRegistry.assistantsAct("deploy"), courseCode: located.course.code,
                 sectionNumber: located.sectionNumber, holding: holding
@@ -2679,6 +2881,24 @@ final class AssistToolRunner {
         // is the whole answer to what was asked, and the teacher can see the
         // window it happened in. Anything that explains what the assistant had
         // to do to obey is talking about itself.
+        //
+        // An outside assistant is the exception (#433): the teacher may not
+        // be looking at Plantoir at all, and Claude or Codex has no window to
+        // see, so a preview its deploy closed is said in the same success
+        // sentence, plainly. "If" because leases name the course and not the
+        // section: the open preview may be of another section, which the
+        // deploy leaves alone.
+        if aPreviewWasOpenElsewhere {
+            ActivityTrail.note(
+                .outsideChangeLeftThePreviewAlone,
+                "an outside assistant deployed while a preview of the course was open in Plantoir",
+                course: located.course.code, section: located.sectionNumber
+            )
+            let said: String = result.message + " " + AssistWording.deployClosedAnOpenPreview(
+                course: located.course.code, section: String(located.sectionNumber)
+            )
+            return AssistToolOutcome.wrote(said, detail: said)
+        }
         return AssistToolOutcome.wrote(result.message, detail: result.message)
     }
 
