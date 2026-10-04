@@ -164,10 +164,10 @@ struct PublishingChoiceView: View {
 
         if !availableAdditionalDeployTargetTypes.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Also publish to, for redundancy")
+                Text("Also deploy to, for redundancy")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                ExampleCaption("Deploying publishes to every destination switched on here, one after another. If one host is down or having trouble, the others still go out. Most teachers leave this off — it is here for anyone who wants a second copy live.")
+                ExampleCaption("Deploying sends your website to every destination switched on here, one after another. If one host is down or having trouble, the others still go out. Most teachers leave this off — it is here for anyone who wants a second copy live.")
 
                 ForEach(availableAdditionalDeployTargetTypes, id: \.self) { type in
                     additionalTargetRow(forType: type)

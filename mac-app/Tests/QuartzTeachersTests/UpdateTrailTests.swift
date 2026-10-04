@@ -24,14 +24,14 @@ final class UpdateTrailTests: XCTestCase {
     func testInstallingSaysWhenAndWhetherItOpensAgain() {
         let now: String = UpdateTrail.installingLine(from: "1.3.1 (3100)", to: "1.3.2 (3120)", moment: .straightAway)
         let after: String = UpdateTrail.installingLine(
-            from: "1.3.1 (3100)", to: "1.3.2 (3120)", moment: .afterHeldWork("publishing Section 2 of ICS3U")
+            from: "1.3.1 (3100)", to: "1.3.2 (3120)", moment: .afterHeldWork("deploying Section 2 of ICS3U")
         )
         let quitting: String = UpdateTrail.installingLine(
-            from: "1.3.1 (3100)", to: "1.3.2 (3120)", moment: .asPlantoirQuits(workStillGoing: "publishing on its schedule")
+            from: "1.3.1 (3100)", to: "1.3.2 (3120)", moment: .asPlantoirQuits(workStillGoing: "deploying on its schedule")
         )
         XCTAssertTrue(now.contains("open again"))
-        XCTAssertTrue(after.contains("publishing Section 2 of ICS3U") && after.contains("open again"))
-        XCTAssertTrue(quitting.contains("publishing on its schedule") && quitting.contains("will not open again"))
+        XCTAssertTrue(after.contains("deploying Section 2 of ICS3U") && after.contains("open again"))
+        XCTAssertTrue(quitting.contains("deploying on its schedule") && quitting.contains("will not open again"))
     }
 
     func testStopsHaveAPlainCategoryAndTheirNumber() {

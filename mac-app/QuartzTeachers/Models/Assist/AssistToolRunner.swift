@@ -3980,17 +3980,17 @@ final class AssistToolRunner {
                 return AssistToolOutcome.planned(
                     already,
                     plan: websiteAnswer == "new"
-                        ? "Start a new website for this section, so publishing it no longer replaces "
-                        + "last year's. Last year's details are kept, and any publish set to happen "
+                        ? "Start a new website for this section, so deploying it no longer replaces "
+                        + "last year's. Last year's details are kept, and any deploy set to happen "
                         + "on its own is turned off."
-                        : "Keep publishing this section to the same website as last year."
+                        : "Keep deploying this section to the same website as last year."
                 )
             }
             if isRollover, websiteAnswer == "new" {
                 let newWebsite: String =
-                    "\n\nIt would also start a new website for this section, so publishing it "
+                    "\n\nIt would also start a new website for this section, so deploying it "
                     + "no longer replaces last year's. Last year's details are kept, and any "
-                    + "publish set to happen on its own is turned off."
+                    + "deploy set to happen on its own is turned off."
                 return AssistToolOutcome.planned(
                     "Worked out what rolling that section over would do.",
                     plan: asked.plan.describe() + newWebsite,
@@ -4301,7 +4301,7 @@ final class AssistToolRunner {
             }
             ActivityTrail.note(
                 .sectionStartedANewWebsiteOnRollover,
-                "rolled the section over onto a new website — it had not been published anywhere yet",
+                "rolled the section over onto a new website — it had not been deployed anywhere yet",
                 course: course.code, section: sectionNumber
             )
             return AssistWording.rolloverHadNoWebsiteYet
