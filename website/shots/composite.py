@@ -11,13 +11,12 @@ cut off. `fan`, `side_by_side`, `with_shadow` and `diagonal_hero` are what
 the WINDOWS harness (capture_windows.py, hero_windows.py) still uses; the
 Mac no longer calls them.
 
-**Every part is a whole macOS window capture, and stays whole.** Each comes
-from `screencapture -x -o -l <window id>` — the Option-click window capture —
-with the window's own rounded corners, transparent outside the curve. This
-module only PLACES them: it never crops through a window, never re-rounds a
-corner, and never draws a shape. Scaling is Lanczos, of a whole image. A
-shadow, where there is one, is made from the capture's own alpha channel, so
-it follows the real curve. (Until 2026-09-27 this file cut Safari's toolbar
+**Every part is a whole window capture, and stays whole.** On the Mac each
+comes from `screencapture -x -l <window id>`, with the window's own rounded
+corners and its natural shadow. This module only PLACES them: it never crops
+through a window, never re-rounds a corner, and never draws a shape. The
+Windows-only functions scale with Lanczos, of a whole image, and give a
+Windows capture (which has no shadow) one made from its own alpha channel. (Until 2026-09-27 this file cut Safari's toolbar
 off the class-site captures and painted an 18 px rounded mask over the cut;
 Russell saw the painted corners on the live site, and the code is gone.
 `test_native_corners.py` fails on a square corner, or one drawn tighter than

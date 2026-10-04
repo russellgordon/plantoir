@@ -2,7 +2,8 @@
 """Every picture on plantoir.app keeps its window's own corners.
 
 Russell's rule, 2026-09-27: the pictures are made ONLY with macOS's own window
-capture (`screencapture -x -o -l <window id>`, the Option-click capture),
+capture (`screencapture -x -l <window id>` since #434, shadow included —
+`NaturalShadows` below holds that shadow whole and the same everywhere),
 kept whole. No crop through a window, no corner painted back on, no rounded
 mask drawn by hand. This test opens every picture the pages show a Mac
 visitor — read from `shots.json` and the pages, both PNG and WebP — and fails
@@ -166,13 +167,24 @@ class NaturalShadows(unittest.TestCase):
         self.assertEqual(len(margins_seen), 1, margins_seen)
         self.assertEqual(list(margins_seen), [shadow.NATIVE_MARGINS])
 
-    def test_the_figures_judged_on_their_edge_are_on_the_pages(self):
-        # A figure exempted from the margin rule that no longer exists would
-        # be an exemption nobody reads again.
-        pictures = shadow.mac_pictures_to_check(REPO / "website", REPO / "site" / "img")
-        for identifier in shadow.FIGURES_WITH_THEIR_OWN_MARGIN:
-            found = [picture for picture, margins in pictures if picture.name == f"{identifier}-light.png"]
-            self.assertEqual(len(found), 1, identifier)
+    def test_every_exemption_names_a_shot_that_exists(self):
+        # An exemption from the margin rule for a shot that no longer exists
+        # would be one nobody reads again.
+        import json
+        manifest = json.loads((REPO / "website" / "shots.json").read_text(encoding="utf-8"))
+        identifiers = [shot["id"] for shot in manifest["shots"]]
+        for identifier in shadow.FIGURES_WITH_THEIR_OWN_MARGIN + shadow.NOT_A_MAC_WINDOW:
+            self.assertIn(identifier, identifiers)
+
+    def test_the_hero_has_clear_canvas_all_round(self):
+        # Russell's check for the hero is strict: its padding means the
+        # outermost pixels are exactly transparent, not merely dithered.
+        for suffix in ("light", "dark"):
+            picture = REPO / "site" / "img" / f"hero-{suffix}.png"
+            self.assertEqual(shadow.edge_alpha(picture), 0, picture.name)
+            margins = shadow.shadow_margins(picture)
+            for side in range(4):
+                self.assertGreater(margins[side], shadow.NATIVE_MARGINS[side], picture.name)
 
 
 class TheShadowCheckItself(unittest.TestCase):
