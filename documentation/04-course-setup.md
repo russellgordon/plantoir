@@ -334,6 +334,16 @@ The skeletons are GENERATED from eleven shapes plus a family table by
 `lint_skeletons.py`; the payloads are hand-written and checked by
 `lint_payload.py`.
 
+Course pages say "your class website" for the site students see, never
+"the published page / website / site" (#443, decided by Russell
+2026-10-04): DEPLOY puts a site online, PUBLISH only marks a page so a
+deploy includes it. `lint_skeletons.py` refuses the phrase in a skeleton.
+The payloads were reworded by hand and have no such rule, because several
+are about students' OWN published work (a newsroom's "published page", a
+journal's "published version") and a blunt pattern would refuse those.
+Courses made before v1.4.4 keep the old sentences: a teacher's pages are
+never rewritten.
+
 ### 1. Course identity
 
 - Prompts for the **course code** (default `ICS3U`), uppercased, and asks it
