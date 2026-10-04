@@ -149,6 +149,10 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         if (MakeRoom(tidied) is { } room) return room;
         if (numberedPageWord is not null && MakeRoomNumbered(tidied, numberedPageWord) is { } numbered) return numbered;
         if (DeployAtATime(tidied) is { } scheduled) return scheduled;
+        // #424: "schedule a deploy at …" read as the family above; "cancel the
+        // scheduled deploy" by a frame of its own.
+        if (ScheduleAsDeploy(tidied) is { } asDeploy && DeployAtATime(asDeploy) is { } scheduledToo) return scheduledToo;
+        if (CancelTheScheduledDeploy(tidied) is { } cancelled) return cancelled;
         if (LinksCard(message) is { } links) return links;
         return DuplicateClass(tidied, message);
     }

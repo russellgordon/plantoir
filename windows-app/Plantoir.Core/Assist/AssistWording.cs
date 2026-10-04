@@ -232,6 +232,15 @@ public static partial class AssistWording
     public static string DeployClosedAnOpenPreview(string course, string section) =>
         $"If a preview of {course} Section {section} was open in Plantoir, deploying closed it — press Preview there to open it again.";
 
+    /// <summary>
+    /// "schedule a deploy" with no time (#424): asked, never guessed and never
+    /// a deploy now. Windows' own sentence until the mac adopts a key for it
+    /// (proposed in bundle A's mac issue); the example it names is one the
+    /// deploy-at-a-time family accepts, so typing it back schedules.
+    /// </summary>
+    public const string ScheduleADeployNeedsATime =
+        "What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to.";
+
     // ---- A publish that stops part way (#436 item 2, mac #412) ------------
 
     /// <summary>

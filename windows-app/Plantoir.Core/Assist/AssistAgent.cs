@@ -864,6 +864,16 @@ public sealed class AssistAgent
                 _courseCode, _section);
             return new List<Line> { new("assistant", AssistWording.MorningOrEvening(question)) };
         }
+        // "schedule a deploy" with no time (#424): never a deploy now, and
+        // never the model, which sent this shape of sentence to deploy_section
+        // 10 of 10 on this PC. Asked in code, transcript only, as above.
+        if (AssistCardCommand.AsksToScheduleWithNoTime(text))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked what time to schedule the deploy for; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.ScheduleADeployNeedsATime) };
+        }
         if (AssistCardCommand.TimeToSayAs(text) is { } respelling)
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
