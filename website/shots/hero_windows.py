@@ -222,10 +222,19 @@ def press_chord(*virtual_keys: int) -> None:
 
 def type_text(text: str) -> None:
     KEYEVENTF_KEYUP = 0x0002
+    VK_SHIFT = 0x10
     for character in text:
-        vk = user32.VkKeyScanW(ord(character)) & 0xFF
+        scanned = user32.VkKeyScanW(ord(character))
+        vk = scanned & 0xFF
+        # The high byte says which modifiers the character needs: without
+        # Shift, "How I Teach" arrived as "how i teach".
+        shifted = bool((scanned >> 8) & 1)
+        if shifted:
+            user32.keybd_event(VK_SHIFT, 0, 0, 0)
         user32.keybd_event(vk, 0, 0, 0)
         user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+        if shifted:
+            user32.keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0)
         time.sleep(0.02)
 
 

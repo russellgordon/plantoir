@@ -118,15 +118,24 @@ drew them is gone rather than merely checked. `schedule` was the one such pictur
 same day from a native capture of Notification Center's window, and
 `DRAWN_BUT_NOT_DETECTABLE` in the test is empty and must stay so.
 
-**Windows keeps the same rule for its three figures, and still owes it for
-the rest (#380).** Since 2026-10-03 `hero_windows.py` photographs each window
-with `website/shots/windowshot/` — a small program that asks
-Windows.Graphics.Capture for ONE window by its handle and writes the frame
+**Windows keeps the same rule for every picture (#380, finished 2026-10-04).**
+Every `-windows` picture is ONE real window photographed by
+`website/shots/windowshot/` — a small program that asks
+Windows.Graphics.Capture for one window by its handle and writes the frame
 whole. The frame carries the window's own alpha, so the corners Windows 11
-rounds are already transparent: `rounded()` and the 1 DIP border crop are
-gone, and nothing is drawn. `hero-windows`, `colour-schemes-windows` and
-`light-and-dark-windows` are made only of such captures
-(`capture_windows.py --figures`), and their ids are `windows: true` again.
+rounds are already transparent: nothing is cropped, masked or drawn, and a
+single-window shot carries no shadow of its own (the page's stylesheet gives
+a Windows single-window picture its drop-shadow; `website/test_shot_shadows.py`).
+The figures (`hero`, `colour-schemes` and its dark version, `light-and-dark`,
+`two-maps`) are such captures placed whole. **One picture is still owed:**
+`schedule` — a Windows scheduled deploy posts no notification (the run deletes
+the job file its toast reads; measured on the installed 1.4.2 as well), and
+Windows' notifications are not windows Windows.Graphics.Capture can be given.
+It stays `windows: false`, named in `test_build_data.py` →
+`WINDOWS_PICTURE_OWED`, until both are settled. The gate judges every
+`-windows` picture (`corners.images_the_pages_show(..., include_windows=True)`
+in `test_native_corners.py` and in `build.py`'s `native_corners_refusal`);
+the interim list of three retaken figures, `WINDOWS_FIGURES_RETAKEN`, is gone.
 
 What was measured, on this project's Windows PC (Intel i5-8365U, UHD 620,
 Windows 11 build 26200, a 3840-wide remote session at 200%):
@@ -138,29 +147,55 @@ Windows 11 build 26200, a 3840-wide remote session at 200%):
   `windowshot` keeps the newest frame that arrives within 0.7 s of the first
   rather than waiting for a third (the first version did, and timed out).
 - The corner radius is 8 DIPs whatever the window's size, so as a fraction of
-  the window's height it runs from 0.0142 (640 DIPs tall) down to 0.0091 in
-  the assembled figures — below the mac's floor of 0.0155. `corners.py`
-  therefore judges a `-windows` picture against `SMALLEST_REAL_WINDOWS_RADIUS`
-  (0.004), and for those pictures the gate catches a SQUARE corner and little
-  else: the masks this replaced measured 0.0099 to 0.0128, inside the real
-  range. The rule is kept by the code that no longer draws.
-- The page windows of the two colour figures are Edge `--app=<address>`
-  windows — a title bar and the page — the counterpart of the mac's
-  `webwindow.swift`. Playwright's page screenshots, which those figures used
-  before, have no window at all.
+  the window's height it runs from 0.0142 (640 DIPs tall) down to 0.0083 for
+  a page window 848 DIPs tall scaled to 1700 px — below the mac's floor of
+  0.0155. `corners.py` therefore judges a `-windows` picture against
+  `SMALLEST_REAL_WINDOWS_RADIUS` (0.004), and for those pictures the gate
+  catches a SQUARE corner and little else: the masks this replaced measured
+  0.0099 to 0.0128, inside the real range. The rule is kept by the code that
+  no longer draws.
 
-Rejected: `PrintWindow` and a screen-region grab (both hand back a rectangle
-with the desktop in the corners, which is why the mask existed); a Python
-binding for Windows.Graphics.Capture (none installs on the Python 3.14 this
-PC runs, and the mac's helpers are small native programs too).
+How each kind of Windows picture is made (`website/README.md`, "Capturing on
+Windows", has the commands):
 
-Still owed: the single-window Windows shots (`assistant`, `coverage`,
-`progress`, `preview`, `search`, `site-*`, `site-phone`) are rendered content
-or page screenshots and are square. The gate judges only
-`corners.WINDOWS_FIGURES_RETAKEN` until they are retaken; then that list goes
-and `include_windows=True` takes over. `build.py --deploy` runs the same
-corner check as the test and refuses on any failing picture a Mac visitor is
-shown, and on any failing retaken Windows figure.
+- **The class sites** are Edge `--app=<address>` windows — a title bar and the
+  page — the counterpart of the mac's `webwindow.swift`, driven over the
+  DevTools protocol in the very window photographed. An anchor is scrolled to
+  only once the page has stopped moving, then CHECKED near the top of the page
+  column (the mac's rule from its anchored-scenes branch, read from the page
+  instead of by OCR), so `site-sch3u-chemistry` shows the reactions and ions
+  and `site-sch3u` the flowchart. Measured on the first run: an `--app` window
+  on a fresh profile drew its title bar dark and the page LIGHT in Windows'
+  dark mode (`--force-dark-mode` changed nothing), so the scheme is handed to
+  the page and the page loaded again with scroll restoration off — a plain
+  reload kept its scroll and the site's own opening scroll ran again, putting
+  `site-mcv4u` 300 px lower in one scheme than the other. `site-phone` is a
+  narrow Edge window (390 x 844 DIPs), captured whole: Windows has no phone
+  simulator, and the picture says so by being a window.
+- **The app's windows** are staged by the app: `Plantoir.exe --stage-scene`
+  (`MarketingShotCapturer.cs`) drives a REAL window to the caption's state and
+  holds it; `app_scenes_windows.py` photographs it. The preview, the progress
+  and the two coverage maps are real previews built by the launchers; the
+  assistant's plan is the app's own answer to a promise-card phrasing; the
+  schedule's sheet is the real Schedule a deploy sheet (its notification is
+  owed, above). Rejected: `RenderTargetBitmap` of a window's content (what
+  `--capture-marketing-shots` did until #380 — no window at all, so square
+  corners and no title bar, and the assistant's bubbles and buttons typed by
+  hand), and photographing the desktop region a window covers (desktop pixels
+  in the corners, the reason a mask was ever drawn).
+
+Rejected for the capture itself: `PrintWindow` and a screen-region grab (both
+hand back a rectangle with the desktop in the corners, which is why the mask
+existed); a Python binding for Windows.Graphics.Capture (none installs on the
+Python 3.14 this PC runs, and the mac's helpers are small native programs
+too).
+
+**Words that fit only the Mac picture.** Only the image is swapped for a
+Windows visitor, never the caption, so a Windows picture must show what the
+shared words say. Where the words name something only a Mac has — `schedule`'s
+alt says "a macOS notification" — `shots.json` carries a `windowsAlt`, which
+`build.py` writes as `data-win-alt` and `layout/base.html` swaps in exactly as
+it swaps the image. A Mac visitor's words never change.
 
 ---
 
@@ -206,34 +241,22 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
 
 ### Windows Capture (`website/shots/capture_windows.py`)
 
-The Windows capture harness is driven by Python and a built-in CLI mode in
-`Plantoir.exe`:
-
 ```powershell
-python website/shots/capture_windows.py            # every Windows picture
-python website/shots/capture_windows.py --figures  # only the hero and the two colour figures
+python website/shots/capture_windows.py                  # every Windows picture
+python website/shots/capture_windows.py --sites [ids]    # the class sites, in Edge windows
+python website/shots/capture_windows.py --figures        # the hero and the colour figures
+python website/shots/capture_windows.py --app [scenes]   # the app's scenes, How I Teach, the schedule
 ```
 
-`--figures` takes the desktop for about four minutes: it switches Windows
-between light and dark, opens Plantoir, Obsidian and Edge in turn, and puts
-the colour mode and Obsidian's list of vaults back. It builds `windowshot`
-the first time (.NET 9 SDK).
-
-Under the hood:
-1. **Autonomous Invocation**: Executes `Plantoir.exe --capture-marketing-shots <output-dir>`.
-2. **Demo Provisioning**: `MarketingShotCapturer.cs` (`windows-app/Plantoir/Services/MarketingShotCapturer.cs`)
-   creates an isolated demo workspace in `Path.Combine(Path.GetTempPath(), "PlantoirMarketingWorkspace")`
-   populated with `ENG2D`, `MCV4U`, and `SCH3U` from `support/example_content/`.
-3. **Staged Rendering**: For each appearance (`ElementTheme.Light` and `ElementTheme.Dark`),
-   the capturer configures and renders the exact visual states:
-   - `courses`: Main window with multi-course sidebar and Section 1 detail.
-   - `new-course`: `NewCourseDialog` populated with `ENG2D` and Ontario curriculum suggestions.
-   - `progress`: `TaskProgressView` demonstrating deploy milestone progression.
-   - `preview`: Live embedded Quartz preview container.
-   - `assistant`: 560×760 `AssistWindow` with prompt suggestion shelf, teacher/assistant message bubbles, and actionable plan card.
-4. **Direct WinUI 3 Capture**: Uses `RenderTargetBitmap` and `BitmapEncoder`
-   to render the visual tree at 2x HiDPI resolution directly to PNG files,
-   eliminating the need for desktop region cropping or OS-level theme changes.
+Each pass takes the desktop: it switches Windows between light and dark,
+opens Plantoir, Edge and Obsidian in turn, and puts the colour mode,
+Obsidian's list of vaults and every process it started back. It builds
+`windowshot` the first time (.NET 9 SDK), and uses the newest Plantoir build
+of the tree (`windows-app/Plantoir/bin/x64/Debug/...` after
+`dotnet build -p:Platform=x64`). The scenes and what each sets up are
+`SCENES` in `app_scenes_windows.py`; the working folders are made by the
+app (`--stage-scene provision`). Windows has no text read-back yet, so each
+picture is looked at; every scene refuses the wrong states it can detect.
 
 ---
 
@@ -326,17 +349,19 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 | `assistant` | Local AI assistant conversation & cards | `assistant-light.png/.webp`<br>`assistant-dark.png/.webp` | `assistant-windows-light.png/.webp`<br>`assistant-windows-dark.png/.webp` |
 | `site-eng2d` | Rendered class website (English) | `site-eng2d-light.png/.webp`<br>`site-eng2d-dark.png/.webp` | `site-eng2d-windows-light.png/.webp`<br>`site-eng2d-windows-dark.png/.webp` |
 | `site-mcv4u` | Rendered class website (Calculus math) | `site-mcv4u-light.png/.webp`<br>`site-mcv4u-dark.png/.webp` | `site-mcv4u-windows-light.png/.webp`<br>`site-mcv4u-windows-dark.png/.webp` |
-| `site-sch3u-chemistry` | Rendered class website (Chemistry: reactions, states, ions) — added 2026-09-27, macOS only | `site-sch3u-chemistry-light.png/.webp`<br>`site-sch3u-chemistry-dark.png/.webp` | none yet (`windows: false`) |
+| `site-sch3u-chemistry` | Rendered class website (Chemistry: reactions, states, ions) — added 2026-09-27; Windows since 2026-10-04 | `site-sch3u-chemistry-light.png/.webp`<br>`site-sch3u-chemistry-dark.png/.webp` | `site-sch3u-chemistry-windows-light.png/.webp`<br>`site-sch3u-chemistry-windows-dark.png/.webp` |
 | `site-sch3u` | Rendered class website (Chemistry) | `site-sch3u-light.png/.webp`<br>`site-sch3u-dark.png/.webp` | `site-sch3u-windows-light.png/.webp`<br>`site-sch3u-windows-dark.png/.webp` |
 | `site-phone` | Rendered class website on Mobile Viewport | `site-phone-light.png/.webp`<br>`site-phone-dark.png/.webp` | `site-phone-windows-light.png/.webp`<br>`site-phone-windows-dark.png/.webp` |
 | `coverage` | Curriculum expectation tag browser | `coverage-light.png/.webp`<br>`coverage-dark.png/.webp` | `coverage-windows-light.png/.webp`<br>`coverage-windows-dark.png/.webp` |
 | `search` | Quartz live search popover | `search-light.png/.webp`<br>`search-dark.png/.webp` | `search-windows-light.png/.webp`<br>`search-windows-dark.png/.webp` |
-| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp` (native captures since 2026-10-03, #380) |
+| `colour-schemes`| 3 course home pages, whole windows fanned out, own corners | `colour-schemes.png/.webp` | `colour-schemes-windows.png/.webp`, and `colour-schemes-windows-dark.png/.webp` for a dark page (2026-10-04) |
 | `light-and-dark`| One course home page, light and dark, two whole windows side by side | `light-and-dark.png/.webp` | `light-and-dark-windows.png/.webp` (native captures since 2026-10-03, #380) |
 
-Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
-`capture_windows.py` takes an id marked `windows: true`, and the section says
-"On the Mac" while `site.json → availability` says so):
+Added for v1.4.0 (macOS first; every one has had its Windows picture since
+2026-10-04, #370 — `app_scenes_windows.py`, scene names as below with the
+Windows `--stage-scene` names `map-ontario`, `map-college-board` and
+`schedule-sheet` for the parts; `schedule` alone is still owed — see "The one
+rule"):
 
 | ID | Subject | Scene(s) |
 |---|---|---|

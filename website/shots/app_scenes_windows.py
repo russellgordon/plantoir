@@ -117,6 +117,28 @@ def end_everything_naming(folder: Path, app_pid: int | None) -> None:
                 pass
 
 
+# The section each preview-building scene serves, so its preview is ended
+# with the launcher's own stop afterwards: a preview's server runs from the
+# builds folder and does not name the working folder, so ending "anything
+# naming the folder" left it holding the port, and the next scene's preview
+# met it (measured: map-college-board refused after map-ontario).
+SERVES: dict[str, tuple[str, int]] = {
+    "progress": ("ENG2D", 2), "preview": ("ENG2D", 1),
+    "map-ontario": ("ICS3U", 1), "map-college-board": ("ICS3U", 1), "both-curricula": ("ICS3U", 1),
+}
+
+
+def stop_preview(exe: Path, folder: Path, code: str, section: int) -> None:
+    import os
+    runtime = exe.parent / "runtime"
+    environment = dict(os.environ)
+    if (runtime / "manifest.json").exists():
+        environment["PLANTOIR_RUNTIME"] = str(runtime)
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                    str(folder / "preview.ps1"), code, str(section), "--stop"],
+                   cwd=folder, env=environment, capture_output=True, text=True, timeout=180)
+
+
 def stage(exe: Path, scene: str, theme: str, folder: Path, extra: list[str] | None = None,
           patience: float = 120.0) -> tuple[int, str, Path]:
     """Start the app on one scene; wait for its ready file. (pid, outcome, state dir)."""
@@ -165,6 +187,10 @@ def ensure_folders(exe: Path, folders: set[Path]) -> None:
         provision(exe, DEMO, DEMO_COURSES)
     if MARKETING in folders:
         provision(exe, MARKETING, MARKETING_COURSES, MARKETING_REFERENCE)
+        # Where ICS3U and ICS4U deploy (their folder destination): a sheet
+        # that offers to deploy there refuses while it does not exist, and the
+        # first schedule-sheet picture showed exactly that warning.
+        (MARKETING / "Websites" / "ICS4U").mkdir(parents=True, exist_ok=True)
         import marketing_folder
         report = marketing_folder.Report()
         marketing_folder.add_how_i_teach(MARKETING / "courses" / marketing_folder.CURRICULUM_COURSE, report)
@@ -178,8 +204,30 @@ def bring_forward(hwnd: int) -> None:
     desk.place(hwnd, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
 
 
+def builds_folder_of(folder: Path) -> Path | None:
+    """The app's builds folder for a working folder, found by the marker it
+    writes there (`working-folder.txt`)."""
+    import os
+    root = Path(os.environ["LOCALAPPDATA"]) / "Plantoir" / "builds"
+    for marker in root.glob("*/working-folder.txt"):
+        try:
+            if Path(marker.read_text(encoding="utf-8").strip()) == folder:
+                return marker.parent
+        except OSError:
+            continue
+    return None
+
+
 def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Path:
     scene, folder = SCENES[identifier]
+    if scene == "progress":
+        # The progress picture is a build caught part-way, and the build is
+        # then ended; a scaffold ended part-way refuses the next build ("the
+        # Explorer's hide filter could not be established" — the dark pass of
+        # the first full run). So the section's build starts from nothing.
+        builds = builds_folder_of(folder)
+        if builds is not None:
+            shutil.rmtree(builds / "work" / SERVES[scene][0] / f"section{SERVES[scene][1]}", ignore_errors=True)
     desk.announce(f"{identifier}, {theme}")
     patience = 25 * 60 if scene in ("preview", "map-ontario", "map-college-board", "both-curricula") else 180
     pid, outcome, state = stage(exe, scene, theme, folder, patience=patience)
@@ -194,6 +242,8 @@ def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Pat
         return desk.photograph(windows[0], parts / f"{identifier}-windows-{theme}.png")
     finally:
         end_everything_naming(folder, pid)
+        if scene in SERVES:
+            stop_preview(exe, folder, *SERVES[scene])
         shutil.rmtree(state, ignore_errors=True)
 
 
@@ -261,7 +311,10 @@ def capture_how_i_teach(parts: Path | None = None) -> None:
     original = desk.OBSIDIAN_CONFIG.read_text(encoding="utf-8") if desk.OBSIDIAN_CONFIG.exists() else None
     settings = vault / ".obsidian"
     had_settings = settings.exists()
-    kept = {name: (settings / name).read_bytes() for name in ("appearance.json", "app.json")
+    # workspace.json too: Obsidian reopens the vault on the page it last
+    # showed, whatever the address asks for (measured: "index"), so it is set
+    # aside for the run and put back after.
+    kept = {name: (settings / name).read_bytes() for name in ("appearance.json", "app.json", "workspace.json")
             if (settings / name).exists()}
     was_apps, was_system = desk.read_theme()
     try:
@@ -280,9 +333,12 @@ def capture_how_i_teach(parts: Path | None = None) -> None:
             (settings / "app.json").write_text(json.dumps({"livePreview": True, "defaultViewMode": "source",
                                                            "propertiesInDocument": "hidden",
                                                            "readableLineLength": True}), encoding="utf-8")
+            (settings / "workspace.json").unlink(missing_ok=True)
             desk.announce(f"how-i-teach, {theme}")
-            address = ("obsidian://open?vault=" + urllib.parse.quote(vault.name)
-                       + "&file=" + urllib.parse.quote("How I Teach"))
+            # By PATH, never by vault name: this PC knows several vaults
+            # called ICS3U, and asking by name opened another one (whose
+            # "How I Teach" did not exist) on the first runs.
+            address = "obsidian://open?path=" + urllib.parse.quote(str(vault / "How I Teach.md"))
             process = subprocess.Popen([str(desk.OBSIDIAN_EXE), address])
             try:
                 hwnd = desk.wait_for_window(lambda: desk.window_titled("Obsidian", pid=process.pid), seconds=45)
@@ -290,7 +346,7 @@ def capture_how_i_teach(parts: Path | None = None) -> None:
                 scale = desk.scale_factor()
                 desk.place(hwnd, 20, 20, round(1280 * scale), round(800 * scale))
                 time.sleep(1.5)
-                if "How I Teach" not in desk.window_title(hwnd):
+                if not desk.window_title(hwnd).startswith("How I Teach - ICS3U"):
                     raise SystemExit(f"Obsidian is showing {desk.window_title(hwnd)!r}, not How I Teach")
                 part = desk.photograph(hwnd, parts / f"how-i-teach-windows-{theme}.png")
             finally:
@@ -308,7 +364,7 @@ def capture_how_i_teach(parts: Path | None = None) -> None:
         if not had_settings:
             shutil.rmtree(settings, ignore_errors=True)
         else:
-            for name in ("appearance.json", "app.json"):
+            for name in ("appearance.json", "app.json", "workspace.json"):
                 if name in kept:
                     (settings / name).write_bytes(kept[name])
                 else:
@@ -444,6 +500,33 @@ def capture_schedule_notifications(exe: Path, parts: Path | None = None) -> None
         print("   Windows colour mode put back")
 
 
+def retake(exe: Path, pairs: list[tuple[str, str]], parts: Path | None = None) -> None:
+    """Take again only the named pictures, e.g. progress in dark."""
+    desk.make_dpi_aware()
+    parts = parts or desk.SCRATCH / "parts-app-windows"
+    was_apps, was_system = desk.read_theme()
+    try:
+        for identifier, theme in pairs:
+            desk.write_theme(0 if theme == "dark" else 1, 0 if theme == "dark" else 1)
+            part = photograph_scene(exe, identifier, theme, parts)
+            if identifier not in PARTS_ONLY:
+                destination = IMAGE_DIR / part.name
+                shutil.copyfile(part, destination)
+                prepare(destination, WIDEST_WINDOW_PIXELS)
+                print(f"   saved {destination.name} + WebP")
+            assemble(parts, theme)
+    finally:
+        desk.write_theme(was_apps, was_system)
+        print("   Windows colour mode put back")
+
+
 if __name__ == "__main__":
     from capture_windows import find_or_build_plantoir_exe
-    capture_app_scenes(find_or_build_plantoir_exe(), sys.argv[1].split(",") if len(sys.argv) > 1 else None)
+    if len(sys.argv) > 2 and sys.argv[1] == "--retake":
+        retake(find_or_build_plantoir_exe(), [tuple(pair.split(":")) for pair in sys.argv[2].split(",")])
+    elif len(sys.argv) > 1 and sys.argv[1] == "--how-i-teach":
+        capture_how_i_teach()
+    elif len(sys.argv) > 1 and sys.argv[1] == "--schedule":
+        capture_schedule_notifications(find_or_build_plantoir_exe())
+    else:
+        capture_app_scenes(find_or_build_plantoir_exe(), sys.argv[1].split(",") if len(sys.argv) > 1 else None)

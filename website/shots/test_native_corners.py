@@ -15,11 +15,9 @@ picture still on the site, and the rule itself lives in the code that no
 longer draws. How a corner is read, and the
 measurements behind the thresholds: `corners.py`.
 
-Of the Windows pictures (`-windows-`), the three figures retaken as whole
-Windows.Graphics.Capture pictures are judged (#380: hero, colour-schemes,
-light-and-dark — `corners.WINDOWS_FIGURES_RETAKEN`), against Windows' own
-measurements. The single-window Windows shots are still owed the same retake
-and are not judged until they have it (see website/SCREENSHOTS.md).
+Every Windows picture (`-windows-`) a Windows visitor is shown is judged too,
+against Windows' own measurements (#380: since 2026-10-04 every one is a whole
+Windows.Graphics.Capture picture of a real window; website/SCREENSHOTS.md).
 
 Stdlib and Pillow only; no app, no network.
 
@@ -57,10 +55,13 @@ class CommittedPictures(unittest.TestCase):
             found.extend(corners.corner_problems(picture))
         self.assertEqual(found, [], "\n" + "\n".join(found))
 
-    def test_the_windows_figures_retaken_natively_keep_their_corners(self):
-        pictures = corners.windows_figures_retaken(REPO / "site" / "img")
-        # Two static figures and the hero in light and dark, each PNG and WebP.
-        self.assertEqual(len(pictures), 8, [picture.name for picture in pictures])
+    def test_every_windows_picture_keeps_its_windows_corners(self):
+        everything = corners.images_the_pages_show(REPO / "website", REPO / "site" / "img", include_windows=True)
+        pictures = [picture for picture in everything if corners.is_windows_picture(picture.name)]
+        # Every id is taken on Windows (#380, #370): far more than the three
+        # figures this test used to name. A list that shrank would mean the
+        # gate had stopped reading them.
+        self.assertGreaterEqual(len(pictures), 80, [picture.name for picture in pictures])
         found: list[str] = []
         for picture in pictures:
             found.extend(corners.corner_problems(picture))

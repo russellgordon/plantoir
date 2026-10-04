@@ -1956,32 +1956,40 @@ public sealed partial class SectionDetailView : UserControl
     /// For the marketing pictures only (<c>--stage-scene two-maps</c>,
     /// <c>both-curricula</c>): show one page of the REAL preview this view is
     /// already serving, scrolled to <paramref name="anchor"/>'s heading when
-    /// one is given. True once the page has loaded and, with an anchor, its
-    /// heading is near the top of the page; false otherwise, so the scene
+    /// one is given. Null once the page has loaded and, with an anchor, its
+    /// heading is near the top of the page (or, for a heading at the very end
+    /// of a page too short to scroll it there, wholly in view with the page at
+    /// its bottom); otherwise why not, so the scene
     /// refuses rather than photographing the wrong page. (This replaced
     /// StagePreviewForCapture, which laid a PICTURE of a site where the
     /// preview goes, with nothing serving it.)
     /// </summary>
-    public async Task<bool> ShowPreviewPageForCaptureAsync(string path, string? anchor = null)
+    public async Task<string?> ShowPreviewPageForCaptureAsync(string path, string? anchor = null)
     {
-        if (_previewUrl is null) return false;
-        var loaded = new TaskCompletionSource<bool>();
-        void Done(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args) => loaded.TrySetResult(args.IsSuccess);
+        if (_previewUrl is null) return "no preview is being served";
+        var target = new Uri(_previewUrl, path);
+        var loaded = new TaskCompletionSource<string?>();
+        void Done(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (sender.Source is { } shown && !string.Equals(shown.AbsolutePath, target.AbsolutePath, StringComparison.OrdinalIgnoreCase)) return;
+            loaded.TrySetResult(args.IsSuccess && args.HttpStatusCode is 0 or 200 ? null : $"{target} answered {args.HttpStatusCode} ({args.WebErrorStatus})");
+        }
         Preview.NavigationCompleted += Done;
         try
         {
-            Preview.Source = new Uri(_previewUrl, path);
-            if (await Task.WhenAny(loaded.Task, Task.Delay(TimeSpan.FromSeconds(30))) != loaded.Task || !loaded.Task.Result) return false;
+            Preview.Source = target;
+            if (await Task.WhenAny(loaded.Task, Task.Delay(TimeSpan.FromSeconds(45))) != loaded.Task) return $"{target} did not finish loading";
+            if (loaded.Task.Result is { } failed) return failed;
         }
         finally { Preview.NavigationCompleted -= Done; }
         await Task.Delay(TimeSpan.FromSeconds(4));   // mathematics and diagrams finish drawing
-        if (anchor is null) return true;
+        if (anchor is null) return null;
         string id = System.Text.Json.JsonSerializer.Serialize(anchor);
         await Preview.CoreWebView2.ExecuteScriptAsync(
             $"(() => {{ const h = document.getElementById({id}); if (h) {{ h.scrollIntoView({{block: 'start'}}); window.scrollBy(0, -24); }} }})()");
         await Task.Delay(1500);
         string top = await Preview.CoreWebView2.ExecuteScriptAsync(
-            $"(() => {{ const h = document.getElementById({id}); if (!h) return -1; const b = h.getBoundingClientRect(); return (b.top >= -2 && b.top < window.innerHeight * 0.3 && b.left < window.innerWidth * 0.6) ? 1 : 0; }})()");
-        return top.Trim() == "1";
+            $"(() => {{ const h = document.getElementById({id}); if (!h) return -1; const b = h.getBoundingClientRect(); const left = b.left < window.innerWidth * 0.6; const end = Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight - 2; return ((b.top >= -2 && b.top < window.innerHeight * 0.3 && left) || (end && b.top >= 0 && b.bottom <= window.innerHeight && left)) ? 1 : 0; }})()");
+        return top.Trim() == "1" ? null : $"the heading #{anchor} is not at the top of {target}";
     }
 }

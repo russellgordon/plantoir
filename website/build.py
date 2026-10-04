@@ -265,6 +265,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
 
     joined = "\n".join(sources)
     win_src_attr = f' data-win-src="{up}img/{win_prefix}light.png"' if has_windows else ""
+    # `windowsAlt` in shots.json: the alt text for the Windows picture, where
+    # the shared one names something only the Mac picture shows (schedule's
+    # macOS notification). base.html swaps it exactly as it swaps the image,
+    # so a Mac visitor's words never change.
+    if has_windows and shot.get("windowsAlt"):
+        win_src_attr += f' data-win-alt="{shot["windowsAlt"]}"'
 
     return (
         f'<figure class="{classes_html}">\n'
@@ -949,10 +955,8 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     question (`shots/corners.py`, about 6 s, Pillow only) and refuses on any
     failing picture, whoever made it.
 
-    Of the `-windows-` pictures, the same scope as the test: the three
-    figures Windows has retaken as whole native captures — hero,
-    colour-schemes and light-and-dark (#380) — are judged; the square
-    single-window shots are still Windows' to retake and are not.
+    Every `-windows-` picture a Windows visitor is shown is judged too, the
+    same scope as the test: since #380 each is a whole native capture.
     """
     sys.path.insert(0, str(website / "shots"))
     try:
@@ -960,10 +964,9 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     except ImportError as error:
         return (f"Not deploying: the corner check needs Pillow ({error}). "
                 f"Install it (python3 -m pip install pillow) and deploy again.")
-    pictures = corners.images_the_pages_show(website, image_dir)
+    pictures = corners.images_the_pages_show(website, image_dir, include_windows=True)
     if not pictures:
         return f"Not deploying: no pictures found in {image_dir} to check."
-    pictures = pictures + corners.windows_figures_retaken(image_dir)
     problems: list[str] = []
     for picture in pictures:
         problems.extend(corners.corner_problems(picture))

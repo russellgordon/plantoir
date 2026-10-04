@@ -239,6 +239,15 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
 
 
+# A Windows picture that cannot be taken yet, each with what blocks it. Every
+# other id must be `windows: true` (Russell, 2026-10-04).
+WINDOWS_PICTURE_OWED = {
+    "schedule": "the Windows scheduled deploy posts no notification (ScheduledRun deletes the job PostFor "
+                "reads; drafts/schedule-toast-issue.md), and the notification is no window Windows.Graphics."
+                "Capture can be given",
+}
+
+
 class WindowsSwapTests(unittest.TestCase):
 
     def test_windows_false_shows_the_mac_picture_to_everybody(self):
@@ -269,6 +278,34 @@ class WindowsSwapTests(unittest.TestCase):
                 self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
             finally:
                 build.IMAGE_DIR = saved
+
+    def test_every_shot_has_its_windows_picture(self):
+        # Russell, 2026-10-04: "Every screenshot must be windows." No id may
+        # show a Windows visitor the Mac picture, so every one is marked
+        # `windows: true` and its files are there (#380, #370).
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        for shot in manifest["shots"]:
+            if shot["id"] in WINDOWS_PICTURE_OWED:
+                # Still owed, by name, and only while it is still false.
+                self.assertIs(shot.get("windows"), False, shot["id"] + " has its picture now: take it off WINDOWS_PICTURE_OWED")
+                continue
+            with self.subTest(shot=shot["id"]):
+                self.assertIs(shot.get("windows"), True)
+                html = build.picture_element(shot, [], "", "./")
+                self.assertIn("data-win-src", html)
+
+    def test_a_windows_alt_is_swapped_only_with_a_windows_picture(self):
+        # `windowsAlt`: words for the Windows picture where the shared alt
+        # names something only the Mac picture shows. The Mac's alt is
+        # untouched; base.html swaps data-win-alt as it swaps the image.
+        shot = {"id": "preview", "alt": "the mac words", "caption": "c", "windowsAlt": "the windows words"}
+        html = build.picture_element(shot, [], "", "./")
+        self.assertIn('alt="the mac words"', html)
+        self.assertIn('data-win-alt="the windows words"', html)
+        shot["windows"] = False
+        self.assertNotIn("data-win-alt", build.picture_element(shot, [], "", "./"))
+        layout = (build.WEBSITE / "layout" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("data-win-alt", layout)
 
 
 class AwaitingCaptureTests(unittest.TestCase):
