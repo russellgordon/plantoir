@@ -1,22 +1,30 @@
 # Director prompt: Plantoir v1.4.3 on Windows
 
-**Temporary.** Written on the mac, 2026-10-03, for the Windows session that
-brings Windows up to v1.4.3 after the macOS cut. Paste everything below the
+**Temporary.** Written on the mac, 2026-10-03, and brought up to date on
+2026-10-04 AFTER the macOS cut of v1.4.3, for the Windows session that brings
+Windows up to v1.4.3. Paste everything below the
 rule as the opening message of a Claude Code session in the repository clone
 on the Windows PC, running on Fable, on a fresh pull of `dev`. Delete this
 file in the branch that ships Windows 1.4.3; the issues stay the record.
 
 ---
 
-You are the DIRECTOR of the Windows half of Plantoir v1.4.3. The mac was to
-cut v1.4.3 on its own the night before. **If the hand-over says the cut
-stopped, read `CUT-STOPPED.md` first** (the mac run writes it beside its
-hand-over): it names the failed step and what is left. Otherwise check that
-the cut happened: `git tag` has `v1.4.3`, and `website/site.json` shows version
-1.4.3 with the Windows download card pinned to 1.4.2. If the tag is not there,
-the mac cut did not finish: say so to Russell before anything else, and do the
-issue work but not the release. Everything below about the tag, the pinned
-card and the test to change back holds only once the cut has happened.
+You are the DIRECTOR of the Windows half of Plantoir v1.4.3. **The mac cut
+v1.4.3 on 2026-10-04 and it is complete**: tag `v1.4.3` (on `ddfbf89c`), the
+release with the mac's DMG and three deltas, the mac update feed, and
+plantoir.app serving 1.4.3 with the Windows download card PINNED to 1.4.2.
+Check it before anything else (`git tag` has `v1.4.3`; `website/site.json`
+shows version 1.4.3 and `downloads[1].pinned` is `"1.4.2"`); if either is not
+so, stop and tell Russell. The last section of this file has the facts.
+
+**Before the session starts (Russell):** on the mac, the session's permission
+classifier refused pushes, local merges, the release and the site deploy until
+allow rules were added by hand, and a sentence of permission in chat did not
+clear it. Add the PC's equivalents through `/permissions` first: `git push`,
+`git merge`, `git commit`, `git fetch`, `git -C`, `git tag`, `git checkout`,
+`git branch`, `git worktree`, `gh issue`, `gh release`, `python
+website/build.py`, the publish and verify-deploy scripts, and writing in the
+run folder.
 
 Your job is the open `windows` issues on the milestone **v1.4.3**, then
 Windows JOINING the existing v1.4.3 release. Russell is at the PC for this
@@ -117,14 +125,14 @@ edited; do not rewrite them.
 
 ## The work
 
-The issue numbers below are what existed when this was written. The mac's
-overnight run opened more `windows` issues on v1.4.3; sort each into the
-bundle whose files it shares when you write the plan.
+The table lists every `windows` issue open on v1.4.3 when the mac cut was
+made (2026-10-04). Check the list again when you start; sort anything new
+into the bundle whose files it shares.
 
-| | Bundle | Issues known on 2026-10-03 | Notes |
+| | Bundle | Issues open on 2026-10-04 | Notes |
 |---|---|---|---|
 | A | The assistant | #424, #432, #430, #436 (the mac's bundle A: #433, #412, #425) | #432 is unblocked: the rows, the scripted cut-off case (`given.modelReply`) and the two daylight-saving rows are on `dev`. Read the mac's comment on #432. |
-| B | Rules, writers and wording | #431, #437 (the mac's bundle C: #408, #377), #438 (the mac's bundle D: `{machine}`, the contract cases, `deploy.ps1`'s lines) | Mostly MATCH. |
+| B | Rules, writers and wording | #431, #437 (the mac's bundle C: #408, #377), #438 (the mac's bundle D: `{machine}`, the contract cases, `deploy.ps1`'s lines), #441 (the launcher lines, and the notification, that still say "published" for a deploy: they move with the contract and BOTH apps, so it needs a `mac` issue for the mac's half) | Mostly MATCH. |
 | C | The updater and the release | #428, then joining the release | The release steps wait for Russell's word. |
 | – | Loose ends | #426, #427, #380, #370 | See below. |
 
@@ -173,9 +181,11 @@ What was decided on the mac side that you need in order to brief:
   in the mac's comment on #432).
 - **#431.** Cases F13 and F14 in `gradedFolders.floor` now LIST "All Classes",
   so the runner's null-the-class-folder workaround goes (#438).
-- **Decisions waiting on Russell, not work:** #439 (an orphaned scheduled
-  deploy after a re-set, mac) and #440 (`add_next_class` `unit`/`days`).
-  #435 is two Mac pictures awaiting capture and owes Windows nothing.
+- **Decided by Russell on 2026-10-04, neither is Windows work today:** #439
+  (a deploy refuses while that section's scheduled run is still working; mac,
+  milestone v1.4.4) and #440 (`add_next_class` `unit`/`days` is to be
+  REDESIGNED in a later release; nothing of it is on `dev`). #435 is closed:
+  every Mac picture on plantoir.app was retaken.
 - **Loose ends.** #380 and #370 were part done with Windows 1.4.2: read each
   one's last comment, finish what is left or say on the issue why it is
   done, and close it; when the milestone "Windows: parity with mac v1.4.0"
@@ -236,10 +246,22 @@ Prepare all of it, then do it on Russell's word. `RELEASING.md` and the
   for `windows.xml`; if it has landed, run it, and if not, verify the two
   signatures by hand as `RELEASING.md` says.
 - UNPIN the Windows download card (`website/site.json` →
-  `downloads[1].pinned` back to `null`) and change
+  `downloads[1].pinned` back to `null`) and, in the same commit, change
   `website/test_build_data.py` →
-  `test_neither_card_is_pinned_while_the_newest_release_has_both_installers`
-  back in the same commit.
+  `test_the_windows_card_is_pinned_while_the_newest_release_has_only_the_mac_installer`
+  back to `test_neither_card_is_pinned_while_the_newest_release_has_both_installers`,
+  asserting both pins are `None` (its comment says so).
+- **The release notes, on Russell's rule of 2026-10-03/04.** An item carries
+  "(Mac)" or "(Windows)" ONLY while it exists on one platform. Nothing is
+  written that highlights one platform having been behind the other: no
+  "Windows catches up" heading, no "the Mac already has this", no
+  after-the-fact notes on older releases. So when Windows joins: edit the
+  v1.4.3 notes on GitHub, take "(Mac)" off every item Windows now has too,
+  replace the opening line ("This release is for the Mac. The Windows download
+  … remains version 1.4.2 for now.") with one plain line for both, add the
+  Windows files to the Downloads table with their sizes and SHA-256, and add a
+  "(Windows)" item only for something that truly is Windows-only. The notes
+  the mac wrote are in the release itself; read them there.
 - `dev` into `main`, the site deployed from `main`
   (`python website/build.py --deploy`, then `--verify-deploy`: both feeds
   live and signed as committed, both cards on 1.4.3), and `main` merged back
@@ -255,18 +277,31 @@ what was left open and why, what the mac now owes (each as a `mac` issue),
 what you closed or borrowed on the PC and put back, and that "PT - Dev" is
 built and not launched.
 
-## What the mac run of 2026-10-03/04 changed
+## What the mac run of 2026-10-03/04 changed, and the cut
 
-Written 2026-10-04 by the mac's release-hygiene branch, after the run landed.
+Written 2026-10-04 on the mac, after the cut.
 
-- Bundles A, C, D and B and the screenshots landed on `dev`.
-- #432 is unblocked: the mac's rows landed as `d83fb50d`.
-- Hand-backs: **#436** (bundle A; it also owes the "preview closed for a
-  deploy" trail event, which its body does not name), **#437** (bundle C),
-  **#438** (bundle D).
-- Decision issues: **#439** and **#440**. `add_next_class` `unit`/`days` is
-  PARKED, not landed, and Windows is asked to measure whether its model sends
-  `unit: "next"`.
-- **#435**: two scenes (`schedule`, `how-i-teach`) awaiting capture on the mac.
-- The mac cut pins the Windows download card to 1.4.2 until Windows joins
-  the release. On joining: unpin it and change its test back (above).
+- **The release:** https://github.com/russellgordon/plantoir/releases/tag/v1.4.3
+  — tag `v1.4.3` on `ddfbf89c`; `Plantoir-macOS.dmg` 411,790,589 bytes, SHA-256
+  `28bad51d83f05b230c766adee8504ab07d095e3ca56c6c28e492436ee43f2500`; deltas
+  `Plantoir3160-2827.delta`, `-2766.delta`, `-2653.delta`. `macos.xml` is live
+  and signed as committed; `windows.xml` and its signature are byte for byte
+  what Windows 1.4.2 shipped. plantoir.app serves 1.4.3 (Released October
+  2026), with the Windows card pinned to 1.4.2.
+- **On `dev`, all gated on the mac** (full suite 2640 tests, 0 failures;
+  `verify.sh`; `verify-deploy.sh` 53 passed, 0 failed, 0 skipped): the mac's
+  bundles A, C, D and B (parts 2 to 4 of #411), the screenshots, the sweep's
+  fixes. GUI rows 706 to 711.
+- **#432 is unblocked:** the mac's rows landed as `d83fb50d`; its comment
+  lists them and asks Windows to measure `unit: "next"`.
+- **Hand-backs:** #436 (bundle A; it also owes the "preview closed for a
+  deploy" trail event, see the comment on it), #437 (bundle C), #438 (bundle
+  D), #441 (words: "published" said for a deploy).
+- **Contract cases that are red on Windows until matched:**
+  `workLeases.declining.outsideChanges`, `publishPlanNaming`, the new
+  `hideIsUnpublish` rows (16 accepted, 35 refused), the ninth
+  `addingKeysToAPage` case, the three `{machine}` sentences, and the
+  `activityTrail.mustRecord` entries added or freed of `appliesOn` (123).
+- **Screenshots:** every Mac window picture now carries its whole natural
+  shadow and the page adds none to it; Windows pictures were not retaken and
+  keep the page's drawn shadow on single-window figures only.
