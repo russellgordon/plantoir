@@ -89,7 +89,6 @@ dwmapi = ctypes.windll.dwmapi
 
 SWP_SHOWWINDOW = 0x0040
 SW_RESTORE = 9
-DWMWA_EXTENDED_FRAME_BOUNDS = 9
 SPI_GETWORKAREA = 0x0030
 HWND_BROADCAST = 0xFFFF
 WM_SETTINGCHANGE = 0x001A
@@ -231,18 +230,6 @@ def reveal_active_file() -> None:
     time.sleep(0.8)
     press_chord(VK_RETURN)
     time.sleep(1.2)
-
-
-def frame_bounds(hwnd: int) -> tuple[int, int, int, int]:
-    """The VISIBLE frame. GetWindowRect includes an invisible resize border."""
-    rect = wintypes.RECT()
-    dwmapi.DwmGetWindowAttribute(
-        wintypes.HWND(hwnd),
-        wintypes.DWORD(DWMWA_EXTENDED_FRAME_BOUNDS),
-        ctypes.byref(rect),
-        ctypes.sizeof(rect),
-    )
-    return rect.left, rect.top, rect.right, rect.bottom
 
 
 def park_pointer() -> None:
@@ -514,7 +501,8 @@ def capture_page(url: str, title_fragment: str, destination: Path) -> Path:
 
     The colour figures are about the SITES, and three toolbars read as three
     browsers -- the mac uses a plain window for the same reason
-    (`webwindow.swift`). Edge's `--app=` window is this side's: a title bar and
+    (`webwindow.swift`). The window is FOUND by the page's title, so close any
+    other window showing the same page first, or it may be the one photographed. Edge's `--app=` window is this side's: a title bar and
     the page, nothing else, and its own edge is the picture's edge. The
     appearance is the machine's, so the caller switches Windows first.
     """
@@ -552,6 +540,7 @@ def capture_page(url: str, title_fragment: str, destination: Path) -> Path:
 def capture_colour_parts(parts: Path, courses: list[dict]) -> None:
     """The home pages the two colour figures are made of: every course in
     light, and the first course in dark as well."""
+    make_dpi_aware()
     was_apps, was_system = read_theme()
     try:
         for theme in ("light", "dark"):

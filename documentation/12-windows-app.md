@@ -835,10 +835,11 @@ otherwise only python's working directory.
 
 ### Real input goes where the pointer is: click the rectangle, with the window in front (2026-10-03)
 
-Most of the suite acts through UI Automation patterns (Invoke, Toggle,
-Select), which reach the app whatever is in front of it. A few tests send
-REAL input — a mouse click and typed keys in the Copy a Page picker — and
-real input goes to whatever window is under the pointer and in front.
+Much of the suite acts through UI Automation patterns (Invoke, Toggle,
+Select), which reach the app whatever is in front of it. FlaUI's
+`element.Click()` and `RightClick()` are different: they send REAL mouse
+input to the element's "clickable point", and typed keys follow the focus —
+so both go to whatever window is under the pointer and in front.
 
 On 2026-10-03 the suite ran 41 of 44 on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), reached over a
 3840-pixel-wide remote session at 200% scale. All three failures were Copy a
@@ -852,8 +853,8 @@ it (and, with the terminal minimised, into Windows Search, which opened Edge).
 The dialog itself was drawn correctly; the product was not at fault. The same
 tests had passed 13 of 13 two days earlier on a smaller desktop.
 
-So: **a test that sends real input calls `DrivenApp.ClickMiddleOf(element)`,
-never `element.Click()`.** It brings the window to the front first
+So: **a test that clicks and then TYPES calls
+`DrivenApp.ClickMiddleOf(element)`, never `element.Click()`.** It brings the window to the front first
 (`BringToFront`, which joins the input queue of the window that is in front —
 Windows refuses a plain `SetForegroundWindow` from a process that is not —
 and throws, naming the window in the way, rather than typing into it), then
@@ -862,8 +863,14 @@ pixels at every scale. Rejected: FlaUI's `Window.SetForeground()` and
 `Focus()` (measured: the terminal stayed in front); minimising the terminal
 from the runner (the click still went to the doubled point).
 
-Not checked: whether `RightClick()` on a sidebar row can be doubled the same
-way. It was not in these runs (the menu it opens was found each time).
+**Only the two Copy a Page pickers were changed.** About twenty other
+`Click()` and `RightClick()` calls remain (the helpers in `DrivenApp.cs`,
+`AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`, `EndToEnd.cs` and
+others), none with `BringToFront`. They passed in the 44 of 44 run on the same
+200% session, so the doubled point is not general — it was measured on the
+picker (an AutoSuggestBox inside a dialog) and nowhere else — but nothing
+proves the others cannot meet it. Moving them to `ClickMiddleOf` is owed
+(the `windows` issue opened with this release).
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
