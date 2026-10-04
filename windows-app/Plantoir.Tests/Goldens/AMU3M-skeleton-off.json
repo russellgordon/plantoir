@@ -1,0 +1,54 @@
+{
+  "shared_folders": [
+    "Concepts",
+    "Discussions",
+    "Examples",
+    "Exercises",
+    "Ontario Curriculum",
+    "Portfolios",
+    "Recaps",
+    "Setup",
+    "Style",
+    "Tasks",
+    "Tutorials"
+  ],
+  "shared_files": [
+    "Extra Help.md",
+    "Learning Goals.md"
+  ],
+  "per_section_folders": [
+    "All Classes"
+  ],
+  "per_section_files": [
+    "Private Notes.md",
+    "Scratch Page.md",
+    "Key Links.md"
+  ],
+  "hidden": [
+    "Media",
+    "Ontario Curriculum",
+    "Extra Help.md",
+    "Learning Goals.md",
+    "Private Notes.md",
+    "Scratch Page.md",
+    "Key Links.md"
+  ],
+  "expandable": [
+    "Concepts",
+    "Discussions",
+    "Examples",
+    "Exercises",
+    "Portfolios",
+    "Recaps",
+    "Setup",
+    "Style",
+    "Tasks",
+    "Tutorials"
+  ],
+  "prepopulate_example_content": false,
+  "use_skeleton": false,
+  "include_curriculum_pages": false,
+  "graded_folders": [
+    "Tasks"
+  ]
+}

@@ -67,6 +67,48 @@ public sealed class PublishPlan
     /// <summary>Backward-compatible dangling links list.</summary>
     public IReadOnlyList<DanglingLink> Dangling { get; init; } = Array.Empty<DanglingLink>();
 
+    /// <summary>
+    /// Linked classes a PUBLISH stopped at (#203 / mac #173): reached by a
+    /// link, neither published nor walked through.
+    /// </summary>
+    public IReadOnlyList<PlannedPage> StoppedAtClasses { get; init; } = Array.Empty<PlannedPage>();
+
+    /// <summary>
+    /// Pages that would change but the writer DECLINES (#308, the mac's #186):
+    /// their settings have no column-0 place for a new line, so nothing will be
+    /// written. Asked of the real writer at plan time, and kept out of
+    /// <see cref="Changes"/> so the card never promises them.
+    /// </summary>
+    public IReadOnlyList<PlannedPage> CannotBeAddedTo { get; init; } = Array.Empty<PlannedPage>();
+
+    /// <summary>The sentence naming <see cref="CannotBeAddedTo"/>, or null.</summary>
+    public string? CannotBeAddedToSentence => CannotBeAddedTo.Count == 0
+        ? null
+        : AssistWording.PagesWhoseSettingsCannotBeAddedTo(CannotBeAddedTo.Select(p => p.DisplayTitle).ToList());
+
+    /// <summary>
+    /// The sentence naming the linked classes left alone, or null. Only the
+    /// ones students cannot CERTAINLY see: a class whose flag the app cannot
+    /// read is not left out, because "already published" has to be something
+    /// the app is sure of.
+    /// </summary>
+    public string? LeftAloneSentence
+    {
+        get
+        {
+            var worth = StoppedAtClasses
+                .Where(page => !(page.IsVisibleToStudents && page.VisibilityIsCertain))
+                .Select(page => page.DisplayTitle)
+                .ToList();
+            return worth.Count switch
+            {
+                0 => null,
+                1 => AssistWording.LinkedClassWasLeftAlone(worth),
+                _ => AssistWording.LinkedClassesWereLeftAlone(worth),
+            };
+        }
+    }
+
     public IEnumerable<PlannedPage> Named => NamedPages.Count > 0 ? NamedPages : Pages.Where(p => !p.ViaLink);
     public IEnumerable<PlannedPage> Linked => Pages.Where(p => p.ViaLink);
     public IEnumerable<PlannedPage> Changing => Changes.Select(c => c.Page);
@@ -96,10 +138,9 @@ public sealed class PublishPlan
                     return null;
             }
 
-            string done = Publishes ? "published" : "hidden";
             if (named.Count == 1)
-                return Publishes ? "It's already been published." : "It's already hidden.";
-            return $"They have already been {done}.";
+                return Publishes ? AssistWording.AlreadyPublishedOne : AssistWording.AlreadyHiddenOne;
+            return Publishes ? AssistWording.AlreadyPublishedSeveral : AssistWording.AlreadyHiddenSeveral;
         }
     }
 
@@ -114,7 +155,12 @@ public sealed class PublishPlan
         lines.Add($"{CourseCode} Section {SectionNumber}: {verb}.");
         lines.Add("");
 
-        if (Changes.Count == 0)
+        if (Changes.Count == 0 && CannotBeAddedTo.Count > 0)
+        {
+            // Said by the sentence below, not as "no page would change",
+            // which reads as "already right" about pages it declined.
+        }
+        else if (Changes.Count == 0)
         {
             lines.Add("No page's visibility would change.");
         }
@@ -131,8 +177,8 @@ public sealed class PublishPlan
                     break;
                 }
                 string becoming = change.WillBeVisible ? "visible" : "hidden";
-                string line = $"“{change.Page.DisplayTitle}” will become {becoming}";
-                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.Title, change.Page.Title, StringComparison.OrdinalIgnoreCase)))
+                string line = $"{change.Page.Named} will become {becoming}";
+                foreach (var move in DateMoves.Where(m => string.Equals(m.Page.RelativePath, change.Page.RelativePath, StringComparison.OrdinalIgnoreCase)))
                 {
                     line += $", with the same date as “{move.TakenFrom}”";
                 }
@@ -145,6 +191,12 @@ public sealed class PublishPlan
         {
             string word = AlreadyRight.Count == 1 ? "page is" : "pages are";
             lines.Add($"{AlreadyRight.Count} {word} already {(Publishes ? "visible" : "hidden")}.");
+        }
+
+        if (CannotBeAddedToSentence is { } declined)
+        {
+            lines.Add("");
+            lines.Add(declined);
         }
 
         if (Kept.Count > 0)
@@ -160,19 +212,25 @@ public sealed class PublishPlan
                     lines.Add($"…and {Kept.Count - listed} more.");
                     break;
                 }
-                lines.Add($"“{staying.Page.DisplayTitle}” stays visible, because {staying.Reason}");
+                lines.Add($"{staying.Page.Named} stays visible, because {staying.Reason}");
                 listed++;
             }
         }
 
-        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.Title), StringComparer.OrdinalIgnoreCase);
-        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.Title)).ToList();
+        if (Publishes && LeftAloneSentence is { } leftAlone)
+        {
+            lines.Add("");
+            lines.Add(leftAlone);
+        }
+
+        var namedAlready = new HashSet<string>(Changes.Select(c => c.Page.RelativePath), StringComparer.OrdinalIgnoreCase);
+        var orphaned = DateMoves.Where(m => !namedAlready.Contains(m.Page.RelativePath)).ToList();
         if (orphaned.Count > 0)
         {
             lines.Add("");
             foreach (var move in orphaned)
             {
-                lines.Add($"“{move.Page.DisplayTitle}” will take the same date as “{move.TakenFrom}”.");
+                lines.Add($"{move.Page.Named} will take the same date as “{move.TakenFrom}”.");
             }
         }
 
@@ -210,6 +268,12 @@ public sealed class PublishPlan
     /// back as an unknown page. The mac reached the same answer for the same
     /// reason (<c>AssistPublishPlan.unitNamed(_:term:)</c>).</para>
     /// </summary>
+    public static int? UnitNamed(string raw, ClassPageNaming naming) =>
+        // A numbered course has NO units (#274; class-planning.json → wholeUnit):
+        // "publish Week 1" read as unit 1 published every meeting on the mac
+        // (4 of 4), and "Week 3" was refused. Every title goes to the page path.
+        naming.IsNumbered ? null : UnitNamed(raw, naming.Word);
+
     public static int? UnitNamed(string raw, string? term = null)
     {
         string tidied = raw.Trim().TrimEnd('.', '!').ToLowerInvariant();
@@ -259,7 +323,8 @@ public sealed record IndexChange(
     string ToClass,
     DateOnly? FromDate,
     DateOnly ToDate,
-    bool HeadingMissing)
+    bool HeadingMissing,
+    SectionIndex.Pointer? Pointer = null)
 {
     public bool WillChange => !HeadingMissing && (FromClass != ToClass || FromDate != ToDate);
 
@@ -267,7 +332,7 @@ public sealed record IndexChange(
         ? $"{RelativePath} has no “{SectionIndex.Heading}” heading, so its front page can’t be updated. " +
           "Nothing else is affected."
         : WillChange
-            ? $"The section's front page would show “{ToClass}” ({ToDate:yyyy-MM-dd}) as the most recent class" +
+            ? $"The section's front page would show “{ToClass}” ({DateText.Iso(ToDate)}) as the most recent class" +
               (FromClass is null ? "." : $", instead of “{FromClass}”.")
             : $"The section's front page already shows “{ToClass}”.";
 }
@@ -295,6 +360,23 @@ public sealed record PlannedPage(
     bool IsSectionLocal = false,
     bool VisibilityIsCertain = true)
 {
+    /// <summary>
+    /// The folder the page sits in (from the course folder), set ONLY when another
+    /// page of the section has the same display title, so the plan can say which
+    /// one goes (bundle 10, S1). Null otherwise.
+    /// </summary>
+    public string? Folder { get; init; }
+
+    /// <summary>
+    /// The page as a plan line names it: the contract's one naming rule, the
+    /// one start of year uses (shared-rules.json → startOfYear.wording.pageName /
+    /// pageNameInFolder) — “{page}”, or “{page}” (in {folder}) when the
+    /// section has two pages of that name.
+    /// </summary>
+    public string Named => Folder is null
+        ? StartOfYearWording.PageName(DisplayTitle)
+        : StartOfYearWording.PageNameInFolder(DisplayTitle, Folder);
+
     /// <summary>What the teacher sees this page called (Quartz displayName).</summary>
     public string DisplayTitle { get; init; } = DisplayTitle ?? Title;
 
@@ -320,7 +402,7 @@ public sealed record PlannedPage(
 
     private static bool? Invert(bool? value) => value is null ? null : !value;
 
-    private string When => Date is { } date ? $"{date:yyyy-MM-dd}, " : "";
+    private string When => Date is { } date ? $"{DateText.Iso(date)}, " : "";
 
     private static string Show(bool? value) =>
         value is null ? "not set" : value.Value ? "true" : "false";

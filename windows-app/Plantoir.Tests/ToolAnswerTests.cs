@@ -153,8 +153,7 @@ public class ToolAnswerTests : IDisposable
     [Fact]
     public async Task PublishingTellsTheTeacherACount_NotEveryPageAndThePreview()
     {
-        var answer = await Tools().PublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        var answer = await Tools().PublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 2" });
 
         Assert.Equal("Published 1 page.", answer.Summary());
@@ -165,12 +164,10 @@ public class ToolAnswerTests : IDisposable
     public async Task UnpublishingSaysSoInItsOwnVerb()
     {
         var tools = Tools();
-        await tools.PublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        await tools.PublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 1", "Unit 1, Day 2" });
 
-        var answer = await tools.UnpublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        var answer = await tools.UnpublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 1", "Unit 1, Day 2" });
 
         Assert.Equal("Unpublished 2 pages.", answer.Summary());
@@ -186,23 +183,20 @@ public class ToolAnswerTests : IDisposable
     public async Task PublishingWhatIsAlreadyPublishedGetsFourWords()
     {
         var tools = Tools();
-        await tools.PublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        await tools.PublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 2" });
 
-        var again = await tools.PublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        var again = await tools.PublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 2" });
 
-        Assert.Equal("It's already been published.", again.Summary());
-        Assert.Equal("It's already been published.", again.Detail());
+        Assert.Equal(AssistWording.AlreadyPublishedOne, again.Summary());
+        Assert.Equal(AssistWording.AlreadyPublishedOne, again.Detail());
     }
 
     [Fact]
     public void APlanNeverAsksTheTeacherToShowItToTheTeacher()
     {
-        var answer = Tools().PlanPublishPages("ICS3U", 1, includeLinked: false,
-                                              pages: new[] { "Unit 1, Day 2" });
+        var answer = Tools().PlanPublishPages("ICS3U", 1, pages: new[] { "Unit 1, Day 2" });
 
         Assert.DoesNotContain("Show this to the teacher", answer.Summary());
         // The instruction is still there for a caller with no Go and Cancel
@@ -218,8 +212,7 @@ public class ToolAnswerTests : IDisposable
     [Fact]
     public void APlanMarksItselfAsOne()
     {
-        var answer = Tools().PlanPublishPages("ICS3U", 1, includeLinked: false,
-                                              pages: new[] { "Unit 1, Day 2" });
+        var answer = Tools().PlanPublishPages("ICS3U", 1, pages: new[] { "Unit 1, Day 2" });
         Assert.True(answer.Meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>());
     }
 
@@ -231,8 +224,7 @@ public class ToolAnswerTests : IDisposable
     [Fact]
     public void APlanThatCouldNotBeMadeIsNotMarkedAsOne()
     {
-        var answer = Tools().PlanPublishPages("ICS3U", 1, includeLinked: false,
-                                              pages: new[] { "Unit 9, Day 9" });
+        var answer = Tools().PlanPublishPages("ICS3U", 1, pages: new[] { "Unit 9, Day 9" });
 
         Assert.True(answer.Meta?[AssistToolAnswer.IsPlanKey] is null);
         Assert.DoesNotContain("Show this to the teacher", answer.Detail());
@@ -252,8 +244,7 @@ public class ToolAnswerTests : IDisposable
         var workspace = new AssistWorkspace(_folder, _launcher, undo: new UndoHistory());
         var tools = new Plantoir.Mcp.PlantoirTools(workspace);
 
-        await tools.PublishPages("ICS3U", 1, includeLinked: false,
-            progress: new Progress<ProgressNotificationValue>(), cancellation: default,
+        await tools.PublishPages("ICS3U", 1, progress: new Progress<ProgressNotificationValue>(), cancellation: default,
             pages: new[] { "Unit 1, Day 2" });
 
         string said = tools.UndoLastChange().Summary();

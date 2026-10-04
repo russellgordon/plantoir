@@ -59,7 +59,7 @@ public class ScheduledWrapperRunTests : IDisposable
         // and two others do not — so whether the machine is left clean depended
         // on which tests ran and in what order, which is not something to leave
         // to luck. Found by review 2026-09-09.
-        try { ScheduledHealthFindings.Take("ICS3U", 1); } catch { }
+        try { ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()); } catch { }
         try { Directory.Delete(_root, recursive: true); } catch { }
     }
 
@@ -86,7 +86,12 @@ public class ScheduledWrapperRunTests : IDisposable
     /// <summary>The task name of the most recent <see cref="RunWrapper"/>, which the capture files are named after.</summary>
     private string _lastTaskName = "";
 
-    private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null)
+    /// <summary>The working folder a run is given — its records are filed under its id (#309).</summary>
+    private string WorkFolder(string? name = null) => Path.Combine(_root, name ?? "work with spaces");
+
+    private (int ExitCode, string Output) RunWrapper(string launcherBody, string? workFolderName = null,
+                                                     string deployBody = "Write-Host 'DEPLOY RAN'\nexit 0",
+                                                     string destinationType = "local_folder")
     {
         // "work with spaces" by DEFAULT, deliberately. Every fixture here used
         // a space-free temp path at first, and that hid a real defect: the
@@ -97,14 +102,14 @@ public class ScheduledWrapperRunTests : IDisposable
         string work = Path.Combine(_root, workFolderName ?? "work with spaces");
         Directory.CreateDirectory(work);
         File.WriteAllText(Path.Combine(work, "preview.ps1"), launcherBody);
-        File.WriteAllText(Path.Combine(work, "deploy.ps1"), "Write-Host 'DEPLOY RAN'\nexit 0");
+        File.WriteAllText(Path.Combine(work, "deploy.ps1"), deployBody);
 
         _lastTaskName = $"Plantoir-wraprun-{Guid.NewGuid():N}";
         string? script = TaskScheduling.WriteWrapperScript(
             _lastTaskName, work, Path.Combine(work, "deploy.ps1"),
             "ICS3U", 1, Path.Combine(work, "courses", "ICS3U"),
             Array.Empty<string>(),
-            new[] { new CourseConfiguration.DeployDestination("local_folder", _root) },
+            new[] { new CourseConfiguration.DeployDestination(destinationType, _root) },
             "");
         Assert.NotNull(script);
 
@@ -115,6 +120,8 @@ public class ScheduledWrapperRunTests : IDisposable
             UseShellExecute = false,
             WorkingDirectory = work,
         };
+        // #179: the wrapper's $healthDir and $pendingDir follow this in the CHILD only.
+        info.Environment[TaskScheduling.TestStateDirVariable] = AppDataRoot.Current;
         // The wrapper is RUN, so it writes wherever it was told to write — and
         // WriteWrapperScript bakes AppDataRoot's real path in, which in a test
         // process is the teacher's own %LOCALAPPDATA%\Plantoir. Before the
@@ -166,10 +173,10 @@ public class ScheduledWrapperRunTests : IDisposable
 
         // The record for the stub's course lives in the real per-user
         // location, so take it the way the app does and put nothing back.
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         RunWrapper(LauncherStub);
-        var found = ScheduledHealthFindings.Take("ICS3U", 1);
+        var found = ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         // The whole point of scanning before the failure guard: this build
         // FAILED, and the finding is the reason it failed.
@@ -188,12 +195,54 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.DoesNotContain("DEPLOY RAN", output);
     }
 
+    /// <summary>
+    /// #395: an overnight Cloudflare publish whose project had to be made
+    /// again leaves 'cloudflare project made again' on the trail, read from
+    /// the captured deploy leg into the section's record. The exit code still
+    /// decides the outcome (the leg runs captured, not plainly).
+    /// </summary>
+    [Fact]
+    public void ACloudflareProjectRemadeOvernightReachesTheTrail()
+    {
+        if (!PowerShellIsAvailable) return;
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+        string trail = Path.Combine(_root, "trail.txt");
+        Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            var (exitCode, output) = RunWrapper("Write-Host 'Static build complete.'\nexit 0",
+                deployBody: "Write-Host 'Made the project again.'\n" +
+                            "Write-Host 'PLANTOIR_CLOUDFLARE_REMADE: ICS3U/1 ics3u-s1-2026 ics3u-s1-2026-x7.pages.dev'\n" +
+                            "Write-Host 'DEPLOY RAN'\nexit 0",
+                destinationType: "cloudflare_pages");
+            Assert.Equal(0, exitCode);
+            ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+            Assert.Contains("ICS3U/1 \u00b7 the Cloudflare project ics3u-s1-2026 was not in this Cloudflare account, so it was made again; " +
+                            "the website is now at ics3u-s1-2026-x7.pages.dev", File.ReadAllText(trail));
+        }
+        finally { Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+    }
+
+    [Fact]
+    public void ACloudflareLegThatFailsIsStillRecordedAsAFailure()
+    {
+        if (!PowerShellIsAvailable) return;
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+        RunWrapper("Write-Host 'Static build complete.'\nexit 0",
+            deployBody: "Write-Host 'nope'\nexit 1", destinationType: "cloudflare_pages");
+
+        var outcome = ScheduledPublishOutcome.ReadFrom(_root, "ICS3U", 1, WorkFolder());
+        Assert.NotNull(outcome);
+        Assert.Equal(ScheduledPublishOutcome.Kind.DidNotFinish, outcome!.Outcome);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+    }
+
     [Fact]
     public void AGoodBuildDeploysAndLeavesNoRecord()
     {
         if (!PowerShellIsAvailable) return;
 
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
 
         var (exitCode, output) = RunWrapper("""
             $ErrorActionPreference = 'Stop'
@@ -206,7 +255,7 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Contains("DEPLOY RAN", output);
         // A clean run clears anything an earlier one left.
-        Assert.Empty(ScheduledHealthFindings.Take("ICS3U", 1));
+        Assert.Empty(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()));
     }
 
     [Fact]
@@ -219,13 +268,13 @@ public class ScheduledWrapperRunTests : IDisposable
         // split and powershell.exe answered "Processing -File 'C:\...\work'
         // failed because the file does not have a '.ps1' extension" — exit
         // -196608, no build, no findings, no deploy, every night, silently.
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder("a folder with spaces"));
 
         var (exitCode, output) = RunWrapper(LauncherStub, "a folder with spaces");
 
         Assert.DoesNotContain("does not have a '.ps1' extension", output);
         Assert.Equal(1, exitCode);                       // the stub's own code, not a launch failure
-        Assert.Single(ScheduledHealthFindings.Take("ICS3U", 1));
+        Assert.Single(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder("a folder with spaces")));
     }
 
     [Fact]
@@ -244,6 +293,43 @@ public class ScheduledWrapperRunTests : IDisposable
         Assert.Empty(Directory.Exists(dir)
             ? Directory.GetFiles(dir, _lastTaskName + "*")
             : Array.Empty<string>());
-        ScheduledHealthFindings.Take("ICS3U", 1);
+        ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder());
+    }
+
+    // ---- #179: the wrapper's run-time folders stay out of the real state ---
+
+    /// <summary>What a TEACHER's wrapper runs when the test variable is absent:
+    /// the same LOCALAPPDATA folder as before #179.</summary>
+    [Fact]
+    public void WithoutTheTestVariableTheWrapperWritesWhereItAlwaysDid()
+    {
+        string expression = TaskScheduling.StateDirExpression(Path.Combine("scheduled", "folder-problems"));
+        Assert.Contains("else { Join-Path $env:LOCALAPPDATA 'Plantoir" + Path.DirectorySeparatorChar + "scheduled" + Path.DirectorySeparatorChar + "folder-problems' }", expression);
+        Assert.Contains("$env:TEMP", expression);
+    }
+
+    /// <summary>Run for real with the variable set: the run's folder-problem
+    /// record lands in this test's scratch folder, and the teacher's real
+    /// scheduled\folder-problems gains nothing named after this task.</summary>
+    [Fact]
+    public void ARunUnderTheSuiteLeavesTheRealFolderProblemsFolderAlone()
+    {
+        if (!PowerShellIsAvailable) return;
+        string real = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Plantoir", "scheduled", "folder-problems");
+
+        string record = TaskScheduling.HealthRecordName("ICS3U", 1, WorkFolder());
+        var before = Directory.Exists(real) ? Directory.GetFiles(real).ToHashSet(StringComparer.OrdinalIgnoreCase) : new HashSet<string>();
+
+        RunWrapper(LauncherStub);
+
+        string[] leaked = (Directory.Exists(real) ? Directory.GetFiles(real) : Array.Empty<string>())
+            .Where(f => !before.Contains(f))
+            .Where(f => Path.GetFileName(f).Contains(record, StringComparison.OrdinalIgnoreCase)
+                     || Path.GetFileName(f).StartsWith(_lastTaskName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Assert.True(leaked.Length == 0, "The wrapper wrote into the teacher's real folder: " + string.Join(", ", leaked));
+        Assert.True(ScheduledHealthFindings.Take("ICS3U", 1, WorkFolder()).Count > 0,
+            "The run left no finding where the app (redirected) reads it, so this test proved nothing.");
     }
 }

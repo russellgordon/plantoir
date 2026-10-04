@@ -49,7 +49,54 @@ public class WizardWordingTests
         string source = File.ReadAllText(Path.Combine(
             ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "NewCourseDialog.cs"));
 
-        Assert.Contains("PrimaryButtonText = WizardWording.CreateCourseButton;", source);
+        // Since #390 the button follows the club box: both words come from
+        // WizardWording.Panel, and NEVER from the code (ClubCodeRule) — a
+        // teacher can untick the box for a club-shaped code.
+        Assert.Contains("PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;", source);
+        Assert.Contains("PrimaryButtonText = words.CreateButton;", source);
+        Assert.Contains("var words = WizardWording.Panel(IsClub);", source);
+        Assert.DoesNotContain("WizardWording.Panel(IsClubCode", source);
         Assert.DoesNotContain($"PrimaryButtonText = \"{WizardWording.CreateCourseButton}\"", source);
+        Assert.DoesNotContain($"\"{WizardWording.ForAClub.CreateButton}\"", source);
+    }
+
+    /// <summary>
+    /// The Starting Content sentences (#250), each against its own key.
+    /// </summary>
+    [Theory]
+    [InlineData("noExampleContentNote", WizardWording.NoExampleContentNote)]
+    [InlineData("noStartingContentNote", WizardWording.NoStartingContentNote)]
+    [InlineData("skeletonToggleLabel", WizardWording.SkeletonToggleLabelTemplate)]
+    [InlineData("skeletonToggleLabelForAGeneralSkeleton", WizardWording.SkeletonToggleLabelForAGeneralSkeleton)]
+    [InlineData("skeletonToggleCaption", WizardWording.SkeletonToggleCaption)]
+    [InlineData("skeletonToggleCaptionWhenExampleContentIsDeclined", WizardWording.SkeletonToggleCaptionWhenExampleContentIsDeclined)]
+    [InlineData("structureFromExampleNote", WizardWording.StructureFromExampleNote)]
+    public void EachStartingContentSentenceIsTheContracts(string key, string constant)
+    {
+        string expected = ContractLoader.LoadJson("shared-rules.json")["wizard"]![key]!.ToString();
+        Assert.Equal(expected, constant);
+    }
+
+    [Fact]
+    public void TheGeneralFamilyReadsItsOwnSentenceRatherThanThisCourse()
+    {
+        Assert.Equal(WizardWording.SkeletonToggleLabelForAGeneralSkeleton,
+            WizardWording.SkeletonToggleLabel("general", "This Course"));
+    }
+
+    /// <summary>The dialog renders the constants rather than literals of its own (the honest limit above, again).</summary>
+    [Fact]
+    public void TheWizardDialogRendersTheStartingContentSentencesFromTheConstants()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "Views", "NewCourseDialog.cs"));
+        foreach (string member in new[] { "NoExampleContentNote", "NoStartingContentNote", "SkeletonToggleCaption",
+                     "SkeletonToggleCaptionWhenExampleContentIsDeclined", "StructureFromExampleNote", "SkeletonToggleLabel(" })
+            Assert.Contains("WizardWording." + member, source);
+        Assert.DoesNotContain("Example content isn’t available", source);
+        Assert.DoesNotContain("$\"Start from a {", source);
+        foreach (string id in new[] { "\"noStartingContentNote\"", "\"noExampleContentNote\"",
+                     "\"skeletonToggleCaptionWhenExampleContentIsDeclined\"", "\"skeletonToggleLabel\"" })
+            Assert.Contains(id, source);
     }
 }

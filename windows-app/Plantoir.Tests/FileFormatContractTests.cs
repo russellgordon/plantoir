@@ -456,6 +456,11 @@ public sealed class FileFormatContractTests : IDisposable
                 // moves the modification time and sends the next build after
                 // a page nothing happened to.
                 Assert.Equal(expectChanged, edit.Changed);
+
+                // #308 (the mac's #186): a declined write is its own outcome,
+                // not "already right", because the teacher is told about it.
+                if (testCase["expectOutcome"]?.ToString() is { } outcome)
+                    Assert.Equal(outcome, OutcomeName(edit.Outcome));
             }
             catch (Xunit.Sdk.XunitException problem)
             {
@@ -466,5 +471,61 @@ public sealed class FileFormatContractTests : IDisposable
         Assert.True(failures.Count == 0,
             "contracts/file-formats.json → pageVisibility.writingCases, played against " +
             "PageFrontmatter.SetDraft:\n\n" + string.Join("\n\n", failures));
+    }
+
+    /// <summary>The contract's spelling of an outcome.</summary>
+    private static string OutcomeName(FrontmatterWriteOutcome outcome) => outcome switch
+    {
+        FrontmatterWriteOutcome.Written => "written",
+        FrontmatterWriteOutcome.AlreadyRight => "alreadyRight",
+        _ => "noRoomForAKey",
+    };
+
+    /// <summary>
+    /// <c>datesAndTitles.writingCases</c> (#284, the mac's #199; plus #308's
+    /// #188 and #186 cases): the date and title writers take a key's
+    /// continuation lines with it. Whole files compared as BYTES — a CRLF case
+    /// is among them, and a lost <c>\r</c> is a failure.
+    /// </summary>
+    [Fact]
+    public void TheDateAndTitleWritingCasesAreFollowed()
+    {
+        var cases = ContractLoader.LoadJson("file-formats.json")["datesAndTitles"]!["writingCases"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 16,
+            $"contracts/file-formats.json carries {cases.Count} date-and-title writing cases; 16 were there on 2026-09-25.");
+
+        var failures = new List<string>();
+        int number = 0;
+        foreach (var testCase in cases)
+        {
+            number++;
+            string before = testCase!["before"]!.ToString();
+            string after = testCase["after"]!.ToString();
+            var write = testCase["write"]!;
+            try
+            {
+                if (write["title"] is { } title)
+                {
+                    Assert.Equal(after, PageFrontmatter.SetTitle(before, title.ToString()));
+                }
+                else
+                {
+                    var day = DateOnly.ParseExact(write["day"]!.ToString(), "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture);
+                    var edit = PageFrontmatter.SetCreated(before, write["key"]!.ToString(), day);
+                    Assert.Equal(after, edit.Text);
+                    if (testCase["expectOutcome"]?.ToString() is { } outcome)
+                        Assert.Equal(outcome, OutcomeName(edit.Outcome));
+                }
+            }
+            catch (Xunit.Sdk.XunitException problem)
+            {
+                failures.Add($"case {number} — {testCase["why"]}\n{problem.Message}");
+            }
+        }
+
+        Assert.True(failures.Count == 0,
+            "contracts/file-formats.json → datesAndTitles.writingCases, played against " +
+            "PageFrontmatter.SetTitle / SetCreated:\n\n" + string.Join("\n\n", failures));
     }
 }

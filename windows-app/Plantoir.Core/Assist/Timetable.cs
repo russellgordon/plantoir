@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
@@ -309,8 +310,8 @@ public sealed class Timetable
         var kept = Meetings.Where(m => m.Date >= firstDay).ToList();
         if (kept.Count == 0)
             throw new AssistRefusal(
-                $"Block {Block} has no class meetings on or after {firstDay:yyyy-MM-dd}. " +
-                $"It runs {Meetings[0].Date:yyyy-MM-dd} to {Meetings[^1].Date:yyyy-MM-dd}.");
+                $"Block {Block} has no class meetings on or after {DateText.Iso(firstDay)}. " +
+                $"It runs {DateText.Iso(Meetings[0].Date)} to {DateText.Iso(Meetings[^1].Date)}.");
 
         return new Timetable
         {

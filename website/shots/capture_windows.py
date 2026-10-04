@@ -48,10 +48,12 @@ from composite import fan, side_by_side  # noqa: E402
 
 # Per-section naming, matching the sites redeployed on 2026-08-19 — see the
 # note beside the same table in capture.py.
+# `title` is how a page window of the site is FOUND to be photographed: the
+# start of the home page's own <title>, which is the window's title.
 DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon"},
-    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon"},
-    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon"},
+    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon", "title": "Grade 10 English"},
+    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon", "title": "Grade 12 Calculus and Vectors"},
+    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon", "title": "Grade 11 Chem"},
 ]
 
 
@@ -151,10 +153,6 @@ def capture_browser_sites() -> None:
             prepare(eng2d_path, WIDEST_WINDOW_PIXELS)
             print(f"   ✓ saved {eng2d_path.name}")
 
-            # Save part for static composite
-            part_path = PARTS / f"home-eng2d-{theme}.png"
-            page.screenshot(path=str(part_path))
-
             # 2. site-mcv4u
             url = site_address("MCV4U") + "/concepts/derivative-rules"
             page.goto(url)
@@ -165,13 +163,6 @@ def capture_browser_sites() -> None:
             prepare(mcv4u_path, WIDEST_WINDOW_PIXELS)
             print(f"   ✓ saved {mcv4u_path.name}")
 
-            # Save part for static composite
-            if not dark:
-                page.goto(site_address("MCV4U") + "/")
-                page.wait_for_load_state("networkidle")
-                time.sleep(0.8)
-                page.screenshot(path=str(PARTS / f"home-mcv4u-{theme}.png"))
-
             # 3. site-sch3u
             url = site_address("SCH3U") + "/style/what-this-site-can-do#diagrams"
             page.goto(url)
@@ -181,13 +172,6 @@ def capture_browser_sites() -> None:
             page.screenshot(path=str(sch3u_path))
             prepare(sch3u_path, WIDEST_WINDOW_PIXELS)
             print(f"   ✓ saved {sch3u_path.name}")
-
-            # Save part for static composite
-            if not dark:
-                page.goto(site_address("SCH3U") + "/")
-                page.wait_for_load_state("networkidle")
-                time.sleep(0.8)
-                page.screenshot(path=str(PARTS / f"home-sch3u-{theme}.png"))
 
             # 4. coverage
             url = site_address("ENG2D") + "/curriculum-coverage"
@@ -237,20 +221,26 @@ def capture_browser_sites() -> None:
 
 
 def build_windows_static_figures() -> None:
+    """The fanned colour schemes and the light/dark pair, from whole captures.
+
+    The parts are real windows photographed with their own corners
+    (`hero_windows.capture_colour_parts`), never page screenshots: a page
+    screenshot has no window, so the figure came out square (#380). A figure
+    whose parts are missing is NOT written -- an old one left in place would
+    be a picture of something else.
+    """
     announce("Assembling Windows Static Color Figures")
+    from hero_windows import capture_colour_parts
+    PARTS.mkdir(parents=True, exist_ok=True)
+    capture_colour_parts(PARTS, DEMO_COURSES)
+
     fanned = [PARTS / f"home-{course['code'].lower()}-light.png" for course in DEMO_COURSES]
-    if all(p.exists() for p in fanned):
-        dest = IMAGE_DIR / "colour-schemes-windows.png"
-        fan(fanned, dest)
-        prepare(dest, WIDEST_WINDOW_PIXELS)
-        print("   ✓ saved colour-schemes-windows.png + WebP")
+    fan(fanned, IMAGE_DIR / "colour-schemes-windows.png")
+    print("   ✓ saved colour-schemes-windows.png + WebP")
 
     pair = [PARTS / "home-eng2d-light.png", PARTS / "home-eng2d-dark.png"]
-    if all(p.exists() for p in pair):
-        dest = IMAGE_DIR / "light-and-dark-windows.png"
-        side_by_side(pair, dest)
-        prepare(dest, WIDEST_WINDOW_PIXELS)
-        print("   ✓ saved light-and-dark-windows.png + WebP")
+    side_by_side(pair, IMAGE_DIR / "light-and-dark-windows.png")
+    print("   ✓ saved light-and-dark-windows.png + WebP")
 
 
 def windows_shot_ids() -> list:
@@ -263,9 +253,19 @@ def windows_shot_ids() -> list:
 
 
 def main() -> int:
-    announce("Photographing Full Windows Suite (App + Edge Browser)")
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     plantoir_exe = find_or_build_plantoir_exe()
+
+    # Only the three figures made of whole window captures (#380): the hero
+    # and the two colour figures. Takes the desktop for a few minutes.
+    if "--figures" in sys.argv:
+        from hero_windows import build as build_hero
+        announce("Photographing the hero, in light and dark")
+        build_hero(plantoir_exe)
+        build_windows_static_figures()
+        return 0
+
+    announce("Photographing Full Windows Suite (App + Edge Browser)")
 
     # 1. Browser Sites in Edge (so preview screenshot can embed real site capture)
     capture_browser_sites()

@@ -31,7 +31,13 @@ public sealed class CourseConfiguration
 
     public static CourseConfiguration FromBytes(byte[] data)
     {
-        var token = JToken.Parse(Encoding.UTF8.GetString(data));
+        // A byte-order mark is not part of the JSON: Notepad writes one, and
+        // Encoding.GetString keeps it as U+FEFF, which the parser refuses — so a
+        // settings file saved there made its course vanish from the sidebar,
+        // and a reference course read as ordinary (markerAgreement, "a
+        // byte-order mark at the head of the file").
+        string text = Encoding.UTF8.GetString(data).TrimStart('\uFEFF');
+        var token = JToken.Parse(text);
         if (token is not JObject obj)
             throw new InvalidDataException("course_config.json does not hold a JSON object.");
         return new CourseConfiguration(obj, data);
@@ -70,23 +76,130 @@ public sealed class CourseConfiguration
         _ => node.DeepClone(),
     };
 
-    public void Write(string path)
+    /// <summary><c>shared-rules.json → specialNames.settingsSaveReplacedSidebarChange.message</c>.</summary>
+    public const string SaveReplacedSidebarChange =
+        "Which items the sidebar hides had also been changed somewhere else since this window read them \u2014 most " +
+        "likely in another Plantoir window. This save replaced that change with the switches shown here.";
+
+    /// <summary>What a Save kept from elsewhere and what it replaced (<c>savingSettings.cases</c>).</summary>
+    public sealed record SaveReport(IReadOnlyList<string> KeptFromElsewhere, IReadOnlyList<string> ReplacedChangesFromElsewhere);
+
+    /// <summary>
+    /// Every writer of course_config.json saves through here (Course Settings,
+    /// Add Section, archive, restore, rename), so the rule lives in ONE place
+    /// (#272 / mac #265, <c>shared-rules.json → savingSettings</c>): a Save
+    /// writes only the TOP-LEVEL keys this copy changed since it last read or
+    /// wrote the file, and keeps the file's value — including being gone — for
+    /// every other key.
+    ///
+    /// <para>MEASURED here before it was written (2026-09-30): a WinUI window
+    /// DOES hold its own copy. Ctrl+N opens a second window on the same
+    /// working folder (<c>Workspace.FolderForNewWindow</c>), each window's
+    /// <c>WorkspaceViewModel</c> loads its own <see cref="Course"/> list, and
+    /// each course its own <see cref="CourseConfiguration"/>; the old Write
+    /// serialised the whole object, so window B's Save put back the hides
+    /// window A had just saved — the mac's reported failure, reproduced by
+    /// <c>TwoWindowSettingsTests.TheOldWholeFileWriteLostTheOtherWindowsHides</c>.</para>
+    /// </summary>
+    public SaveReport Write(string path)
     {
-        byte[] data = SerializedBytes();
+        JObject? onDisk = null;
+        try { if (File.Exists(path)) onDisk = ParseObject(File.ReadAllBytes(path)); }
+        catch { onDisk = null; }   // unreadable: this copy is the only truth left
+        JObject? lastRead = null;
+        try { if (_lastSavedData.Length > 0) lastRead = ParseObject(_lastSavedData); } catch { lastRead = null; }
+
+        var (written, kept, replaced) = onDisk is null || lastRead is null
+            ? ((JObject)_values.DeepClone(), new List<string>(), new List<string>())
+            : Merged(lastRead, onDisk, _values);
+        byte[] data = Serialize(written);
         string temp = path + ".tmp";
         File.WriteAllBytes(temp, data);
         File.Move(temp, path, overwrite: true);
+        _values = written;
         _lastSavedData = data;
+        return new SaveReport(kept, replaced);
+    }
+
+    /// <summary>
+    /// The per-key merge: <paramref name="lastRead"/> is what this copy last
+    /// read or wrote, <paramref name="onDisk"/> the file now, <paramref name="mine"/>
+    /// this copy. A key this copy changed is written as this copy has it (the
+    /// Save being made wins, whole list — said, not merged); every other key
+    /// follows the file.
+    /// </summary>
+    public static (JObject Written, List<string> KeptFromElsewhere, List<string> Replaced) Merged(
+        JObject lastRead, JObject onDisk, JObject mine)
+    {
+        var written = (JObject)onDisk.DeepClone();
+        var kept = new List<string>();
+        var replaced = new List<string>();
+        var keys = lastRead.Properties().Select(p => p.Name)
+            .Concat(mine.Properties().Select(p => p.Name))
+            .Concat(onDisk.Properties().Select(p => p.Name))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(k => k, StringComparer.Ordinal);
+        foreach (string key in keys)
+        {
+            JToken? before = lastRead[key], now = onDisk[key], ours = mine[key];
+            bool iChanged = !JToken.DeepEquals(before, ours);
+            bool elsewhereChanged = !JToken.DeepEquals(before, now);
+            if (iChanged)
+            {
+                if (ours is null) written.Remove(key); else written[key] = ours.DeepClone();
+                if (elsewhereChanged && !JToken.DeepEquals(now, ours)) replaced.Add(key);
+            }
+            else if (elsewhereChanged)
+            {
+                kept.Add(key);
+            }
+        }
+        return (written, kept, replaced);
+    }
+
+    /// <summary>
+    /// Revert reads the FILE (#272 / mac #265, 3a), not this copy's
+    /// remembered last save: with two windows, B reverting to its own old copy
+    /// showed A's saved hides as gone and "nothing unsaved", and B's next hide
+    /// then wrote them away. Falls back to the remembered copy only when the
+    /// file cannot be read.
+    /// </summary>
+    public void RevertToFile(string path)
+    {
+        try
+        {
+            byte[] data = File.ReadAllBytes(path);
+            _values = ParseObject(data);
+            _lastSavedData = data;
+        }
+        catch { DiscardChanges(); }
+    }
+
+    /// <summary>
+    /// After ANOTHER copy saved this course: read the file again, unless this
+    /// copy holds unsaved changes — those are left alone, and its own Save
+    /// follows the merge rule. True when it re-read.
+    /// </summary>
+    public bool RereadIfNothingUnsaved(string path)
+    {
+        if (HasUnsavedChanges) return false;
+        try
+        {
+            byte[] data = File.ReadAllBytes(path);
+            _values = ParseObject(data);
+            _lastSavedData = data;
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>
     /// Writes ONE change to the file on disk from a fresh read, leaving every
     /// other unsaved edit in this object unsaved — the recorder a folder
     /// rename uses, because the folder has really moved and a Cancel that
-    /// appeared to undo it would be a lie. <see cref="Write"/> is left exactly
-    /// as it is: making it read-compare-write would change what
-    /// <see cref="HasUnsavedChanges"/> and <see cref="DiscardChanges"/> mean,
-    /// and Cancel in Course Settings would stop doing what it says.
+    /// appeared to undo it would be a lie. <see cref="Write"/> writes this
+    /// object's WHOLE set of changes (merged per key since #272); this writes
+    /// one change and leaves the rest of this object's edits unsaved.
     ///
     /// <para>Read, change, and write only if nothing else wrote in between. A
     /// build's own <c>preflight_update_course_config</c> writes this same
@@ -133,6 +246,32 @@ public sealed class CourseConfiguration
     private static byte[] Serialize(JObject values) =>
         new CourseConfiguration(values, Array.Empty<byte>()).SerializedBytes();
 
+    /// <summary>
+    /// How many unsaved exclusion changes this copy holds: names that differ,
+    /// in either direction and in both scopes, between the in-memory
+    /// <c>excluded_items</c> and what THIS copy last read or wrote — never the
+    /// file, because an exclusion another window saved meanwhile is not one of
+    /// this copy's changes (<c>excludedItems.recordedOnClick</c>; the mac
+    /// counted against the file first and reported a revert of a removal the
+    /// window never made). The count the <c>exclusions reverted</c> line carries.
+    /// </summary>
+    public int ExclusionChangesSinceLastRead()
+    {
+        if (_lastSavedData.Length == 0) return 0;
+        CourseConfiguration baseline;
+        try { baseline = new CourseConfiguration(ParseObject(_lastSavedData), _lastSavedData); }
+        catch { return 0; }
+        int changes = 0;
+        foreach (string scope in new[] { SharedScope, PerSectionScope })
+        {
+            var now = ExcludedItems(scope);
+            var then = baseline.ExcludedItems(scope);
+            changes += now.Except(then, StringComparer.Ordinal).Count();
+            changes += then.Except(now, StringComparer.Ordinal).Count();
+        }
+        return changes;
+    }
+
     /// <summary>The Revert button: put the values back the way the last save left them.</summary>
     public void DiscardChanges()
     {
@@ -156,11 +295,71 @@ public sealed class CourseConfiguration
 
     public JObject Values => _values;
 
+    /// <summary>The settings as this copy last read or wrote them, or null when unknown.</summary>
+    public JObject? LastReadOrWritten()
+    {
+        try { return _lastSavedData.Length == 0 ? null : ParseObject(_lastSavedData); }
+        catch { return null; }
+    }
+
     // ---- Flat keys ------------------------------------------------------
 
     public string CourseCode => StringValue("course_code");
 
     public void SetCourseCode(string code) => _values["course_code"] = code;
+
+    // ---- Kept for reference (#241; shared-rules.json → referenceCourses) ----
+
+    /// <summary>
+    /// Whether this course is KEPT FOR REFERENCE — never deployed, its pages
+    /// locked. Read STRICTLY: a JSON <c>true</c> at the top level and nothing
+    /// else. Newtonsoft hands back an Integer for <c>1</c>, a Float for
+    /// <c>1.0</c> and a String for <c>"true"</c>, so all three read false here
+    /// (the mac read <c>1</c> as true through NSNumber's bridging and froze a
+    /// course every launcher then deployed — <c>markerAgreement</c>,
+    /// <c>appReadsAsReference</c>). Absent means false: the reverse would make
+    /// a live course silently undeployable. The launchers refuse the odd
+    /// values with their own "cannot tell" sentence, which is the direction
+    /// that publishes nothing and freezes nothing.
+    /// </summary>
+    public bool KeptForReference =>
+        _values["kept_for_reference"] is JValue { Type: JTokenType.Boolean } kept && (bool)kept!;
+
+    /// <summary>
+    /// The school year a reference course was taught in, AS STORED — the
+    /// calendar year it started in, or whatever a hand edit left there. Read
+    /// it through <see cref="SchoolYear.Read"/>, which turns anything out of
+    /// range into "Other".
+    /// </summary>
+    public JToken? StoredReferenceSchoolYear => _values["reference_school_year"];
+
+    /// <summary>
+    /// Files the course under <paramref name="startingYear"/>, or under no
+    /// year. Null clears the key rather than writing a JSON null, so a course
+    /// nobody filed writes the file it always did.
+    /// </summary>
+    public void SetReferenceSchoolYear(int? startingYear)
+    {
+        if (startingYear is int year) _values["reference_school_year"] = year;
+        else _values.Remove("reference_school_year");
+    }
+
+    /// <summary>
+    /// Makes this the settings of a reference course in ONE act: the marker,
+    /// the year, and the neutralisation (<c>referenceCourses.neutralises</c>)
+    /// that leaves an OLDER Plantoir — one that has never heard of the marker
+    /// — with nowhere to deploy to either. Per-page visibility is untouched.
+    /// </summary>
+    public void MarkKeptForReference(int? startingYear)
+    {
+        _values["kept_for_reference"] = true;
+        SetReferenceSchoolYear(startingYear);
+        _values["deploy_target"] = "local_folder";
+        _values["deploy_folder_path"] = "";
+        _values.Remove("additional_deploy_targets");
+        // Never claim last year's domain: the live course that replaced it may use it.
+        _values.Remove("custom_domains");
+    }
 
     public string CourseName
     {
@@ -185,7 +384,21 @@ public sealed class CourseConfiguration
         get { var raw = StringValue("deploy_target"); return raw.Length == 0 ? "netlify" : raw; }
         set
         {
-            _values["deploy_target"] = value;
+            // Choosing again what the SAVED settings already meant leaves the
+            // key as it was saved — absent stays absent — so a teacher who
+            // picks a folder and then Netlify again has nothing to save.
+            // Writing "netlify" over an absent key read as an unsaved change
+            // (Revert stayed on); found by CourseSettingsSaveUiTests on its
+            // first unlocked run, bundle 11.
+            var saved = LastReadOrWritten();
+            var savedRaw = saved?["deploy_target"];
+            string savedMeant = savedRaw?.Type == JTokenType.String && ((string)savedRaw!).Length > 0 ? (string)savedRaw! : "netlify";
+            if (saved is not null && value == savedMeant)
+            {
+                if (savedRaw is null) _values.Remove("deploy_target");
+                else _values["deploy_target"] = savedRaw.DeepClone();
+            }
+            else _values["deploy_target"] = value;
             // A destination can never be both primary and additional at
             // once — deploying to the same place twice makes no sense.
             AdditionalDeployTargets = PruningAdditionalTargets(AdditionalDeployTargets, value);
@@ -369,6 +582,13 @@ public sealed class CourseConfiguration
     {
         string path = rawPath.Trim();
         if (path.Length == 0) return "Choose the folder this course deploys into.";
+        // #304 (mac #227): a partial path is refused BEFORE the folder is looked
+        // for. Directory.Exists would resolve it against THIS app's current
+        // folder while deploy.ps1 publishes from the working folder - checked
+        // in one place and published into another. IsPathFullyQualified also
+        // refuses drive-relative "C:out" and root-relative "\out".
+        if (!Path.IsPathFullyQualified(path))
+            return "That isn’t a full folder location — use Choose… to pick the folder.";
         if (File.Exists(path)) return "That’s a file — deploying needs a folder.";
         if (!Directory.Exists(path)) return "That folder doesn’t exist — use Choose… to pick or create one.";
         try
@@ -408,6 +628,24 @@ public sealed class CourseConfiguration
         set => _values["footer_html"] = value;
     }
 
+    /// <summary>The window when nothing usable is stored: a week.</summary>
+    public const int DefaultMayRunLateDays = 7;
+
+    /// <summary>
+    /// How long after its moment a scheduled deploy of this course is still
+    /// worth running (#239; <c>scheduledDeployCancellation.theSetting</c>): 1,
+    /// 3, 7 or 14 days, and anything else — absent, 0, 5, 365, not a number —
+    /// means a week. Read at the run, off disk. This app offers no control for
+    /// it yet; the key is still PRESERVED on every save, because the settings
+    /// are kept as a JObject and edited key by key, so a teacher's choice made
+    /// on a Mac survives a save on Windows.
+    /// </summary>
+    public int ScheduledDeployMayRunLateDays =>
+        _values["scheduled_deploy_may_run_late_days"] is JValue { Type: JTokenType.Integer } stored
+        && stored.ToObject<long>() is 1 or 3 or 7 or 14
+            ? (int)stored.ToObject<long>()
+            : DefaultMayRunLateDays;
+
     public List<string> SharedFolders { get => StringList("shared_folders"); set => SetStringList("shared_folders", value); }
     public List<string> SharedFiles { get => StringList("shared_files"); set => SetStringList("shared_files", value); }
     public List<string> PerSectionFolders { get => StringList("per_section_folders"); set => SetStringList("per_section_folders", value); }
@@ -427,6 +665,31 @@ public sealed class CourseConfiguration
     {
         get => StringValue("curriculum_folder");
         set => _values["curriculum_folder"] = value;
+    }
+
+    /// <summary>
+    /// Every curriculum folder this course DECLARES, in order (#345, the mac's
+    /// #128): <c>curriculum_folders</c>, then the legacy
+    /// <c>curriculum_folder</c> when it is not already there. Written as BOTH
+    /// keys — the list, and the legacy key naming the list's first (primary)
+    /// folder, because an older Plantoir on another machine reads only that
+    /// one and would otherwise lose the map. An empty list removes both.
+    /// </summary>
+    public List<string> CurriculumFolders
+    {
+        get => CurriculumFolderRule.Declared(_values["curriculum_folders"], _values["curriculum_folder"]);
+        set
+        {
+            var names = CurriculumFolderRule.Declared(new JArray(value ?? new List<string>()), null);
+            if (names.Count == 0)
+            {
+                _values.Remove("curriculum_folders");
+                _values.Remove("curriculum_folder");
+                return;
+            }
+            _values["curriculum_folders"] = new JArray(names);
+            _values["curriculum_folder"] = names[0];
+        }
     }
 
     /// <summary>
@@ -476,11 +739,50 @@ public sealed class CourseConfiguration
     }
 
     /// <summary>
+    /// The raw <c>class_page_scheme</c> (#274, mac #267), or null when absent.
+    /// Written by the wizard for a CLUB only and never switchable afterwards.
+    /// </summary>
+    public string? ClassPageSchemeRaw
+    {
+        get => _values["class_page_scheme"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_page_scheme"); else _values["class_page_scheme"] = value; }
+    }
+
+    /// <summary>
+    /// The heading a section's front page was CREATED with, or null when the
+    /// course never recorded one. Read only at creation and by the front-page
+    /// pointer's insert fallback; never shown as "Most Recent Class" for a
+    /// course that did not record it (<c>settingsRows.shownWhen</c>, #376).
+    /// </summary>
+    public string? FrontPageHeading
+    {
+        get => _values["front_page_heading"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("front_page_heading"); else _values["front_page_heading"] = value; }
+    }
+
+    /// <summary>The raw <c>class_noun</c>, or null when absent.</summary>
+    public string? ClassNounRaw
+    {
+        get => _values["class_noun"] is JValue { Type: JTokenType.String } v ? (string)v! : null;
+        set { if (value is null) _values.Remove("class_noun"); else _values["class_noun"] = value; }
+    }
+
+    /// <summary>What the assistant calls a class page to THIS course's teacher.</summary>
+    public ClassNoun ClassNoun => ClassPageSchemes.NounReading(ClassNounRaw);
+
+    /// <summary>
+    /// How this course names its class pages — word and scheme together. Every
+    /// path that parses or WRITES a class-page title reads this, never the
+    /// word alone (<see cref="ClassPageNaming"/>).
+    /// </summary>
+    public ClassPageNaming Naming => new(UnitWord, ClassPageSchemes.Reading(ClassPageSchemeRaw));
+
+    /// <summary>
     /// The folder this app protects as the curriculum folder, or null.
     /// Name-only — see <see cref="CurriculumFolderRule"/>.
     /// </summary>
     public string? ResolvedCurriculumFolder =>
-        CurriculumFolderRule.Resolve(CurriculumFolder, SharedFolders);
+        CurriculumFolderRule.Resolve(CurriculumFolders, SharedFolders, null).Resolved.FirstOrDefault();
 
     /// <summary>
     /// The folders whose contents count for marks, or <b>null</b> when the key
@@ -795,8 +1097,16 @@ public sealed class CourseConfiguration
 
     public void SetShowsGradeInTitle(int section, bool value)
     {
-        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean })
+        // The legacy course-wide Bool is replaced by the per-section map
+        // SEEDED with it for every section (#387, mac #373 perSectionEditCases):
+        // an EMPTY map let section 1 silently read the default, true, so
+        // toggling section 2 turned section 1's grade back on.
+        if (_values["show_grade_in_title"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["show_grade_in_title"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("show_grade_in_title", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("show_grade_in_title", "sections", SectionKey(section), value);
     }
 
@@ -809,8 +1119,14 @@ public sealed class CourseConfiguration
 
     public void SetIncludesCurriculumCoverage(int section, bool value)
     {
-        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean })
+        // Seeded with the legacy value for every section, for the reason
+        // SetShowsGradeInTitle gives.
+        if (_values["include_curriculum_coverage"] is JValue { Type: JTokenType.Boolean } legacy)
+        {
             _values["include_curriculum_coverage"] = new JObject();
+            foreach (int each in SectionNumbers)
+                SetNestedValue("include_curriculum_coverage", "sections", SectionKey(each), (bool)legacy);
+        }
         SetNestedValue("include_curriculum_coverage", "sections", SectionKey(section), value);
         if (!value)
         {
@@ -886,6 +1202,45 @@ public sealed class CourseConfiguration
     public static bool CurriculumPagesEnabled(bool hasExampleContent, bool prepopulating,
                                               bool contentIncludesCurriculum, bool curriculumSwitchIsOn) =>
         hasExampleContent && prepopulating && contentIncludesCurriculum && curriculumSwitchIsOn;
+
+    /// <summary>
+    /// Whether a NEW course is offered the curriculum pages written for its
+    /// code (<c>file-formats.json</c> → <c>include_curriculum_pages</c>, GitHub
+    /// issue #252, the mac's #251): the code has a payload, that payload
+    /// declares a curriculum folder, AND either the teacher is taking the
+    /// payload or a skeleton is offered and wanted.
+    /// </summary>
+    /// <remarks>
+    /// <para>Beside <see cref="Catalogs.SkeletonCatalog.HasSkeleton"/> and
+    /// calling it rather than re-deriving it, for the same reason that one
+    /// exists: three surfaces ask — the toggles' enabled state, the three keys
+    /// written, and the <c>course created</c> line. Until #252 the wizard wrote
+    /// <c>hasContent &amp;&amp; prepopulate &amp;&amp; …</c>, so a teacher who
+    /// declined the ready-made pages and kept the subject's skeleton got the
+    /// skeleton's placeholder Curriculum folder (one fake expectation, A1.1)
+    /// instead of the payload's: MEASURED on the mac by driving the real
+    /// <c>setup_course.py</c>, ICS4U 2 curriculum pages against 61, MCMPR11 2
+    /// against 59. Nothing on either platform goes red when this is left out —
+    /// the Python's branch simply never runs — which is the trap.</para>
+    /// </remarks>
+    public static bool CurriculumPagesOffered(string exampleContentRoot, string skeletonsRoot, string code,
+                                              bool takingExampleContent, bool skeletonWanted)
+    {
+        if (!Catalogs.ExampleContentCatalog.HasContent(exampleContentRoot, code)) return false;
+        if (!Catalogs.ExampleContentCatalog.IncludesCurriculum(exampleContentRoot, code)) return false;
+        if (takingExampleContent) return true;
+        return Catalogs.SkeletonCatalog.HasSkeleton(exampleContentRoot, skeletonsRoot, code, takingExampleContent)
+               && skeletonWanted;
+    }
+
+    /// <summary>
+    /// Whether a NEW course's coverage map is switched on: only when the
+    /// curriculum pages are offered and kept, since the map is drawn from
+    /// them. The mac's <c>curriculumCoverageEnabled(curriculumPagesOffered:…)</c>.
+    /// </summary>
+    public static bool NewCourseCoverageEnabled(bool curriculumPagesOffered, bool includesCurriculumPages,
+                                                bool includesCurriculumCoverage) =>
+        curriculumPagesOffered && includesCurriculumPages && includesCurriculumCoverage;
 
     /// <summary>color_schemes is FLAT — {"color_schemes": {"sectionN": "id"}}, no "sections" wrapper.</summary>
     public string ColourSchemeId(int section) =>

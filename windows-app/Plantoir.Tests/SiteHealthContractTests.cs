@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 
 namespace Plantoir.Tests;
 
@@ -12,6 +13,7 @@ namespace Plantoir.Tests;
 /// passing after the product's words change, which is the whole reason the
 /// contract exists.
 /// </summary>
+[Collection(SharedActivityState.Name)]
 public class SiteHealthContractTests
 {
     private static JsonNode SiteHealth =>
@@ -191,7 +193,8 @@ public class SiteHealthContractTests
     private static readonly string[] MachineryWords =
     {
         "toolchain", "script", "docker", "container", "wsl",
-        "python", "stdout", "quartz", "repository", "config",
+        "python", "json", "stdout", "quartz", "repository", "config",
+        "yaml", "frontmatter", "symlink", "vault",
     };
 
     /// <summary>
@@ -204,12 +207,20 @@ public class SiteHealthContractTests
     [Fact]
     public void NoCheckNamesTheMachinery()
     {
+        // Every string a check carries reaches a teacher, assembled into the
+        // sentence or the detail, except these three (#300, the mac's
+        // testNoCheckNamesTheMachinery): pageSettingsUnreadable brought
+        // sentenceForSeveral, pageWithLine, pageWithoutLine, andMore, frontPage.
+        var notShown = new HashSet<string> { "name", "why", "fill" };
         foreach (var check in SiteHealth["checks"]!.AsArray())
         {
-            string said = (check!["sentence"]!.ToString() + " " + check["detail"]!.ToString())
-                .ToLowerInvariant();
-            foreach (string word in MachineryWords)
-                Assert.False(said.Contains(word), $"{check["name"]} says \"{word}\" to a teacher");
+            foreach (var (key, value) in check!.AsObject())
+            {
+                if (notShown.Contains(key) || value is not System.Text.Json.Nodes.JsonValue text
+                    || !text.TryGetValue<string>(out var shown)) continue;
+                foreach (string word in MachineryWords)
+                    Assert.False(shown.ToLowerInvariant().Contains(word), $"{check["name"]}.{key} says \"{word}\" to a teacher");
+            }
         }
     }
 
@@ -307,5 +318,58 @@ public class SiteHealthContractTests
 
         Assert.Equal(2, findings.Count);
         Assert.Equal(new[] { 1, 2 }, findings.Select(f => f.Section).ToArray());
+    }
+
+    /// <summary>
+    /// <c>siteHealth.marker.consoleCases</c> (#299), fed to ONE console reader
+    /// as the case's <c>howToRunACase</c> says: <see cref="ScriptRunner.ReceiveOutput"/>,
+    /// which both reads findings out of the arriving output and builds the
+    /// transcript a teacher sees. A chunk is not a line. Replaces nothing:
+    /// the hand-written cases above stay, and these are the shared ones.
+    /// </summary>
+    [Fact]
+    public void TheConsoleCasesAreFollowed()
+    {
+        var cases = SiteHealth["marker"]!["consoleCases"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 4, $"consoleCases lost cases: {cases.Count}");
+
+        var failures = new List<string>();
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            var runner = new ScriptRunner(uiContext: null);
+            var chunks = c["chunks"]!.AsArray().Select(chunk => chunk!.ToString()).ToList();
+            var afterEach = c["expectShownAfterEachChunk"]?.AsArray();
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                runner.ReceiveOutput(chunks[i]);
+                if (afterEach is null) continue;
+                var expected = afterEach[i]!.AsArray().Select(line => line!.ToString()).ToList();
+                var shown = Shown(runner);
+                if (!expected.SequenceEqual(shown))
+                    failures.Add($"{name}, after chunk {i + 1}: shown [{string.Join(" | ", shown)}]");
+            }
+
+            var expectShown = c["expectShown"]!.AsArray().Select(line => line!.ToString()).ToList();
+            var finalShown = Shown(runner);
+            if (!expectShown.SequenceEqual(finalShown))
+                failures.Add($"{name}: shown [{string.Join(" | ", finalShown)}], expected [{string.Join(" | ", expectShown)}]");
+
+            var expectFindings = c["expectFindings"]!.AsArray().Select(line => line!.ToString()).ToList();
+            var found = runner.HealthFindings.Select(finding => finding.Name).ToList();
+            if (!expectFindings.SequenceEqual(found))
+                failures.Add($"{name}: found [{string.Join(", ", found)}], expected [{string.Join(", ", expectFindings)}]");
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    /// <summary>The console's text as lines; an empty console is no lines.</summary>
+    private static List<string> Shown(ScriptRunner runner)
+    {
+        string text = runner.Transcript.DisplayText;
+        return text.Length == 0
+            ? new List<string>()
+            : text.Split('\n').Select(line => line.TrimEnd('\r')).ToList();
     }
 }

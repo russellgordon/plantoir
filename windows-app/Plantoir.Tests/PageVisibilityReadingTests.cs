@@ -8,7 +8,7 @@ namespace Plantoir.Tests;
 /// The three-way reading of a page's visibility flag.
 ///
 /// <para><c>contracts/file-formats.json</c> → <c>pageVisibility.readingCases</c>
-/// carries the 54 answers the two apps must agree on, and
+/// carries the answers the two apps must agree on, and
 /// <c>ContractTests.FileFormats_PageVisibilityReadingCases</c> runs those. This
 /// file covers the half the shared list deliberately leaves out: the forms
 /// where this app says <c>CannotTell</c>, and the corners it handles rather
@@ -111,7 +111,7 @@ public class PageVisibilityReadingTests
     {
         // Measured: a page whose whole frontmatter is `publish:false` reaches
         // Quartz with NO keys and is published; one with another key beside it
-        // stops the build. Either way this is not the page's flag, and reading
+        // cannot be parsed (it stopped the build until #246; the build now hides and names it). Either way this is not the page's flag, and reading
         // it as one called a live page hidden.
         Assert.Equal(PageVisibility.SaysNothing, Answer("publish:false"));
         Assert.Equal(PageVisibility.SaysNothing, Answer("publish:true"));
@@ -465,8 +465,8 @@ public class PageVisibilityWritingTests
     ///
     /// <para>Every one of those lands <c>False -&gt; HIDDEN</c> with the sweep.
     /// The teacher asked for the page to be taken down and was told it had
-    /// been; without this they could still read it. Issue #176 — the mac still
-    /// owes the same fix.</para>
+    /// been; without this they could still read it. Issue #176 — the mac took
+    /// the same fix on 2026-09-19 (#190).</para>
     ///
     /// <para>A complete-LOOKING value with an indented one below it —
     /// <c>publish: false</c> over <c>  false</c> — is the same family and is
@@ -534,9 +534,9 @@ public class PageVisibilityWritingTests
     /// <para>The three-way answer is <c>CannotTell</c>, so REPORTING says
     /// visible — which is what the site does — and any writer writes the flag
     /// out in full. Measured after that write: <c>False -&gt; HIDDEN</c>.
-    /// Changes none of the 54 shared <c>readingCases</c>. The mac reads these
-    /// as <c>hidden</c> and is wrong; that is on issue #176 with the case
-    /// proposed for <c>contracts/file-formats.json</c>.</para>
+    /// Changes none of the shared <c>readingCases</c> (59 on 2026-09-30). The mac
+    /// read these as <c>hidden</c> until #176 landed there on 2026-09-19; the
+    /// two forms are now shared <c>readingCases</c> both suites run (#190).</para>
     /// </remarks>
     [Theory]
     [InlineData("false")]
@@ -763,7 +763,7 @@ public class PageVisibilityCertaintyTests : IDisposable
     public void APageWhoseFlagCannotBeReadIsNotOnTheAlreadyRightList()
     {
         UnreadableClass();
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         Assert.Empty(plan.AlreadyRight);
         var change = Assert.Single(plan.Changes);
@@ -775,13 +775,13 @@ public class PageVisibilityCertaintyTests : IDisposable
     public void ThereIsNoNothingToDoSentenceForAPageWhoseFlagCannotBeRead()
     {
         UnreadableClass();
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
         Assert.Null(plan.NothingToDoSentence);
 
         // The control: the same page saying plainly what was asked for.
         Write("section1/All Classes/Unit 1, Day 2.md",
               "title: Unit 1, Day 2\npublish: true\ncreated: 2026-09-10T07:00:00.000-0400\n");
-        var settled = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false);
+        var settled = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" });
         Assert.Equal("It's already been published.", settled.NothingToDoSentence);
     }
 
@@ -805,7 +805,7 @@ public class PageVisibilityCertaintyTests : IDisposable
         Write("Concepts/Ohm's Law.md",
               "title: Ohm's Law\npublishForSection1: !!str false\ncreated: 2026-01-01T07:00:00.000-0400\n");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         var move = Assert.Single(plan.DateMoves, m => m.Page.Title == "Ohm's Law");
         Assert.Equal(new DateOnly(2026, 9, 8), move.To);
@@ -823,7 +823,7 @@ public class PageVisibilityCertaintyTests : IDisposable
         var workspace = Open();
 
         await workspace.Apply(
-            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false),
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }),
             preview: false);
 
         string after = File.ReadAllText(path);

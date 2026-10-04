@@ -524,7 +524,10 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
                 course_code="ADA1O", course_name="Drama"
             )
             files = sorted(
-                str(path.relative_to(course_path))
+                # as_posix: the hash was taken from forward slashes, and on
+                # Windows str() spells the same path with backslashes, which
+                # changed the hash while every file was byte-for-byte right.
+                path.relative_to(course_path).as_posix()
                 for path in course_path.rglob("*") if path.is_file()
             )
             self.assertEqual(len(files), self.PAYLOAD_FILE_COUNT)
@@ -537,7 +540,12 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
             for name in files:
                 digest.update(name.encode())
                 digest.update(b"\0")
-                digest.update((course_path / name).read_bytes())
+                # CR LF read as LF: a Windows checkout with core.autocrlf=true
+                # holds the payload itself in CR LF (measured 2026-09-30: all
+                # 207 ADA1O files `w/crlf`), and the install copies it as it
+                # finds it, so the raw bytes differ from the mac's while
+                # nothing the installer did has changed.
+                digest.update((course_path / name).read_bytes().replace(b"\r\n", b"\n"))
                 digest.update(b"\0")
             self.assertEqual(
                 digest.hexdigest(), self.PAYLOAD_CONTENT_HASH,

@@ -70,6 +70,19 @@ public class NarrowToolsMirrorTests
     }
 
     /// <summary>
+    /// The script shortens exactly the descriptions the app still shortens
+    /// (#352): every other tool is measured with its served text in full.
+    /// </summary>
+    [Fact]
+    public void TheMeasurementScriptShortensOnlyWhatTheAppShortens()
+    {
+        var mirrored = NamesIn(NarrowToolsSource, "STILL_SHORTENED");
+        Assert.True(mirrored.SetEquals(AssistAgent.StillShortened),
+            "research/ai-assist/narrow-tools.py STILL_SHORTENED no longer mirrors AssistAgent.StillShortened: script [" +
+            string.Join(", ", mirrored.Order()) + "], app [" + string.Join(", ", AssistAgent.StillShortened.Order()) + "].");
+    }
+
+    /// <summary>
     /// The script hides the same card-only arguments the app does.
     ///
     /// <para>Same reasoning as the tool list, one level down. <c>duplicate</c>

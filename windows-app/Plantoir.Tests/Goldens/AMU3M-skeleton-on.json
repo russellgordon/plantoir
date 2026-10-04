@@ -1,0 +1,52 @@
+{
+  "shared_folders": [
+    "Concepts",
+    "Repertoire",
+    "Warm-Ups",
+    "Listening",
+    "Portfolios",
+    "Tasks",
+    "Setup",
+    "Style",
+    "Tutorials",
+    "Curriculum"
+  ],
+  "shared_files": [
+    "Learning Goals.md",
+    "Help Sessions.md"
+  ],
+  "per_section_folders": [
+    "All Classes"
+  ],
+  "per_section_files": [
+    "Key Links.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "hidden": [
+    "Media",
+    "Curriculum",
+    "Learning Goals.md",
+    "Help Sessions.md",
+    "Key Links.md",
+    "Private Notes.md",
+    "Scratch Page.md"
+  ],
+  "expandable": [
+    "Concepts",
+    "Repertoire",
+    "Warm-Ups",
+    "Listening",
+    "Portfolios",
+    "Tasks",
+    "Setup",
+    "Style",
+    "Tutorials"
+  ],
+  "prepopulate_example_content": false,
+  "use_skeleton": true,
+  "include_curriculum_pages": false,
+  "graded_folders": [
+    "Tasks"
+  ]
+}

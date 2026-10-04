@@ -44,6 +44,10 @@ public static class ScheduledDeployCompletion
 
         [JsonPropertyName("completedAtUtc")]
         public DateTime CompletedAtUtc { get; set; }
+
+        /// <summary>The rule the wrapper's fingerprint was taken under (#358); absent from wrappers written before it.</summary>
+        [JsonPropertyName("fingerprintRule")]
+        public int? FingerprintRule { get; set; }
     }
 
     private static readonly JsonSerializerOptions ReadOptions = new()
@@ -96,9 +100,14 @@ public static class ScheduledDeployCompletion
         if (sentinel is null || string.IsNullOrEmpty(sentinel.Fingerprint)) return;
         if (!Directory.Exists(sentinel.CourseDirectory)) return; // course removed or renamed since scheduling
 
+        // The rule the WRAPPER took the fingerprint under: a wrapper written
+        // before #358 wrote no rule and computed rule 1, and recording its
+        // value as rule 2 would be a false "— Edited" for any course with a
+        // How I Teach page.
         bool recorded = SectionPublishState.RecordPublish(
             sentinel.CourseDirectory, sentinel.SectionNumber, sentinel.Fingerprint,
-            sentinel.DestinationTypes, sentinel.CompletedAtUtc);
+            sentinel.DestinationTypes, sentinel.CompletedAtUtc,
+            sentinel.FingerprintRule ?? SectionPublishState.RuleWhenAbsent);
 
         string joined = MultiDestinationDeployRunner.JoinedWithAnd(sentinel.DestinationNames);
         string sentence = recorded

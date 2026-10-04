@@ -43,46 +43,16 @@ public sealed class ScheduledDeployTests : IDisposable
             Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md"),
             $"---\ntitle: {title}\ncreated: {created}\npublish: {(published ? "true" : "false")}\n---\nBody.\n");
 
-    // ---- What the sidebar's own dialog says about unpublished classes ------
-
-    /// <summary>
-    /// The sidebar has no list of named classes the way the assistant's tool
-    /// does, so EVERY unpublished class is named — dated after the deploy or
-    /// not at all, it is still a page students cannot see, which is the
-    /// contract's rule and the mac's behaviour. The section's front page is
-    /// never a class, even when it sits inside the class folder.
-    /// </summary>
-    [Fact]
-    public void TheClassesADeployWouldLeaveBehindAreEveryUnpublishedOne()
-    {
-        DatedClassPage("Unit 1, Day 1", published: true, created: "2026-09-08");
-        DatedClassPage("Unit 1, Day 2", published: false, created: "2026-09-09");
-        DatedClassPage("Unit 1, Day 4", published: false, created: "2026-12-14");
-        ClassPage("Unit 9, Day 1", published: false);       // undated, still named
-        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "index.md"),
-            "---\ntitle: All Classes\npublish: false\n---\n");
-        var course = Open().Course("ICS3U");
-
-        Assert.Equal(new[] { "Unit 1, Day 2", "Unit 1, Day 4", "Unit 9, Day 1" },
-                     ScheduledDeploy.UnpublishedClassesIn(course, 1));
-    }
+    // ---- What the sidebar's own dialog says (#400) -------------------------
 
     [Fact]
-    public void TheDialogsSentenceCarriesTheSameContentAsTheAssistantsDescription()
+    public void TheDialogSaysNothingAboutUnpublishedClassesAndNamesTheDestination()
     {
-        Assert.Null(ScheduledDeploy.UnpublishedClassesSentence(Array.Empty<string>()));
-
-        string one = ScheduledDeploy.UnpublishedClassesSentence(new[] { "Unit 1, Day 2" })!;
-        Assert.StartsWith("One thing first — 1 class is not published yet: Unit 1, Day 2.", one);
-        Assert.Contains("Deploying now would put the site up without it.", one);
-        Assert.EndsWith("Publish first, look the preview over, then schedule this.", one);
-
-        var many = Enumerable.Range(1, 10).Select(n => $"Unit 2, Day {n}").ToList();
-        string sentence = ScheduledDeploy.UnpublishedClassesSentence(many)!;
-        Assert.Contains("10 classes are not published yet", sentence);
-        Assert.Contains("Unit 2, Day 8 …and 2 more.", sentence);
-        Assert.DoesNotContain("Unit 2, Day 9", sentence);
-        Assert.Contains("without them.", sentence);
+        ClassPage("Unit 9, Day 1", published: false);
+        string opening = ScheduledDeploy.DialogOpening(Open().Course("ICS3U"), 1);
+        Assert.Contains("will deploy on its own to Netlify at the time you pick.", opening);
+        Assert.DoesNotContain("not published", opening);
+        Assert.DoesNotContain("Unit 9", opening);
     }
 
     public void Dispose()
@@ -284,9 +254,8 @@ public sealed class ScheduledDeployTests : IDisposable
 
         // The failure this exists to prevent: a deploy that runs perfectly at
         // half six and ships a site without tomorrow's class.
-        Assert.Equal("Unit 2, Day 3", Assert.Single(plan.UnpublishedClasses));
-        Assert.Contains("not published yet", plan.Describe());
-        Assert.Contains("Publish first", plan.Describe());
+        Assert.Equal(("Unit 2, Day 3", (bool?)false), Assert.Single(plan.ClassesNamed));
+        Assert.Contains("Unit 2, Day 3 — NOT published, so the deploy would ship without it.", plan.Describe());
     }
 
     [Fact]
@@ -296,8 +265,8 @@ public sealed class ScheduledDeployTests : IDisposable
 
         var plan = Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow, new[] { "Unit 2, Day 3" });
 
-        Assert.Empty(plan.UnpublishedClasses);
-        Assert.DoesNotContain("not published yet", plan.Describe());
+        Assert.Equal(("Unit 2, Day 3", (bool?)true), Assert.Single(plan.ClassesNamed));
+        Assert.DoesNotContain("NOT published", plan.Describe());
     }
 
     [Fact]
@@ -311,9 +280,12 @@ public sealed class ScheduledDeployTests : IDisposable
     }
 
     [Fact]
-    public void TheTaskNameIsPerSectionSoTwoSectionsDoNotCollide()
+    public void TheTaskNameIsPerSectionAndPerWorkingFolder()
     {
-        var one = Open().PlanScheduledDeploy("ICS3U", 1, Tomorrow);
-        Assert.Equal("Plantoir deploy ICS3U section 1", one.TaskName);
+        // #309: section 1 and section 2 differ, and so do two working folders.
+        string one = TaskScheduling.NameFor("ICS3U", 1, _folder);
+        Assert.NotEqual(one, TaskScheduling.NameFor("ICS3U", 2, _folder));
+        Assert.NotEqual(one, TaskScheduling.NameFor("ICS3U", 1, Path.Combine(_folder, "last year")));
+        Assert.StartsWith("Plantoir deploy ICS3U section 1 ", one);
     }
 }

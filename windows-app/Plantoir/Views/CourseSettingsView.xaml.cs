@@ -62,30 +62,16 @@ public sealed partial class CourseSettingsView : UserControl
     /// that lives in a view can be pinned by no test. A FILE has no marks pool
     /// to consider, so it needs only the exclusion.</para>
     /// </summary>
-    private void RecordExclusion(string scope, string kind, string name)
-    {
-        if (kind == "folder") FolderRemoval.RemoveFolderFromCourse(Config, _course.DirectoryPath, scope, name);
-        else Config.Exclude(scope, name);
-        // No section on the line: these lists are COURSE-wide, and the
-        // two-argument overload exists for exactly that. Naming the course's
-        // first section would assert a section that had nothing to do with the
-        // change -- and on a course numbered [3, 5] it would say "/3", which a
-        // person reading the trail would believe.
-        ActivityTrail.Note(ActivityTrail.Event.ItemExcluded,
-            $"{_course.Code}: removed the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” from this course's site");
-    }
+    private void RecordExclusion(string scope, string kind, string name) =>
+        CourseSettingsExclusions.RecordExclusion(Config, _course.Code, _course.DirectoryPath, scope, kind, name);
 
     /// <summary>
     /// A teacher added a name back. The trail line goes on ONLY when the name
     /// really was excluded — an ordinary new folder is not a re-inclusion, and
     /// a line saying it was would be believed.
     /// </summary>
-    private void RecordReInclusion(string scope, string kind, string name)
-    {
-        if (!Config.ReInclude(scope, name)) return;
-        ActivityTrail.Note(ActivityTrail.Event.ItemReIncluded,
-            $"{_course.Code}: added the {CourseConfiguration.ScopeInWords(scope)} {kind} “{name}” back to this course's site");
-    }
+    private void RecordReInclusion(string scope, string kind, string name) =>
+        CourseSettingsExclusions.RecordReInclusion(Config, _course.Code, scope, kind, name);
 
     /// <summary>
     /// Redraw the controls whose rows carry a protection state, because that
@@ -152,7 +138,7 @@ public sealed partial class CourseSettingsView : UserControl
         button.Click += async (_, _) =>
         {
             if (XamlRoot is null) return;
-            var dialog = SpecialFoldersHelpDialog.For(Config);
+            var dialog = SpecialFoldersHelpDialog.For(Config, CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath));
             dialog.XamlRoot = XamlRoot;
             await dialog.ShowAsync();
         };
@@ -208,6 +194,128 @@ public sealed partial class CourseSettingsView : UserControl
     /// <summary>Removal excludes; it has never deleted anything, and teachers could not tell.</summary>
     private void NoticeAfterRemoval(string name) =>
         ShowFolderNotice(SpecialNames.RemoveLeavesTheFolderOnDisk.Replace("{name}", name));
+
+    // ---- Renaming the word for a unit (#158) -----------------------------------
+
+    /// <summary>
+    /// The sheet: the wizard's own question, the explanation, the "prose is
+    /// left alone" line, the plan (pages, sections, links — surveyed once,
+    /// OFF the UI thread, when the sheet opens), and a live refusal. Rename
+    /// runs the whole rename off the UI thread and the sheet cannot be
+    /// dismissed while it runs. The mac's UnitWordRenameSheet.
+    /// </summary>
+    private async Task OpenRenameUnitWordDialog()
+    {
+        string oldWord = Config.UnitWord;
+        var facts = UnitWordRenamer.Facts(_course);
+        string? interruptedTarget = null;
+        UnitWordSurvey? survey = null;
+        await Task.Run(() =>
+        {
+            interruptedTarget = UnitWordRenamer.InterruptedRenameTarget(facts);
+            survey = UnitWordRenamer.Survey(facts);
+        });
+
+        var field = new TextBox { Text = interruptedTarget ?? oldWord, Header = UnitWordRenameWording.FieldLabel };
+        AutomationProperties.SetAutomationId(field, "renameUnitWordField");
+        var planText = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
+        var problem = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+        };
+        AutomationProperties.SetAutomationId(problem, "renameUnitWordProblem");
+
+        var body = new StackPanel { Spacing = 10 };
+        if (interruptedTarget is not null)
+            body.Children.Add(new TextBlock { Text = UnitWordRenameWording.InterruptedRename(oldWord, interruptedTarget), TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(field);
+        body.Children.Add(new TextBlock { Text = UnitWordRenameWording.Explanation, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(new TextBlock { Text = UnitWordRenameWording.ProseIsLeftAlone, TextWrapping = TextWrapping.Wrap, Opacity = 0.8 });
+        body.Children.Add(planText);
+        body.Children.Add(problem);
+
+        var dialog = new ContentDialog
+        {
+            Title = UnitWordRenameWording.SheetTitle(oldWord),
+            Content = body,
+            PrimaryButtonText = "Rename",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        AutomationProperties.SetAutomationId(dialog, "renameUnitWordDialog");
+
+        bool running = false;
+        dialog.Closing += (_, args) => { if (running) args.Cancel = true; };
+
+        void Recheck()
+        {
+            string typed = field.Text.Trim();
+            planText.Text = survey is null ? UnitWordRenameWording.LookingOver
+                : UnitWordRenameWording.Pages(survey.Pages, survey.Sections, _course.Code, oldWord, typed.Length == 0 ? oldWord : typed)
+                  + " " + UnitWordRenameWording.Links(survey.Links);
+            string? why = UnitWordRenamer.Problem(oldWord, field.Text, interruptedTarget);
+            problem.Text = why ?? "";
+            problem.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
+            dialog.IsPrimaryButtonEnabled = why is null;
+        }
+        field.TextChanged += (_, _) => Recheck();
+        Recheck();
+
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            var deferral = args.GetDeferral();
+            string newWord = field.Text.Trim();
+            string workingFolder = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(_course.DirectoryPath)!)!;
+            string coursesDirectory = System.IO.Path.GetDirectoryName(_course.DirectoryPath)!;
+            try
+            {
+                if (CourseActivity.IsPreviewing(workingFolder, _course.Code) || CourseActivity.IsPublishing(workingFolder, _course.Code))
+                {
+                    problem.Text = UnitWordRenameWording.ProblemBusy(_course.Code);
+                    problem.Visibility = Visibility.Visible;
+                    args.Cancel = true;
+                    return;
+                }
+                running = true;
+                dialog.IsPrimaryButtonEnabled = false;
+                problem.Text = UnitWordRenameWording.LookingOver;
+                problem.Visibility = Visibility.Visible;
+                var outcome = await Task.Run(() =>
+                {
+                    // The plan is redone at Rename: the destination check
+                    // depends on the word typed and on the disk now.
+                    var plan = UnitWordRenamer.Plan(oldWord, newWord, UnitWordRenamer.Facts(_course));
+                    return UnitWordRenamer.Rename(plan, _course, coursesDirectory);
+                });
+                ShowFolderNotice(UnitWordRenameWording.Done(oldWord, newWord, outcome));
+                BuildForm();
+            }
+            catch (UnitWordRenameProblem failure)
+            {
+                problem.Text = failure.Message;
+                problem.Visibility = Visibility.Visible;
+                args.Cancel = true;
+            }
+            catch (Exception error)
+            {
+                problem.Text = error.Message;
+                problem.Visibility = Visibility.Visible;
+                args.Cancel = true;
+            }
+            finally
+            {
+                running = false;
+                dialog.IsPrimaryButtonEnabled = true;
+                deferral.Complete();
+            }
+        };
+
+        try { await dialog.ShowAsync(); }
+        catch (Exception ex) { App.LogDiagnostic($"rename unit word dialog: {ex.Message}"); }
+    }
 
     // ---- Renaming a folder ---------------------------------------------------
 
@@ -312,12 +420,21 @@ public sealed partial class CourseSettingsView : UserControl
         string courseDirectory = _course.DirectoryPath;
         var sections = Config.SectionNumbers.ToList();
         RenameOutcome outcome;
+        List<string>? curriculumPages = null;
+        List<string>? curriculumLetterFirst = null;
         try
         {
             // Off the UI thread: the move is quick, but reading every page in
             // the course to rewrite links is not on a synced vault.
+            var sharedBefore = Config.SharedFolders.Append(newName).ToList();
             outcome = await Task.Run(() =>
             {
+                // The curriculum folders are decided from their pages, so they
+                // are read BEFORE the move (#345) — afterwards the old name is
+                // not there — and off the UI thread, like the move itself.
+                var (pagesBefore, letterFirstBefore) = CurriculumFolderRule.FoldersWithPages(courseDirectory, sharedBefore);
+                curriculumPages = pagesBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
+                curriculumLetterFirst = letterFirstBefore.Select(f => string.Equals(f, newName, StringComparison.OrdinalIgnoreCase) ? oldName : f).ToList();
                 if (!finishing) return SpecialFolderRenamer.Rename(oldName, newName, scope, courseDirectory, sections);
                 // The folders already moved; only the links and the record remain.
                 int relinked = SpecialFolderRenamer.RelinkPages(courseDirectory, oldName, newName);
@@ -332,7 +449,8 @@ public sealed partial class CourseSettingsView : UserControl
 
         try
         {
-            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope),
+            Config.RecordOnDisk(values => SpecialFolderRenamer.Renaming(values, oldName, newName, scope,
+                                                                        curriculumPages, curriculumLetterFirst),
                                 _course.ConfigFilePath);
         }
         catch (Exception error)
@@ -390,17 +508,35 @@ public sealed partial class CourseSettingsView : UserControl
     private List<string> MarksPool() =>
         Config.MaterializedGradedFolders(GradedFolderChoicesNow());
 
-    private ProtectionContext Protection() => new(
-        InWizard: false,
-        CurriculumCoverageEnabled: Config.OverallIncludesCurriculumCoverage,
-        // Course Settings has no curriculum-PAGES switch - that choice is made
-        // once, in the wizard - so it can never be the reason here.
-        CurriculumPagesEnabled: false,
-        Jurisdiction: SpecialNames.DefaultJurisdiction,
-        ResolvedCurriculumFolder: Config.ResolvedCurriculumFolder,
-        GradedFolders: MarksPool(),
-        PerSectionFolders: Config.PerSectionFolders,
-        ResolvedClassFolder: ClassFolderRule.Name(Config.ClassFolder, Config.PerSectionFolders));
+    /// <summary>
+    /// The context a row is DRAWN with: the walk taken once for this pass,
+    /// shared by the checklist and all three lists (#348 — a walk per row was
+    /// measured on the mac at 53 ms each on a 400-folder course).
+    /// </summary>
+    private ProtectionContext Protection() => CourseSettingsProtection.For(Config, _walkedFolders, _curriculum);
+
+    /// <summary>
+    /// This pass's curriculum folders, decided from the disk (#345): read once
+    /// per drawing like the walk, and afresh at the click.
+    /// </summary>
+    private CurriculumFolderRule.Resolution _curriculum =
+        new(Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
+
+    /// <summary>
+    /// The context a row is ACTED ON with: the disk walked afresh, because the
+    /// marks floor depends on it, and a folder deleted in Explorer while this
+    /// page is open — #80's own scenario — must count as gone.
+    /// </summary>
+    private ProtectionContext ProtectionWhenActedOn()
+    {
+        _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
+        _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
+        _curriculum = CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath);
+        return CourseSettingsProtection.For(Config, _walkedFolders, _curriculum);
+    }
+
+    /// <summary>This pass's walk, every occurrence kept (see <see cref="Protection"/>).</summary>
+    private IReadOnlyList<WalkedFolder> _walkedFolders = Array.Empty<WalkedFolder>();
 
     // ---- Font sample text ------------------------------------------------
 
@@ -418,14 +554,48 @@ public sealed partial class CourseSettingsView : UserControl
 
     private PublishingChoiceView? _publishingChoice;
 
+    /// <summary>The held-back sentence last shown beside Save, so clearing it never clears a saved confirmation.</summary>
+    private string? _heldBackShown;
+
+    /// <summary>Whether this visit's trail already says Save was held back (once per visit, #387).</summary>
+    private bool _heldBackRecorded;
+
     private void RefreshDirtyState()
     {
-        bool dirty = Config.HasUnsavedChanges;
-        // A folder-publishing course with a bad folder cannot be saved — a
-        // publish must never discover the problem after the fact (row 102).
-        SaveButton.IsEnabled = dirty && _publishingChoice?.Problem is null;
-        RevertButton.IsEnabled = dirty;
+        // #387 (mac #364 #373; savingSettings.whatEnablesSave): a destination
+        // problem holds Save back ONLY when the unsaved edit moves where the
+        // course publishes. Before, `dirty && Problem is null` meant a course
+        // whose folder is missing on this PC could not save a colour scheme,
+        // and nothing near Save said why.
+        var state = SettingsSaveState.Decide(Config, _window.Workspace.Settings.CloudflareAccountId ?? "");
+        SaveButton.IsEnabled = state.SaveEnabled;
+        RevertButton.IsEnabled = state.RevertEnabled;
+
+        if (state.Sentence is { } sentence)
+        {
+            SaveStatus.Text = sentence;
+            _heldBackShown = sentence;
+            if (!_heldBackRecorded)
+            {
+                _heldBackRecorded = true;
+                ActivityTrail.Note(ActivityTrail.Event.SettingsSaveHeldBack,
+                    SettingsSaveHeldBackLine(_course.Code, state.Check!));
+            }
+        }
+        else if (_heldBackShown is not null)
+        {
+            if (SaveStatus.Text == _heldBackShown) SaveStatus.Text = "";
+            _heldBackShown = null;
+        }
     }
+
+    /// <summary>The trail line: the course and WHICH check — never the path or the ID. Worded as a hold, not a failure.</summary>
+    internal static string SettingsSaveHeldBackLine(string code, string check) => check switch
+    {
+        SettingsSaveState.DeployFolderCheck => $"Save held back for {code} (deploy folder) — the publishing folder needs attention",
+        SettingsSaveState.CloudflareAccountCheck => $"Save held back for {code} (cloudflare account id) — the Cloudflare Account ID needs attention",
+        _ => $"Save held back for {code} (additional destination) — an additional destination needs attention",
+    };
 
     // ---- Form ------------------------------------------------------------
 
@@ -436,17 +606,62 @@ public sealed partial class CourseSettingsView : UserControl
 
         // Walked once per pass, before anything asks what the Marks list
         // offers or what the pool currently holds.
-        _nestedFolderNames = GradedFolderChoices.NestedFolderNames(
-            _course.DirectoryPath,
-            Config.ExcludedItems(CourseConfiguration.SharedScope),
-            Config.ExcludedItems(CourseConfiguration.PerSectionScope));
+        _walkedFolders = CourseSettingsProtection.Walk(Config, _course.DirectoryPath);
+        _nestedFolderNames = GradedFolderChoices.NamesIn(_walkedFolders);
+        _curriculum = CurriculumFolderRule.ForCourse(Config, _course.DirectoryPath);
 
         // -------- Settings — Overall --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Settings — Overall", null));
 
         var nameBox = new TextBox { Text = Config.CourseName };
+        AutomationProperties.SetAutomationId(nameBox, "courseNameField");
         nameBox.TextChanged += (_, _) => { Config.CourseName = nameBox.Text; MarkChanged(); RebuildGradeWarnings(); };
         Form.Children.Add(FormBuilders.LabeledRow("Course name", nameBox));
+
+        // The word for a unit, with Rename… beside it (#158). It commits to
+        // DISK at once, like a folder rename, so it is a sheet and not a field.
+        var unitWord = new TextBlock { Text = Config.UnitWord, VerticalAlignment = VerticalAlignment.Center };
+        var renameUnitWord = new Button { Content = UnitWordRenameWording.RenameButton, Margin = new Thickness(12, 0, 0, 0) };
+        AutomationProperties.SetAutomationId(renameUnitWord, "renameUnitWordButton");
+        renameUnitWord.Click += (_, _) => _ = OpenRenameUnitWordDialog();
+        var unitWordRow = new StackPanel { Orientation = Orientation.Horizontal };
+        unitWordRow.Children.Add(unitWord);
+        unitWordRow.Children.Add(renameUnitWord);
+        Form.Children.Add(FormBuilders.LabeledRow(UnitWordRenameWording.FieldLabel, unitWordRow));
+        if (Config.Naming.IsNumbered)
+        {
+            // A club's word was chosen in the wizard with its folder, heading
+            // and noun (#274): Rename… is DISABLED, and says why beneath it.
+            renameUnitWord.IsEnabled = false;
+            Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaptionNumbered(Config.UnitWord)));
+            var locked = FormBuilders.ExampleCaption(UnitWordRenameWording.RenameLockedNumbered);
+            AutomationProperties.SetAutomationId(locked, "renameLockedNumbered");
+            Form.Children.Add(locked);
+        }
+        else
+        {
+            Form.Children.Add(FormBuilders.ExampleCaption(UnitWordRenameWording.RowCaption(Config.UnitWord)));
+        }
+
+        // The club's three settings, LOCKED — a label and the value, no
+        // control — and only those the course RECORDED (#274, #387; mac #376).
+        var clubRows = ClubSettingsRows.Shown(Config);
+        if (clubRows.Count > 0)
+        {
+            var group = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+            AutomationProperties.SetAutomationId(group, "clubLockedRows");
+            foreach (var row in clubRows)
+            {
+                var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                line.Children.Add(new TextBlock { Text = row.Label, FontSize = 13 });
+                var value = new TextBlock { Text = row.Value, FontSize = 13, Opacity = 0.8 };
+                AutomationProperties.SetAutomationId(value, "clubLockedRow_" + row.Key);
+                line.Children.Add(value);
+                group.Children.Add(line);
+            }
+            group.Children.Add(FormBuilders.ExampleCaption(ClubSettingsRows.LockedCaption));
+            Form.Children.Add(group);
+        }
 
         if (Config.IsClub(CourseNameCatalogs.Shared))
         {
@@ -463,7 +678,9 @@ public sealed partial class CourseSettingsView : UserControl
         {
             if (localeBox.SelectedIndex >= 0) { Config.Locale = LocaleCatalog.Codes[localeBox.SelectedIndex]; MarkChanged(); }
         };
-        Form.Children.Add(FormBuilders.LabeledRow("Language / region (Quartz locale)", localeBox));
+        var localeRow = FormBuilders.LabeledRow(CourseSettingsWording.LocaleLabel, localeBox);
+        localeRow.Children.Add(FormBuilders.ExampleCaption(CourseSettingsWording.LocaleCaption));
+        Form.Children.Add(localeRow);
 
         var readTime = new ToggleSwitch { IsOn = Config.ShowReadingTime, OnContent = "", OffContent = "" };
         readTime.Toggled += (_, _) => { Config.ShowReadingTime = readTime.IsOn; MarkChanged(); };
@@ -565,7 +782,8 @@ public sealed partial class CourseSettingsView : UserControl
             name => { RecordReInclusion(CourseConfiguration.SharedScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.Shared); },
             name => ItemProtectionRule.For(name, ItemList.SharedFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the shared folders", name, reason),
-            name => _ = OpenRenameFolderDialog(name, FolderScope.Shared)));
+            name => _ = OpenRenameFolderDialog(name, FolderScope.Shared),
+            name => ItemProtectionRule.For(name, ItemList.SharedFolders, ProtectionWhenActedOn())));
         Form.Children.Add(FormBuilders.StringListEditor("Shared files (all sections)", true,
             () => Config.SharedFiles, v => Config.SharedFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.SharedScope, "file", name),
@@ -578,7 +796,8 @@ public sealed partial class CourseSettingsView : UserControl
             name => { RecordReInclusion(CourseConfiguration.PerSectionScope, "folder", name); CreateFolderForNewEntry(name, FolderScope.PerSection); },
             name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, Protection()),
             (name, reason) => RecordRemovalBlocked("the per-section folders", name, reason),
-            name => _ = OpenRenameFolderDialog(name, FolderScope.PerSection)));
+            name => _ = OpenRenameFolderDialog(name, FolderScope.PerSection),
+            name => ItemProtectionRule.For(name, ItemList.PerSectionFolders, ProtectionWhenActedOn())));
         Form.Children.Add(FormBuilders.StringListEditor("Per-section files", true,
             () => Config.PerSectionFiles, v => Config.PerSectionFiles = v, ChangedAndRedraw,
             name => RecordExclusion(CourseConfiguration.PerSectionScope, "file", name),
@@ -587,12 +806,61 @@ public sealed partial class CourseSettingsView : UserControl
             (name, reason) => RecordRemovalBlocked("the per-section files", name, reason)));
         Form.Children.Add(FormBuilders.ExampleCaption(SpecialNames.ContentStructureTip));
 
+        // -------- How I Teach (#360, howITeachPage.settingsButton) --------
+        // Beside the curriculum folders: Open when the course has a page,
+        // Create and Open when it has none (exactly createdBytes, CreateNew,
+        // never over a page made a moment earlier), then the PAGE in Obsidian.
+        var howITeachRow = FormBuilders.LabeledRow(HowITeachSettingsRow.RowLabel, new StackPanel());
+        var howITeachButton = new Button { Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath) };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(howITeachButton, "howITeachButton");
+        var howITeachProblem = FormBuilders.WarningCaption("");
+        howITeachProblem.Visibility = Visibility.Collapsed;
+        howITeachButton.Click += (_, _) =>
+        {
+            var (outcome, page, problem) = HowITeachSettingsRow.Press(_course.DirectoryPath, _course.Code);
+            howITeachProblem.Text = problem ?? "";
+            howITeachProblem.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            howITeachButton.Content = HowITeachSettingsRow.ButtonFor(_course.DirectoryPath);
+            if (page is not null)
+                _ = FolderActions.OpenInObsidian(_course.DirectoryPath, _course.DirectoryPath,
+                    BundledToolchain.SupportPath("obsidian_defaults/.obsidian"), page);
+        };
+        howITeachRow.Children.RemoveAt(1);
+        howITeachRow.Children.Add(howITeachButton);
+        howITeachRow.Children.Add(FormBuilders.ExampleCaption(HowITeachSettingsRow.Caption));
+        howITeachRow.Children.Add(howITeachProblem);
+        Form.Children.Add(howITeachRow);
+
+        // -------- Curriculum folders (#345, specialNames.curriculumFoldersOffer) --------
+        // Only with two or more candidates; ticked are the folders with a map,
+        // then every declared folder; a tick writes the ticked ones FIRST so the
+        // primary map keeps its name; the last ticked folder stays ticked.
+        var offered = CurriculumFoldersOffer.Offered(Config.SharedFolders, Config.CurriculumFolders);
+        if (offered.Count > 0)
+        {
+            List<string> Ticked() => CurriculumFoldersOffer.Ticked(Config.SharedFolders, Config.CurriculumFolders, _curriculum.Mapped);
+            var curriculumList = FormBuilders.MembershipToggleList(CurriculumFoldersOffer.Label, offered,
+                Ticked,
+                v => Config.CurriculumFolders = v,
+                () => { MarkChanged(); RebuildProtectedRows(); },
+                name =>
+                {
+                    var ticked = Ticked();
+                    return ticked.Count == 1 && ticked.Contains(name, StringComparer.OrdinalIgnoreCase)
+                        ? ItemProtection.Blocked(CurriculumFoldersOffer.LastStaysTicked)
+                        : ItemProtection.Ordinary;
+                },
+                (name, reason) => RecordRemovalBlocked("the curriculum folders", name, reason));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(curriculumList, "curriculumFoldersList");
+            Form.Children.Add(curriculumList);
+            Form.Children.Add(FormBuilders.ExampleCaption(CurriculumFoldersOffer.Caption));
+        }
+
         // -------- Sidebar Visibility --------
         Form.Children.Add(FormBuilders.SectionHeaderWithCaption("Sidebar Visibility", null));
-        Form.Children.Add(FormBuilders.MembershipToggleList("Hide from the site's sidebar",
-            Config.AllSidebarItems, () => Config.HiddenItems, v => Config.HiddenItems = v, MarkChanged));
-        Form.Children.Add(FormBuilders.MembershipToggleList("Expandable in the site's sidebar",
-            Config.AllSidebarItems, () => Config.ExpandableItems, v => Config.ExpandableItems = v, MarkChanged));
+        Form.Children.Add(FormBuilders.SidebarVisibilityTable(Config.AllSidebarItems,
+            () => Config.HiddenItems, v => Config.HiddenItems = v,
+            () => Config.ExpandableItems, v => Config.ExpandableItems = v, MarkChanged));
 
         // -------- Marks --------
         // Which folders hold work that counts for marks. Before this key
@@ -618,7 +886,8 @@ public sealed partial class CourseSettingsView : UserControl
             // it unblocks that folder's row in the lists above too.
             () => { MarkChanged(); RebuildProtectedRows(); },
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, Protection()),
-            (name, reason) => RecordRemovalBlocked("the marks list", name, reason)));
+            (name, reason) => RecordRemovalBlocked("the marks list", name, reason),
+            name => ItemProtectionRule.For(name, ItemList.GradedFolders, ProtectionWhenActedOn())));
         // BELOW the list, not above it: the caption says "a page in one of
         // these", and above the list "these" followed the section header
         // "Marks" and referred to nothing. The mac has always drawn it here.
@@ -672,7 +941,7 @@ public sealed partial class CourseSettingsView : UserControl
         var schemeIds = new System.Collections.Generic.List<string>();
         if (currentScheme.Length == 0)
         {
-            schemeBox.Items.Add("Quartz default (none chosen)");
+            schemeBox.Items.Add(CourseSettingsWording.ColourSchemeNoneChosen);
             schemeIds.Add("");
             selectedIndex = 0;
         }
@@ -851,7 +1120,10 @@ public sealed partial class CourseSettingsView : UserControl
 
     private void Revert_Click(object sender, RoutedEventArgs e)
     {
-        Config.DiscardChanges();
+        // Counts this copy's unsaved exclusion changes and says so on the
+        // trail before the file is read back (#348): the click lines stay,
+        // and this one says they were taken back.
+        CourseSettingsExclusions.Revert(Config, _course.Code, _course.ConfigFilePath);
         BuildForm();
         RefreshDirtyState();
         HeaderName.Text = Config.CourseName;
@@ -861,14 +1133,66 @@ public sealed partial class CourseSettingsView : UserControl
     {
         try
         {
-            Config.Write(_course.ConfigFilePath);
+            // Where the course deployed BEFORE this Save, off disk (#347): a
+            // scheduled deploy goes where the course deploys when it RUNS, so a
+            // Save that moves or breaks one is said now, while somebody is awake.
+            IReadOnlyList<CourseConfiguration.DeployDestination> before;
+            try { before = CourseConfiguration.FromBytes(File.ReadAllBytes(_course.ConfigFilePath)).AllDeployDestinations; }
+            catch { before = Config.AllDeployDestinations; }
+
+            var report = Config.Write(_course.ConfigFilePath);
+            // Every OTHER window's copy of this course with nothing unsaved
+            // reads the file again (#272 / mac #265); one with unsaved changes
+            // is left alone, and its own Save merges.
+            Plantoir.ViewModels.WorkspaceViewModel.OtherCopiesReread(_course.ConfigFilePath, Config);
+            BuildForm();
             RefreshDirtyState();
             // The mac's wording, so the two trails read the same. Declared
             // when the trail was built and emitted by nobody until 2026-09-07.
+            // Since #272 it also says what it kept or replaced from elsewhere.
+            string fromElsewhere =
+                (report.KeptFromElsewhere.Count > 0 ? "; kept from elsewhere: " + string.Join(", ", report.KeptFromElsewhere) : "") +
+                (report.ReplacedChangesFromElsewhere.Count > 0 ? "; replaced a change made elsewhere to: " + string.Join(", ", report.ReplacedChangesFromElsewhere) : "");
             ActivityTrail.Note(ActivityTrail.Event.SettingsSaved,
-                "saved the settings for " + _course.Code);
-            SaveStatus.Text = "Saved ✓";
+                "saved the settings for " + _course.Code + fromElsewhere);
+
+            IReadOnlyList<string> aboutScheduled = Array.Empty<string>();
+            string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
+            if (workingFolder is not null)
+            {
+                try
+                {
+                    aboutScheduled = Plantoir.Core.Assist.ScheduledRun.WhatASaveSays(
+                        Plantoir.Core.Assist.ScheduledRun.StillToCome(workingFolder, _course.Code),
+                        new Course(_course.Code, _course.DirectoryPath, Config), before,
+                        AppSettings.Load().CloudflareAccountId);
+                }
+                catch { aboutScheduled = Array.Empty<string>(); }
+            }
+
+            // specialNames.settingsSaveReplacedSidebarChange comes FIRST among
+            // the after-Save sentences (#272): the last Save wins for the whole
+            // list, but said.
+            var afterSave = new List<string>();
+            if (report.ReplacedChangesFromElsewhere.Contains("hidden")) afterSave.Add(CourseConfiguration.SaveReplacedSidebarChange);
+            // A Save never reaches a running preview or publish (#272): say
+            // which, and offer Preview Again for a preview. A publish wins
+            // over a preview: it is the one that sends the old settings out.
+            PreviewAgainButton.Visibility = Visibility.Collapsed;
+            if (workingFolder is not null && CourseActivity.IsPublishing(workingFolder, _course.Code))
+            {
+                afterSave.Add(SavedSettings.SavedWhilePublishing);
+            }
+            else if (OpenPreviewsOfThisCourse().Count > 0)
+            {
+                afterSave.Add(SavedSettings.SavedWhilePreviewing);
+                PreviewAgainButton.IsEnabled = true;
+                PreviewAgainButton.Visibility = Visibility.Visible;
+            }
+            afterSave.AddRange(aboutScheduled);
+            SaveStatus.Text = afterSave.Count == 0 ? "Saved ✓" : "Saved ✓ " + string.Join(" ", afterSave);
             SaveStatus.Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+            if (afterSave.Count > 0) return;   // none of these sentences fades; they stay until the next Save
             await Task.Delay(3000);
             SaveStatus.Text = "";
         }
@@ -884,6 +1208,52 @@ public sealed partial class CourseSettingsView : UserControl
                 "could not save the settings for " + _course.Code + " — " + error.Message);
             SaveStatus.Text = $"Could not save: {error.Message}";
             SaveStatus.Foreground = (Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+        }
+    }
+
+    /// <summary>This course's previews open anywhere in this app, for this working folder.</summary>
+    private List<PreviewLeases.Lease> OpenPreviewsOfThisCourse()
+    {
+        string? workingFolder = Path.GetDirectoryName(Path.GetDirectoryName(_course.DirectoryPath));
+        return PreviewLeases.Active
+            .Where(lease => workingFolder is not null && WorkingFolder.IsTheSame(lease.FolderPath, workingFolder) &&
+                            string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Preview Again (#272 / mac #265): stop and start every open preview of
+    /// this course, in whichever window shows it, so it bakes in what was just
+    /// saved. Removes only the preview sentence; a replaced-sidebar sentence
+    /// stays. When none is open any more the button stays, disabled, with
+    /// settingsPreviewAgainNothingOpen.
+    /// </summary>
+    private async void PreviewAgain_Click(object sender, RoutedEventArgs e)
+    {
+        var open = OpenPreviewsOfThisCourse();
+        if (open.Count == 0)
+        {
+            PreviewAgainButton.IsEnabled = false;
+            SaveStatus.Text = SaveStatus.Text.Replace(SavedSettings.SavedWhilePreviewing, SavedSettings.PreviewAgainNothingOpen);
+            ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+                "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
+            return;
+        }
+        SaveStatus.Text = SaveStatus.Text.Replace(" " + SavedSettings.SavedWhilePreviewing, "")
+                                         .Replace(SavedSettings.SavedWhilePreviewing, "");
+        PreviewAgainButton.Visibility = Visibility.Collapsed;
+        ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
+            "Preview Again pressed in Course Settings for " + _course.Code + ": rebuilt section(s) " +
+            string.Join(", ", open.Select(lease => lease.SectionNumber).Distinct().OrderBy(n => n)));
+        foreach (var lease in open)
+        {
+            if (App.WindowFor(lease.FolderPath) is not { } main) continue;
+            try
+            {
+                await main.StopPreviewForAsync(lease.FolderPath, lease.CourseCode, lease.SectionNumber);
+                main.ShowPreviewFor(lease.CourseCode, lease.SectionNumber);
+            }
+            catch (Exception error) { App.LogDiagnostic($"PreviewAgain_Click: {error}"); }
         }
     }
 

@@ -156,10 +156,14 @@ public class CourseConfigurationTests
     [Fact]
     public void FirstPerSectionWriteReplacesLegacyBool()
     {
-        var config = FromJson("""{"course_code":"ICS3U","show_grade_in_title":false}""");
+        var config = FromJson("""{"course_code":"ICS3U","section_numbers":[1,2],"show_grade_in_title":false}""");
         config.SetShowsGradeInTitle(2, true);
         Assert.True(config.ShowsGradeInTitle(2));
-        Assert.True(config.ShowsGradeInTitle(1));   // map default, legacy gone
+        // Section 1 KEEPS the legacy false (#387, mac #373 perSectionEditCases
+        // case 7): this line used to assert true — the map's default — which
+        // was exactly the bug, a change to one section turning another's grade
+        // back on.
+        Assert.False(config.ShowsGradeInTitle(1));
         Assert.IsType<JObject>(config.Values["show_grade_in_title"]);
     }
 
@@ -316,6 +320,30 @@ public class CourseConfigurationTests
         config.DiscardChanges();
         Assert.Equal("Original", config.CourseName);
         Assert.False(config.HasUnsavedChanges);
+    }
+
+    /// <summary>
+    /// Choosing a folder and then Netlify again, on a course whose settings
+    /// never named a destination, leaves nothing to save (bundle 11: found by
+    /// CourseSettingsSaveUiTests through the real window — "netlify" written
+    /// over an ABSENT key read as a change, so Revert stayed on).
+    /// </summary>
+    [Fact]
+    public void ChoosingTheSavedDestinationAgainLeavesNothingUnsaved()
+    {
+        var absent = FromJson("""{"course_code":"X"}""");
+        absent.DeployTarget = "local_folder";
+        Assert.True(absent.HasUnsavedChanges);
+        absent.DeployTarget = "netlify";
+        Assert.False(absent.HasUnsavedChanges);
+        Assert.Null(absent.Values["deploy_target"]);
+
+        var named = FromJson("""{"course_code":"X","deploy_target":"local_folder","deploy_folder_path":"C:\\out"}""");
+        named.DeployTarget = "netlify";
+        Assert.True(named.HasUnsavedChanges);
+        Assert.Equal("netlify", named.Values["deploy_target"]!.ToString());   // a real change is still written
+        named.DeployTarget = "local_folder";
+        Assert.False(named.HasUnsavedChanges);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Plantoir.Core;
@@ -10,26 +11,38 @@ namespace Plantoir.Tests;
 
 public class ContractTests
 {
+    /// <summary>
+    /// <c>assist-wording.json</c> → <c>wording</c> is THE list (#157): every key
+    /// is walked by reflection, in both directions, rather than named here one
+    /// line at a time. A key the mac adds with no member here goes red naming
+    /// itself; a member here with no key goes red too, unless it is one of the
+    /// sentences this app says and the mac says differently
+    /// (<see cref="WindowsOnlyWording"/>). A key this app does not carry yet is
+    /// held open BY NAME in <see cref="NamedGapLedger"/> against the issue that
+    /// owns it, and the ledger fails the day it starts existing.
+    ///
+    /// <para>What is compared. A key is resolved to a public static member of
+    /// the same name (first letter upper-cased) on <c>AssistWording</c>, then on
+    /// <c>ClassChangeWording</c>, where the duplicate-and-copy sentences live. A
+    /// constant is compared with the file WHOLE. A method cannot be compared
+    /// generically — its example values live in the file, not in its
+    /// signature — so the methods keep their hand-written calls below, with the
+    /// placeholder convention of the generator ("{course}", "{section}", 2).</para>
+    /// </summary>
     [Fact]
     public void AssistWording_MatchesContract()
     {
         var doc = ContractLoader.LoadJson("assist-wording.json");
         var wording = doc["wording"]!.AsObject();
 
-        Assert.Equal(wording["deployApproval"]!.ToString(), AssistWording.DeployApproval);
-        Assert.Equal(wording["deployQuestion"]!.ToString(), AssistWording.DeployQuestion);
-        Assert.Equal(wording["planQuestion"]!.ToString(), AssistWording.PlanQuestion);
-        Assert.Equal(wording["deployAccepted"]!.ToString(), AssistWording.DeployAccepted);
-        Assert.Equal(wording["planAccepted"]!.ToString(), AssistWording.PlanAccepted);
-        Assert.Equal(wording["cancelled"]!.ToString(), AssistWording.Cancelled);
-        Assert.Equal(wording["deployWasCancelled"]!.ToString(), AssistWording.DeployWasCancelled);
-        Assert.Equal(wording["planWasCancelled"]!.ToString(), AssistWording.PlanWasCancelled);
-
+        // ---- The methods, by hand: their example values come from the file.
         Assert.Equal(wording["deployed"]!.ToString(), AssistWording.Deployed("{course}", "{section}"));
         Assert.Equal(wording["couldNotBuildBeforeDeploying"]!.ToString(), AssistWording.CouldNotBuildBeforeDeploying("{course}", "{section}"));
         Assert.Equal(wording["deployDidNotFinish"]!.ToString(), AssistWording.DeployDidNotFinish("{course}", "{section}"));
         Assert.Equal(wording["sectionIsBusy"]!.ToString(), AssistWording.SectionIsBusy("{course}", "{section}"));
         Assert.Equal(wording["courseIsBusy"]!.ToString(), AssistWording.CourseIsBusy("{course}"));
+        Assert.Equal(wording["courseIsBeingBuiltElsewhere"]!.ToString(), AssistWording.CourseIsBeingBuiltElsewhere("{course}"));
+        Assert.Equal(wording["deployWentOutTo"]!.ToString(), AssistWording.DeployWentOutTo("{destinations}"));
 
         Assert.Equal(wording["previewIsRebuilding"]!.ToString(), AssistWording.PreviewIsRebuilding("{course}", "{section}"));
         Assert.Equal(wording["builtWithNoWindowOpen"]!.ToString(), AssistWording.BuiltWithNoWindowOpen("{course}", "{section}"));
@@ -40,50 +53,222 @@ public class ContractTests
         Assert.Equal(wording["undidPartly"]!.ToString(), AssistWording.UndidPartly("{change}", 2));
         Assert.Equal(wording["couldNotUndo"]!.ToString(), AssistWording.CouldNotUndo("{change}", 2));
 
-        Assert.Equal(wording["undoIsStillAvailable"]!.ToString(), AssistWording.UndoIsStillAvailable);
-        Assert.Equal(wording["nothingToUndo"]!.ToString(), AssistWording.NothingToUndo);
-        Assert.Equal(wording["aCreatedPageCanBeTakenBack"]!.ToString(), AssistWording.ACreatedPageCanBeTakenBack);
-        Assert.Equal(wording["undoDoesNotReachTheLiveSite"]!.ToString(), AssistWording.UndoDoesNotReachTheLiveSite);
-        Assert.Equal(wording["whereTheOutputIs"]!.ToString(), AssistWording.WhereTheOutputIs);
-        Assert.Equal(wording["nothingToDo"]!.ToString(), AssistWording.NothingToDo);
-
-        // Rolling a section over to a new year. Pinned here rather than merely
-        // present in AssistWording, because the two sentences a teacher is
-        // OFFERED are the two AssistCardCommand must accept verbatim — a
-        // reply that invites a phrasing the matcher does not take is worse
-        // than one that offers nothing.
         // Both said straight to a teacher now that "back up this course" and
         // "what does publishing mean?" are fixed phrasings, matched in code.
         Assert.Equal(wording["backedUpCourse"]!.ToString(),
                      AssistWording.BackedUpCourse("{course}", "{course}_backup_2026-09-08_190000.zip"));
-
-        // Said when a teacher asks what publishing means twice in one
-        // conversation. Pinned here rather than merely present, because a
-        // fixed phrasing lets a TEACHER reach it — the sentence it replaced
-        // was addressed to a model, and the mac made and corrected that same
-        // mistake, so the two apps saying one thing is the point.
         Assert.Equal(wording["publishingAlreadyExplained"]!.ToString(),
                      AssistWording.PublishingAlreadyExplained("{course}", "{section}"));
 
-        Assert.Equal(wording["rolloverWebsiteQuestion"]!.ToString(), AssistWording.RolloverWebsiteQuestion);
-        Assert.Equal(wording["rolloverSayToStartANewWebsite"]!.ToString(), AssistWording.RolloverSayToStartANewWebsite);
-        Assert.Equal(wording["rolloverSayToKeepTheSameWebsite"]!.ToString(), AssistWording.RolloverSayToKeepTheSameWebsite);
-        Assert.Equal(wording["rolloverIsOnANewWebsite"]!.ToString(), AssistWording.RolloverIsOnANewWebsite);
-        Assert.Equal(wording["rolloverHadNoWebsiteYet"]!.ToString(), AssistWording.RolloverHadNoWebsiteYet);
-        Assert.Equal(wording["rolloverKeptTheSameWebsite"]!.ToString(), AssistWording.RolloverKeptTheSameWebsite);
-        Assert.Equal(wording["rolloverWebsiteNotDecided"]!.ToString(), AssistWording.RolloverWebsiteNotDecided);
-        Assert.Equal(wording["rolloverTurnedOffTheScheduledPublish"]!.ToString(),
-                     AssistWording.RolloverTurnedOffTheScheduledPublish);
-        Assert.Equal(wording["rolloverCouldNotTurnOffTheScheduledPublish"]!.ToString(),
-                     AssistWording.RolloverCouldNotTurnOffTheScheduledPublish);
-
-        // The two with a value in them carry the generator's own example, the
-        // same way `deployed` above carries "{course}" and "{section}".
+        // The two with a value in them carry the generator's own example.
         Assert.Equal(wording["rolloverStartedANewWebsite"]!.ToString(),
                      AssistWording.RolloverStartedANewWebsite(
                          ".netlify_sites/section1.previous-2026-09-08_071500.json"));
         Assert.Equal(wording["rolloverCouldNotStartANewWebsite"]!.ToString(),
                      AssistWording.RolloverCouldNotStartANewWebsite(".netlify_sites/section1.json"));
+
+        // The class-planning sentences hoisted on 2026-09-30, with the
+        // generator's own examples.
+        Assert.Equal(wording["madeRoom"]!.ToString(), AssistWording.MadeRoom(1, "Unit 3, Day 4"));
+        Assert.Equal(wording["movedToLaterDays"]!.ToString(), AssistWording.MovedToLaterDays(3));
+        Assert.Equal(wording["movesAndBecomesADraft"]!.ToString(), AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"));
+        Assert.Equal(wording["publishedTheClassOn"]!.ToString(), AssistWording.PublishedTheClassOn("2026-09-14"));
+        Assert.Equal(wording["reDatingOntoTheDatesOnFile"]!.ToString(), AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"));
+        Assert.Equal(wording["theNextWouldFallOn"]!.ToString(), AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"));
+
+        // #352 (mac #197) and #203 / #342 (mac #173 / #201): methods, so the
+        // value walk below cannot see them; rendered here with the
+        // contract's own placeholders and literal titles.
+        Assert.Equal(wording["everyPageIsNotAPageToPublish"]!.ToString(), AssistWording.EveryPageIsNotAPageToPublish("{example}"));
+        Assert.Equal(wording["everyPageIsNotAPageToHide"]!.ToString(), AssistWording.EveryPageIsNotAPageToHide("{example}"));
+        Assert.Equal(wording["noPageCalled"]!.ToString(), AssistWording.NoPageCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["noPagesCalled"]!.ToString(), AssistWording.NoPagesCalled("{course}", "{section}", "{pages}"));
+        Assert.Equal(wording["linkedClassWasLeftAlone"]!.ToString(), AssistWording.LinkedClassWasLeftAlone(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["linkedClassesWereLeftAlone"]!.ToString(),
+                     AssistWording.LinkedClassesWereLeftAlone(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+        Assert.Equal(wording["linkedClassStaysVisible"]!.ToString(), AssistWording.LinkedClassStaysVisible("Unit 2, Day 4"));
+        // #305 (mac #167): the links answer.
+        Assert.Equal(wording["pageLinksTo"]!.ToString(), AssistWording.PageLinksTo("{page}"));
+        Assert.Equal(wording["pageLinksToNothing"]!.ToString(), AssistWording.PageLinksToNothing("{page}"));
+        Assert.Equal(wording["morePagesThanOneAreCalled"]!.ToString(), AssistWording.MorePagesThanOneAreCalled("{course}", "{section}", "{page}"));
+        Assert.Equal(wording["pageCouldNotBeRead"]!.ToString(), AssistWording.PageCouldNotBeRead("{page}"));
+
+        // #281/#288: rendered by running this app's own functions on the
+        // inputs the generator used, so the keys test the code path rather
+        // than a template.
+        Assert.Equal(wording["morningOrEvening"]!.ToString(),
+                     AssistWording.MorningOrEvening(AssistCardCommand.MorningOrEvening("deploy at 6:30")!));
+        Assert.Equal(wording["sayTheTimeAs"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6.30 pm")!));
+        Assert.Equal(wording["sayTheTimeAsWithoutTheComma"]!.ToString(),
+                     AssistWording.SayTheTimeAs(AssistCardCommand.TimeToSayAs("deploy at 6:30 pm,")!));
+
+        // #180: a call the model made for another course.
+        Assert.Equal(wording["askedAboutAnotherCourse"]!.ToString(),
+                     AssistWording.AskedAboutAnotherCourse("{course}", "{otherCourse}"));
+        Assert.Equal(wording["askedAboutACourseThatIsNotHere"]!.ToString(),
+                     AssistWording.AskedAboutACourseThatIsNotHere("{course}", "{otherCourse}"));
+
+        // #274 (mac #267): the class/meeting pairs, each rendered with the
+        // generator's own example values. The meeting form is the TEACHER's
+        // copy only — ClubNounTests pins that it never reaches the model.
+        void Pair(string key, string forAClass, string forAMeeting)
+        {
+            Assert.Equal(wording[key]!.ToString(), forAClass);
+            Assert.Equal(wording[key + "ForAMeeting"]!.ToString(), forAMeeting);
+        }
+        // #392 (mac #379).
+        Assert.Equal(wording["linksIntoHiddenPagesWillBeOffered"]!.ToString(),
+                     AssistWording.LinksIntoHiddenPagesWillBeOffered("{course}", "{section}"));
+        Pair("addedTheNextPage", AssistWording.AddedTheNextPage, AssistWording.AddedTheNextPageForAMeeting);
+        Pair("allScheduledDatesHaveConcluded",
+             AssistWording.AllScheduledDatesHaveConcluded(12, "{course}", "{section}", "Tuesday", "2026-12-15"),
+             AssistWording.AllScheduledDatesHaveConcludedForAMeeting(12, "{course}", "{section}", "Tuesday", "2026-12-15"));
+        Pair("datesForTheNextPage", AssistWording.DatesForTheNextPage, AssistWording.DatesForTheNextPageForAMeeting);
+        Pair("datesNotGivenYet", AssistWording.DatesNotGivenYet, AssistWording.DatesNotGivenYetForAMeeting);
+        Pair("datesToDuplicate", AssistWording.DatesToDuplicate, AssistWording.DatesToDuplicateForAMeeting);
+        Pair("datesToFindADaysPage", AssistWording.DatesToFindADaysPage, AssistWording.DatesToFindADaysPageForAMeeting);
+        Pair("datesToReDate", AssistWording.DatesToReDate, AssistWording.DatesToReDateForAMeeting);
+        Pair("datesToReplace", AssistWording.DatesToReplace("{course}", "{section}"),
+             AssistWording.DatesToReplaceForAMeeting("{course}", "{section}"));
+        Pair("everyDateIsSpokenFor", AssistWording.EveryDateIsSpokenFor, AssistWording.EveryDateIsSpokenForForAMeeting);
+        Assert.Equal(wording["linkedClassStaysVisibleForAMeeting"]!.ToString(), AssistWording.LinkedClassStaysVisibleForAMeeting("Week 4"));
+        Assert.Equal(wording["linkedClassWasLeftAloneForAMeeting"]!.ToString(), AssistWording.LinkedClassWasLeftAloneForAMeeting(new[] { "Week 4" }));
+        Assert.Equal(wording["linkedClassesWereLeftAloneForAMeeting"]!.ToString(),
+                     AssistWording.LinkedClassesWereLeftAloneForAMeeting(new[] { "Week 4", "Week 5" }));
+        Assert.Equal(wording["madeRoomForAMeeting"]!.ToString(), AssistWording.MadeRoomForAMeeting(1, "Week 5"));
+        Pair("makingRoomCannotBeUndone", AssistWording.MakingRoomCannotBeUndone, AssistWording.MakingRoomCannotBeUndoneForAMeeting);
+        Pair("mayIAskForYourDates", AssistWording.MayIAskForYourDates, AssistWording.MayIAskForYourDatesForAMeeting);
+        Pair("movedToLaterDays", AssistWording.MovedToLaterDays(3), AssistWording.MovedToLaterDaysForAMeeting(3));
+        Pair("movesAndBecomesADraft", AssistWording.MovesAndBecomesADraft("{page}", "2026-12-15"),
+             AssistWording.MovesAndBecomesADraftForAMeeting("{page}", "2026-12-15"));
+        Pair("movesToTheFirstDay", AssistWording.MovesToTheFirstDay("{page}", "2026-09-08"),
+             AssistWording.MovesToTheFirstDayForAMeeting("{page}", "2026-09-08"));
+        Pair("otherClassesWouldMoveAndLinksFollow", ClassChangeWording.OtherClassesWouldMoveAndLinksFollow(2),
+             ClassChangeWording.OtherClassesWouldMoveAndLinksFollowForAMeeting(2));
+        Pair("otherClassesWouldMoveKeepingTheirNames", ClassChangeWording.OtherClassesWouldMoveKeepingTheirNames(2),
+             ClassChangeWording.OtherClassesWouldMoveKeepingTheirNamesForAMeeting(2));
+        Pair("pagesAcrossTheDates", AssistWording.PagesAcrossTheDates("{course}", "{section}", 4, 12, 8),
+             AssistWording.PagesAcrossTheDatesForAMeeting("{course}", "{section}", 4, 12, 8));
+        Pair("pagesRunFrom", AssistWording.PagesRunFrom(12, "2026-09-08", "Tuesday", "2026-12-15", "Tuesday"),
+             AssistWording.PagesRunFromForAMeeting(12, "2026-09-08", "Tuesday", "2026-12-15", "Tuesday"));
+        Pair("pagesWithNoDayOfTheirOwn", AssistWording.PagesWithNoDayOfTheirOwn(2, "2026-12-15"),
+             AssistWording.PagesWithNoDayOfTheirOwnForAMeeting(2, "2026-12-15"));
+        Pair("publishedTheClassOn", AssistWording.PublishedTheClassOn("2026-09-14"), AssistWording.PublishedTheClassOnForAMeeting("2026-09-14"));
+        Pair("reDated", AssistWording.ReDated(12, 5), AssistWording.ReDatedForAMeeting(12, 5));
+        Pair("reDatedOnlyPagesTheyUse", AssistWording.ReDatedOnlyPagesTheyUse(3), AssistWording.ReDatedOnlyPagesTheyUseForAMeeting(3));
+        Pair("reDatingOntoTheDatesOnFile", AssistWording.ReDatingOntoTheDatesOnFile("{course}", "{section}"),
+             AssistWording.ReDatingOntoTheDatesOnFileForAMeeting("{course}", "{section}"));
+        Pair("sharingTheLastDay", AssistWording.SharingTheLastDay, AssistWording.SharingTheLastDayForAMeeting);
+        Pair("spareDatesAfterThese", AssistWording.SpareDatesAfterThese(3, "timetable.xlsx, block H"),
+             AssistWording.SpareDatesAfterTheseForAMeeting(3, "timetable.xlsx, block H"));
+        Pair("theNextWouldFallOn", AssistWording.TheNextWouldFallOn("2026-09-14", "Monday"),
+             AssistWording.TheNextWouldFallOnForAMeeting("2026-09-14", "Monday"));
+        Pair("theSemesterBegins", AssistWording.TheSemesterBegins("Tuesday", "2026-09-08", 3),
+             AssistWording.TheSemesterBeginsForAMeeting("Tuesday", "2026-09-08", 3));
+        Pair("wouldAddPages", AssistWording.WouldAddPages(1, "Unit 4", "{course}", "{section}"),
+             AssistWording.WouldAddPagesForAMeeting(1, "{course}", "{section}"));
+        Pair("wouldMakeRoom", AssistWording.WouldMakeRoom(2, "Unit 3, Day 4", "{course}", "{section}"),
+             AssistWording.WouldMakeRoomForAMeeting(2, "Week 5", "{course}", "{section}"));
+        Pair("yourNextUpcoming", AssistWording.YourNextUpcoming(3, "{course}", "{section}"),
+             AssistWording.YourNextUpcomingForAMeeting(3, "{course}", "{section}"));
+
+        // #241: a course kept for reference.
+        Assert.Equal(wording["askedAboutAReferenceCourse"]!.ToString(),
+                     AssistWording.AskedAboutAReferenceCourse("{course}", "{otherCourse}"));
+        Assert.Equal(wording["deployRefusedForAReferenceCourse"]!.ToString(),
+                     AssistWording.DeployRefusedForAReferenceCourse("{course}"));
+
+        // #308 (mac #186): the pages the writer declined, named — rendered with
+        // the generator's own example titles (one; five, of which three are named).
+        var five = new[] { "Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6", "Unit 2, Day 7", "Unit 2, Day 8" };
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedTo"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 2, Day 4" }));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedToNamingSeveral(five));
+        Assert.Equal(wording["pagesWhoseSettingsCannotBeAddedToNamingSeveral"]!.ToString(),
+                     AssistWording.PagesWhoseSettingsCannotBeAddedTo(five));
+        Assert.Equal(wording["pageWhoseNewDateCouldNotBeSet"]!.ToString(),
+                     AssistWording.PageWhoseNewDateCouldNotBeSet("Unit 2, Day 4"));
+        Assert.Equal(wording["pagesWhoseNewDatesCouldNotBeSet"]!.ToString(),
+                     AssistWording.PagesWhoseNewDatesCouldNotBeSet(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
+
+        // ---- The walk: the file is the list.
+        var keys = wording.Select(pair => pair.Key).ToList();
+        var here = keys.Where(key => WordingMember(key) is not null).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.AssistWordingKeys, keys, here);
+
+        var unresolved = keys
+            .Where(key => WordingMember(key) is null && !deferred.Contains(key))
+            .ToList();
+        Assert.True(unresolved.Count == 0,
+            "assist-wording.json names sentences with no member of the same name on AssistWording or " +
+            "ClassChangeWording, and no NamedGapLedger entry holding them open: " +
+            string.Join(", ", unresolved) + ". Add the member (the mac owns the words; copy them), or " +
+            "ledger the key by name against the open issue that owns it.");
+
+        // ---- The other direction: a member of AssistWording with no key.
+        var keySet = keys.ToHashSet(StringComparer.Ordinal);
+        var members = typeof(AssistWording)
+            .GetMembers(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(member => member is FieldInfo or MethodInfo { IsSpecialName: false })
+            .Select(member => member.Name)
+            .Distinct()
+            .ToList();
+        foreach (var (name, why) in WindowsOnlyWording)
+        {
+            Assert.True(members.Contains(name),
+                $"WindowsOnlyWording names {name}, which AssistWording no longer has: delete the entry ({why}).");
+            Assert.False(keySet.Contains(char.ToLowerInvariant(name[0]) + name[1..]),
+                $"WindowsOnlyWording names {name}, and assist-wording.json now carries it as a key: delete " +
+                "the entry so the walk compares it.");
+        }
+        var keyless = members
+            .Where(name => !keySet.Contains(char.ToLowerInvariant(name[0]) + name[1..]))
+            .Where(name => !WindowsOnlyWording.ContainsKey(name))
+            .ToList();
+        Assert.True(keyless.Count == 0,
+            "AssistWording carries sentences assist-wording.json does not name: " + string.Join(", ", keyless) +
+            ". The mac owns the sentence (CLAUDE.md rule 2): propose the key on a `mac` issue, or say here " +
+            "why the two apps word it differently.");
+
+        // ---- Values last, so a sentence that differs cannot hide a missing key.
+        var differs = here
+            .Select(key => (key, member: WordingMember(key)))
+            .Where(entry => entry.member is FieldInfo { FieldType: var type } && type == typeof(string))
+            .Where(entry => (string?)((FieldInfo)entry.member!).GetValue(null) != wording[entry.key]!.ToString())
+            .Select(entry => $"{entry.key}: contract \"{wording[entry.key]}\", here \"{((FieldInfo)entry.member!).GetValue(null)}\"")
+            .ToList();
+        Assert.True(differs.Count == 0,
+            "These sentences differ from assist-wording.json:\n" + string.Join("\n", differs));
+    }
+
+    /// <summary>
+    /// Sentences AssistWording carries that the contract deliberately does not,
+    /// each with its reason. Mend-checked both ways by the test above.
+    /// </summary>
+    private static readonly Dictionary<string, string> WindowsOnlyWording = new(StringComparer.Ordinal)
+    {
+        ["DeployedToMultipleDestinations"] =
+            "this app's own sentence for a deploy to more than one destination; the mac says " +
+            "wording.deployed; the multi-destination sentences are the same on both apps but not generated into the contract",
+        ["DeployPartiallySucceeded"] =
+            "this app's own sentence for a deploy that reached some destinations; the mac's shape is " +
+            "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
+        ["DeployToMultipleDestinationsDidNotFinish"] =
+            "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
+        ["PagesAChangeCouldNotFinish"] =
+            "this app's own sentence for a make-room write that did not finish (#422); proposed to the mac as " +
+            "wording.pagesAChangeCouldNotFinish in parity bundle 10's mac issue",
+    };
+
+    /// <summary>The public static member a wording key names, or null.</summary>
+    private static MemberInfo? WordingMember(string key)
+    {
+        string name = char.ToUpperInvariant(key[0]) + key[1..];
+        return new[] { typeof(AssistWording), typeof(ClassChangeWording) }
+            .Select(home => home.GetMember(name, BindingFlags.Public | BindingFlags.Static).FirstOrDefault())
+            .FirstOrDefault(member => member is not null);
     }
 
     [Fact]
@@ -240,6 +425,22 @@ public class ContractTests
 
             var backup = BackupItem.From(filePath, courseCode);
             var archive = ArchivedItem.From(filePath, courseCode);
+
+            // #161: the moment each name stands for, taken apart field by
+            // field against the GREGORIAN calendar. Never re-formatted with our
+            // own writer: a round trip through the same code stays green while
+            // both halves are wrong (a Buddhist-calendar year reads back fine).
+            if (c["moment"]?.ToString() is string moment && kind is "backup" or "archive")
+            {
+                DateTime expected = DateTime.ParseExact(moment, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                DateTime actual = kind == "backup" ? backup!.BackedUpAt : archive!.ArchivedAt;
+                var gregorian = new GregorianCalendar();
+                Assert.True(
+                    gregorian.GetYear(actual) == expected.Year && gregorian.GetMonth(actual) == expected.Month
+                    && gregorian.GetDayOfMonth(actual) == expected.Day && actual.Hour == expected.Hour
+                    && actual.Minute == expected.Minute && actual.Second == expected.Second,
+                    $"{name} read as {actual:O}, the contract says {moment}.");
+            }
 
             switch (kind)
             {
@@ -738,14 +939,18 @@ public class ContractTests
         var doc = ContractLoader.LoadJson("app-rules.json");
         var cases = doc["failureExplanations"]!["cases"]!.AsArray();
 
-        foreach (var c in cases)
-        {
-            if (c is null) continue;
-            string output = c["output"]!.ToString();
-            string? expect = c["expect"]?.ToString();
-            string? actual = FailureExplainer.Explanation(output);
-            Assert.Equal(expect, actual);
-        }
+        // Every case is played and every mismatch reported, rather than
+        // stopping at the first: this list grows from the mac, and a red that
+        // names only its first case hides which issues own the rest.
+        var mismatches = cases
+            .Where(c => c is not null)
+            .Select((c, index) => (index, expect: c!["expect"]?.ToString(), actual: FailureExplainer.Explanation(c["output"]!.ToString())))
+            .Where(result => result.expect != result.actual)
+            .Select(result => $"case {result.index}: expected \"{result.expect ?? "null"}\", got \"{result.actual ?? "null"}\"")
+            .ToList();
+        Assert.True(mismatches.Count == 0,
+            "app-rules.json → failureExplanations: " + mismatches.Count + " of " + cases.Count +
+            " cases explained differently here:\n" + string.Join("\n", mismatches));
     }
 
     [Fact]
@@ -934,7 +1139,15 @@ public class ContractTests
                             Assert.Contains("Cloudflare Pages, which needs your Account ID", problem);
                             break;
                         case "neverDeployed":
-                            Assert.Contains("has never been deployed", problem);
+                        case "additionalDestinationNeverDeployed":
+                            // Compared WHOLE (#344 / mac #322): both contain
+                            // "has never been deployed to", so a substring
+                            // cannot tell the primary's from an additional's.
+                            string rendered = ContractLoader.LoadJson("shared-rules.json")!
+                                ["scheduledDeployRefusals"]!["wording"]![expectRefusal]!.ToString()
+                                .Replace("{course}", "ICS3U").Replace("{section}", "1")
+                                .Replace("{destination}", c["destinationNamed"]!.ToString());
+                            Assert.Equal(rendered, problem);
                             break;
                         case "additionalDeployFolderNeedsAttention":
                             Assert.Contains("also deploys to a folder", problem);
@@ -942,9 +1155,6 @@ public class ContractTests
                             break;
                         case "additionalCloudflareAccountMissing":
                             Assert.Contains("also deploys to Cloudflare Pages, which needs your Account ID", problem);
-                            break;
-                        case "additionalDestinationNeverDeployed":
-                            Assert.Contains("has never been deployed to", problem);
                             break;
                         default:
                             Assert.Fail($"Unknown refusal case: {expectRefusal}");
@@ -968,16 +1178,22 @@ public class ContractTests
         string repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         string source = File.ReadAllText(Path.Combine(repoRoot, "windows-app", "Plantoir.Core", "Models", "CourseConfiguration.cs"));
 
-        foreach (string key in keys)
-        {
-            Assert.Contains($"\"{key}\"", source);
-        }
+        // A key this app does not carry yet is held open by name against the
+        // issue that owns it (NamedGapLedger, the parity burn-down list), and
+        // the ledger fails the day the key appears in CourseConfiguration.cs.
+        var here = keys.Where(key => source.Contains($"\"{key}\"")).ToList();
+        var deferred = NamedGapLedger.GapsIn(NamedGapLedger.CourseConfigKeys, keys, here);
+
+        var missing = keys.Where(key => !here.Contains(key) && !deferred.Contains(key)).ToList();
+        Assert.True(missing.Count == 0,
+            "file-formats.json → courseConfigKeys names keys CourseConfiguration.cs does not: " +
+            string.Join(", ", missing));
     }
 
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
-            Task.FromResult<JsonObject?>(null);
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<ModelReply?>(null);
     }
 
     private sealed class DummyTools : IToolServer

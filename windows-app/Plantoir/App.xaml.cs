@@ -14,6 +14,17 @@ public partial class App : Application
     public static AppSettings Settings { get; private set; } = null!;
     private static readonly List<MainWindow> _windows = new();
 
+    /// <summary>
+    /// The update engine (#337), or null in a development build (no feed at
+    /// all, decision 5). Constructed in a Release build, but INACTIVE — it
+    /// fetches nothing and shows no menu item — while AppUpdates.ConfiguredFeed
+    /// is empty, which it is until a release sets it.
+    /// </summary>
+    public static Plantoir.Core.Assist.AppUpdater? Updater { get; private set; }
+
+    /// <summary>The windows open now, as a copy (a handler may open or close one).</summary>
+    public static IReadOnlyList<MainWindow> OpenWindows => _windows.ToList();
+
     public App()
     {
         InitializeComponent();
@@ -33,7 +44,7 @@ public partial class App : Application
         {
             string dir = Plantoir.Core.Models.AppDataRoot.Current;
             Directory.CreateDirectory(dir);
-            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}\n");
+            File.AppendAllText(Path.Combine(dir, "startup.log"), $"[{Plantoir.Core.Models.DateText.Invariant(DateTime.Now, "yyyy-MM-dd HH:mm:ss.fff")}] {message}\n");
         }
         catch { }
     }
@@ -71,6 +82,10 @@ public partial class App : Application
 
         LogDiagnostic("App.OnLaunched starting");
         if (!string.IsNullOrEmpty(stateDir)) LogDiagnostic($"State redirected to {stateDir}");
+        // #155: AFTER the redirect, so the line lands in the run's own
+        // startup.log. For the developer only — never on the trail.
+        if (Plantoir.Core.Scripting.StdioState.Describe(Plantoir.Core.Scripting.StdioState.FileTypeOf) is { } redirected)
+            LogDiagnostic(redirected);
 
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
 
@@ -91,6 +106,16 @@ public partial class App : Application
         try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); }
         catch (Exception ex) { LogDiagnostic($"Scheduled-publish trail sweep failed: {ex}"); }
 
+        // ONE watch on the records' folder for the whole app (#218): a run that
+        // finishes while Plantoir is open reaches every window at once, and its
+        // trail line is written then rather than at the next launch (the sweep
+        // is idempotent — each record's line is written once).
+        Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += () =>
+        {
+            try { Plantoir.Core.Assist.ScheduledPublishOutcome.NoteFinishedRunsOnTrail(); } catch { }
+        };
+        Plantoir.Core.Assist.ScheduledPublishWatcher.Start();
+
         try
         {
             Settings = AppSettings.Load();
@@ -100,6 +125,48 @@ public partial class App : Application
         {
             LogDiagnostic($"Error loading settings: {ex}");
             Settings = new AppSettings();
+        }
+
+        // `app updated` (#337): the first launch of a new version, whoever
+        // installed it. No updater runs yet, so it is always "by hand".
+        try
+        {
+            string running = Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion;
+            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: false) is { } line)
+                Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AppUpdated, line);
+            if (Settings.LastLaunchedVersion != running)
+            {
+                Settings.LastLaunchedVersion = running;
+                Settings.Save();
+            }
+        }
+        catch (Exception ex) { LogDiagnostic($"app updated: {ex.Message}"); }
+
+        // Ruling 12: installer.iss refused the update and reopened us.
+        if (Plantoir.Core.Assist.AppUpdates.NotInstalledLine(Environment.GetCommandLineArgs()) is { } notInstalled)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.UpdateHeldWhileWorkIsUnderWay, notInstalled);
+
+#if DEBUG
+        const bool developmentBuild = true;
+#else
+        const bool developmentBuild = false;
+#endif
+        if (Plantoir.Core.Assist.AppUpdates.FeedFor(developmentBuild) is not null)
+        {
+            Updater = new Plantoir.Core.Assist.AppUpdater(
+                Plantoir.Core.Assist.AppUpdates.ConfiguredFeed, Plantoir.Core.Assist.AppUpdates.PublicKey,
+                new Services.UpdatePrompts(), Services.UpdatePrompts.Snapshot,
+                Plantoir.Core.Assist.MachineWork.RunningAssistantServers,
+                Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion,
+                Plantoir.Core.Assist.AppUpdates.IsPerUserInstall(AppContext.BaseDirectory,
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
+                Settings.SkippedUpdateVersion,
+                skipped => { Settings.SkippedUpdateVersion = skipped; try { Settings.Save(); } catch { } },
+                _ => QuitConfirmation.WhatIsUnderWay(CourseActivity.UnderWay()));
+            Updater.RememberingDailyChecksIn(
+                () => Settings.LastUpdateCheckUtc,
+                when => { Settings.LastUpdateCheckUtc = when; try { Settings.Save(); } catch { } });
+            Updater.Start();
         }
 
         // Name every builds folder this app can name, then sweep the ones
@@ -158,15 +225,31 @@ public partial class App : Application
         // Windows has no system restoration: the remembered list is the
         // mechanism. Replay it when the preference asks; otherwise one
         // window, which shows the picker when no folder is remembered.
+        // The rule is LastWorkingFolder.FoldersToOpen (#320): the remembered
+        // windows when they come back, otherwise ONE window on the last
+        // working folder — kept even when it cannot be reached, so the window
+        // can say which folder and why.
         var remembered = Settings.RestoreWindowsOnLaunch ? Settings.RememberedWindows.ToList()
                                                          : new List<RememberedWindow>();
+        var folders = LastWorkingFolder.FoldersToOpen(
+            Settings.RestoreWindowsOnLaunch, remembered.Select(entry => entry.Path).ToList(), Settings.WorkspacePath);
+
+        // The scheduled-publish toast (#324): a click while Plantoir runs
+        // arrives on a background thread and is carried to this one; a click
+        // that STARTED Plantoir is routed once its windows are open.
+        var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        Services.ScheduledPublishNotifier.Register(argument =>
+            dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(argument)));
+        string? launchedBy = Services.ScheduledPublishNotifier.LaunchedFromAToast();
+
         if (remembered.Count == 0)
-        {
-            OpenWindow(Settings.WorkspacePath, null);
-            return;
-        }
-        foreach (var entry in remembered)
-            OpenWindow(entry.Path, entry);
+            OpenWindow(folders[0], null);
+        else
+            foreach (var entry in remembered)
+                OpenWindow(entry.Path, entry);
+
+        if (launchedBy is not null)
+            dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(launchedBy));
     }
 
     /// <summary>
@@ -258,6 +341,10 @@ public partial class App : Application
         return window;
     }
 
+    /// <summary>Whether closing this window quits the app: it is the last one still open (#231).</summary>
+    public static bool ClosingThisQuits(MainWindow window) =>
+        _windows.Where(open => !open.IsClosed).All(open => ReferenceEquals(open, window));
+
     /// <summary>Recorded while the windows still exist — a list rewritten as they close shrinks to nothing.</summary>
     public static void RememberOpenWindows()
     {
@@ -270,9 +357,30 @@ public partial class App : Application
         Settings.Save();
     }
 
+    /// <summary>The update engine's exit: the installer is already started.</summary>
+    public static void QuitForUpdate()
+    {
+        _installerStarted = true;
+        QuitTime();
+    }
+
+    private static bool _installerStarted;
+
     private static void QuitTime()
     {
         LogDiagnostic("QuitTime called");
+        // atQuit (#337): never refuses; a prepared update is set aside when
+        // work is under way, or installed as Plantoir quits without reopening.
+        try
+        {
+            if (!_installerStarted && Updater is { } updater)
+            {
+                // The same gate as the install (ruling 7), not only this app's own work.
+                if (updater.AtQuitGated() is { } install)
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(install.Path, install.Arguments) { UseShellExecute = false });
+            }
+        }
+        catch (Exception ex) { LogDiagnostic($"update at quit: {ex.Message}"); }
         WorkspaceViewModel.IsTerminating = true;
         FolderContainers.ReleaseEverythingAtQuit(
             Settings.RememberedWindows.Select(w => w.Path).Distinct().ToList());

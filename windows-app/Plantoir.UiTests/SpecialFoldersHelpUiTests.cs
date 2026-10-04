@@ -157,6 +157,9 @@ public class SpecialFoldersHelpUiTests
                 "lessons" => "Lessons",
                 "curriculum" => "Expectations",
                 "graded" => "Tests",
+                // The coverage row (#345) is named from the course's maps; the
+                // fixture has no expectation page, so it reads the placeholder.
+                "coverage" => row["placeholderWhenNone"]!.ToString(),
                 _ => row["name"]!.ToString(),
             });
             expected.Add(row["what"]!.ToString());
@@ -225,7 +228,7 @@ public class SpecialFoldersHelpUiTests
             "the sheet did not need scrolling — the fixture no longer exercises the case this test is for");
         scroll.SetScrollPercent(-1, 100);
 
-        string lastName = Row("coverage", "name");
+        string lastName = Row("coverage", "placeholderWhenNone");   // no map in the fixture yet
         string lastWhy = Row("coverage", "why");
 
         // Against the SCROLLER's rectangle, not the dialog's. A WinUI

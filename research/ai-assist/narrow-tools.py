@@ -80,10 +80,18 @@ FOR_THE_LOCAL_MODEL = {
 CARD_ONLY_ARGUMENTS = {
     "add_next_class.duplicate",
     "plan_add_next_class.duplicate",
+    "read_page.answer",
+    "read_page.asTyped",
+    "read_page.onlyIfFound",
 }
 
 # MIRROR of AssistAgent.ExampleCourse.
 EXAMPLE_COURSE = "ICS3U"
+
+# MIRROR of AssistAgent.StillShortened: the only tools whose description the
+# local model still reads through briefly() (#352; kept by #420's step-b
+# measurement, 2026-10-01, which failed its pre-registered criteria).
+STILL_SHORTENED = {"publish_pages", "unpublish_pages"}
 
 
 def briefly(description):
@@ -139,7 +147,11 @@ for tool in tools:
     if tool["name"] not in FOR_THE_LOCAL_MODEL:
         continue
     parameters = tool.get("inputSchema", {"type": "object"})
-    described = briefly(tool.get("description", ""))
+    # MIRROR of AssistAgent.StillShortened (#352, 2026-10-01): every other
+    # tool is shown its served description - the contract's - unshortened.
+    described = tool.get("description", "")
+    if tool["name"] in STILL_SHORTENED:
+        described = briefly(described)
     hide_card_only_arguments(parameters, tool["name"])
     if course_code is not None:
         make_examples_real(parameters, course_code)

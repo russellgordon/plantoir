@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json.Nodes;
+using Plantoir.Core.Models;
 
 namespace Plantoir.Core.Assist;
 
-public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
+public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDictionary<string, string> Arguments)
 {
     private static readonly char[] TrimChars = new[] { ' ', '\t', '\r', '\n', '.', '!' };
 
@@ -54,6 +56,27 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             ["publish sunday's class"] = ("publish_class_on", new() { ["when"] = "sunday" }),
             ["what pages are in this section?"] = ("list_pages", new()),
             ["add the next class page"] = ("add_next_class", new()),
+            // A club's own words (#274, mac #267): the same tools, the
+            // course's noun. Fixed shapes, so they match in any course — the
+            // sentence names nothing a Unit/Day course would read differently.
+            ["publish tomorrow's meeting"] = ("publish_class_on", new() { ["when"] = "tomorrow" }),
+            ["publish monday's meeting"] = ("publish_class_on", new() { ["when"] = "monday" }),
+            ["publish tuesday's meeting"] = ("publish_class_on", new() { ["when"] = "tuesday" }),
+            ["publish wednesday's meeting"] = ("publish_class_on", new() { ["when"] = "wednesday" }),
+            ["publish thursday's meeting"] = ("publish_class_on", new() { ["when"] = "thursday" }),
+            ["publish friday's meeting"] = ("publish_class_on", new() { ["when"] = "friday" }),
+            ["publish saturday's meeting"] = ("publish_class_on", new() { ["when"] = "saturday" }),
+            ["publish sunday's meeting"] = ("publish_class_on", new() { ["when"] = "sunday" }),
+            ["add the next meeting page"] = ("add_next_class", new()),
+            ["when are my next meetings?"] = ("read_remembered_timetable", new()),
+            ["when are my next meetings"] = ("read_remembered_timetable", new()),
+            ["when is my next meeting?"] = ("read_remembered_timetable", new()),
+            ["when is my next meeting"] = ("read_remembered_timetable", new()),
+            ["i have a revised list of meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["i have a new list of meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["change my meeting dates"] = ("read_remembered_timetable", new() { ["revise"] = "yes" }),
+            ["re-date my meetings"] = ("re_date_classes", new()),
+            ["redate my meetings"] = ("re_date_classes", new()),
             ["start a new unit for the next class"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["start a new unit"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["when are my next classes?"] = ("read_remembered_timetable", new()),
@@ -99,7 +122,15 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12,
     };
 
-    public static AssistCardCommand? Matching(string message)
+    public static AssistCardCommand? Matching(string message) => Matching(message, null);
+
+    /// <param name="numberedPageWord">
+    /// The window's course's page word when that course is NUMBERED ("Week"),
+    /// else null. Only the numbered make-room family reads it (#274): it
+    /// matches ONLY in such a course, on that word or a bare number, so
+    /// "at period 3" reaches the model everywhere.
+    /// </param>
+    public static AssistCardCommand? Matching(string message, string? numberedPageWord)
     {
         string tidied = message.Trim(TrimChars).ToLowerInvariant();
         if (string.IsNullOrEmpty(tidied)) return null;
@@ -109,9 +140,16 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             return new AssistCardCommand(found.Tool, found.Args);
         }
 
+        // Hide and unpublish first, by a frame of their own; a publish
+        // sentence falls through to the shipped publish reading untouched —
+        // see HideOrUnpublish for why the VERB is the gate.
+        if (HideOrUnpublish(tidied) is { } hidden) return hidden;
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
         if (MakeRoom(tidied) is { } room) return room;
+        if (numberedPageWord is not null && MakeRoomNumbered(tidied, numberedPageWord) is { } numbered) return numbered;
+        if (DeployAtATime(tidied) is { } scheduled) return scheduled;
+        if (LinksCard(message) is { } links) return links;
         return DuplicateClass(tidied, message);
     }
 
@@ -175,15 +213,122 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
         });
     }
 
+    /// <summary>
+    /// "make room for one meeting at Week 5" in a NUMBERED course (#274, mac
+    /// #267): <c>make room for &lt;count&gt; class|classes|meeting|meetings at
+    /// [&lt;word&gt;] &lt;number&gt;</c>, where the word must be the course's own
+    /// page word, case-folded. The first mac version took any single word, and
+    /// "at period 3", "at block 2" and "at section 2" were all planned in a
+    /// club as a page — renaming pages the teacher's links point at. The count
+    /// and noun must agree, as in the Unit/Day frame.
+    /// </summary>
+    private static AssistCardCommand? MakeRoomNumbered(string tidied, string pageWord)
+    {
+        const string opening = "make room for ";
+        if (!tidied.StartsWith(opening, StringComparison.Ordinal)) return null;
+        string[] words = tidied[opening.Length..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length is not (4 or 5) || words[2] != "at") return null;
+        if (words.Length == 5 && words[3] != pageWord.Trim().ToLowerInvariant()) return null;
+
+        bool singular = words[1] is "class" or "meeting";
+        if (!singular && words[1] is not ("classes" or "meetings")) return null;
+
+        int howMany;
+        if (words[0] == "a") howMany = 1;
+        else if (SpelledNumbers.TryGetValue(words[0], out int spelled)) howMany = spelled;
+        else if (!int.TryParse(words[0], NumberStyles.None, CultureInfo.InvariantCulture, out howMany)) return null;
+        if (howMany <= 0 || (howMany == 1) != singular) return null;
+
+        if (!int.TryParse(words[^1], NumberStyles.None, CultureInfo.InvariantCulture, out int number) || number <= 0)
+            return null;
+
+        return new AssistCardCommand("make_room_for_classes", new Dictionary<string, string>
+        {
+            ["unit"] = number.ToString(CultureInfo.InvariantCulture),
+            ["howMany"] = howMany.ToString(CultureInfo.InvariantCulture),
+        });
+    }
+
+    /// <summary>
+    /// <c>[please] hide|unpublish unit &lt;n&gt;[[,] day &lt;m&gt;] [please]</c> →
+    /// <c>unpublish_pages</c> (#217, the mac's #215).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why.</b> Measured on the mac (Qwen2.5-1.5B, Metal, M4 Pro):
+    /// "unpublish unit 4, day 21" reached <c>unpublish_pages</c> every time;
+    /// "hide unit 4, day 21" reached NO tool in five phrasings of five, and
+    /// the model echoed the teacher's sentence back — after which even
+    /// "Unpublish Unit 4, Day 20" echoed too. Read in code, it never reaches
+    /// the model at all.</para>
+    ///
+    /// <para><b>The whole VERB is gated.</b> Hide and unpublish take both
+    /// references AND the tolerance (please at either end, a trailing ?, odd
+    /// spacing around the comma). Publish takes NONE of it: it keeps its own
+    /// literal "publish unit &lt;n&gt;" below. Unpublishing errs safe — a
+    /// page nobody can see — while publishing puts a page in front of
+    /// students, and "publish unit 4?" is plausibly a teacher ASKING. The
+    /// mac's first cut let the tolerance reach publish and a fuzz found 141
+    /// new publish matches nobody asked for; each is a refused row in
+    /// <c>hideIsUnpublish</c>.</para>
+    ///
+    /// <para><b>Refusals first.</b> A card binds THIS window's course and
+    /// section unconditionally, so a frame that swallowed "hide unit 4, day 21
+    /// in ICS3U" would act on this course and report success. The frame reads
+    /// a fixed number of words and refuses everything else — a leading word
+    /// other than please, a second page, a section named, a spelled-out
+    /// number. Term-blind on purpose: only the literal word "unit".</para>
+    ///
+    /// <para>The number is accepted as the shipped unit family accepts it (an
+    /// integer, sign allowed, no positivity guard), and the teacher's own
+    /// digits travel: "hide unit 04" is "Unit 04".</para>
+    /// </remarks>
+    private static AssistCardCommand? HideOrUnpublish(string tidied)
+    {
+        // A question mark comes off HERE, not in the shared tidier: fixed
+        // shapes are matched by equality and some of them carry one.
+        string frame = tidied.TrimEnd('?');
+        var words = frame.Replace(',', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
+        if (words.Count > 0 && words[^1] == "please") words.RemoveAt(words.Count - 1);
+
+        if (words.Count < 3 || words[1] != "unit") return null;
+        if (words[0] != "hide" && words[0] != "unpublish") return null;
+
+        string unit = words[2];
+        if (!IsAnInteger(unit)) return null;
+        if (words.Count == 3)
+            return new AssistCardCommand("unpublish_pages", new Dictionary<string, string> { ["pages"] = $"Unit {unit}" });
+
+        if (words.Count != 5 || words[3] != "day" || !IsAnInteger(words[4])) return null;
+        return new AssistCardCommand("unpublish_pages",
+            new Dictionary<string, string> { ["pages"] = $"Unit {unit}, Day {words[4]}" });
+    }
+
+    /// <summary>What Swift's <c>Int(...)</c> accepts: ASCII digits with an optional sign.</summary>
+    private static bool IsAnInteger(string text) =>
+        int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _);
+
     private static AssistCardCommand? WholeUnit(string tidied)
     {
-        var prefixes = new[] { ("unpublish unit ", "unpublish_pages"), ("publish unit ", "publish_pages") };
+        // Publish only: "unpublish unit <n>" is read by HideOrUnpublish (#217).
+        // The two openings after "publish unit " are #197's: measured, "Publish
+        // all the classes in Unit 2." went to publish_class_on with TODAY's
+        // date 3 times in 3 on the smaller assistant. Same frame, nothing else
+        // widened: a literal opening and a bare number, nothing before or
+        // after, so a course or section named, a courtesy word or a question
+        // mark falls through to the model (pagesNamingNoPage.everythingInAUnit).
+        var prefixes = new[]
+        {
+            ("publish unit ", "publish_pages"),
+            ("publish all the classes in unit ", "publish_pages"), ("publish everything in unit ", "publish_pages"),
+        };
         foreach (var (prefix, tool) in prefixes)
         {
             if (tidied.StartsWith(prefix, StringComparison.Ordinal))
             {
                 string rest = tidied[prefix.Length..].Trim();
-                if (!string.IsNullOrEmpty(rest) && !rest.Contains(',') && int.TryParse(rest, out _))
+                if (!string.IsNullOrEmpty(rest) && !rest.Contains(',') && int.TryParse(rest, out _) &&
+                    (prefix.EndsWith(" in unit ", StringComparison.Ordinal) ? rest.All(char.IsDigit) : true))
                 {
                     return new AssistCardCommand(tool, new Dictionary<string, string>
                     {
@@ -229,7 +374,7 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
 
         string typed = original.Trim(TrimChars);
         string body = tidied[opening.Length..];
-        string[] endings = { " as my next class", " as the next class", " as my next lesson" };
+        string[] endings = { " as my next class", " as the next class", " as my next lesson", " as my next meeting" };
 
         foreach (string ending in endings)
         {
@@ -315,11 +460,8 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
             ["course"] = course,
             ["section"] = section,
         };
-        if (ToolName == "publish_pages" || ToolName == "unpublish_pages" ||
-            ToolName == "plan_publish_pages" || ToolName == "plan_unpublish_pages")
-        {
-            obj["includeLinked"] = false;
-        }
+        // No `includeLinked` (#420): publishing always takes what a page links
+        // to, and the tools no longer declare the flag.
         foreach (var (k, v) in Arguments)
         {
             if (k == "when" && PublishesADaysClass.Contains(ToolName))
@@ -331,16 +473,12 @@ public sealed record AssistCardCommand(string ToolName, IReadOnlyDictionary<stri
                 // Buddhist - and the tool would then look for a class on a day
                 // no course has.
                 obj["date"] = day is { } read
-                    ? read.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    ? DateText.Iso(read)
                     : v;
             }
             else if (k == "pages")
             {
                 obj[k] = new JsonArray(JsonValue.Create(v));
-            }
-            else if (k == "includeLinked" && bool.TryParse(v, out bool b))
-            {
-                obj[k] = b;
             }
             else
             {

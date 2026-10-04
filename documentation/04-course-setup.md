@@ -82,6 +82,17 @@ Neither app takes a default value for the second argument, so a call site
 that has not been made to think about the example-content toggle fails to
 compile.
 
+On Windows the rule is called from three pure seams rather than from the
+view, because `NewCourseDialog` cannot be reached by a test:
+`WizardStructure.Adopting` / `RestoringDefaults` (the editor's five lists),
+`NewCourseAnswers.Decide` (the keys the Starting Content answers write — the
+three starting-point keys, the lists, the sidebar and the marks pool), and
+`CourseConfiguration.CurriculumPagesOffered`, which calls `HasSkeleton` rather
+than asking again. Six goldens captured from the old rule before the fix
+(`Plantoir.Tests/Goldens/`) pin that a teacher TAKING the ready-made pages
+still gets the same keys byte for byte (`documentation/12-windows-app.md` →
+"Course creation and the smaller course pieces").
+
 Both apps asked the wrong question until 2026-09-21
 ([#248](https://github.com/russellgordon/plantoir/issues/248)): "does
 example content EXIST for this code?" rather than "is the teacher TAKING
@@ -646,6 +657,20 @@ a course that does not already say it, and Course Settings shows the settings
 locked. Russell's `CODING` fixture — pages already named "Week N" in
 `All Meetings`, no `class_page_scheme` — therefore stays exactly as it is: no
 planner sees its pages as class pages, as before #267.
+
+**On Windows (parity bundle 7, #274, 2026-10-01).** The wizard writes the same
+keys from `ClubFill` and `ClubFill.ClubKeys` (Core), and gives `setup.ps1` a
+configuration the shared `ClubStart` already handles — the Python is inherited
+unchanged. Two Windows seams a reader may need: the club's choices go through
+`NewCourseAnswers.ForAClub`, which turns off example content, skeleton and
+curriculum pages whatever the toggles held (so `gradedFolders.newCourse`'s club
+case runs through the same function the dialog calls); and `class_folder` is
+written from the club row's own field rather than `ClassFolderRule.Name`, whose
+guess would never find "All Meetings". Windows' front-page pointer INSERTS a
+class line under the course's heading where none names a class (the mac's
+never does), so on Windows a club front page emptied by hand gets
+`![[Week N]]` back on the next assistant publish — the contract's
+`expectBodyOnWindows`, stated there rather than settled.
 
 ## Which of a course's folders the build treats specially
 
@@ -1594,7 +1619,9 @@ list of classes a scheduled deploy says students cannot see yet.
 `UnpublishedClassesIn`'s comment claimed it "walks the same folders
 `AssistWorkspace.ClassPages` walks", which was false between the two of them;
 a test now pins them together on one fixture, because a comment claiming
-agreement is exactly what stops anybody checking.
+agreement is exactly what stops anybody checking. (That pin went with
+`UnpublishedClassesIn` itself on 2026-09-30, when #400 took the unpublished
+list out of scheduling and left the helper with no caller.)
 
 **The path reached above the section.** `Relative()` is relative to the WORKING
 folder, so the segments handed to the rule still included `courses`, the course

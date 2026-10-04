@@ -82,7 +82,7 @@ public sealed partial class AssistWindow : Window
         // Closed handler is the one thing the rest of this app avoids
         // (App.OpenWindow drops a closing window before remembering the rest).
         AppWindow.Changed += (sender, args) => { if (args.DidPositionChange) _lastPosition = sender.Position; };
-        Closed += (_, _) => { RememberPlacement(); Shutdown(); };
+        Closed += (_, _) => { RememberPlacement(); _backupHold?.Dispose(); Shutdown(); };
 
         // Started on Loaded, not here: the download offer is a ContentDialog,
         // and a dialog needs a XamlRoot, which does not exist until the
@@ -177,6 +177,7 @@ public sealed partial class AssistWindow : Window
     /// what a restore puts back.
     /// </summary>
     private string? _conversationBackupPath;
+    private IDisposable? _backupHold;
 
     private void ShowRestoreBanner()
     {
@@ -215,9 +216,10 @@ public sealed partial class AssistWindow : Window
         catch (Exception ex) { App.LogDiagnostic($"restore dialog: {ex.Message}"); return; }
         if (choice != ContentDialogResult.Primary) return;
 
+        int notPutBack;
         try
         {
-            AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
+            notPutBack = AssistSectionRestore.Restore(_conversationBackupPath, _course.Code, _section,
                                          Workspace.CoursesDirectory(_folder));
         }
         catch (Exception error)
@@ -228,7 +230,7 @@ public sealed partial class AssistWindow : Window
         ActivityTrail.Note(ActivityTrail.Event.SectionRestored,
             "put the section back to how it was when this conversation started, from " +
             Path.GetFileName(_conversationBackupPath!), _course.Code, _section);
-        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section));
+        Say("Assistant", AssistSectionRestore.DoneMessage(_course.Code, _section, notPutBack));
     }
 
     private void OnceLoaded(object sender, RoutedEventArgs e)
@@ -481,10 +483,20 @@ public sealed partial class AssistWindow : Window
         // Narrowed before the model ever sees them — see AssistAgent for the
         // measurements. Fewer tools is both better routing and a shorter
         // prompt, and the prompt is what makes the first answer slow.
-        var schemas = AssistAgent.NarrowToLocal(await _tools.Tools(_closing.Token), _course.Code);
+        var served = await _tools.Tools(_closing.Token);
+        var schemas = AssistAgent.NarrowToLocal(served, _course.Code);
 
         _agent = new AssistAgent(_model, _tools, schemas, _course.Code, _section)
         {
+            // A club's "make room for one meeting at Week 5" matches only in
+            // a numbered course, on its own page word (#274).
+            NumberedPageWord = _course.Configuration.Naming is { IsNumbered: true } naming ? naming.Word : null,
+            // The full surface, so a tool the model names but was not shown
+            // is refused rather than run (#350 / mac #327).
+            ServedTools = served
+                .Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .OfType<string>()
+                .ToList(),
             // A tool that narrates gets its words on the thinking indicator,
             // where "Thinking" alone would be a lie minutes long.
             OnToolProgress = NoteToolProgress,
@@ -512,6 +524,9 @@ public sealed partial class AssistWindow : Window
             // answer is read off a detail pane, and another folder's pane
             // answers about another folder's section.
             SectionIsBusy = () => MainWindowShowingThisSection()?.IsSectionBusy(_course.Code, _section) == true,
+            // Same process as every window's Deploy, so the in-memory publish
+            // record is the truth about this section being deployed (#386).
+            SectionIsBeingDeployed = () => CourseActivity.IsPublishingSection(_folder, _course.Code, _section),
             // Same process as the previews, so the in-memory leases are the
             // truth about whether one is on screen.
             PreviewIsShowing = () => PreviewLeases.Active.Any(lease =>
@@ -519,6 +534,33 @@ public sealed partial class AssistWindow : Window
                 string.Equals(lease.CourseCode, _course.Code, StringComparison.OrdinalIgnoreCase) &&
                 lease.SectionNumber == _section),
             ConfirmationMode = () => App.Settings.AssistantAsksBeforeChanging,
+            // Asked only when the model names another course, to say whether
+            // that course is here to be opened (#180).
+            CoursesInTheFolder = () => Workspace.DiscoverCourses(_folder)
+                .Where(c => !ReferenceCourse.IsKeptForReference(c)).Select(c => c.Code).ToList(),
+            // A course kept for reference is named by the code a teacher reads,
+            // and only when no course being taught answers to it (#241).
+            ReferenceCourseNamed = named =>
+            {
+                var courses = Workspace.DiscoverCourses(_folder);
+                if (courses.Any(c => !ReferenceCourse.IsKeptForReference(c)
+                                     && c.Code.Equals(named.Trim(), StringComparison.OrdinalIgnoreCase))) return null;
+                return courses.Where(ReferenceCourse.IsKeptForReference)
+                    .Where(c => c.Code.Equals(named.Trim(), StringComparison.OrdinalIgnoreCase)
+                                || ReferenceCourse.ShownCode(c).Equals(named.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .Select(ReferenceCourse.ShownCode).FirstOrDefault();
+            },
+            // Read from disk at the call: a course marked by hand while this
+            // window was open is refused all the same (doors 2-4).
+            CourseIsKeptForReference = () => Workspace.DiscoverCourses(_folder)
+                .Any(c => c.Code.Equals(_course.Code, StringComparison.OrdinalIgnoreCase) && ReferenceCourse.IsKeptForReference(c)),
+            // "What does Unit 2, Day 3 in SPH3U link to?": SPH3U is a course
+            // because it is a code in the shipped lists, not because of its
+            // shape (#305 / mac #167).
+            IsACourseCode = code => Plantoir.Services.CourseNameCatalogs.Shared.Names(code) is not null,
+            // What a scheduled card would replace, read by task name (#261).
+            ScheduleDeployItWouldReplace = when =>
+                TaskScheduling.MomentItWouldReplace(_folder, _course.Code, _section, when, DateTime.Now),
             OnPlanAccepted = () =>
             {
                 App.Settings.PlansAcceptedCount++;
@@ -527,14 +569,18 @@ public sealed partial class AssistWindow : Window
             OnConversationBackup = path => DispatcherQueue.TryEnqueue(() =>
             {
                 _conversationBackupPath = path;
+                // Held while this window is open, so All Backups keeps it (#283).
+                _backupHold?.Dispose();
+                _backupHold = HeldBackups.HoldWhileOpen(path);
                 ShowRestoreBanner();
             }),
-            DestinationProvider = () =>
-            {
-                if (_course.Configuration.DeploysToLocalFolder) return "a folder on this computer";
-                if (_course.Configuration.DeploysToCloudflare) return "Cloudflare Pages";
-                return "Netlify";
-            },
+            // Every destination, by type, in the saved order (#400): the card
+            // for a course deploying to Netlify AND Cloudflare Pages said
+            // "Netlify" alone.
+            // Read from disk at the call, never from this window's snapshot
+            // (#344 / mac #322): a destination changed in Course Settings
+            // after the window opened must be the one the card names.
+            DestinationProvider = () => DeployCommand.EveryDestinationByTypeAtTheCall(_folder, _course.Code, _course.Configuration),
         };
 
         // Mount the prompt shelf at the top of the window with clickable cards.
@@ -543,7 +589,9 @@ public sealed partial class AssistWindow : Window
             ShowRecalled(phrasing);
             _history.StopBrowsing();
             Input.Focus(FocusState.Programmatic);
-        });
+        },
+        // A club's own shelf, in its own noun (#274).
+        groups: AssistPromptShelf.GroupsFor(_course.Configuration.Naming, _course.Configuration.ClassNoun));
         PromptShelfHost.Content = shelf;
         PromptShelfArea.Visibility = Visibility.Visible;
 

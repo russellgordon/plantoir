@@ -869,6 +869,13 @@ Windows a DST requirement discovered here and never discussed there. It is a
 mac test and a named trap in the handover instead, to be proposed as a row once
 both sides have met it. The same goes for the fall-back convention.
 
+*Windows has now met both (parity bundle 5a, 2026-09-30):* `ScheduledMoment.Settle`
+moves a nonexistent wall time forward by the GAP — 02:30 onto 03:30, not onto
+03:00, the first minute that exists, which its first draft did and a test
+caught — and takes a repeated hour as its earlier instant. Both are pinned in
+`DeployAtATimeContractTests` against `America/Toronto`, and proposed back to
+the mac as `resolving` rows in the bundle's mac draft.
+
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read
 that time". That is a deliberate divergence from the `publish_class_on`
@@ -1307,6 +1314,36 @@ was 6, so "the N the model SEES" is 22 where it was 23; a number from before
 this is not comparable to one after it without saying so. **Windows' model
 still sees the probe** until their app answers the family in code too.
 
+#### On Windows (#305, 2026-09-30)
+
+The same family, matched in `AssistCardCommand.LinksQuestion` (its own file,
+`AssistCardCommand.Links.cs`) and answered by `AssistWorkspace.LinksAnswer`
+(`AssistWorkspace.Links.cs`), with every `linksQuestion` row run by
+`LinksQuestionContractTests` and the scenario by `AssistScenarioTests`, whose
+runner now honours `expectModelRequests`.
+
+- **Where the Windows mechanics differ, and why.** The mac's tool runner shares
+  a process with its card, so `answer: "links"` is in no schema at all. Here the
+  window reaches `read_page` over JSON-RPC and the SDK's binder DROPS a key the
+  method does not declare (#149's lesson), so `read_page` DECLARES `answer`,
+  `asTyped` and `onlyIfFound`, and `AssistAgent.CardOnlyArguments` takes all
+  three out of the schema the local model is shown (mirrored in
+  `research/ai-assist/narrow-tools.py`). Claude Code sees them with a "leave
+  empty" description; that is a difference in the OUTSIDE surface only.
+- **"the quiz"** (`onlyIfAPageIsCalled`) is decided by the server, which marks
+  its answer `plantoir.app/noPageFound` when nothing is called that; the agent
+  then hands the teacher's sentence to the model as an ordinary turn.
+- **Course codes** ("in SPH3U" a course, "in Lab01" part of a name) come from
+  the shipped Ontario and BC lists through `AssistAgent.IsACourseCode`, which
+  the window sets from `CourseNameCatalogs.Shared`.
+- **Transcript only.** The answer is one `tools` line in the transcript and is
+  never appended to the model's conversation; the must-fail that appends it
+  turns `TheAnswerEndsTheTurnAndNeverReachesTheModel` red. The link reader is
+  `WikiLinks.PageLinks`, so a Markdown-style link (#359) is answered too.
+- **Rejected here:** handing a "not found" for "the quiz" back as a tool result
+  (the model would read a result with no question in front of it); one planner
+  call per lookup reading (`LinksAnswer` reads the section once).
+
 ### The dateline, and why its position is a finding
 
 A model has no clock. Every message the teacher sends therefore carries
@@ -1741,6 +1778,29 @@ still reaches the model and still misroutes 3/3, because the frame refuses any
 extra word on purpose — a matched card binds THIS window's course. Numbers in
 `research/ai-assist/two-lap-all-results.txt`.
 
+##### On Windows (#352, 2026-09-30)
+
+The rule is in `AssistWorkspace.PlanPublish`, which both the window's model and
+`plantoir-mcp` pass through, run by `PagesNamingNoPageContractTests` (every
+case; the numbered one since parity bundle 7, #274, whose example names the
+course's first page, "Publish Week 1"). Two
+things Windows did not have before and has now:
+
+- **The open-ended publish refusal.** Windows never refused "every class from a
+  day to the end of the course"; the contract's case "every page, publishing
+  from a date with no end" asks for each platform's OWN refusal, so this app
+  gained one (its own wording, not a contract key). Refusing a publish is the
+  safe direction; an open-ended UNPUBLISH is still allowed.
+- **The whole-unit openings** "publish all the classes in unit N" and "publish
+  everything in unit N" sit beside "publish unit N" in `AssistCardCommand`,
+  digits only after the opening, nothing before or after.
+
+**Not done: #114's half (one description per tool).** It requires a
+pre-registered BEFORE/AFTER routing measurement on this PC's tier before any
+description moves, and this piece of work ran no model. The descriptions and
+`Briefly()` were unchanged then; the work stayed on #352, and landed in parity
+bundle 9 (2026-10-01) — see "On Windows: measured, and moved (#352)" below.
+
 ### Step 4 — The app presses its own buttons
 
 Two of those Swift functions do not do the work themselves. When a teacher
@@ -1989,6 +2049,16 @@ widened method is how the divergence happened at all. The contract is
 The three `followingLinks.publishing` booleans stay TRUE: the walk is still
 transitive and still takes what a page links to; it has one stop.
 
+#### On Windows (#203, 2026-09-30)
+
+The behaviour was already Windows' (it is the answer that won #173). What was
+owed and is now done: the case lists are RUN (`FollowingLinksContractTests`
+lays a real course out from each case, publishes through `PlantoirTools`, and
+asserts "untouched" as byte-identical), and the plan names the linked classes
+it stopped at, from `PublishPlan.StoppedAtClasses` → `LeftAloneSentence`, said
+once in `Describe()` and only about a class whose visibility is not CERTAINLY
+visible.
+
 #### Unpublishing stops there too (#201)
 
 Decided 2026-09-26,
@@ -2106,6 +2176,18 @@ it is wanted, it is its own issue.
 No trail event: nothing on the trail records what an unpublish REACHED
 (`assistant chose a tool`, `task started` / `task finished`), and "Unpublished
 N pages." stays true with a smaller N — the same decision #173 made.
+
+##### On Windows (#342, 2026-09-30)
+
+`AssistWorkspace.ReasonToKeep` returns "it is a class of its own." for a class
+page after the curriculum check and before the referrer test, so the sweep
+neither takes a linked class down nor walks into it; `Describe()`'s existing
+"“X” stays visible, because …" line renders `linkedClassStaysVisible` byte for
+byte. A class is not counted in the "index pages, the curriculum, and the
+pages Key Links points at are never hidden" sentence, which it would make
+false. One trap met while wiring the cases: two classes named TOGETHER link to
+each other, and the second must not be reported as "staying" because it is a
+class, so the report skips any page that is itself going down.
 
 ### What counts as a link
 
@@ -2324,6 +2406,16 @@ rewriter half moves nothing that ships; it matters for what teachers write.
 | build `_extract_wikilink_targets` | 0 | 7 (TEJ2O only) |
 | the rule | **0** | 7 before the TEJ2O fix, **0** after |
 
+**Windows since 2026-09-30** (#339, parity bundle 2): `Plantoir.Core/Models/MarkdownCode.cs`
+is a rule-for-rule port of `scripts/markdown_code.py`, and `WikiLinks.Parse`, the
+insertion's relink and count (`WikiLinks.Rewriting` / `CountLinksTo`), the
+unit-word rename and `FolderPathRewriter` all mask with its `NotALinkRanges`,
+restarting the search at the end of a range a match started in. Measured the way
+the mac was: `NotALinkRanges` against `markdown_code.not_a_link_ranges` on all
+**12,490** pages in `support/`, UTF-16 offsets, **0 disagreements** (Windows 11 Pro
+26200, .NET 9, CPython 3.14; the harness was a one-off and is not committed). The
+50,000 fuzzed texts were NOT re-run on Windows. `WithoutCode` is gone.
+
 **The shipped page this exposed.** TEJ2O's `shared/Labs/Control Something with
 Code.md` opened `   ```python` at three spaces inside step 4 of a numbered
 list and wrote the program at column 0. CommonMark cannot continue a fence
@@ -2486,6 +2578,18 @@ publishing cases, +1 unpublishing case; the build's link check reads the same
 `support/` (ENL1W's, itself dead, now a wikilink). **Not done:** a page rename
 does not rewrite a Markdown-style link.
 
+##### On Windows (#359, 2026-09-30)
+
+`WikiLinks.PageLinks` reads the wikilinks `Parse` reads and then the two
+Markdown shapes, using the folder rename's OWN two patterns
+(`FolderPathRewriter.MarkdownLink` / `AngleLink`, now internal rather than
+copied) through `MarkdownCode.MatchesOutside`. Publishing, the unpublish
+referrer test, `LinkGraph` (so check_section) and the links answer read
+through it; the rewriters do not. check_section now names TEN links into
+hidden pages and counts the rest, the build's number
+(`siteHealth.linksIntoHiddenPages`, run by `LinksIntoHiddenPagesContractTests`);
+it named fifteen before.
+
 ### No booleans, and separate verbs
 
 There is no single `set_visibility(publish: true/false)` tool. Publishing and
@@ -2576,8 +2680,9 @@ Claude Code is offered a **longer** list than the local model: 37 tools
 against 13 — the twenty-two that exist, plus fifteen served only over MCP
 (#209's three How I Teach tools and #96's start-of-year pair, both 2026-09-26;
 see "Getting a section ready for the start of the year" below).
-(Windows' separate `plantoir-mcp.exe` also serves 37, but not the same 37 —
-five on each side are the other's; "The two MCP surfaces are not the same
+(Windows' separate `plantoir-mcp.exe` serves 42 — 40 since #340 brought the How I
+Teach tools there on 2026-09-30, 42 since bundle 6a's start-of-year pair — the
+mac's 37 plus five of its own; the mac has none Windows lacks; "The two MCP surfaces are not the same
 product" below names them. [Issue #66](https://github.com/russellgordon/plantoir/issues/66),
 which recorded the gap when the counts differed, is closed.) Six of the extra ones ask for judgement about meaning — reading the
 curriculum and deciding which expectations a page addresses, and reading or
@@ -2721,11 +2826,13 @@ described in "Step 1" and "Step 2" above. The rows in the table are from
 before that change and stay as they were written; a re-run of the `--app-body`
 arm reproduces them only with `--uncapped`.
 
-**Windows is not fixed by that, and this is the part they owe.** Their cap
-bounds the wait, and `LocalModel.Ask` returns `choices[0].message` and drops
-the rest of the response, so the finish reason never leaves `Ask` and a
-cut-off call is acted on. They meet it MORE often than the mac ever did,
-because their cap fires where the mac's context used to.
+**Windows was not fixed by that, and was until 2026-09-30.** Its cap bounded
+the wait, but `LocalModel.Ask` returned `choices[0].message` and dropped the
+rest of the response, so the finish reason never left `Ask` and a cut-off call
+was acted on — MORE often than the mac ever met it, because that cap fires
+where the mac's context used to. Parity bundle 5a (#196) carries the reason
+out of `Ask`; see "The Windows half of the assistant chain" at the end of this
+page.
 
 The figures above are not a failure rate. The suite runs at temperature 0.1
 (0 in the arms that copy the app's own request), which is near-greedy: ten
@@ -2790,7 +2897,9 @@ Three consequences that follow, each of which cost something to learn:
 `publish_pages` and `unpublish_pages` used to take an `includeLinked`
 boolean with no default, so the MODEL decided. That is the same reasoning
 this design exists to keep out of the model, and a boolean is the thing that
-inverted polarity on the 3B. It is gone, and the rules are now code:
+inverted polarity on the 3B. It is gone, and the rules are now code
+(on Windows too since 2026-10-01, #420 step (a), where it had lingered with a
+default of false — "On Windows: the behaviour landed" below):
 
 **Publishing always publishes the pages it links to.** Never publish a page
 whose links lead somewhere students cannot see — that is the whole point.
@@ -3500,7 +3609,7 @@ the 13-tool local surface and the 37-tool MCP one (32 until #209 added three
 How I Teach tools and #96 the start-of-year pair; `toolDescriptions` pins all
 37). (It said 23; corrected
 2026-09-06 when the list was first run against this side. `plantoir-mcp.exe`
-serves 37 as well, but not the same 37 — see "The two MCP surfaces are not
+serves 42: the mac's 37 plus five of its own (40 after #340 on 2026-09-30, 42 after bundle 6a's start-of-year pair); the mac has none Windows lacks — see "The two MCP surfaces are not
 the same product" below; `AssistSurfaceContractTests`' own comment there still
 says "the contract carries the mac's 32", which is Windows' to correct.) The mac's own test has
 pinned that sum for longer than the prose said so; it is 22 + 15 MCP-only = 37: 22 + 10 = 32 once all six of the tools sorted as the mac's landed on 2026-09-08, then #209's three How I Teach tools and #96's start-of-year pair. What the two
@@ -3550,7 +3659,8 @@ and its `note` says so.
 
 - **The local model is shown the same text** — only the example course is
   rewritten — **never a shortened copy.** Windows' `Briefly()` trim is what
-  its router reads today; measured on the smaller assistant, trimming the
+  its router reads today (since #352, 2026-10-01, only for `publish_pages` and
+  `unpublish_pages` — see "On Windows: measured, and moved" below); measured on the smaller assistant, trimming the
   contract text that way ties on the 29-probe suite but loses 40 control
   trials on teachers-say, so the decision is to stop trimming, not to trim the
   new text. (`research/ai-assist/description-convergence-results.txt`.)
@@ -3605,6 +3715,143 @@ form quoted above, before and after regenerating the contracts:
 will move is Windows' — its narrowed local surface and its MCP descriptions —
 and that is theirs to measure.
 
+#### On Windows: measured, and moved (#352, 2026-10-01)
+
+**Behaviour first, and it was NOT the same.** Windows' `publish_pages` and
+`unpublish_pages` take `includeLinked`, default FALSE, and the local model is
+shown it; card phrasings send `false`. So the pinned `publish_pages` sentence
+("the linked pages come by themselves — there is nothing to ask for and no way
+to leave them out") and `unpublish_pages`' sweep promise are untrue there.
+Those two descriptions did NOT move: they keep Windows' text, and the local
+model still reads them through `Briefly()` (`AssistAgent.StillShortened`,
+mirrored as `STILL_SHORTENED` in `narrow-tools.py` and pinned by
+`NarrowToolsMirrorTests`). The behaviour is [#420](https://github.com/russellgordon/plantoir/issues/420), and the hold is recorded in `toolDescriptions.measuredDepartures` (two entries, issue 420);
+`EveryDescriptionIsTheContractsOwn` fails the day either one matches the
+contract, so the hold cannot outlive its record. (Since 2026-10-01 the
+behaviour HAS landed and the hold is kept for a measured routing reason
+instead — the next subsection.)
+
+**The measurement**, pre-registered before the first request
+(`research/ai-assist/windows-description-convergence-preregistration.txt`,
+with a dated note binding ruling P2: ANY polarity inversion in AFTER blocks)
+and recorded in `windows-description-convergence-results.txt`: this PC
+(i5-8365U, 16 GB, Intel UHD 620, Windows 11 26200), llama.cpp b10435, the
+smaller assistant (qwen2.5-1.5b q4_k_m) with the app's own flags; BEFORE = the
+live narrowed surface, AFTER = the same schemas with the contract text in full
+(`windows-description-arms.py`). Only three local descriptions differ
+(`check_section`, `add_next_class`, `read_remembered_timetable`); the other
+eight already equalled the contract after `Briefly()`. Ten greedy trials:
+trimmed-surface EXC2O, model-seen 160→161/220; teachers-say 210→220/250
+(`ctl cancel_scheduled` 0→10); trimmed-surface ICS3U 150→160/220
+(`schedule a deploy` 0→10). 0 polarity inversions and 0 cut-offs in every arm;
+no changed tool lost a trial. "card: undo" went 10→0, and it is answered in
+code before any model reads it. Not measured: the larger tier, other dates,
+and what Claude Code does with the new text.
+
+**What moved.** `PlantoirTools` serves the contract's text for every shared
+tool but those two (26 descriptions changed); `NarrowToLocal` stops
+shortening them; the shipped local surface was re-dumped after the change and
+is identical to the measured AFTER arm once parsed (the files differ only in how one em-dash is escaped). The procedure the old Windows
+bodies carried for Claude Code (plan first and read it out; look at the
+preview before deploying; a scheduled deploy needs the computer awake; send
+the WHOLE timetable; `matching`; `publish:` vs `publishForSectionN:` vs
+`draft:`; what undo can and cannot reach; back up before editing files
+directly) moved, as decided, into the MCP `instructions` field —
+`Plantoir.Mcp/McpInstructions.cs`, set as `ServerInstructions` — which the
+local router never reads. check_section's fourth phrasing went with the rest,
+and `TheTriggerPhrasingsAreTheContractsOwn` became
+`EveryDescriptionIsTheContractsOwn` (full text, both directions of the hold)
+plus `TheLocalModelReadsTheContractsDescriptionsUnshortened`.
+**Rejected:** keeping `Briefly()` for every tool and trimming the contract
+text (the mac's arm C lost 40 control trials on teachers-say); moving
+`publish_pages`/`unpublish_pages` too because their routing would not have
+moved (the sentence would lie to Claude Code); dropping the procedural
+sentences outright (nothing would tell Claude Code to plan first).
+
+#### On Windows: the behaviour landed, the text was measured and stays (#420, 2026-10-01)
+
+**Step (a), the behaviour.** `includeLinked` is gone: `AssistWorkspace.PlanPublish`
+always takes what the named pages link to (transitively, stopping at a
+class) and the unpublish sweep was already unconditional; the four tools
+(`publish_pages`, `unpublish_pages` and their `plan_` twins) no longer
+declare the flag, the card and the agent's code-matched phrasings stop
+sending it, and `FollowingLinksContractTests` runs every `followingLinks`
+case through the tools WITHOUT a flag — which is how the contract should
+have been run all along (the harness used to pass `includeLinked: true`,
+supplying the behaviour the contract says is unconditional). An old client
+that still sends the key is harmless: the SDK's binder drops undeclared
+arguments. `PublishFollowsLinksTests` pins the undo (one "undo that" puts
+every linked page back), the reply's count, the cards and the schema.
+
+**And the walk is keyed by PATH (bundle 10 review, R5).** `PlanPublish` used
+to key its link graph by FILE NAME: the first page per name answered a
+lookup, the last page per name owned the links. Two pages can share a name
+— every folder's landing page is `index.md`, and a section page can share a
+shared page's name — so publishing one followed the OTHER one's links
+(measured before the fix: publishing `Concepts/index` put the Labs page's
+`Answer Key` on the plan). Once links are always followed, that is the
+damaging direction, so pages, links, referrers, the unpublish sweep and Key
+Links are now keyed by path; a name that fits more than one page is ASKED
+about with `wording.morePagesThanOneAreCalled` and the list of paths (the
+links question's sentence) rather than guessed; a path names exactly one
+page; two pages a teacher would read by the same name are named on the plan
+with their folder in the CONTRACT's one shape, the one start of year uses
+(`startOfYear.wording.pageNameInFolder`: “Notes” (in section1)), and the
+"which one?" question names each candidate the same way (or by its own name
+when those differ, as two landing pages do), so the answer can be typed back;
+only that planner-made shape is read back, never a page's own title ending
+"(in …)"; and the app's own callers (a whole
+unit, the links checklist, `publish_class_on`) pass paths.
+`PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks` and
+`.ThePlanSaysWhichOfTwoSameNamedPagesGoes` (both red against the old
+planner). Rejected: picking the first match silently (the old behaviour, and
+the bug).
+
+**Step (b), the text — measured, and it FAILED.** Pre-registered before the
+first request (`windows-description-convergence-preregistration.txt`, the
+#420 section; ruling Q3: ANY inversion a veto, neither changed tool may lose
+a trial, ≤5 percentage points per suite), same three suites and tier as #352,
+this PC (i5-8365U, 16 GB, Intel UHD 620, Windows 11 26200), and this time the
+server's full command line and `--list-devices` written into each suite's log.
+BEFORE = dev's local surface; AFTER = the flag gone and the contract text in
+full. Trimmed-surface EXC2O model-seen 161→150/220; teachers-say 220→210/250;
+trimmed-surface ICS3U 160→**123**/220, with 37 turns the SERVER rejected
+mid-call (a llama.cpp grammar fault, "Unexpected empty grammar stack", seen
+only under the AFTER surface). `unpublish_pages` lost 11 trials (the
+hide-inversion probe 1→0, ICS3U "no course named: hide" 10→0). No polarity
+inversion anywhere. Said plainly (review N2): without the 37 rejected calls
+the FAIL rests on ONE trial — the S1 hide-inversion probe, which BEFORE
+passed once in ten. So the two descriptions stay at their
+Windows text, shortened for the local model (`AssistAgent.StillShortened`
+unchanged) and the two `measuredDepartures` entries stay with these numbers —
+by Russell's decision (2026-10-01) a PERMANENT measured departure, and #420
+closes with the behaviour half landed. The text changes only with a new
+pre-registered measurement; the untrue "optionally" and the stray
+"section's website" fragment in it stay for the same reason. The conditional MIDDLE arm — the
+flag gone, the text held: the surface that ships — is better on S1, level
+on S3 and 4 points lower on S2, with three regressions (reviews R1, S3): EXC2O
+161→**190**/220 (two publish-by-name cards 0→10 to `publish_pages`, the
+hide-inversion probe 1→10 to `unpublish_pages`); ICS3U 160→160 with one probe
+gained (`card: plan a publish` 0→10) and one LOST (`schedule a deploy` 10→0,
+all to `deploy_section`); teachers-say 220→210/250 (`ctl cancel_scheduled`
+10→0, declined), and TEN turns at the 512-token cap on `next: next day's
+lesson` (61–89 s each; the score did not move because that suite reads no
+`finish_reason`, so under the registered criterion (d) MIDDLE would fail).
+0 inversions, 0 malformed. It ships anyway (ruling Q3: it is the contract's
+schema, and the behaviour needs it); the three regressions (schedule →
+deploy_section, cancel → declined, next day's lesson → cut off) are a
+`windows` + `assistant` issue of their own (bundle 10, R2/S3); the cancel one
+declines rather than acts, the safe direction. What the immediate-deploy
+mistake meets today: `deploy_section` waits for the approval card, whose
+button is Deploy — nothing goes out until the teacher presses it.
+**Rejected:** moving the text anyway because no inversion was seen (the
+registered criteria, not the veto alone, decide); trimming the contract text
+for Windows' router (a second description per tool is what #114 removed);
+re-registering looser criteria after reading the result. **Known, not
+changed:** the held text still says linked pages come "optionally" — untrue
+since step (a), and a routing change to fix; kept by Russell's decision with
+the rest of the text (above).
+
 ### The two MCP surfaces are not the same product
 
 Written 2026-09-06 after a mac audit asked whether the parity list was
@@ -3641,6 +3888,10 @@ pair (#209) and the `prepare_for_start_of_year` pair (#96) are not in
 opened. Both servers therefore declare 37 names, and five on each side are the
 other's — equal counts, different sets (re-counted 2026-09-27 against
 `assist-cases.json` → `toolSchemas.mcp` and the `[McpServerTool]` names).
+**Updated 2026-09-30 (Windows #340):** `plantoir-mcp.exe` now serves the three
+How I Teach tools too, so it declares **40** names: the mac's 37 less the
+start-of-year pair (still owed, #355), plus Windows' five. The two sets differ
+by five one way and two the other.
 
 **Why neither suite noticed — and how it is now caught.** Not a subset check
 — an earlier write-up said that and was wrong. `Assert.Equal` on `HashSet`s is
@@ -3835,7 +4086,9 @@ leases from running work, so an idle MCP server holds none.
 against stand-in launchers that write down their words and exit 3 (MF-6), and
 the window's runner without the flag; the contract case is `assist-cases.json`
 → `scenarios` → "deploy with no section window open, which meets a question".
-Windows owes the same for `plantoir-mcp.exe` (the `windows` issue from #378);
+Windows did the same for `plantoir-mcp.exe` in #391 (2026-09-30:
+`AssistWorkspace.Deploy`/`RebuildPreview` pass the flag to every leg and read
+`LaunchOutcome.ExitCode`; the in-app assistant reaches it through that server);
 `deploy.py`'s header records its twin, a `python.exe` waiting 45 minutes at the
 site-name prompt.
 
@@ -4206,6 +4459,18 @@ everything off the offered list (the local list also hides
 `remember_timetable`, `re_date_classes` and every `plan_` twin, none of which
 a model should reach either).
 
+#### On Windows (#350, 2026-09-30)
+
+The window passes the agent the FULL served list (`AssistAgent.ServedTools`);
+a name on it and not on the narrowed list is refused in `Run` after the
+cut-off gate and above the readability and course gates, with 5a's
+`WindTheTurnBack` and `didNotFollowThat`, and the trail line `assistant named
+a tool it was not offered`. With `ServedTools` unset (the tests' default)
+nothing is refused, because a refusal decided from a list the agent was never
+given would be a guess. `plan_curriculum_mentions` now marks its answer as a
+plan (it returned a bare string, so the window read it as a refusal and never
+offered Go), and `PlanTwins` carries the irregular pair.
+
 ### Undo is not version control, and it should not pretend to be
 
 Worth stating because it is easy to assume otherwise: **courses are not git
@@ -4394,17 +4659,30 @@ renaming `makingRoomCannotBeUndone` to something generic (a rename changes the
 generated file for no gain, and Windows owes the key under its current name in
 #274).
 
-**What Windows owes** is in the `windows` issue opened for #185:
-`DuplicateClassPlan.Describe()` adds `MakingRoomCannotBeUndone` when
-`MovesOtherClasses`, and `Duplication_MatchesContract` reads
-`undoRule.planWarns`. Nothing goes red there when this is pulled —
-`Duplication_MatchesContract` reads fields by name — so it is unrun there,
-not failing. The trap: `OtherClassesMoved` is the past tense and must not go
+**Windows did it on 2026-09-30** (#346, parity bundle 2):
+`DuplicateClassPlan.Describe()` adds `AssistWording.MakingRoomCannotBeUndone`
+when `MovesOtherClasses`, asserted both ways in `DuplicateClassTests`
+(`APlanThatMovesOtherClassesWarnsTheUndoWillNotHelp`, and its absence on the
+last-class plan). Since parity bundle 7 (#274) `Duplication_MatchesContract`
+runs every case, the numbered ones in a numbered course, and reads
+`undoRule.planWarns` too: the warning is on the plan exactly when the undo is
+withheld. The trap: `OtherClassesMoved` is the past tense and must not go
 on a plan.
 
 #### Three things the duplicate did that nothing was watching
 
 All three were found from the Windows side and closed on the mac in #163.
+**Windows took them back on 2026-09-30** ([#200](https://github.com/russellgordon/plantoir/issues/200),
+parity bundle 2), and its shipped code had had B — the rejected fix below —
+since #149: `AssistWorkspace.ApplyDuplicateClass` now strips the copy's
+inherited per-section keys (`PageFrontmatter.WithoutPerSectionKeys`), abandons a
+copy it cannot read back as hidden (`ClassChangeWording.TheCopyCouldNotBeMadeHidden`,
+trail `class copy not made`), and asks the insertion what it CREATED rather than
+comparing the destination's text (a private overload of `ApplyInsertClasses`
+hands back the paths of the blanks it wrote). Windows' test for A cannot use
+the mac's invalid-UTF-8 page — .NET reads one without complaint — so it turns
+`Unit 1, Day 5.md` into a FOLDER of that name after the plan, which skips the
+rename the same way (`DuplicateClassTests.ALinkRewrittenInsideTheLessonCannotFoolTheGuard`).
 
 **1. A copy could arrive already visible to students.** The copy is given a
 plain `publish: false`, but the build consults `publishForSection<N>` FIRST,
@@ -5076,23 +5354,34 @@ times".
   per call rather than a stored date, because one `plantoir-mcp` can stay open
   longer than a calendar day.
 
-**The guarantee is the CARD path's, and only its.** When the MODEL sends
-`date: "tomorrow"` — which `ClassDateHelp` tells it not to, and which a small
-model will sometimes do anyway — the twin and the act each call `DayFor` and
-each read the clock, so the 23:59/00:01 case above still exists on that path.
-It is not closed here because this piece is the card path, and that is the only
-honest reason: normalising a model-supplied `date` inside `AssistAgent` after
-the model has already CHOSEN the tool would cost no routing accuracy at all —
-the model sees nothing of it — and is exactly the "steer with code" move
-recommended below. Cheap, and simply not done yet. Worth knowing before
-anybody reads the paragraph above as covering everything, and before anybody
-talks themselves out of the fix on the grounds that it needs a re-measurement.
-It does not.
+**When this was written the guarantee was the CARD path's, and only its.** When
+the MODEL sends `date: "tomorrow"` — which `ClassDateHelp` tells it not to, and
+which a small model will sometimes do anyway — the twin and the act each call
+`DayFor` and each read the clock, so the 23:59/00:01 case above still existed
+on that path. It was not closed here because this piece was the card path, and
+that was the only honest reason: normalising a model-supplied `date` inside
+`AssistAgent` after the model has already CHOSEN the tool would cost no routing
+accuracy at all — the model sees nothing of it — and is exactly the "steer with
+code" move recommended below. Cheap, and simply not done yet.
 
-**Done on the mac on 2026-09-10, and still owed on Windows** — see "The mac's
-half" below, and [issue #159](https://github.com/russellgordon/plantoir/issues/159).
-It cost fifty lines of code — 170 with the comments that explain them — and
-no re-measurement, exactly as predicted here.
+**Done on the mac on 2026-09-10 and on Windows on 2026-09-19** — see "The mac's
+half" and "The Windows half" below, and
+[issue #159](https://github.com/russellgordon/plantoir/issues/159). It cost
+fifty lines of code — 170 with the comments that explain them — and no
+re-measurement, exactly as predicted here.
+
+**The carve-out that REMAINS is the MCP surface, on both platforms, and it is a
+decision rather than a leftover.** An external client — Claude Code — calls
+`plan_publish_class_on` and then `publish_class_on` as two separate requests,
+each with its own words, and there is no single moment "the call is created" to
+settle at: inventing one would mean the server remembering plans between
+requests. So `PlantoirTools.DayFor` goes on reading `Today()` per call, and
+`Today` stays a `Func<DateOnly>` rather than a stored date, because one
+`plantoir-mcp` outlives a calendar day by a long way. The mac made the identical
+trade for `--mcp-stdio`, and #159 excluded it in as many words. The exposure is
+one minute of one night for a client that split its plan and its act across
+midnight; the exposure that was closed was every request in a window left open
+overnight.
 
 **The tool DESCRIPTIONS were deliberately not touched, so no routing
 re-measurement is owed.** `ClassDateHelp` still tells the model to work the
@@ -5150,6 +5439,10 @@ machine's DEFAULT CALENDAR, which is 2569 on a Thai-locale Windows machine
 course has.
 
 **The rule is applied at the boundary this piece owns, and nowhere else.**
+(Two more of those sites went on 2026-09-19 — `AssistAgent`'s dateline and its
+"deploy tomorrow's class at 6:30" card — for the same reason the mac gave: they
+were being rewritten anyway by #159. See "The Windows half" below. The count
+below is from 2026-09-08 and has not been re-taken; #144 still owns the sweep.)
 Sixty-six sites in this app's product code still format a date with no culture,
 and several of them WRITE one, which is the half that matters: an affected
 machine would corrupt a section's dates DURABLY rather than merely print them
@@ -5160,7 +5453,12 @@ remembered class dates in the machine's calendar and `TimetableMemory.Read`
 parses them back with `InvariantCulture`, so on a Thai-locale machine every
 date a teacher remembered lands 543 years in the future and nothing reports a
 fault. That sweep is its own piece of work, with its own review: [issue
-#144](https://github.com/russellgordon/plantoir/issues/144). **`CalendarDay`
+#144](https://github.com/russellgordon/plantoir/issues/144) — **landed
+2026-09-27**: one helper, `DateText`, every product site through it, and a
+source-scan test that fails on the next bare `yyyy`; the reasoning, the two
+things the fix itself would have broken, and the five sites left to #159's
+branch are in [`12-windows-app.md`](12-windows-app.md) → "Dates are written
+in the Gregorian calendar, by one helper (#144)". **`CalendarDay`
 is immune by construction** — `.text` is `String(format: "%04d-%02d-%02d", …)`,
 three integers and no calendar — **but the mac was not, and this line used to
 say it was.** Two `DateFormatter`s in mac product code set a `dateFormat` and
@@ -5337,6 +5635,146 @@ reasoning. The published date is in what the teacher was told instead
 ("Published the class on 2026-09-09."), which is why that sentence names the
 day it settled on rather than the word it was sent.
 
+### The Windows half: the same settling, and what the gate really tracks
+
+Written on Windows, 2026-09-19, answering
+[issue #159](https://github.com/russellgordon/plantoir/issues/159) — the mac's
+hand-back of the gap this app's own write-up above had described and left open.
+The shape is the mac's, decision for decision, because two apps that settle a
+day in different places will eventually settle it on different days.
+
+**What was wrong here.** Nothing captured a date — `PlantoirTools.Today` has
+always been a `Func<DateOnly>` read per call, so the mac's second half was
+already true on this side. What was missing is the first: the model's call is
+created in `AssistAgent.Run` and then READ THREE TIMES. `AskFirst` puts it in
+`_awaiting`, `ShowPlan` sends `ArgumentsOf(call)` to the `plan_` twin, and
+`Approve` hands the very same object to `RunTool`. A `date` still carrying the
+word `tomorrow` therefore reached `PlantoirTools.DayFor` twice, once for the
+twin and once for the act, each against a clock that had moved on between them.
+
+**What landed.**
+
+- **`AssistAgent.WithTheDaySettled(call)`**, called at the one place the model's
+  call is created, before the approval branch and before the twin. The three
+  readers then carry the same absolute `YYYY-MM-DD` by construction. It uses the
+  EXISTING reader, `SectionScheduleSource.ReadRelativeDay` — the one the card
+  path and the tool already share — so there is exactly one answer in this
+  product to what "monday" means, and no second parser to drift.
+- **`AssistAgent.Today`**, a `Func<DateOnly>` and this class's one clock. The
+  dateline, the scheduled-deploy card, the card path's own
+  `AssistCardCommand.ToJsonObject` and the settler all ask it. The mac learned
+  this the expensive way — an earlier draft read the machine's clock in the
+  agent while the runner had its own, and two existing tests stopped pinning
+  anything.
+- **`WithArgumentsRewritten(call, rewrite)`**, the round trip written once: a
+  call's `arguments` are a JSON STRING, so changing one means parse, edit,
+  re-serialise. It is deliberately not named for the day. Binding the model's
+  `course` and `section` to the window's own section is the next rewrite at this
+  same seam ([issue #180](https://github.com/russellgordon/plantoir/issues/180)),
+  and it goes beside the settler rather than parsing the same string again.
+
+**The gate is spelled `date`, and what it TRACKS is what consults the clock.**
+Only a tool whose own schema declares a `date` property is touched — asked of
+the surface the model was shown, never of a list kept beside the settling code,
+because a list is how the next tool with a date gets quietly left out. Today
+that is exactly `publish_class_on`, whose `date` reaches `DayFor`, the one
+place a relative word is read against a clock. Two things are excluded and for
+different reasons, and the difference is the part worth remembering:
+
+- **`schedule_deploy`'s `when` declares no `date` at all**, being a day AND a
+  time, so it is excluded by construction rather than by being remembered.
+- **`publish_pages` and `unpublish_pages` take `before` and `onOrAfter`**, which
+  go to `ParseDate` — `DateOnly.TryParse`, invariant, and it REFUSES "tomorrow".
+  They consult no clock, so there is nothing to settle. **A future forgiving
+  parser behind one of those names would reopen this hole with the gate shut.**
+  That is the trap, and it is why the sweep test
+  (`TheDaySettlerTouchesExactlyTheToolsThatDeclareADate`) asserts that the set
+  of tools this rewrite touches is exactly the set declaring a `date`: a new
+  clock-consulting argument under another name then becomes a visible decision
+  rather than a silence.
+
+**What the settler will not do.** A word the reader refuses — "next monday",
+which both platforms refuse rather than guess — passes through untouched, so the
+tool answers with its own sentence about it. An absolute date settles to itself.
+A `date` that is not a string at all passes through untouched too:
+`JsonNode.GetValue<string>()` THROWS on a number, and `"date": 20260920` is
+exactly the sort of thing a small model sends, so the read is `TryGetValue`.
+Malformed `arguments` are left exactly as they arrived, the way `ArgumentsOf`
+and `RunTool` already treat them.
+
+**Nothing the model sees changed** — no schema, no description, no
+`ClassDateHelp` — so no routing re-measurement is owed, exactly as the mac
+predicted. It has already chosen the tool by the time any of this runs.
+
+**The locale half, which was live rather than tidying.** `AssistAgent`'s
+dateline and the "deploy tomorrow's class at 6:30" card both formatted
+`yyyy-MM-dd` with `CurrentCulture`, so on a Thai-calendar machine the assistant
+was told the year was **2569** in the sentence it does all its date arithmetic
+from, on every single turn — and the card WROTE that year into a scheduled
+deploy, which is the half that lasts. Both are `InvariantCulture` now and built
+from the one clock.
+
+**And the READERS had to move with the writer, which is the part that would
+have shipped as a regression.** Measured under `th-TH` rather than reasoned
+about: before this piece BOTH halves were cultural, so the card wrote
+`2569-09-20 06:30` and every reader parsed it straight back to the right
+moment. Wrong on the wire and symmetric in practice — which is exactly why
+nobody had met it. Making the write invariant on its own would have turned
+"deploy tomorrow's class at 6:30" into a **refusal** on such a machine: a
+cultural parse of `2026-09-20 06:30` is **1483-09-20**, `ScheduledDeploy.Problem`
+sees a moment in the past and answers "…has already passed. Pick a time still
+to come.", and **nothing is scheduled at all** — after an approval card that
+said tomorrow, in the fifteenth century's weekday.
+
+Three readers of that same string, all fixed here: `AssistAgent.Explain`, which
+builds the card's sentence, and `plan_scheduled_deploy` and `schedule_deploy`
+in `Plantoir.Mcp/PlantoirTools.cs`, which is where it actually lands — the app
+reaches every tool through `plantoir-mcp`, so the card path crosses JSON-RPC
+and is parsed again on the far side. All three now call ONE reader,
+`ScheduledDeploy.ReadTheMoment`: the form the app WRITES, exact and invariant;
+then an invariant LENIENT parse, which covers what a model sends when it is
+close but not exact (`T` as the separator, a missing leading zero, "6:30 AM");
+and only then the machine's own culture, for a genuinely human-written shape
+with no fixed form to pin it to. This changes no tool schema and no
+description, so the model sees nothing of it. The DISPLAY stays cultural
+deliberately — that sentence is the teacher's, not a wire format — which is why
+the test renders the moment that is CORRECT through the machine's own culture
+and compares that, rather than asserting how Thai writes a Wednesday.
+
+**Symmetry at a boundary is the general rule** the
+[#144](https://github.com/russellgordon/plantoir/issues/144) family keeps
+teaching, and #144's own scope is WRITERS: `TimetableMemory` writes culturally
+and reads invariantly; this wrote invariantly and read culturally; each half
+looks right on its own, and neither is ever noticed from inside one function.
+An audit that greps writers alone finds one end of every one of these. Measured byte-identical on a Gregorian machine
+(en-CA: `" (Today is 2026-09-19, a Saturday.)"` either way), which is what keeps
+the routing measurements standing;
+`RelativeDayFreshnessTests.ANonGregorianMachineIsToldTheSameYearAsEverybodyElse`
+pins it by running the turn under `th-TH`. These are two of the writer sites
+that [issue #144](https://github.com/russellgordon/plantoir/issues/144) sweeps
+for; they are fixed here because this piece was rewriting those lines anyway.
+
+**The MCP server is deliberately unchanged**, for the reason given at the end of
+the card-path section above: two requests, no single moment to settle at, and
+the same posture the mac takes for `--mcp-stdio`.
+
+**A note for anyone writing a test at this seam.** Every other agent rig in the
+Windows suite constructs `AssistAgent` with an EMPTY schema array, because
+nothing else in the loop reads the schemas — which makes a schema-gated rewrite
+inert and every assertion about it vacuously true. `RelativeDayFreshnessTests`
+deserialises `contracts/assist-cases.json` → `toolSchemas.local` instead, the
+same surface the window narrows to. Mutation-checked both ways: with the
+settler's call removed the midnight test and the sweep go red; with the gate
+forced open the sweep goes red.
+
+**No contract case, and none proposable.** WHERE a word is settled stays a
+platform matter; `relativeDays.note` in `contracts/schedule-rules.json` now says
+what each side does. A midnight SCENARIO cannot be written either: the scenario
+grammar's `given` keys carry no clock, so a case pinning "the clock moves
+between the plan and the act" would need a key the mac does not implement — it
+would fail there or pass vacuously. The grammar such a case would need is
+proposed in #159's closing comment rather than added to `contracts/`.
+
 ### Settings are read at the call, not when the window opened (#322)
 
 Written on the mac, 2026-09-26. The same failure shape as the clock above, one
@@ -5484,6 +5922,20 @@ additional destination's refusal.
   no stock format measured on this Mac (en_CA, en_AU, es_ES, en_GB, fr_CA)
   writes one, and the line carries the moment anyway. Left as it is.
 
+#### On Windows (#344, 2026-09-30)
+
+`AssistWorkspace.Courses()` was already uncached, so the server side was right.
+The WINDOW was not: the schedule card's destination came from the window's own
+snapshot of the course, so the contract's case 2 was a live bug here. The card
+now reads through `DeployCommand.EveryDestinationByTypeAtTheCall`, which
+rediscovers the course on disk at the call and falls back to the snapshot only
+when the course can no longer be found. `assistantReadsSettingsAtTheCall` is
+run by `AssistantReadsSettingsAtTheCallTests`, which rejects an unknown
+`expect` key and fails a case that checked nothing. `schedule_deploy`'s
+refusal at the act opens "Nothing was scheduled." and is recorded as
+`scheduled deploy could not be set` with every destination by kind; the mac's
+#396 refinement (only the destination that CAUSED it) is not done here.
+
 ## The other doors: handing a course to an assistant the teacher already has
 
 Written 2026-09-19 with [issue #205](https://github.com/russellgordon/plantoir/issues/205),
@@ -5626,6 +6078,52 @@ not a git repository.
 Whole `exec` session including the model call: 15 s. MCP cold-start was not
 timed separately, and a signed-out launch was not measured (expected: Codex
 asks them to sign in).
+
+### On Windows (#210, 2026-09-30)
+
+"Revise with Codex…" is in the section and course menus beside "Revise with
+Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
+`Plantoir.Core/Assist/CodexLauncher.cs`). It finds `codex.exe`, `codex.cmd` or
+`codex.bat` on PATH, then `%USERPROFILE%\.local\bin\codex.exe`,
+`%APPDATA%\npm\codex.cmd` and `%USERPROFILE%\.bun\bin\codex.exe`, and passes the
+contract's argv exactly — which needed `plantoir-mcp.exe` to accept
+`--mcp-stdio <folder>` (an alias of `--folder`; Windows' server took only
+`--folder` until now). So a Codex session reaches the whole working folder, as
+the contract says (`courseIsNamedInTheGreetingOnly`) — where Windows' CLAUDE
+door still passes `--course` and is locked to one course, a difference the
+contract does not describe; see the questions in `ready/bundle5b.md`.
+
+**The escaping is three layers here, not two, and each is its own function.**
+TOML first (`TomlBasicString`), then the C runtime's argv quoting
+(`ArgvQuote`, the rule Rust's and Node's parsers read back), then cmd's
+metacharacters (`ForCmd`), which follows cmd's OWN quote toggling — cmd knows
+nothing of `\"`, so after a TOML `\"` the rest of a path is unquoted to cmd and
+`&`, `|`, `<`, `>`, `(`, `)` and `^` there get a caret. A `codex.cmd` (npm's
+shim, which re-parses `%*`) is escaped for TWO cmd parses; a `codex.exe` for
+one. `CodexLauncherTests` sends the argv through a real `cmd.exe /s /c` into a
+stub `codex.cmd` shaped like npm's shim and into a native executable, with a
+server path carrying `"` and `&` and a folder carrying `'`, `(`, `&`, `^`, `|`,
+`<`, `>`, `Français 🎓` and a trailing backslash, and asserts the argv arrives
+exactly and that `args` still parses as a list of two strings. Measured
+must-fails: escaping for one cmd parse where the shim needs two cut the argv
+off after the first override; a TOML `"` left unescaped failed the fixture.
+
+**Rejected: `wt.exe`**, which the Claude door uses. Windows Terminal parses its
+own command line — `;` starts a new tab, and it re-joins arguments with its own
+quoting — a third layer no unit test can drive without opening a window. The
+door starts `cmd.exe /s /k "…"` directly; on Windows 11 the console it opens is
+Windows Terminal anyway when that is the default terminal. **Not handled**: a
+`%NAME%` inside a folder or server path is expanded by cmd's first parse when a
+variable of that name exists; cmd offers no escape for `%` on a command line.
+
+**The trail**: `started Claude Code for <CODE>` (the Claude door shipped
+recording nothing) and `started Codex for <CODE>`, both `assistant opened`.
+
+**Start-up was NOT measured here**: Codex is not installed on this PC (`where
+codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
+`%APPDATA%\npm` has no `codex.cmd`). Plantoir never installs it, and neither did
+this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
+Windows machine that has Codex, with its hardware, before trusting it there.
 
 ### The two timeouts, and why they are passed rather than trusted
 
@@ -5970,7 +6468,54 @@ shortfall on B is recorded on #209 and flagged, not tuned away (steer with
 code, not descriptions), and does not block the merge. Results: not yet run
 (Russell's list, `ready/209.md`).
 
+### On Windows (#340, 2026-09-30)
+
+`plantoir-mcp.exe` serves the three tools with the contract's schemas, in
+`PlantoirTools.cs` → "The How I Teach page"; the disk half is
+`AssistWorkspace.HowITeach.cs`, and the page rules (name folding, settings
+block, mark, words) are `Plantoir.Core/Models/HowITeachPage.cs`, a close port of
+the mac's `HowITeachPage.swift` so the two cannot disagree about the same
+bytes. `HowITeachTests` deserialises `nameCases`, `markCases` and
+`emptyPageIsNotWritten.cases` rather than retyping them. What is worth knowing
+before changing it:
+
+- **The BOM.** `File.ReadAllText` drops a leading byte-order mark exactly as
+  Foundation does, so the page is read as bytes and decoded with a strict
+  `UTF8Encoding`, which KEEPS U+FEFF; writing that string back with a
+  no-BOM encoder emits the mark again. The undo entry's "after" is the file as
+  `ReadAllText` reads it back (BOM gone), or `UndoHistory` would see the page
+  as edited since and leave it alone; "before" keeps the BOM.
+- **The listing skip is at each listing, never in the walk.** `Pages()` (so
+  `list_pages` and curriculum targets), `Page()` (by title) and
+  `PlanPublish`'s page list leave the page out; asked for by name, `Page()`
+  refuses and `PlanPublish` adds `howITeachIsNeverPublished` to its problems
+  rather than "no page is called that". `PagePaths.MarkdownPages` and the
+  link rewriting are untouched (`notListedAsAPage.notNarrowed`).
+- **`list_courses`' line goes to an outside door only.** The in-app window
+  reaches `list_courses` through a fixed phrasing over the SAME server binary,
+  so the window's `McpClient` sets `PLANTOIR_LOCAL_WINDOW=1` and the server
+  leaves the line out. Rejected: keying it on `--course` (both the window and
+  the Claude door pass it), and stripping it in `AssistAgent` (the window would
+  then have to know a sentence it never says).
+- **A backup that cannot be made does not stop the save** — the mac's choice,
+  with "with no backup, because one could not be made" on the trail. Every other
+  Windows write refuses instead; this one follows the mac because the page is
+  never on the site and the undo entry still holds the previous text.
+- **No reference-course gate yet**: Windows has no courses kept for reference
+  (#241). When it does, the PLAN must refuse one, as the mac's does, or it
+  promises what the write will refuse.
+- **`PLANTOIR_KEPT_OFF:`** is read from a watched console (`ScriptRunner`) and
+  from a scheduled publish's record (`ScheduledHealthFindings`, the wrapper's
+  scan now keeps the line), and hidden from the console a teacher reads
+  (`TranscriptBuilder`), as `PLANTOIR_DATED:` is.
+- **The Claude door's greeting** carries `greetingHowITeachSentence` verbatim,
+  straight after "Start by listing its sections…" — added in the same piece as
+  the tools, never before them, for the reason the issue gives.
+- Not done here: Course Settings' row (#360) and MCP `instructions` (mac only).
+
 ## A course kept for reference: the write gate, and the seam it is NOT gated on
+
+> **On Windows** the gate is a call-tool filter in plantoir-mcp (`Plantoir.Mcp/ReferenceWriteGate.cs`), reading each tool's own `ReadOnly` flag over all 42 tools it serves, so it covers the local window (which reaches its tools through plantoir-mcp) and every outside session alike. The local assistant also refuses a deploy before it shows a card or stops a preview. Details: `12-windows-app.md` → "The fifteen doors on Windows".
 
 A reference course is read-only to every tool on both surfaces. The gate is one
 check at the top of `AssistToolRunner.run(call:)`, and three decisions in it are
@@ -6258,7 +6803,10 @@ with no class on it was re-dated to the newest class on every assistant publish
 It now returns nil before the date step when no class embed was found — one
 `Bool`, nothing else moves. Windows already behaved this way
 (`AssistWorkspace.ApplyIndexChange` returns before dating when
-`SectionIndex.WithMostRecent` finds nothing). Pinned by
+`SectionIndex.PointedAndDated` finds nothing to point — since parity bundle 7
+the pointer is `SectionIndex.Repointed`, which finds the line by the class page
+it names, as the mac's does, and still inserts under the course's heading when
+no line names a class). Pinned by
 `sectionIndexPointer.dateCases`, run through the pointer WITH the class's date
 by `testTheFrontPagesDateFollowsTheClassItShows` — two failures on the old
 pointer, by copy-and-restore. The same cases are run by the build, which dates
@@ -6681,3 +7229,95 @@ Written here so nobody adds it later thinking it was an oversight. The check
 that it stayed off is structural rather than a promise: no generated contract
 moved with the feature, so `assist-wording.json` and `assist-cases.json` cannot
 disagree with the Swift, and `--write-contracts` is not owed by it.
+
+---
+
+## The Windows half of the assistant chain (parity bundle 5a, 2026-09-30)
+
+Ten issues landed together on `issue/bundle5a-assistant-chain`, in the order
+they build on one another, all at one seam: the place in `AssistAgent` where a
+call is made. Everything here is provable with a scripted model, so no model
+was run and no routing number moved — nothing the model SEES changed (no
+schema, description, system prompt or dateline), which is what makes that
+claim true rather than hoped.
+
+**The order a model reply now meets, in `AssistAgent.Run`.** (1) An engine
+that did not answer: reported, not wound back. (2) `finish_reason: length`:
+nothing runs, `wording.answerWasCutOff`, wound back (#196) — ABOVE the
+tool-call branch, because a reply cut before the tool name arrives with no
+tool call and a raw `<tool_call>` fragment in its content. (3) Arguments that
+are not a JSON object: the same sentence, a different trail line. (4) Nothing
+written for a tool that needs more than the window supplies:
+`wording.answerLeftOutWhatItWasFor` (#262). (5) No tool call and the reply is
+the request handed back: `wording.didNotFollowThat`, wound back (#217) — below
+the tool branch, above the append. (6) The day settled (#159), the moment
+settled (#193), then course and section bound or the turn refused (#180).
+Only then is the tool chosen, carded or run.
+
+**One rewind, three callers.** `WindTheTurnBack` truncates the messages SENT
+TO THE MODEL to the count taken at the top of `Say`; the window's transcript
+is never touched, so the teacher's own sentence stays on screen. A lap after an
+approved call re-marks at its result, so a rewind can never erase a call that
+already ran. Not on an engine failure, as on the mac.
+
+**#180 — what was decided and rejected.** Gated on the tool's own schema
+declaring `course`/`section`, never on a list. Refused rather than rebound for
+another course (Russell, 2026-09-19); the window's spelling written for a
+casing difference; the folder's spelling named in the refusal; the model's
+spelling kept on the trail. `AssistWorkspace`'s locked-course refusal adopted
+the two contract sentences, which meant asking the folder again — `Courses()`
+has already filtered to the lock. Driven through `WindowBindingContractTests`,
+whose every case is a scripted MODEL call (a card phrasing never meets the
+binder).
+
+**#196 — the seam.** `IChatModel.Ask` returns `ModelReply(Message,
+FinishReason)`; a `JsonObject` converts implicitly so scripted test models stay
+one line. `LocalModel.ReadReply` is the body reader, testable without a
+server. A #159 test that pinned unreadable arguments REACHING a tool was
+changed on purpose: they no longer do.
+
+**#262 — the same rule as the mac, after a fix round.** The rule reads each tool's
+own schema. Windows' local `add_next_class` first declared `unit` and `days`
+where the mac's declares only course and section, so an EMPTY model call to it
+was refused here and ran there; the fix round made it run as on the mac, so
+there is no difference left to know. "Add the next class page" is a card and
+never meets the rule. "Changes pages" is this app's own list of writes, because the
+schemas the server hands out carry no read-only flag. A call naming no course
+answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
+
+**#193 — the trap at the server, and the choice made there.**
+`ScheduledDeploy.ReadTheMoment`'s lenient step reads a bare `"06:30"` as TODAY,
+silently. The app's calls are settled into whole moments in the agent (card
+path and model path, one clock: `Today` + `Now` + `TimeZone`), so they cross
+already whole. `plantoir-mcp` REFUSES a bare time, matching the mac's
+`--mcp-stdio`, which "deliberately settles nothing" (above). The first draft
+settled it in the server instead — forgiving, and a divergence — and was
+reversed. The scheduled card now asks `wording.scheduleQuestion`, chosen by the
+tool's NAME (#260), and the immediate card says "This happens now."
+
+**#281 and #288 — transcript only.** `AssistCardCommand.Time.cs` is a port of
+the mac's frame, `TimeOfDay`, `askedOutright`, `respellingReading` and its
+`DayPart` table, one reading behind the question and the spelling so a sentence
+is never both. Both replies return before anything is appended for the model.
+The must-fail for that is the damaging direction itself: appending the
+teacher's "deploy at 6:30" and the question "for context" turns
+`TimeAskedInCodeTests` red because the next request carries "6:30".
+`onlyDifference` is decided by running the matcher and comparing the MOMENTS.
+
+**#261 — read by name, not by folder.** Since #309 a task's name carries its
+folder, so `Schedule` replaces exactly the task named `NameFor(code, section,
+folder)` (`/Create /F`) plus this folder's pre-#309 task. `For()` finds tasks
+through the folder their JOB names, and a task whose job cannot be read belongs
+to no folder there — yet is still overwritten. `WhatSchedulingReplaces` asks
+by name first; the must-fail (asking `For()` alone) turns
+`ADeployWhoseJobCannotBeReadIsStillNamedBecauseItIsReadByName` red. Another
+folder's task for the same code is a different task and is neither replaced nor
+named — the mac's #237, closed here by construction. A refused `/Create` leaves
+the old task, so the failure sentence says it "still stands"; "turned off" is
+recorded only if it has actually gone.
+
+**Rejected, so nobody proposes them again.** Settling a bare time in the server
+(above). Folding the echo into "answer was cut off" (that answer finished).
+Steering any of this with a tool description (the measured precedent is in
+"Steer the model with code"). Splitting steps 6–9 into four commits: they share
+one frame and one settler, and the plan pairs #260 with #193.

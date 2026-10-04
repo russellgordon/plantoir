@@ -358,7 +358,15 @@ public static class SpecialFolderRenamer
     /// only by a rename in their own scope, because a shared folder and a
     /// per-section folder may legitimately share a name.</para>
     /// </summary>
-    public static JObject Renaming(JObject values, string oldName, string newName, FolderScope scope)
+    /// <param name="withPages">
+    /// The shared folders that held an expectation page BEFORE the move (#345):
+    /// which curriculum folders the course resolves to is decided from the
+    /// disk, and after the move the old name is not there to read. Null reads
+    /// the curriculum folders by name alone, as before.
+    /// </param>
+    /// <param name="withLetterFirstPages">Those of them holding a letter-first (<c>A1.1</c>) page; null means all of them.</param>
+    public static JObject Renaming(JObject values, string oldName, string newName, FolderScope scope,
+                                   IEnumerable<string>? withPages = null, IEnumerable<string>? withLetterFirstPages = null)
     {
         var updated = (JObject)values.DeepClone();
         var perSection = Strings(values["per_section_folders"]);
@@ -369,16 +377,30 @@ public static class SpecialFolderRenamer
         bool wasTheClassFolder = scope == FolderScope.PerSection
             && WasSurelyTheClassFolder(oldName, perSection,
                 values["class_folder"]?.Type == JTokenType.String ? values["class_folder"]!.ToString() : null);
-        bool wasTheCurriculumFolder = scope == FolderScope.Shared
-            && string.Equals(
-                CurriculumFolderRule.Resolve(values["curriculum_folder"]?.Type == JTokenType.String ? values["curriculum_folder"]!.ToString() : null, shared),
-                oldName, StringComparison.OrdinalIgnoreCase);
+        // #345: ONE OF the curriculum folders the course resolves to — declared
+        // first, then (when none holds a page) the scan's — read from the
+        // pages as they were before the move.
+        var declaredCurriculum = CurriculumFolderRule.Declared(values["curriculum_folders"], values["curriculum_folder"]);
+        var curriculum = CurriculumFolderRule.Resolve(declaredCurriculum, shared, withPages, withLetterFirstPages);
+        bool wasACurriculumFolder = scope == FolderScope.Shared
+            && curriculum.Resolved.Contains(oldName, StringComparer.OrdinalIgnoreCase);
 
         string listKey = ConfigurationKey(scope);
         updated[listKey] = new JArray(RenamingInList(Strings(values[listKey]), oldName, newName));
 
         if (wasTheClassFolder) updated["class_folder"] = newName;
-        if (wasTheCurriculumFolder) updated["curriculum_folder"] = newName;
+        if (wasACurriculumFolder)
+        {
+            // The declared list (or, when nothing was declared, the folders it
+            // resolves to) with the old name replaced in the same place — and
+            // the legacy key naming the list's FIRST (primary) folder, so an
+            // older Plantoir reading only that key keeps its map.
+            var list = (declaredCurriculum.Count > 0 ? declaredCurriculum : curriculum.Resolved.ToList())
+                .Select(name => string.Equals(name, oldName, StringComparison.OrdinalIgnoreCase) ? newName : name)
+                .ToList();
+            updated["curriculum_folders"] = new JArray(list);
+            updated["curriculum_folder"] = list[0];
+        }
 
         // Three flat lists that name folders from EITHER scope.
         foreach (string key in new[] { "graded_folders", "hidden", "expandable" })
@@ -386,7 +408,7 @@ public static class SpecialFolderRenamer
                 updated[key] = new JArray(RenamingInList(Strings(names), oldName, newName));
 
         // Scoped, both of them: carried only by a rename in their own scope.
-        if (scope == FolderScope.Shared && values["curriculum_folder"]?.Type == JTokenType.String
+        if (!wasACurriculumFolder && scope == FolderScope.Shared && values["curriculum_folder"]?.Type == JTokenType.String
             && values["curriculum_folder"]!.ToString().Equals(oldName, StringComparison.OrdinalIgnoreCase))
             updated["curriculum_folder"] = newName;
         if (scope == FolderScope.PerSection && values["class_folder"]?.Type == JTokenType.String
@@ -579,7 +601,7 @@ public static class SpecialFolderRenamer
     /// </summary>
     public static IReadOnlyList<string> KeysThatCarryAcross => new[]
     {
-        "shared_folders", "per_section_folders", "graded_folders", "curriculum_folder",
+        "shared_folders", "per_section_folders", "graded_folders", "curriculum_folder", "curriculum_folders",
         "class_folder", "hidden", "expandable", "excluded_items",
     };
 }
