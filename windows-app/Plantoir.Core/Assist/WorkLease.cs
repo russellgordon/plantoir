@@ -220,6 +220,27 @@ public static class WorkLease
         return held.Contains(Previewing) ? OutsideMeeting.AServedPreview : OutsideMeeting.Nothing;
     }
 
+    /// <summary>
+    /// A window's preview work lease, given up the moment a preview that had
+    /// been SERVING ends (bundle A fix round, ruling 2): otherwise the lease
+    /// outlived the preview — after another program's deploy closed it, an
+    /// outside assistant went on being told a preview was open ("still shows
+    /// the pages as they were", "deploying closed it") about one that was not.
+    /// Returns what the caller should keep: null once released. Said on the
+    /// trail when the end was a closing for a deploy.
+    /// </summary>
+    public static Held? LetGoWhenAServingPreviewEnds(Held? previewWork, bool isRunning, bool hasBeenServing,
+                                                     bool closedForADeploy, string course, int section)
+    {
+        if (previewWork is null || isRunning || !hasBeenServing) return previewWork;
+        previewWork.Dispose();
+        if (closedForADeploy)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.PreviewClosedForADeploy,
+                "the window let go of the closed preview's hold on the course, so nothing is told a preview is still open",
+                course, section);
+        return null;
+    }
+
     /// <summary>The same, read off disk for this working folder (other live programs only).</summary>
     public static OutsideMeeting WhatAnOutsideChangeMeets(string workspacePath, string courseCode) =>
         OutsideMeets(HeldBy(workspacePath, courseCode));

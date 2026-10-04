@@ -52,7 +52,7 @@ public class ScheduleAndCancelFramesTests : IDisposable
         var refused = Rows["refused"]!.AsArray();
         Assert.True(refused.Count >= 11, "scheduleAndCancel.refused has lost rows");
         var wrongly = refused.Select(row => row!["input"]!.ToString())
-            .Where(input => AssistCardCommand.Matching(input) is not null || AssistCardCommand.AsksToScheduleWithNoTime(input))
+            .Where(input => AssistCardCommand.Matching(input) is not null || AssistCardCommand.AsksWhenToSchedule(input))
             .ToList();
         Assert.True(wrongly.Count == 0, "answered in code, and the contract refuses: " + string.Join(" | ", wrongly));
     }
@@ -112,8 +112,12 @@ public class ScheduleAndCancelFramesTests : IDisposable
     [Fact]
     public void EveryRequestCarriesTheWritingTimeLimit()
     {
-        var body = LocalModel.Request(new JsonArray(), new JsonArray());
+        var body = LocalModel.Request(new JsonArray(), new JsonArray(), AssistModelTier.Small);
         Assert.Equal(30_000, body["t_max_predict_ms"]!.GetValue<int>());
         Assert.Equal(512, body["max_tokens"]!.GetValue<int>());
+        // The larger tier was not measured: it keeps the cap alone (ruling 4).
+        var larger = LocalModel.Request(new JsonArray(), new JsonArray(), AssistModelTier.Large);
+        Assert.Null(larger["t_max_predict_ms"]);
+        Assert.Equal(512, larger["max_tokens"]!.GetValue<int>());
     }
 }

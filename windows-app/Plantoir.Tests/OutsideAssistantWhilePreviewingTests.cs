@@ -132,6 +132,46 @@ public class OutsideAssistantWhilePreviewingTests : IDisposable
     }
 
     /// <summary>
+    /// Fix round ruling 2: once a serving preview ends — here, closed by an
+    /// outside deploy — the window's preview lease is gone, so an outside
+    /// assistant is no longer told a preview is open. Read as ANOTHER program
+    /// reads it: the kinds of the lease files left in the folder.
+    /// </summary>
+    [Fact]
+    public void AServingPreviewThatEndsLetsGoOfTheCourse()
+    {
+        var held = WorkLease.Take(_folder, Course, WorkLease.Previewing);
+        Assert.Equal(WorkLease.OutsideMeeting.AServedPreview, WorkLease.OutsideMeets(KindsOnDisk()));
+
+        // Still running, or never served: kept.
+        Assert.Same(held, WorkLease.LetGoWhenAServingPreviewEnds(held, isRunning: true, hasBeenServing: true, false, Course, 1));
+        Assert.Same(held, WorkLease.LetGoWhenAServingPreviewEnds(held, isRunning: false, hasBeenServing: false, false, Course, 1));
+
+        Assert.Null(WorkLease.LetGoWhenAServingPreviewEnds(held, isRunning: false, hasBeenServing: true,
+                                                           closedForADeploy: true, Course, 1));
+        Assert.NotEqual(WorkLease.OutsideMeeting.AServedPreview, WorkLease.OutsideMeets(KindsOnDisk()));
+        Assert.Contains("let go of the closed preview's hold", File.ReadAllText(_trail));
+    }
+
+    /// <summary>
+    /// Fix round ruling 3: the Claude door's course is HELD (an assist lease),
+    /// never locked — the session still reaches every course (#430).
+    /// </summary>
+    [Fact]
+    public void TheDoorsCourseIsHeldNotLocked()
+    {
+        var workspace = new AssistWorkspace(_folder, _launcher);
+        Assert.Equal(Course, workspace.CourseToHoldForTheConversation("ics3u"));
+        Assert.Null(workspace.CourseToHoldForTheConversation("NOPE1"));
+        Assert.Null(workspace.CourseToHoldForTheConversation(null));
+        Assert.Null(workspace.LockedCourse);
+    }
+
+    private IEnumerable<string> KindsOnDisk() =>
+        Directory.EnumerateFiles(Path.Combine(_folder, "courses", ".internal", "activity"), "*.lease")
+            .Select(path => Path.GetFileName(path).Split('.')[^3]);
+
+    /// <summary>
     /// The door holds back EVERY change, not only a publish: until #436 the
     /// workspace refused only <c>if (plan.Publishes)</c>, so an unpublish went
     /// ahead mid-build. Nothing is written and nothing is backed up.

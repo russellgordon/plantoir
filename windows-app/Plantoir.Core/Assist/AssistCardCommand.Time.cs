@@ -119,6 +119,9 @@ public sealed partial record AssistCardCommand
         if (words.Count < 3 || words[0] != "schedule" || words[1] is not ("a" or "the") || words[2] != "deploy")
             return null;
         words.RemoveRange(0, 3);
+        // The day first (bundle A fix round, ruling 1a): "for tomorrow at
+        // 6:30 am" is "tomorrow at 6:30 am" — the more common order.
+        if (words.Count >= 2 && words[0] == "for" && words[1] is "today" or "tomorrow") words.RemoveAt(0);
         int where = words.Count > 0 && words[0] is "today" or "tomorrow" ? 1 : 0;
         if (words.Count > where && words[where] == "for") words[where] = "at";
         var rebuilt = new List<string>();
@@ -129,21 +132,40 @@ public sealed partial record AssistCardCommand
     }
 
     /// <summary>
-    /// "schedule a deploy" with NO time at all (#424): never a deploy now, and
+    /// "schedule a deploy" with no time the family can set (#424): never a deploy now, and
     /// never sent to the model, which measured 10 of 10 to an immediate deploy
     /// for this shape of sentence. The app asks for the time instead
     /// (<see cref="AssistWording.ScheduleADeployNeedsATime"/>), transcript only.
     /// </summary>
-    public static bool AsksToScheduleWithNoTime(string message)
+    /// <remarks>
+    /// Widened in the bundle A fix round (ruling 1b): ANY sentence that opens
+    /// "[please] schedule a|the deploy" and is not answered by the family —
+    /// "schedule a deploy tomorrow morning", "… later today", "… for Monday",
+    /// "… at 7" — is asked about, because the model it would otherwise reach
+    /// sent exactly this shape to an immediate deploy 10 of 10. Three things
+    /// still fall through to the model, as everywhere in these frames: a
+    /// question mark, a negation, and another course or section named (a
+    /// card, and this question, are about THIS window's section).
+    /// </remarks>
+    public static bool AsksWhenToSchedule(string message)
     {
         string tidied = TidiedForTime(message);
+        if (tidied.EndsWith('?')) return false;
         var words = Words(tidied).ToList();
         if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
-        if (words.Count > 0 && words[^1] == "please") words.RemoveAt(words.Count - 1);
         if (words.Count < 3 || words[0] != "schedule" || words[1] is not ("a" or "the") || words[2] != "deploy")
             return false;
-        // Nothing after the opening but, at most, the day it is for.
-        return string.Join(' ', words.Skip(3)) is "" or "today" or "tomorrow" or "for today" or "for tomorrow";
+        foreach (string raw in words.Skip(3))
+        {
+            string word = raw.Trim(',', ';', ':');
+            if (word is "don't" or "dont" or "don’t" or "not" or "never" or "no") return false;
+            if (word.Contains("section", StringComparison.Ordinal) || word is "course" or "courses") return false;
+            if (System.Text.RegularExpressions.Regex.IsMatch(word, "^[a-z]{3}[0-9][a-z0-9-]*$")) return false;
+        }
+        // Answered already — set, asked morning-or-evening, or respelled.
+        if (Matching(message) is not null || MorningOrEvening(message) is not null || TimeToSayAs(message) is not null)
+            return false;
+        return true;
     }
 
     /// <summary>

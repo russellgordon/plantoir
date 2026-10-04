@@ -27,7 +27,9 @@ namespace Plantoir.Core.Assist;
 ///   Until v1.4.3 this door passed <c>--course</c> and locked the session to
 ///   one course, the one place the two apps disagreed. The local assistant
 ///   window STILL passes <c>--course</c>, which is why nothing tells the
-///   window apart by it: <c>PLANTOIR_LOCAL_WINDOW=1</c> does that.
+///   window apart by it: <c>PLANTOIR_LOCAL_WINDOW=1</c> does that. The
+///   course is ALSO named in the server's environment
+///   (<c>PLANTOIR_DOOR_COURSE</c>, fix round ruling 3) — held, never locked.
 ///
 /// The menu item only appears when this returns true from
 /// <see cref="IsAvailable"/> — a teacher without Claude Code should not be
@@ -233,15 +235,18 @@ public static class ClaudeCodeLauncher
         // so two doors opened seconds apart cannot overwrite each other's file
         // mid-launch — although what it says no longer depends on the course.
         string path = Path.Combine(directory, $"mcp-{courseCode}.json");
-        File.WriteAllText(path, ConfigText(workspacePath, server));
+        File.WriteAllText(path, ConfigText(workspacePath, server, courseCode));
         return path;
     }
 
     /// <summary>
     /// The configuration file's text: one server, <c>plantoir</c>, started with
-    /// <see cref="ServerArguments"/> — the folder and no course (#430).
+    /// <see cref="ServerArguments"/> — the folder and no course (#430) — and,
+    /// in its ENVIRONMENT, the course the door was opened from
+    /// (<see cref="AssistWorkspace.DoorCourseVariable"/>, fix round ruling 3),
+    /// which the server holds an <c>assist</c> lease on without locking to it.
     /// </summary>
-    internal static string ConfigText(string workspacePath, string server)
+    internal static string ConfigText(string workspacePath, string server, string courseCode)
     {
         var config = new
         {
@@ -251,6 +256,7 @@ public static class ClaudeCodeLauncher
                 {
                     command = server,
                     args = ServerArguments(workspacePath),
+                    env = new Dictionary<string, string> { [AssistWorkspace.DoorCourseVariable] = courseCode },
                 },
             },
         };
