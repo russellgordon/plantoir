@@ -39,19 +39,22 @@ scanning logic lives once, in `scripts/netlify_badge.py`, and
 ## The update feeds (`updates/`, #204)
 
 `website/updates/macos.xml` is the feed a released Plantoir on a Mac asks once a
-day for a new version; `updates/windows.xml` will join it with Windows' v1.4.0.
+day for a new version; `updates/windows.xml` is the Windows app's, since its v1.4.2.
 Each is **signed**, so the site must serve the exact bytes that were signed:
 `build.py` copies `updates/*.xml` (and any `*.xml.signature`, NetSparkle's
 detached form) into `site/updates/` byte for byte, never parsing and rewriting
 them, and checks the mac's in both modes (`update_feeds.problems_with`: well
 formed, signed, every download the platform's own asset under its own
 version's release, never the other platform's) — the MAC's feed only: the
-checker reads Sparkle's shape, and NetSparkle's `windows.xml` gets a checker of
-its own when Windows adopts it (v1.4.0). `--deploy` refuses when the mac
+checker reads Sparkle's shape, and NetSparkle's `windows.xml` still has no
+checker of its own at build time (its two signatures are verified with the
+generator at the cut, `RELEASING.md` → "The update feed (Windows)"). `--deploy` refuses when the mac
 feed's newest version is not `MARKETING_VERSION`, and afterwards — like
-`--verify-deploy` — fetches the live mac feed, compares its SHA-256 with `site/`,
+`--verify-deploy` — fetches each live feed, compares its SHA-256 with `site/`,
 and follows its newest download to a 200 of the right length: the check for a
-feed deployed before its release was published.
+feed deployed before its release was published. For the Windows feed it also
+checks `windows.xml.signature` is live as built, and counts a missing one as a
+failure.
 
 `updates/macos-notes.html` is the cumulative release notes the feed is built
 from, and is NOT served. Both files are written only by
@@ -423,6 +426,9 @@ because the lessons in it are real, not because the task is still open.
 rule, and `hero`, `colour-schemes` and `light-and-dark` show Windows visitors
 the Mac picture until they are retaken — `SCREENSHOTS.md` → "The one rule",
 #375.)
+(Those three were retaken as whole native captures on 2026-10-03, #380, and
+Windows visitors see them again; the single-window Windows shots still owe
+the rule.)
 
 ### What Windows built
 

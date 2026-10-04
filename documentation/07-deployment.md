@@ -377,7 +377,14 @@ writes the real client at the end of the body (case 12).
 - *Editing `deploy.ps1` from the mac*: its last mac-written port was true for
   every site of two or more pages ("A third detail", above), and there is no
   `pwsh` on this Mac, so it would ship unrun PowerShell on the publishing path.
-  Windows owes it on #272 and keeps the old (safe-direction) fault until then.
+  Windows did it itself on #272 (2026-09-30): `Test-CarriesLiveReload` reads
+  each page whole as bytes (ISO-8859-1, one to one) and matches the tag, the
+  explicit byte class `[ \t\n\x0B\f\r]*` and the client case-sensitively,
+  with `-Force` so hidden folders count and an unreadable page passed over
+  rather than thrown on under `$ErrorActionPreference = 'Stop'`.
+  `windows-app/test_launcher_rules.ps1` runs all 15 cases against it; measured
+  on an i5-8365U (Windows 11 build 26200): 32–35 ms warm for a preview build,
+  78–86 ms for a clean 299-page section read whole.
 - *A new activity-trail event* ("rebuilt because the site was a preview's"):
   the piece narrows WHEN an existing behaviour fires, and what a teacher sees
   change — the folder publish succeeds, Publish skips a needless build — is
@@ -754,6 +761,18 @@ to be served over HTTP.
 GitHub issue [#227](https://github.com/russellgordon/plantoir/issues/227),
 2026-09-25. Two holes, both of which ended in "Published" over a folder that
 was empty, stale, or somewhere else entirely.
+
+**The path rule, on both platforms:** the app refuses any partial path; a
+launcher given one on a command line takes a plain relative name from the
+working folder. That INCLUDES `..` — `..\..\x` (or `../../x`) publishes
+OUTSIDE the working folder, on purpose and the same on both: a teacher may
+already publish to any absolute folder they choose, so escaping the working
+folder is not a new power, and refusing `..` on one platform alone would be
+the drift this rule exists to prevent. Windows' `deploy.ps1`
+(`Resolve-PublishFolder`, since bundle 4) additionally REFUSES a
+drive-relative (`C:foo`) or root-relative (`\out`) path, which .NET would
+otherwise resolve against the process's directory; the mac has no such
+shapes.
 
 **A relative `--to-folder` was handed to rsync as it was typed, and rsync reads
 a colon before the first `/` as a REMOTE computer.** Measured on macOS 26.6 with
@@ -1137,10 +1156,15 @@ does its own post-run work.
   the mac said so.
 
   The honest version: **this side needs no mark at all**, because the run IS
-  Plantoir and writes the line once as it finishes. Windows cannot do that —
-  Task Scheduler runs plain PowerShell with nothing of the app loaded — so the
-  line is written by a sweep when the app next opens, and a sweep with no memory
-  would write it again every launch. Hence a `.noted` sidecar, kept beside the
+  Plantoir and writes the line once as it finishes. Windows could not do that
+  until parity bundle 3: Task Scheduler then ran plain PowerShell with nothing of
+  the app loaded, so the line is written by a sweep when the app next opens.
+  Since bundle 3 Task Scheduler starts `Plantoir.exe --run-scheduled-deploy`
+  (the task is registered from XML with `DisallowStartIfOnBatteries` false,
+  `StopIfGoingOnBatteries` false and `StartWhenAvailable` true), so the run IS
+  Plantoir on Windows too; the code still writes the line from the sweep when
+  the app next opens (`ScheduledPublishOutcome`), not from the run, and a sweep
+  with no memory would write it again every launch. Hence a `.noted` sidecar, kept beside the
   record rather than inside it because the record's modification time is what
   dates the notice. Two platforms, one property — a line per run, dated to the
   run — reached the only way each of them can.
@@ -1816,19 +1840,24 @@ used to end "this suite is red on `kinds`/`sentences` until the mac adopts it",
 which was true when it was written on the Windows branch and stopped being true
 the moment these two merged.
 
-**`buildDidNotFinish` is on the mac only, as of 2026-09-25** (#137, above), and
-Windows owes it: their wrapper still records a failed build as `DidNotFinish`
-with every destination joined, and their suite goes red on `kinds` and
-`sentences` until it adopts the kind, which is the request rather than damage.
-So do `tooLateToRun` and `courseWasBusy`, on the conditions the contract gives
-for each; `platformDifferences` is where that is kept current.
+**`buildDidNotFinish` was on the mac only from 2026-09-25** (#137, above) until
+Windows adopted it on 2026-09-30 (bundle 3, [#297](https://github.com/russellgordon/plantoir/issues/297)):
+its wrapper now records a build that exits with any code but 3 as
+`buildDidNotFinish` with no destination, and `whichKind.cases` run through the
+real generated wrapper. Windows records `tooLateToRun`, `courseWasBusy` and
+`couldNotRunAsSetNow` too since the same day — see "On Windows since bundle 3"
+below.
 
 **One difference remains, and it is deliberate: who writes the trail line,
 which cannot be the same on both.** Here the
 launchd agent runs Plantoir, so the RUN writes it, as the `trail` key describes.
-On Windows Task Scheduler runs plain PowerShell with no app process alive, so
-that side sweeps every record when the app next opens, dating each line from the
-record rather than from the reading. Writing it from the wrapper's own shell was
+On Windows Task Scheduler ran plain PowerShell with no app process alive, so
+that side sweeps every record when the app next opens — and, since bundle 3,
+the moment a record lands while the app is open (#218) — dating each line from
+the record rather than from the reading. (Since bundle 3 the Windows run IS
+Plantoir, headless, and writes its own `waited` and `read the course's
+settings` lines directly; the outcome lines stay with the sweep so they have
+one writer.) Writing it from the wrapper's own shell was
 rejected there for the same reason it was rejected here — see below. The
 property the contract is actually asking for survives either way: **a teacher
 who never opens the failed section still gets the line**, and that teacher is
@@ -1907,6 +1936,8 @@ line. Giving the rebuild its own exit code was rejected as a launcher contract
 change Windows shares.
 
 ## A course kept for reference is never deployed — fifteen doors, one rule
+
+> **Windows' chokepoints for each door**, and the test that holds each, are tabled in `12-windows-app.md` → "The fifteen doors on Windows". Door 12 (the folder publish) is `deploy.ps1`'s host-side check, and every `markerAgreement` row is run against the REAL `deploy.ps1` by `ReferenceMarkerAgreementTests`.
 
 A REFERENCE COURSE is last year's course, or a course full of example content,
 kept in this year's sidebar to be read. It may be previewed; it is never
@@ -2790,11 +2821,13 @@ the old wrapper; falling back to the scheduled wrapper when settings cannot be
 read (the fault itself); a temporary wrapper file (everything finds the job by
 its wrapper's path); warning at Save alone.
 
-**Windows** has the same fault — `TaskScheduling.WriteWrapperScript` bakes the
-destinations and the Account ID into the `.ps1`, and Task Scheduler runs
-PowerShell with no app alive — and owes `theDestination`, the kind, the event and
-the two Save sentences. How is theirs; the mac's shape (the task launches
-`Plantoir.exe --run-scheduled-deploy`) is the likely best.
+**Windows** had the same fault — `TaskScheduling.WriteWrapperScript` baked the
+destinations and the Account ID into the `.ps1`, and Task Scheduler ran
+PowerShell with no app alive. Since bundle 3 (2026-09-30, [#347](https://github.com/russellgordon/plantoir/issues/347))
+the task launches `Plantoir.exe --run-scheduled-deploy "<task name>"` and the
+run follows `theDestination` (11 of its 12 cases; the twelfth is mac-only), with
+the kind, the event and the two Save sentences — see "On Windows since bundle 3"
+below.
 
 ### The window's acts read the saved settings too (#335)
 
@@ -2888,7 +2921,8 @@ three `specialNames` keys and the trail event. Mac tests:
 `ActsUseTheSavedSettingsTests` and the extended `SettingsSaveNoticeTests`.
 **Windows** looks like the same shape (`SidebarPane.xaml.cs` and
 `SectionDetailView.xaml.cs` read `Configuration.AllDeployDestinations` off the
-shared copy) and owes the check, the cases, the keys and the event.
+shared copy) and owes the check, the cases, the keys and the event (#357 —
+not part of bundle 3, which took only the scheduled deploy's own re-read).
 
 ### What the schedule sheet says, and what it no longer lists (#396)
 
@@ -3050,7 +3084,203 @@ tests `ActsUseTheSavedSettingsTests.testARefusalAtThePressNamesTheDestinationTha
 and `AssistSettingsFreshnessTests.testARefusalOverAnAdditionalDestinationNamesThatDestination`, and the extended
 `AssistToolRunnerTests.testPlanningAndSettingADeployForLater`. **Windows**
 built the same list twice (`ScheduledDeploy.UnpublishedClassesSentence` in the
-sidebar dialog, and `Describe()`'s block) and has the same primary-only
+sidebar dialog, and `Describe()`'s block) and had the same primary-only
 sentence in `Describe()`, the card and `PlantoirTools.cs`' `schedule_deploy`
-result; what it owes is its `windows` issue #400 (from #396), listed in
-`WINDOWS-PARITY.md`.
+result. Since 2026-09-30 (bundle 3, #400) both lists are gone —
+`UnpublishedClassesIn` and `UnpublishedClassesSentence` deleted with their
+pins, no product caller being left — and every surface names every destination:
+`ScheduledDeploy.EveryDestination` (the sheet's words) for `Describe()`, the
+dialog's opening (`ScheduledDeploy.DialogOpening`) and the MCP result, and
+`DeployCommand.EveryDestinationByType` (the card's words) for the assistant's
+card and `list_courses` (#404). `planOpening.cases` and
+`listCoursesLine.cases` run through all of them
+(`SharedRuleContractTests.EveryPlanOpeningNamesEveryDestinationInTheSavedOrder`).
+Not done there: `actsUseTheSavedSettings` case 8 (rides with #357) and the
+`scheduled deploy could not be set` line naming the cause (#261).
+
+## On Windows since bundle 3: the scheduled run is Plantoir
+
+Since 2026-09-30 (the Windows parity run's bundle 3: #347, #289, #239, #309,
+#297, #218). Until then a Windows task ran `powershell.exe -File <wrapper>`,
+written when the teacher pressed Schedule, with the destinations and the
+Cloudflare Account ID baked in — so nothing of Plantoir's ran at the moment
+itself, and every rule that has to be decided THEN (how late is too late,
+whether another program is building the course, whether the task still stands,
+where the course deploys now) had nowhere to live.
+
+**What a task runs now.** `"<Plantoir.exe>" --run-scheduled-deploy "<task
+name>"`. `Program.Main` takes that branch before WebView2's folder, the COM
+wrappers and `Application.Start`, so no window appears; the job — working
+folder, course, section, the moment it was set for, and where the teacher was
+TOLD it would go — is a small JSON file beside the wrappers
+(`TaskScheduling.JobPath`), found from the task's own name. `ScheduledRun.Execute`
+then, in the contract's order (`theDestination.order`):
+
+1. **The lateness window** (#239): `abs(now − moment)` against the course's
+   `scheduled_deploy_may_run_late_days`, read at the run; too late stands down
+   `tooLateToRun`. The key is preserved on every save (`CourseConfiguration`
+   is a JObject edited key by key), and all ten `howLateIsTooLate` cases and
+   seven stored-value cases run.
+2. **The wait for the course** (#289): another program's `build` or `publish`
+   lease — never a `preview` — is waited for, looking again every 15 s on the
+   wall clock for up to ten minutes, take-then-check with the run's own
+   `build` + `publish` leases; still busy, it stands down `courseWasBusy`, its
+   leases released first, with `scheduled publish waited for the course` on the
+   trail.
+3. **Whether the task still stands**: registered, and its job still naming
+   this run's moment. A task cancelled or re-set while the run waited deploys
+   nothing and writes nothing.
+4. **The settings as they are now** (#347): `ScheduledDeploy.RefusalOf` — the
+   ONE keyed decision the schedule sheet's `Problem` also uses, so there is no
+   second copy of the refusals — for every destination, with the Account ID
+   read from the app's own settings. A refusal stands down
+   `couldNotRunAsSetNow` with the reason clause; a destination that differs
+   from what the teacher was told goes ahead and says so
+   (`scheduled publish read the course's settings`).
+5. **The wrapper**, written from those settings under the task's OWN name
+   (#309's trap: never recomputed), and run. The task is then cleared (it is
+   one-shot); the wrapper's record stays.
+
+**Measured end to end on this Windows PC** (Intel Core i5-8365U, 4 cores / 8
+threads, 15.7 GB, NTFS, Windows 11 Pro 25H2 build 26200, 2026-09-30): a real
+task registered through `schtasks`, due two minutes later, against a throwaway
+working folder whose course had been moved from Netlify to a folder after
+scheduling. It fired at 19:22:00; the trail said *"was set to deploy to
+Netlify; the course deploys to <the folder> now, so it went there"* at
+19:22:02; the stand-in `deploy.ps1` was handed `--to-folder <the folder>`; the
+`succeeded` record was filed under the folder's id at 19:22:04; the task, its
+job and its wrapper were gone afterwards; no window appeared and no Plantoir
+process was left.
+
+**The command carries the task's NAME, not the job's path — measured.** The
+first version passed the job's path; in the deep folder the probe ran from,
+`"<exe>" --run-scheduled-deploy "<job path>"` was 548 characters and `schtasks`
+refused it outright (*"Value for '/TR' option cannot be more than 261
+character(s)"*). A name is a few dozen characters wherever the working folder is.
+
+**The task's settings, and whether a missed start runs late (#239's CHECK; fix round, ruling 1).**
+At first the task was made with `schtasks /Create /SC ONCE`, which writes no
+`<StartWhenAvailable>` and sets `DisallowStartIfOnBatteries` and
+`StopIfGoingOnBatteries` TRUE (read back with `/Query /XML`): a laptop on battery
+at the moment never published, and left no record. Since the bundle 3 fix round
+the task is registered from XML (`TaskScheduling.TaskXml`, through `/Create
+/XML`) with the battery gate off, not stopped by unplugging, and
+`StartWhenAvailable` true, its StartBoundary written in one invariant form (no
+locale date format is guessed). `TaskDefinitionTests` schedules through
+`Schedule()` and reads the registered task back from the real Task Scheduler.
+
+**Measured** (this PC, on mains, flag read back true, 2026-09-30 20:07–20:22):
+a task registered with its start two minutes already past did NOT run within
+15 minutes (Last Result 267011) — a start already past when the task was
+registered is not treated as missed. Two earlier simulations (before the fix)
+agreed. **Not measured:** a start missed while the PC is asleep or off; that
+such a start runs once Windows is available again is Microsoft's documented
+behaviour for `StartWhenAvailable`, unmeasured here (it would have suspended the
+machine the run was on). If it holds, the lateness window decides whether the
+late run is still worth doing, so `tooLateToRun` has a real path; its ten cases
+run either way.
+
+**A crash between writing the job and replacing the task** (the fix round's
+order, job first): the task's arguments carry the setting's TOKEN as well as its
+name, and a run whose task token differs from the job's does nothing and leaves
+the task alone — so an old task cannot run on a new job's settings.
+
+**One task per section per working folder** (#309, mac #237):
+`Plantoir deploy <CODE> section <N> <folder id>`, the id being
+`FolderContainers.FolderIdentifier` — the one this folder's builds folder
+already uses. Every reader (the clock, the menu, cancel, removal, rename,
+rollover) finds a folder's tasks by the working folder the task's own job
+names — or, for a task set before the update, the folder its old wrapper
+names (`$toolchainScripts = Join-Path '<folder>' …`) — never by rebuilding a
+name, so an old-named task keeps being shown, cancelled and run. Scheduling a
+section this folder set before the update retires the old task only AFTER the
+new one is accepted. The listing is one `schtasks /Query /FO CSV /NH` for the
+whole machine, remembered for two seconds because the sidebar asks per section.
+Records and folder-problem findings are filed as
+`<CODE>-section<N>.<folder id>.txt`; a record an old task writes under the
+folder-less name is filed under its folder by the sweep, from its wrapper, and
+one whose wrapper is gone is shown nowhere (the mac's stated limit, for the
+mac's reason: folder A's failure must not appear in folder B).
+
+**Removing a course or a section turns its deploys off FIRST** (#239):
+`ScheduledDeployRemoval.TurnOffFirst`, asked of the scheduler (a section
+removed on an earlier build left its task behind and took its number out of
+the settings) and scoped to this folder. A cancel that fails removes nothing
+and says `couldNotTurnItOff…`; a removal that fails after the cancel says
+`removalFailedAfterTurningItOff…`; the confirmation says
+`confirmation…Removed…` first. Until then Windows turned a section's deploy
+off AFTER archiving and ignored a failure, and a course's not at all — and on
+this side an orphan reports SUCCESS for every folder and Cloudflare course.
+Rename and rollover follow the same scoping. Every `provedBy: run` case is
+named against the test that plays it
+(`ScheduledDeployCancellationTests.EveryRunCaseInTheContractIsPlayedHere`),
+so a case added on the mac fails by name here; the three `sourceHasNoCancel`
+cases name mac files, and the rule is checked against `CourseRestorer.cs`.
+
+**Tasks set before bundle 3 drain; they are not migrated.** They run the old
+`powershell.exe -File <baked .ps1>` once and then have nothing left to do.
+Migrating them at app start was rejected: it rewrites an alarm the teacher
+set, through the one step that can lose it, for a task that ends itself by
+running. For their one remaining run they keep the old behaviour — the
+destination baked in, no wait, no lateness check.
+
+**Rejected on the way:** re-implementing the refusals in the wrapper's
+PowerShell (#347's option (b), a third copy of them); re-registering tasks at
+Save (option (c), misses every other writer of the settings); hosting the run
+in `plantoir-mcp.exe` (a console program, with no identity a notification
+could carry); creating tasks from XML to escape the 261-character limit (more
+surface than a shorter argument, and it would have changed the battery
+settings silently); a sweep that deletes tasks whose course is gone (the
+mac dropped it: the only code that would delete something a teacher set on
+purpose, and wrong in silence whenever `courses\` reads empty).
+
+### The notice arrives while the section is open (#218)
+
+**The CHECK.** Windows re-read the band and the sidebar badge when a window
+was ACTIVATED and when a section opened — never while the app simply stayed in
+front. Now `ScheduledPublishWatcher` is ONE `FileSystemWatcher` for the app on
+`scheduled\unanswered`, each window marshalling to its own UI thread and
+refreshing both together; a dismissal in the app raises it too, and a finished
+run's trail line is written then rather than at the next launch.
+
+**Measured on this Windows PC** (as above), 40 trials each, a record read at
+the FIRST event the watcher raised: written in place 21, 21 and 18 of 40
+readable; assembled in `%TEMP%` and moved in 40 of 40, every run. So every
+record this app writes is assembled outside the folder and moved in —
+`ScheduledPublishOutcome.Record`, and the wrapper's `Write-Outcome`, which
+writes beside the folder and `Move-Item`s in. Two differences from the mac,
+both deliberate: Windows' watcher also reports a file that GROWS
+(`NotifyFilters.Size | LastWrite`), so an old wrapper's in-place write is read
+again when its content lands and no per-file watch is needed; and the reader
+no longer deletes an EMPTY record less than a minute old — it used to delete an
+unusable record on sight, which with a watcher would have destroyed the very
+news it was woken for. The badge already had hover text; the mac's
+"notice floats in the middle of an empty window" was not reproduced here
+(the band is an InfoBar at the top of the section).
+
+**"40 of 40, every run" stopped being true under load, and the cause was the
+READ, not the record (#417, 2026-10-01).** The 40-trial test went red 2 runs in
+10 when the bundle-8 reviewer measured it on this PC, and 14 in 35 under load (an
+eight-process Python fuzz beside it, i5-8365U, 16 GB, Windows 11 26200). Read
+inside the event handler, every failing trial's record EXISTED and was whole;
+the read threw `IOException … being used by another process` — 21 of 1,400
+first-event reads. Something else on the machine (not identified; a scanner or
+indexer is the usual suspect) opens a new file with write access for a moment,
+and `File.ReadAllText` asks for `FileShare.Read`, which refuses to share with a
+writer. A teacher would have seen it as the notice NOT arriving until the
+window was next activated — the exact gap #218 closed. `ReadPath` now opens the
+record sharing ReadWrite|Delete, which reads the same bytes beside that holder:
+30 runs of the class after the change, 30 green, under the same load.
+`ARecordHeldOpenForWritingByAnotherHandleIsStillRead` pins the collision
+deterministically (another handle holds the record open for writing; the old
+reader returned null). **Rejected:** a retry with a pause, as the issue first
+suggested — a guessed interval for something the open mode removes — and
+skipping trials whose record "is not there yet", which was the first hypothesis
+and was disproved by the instrumented runs (the record was always there). The
+mac has no share modes; nothing to mirror.
+
+**The notification itself landed in parity bundle 8** (#212's Windows half,
+#324): the scheduled run posts a toast in the section's own sentence, and a
+click opens that section (`ScheduledPublishToast`; trail `scheduled publish
+notification`). It is unproven on a real click (the desktop was locked), and
+nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.

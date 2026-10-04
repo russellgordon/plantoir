@@ -384,7 +384,7 @@ up. At the app's minimum window of 900 with a 228-point sidebar the column is
 671, so it collapses there by five points — a genuine lack of room rather than
 a limit, and a separate question if it ever matters.
 
-**Windows** carries the same limit: `MaxWidth="520"` on the `BreadcrumbBar`
+**Windows** carried the same limit until bundle 8 (#302, 2026-10-01, which dropped it): `MaxWidth="520"` on the `BreadcrumbBar`
 in its picker's empty-folder offer, where it ellipsises the leftmost crumbs at
 520 whatever the window's width. Its picker shows no bar for a synced folder
 (that notice lives in its main window), so there the empty-folder offer is
@@ -1650,6 +1650,36 @@ will not close.
 **REJECTED — a per-app Colima profile (`colima -p plantoir`).** A private VM
 would rot from uptime in exactly the same way unless the quit path works, so
 fixing the quit path is the prerequisite either way rather than the alternative.
+
+### On Windows since bundle 3 (#231)
+
+Russell decided on 2026-09-25 to match all three rules; Windows did on
+2026-09-30. **The question**: quitting there is closing the LAST window, so
+`MainWindow`'s `AppWindow.Closing` asks (`QuitConfirmation`, all nine contract
+cases, Keep Working the default) when the app's own records show a publish or a
+preview being BUILT (`CourseActivity.BeginPreviewBuild`, from the press until
+the page first answers — never the port lease), and never when Windows is
+ending the session: a window subclass hears `WM_QUERYENDSESSION`, Windows'
+`kAEQuitReason`. Both answers go on the trail. A copy of a course being saved
+counts as the rule says, but Windows zips on the window's own thread, so a quit
+cannot land mid-zip there. Both `appliesOn: ["mac"]` keys were deleted.
+
+**The WSL release** (`FolderContainers.ReleaseEverythingAtQuit`) is reached
+only by a build with no native runtime — never a shipped one — and was hardened
+rather than deleted, because deleting it is a decision about the fallback
+itself: it now leaves everything alone while another program holds a build or
+publish lease in any of the folders (leases first) or while a launcher for one
+of them runs (Windows' own process list: `Win32_Process` command lines
+containing `<folder>\preview.ps1`, `deploy.ps1` or `setup.ps1`, matched
+LITERALLY, the launchers' `--stop` runs excluded — checked against real
+processes in a folder named `C++ 26(27) [quit]…`); it counts the machine idle
+only when `docker ps` ANSWERS (exit 0) and is empty; and it starts PowerShell
+and wsl by their System32 path. **The CHECK #231 asked** — did
+`RunDetached("wsl"/"powershell")` resolve from a PATH a teacher may have
+edited? No: by name, `CreateProcess` looks in the app's folder, the current
+directory (which `Program.Main` sets to the app's folder), then System32, and
+only then PATH — so PATH could not reach them, but a stray `wsl.exe` beside
+the app could have. Full paths close that.
 
 ## A preview that never appears: bounding the QUIET, not the run
 
@@ -2925,6 +2955,37 @@ preview not waited for); the stand-down record and its trail line; the MCP
 leaving order. It resets process-wide stores and relies on the scheme's
 `parallelizable = "NO"`, like `CourseActivityTests`.
 
+### On Windows since bundle 3 (#289)
+
+Windows took the same rules on 2026-09-30, so "Windows' only blocking kind is
+build" is history now. `WorkLease` gained the pure seam the contract's lists
+run through — `FirstInTheWay` (all 29 `declining` cases), `IsAlive` on the
+signal and table answers (17 of the 19 `liveness` cases; the two one-line
+IMPORT cases are mac-only), `ReadBody` (the 7 `bodyCases`) — and `Take` now
+answers a `Held` carrying its claim (line 3's moment, the pid).
+
+- **The window** takes its BUILD lease before its preview lease and looks
+  right after (`DeclinedAfterTaking`); Deploy takes its build + publish claim
+  BEFORE it stops the preview, in fields of its own so the stop cannot release
+  them, and the second look after the stop is gone (the claim was up through
+  it). Declined, it says `courseIsBeingBuiltElsewhere` in a Cannot Preview /
+  Cannot Deploy Yet dialog. The Deploy button still greys only for another
+  program's BUILD — the mac rejected greying; Windows keeps it as a courtesy,
+  and the press is the guarantee.
+- **Both assistants** are `plantoir-mcp` on Windows (the in-app window drives
+  it over stdio), so both are told `courseIsBusy` — the outside assistant's
+  sentence. A build path declines on a preview elsewhere
+  (`ClaimTheBuildOrDecline`); a WRITE does not — only the rebuild after it is
+  declined, and the note says `courseIsBusy` where the preview would have been
+  refreshed.
+- **The scheduled publish** now runs as Plantoir (07-deployment → "On Windows
+  since bundle 3") and writes `build` + `publish` leases, waiting for another
+  program's build or publish as the rule says.
+- **Leaving**: `LauncherRunner.StopEverythingItStarted` kills each launcher
+  tree it is waiting on and runs `preview.ps1 <code> <section> --stop`, each up
+  to 15 s, BEFORE the leases go — on stdin close and on process exit
+  (`McpLeavingTests`). A kill skips it, as here.
+
 ## A course code Plantoir keeps for itself: WORK (#101)
 
 `CourseCodeRule` refuses the code `WORK`, in any case and with any surrounding
@@ -3218,6 +3279,14 @@ course's words come back; run it with
 Not changed, on purpose: "Enter a course code." (a refusal before anything is
 known) and the grade-in-title warning's own words.
 
+
+**On Windows** (parity bundle 7, #274/#390/#387, 2026-10-01): the same choice,
+fill rule, panel words, locked rows and disabled Rename…, through Core seams
+(`ClubFill`, `WizardWording.Panel`, `ClubSettingsRows`) the WinUI dialog calls.
+Its trap is the same: the words follow the BOX, never `ClubCodeRule`. Where the
+C# lives and what Windows decided differently (the label scan reads every view
+literal) is in [12 → "Clubs, Course Settings and today's class on
+Windows"](12-windows-app.md).
 ## Renaming a course's word for a unit
 
 Beside the word under Settings — Overall ("What do you call a unit?  Unit
@@ -3234,16 +3303,21 @@ sentences), `UnitWordRenameSheet` (the sheet). The rules and the cases are
 [`contracts/shared-rules.json`](../contracts/shared-rules.json) →
 `specialNames.renameUnitWord`; the trail line is `word for a unit renamed`.
 
-**Only the mac runs any of it today**, and this line said "the cases both
-suites run" until 2026-09-18, which was never true: Windows has no renamer, so
-its suite has no counterpart of `ClassPlanningContractTests.testRenamingTheUnitWordCases`
-and the seven `cases` and three `linkCases` are UNRUN there rather than
-failing. The two pieces that did turn the Windows suite red — the trail event
-and `renameUnitWord.explanation` — are held there as named gaps
-(`windows-app/Plantoir.Tests/NamedGapLedger.cs`) against
-[issue #158](https://github.com/russellgordon/plantoir/issues/158), milestoned
-v1.3.0, which is what owes the whole feature. `contracts/README.md` →
-"Named gaps: the handover whose fix belongs to a LATER release" says when that is allowed.
+**Both apps run it since 2026-09-30.** Windows' renamer landed with #158
+(bundle 2): `Plantoir.Core/Models/UnitWordRenamer.cs` and
+`UnitWordRenameWording.cs`, and a Rename… button beside the word under
+Settings — Overall in `CourseSettingsView`. `UnitWordRenameContractTests`
+runs the seven `cases` (each on a course built on disk) and the six
+`linkCases`, pins every sheet sentence, and drives one rename through the
+contract's order; the two named gaps are deleted. Three Windows-side choices
+worth knowing: `unit_word` is written with `CourseConfiguration.RecordOnDisk`
+(only that key, so unsaved edits in Course Settings stay unsaved — the folder
+rename's rule); "is it the same file?" is asked of the directory listing's
+real spelling (NTFS has no inode number to ask), so a case-only rename on a
+case-insensitive volume is a move onto itself, which `File.Move` performs; and
+a whole-course restore clears the record of a stopped rename. The sheet was
+compiled and NOT driven (no UI test covers it yet). This line said "the cases
+both suites run" until 2026-09-18, which was not true then; it is now.
 
 What it does, in the order it does it — and the order is part of the
 contract, because "disk first, configuration last" is the kind of reasoning a
@@ -3538,6 +3612,8 @@ step to a removal adds it there rather than in the view. The view keeps one
 call, the confirmation's extra sentence and the "Could not remove" alert.
 
 ## A reference course, and what FROZEN means on disk
+
+> **On Windows (bundle 6b, 2026-10-01):** NTFS has no `uchg`, so the lock is DENY entries on every content file plus a delete-child deny on each folder holding one — measured to refuse write, rename-over, rename and delete, and NOT carried by any ordinary copy; the read-only attribute was rejected because it travels into the build and publishes hidden pages. Unlock matches the entry's SHAPE, whoever it names. `robocopy /SEC` and `/COPYALL` are the one copy that carries it (and stall on it). Everything Windows does differently, with its numbers, is in `12-windows-app.md` → "Courses kept for reference on Windows".
 
 A reference course is last year's course — or a course full of example content
 — kept in this year's sidebar to be read, and never deployed. The rules both
@@ -3835,6 +3911,8 @@ deployable one, and a deploy that reports success is the worst direction this
 feature can fail in.
 
 ### Importing last year's folder
+
+> **On Windows:** a stream copy with a bytes progress bar and Stop (NTFS has no clone: 507 MB end to end in 5.2–5.6 s on an NVMe, 90–97 MB/s), every reparse point left behind rather than copied as a link, and the staging folder made with `CreateDirectoryW` so the create is exclusive. See `12-windows-app.md` → "The import".
 
 The second way a reference course is made, and the one a teacher reaches for
 first: **File ▸ Import Courses for Reference…**, point at the folder last
@@ -5388,6 +5466,62 @@ teacher meets in the first ten seconds.
   Measured: two PDFs and one `.html` across the real courses, and the only
   pages linking them are class pages, which are never copyable.
 
+### On Windows (#247, #258's half, #384): what differs, and what was measured
+
+The Windows port is `Plantoir.Core/Models/CoursePageCopy.cs` (the plan and the
+copy), `CopyPageFrontmatter.cs` (the four steps and the guard) and
+`CopyPageWording.cs` (every `copyingAPageBetweenCourses.wording` key, compared
+with the contract by `CopyAPageFrontmatterTests`), drawn by
+`Plantoir/Views/CopyAPageDialog.cs`. The rules are the contract's and all 32
+`cases`, 9 `frontmatterCases` and 36 `builderAgreement.cases` run on Windows.
+Four things are different in HOW, and each was measured rather than assumed
+(i5-8365U, 16 GB, Samsung 980 NVMe, NTFS, Windows 11 build 26200, Python 3.14,
+python-frontmatter/PyYAML as `scripts/` pins them):
+
+- **NTFS does not refuse an accent twin.** `FileMode.CreateNew` refuses a name
+  differing only by CASE (an `IOException` with HResult `0x80070050`,
+  `ERROR_FILE_EXISTS`, which is the ordinary "already here" skip) — but a name
+  differing only by NFC/NFD spelling is created as a SECOND file
+  (`CopyAPageNamesTests.NtfsDoesNotRefuseAnAccentTwinButDoesRefuseACaseTwin`).
+  On the mac `O_EXCL` refuses both. So on Windows the name index — NFC, then
+  `ToUpperInvariant`, ordinal, `.md` dropped, over the whole destination — is
+  the ONLY guard against a twin, and it is updated after EACH successful write
+  (bundle-6 ruling 5): two incoming pictures that are twins of each other both
+  plan as new, and the index written after the first is what makes the second a
+  skip (`TwoAccentTwinPicturesInOneRunMakeOneFileAndOneSkip`; with the per-write
+  update removed the test finds two files). Writes keep the SOURCE's exact
+  UTF-16 name: .NET's listing and `Path.Combine` leave an NFD name as stored.
+- **Every write is a stream copy into `FileMode.CreateNew`.** No `File.Copy`
+  (it carries the read-only attribute) and never a `File.Exists` check before a
+  write. A page that appears between the plan and the write is caught by the
+  exclusive create (`ALateCollisionIsASkipNotAnOverwrite`, with a racing
+  creator injected right before the write). Nothing written carries a lock or a
+  read-only bit, and `ReferenceLock.Clear` runs on each file before the read-back
+  anyway (`CopyAPageClearsTheLockTests` locks the source with design A and a
+  read-only bit first).
+- **There is no YAML library in this app**, so the guard is a narrow whitelist
+  language (`CopyPageFrontmatter.BuilderAgrees`) that REFUSES anchors, aliases,
+  tags, block scalars, flow mappings, directives, indented fences, a lone CR,
+  tabs, control characters and digit-led values PyYAML resolves but cannot
+  construct — "certified" is true by construction for what it accepts. That the
+  restriction is SOUND is fuzz-backed, not proven: `CopyAPageFuzzTests` composes
+  generated sources in C# and asks ONE Python pool, which imports
+  `scripts/build_site.py` and runs the real `process_frontmatter` for sections
+  1–4, whether each certified page is hidden. 5,000 sources (the default, ~30 s):
+  2,017 certified, 2,983 refused, **0 certified and not hidden**. **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0.** Re-run on 2026-10-01 over the original range in ONE process: 399,417 certified, 0 not hidden — and the 856 run had certified 401,096, which no committed state does (the count is a fingerprint of a seeded, deterministic run), so the 856 came from a different binary — its guard or its generator differed (the oracle only judges pages already certified, so it cannot move that count on its own), possibly with an older oracle as well, and which of them is not known; documentation/12 → "Copy a Page on Windows" has the numbers. The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net. Tracked as `windows` issue #414. Every one of the 12,128 pages Plantoir ships
+  (`support/example_content` + `support/skeletons`) is certified: **0 false
+  refusals**. With the guard widened to admit `&`/`*` values (an anchor or
+  alias), the same fuzz finds 5 published pages — the oracle has teeth.
+- **The scroll region (#384)** is one `ScrollViewer` with `MaxHeight` 380 epx on
+  the checklist and 320 on the result, around the rows AND every per-page
+  sentence; `CopyAPageDialogUiTests.CheckListAndSentencesScrollAsOne` asserts a
+  minimum height as well as the ceiling, with eleven rows and seventy sentences
+  at the window's smallest height.
+
+`draftSectionTwo` and `createdForSectionTwo` (#258's half) are stripped by
+exact name with the plain pair, before the guard is asked; the import of the
+2024-25 layout itself was decided NO for Windows.
+
 ## What an archive or a backup is CALLED, and the calendar it is stamped in
 
 Three kinds of zip share `courses/_backups/<CODE>/` and are told apart only by
@@ -5694,6 +5828,9 @@ pruner" above for why.
   reading`) would treat as "not a backup", making a mac-made zip VANISH from a
   Windows list until they ship the same reader. Its own small piece, Windows
   first or together.
+
+
+**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant (plantoir-mcp, which records no zip) may restore from held by its live `assist` lease: the newest assistant backup of that course is kept. [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
 ## Notifications: the one permission, and where it is asked (#212)
 
@@ -6520,6 +6657,52 @@ a report from the file had the same strict read and was left behind; since
 [#301](https://github.com/russellgordon/plantoir/issues/301) it follows the same
 rule through the same function — see the next section.
 
+#### On Windows: a sharing violation, not a rewrite (#303)
+
+Since 2026-09-30 ([#303](https://github.com/russellgordon/plantoir/issues/303)).
+Windows lost lines for a different reason with the same effect. It never
+trims, so it has no rewrite race; its writers are the app, `plantoir-mcp.exe`
+and (from bundle 3 on) the scheduled run, and no `.ps1` launcher writes the
+trail. `ActivityTrail.Append` was `lock` + `File.AppendAllText` + an empty
+`catch`: `lock` covers threads of one process, and `AppendAllText` opens with
+`FileShare.Read`, so a second PROCESS opening the file while the first held it
+threw a sharing violation, and the empty catch dropped the line.
+
+Measured on this Windows PC (Intel Core i5-8365U, 4 cores / 8 threads, 15.7 GB,
+NTFS, Windows 11 Pro 25H2 build 26200, 2026-09-30) with a harness that calls
+the app's own `ActivityTrail.Note`, each writer its own process, all started on
+the same clock tick:
+
+| Writer | 2 processes × 500 lines, 5 rounds | 3 processes × 3 lines, bursts (the mac's shape) |
+|---|---|---|
+| `File.AppendAllText` (what shipped) | **4,444 of 5,000 kept** | **682 of 900** (100 bursts) |
+| `FileStream(Append, Write, FileShare.ReadWrite)`, one `Write` per line, no lock — the issue's first candidate | 4,512 of 5,000 | 180 of 270 (30 bursts) |
+| a named mutex `Local\PlantoirActivityTrail` round open-append-close (what it does now) | **5,000 of 5,000** | **900 of 900** (100 bursts) |
+
+**Why the first candidate lost lines.** The reasoning behind it was that an
+append-mode write lands at end-of-file. It does in POSIX `O_APPEND`; .NET's
+`FileMode.Append` instead opens for ordinary write, seeks to the end ONCE and
+keeps its own position, so two writers that open at the same end both write at
+that offset and the second overwrites the first. Opening with the share flag
+only swapped the dropped line for an overwritten one.
+
+**What it does now.** Every writer takes the named mutex, opens with
+`FileShare.ReadWrite | FileShare.Delete` (so a problem report reading the file
+cannot make a writer fail), appends one line in one `Write`, and releases. The
+redaction (`LogRedactor.Redacting`) still happens before any of it. A mutex
+abandoned by a writer that died is taken over (`AbandonedMutexException`); a
+wait longer than five seconds writes the line anyway — a line that might
+interleave beats a line certainly lost, and one line's append is well under a
+millisecond. `Local\`, not `Global\`: the trail is per user and every writer
+runs in the teacher's session. Pinned by `ActivityTrailWritersTests` (another
+writer's open handle held across a `Note`: RED on the old append).
+
+**Rejected:** the share flag alone (measured above); a retry loop on the
+sharing violation, as the issue says — a guessed delay that still drops the
+line after its last retry. **To KNOW:** if Windows ever trims, the trim must
+run under this same mutex, because a trim is the one write that replaces the
+file, which is exactly how the mac lost lines.
+
 ### When the trail holds characters that cannot be read
 
 Since 2026-09-26 ([#301](https://github.com/russellgordon/plantoir/issues/301)).
@@ -7070,6 +7253,12 @@ pointer has always written): the file's permissions are kept and any extended
 attributes on the front page are not (implementation review, note 7) — left
 as it is, since no Plantoir feature keeps anything in them.
 
+
+**On Windows** (parity bundle 7, #406, 2026-10-01): `TodaysClassOnTheFrontPage`
+in Core, asked only by `SectionDetailView`'s Preview button (pinned by a source
+test), all 42 cases and the pointer's 27 run through the real readers. Windows'
+pointer still inserts under the course's heading where no line names a class;
+the question is not asked there, on either platform. See [12](12-windows-app.md).
 ## The links checklist (#379)
 
 The section window's answer to #333's alert. The rule that chooses the pages

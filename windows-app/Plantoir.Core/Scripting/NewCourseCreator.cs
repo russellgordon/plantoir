@@ -23,6 +23,13 @@ public sealed class NewCourseCreator
     private long _respondedVersion = -1;
     private int _responsesSent;
 
+    /// <summary>
+    /// Where the bundled skeletons live, so the <c>course created</c> line can
+    /// name the subject a skeleton course started from. Null leaves the
+    /// subject out ("the general course skeleton").
+    /// </summary>
+    public string? SkeletonsRoot { get; init; }
+
     public NewCourseCreator(ScriptRunner runner) => Runner = runner;
 
     public async Task CreateCourse(JObject configuration, string workspacePath)
@@ -59,6 +66,25 @@ public sealed class NewCourseCreator
             return;
         }
 
+        // One line per creation, written BEFORE the launcher starts, so a
+        // creation that fails part-way still says what was asked for — read
+        // from the configuration just written, never from the interface.
+        var written = CourseConfiguration.FromDictionary(configuration);
+        ActivityTrail.Note(ActivityTrail.Event.CourseCreated, written.Naming.IsNumbered
+            // A club (#274) says so, with its page word and class folder — the
+            // two things "my club's pages are not being seen" needs. Read from
+            // what was just written, never from the interface.
+            ? ClubLine(_courseCode, written.Naming, written.ClassFolder)
+            : StartingContentLine(
+            _courseCode,
+            takesExampleContent: configuration["prepopulate_example_content"]?.Type == JTokenType.Boolean
+                                 && configuration["prepopulate_example_content"]!.Value<bool>(),
+            usesSkeleton: configuration["use_skeleton"]?.Type == JTokenType.Boolean
+                          && configuration["use_skeleton"]!.Value<bool>(),
+            skeletonSubject: SkeletonsRoot is null ? null : SkeletonSubject(SkeletonsRoot, _courseCode),
+            withCurriculumPages: configuration["include_curriculum_pages"]?.Type == JTokenType.Boolean
+                                 && configuration["include_curriculum_pages"]!.Value<bool>()));
+
         _respondedVersion = -1;
         _responsesSent = 0;
         IsCreating = true;
@@ -76,7 +102,47 @@ public sealed class NewCourseCreator
         Runner.Run("setup.ps1", new[] { "--install-example" }, workspacePath);
         await Runner.WaitUntilFinished();
         InstalledExampleCode = OutputParsers.ExampleCourseCode(Runner.Transcript.DisplayText);
+        // AFTER the run, and only when it reported the code: the example
+        // installs under another code when EXC2O is taken.
+        if (InstalledExampleCode is { Length: > 0 } installed)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.CourseCreated, StartingContentLine(
+                installed, takesExampleContent: true, usesSkeleton: false, skeletonSubject: null));
+        }
         IsCreating = false;
+    }
+
+    /// <summary>
+    /// The <c>course created</c> line: the code and which of the three starting
+    /// points the course began from — never the name the teacher typed. The
+    /// mac's <c>NewCourseCreator.startingContentLine</c>, word for word (trail
+    /// text, not a contract sentence).
+    /// </summary>
+    public static string StartingContentLine(string courseCode, bool takesExampleContent, bool usesSkeleton,
+        string? skeletonSubject, bool withCurriculumPages = false)
+    {
+        if (takesExampleContent) return $"created {courseCode} from the ready-made pages written for it";
+        if (usesSkeleton)
+        {
+            string line = string.IsNullOrEmpty(skeletonSubject)
+                ? $"created {courseCode} from the general course skeleton"
+                : $"created {courseCode} from the {skeletonSubject.ToLowerInvariant()} skeleton";
+            if (withCurriculumPages) line += $" with the {courseCode} curriculum pages";
+            return line;
+        }
+        return $"created {courseCode} with empty folders";
+    }
+
+    /// <summary>The <c>course created</c> line for a club (mac <c>NewCourseCreator</c>, #267).</summary>
+    public static string ClubLine(string courseCode, ClassPageNaming naming, string classFolder) =>
+        $"created {courseCode} as a club, with pages named “{naming.Title(1, 1)}” in “{classFolder}”";
+
+    /// <summary>The family label a skeleton course is named by, or null for the general family.</summary>
+    public static string? SkeletonSubject(string skeletonsRoot, string code)
+    {
+        var family = Catalogs.SkeletonCatalog.GetFamily(skeletonsRoot, code);
+        if (family is null || family.Name == Catalogs.SkeletonCatalog.GeneralFamilyName) return null;
+        return family.Label;
     }
 
     /// <summary>

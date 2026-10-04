@@ -58,23 +58,50 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     // ---- Looking around --------------------------------------------------
 
     [McpServerTool(Name = "list_courses", Title = "List courses", ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"what courses do I have?\", \"list my courses\". " +
-                 "List the teacher's courses in this working folder: code, name, sections, and where each one publishes to. " +
-                 "Call this first when the teacher mentions a course but you are not certain of its exact code.")]
+    [Description("TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses in this working " +
+                 "folder: the code, the name, which sections each one has, and where each publishes to. Call this " +
+                 "first when a teacher mentions a course and you are not certain of its exact code — guessing a code " +
+                 "reaches the wrong course silently.")]
     public string ListCourses()
     {
-        var courses = workspace.Courses();
-        if (courses.Count == 0) return "This working folder has no courses yet.";
+        // The local window is told nothing about a course kept for reference
+        // (#241), so filter FIRST and then ask whether anything is left: a
+        // folder holding only reference courses would otherwise answer the
+        // teacher with an empty string (bundle 9 review F2; the mac filters
+        // first too).
+        var courses = workspace.Courses()
+            .Where(course => !(workspace.ServesTheLocalWindow && ReferenceCourse.IsKeptForReference(course)))
+            .ToList();
+        if (courses.Count == 0) return AssistWording.NoCoursesYet;
 
         var text = new StringBuilder();
         foreach (var course in courses)
         {
             var configuration = course.Configuration;
-            string destination = configuration.DeploysToLocalFolder ? "a folder on this computer"
-                : configuration.DeploysToCloudflare ? "Cloudflare Pages" : "Netlify";
+            if (ReferenceCourse.IsKeptForReference(course))
+            {
+                // The local window is told NOTHING about a reference course
+                // (#241): "what courses do i have?" is matched in code and its
+                // answer is shown to the teacher. An outside session is told on
+                // purpose — reading last year's material is the point — with
+                // the name it must address it by, the code a teacher reads, and
+                // the year.
+                if (workspace.ServesTheLocalWindow) continue;
+                text.AppendLine($"{course.Code} — {configuration.CourseName}");
+                text.AppendLine($"  course code: {ReferenceCourse.ShownCode(course)}");
+                text.AppendLine("  kept for reference — never deployed");
+                string year = SchoolYear.Name(SchoolYear.Read(configuration.StoredReferenceSchoolYear, Today()), "none");
+                text.AppendLine($"  school year: {year}");
+                text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
+                continue;
+            }
             text.AppendLine($"{course.Code} — {configuration.CourseName}");
             text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
-            text.AppendLine($"  publishes to: {destination}");
+            // EVERY destination by type (#404, mac #403) — it used to name the
+            // primary alone, and a folder with no path chosen yet as Netlify.
+            text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
+            // To an outside door only (#340, howITeachPage.listCoursesLine).
+            if (workspace.HowITeachListingLine(course) is { } howITeach) text.AppendLine(howITeach);
         }
         return text.ToString().TrimEnd();
     }
@@ -88,10 +115,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private const int MostPagesListed = 60;
 
     [McpServerTool(Name = "list_pages", Title = "List pages in a section", ReadOnly = true, Destructive = false)]
-    [Description("List the pages in one section of a course, as paths relative to the working folder. " +
-                 "Use this to find the exact title of a page before acting on it. " +
-                 "Courses hold hundreds of pages, so pass `matching` to narrow the list — for example \"Unit 2\" " +
-                 "for that unit's classes.")]
+    [Description("List the pages in one section of a course, as paths relative to the working folder.")]
     public CallToolResult ListPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -127,17 +151,34 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         });
 
     [McpServerTool(Name = "read_page", Title = "Read a page", ReadOnly = true, Destructive = false)]
-    [Description("Read one page's Markdown, including its frontmatter. Use this to see what a class page's agenda links to, " +
-                 "and to see which key governs the page: a page under section1/ carries `publish:`, while a course-level " +
-                 "page such as a Concept carries `publishForSection1:` and `publishForSection2:` — one flag per section. " +
-                 "Older courses carry `draft:` and `draftSection1:` instead, which mean the OPPOSITE — `draft: true` is a " +
-                 "page students cannot see. Both are understood; report what you find without rewriting it yourself.")]
+    [Description("Read one page's Markdown, including its frontmatter.")]
     public CallToolResult ReadPage(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page)
+        [Description("The page title as it appears in the sidebar, for example \"Unit 2, Day 3\".")] string page,
+        [Description(LinksAnswerHelp)] string answer = "",
+        [Description(LinksAnswerHelp)] string asTyped = "",
+        [Description(LinksAnswerHelp)] string onlyIfFound = "")
         => Guarded(() =>
         {
+            // "What does <page> link to?" (#305 / mac #167): filled by the
+            // window's fixed phrasing, in code, and never shown to the local
+            // model (AssistAgent.CardOnlyArguments). The answer is the whole
+            // reply, for the teacher; the turn ends on it.
+            if (answer.Equals("links", StringComparison.OrdinalIgnoreCase))
+            {
+                string? links = workspace.LinksAnswer(course, section, page,
+                    asTyped.Length > 0 ? asTyped : null, onlyIfFound.Equals("yes", StringComparison.OrdinalIgnoreCase));
+                if (links is null)
+                {
+                    var none = Answering("No page is called that.");
+                    none.Meta ??= new JsonObject();
+                    none.Meta[AssistToolAnswer.NoPageFoundKey] = true;
+                    return none;
+                }
+                return Answering(links);
+            }
+
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
             string path = workspace.Page(found, number, page);
@@ -152,13 +193,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [McpServerTool(Name = "deploy_section", Title = "Deploy a section's website",
                    Destructive = false, Idempotent = true)]
     [Description("TEACHERS SAY: \"deploy the site\", \"put it online\", \"push it live\", \"send it to the website\", " +
-                 "\"make it live for students\", \"upload the site\". " +
-                 "Put a section's website where students can actually reach it. This is the one thing that changes " +
-                 "what students see, so treat it as a big step. " +
-                 "\n\nBEFORE calling this, tell the teacher plainly to look over the preview in Plantoir first, and " +
-                 "wait for them to say they have. Publishing a page only rebuilds their preview; this is what makes " +
-                 "it real. If they have not looked, say so and offer to wait rather than going ahead. " +
-                 "\n\nThis takes several minutes.")]
+                 "\"make it live for students\", \"upload the site\". Put a section's website where students can " +
+                 "actually reach it.")]
     public async Task<string> DeploySection(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -176,11 +212,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "explain_publishing", Title = "Explain what publishing means here",
                    Destructive = false, Idempotent = true)]
-    [Description("Call this FIRST, before doing anything else with a section. It returns a short explanation of " +
-                 "what publishing and deploying mean in Plantoir — say it to the teacher word for word. " +
-                 "It only returns the explanation the first time for a given section in this conversation; after " +
-                 "that it says so and you should get straight on with what they asked. Never re-explain a section " +
-                 "you have been told is already covered.")]
+    [Description("Call this FIRST, before doing anything else with a section. It returns a short explanation of what " +
+                 "publishing and deploying mean in Plantoir — say it to the teacher word for word. It answers once per " +
+                 "section: after that it says so, and you should get straight on with what was asked rather than " +
+                 "repeating it.")]
     public string ExplainPublishing(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -196,25 +231,30 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             if (workspace.NoteExplainedThisConversation(found.Code, number))
                 return AssistWording.PublishingAlreadyExplained(found.Code, number.ToString());
 
-            // The SAME answer a deploy gives, so the briefing cannot promise
-            // one destination while the deploy uses another — and a folder is
-            // named rather than described, since "the folder you publish into"
-            // tells a teacher with two courses nothing at all.
-            return Briefing.Words(found.Code, number, AssistWorkspace.DestinationOf(found));
+            // The mac's sentence, from the contract (#157). It names no
+            // destination, so it cannot promise one the deploy does not use —
+            // the reason the old Briefing.Words looked the destination up.
+            return AssistWording.WhatPublishingMeans;
         });
 
     /// <summary>How many of each kind to name before summarising.</summary>
     private const int MostListed = 15;
 
+    /// <summary>
+    /// The three arguments only the links phrasing fills (#305). Declared
+    /// because the binder DROPS a key a method does not take (#149's lesson);
+    /// hidden from the local model by <c>AssistAgent.CardOnlyArguments</c>.
+    /// </summary>
+    private const string LinksAnswerHelp =
+        "Leave empty. Filled by Plantoir's own window when a teacher asks what a page links to.";
+
+    /// <summary>How many links into hidden pages check_section names before counting the rest — the build's number.</summary>
+    private const int HiddenLinksNamed = 10;
+
     [McpServerTool(Name = "check_section", Title = "Check what students would see",
                    ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"what do students see right now?\", \"what would students see in this section right now?\", " +
-                 "\"is anything broken?\", \"what's live?\". " +
-                 "Check a section's website as students would meet it, changing nothing. Reports two things that " +
-                 "publishing and unpublishing tools cannot see for themselves: links on visible pages that lead to a hidden " +
-                 "page (students click and find nothing), and pages nothing links to — which are still published and " +
-                 "still listed in the site's explorer, so students can see them even though no class points there. " +
-                 "Use this before a term starts, and after any bulk change.")]
+    [Description("TEACHERS SAY: \"what do students see right now?\", \"is anything broken?\", \"what's live?\". Check " +
+                 "a section's website as students would meet it, changing nothing.")]
     public string CheckSection(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -234,6 +274,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var orphans = graph.Unreferenced(classPages: classPages)
                 .Where(p => !isHidden(p)).ToList();
+            var missed = SectionCheck.LinkedButMissed(workspace.StartOfYearPages(found, number))
+                .Select(p => p.Id).ToList();
 
             int visible = graph.Pages.Count(p => !isHidden(p));
             string pageWord = visible == 1 ? "page" : "pages";
@@ -253,10 +295,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 var lines = new List<string>();
                 string word = dangling.Count == 1 ? "link" : "links";
                 lines.Add($"{dangling.Count} {word} would take a student to a page that isn’t there:");
-                foreach (var link in dangling.Take(MostListed))
+                // Ten named and the rest counted, as the build's own
+                // linksIntoHiddenPages finding does (#359 / mac #333:
+                // siteHealth.linksIntoHiddenPages, expectDetailNames).
+                foreach (var link in dangling.Take(HiddenLinksNamed))
                     lines.Add($"• {workspace.Relative(link.From)}  →  {Path.GetFileNameWithoutExtension(link.To)}  (hidden)");
-                if (dangling.Count > MostListed)
-                    lines.Add($"…and {dangling.Count - MostListed} more.");
+                if (dangling.Count > HiddenLinksNamed)
+                    lines.Add($"…and {dangling.Count - HiddenLinksNamed} more.");
                 lines.Add("Either publish the page each one points at, or take the link off the page that points at it.");
                 paragraphs.Add(string.Join("\n", lines));
             }
@@ -271,6 +316,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     lines.Add("• " + workspace.Relative(page));
                 if (orphans.Count > MostListed)
                     lines.Add($"…and {orphans.Count - MostListed} more.");
+                paragraphs.Add(string.Join("\n", lines));
+            }
+
+            if (missed.Count > 0)
+            {
+                var lines = new List<string>();
+                string word = missed.Count == 1 ? "page is" : "pages are";
+                lines.Add($"{missed.Count} visible {word} used only by classes students cannot see. Students can still " +
+                          "reach these through the site’s explorer, though no class they can see points there:");
+                foreach (string page in missed.Take(MostListed))
+                    lines.Add("• " + workspace.Relative(page));
+                if (missed.Count > MostListed)
+                    lines.Add($"…and {missed.Count - MostListed} more.");
                 paragraphs.Add(string.Join("\n", lines));
             }
 
@@ -306,6 +364,50 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return string.Join("\n\n", paragraphs);
         });
 
+    // ---- Getting a section ready for the start of the year (#355, mac #96)
+
+    [McpServerTool(Name = "plan_prepare_for_start_of_year", Title = "Plan getting a section ready for the year",
+                   ReadOnly = true, Destructive = false)]
+    [Description("Work out what getting a section ready for the start of the year would do, changing nothing. " +
+                 "Lists every page that would go into draft and why, what stays, the links that would lead to hidden " +
+                 "pages, and the plan code prepare_for_start_of_year needs.")]
+    public CallToolResult PlanPrepareForStartOfYear(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section)
+        => Guarded(() =>
+        {
+            var proposal = workspace.PlanStartOfYear(course, section);
+            // A plan with nothing to do, or no first class, is an answer, not a proposal.
+            return proposal.Plan.First is null || proposal.Plan.NothingToDo
+                ? Answering(proposal.TeacherText, proposal.Text)
+                : Proposing(proposal.Text, proposal.TeacherText);
+        });
+
+    [McpServerTool(Name = "prepare_for_start_of_year", Title = "Get a section ready for the year",
+                   Destructive = false, Idempotent = true)]
+    [Description("TEACHERS SAY: \"get ready for the start of the year\", \"put everything after the first class into draft\", " +
+                 "\"hide every class past Day 1\". Put every class after the first into draft, with the pages only later " +
+                 "classes use, leaving the first class, the pages it links to, Key Links and the pages it lists, folder " +
+                 "pages and curriculum pages as they are. Call plan_prepare_for_start_of_year FIRST, show the teacher the " +
+                 "whole plan and wait for them to agree; then pass the code the plan gave. The course is backed up first, " +
+                 "and undo_last_change takes it back. Nothing reaches students until they deploy.")]
+    public CallToolResult PrepareForStartOfYear(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description("The section number, for example 1.")] int section,
+        [Description("The code on the line that starts \"Plan code:\" in the plan plan_prepare_for_start_of_year gave, " +
+                     "for example \"3f9a1c07\". Without it, or if the section has changed since, nothing is changed and " +
+                     "the current plan comes back instead.")] string planCode = "")
+        => Guarded(() =>
+        {
+            var outcome = workspace.PrepareForStartOfYear(course, section, planCode, StartOfYearAskedFrom.AnOutsideAssistant);
+            if (outcome.Changed) return Answering(outcome.Message);
+            // Refused: the sentence, then the plan as it stands now with its code.
+            var now = workspace.PlanStartOfYear(course, section);
+            return outcome.Message == now.Text
+                ? Answering(outcome.Message)
+                : Answering(outcome.Message, outcome.Message + "\n\n" + now.Text);
+        });
+
     // ---- Rolling a course onto a real timetable --------------------------
 
     private const string TimetableHelp =
@@ -318,14 +420,28 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     private const string WhenHelp =
         "When to deploy, as YYYY-MM-DD HH:MM in 24-hour time — for example \"2026-09-09 06:30\".";
 
+    /// <summary>
+    /// A bare time of day — "06:30", "tomorrow 06:30" — is REFUSED here, never
+    /// read (#193). <c>ReadTheMoment</c>'s lenient step would read "06:30" as
+    /// TODAY at 06:30, silently, usually a moment already past: the trap the
+    /// mac's handover named at this line. The app settles its own calls into
+    /// whole moments in <c>AssistAgent</c> before they cross, so only an
+    /// outside client can arrive here with a bare time — and the mac's
+    /// <c>--mcp-stdio</c> deliberately settles nothing and refuses it too,
+    /// because this tool's schema asks for <c>YYYY-MM-DD HH:MM</c>. Settling
+    /// it here instead was the first draft, and was a divergence from the mac.
+    /// </summary>
+    private string Settled(string when)
+    {
+        if (ScheduledMoment.Settle(when, Today(), DateTime.Now) is not null)
+            throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
+        return when;
+    }
+
     [McpServerTool(Name = "plan_scheduled_deploy", Title = "Plan a deploy for later",
                    ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"what happens if I schedule it for 6:30?\", \"check before you set that up\". " +
-                 "Work out what scheduling a deploy would mean, scheduling nothing. Use this for \"deploy " +
-                 "tomorrow's class at 6:30 AM\". Pass the class pages the teacher has in mind as `classes` and " +
-                 "it will check whether they are actually PUBLISHED — a deploy that runs perfectly and ships a " +
-                 "site without tomorrow's class is the failure worth catching while somebody is awake. " +
-                 "Read the whole thing to the teacher, including what has to be true of their computer.")]
+    [Description("TEACHERS SAY: \"what happens if I schedule it for 6:30?\", \"check before you set that up\". Work " +
+                 "out what scheduling a deploy would mean, scheduling nothing.")]
     public CallToolResult PlanScheduledDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -334,7 +450,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string classes = "")
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
             return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
                 classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -343,39 +465,50 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "schedule_deploy", Title = "Deploy at a set time",
                    Destructive = false, Idempotent = true)]
-    [Description("TEACHERS SAY: \"deploy tomorrow's class at 6:30 AM\", \"put it live before school\", " +
-                 "\"send it out at 7am\", \"schedule the deploy for Monday morning\". " +
-                 "Ask this computer to deploy a section at a set time. Call plan_scheduled_deploy FIRST and " +
-                 "read it out — especially that the computer must be ON and AWAKE at that moment, plugged in " +
-                 "if it is a laptop, with the lid open. Plantoir does not wake it. Replaces any deploy already " +
-                 "scheduled for the same section. Use cancel_scheduled_deploy to call it off.")]
+    [Description("TEACHERS SAY: \"deploy tomorrow's class at 6:30 AM\", \"put it live before school\", \"send it out " +
+                 "at 7am\", \"schedule the deploy for Monday morning\". Ask this computer to deploy a section at a set " +
+                 "time.")]
     public CallToolResult ScheduleDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when)
         => Guarded(() =>
         {
-            if (!DateTime.TryParse(when, out var moment))
+            // ScheduledDeploy.ReadTheMoment, not DateTime.TryParse: the string
+            // is normally one Plantoir wrote invariantly a moment earlier, and
+            // a bare parse reads its year in the MACHINE's calendar — measured
+            // as 1483-09-20 for "2026-09-20 06:30" on a Thai-locale machine,
+            // which is in the past, so the deploy was refused outright while
+            // the card said tomorrow. Issue #144's family, read end.
+            if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
 
-            var plan = workspace.PlanScheduledDeploy(course, section, moment);
-            // The Cloudflare Account ID is a per-teacher, machine-global
-            // setting, read the same way PlanScheduledDeploy's own refusal
-            // check does — omitting it here would schedule a Cloudflare
-            // deploy with an empty --account, even once the refusal check
-            // above had already confirmed a real one was configured.
-            string cloudflareAccountId = AppSettings.Load().CloudflareAccountId;
+            ScheduledDeploy plan;
+            // A refusal at the ACT says so first (#344 / mac #322): the
+            // contract's sentence is "Nothing was scheduled. " + the reason,
+            // the same opening a refusal from the scheduler itself carries.
+            try { plan = workspace.PlanScheduledDeploy(course, section, moment); }
+            catch (AssistRefusal refusal)
+            {
+                ScheduledDeploy.NoteRefusedAtTheAct(workspace, course, section, moment, refusal.Message);
+                throw new AssistRefusal($"Nothing was scheduled. {refusal.Message}");
+            }
+            // Where it goes and the Cloudflare Account ID are read when the
+            // deploy RUNS now (#347), from the course's settings and the app's
+            // own; what is written here is only what the teacher was told.
             var scheduledCourse = workspace.Course(plan.CourseCode);
-            if (TaskScheduling.Schedule(plan.TaskName, workspace.FolderPath,
-                                        plan.CourseCode, plan.SectionNumber, moment, scheduledCourse.DirectoryPath,
-                                        scheduledCourse.Configuration.AllDeployDestinations, cloudflareAccountId) is { } problem)
+            DateTime? replaced = TaskScheduling.MomentItWouldReplace(
+                workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment, DateTime.Now);
+            if (TaskScheduling.Schedule(workspace.FolderPath, plan.CourseCode, plan.SectionNumber, moment,
+                                        scheduledCourse.Configuration.AllDeployDestinations) is { } problem)
                 throw new AssistRefusal($"Nothing was scheduled. {problem}");
 
             // The caution about the computer being awake is on the card the
             // teacher agreed to, before this ran. Repeating it afterwards is
             // the assistant explaining itself to somebody who just read it.
             string summary = $"Scheduled: {plan.CourseCode} Section {plan.SectionNumber} deploys to " +
-                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}.";
+                             $"{plan.Destination} at {moment:dddd d MMMM, h:mm tt}." +
+                             (replaced is { } was ? " " + AssistWording.ScheduleReplaces($"{was:dddd d MMMM, h:mm tt}") : "");
             return Answering(summary, summary + "\n\n" +
                              "Remember this computer has to be on and awake then — plugged in if it is a laptop, " +
                              "lid open. Plantoir cannot wake it up. Say the word and I'll cancel it.");
@@ -383,9 +516,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "cancel_scheduled_deploy", Title = "Call off a scheduled deploy",
                    Destructive = false, Idempotent = true)]
-    [Description("TEACHERS SAY: \"cancel that scheduled deploy\", \"don't send it in the morning after all\", " +
-                 "\"call it off\". " +
-                 "Call off a deploy that was scheduled for a section. Safe to call when nothing is scheduled.")]
+    [Description("TEACHERS SAY: \"cancel that scheduled deploy\", \"don't send it in the morning after all\", \"call " +
+                 "it off\". Call off a deploy that was scheduled for a section.")]
     public CallToolResult CancelScheduledDeploy(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -393,14 +525,15 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         {
             var found = workspace.Course(course);
             int number = workspace.Section(found, section);
-            string name = $"Plantoir deploy {found.Code} section {number}";
 
-            if (!TaskScheduling.Exists(name))
+            // THIS working folder's deploy of the section (#309), found by the
+            // folder its task names — another folder's ICS3U is not ours.
+            if (TaskScheduling.For(workspace.FolderPath, found.Code, number) is not { } scheduled)
                 return Answering($"There is no deploy scheduled for {found.Code} Section {number}.",
                                  $"There is no deploy scheduled for {found.Code} Section {number}, " +
                                  "so there was nothing to call off.");
 
-            return TaskScheduling.Cancel(name) is { } problem
+            return TaskScheduling.Cancel(scheduled) is { } problem
                 ? Answering($"That could not be cancelled: {problem}")
                 : Answering($"Cancelled the scheduled deploy for {found.Code} Section {number}.");
         });
@@ -446,15 +579,23 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Work out what adding curriculum transclusions to a page would do, changing nothing. " +
                  "Show the teacher what it says — it quotes each expectation's wording so they can tell " +
                  "whether it fits their lesson without looking it up — then wait for them to agree.")]
-    public string PlanCurriculumMentions(
+    public CallToolResult PlanCurriculumMentions(
         [Description("The course code, for example ADA1O.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description("The page title, for example \"Movement Concepts\".")] string page,
         [Description("The expectation codes to add, separated by commas — for example \"A1.1, A2.2\".")]
         string codes)
-        => Guarded(() => workspace.PlanCurriculumMentions(course, section, page,
-                             codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                         .Describe());
+        => Guarded(() =>
+        {
+            // Marked as a PLAN (#350 / mac #327): the window reads an unmarked
+            // answer as a refusal and never offers Go, which left
+            // add_curriculum_mentions unrunnable from the app. A plan that
+            // adds nothing is an ANSWER, not a proposal — there is nothing to
+            // agree to.
+            var plan = workspace.PlanCurriculumMentions(course, section, page,
+                codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return plan.ChangesNothing ? Answering(plan.Describe()) : Proposing(plan.Describe());
+        });
 
     [McpServerTool(Name = "add_curriculum_mentions", Title = "Point a page at curriculum expectations",
                    Destructive = false, Idempotent = true)]
@@ -500,13 +641,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "plan_make_room_for_classes", Title = "Plan making room for classes",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out what would happen if a class were inserted part-way through a unit, changing nothing. " +
-                 "Use this for \"duplicate Unit 2, Day 2 and make it the third class, pushing everything back\", " +
-                 "or \"give this unit another day\". Later days of the SAME unit are renamed; every class after " +
-                 "the insertion point, later units included, moves onto a later day the class actually meets. " +
-                 "\n\nThis is the most far-reaching change there is — it renames pages other pages link to — so " +
-                 "read the whole plan to the teacher, word for word, and wait. The link count especially: they " +
-                 "cannot check that themselves without opening every page in the course.")]
+    [Description("Work out what making room part-way through a unit would do, and change nothing. Names every page " +
+                 "that would be renamed, every class that would move to a later day, and every link that would be " +
+                 "rewritten. Call this first and show the teacher what it said, in full — this moves more pages than " +
+                 "anything else here.")]
     public CallToolResult PlanMakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -524,40 +662,45 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         => Guarded(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
+            var noun = workspace.NounForCourse(course);
             return plan.ChangesNothing
                 ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(noun));
         });
 
     [McpServerTool(Name = "make_room_for_classes", Title = "Make room for classes",
                    Destructive = false, Idempotent = false)]
-    [Description("TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". " +
-                 "Insert one or more classes part-way through a unit: rename the later days of that unit, " +
-                 "update every link that pointed at them, move the classes that follow onto later class days, " +
-                 "and create the new pages unpublished. " +
-                 "\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course is " +
-                 "backed up first, and the backup is the way back: because this moves and renames many pages " +
-                 "at once, undo_last_change does NOT reverse it. Afterwards, tell them to look " +
-                 "the section over in Plantoir before deploying — many pages moved at once.")]
+    [Description("TEACHERS SAY: \"make room for a class at Unit 3, Day 4\". Insert one or more classes part-way " +
+                 "through a unit: the later days of that unit are renumbered, every link that pointed at them is " +
+                 "rewritten, the classes that follow move onto later class days, and the new pages arrive " +
+                 "unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course " +
+                 "is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and " +
+                 "the backup is the way out — so tell the teacher to look the section over in Plantoir before " +
+                 "publishing anything.")]
     public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(UnitHelp)] int unit,
         [Description("The day number the new class takes. Existing days from here on are renumbered.")] int atDay,
         [Description("How many classes to make room for. 1 unless the teacher asked for more.")] int howMany = 1)
-        => GuardedResult(() =>
+        => Guarded(() =>
         {
             var plan = workspace.PlanInsertClasses(course, section, unit, atDay, howMany);
-            return workspace.ApplyInsertClasses(plan).Message;
+            var result = workspace.ApplyInsertClasses(plan);
+            if (!result.Succeeded || workspace.NounForCourse(course) != ClassNoun.Meeting)
+                return Answering(result.Message);
+            // A club's teacher reads "meeting" (#274); the model's copy is untouched.
+            return Answering(result.Message.Replace(
+                                 AssistWording.MadeRoom(plan.Added.Count, plan.PositionTitle),
+                                 AssistWording.MadeRoomForAMeeting(plan.Added.Count, plan.PositionTitle)),
+                             result.Message);
         });
 
     [McpServerTool(Name = "plan_add_classes", Title = "Plan adding class pages",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out which class pages would be created for a unit and what dates they would fall on, " +
-                 "changing nothing. Use this for \"add placeholder pages for the next unit, seven days\" or " +
-                 "\"add Unit 2 Days 1 through 10\". Dates come from the section's remembered timetable, skipping " +
-                 "days already taken by an existing class, so the new unit follows on from the work already there. " +
-                 "Show the teacher what it says, word for word, then wait.")]
+    [Description("Work out what adding several class pages to a unit would do, and change nothing. Shows what each " +
+                 "page would be called and the day it would land on. Call this first and show the teacher what it " +
+                 "said.")]
     public CallToolResult PlanAddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -574,16 +717,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                                                 workspace.DayToCarryOnFrom(course, section, unit), howMany);
             return plan.ChangesNothing
                 ? Answering(plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(workspace.NounForCourse(course)));
         });
 
     [McpServerTool(Name = "add_classes", Title = "Add class pages", Destructive = false, Idempotent = false)]
-    [Description("TEACHERS SAY: \"add five more days to Unit 4\". " +
-                 "Create the class pages for a unit, dated to the days the section actually meets. " +
-                 "Call plan_add_classes FIRST and show the teacher what it said. " +
-                 "\n\nThe pages are created UNPUBLISHED — empty skeletons for the teacher to write, which stay out " +
-                 "of the site until they publish them. An existing page is never written over. The course is " +
-                 "backed up first, and undo_last_change removes what this created.")]
+    [Description("TEACHERS SAY: \"add five more days to Unit 4\". Add several class pages to a unit, dated to the days " +
+                 "this section actually meets, continuing from the last day that unit already has. Call " +
+                 "plan_add_classes first and show the teacher what it said.\n\nThe pages arrive UNPUBLISHED — empty " +
+                 "skeletons for the teacher to write, which stay out of the site until they publish them. An existing " +
+                 "page is never written over, the course is backed up first, and undo_last_change takes back what this " +
+                 "created.")]
     public CallToolResult AddClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -601,11 +744,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "plan_add_next_class", Title = "Plan adding the next class",
                    ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", " +
-                 "\"show me before you add it\". " +
-                 "Work out what the next class page would be called and what date it would land on, " +
-                 "changing nothing. Use this for \"add the next class\" or \"start a new unit for the next class\". " +
-                 "The title continues the highest unit's count; the date is the next unused day in the section's timetable.")]
+    [Description("TEACHERS SAY: \"what would the next class page be?\", \"which day comes next?\", \"show me before " +
+                 "you add it\". Work out which page adding the next class would create and which day it would fall on, " +
+                 "WITHOUT changing anything.")]
     public CallToolResult PlanAddNextClass(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -621,23 +762,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // they reach the write, so a twin that cannot see `duplicate`
             // proposes an ordinary next class and the teacher approves
             // something other than what runs.
+            var noun = workspace.NounForCourse(course);
             if (!string.IsNullOrWhiteSpace(duplicate))
-                return Proposing(workspace.PlanDuplicateClass(course, section, duplicate).Describe());
+            {
+                var copy = workspace.PlanDuplicateClass(course, section, duplicate);
+                return Proposing(copy.Describe(), copy.Describe(noun));
+            }
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
             return plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
-                : Proposing(plan.Describe());
+                : Proposing(plan.Describe(), plan.Describe(noun));
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
-    [Description("TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", " +
-                 "\"start the next class\", \"add the next class\", \"make a page for our next class\", " +
-                 "\"set up next day's lesson\". " +
-                 "Create the next class page, dated to the day the section next meets. " +
-                 "Call plan_add_next_class FIRST and show the teacher what it said. " +
-                 "The page starts UNPUBLISHED — an empty skeleton for the teacher to write, which stays out of the site " +
-                 "until they publish it. An existing page is never written over.")]
+    [Description("TEACHERS SAY: \"add an entry for the next class\", \"add tomorrow's class page\", \"start the next " +
+                 "class\", \"add the next class\", \"make a page for our next class\", \"set up next day's lesson\". " +
+                 "Create the next class page in a section: it continues the unit the last class was in, and takes its " +
+                 "date from the section's remembered timetable. Work out no numbers and no dates yourself — this tool " +
+                 "does both. It starts unpublished, so students see nothing until the teacher publishes it.")]
     public CallToolResult AddNextClass(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -672,14 +815,14 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // The teacher asked for a page. Its name and its date are the
             // whole answer; how it was worked out is the model's half.
             var made = plan.Classes[0];
-            return Answering($"Added {made.Title}, dated {made.Date:yyyy-MM-dd}.",
+            return Answering($"Added {made.Title}, dated {DateText.Iso(made.Date)}.",
                              result.Message + "\n\n" + AssistWording.ACreatedPageCanBeTakenBack);
         });
 
     [McpServerTool(Name = "plan_remember_timetable", Title = "Plan remembering class dates",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out what remembering a section's class dates would do, changing nothing. " +
-                 "Dates are YYYY-MM-DD, separated by commas or spaces.")]
+    [Description("Work out what recording these class dates would do, WITHOUT changing anything. Says how many days it " +
+                 "would remember, the first and the last, and what it would replace.")]
     public CallToolResult PlanRememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -696,7 +839,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             foreach (string piece in dates.Split([',', ';', ' ', '\t', '\n', '\r'],
                                                  StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (DateOnly.TryParse(piece, out var date)) parsed.Add(date);
+                if (DateText.TryReadDay(piece, out var date)) parsed.Add(date);
                 else unreadable.Add(piece);
             }
 
@@ -706,20 +849,22 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"({string.Join(", ", unreadable.Take(5))}). Give them as YYYY-MM-DD.");
             if (parsed.Count == 0)
                 throw new AssistRefusal("Nothing was recorded — no dates were given.");
+            if (TimetableMemory.Unbelievable(parsed, DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+                throw new AssistRefusal(
+                    $"Nothing was recorded — {DateText.Iso(impossible)} can't be a class date. Plantoir keeps " +
+                    $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
+                    $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
             parsed.Sort();
             return Proposing($"Would record {parsed.Count} class dates for {found.Code} Section {number}, " +
-                             $"{parsed[0]:yyyy-MM-dd} to {parsed[^1]:yyyy-MM-dd}, from {source}.");
+                             $"{DateText.Iso(parsed[0])} to {DateText.Iso(parsed[^1])}, from {source}.");
         });
 
     [McpServerTool(Name = "read_remembered_timetable", Title = "What dates this section meets",
                    ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"when does this class meet?\", \"what dates do you have for us?\", " +
-                 "\"do you know our timetable?\", \"how many class days are left?\". " +
-                 "Read the class meeting dates Plantoir already knows for a section, changing nothing. " +
-                 "CALL THIS FIRST whenever you need to know when a section's classes fall — before asking the " +
-                 "teacher for a timetable, and before any tool that needs dates. It is remembered from the last " +
-                 "time they gave one.")]
+    [Description("TEACHERS SAY: \"when does this class meet?\", \"what dates do you have for us?\", \"do you know our " +
+                 "timetable?\", \"how many class days are left?\". Read back the class dates recorded for a section, " +
+                 "and where the teacher said they came from, changing nothing.")]
     public CallToolResult ReadRememberedTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -744,7 +889,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             {
                 var all = new StringBuilder($"Every date on file for {where}:");
                 foreach (var date in remembered.Dates)
-                    all.Append($"\n• {date:dddd}, {date:yyyy-MM-dd}");
+                    all.Append($"\n• {date:dddd}, {DateText.Iso(date)}");
                 return Answering($"All {remembered.Dates.Count} dates for {where}.", all.ToString());
             }
 
@@ -758,7 +903,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 existingClasses.Add((title, dt));
                 if (dt is { } d)
                 {
-                    classByDate[d.ToString("yyyy-MM-dd")] = title;
+                    classByDate[DateText.Iso(d)] = title;
                 }
             }
 
@@ -775,7 +920,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     upcomingDates.Add(remembered.Dates[i]);
                 }
                 string countStr = upcomingDates.Count == 1 ? "first class is" : $"first {upcomingDates.Count} classes are";
-                lines.Add($"The semester begins on {firstDate:dddd}, {firstDate:yyyy-MM-dd}. The {countStr}:");
+                lines.Add($"The semester begins on {firstDate:dddd}, {DateText.Iso(firstDate)}. The {countStr}:");
             }
             else
             {
@@ -788,7 +933,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 }
                 if (upcomingDates.Count == 0)
                 {
-                    lines.Add($"All {remembered.Dates.Count} scheduled classes for {where} have concluded (last class was on {lastDate:dddd}, {lastDate:yyyy-MM-dd}).");
+                    lines.Add($"All {remembered.Dates.Count} scheduled classes for {where} have concluded (last class was on {lastDate:dddd}, {DateText.Iso(lastDate)}).");
                 }
                 else
                 {
@@ -800,7 +945,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             for (int i = 0; i < upcomingDates.Count; i++)
             {
                 var date = upcomingDates[i];
-                string dateStr = date.ToString("yyyy-MM-dd");
+                string dateStr = DateText.Iso(date);
                 string classTitle;
                 if (classByDate.TryGetValue(dateStr, out var t))
                 {
@@ -826,7 +971,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                         classTitle = "(page not yet created)";
                     }
                 }
-                lines.Add($"• {date:dddd}, {date:yyyy-MM-dd} — {classTitle}");
+                lines.Add($"• {date:dddd}, {DateText.Iso(date)} — {classTitle}");
             }
 
             lines.Add("");
@@ -834,18 +979,18 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             lines.Add($"{where} has {existingClasses.Count} class {(existingClasses.Count == 1 ? "page" : "pages")} across {remembered.Dates.Count} recorded dates ({spare} spare).");
             if (spare == 0)
             {
-                lines.Add("Every recorded date is spoken for, so another class cannot be dated until more dates are recorded.");
+                lines.Add(AssistWording.EveryDateIsSpokenFor);
             }
             else if (existingClasses.Count < remembered.Dates.Count)
             {
                 var next = remembered.Dates[existingClasses.Count];
-                lines.Add($"The next class would fall on {next:yyyy-MM-dd} ({next:dddd}).");
+                lines.Add(AssistWording.TheNextWouldFallOn(DateText.Iso(next), $"{next:dddd}"));
             }
 
             string origin = $"Where they came from: {remembered.Source}.";
             if (remembered.Recorded is { } when)
             {
-                origin += $" Recorded {when:yyyy-MM-dd}.";
+                origin += $" Recorded {DateText.Iso(when)}.";
             }
             lines.Add("");
             lines.Add(origin);
@@ -863,12 +1008,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "remember_timetable", Title = "Remember when a section meets",
                    Destructive = false, Idempotent = true)]
-    [Description("TEACHERS SAY: \"here are the days we meet\", \"remember our timetable\", " +
-                 "\"these are our class dates\", \"save these dates\". " +
-                 "Write down the dates a section's classes fall on, so nobody has to ask again. Call this as soon " +
-                 "as a teacher tells you when their class meets, however they say it. Replaces anything recorded " +
-                 "before, so send the WHOLE list every time, not just new dates. Dates are YYYY-MM-DD, separated " +
-                 "by commas or spaces.")]
+    [Description("TEACHERS SAY: \"here are the days we meet\", \"remember our timetable\", \"these are our class " +
+                 "dates\", \"save these dates\". Write down the days a section meets, so nothing has to ask for them " +
+                 "again. Changes no page.")]
     public CallToolResult RememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -885,7 +1027,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             foreach (string piece in dates.Split([',', ';', ' ', '\t', '\n', '\r'],
                                                  StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (DateOnly.TryParse(piece, out var date)) parsed.Add(date);
+                if (DateText.TryReadDay(piece, out var date)) parsed.Add(date);
                 else unreadable.Add(piece);
             }
 
@@ -897,6 +1039,11 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                     $"({string.Join(", ", unreadable.Take(5))}). Give them as YYYY-MM-DD and I'll keep the lot.");
             if (parsed.Count == 0)
                 throw new AssistRefusal("Nothing was recorded — no dates were given.");
+            if (TimetableMemory.Unbelievable(parsed, DateOnly.FromDateTime(DateTime.Now)) is { } impossible)
+                throw new AssistRefusal(
+                    $"Nothing was recorded — {DateText.Iso(impossible)} can't be a class date. Plantoir keeps " +
+                    $"dates from {DateText.Iso(TimetableMemory.EarliestBelievable)} to " +
+                    $"{TimetableMemory.YearsAheadBelievable} years from today; check the year and try again.");
 
             if (!TimetableMemory.Write(workspace.FolderPath, found.Code, number, parsed, source,
                                        DateOnly.FromDateTime(DateTime.Now)))
@@ -906,7 +1053,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
             var stored = TimetableMemory.Read(workspace.FolderPath, found.Code, number)!;
             return $"Recorded {stored.Dates.Count} class dates for {found.Code} Section {number}, " +
-                   $"{stored.Dates[0]:yyyy-MM-dd} to {stored.Dates[^1]:yyyy-MM-dd}. " +
+                   $"{DateText.Iso(stored.Dates[0])} to {DateText.Iso(stored.Dates[^1])}. " +
                    "I won't need to ask for this again.";
         });
 
@@ -930,17 +1077,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var parsed = await Load(timetable, block, startYear, cancellation, firstDay);
             var text = new StringBuilder();
             text.AppendLine($"Block {parsed.Block}: {parsed.Meetings.Count} class meetings, " +
-                            $"{parsed.Meetings[0].Date:yyyy-MM-dd} to {parsed.Meetings[^1].Date:yyyy-MM-dd}.");
+                            $"{DateText.Iso(parsed.Meetings[0].Date)} to {DateText.Iso(parsed.Meetings[^1].Date)}.");
             text.AppendLine();
             foreach (var meeting in parsed.Meetings)
-                text.AppendLine($"  {meeting.Number,3}  {meeting.Date:yyyy-MM-dd}  {meeting.Date:ddd}");
+                text.AppendLine($"  {meeting.Number,3}  {DateText.Iso(meeting.Date)}  {meeting.Date:ddd}");
 
             if (parsed.NonTeachingDays.Count > 0)
             {
                 text.AppendLine();
                 text.AppendLine("Not teaching days — no unit content belongs on these:");
                 foreach (var day in parsed.NonTeachingDays)
-                    text.AppendLine($"       {day.Date:yyyy-MM-dd}  {day.Label}");
+                    text.AppendLine($"       {DateText.Iso(day.Date)}  {day.Label}");
             }
             return text.ToString().TrimEnd();
         }
@@ -949,13 +1096,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "plan_re_date_classes", Title = "Plan re-dating classes",
                    ReadOnly = true, Destructive = false)]
-    [Description("Work out what moving a section's classes onto a timetable would do, WITHOUT changing anything. " +
-                 "Always call this first and show the teacher the result. " +
-                 "Give `pages` and `meetings` as matching lists to say which lesson lands on which meeting — that " +
-                 "choice is yours to make from the lesson content, because a naive spread can leave a class holding " +
-                 "nothing but a warm-up, or split a lesson that has to stay whole. Leave both empty for an even " +
-                 "spread across the block, which is a starting point rather than an answer. " +
-                 "The plan also reports date problems the change would leave behind.")]
+    [Description("Work out what re-dating a whole section onto its recorded class dates would do, and change nothing. " +
+                 "Shows every page that would move and why.")]
     public Task<CallToolResult> PlanReDateClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -1028,7 +1170,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             var parsed = await Load(timetable, block, startYear, cancellation, firstDay);
             var plan = workspace.PlanReDate(course, section, parsed,
                 pages ?? Array.Empty<string>(), meetings ?? Array.Empty<int>());
-            var result = workspace.ApplyReDate(plan);
+            var result = workspace.ApplyReDate(plan, isARollover: true);
 
             var found = workspace.Course(course);
 
@@ -1048,7 +1190,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // session calling it has chosen already. The QUESTION belongs to
             // the card phrasing, which reaches re_date_classes instead.
             var text = new StringBuilder(result.Message);
-            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes"));
+            text.Append("\n" + SettleTheWebsiteAfterARollover(found, section, "new", "yes", releasedWithTheDates: !plan.ChangesNothing));
             text.Append("\n\nNothing was hidden. Preview the section and check the dates and structure look right, " +
                         "then decide what students should see.");
             if (plan.Problems.Count > 0)
@@ -1197,18 +1339,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 // website, and left the section pinned to last year's. An offer
                 // that looks like it worked is worse than no offer at all.
                 string aboutTheWebsiteOnly = SettleTheWebsiteAfterARollover(
-                    found, number, website, rollover);
+                    found, number, website, rollover, releasedWithTheDates: false);
                 if (aboutTheWebsiteOnly.Length == 0) return Answering(already);
                 string bothHalves = already + "\n\n" + aboutTheWebsiteOnly;
                 return Answering(bothHalves, bothHalves);
             }
 
-            var result = workspace.ApplyReDate(plan);
-            int moved = plan.Moves.Count > 0 ? plan.Moves.Count : plan.Changing.Count();
-            int classCount = plan.ClassCount > 0 ? plan.ClassCount : plan.Dates.Count;
-            int materials = moved - classCount;
-            string summary = $"Re-dated {classCount} {(classCount == 1 ? "class" : "classes")}" +
-                             $" and {materials} {(materials == 1 ? "page" : "pages")} they use.";
+            var result = workspace.ApplyReDate(plan, isARollover: IsARollover(website, rollover));
+            // The counts ApplyReDate made from what it WROTE (#357 / mac #343):
+            // its first paragraph. Never recomputed here from the plan.
+            string summary = result.Message.Split("\n\n")[0];
             string detail = summary +
                             $"\n\n{AssistWorkspace.BackedUpNote}" +
                             "\n\nNothing was published or hidden, so students see no change until you deploy.";
@@ -1217,7 +1357,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // summary is the one line the teacher reads in the chat window, and
             // this is the part they have to answer. Put only in `detail` it
             // would work over MCP and be invisible in the app.
-            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover);
+            string aboutTheWebsite = SettleTheWebsiteAfterARollover(found, number, website, rollover,
+                                                                    releasedWithTheDates: !plan.ChangesNothing);
             if (aboutTheWebsite.Length > 0)
             {
                 summary += "\n\n" + aboutTheWebsite;
@@ -1309,9 +1450,17 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// rather than silent.</para>
     /// </remarks>
     private string SettleTheWebsiteAfterARollover(
-        Course course, int sectionNumber, string website, string rollover)
+        Course course, int sectionNumber, string website, string rollover, bool releasedWithTheDates)
     {
         if (!IsARollover(website, rollover)) return "";
+
+        // EVERY rollover, same website or new (#392): the published-pages
+        // record and the checklist's answers belong to last year's classes.
+        // Normally released INSIDE the re-date's own undo entry (ApplyReDate);
+        // only a turn whose dates were already right (the website answered on
+        // a second turn) releases here, in an entry of its own, because there
+        // is no re-date write for it to join.
+        if (!releasedWithTheDates) workspace.ReleasePublishedPagesForARollover(course, sectionNumber);
 
         if (string.Equals(website, "same", StringComparison.OrdinalIgnoreCase))
         {
@@ -1357,7 +1506,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             said += "\n\n" + AssistWording.RolloverCouldNotStartANewWebsite(
                 string.Join(", ", released.StillPinned));
 
-        switch (TurnOffAnyScheduledPublish(course.Code, sectionNumber))
+        switch (TurnOffAnyScheduledPublish(workspace.FolderPath, course.Code, sectionNumber))
         {
             case ScheduledPublishOutcome.NoneWasSet: break;
             case ScheduledPublishOutcome.TurnedOff:
@@ -1412,16 +1561,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// while the address the teacher's students actually read quietly stopped
     /// updating.
     /// </remarks>
-    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string courseCode, int sectionNumber)
+    private static ScheduledPublishOutcome TurnOffAnyScheduledPublish(string workingFolder, string courseCode, int sectionNumber)
     {
-        string taskName = TaskScheduling.NameFor(courseCode, sectionNumber);
-        if (!TaskScheduling.Exists(taskName)) return ScheduledPublishOutcome.NoneWasSet;
+        // THIS working folder's deploy of the section only (#239's rollover
+        // case: the mac's rollover was the one cancel left folder-blind).
+        var (turnedOff, problem) = TaskScheduling.CancelFor(workingFolder, courseCode, sectionNumber);
+        foreach (int section in turnedOff)
+            ActivityTrail.Note(ActivityTrail.Event.ScheduledDeployTurnedOff,
+                "turned off: the section was rolled over onto a new website", courseCode, section);
         // The failure is REPORTED, never swallowed: a task left behind runs at
         // its appointed time, with nobody to ask what the new website should be
         // called — the whole thing turning it off exists to prevent.
-        return TaskScheduling.Cancel(taskName) is null
-            ? ScheduledPublishOutcome.TurnedOff
-            : ScheduledPublishOutcome.CouldNotTurnOff;
+        if (problem is not null) return ScheduledPublishOutcome.CouldNotTurnOff;
+        return turnedOff.Count > 0 ? ScheduledPublishOutcome.TurnedOff : ScheduledPublishOutcome.NoneWasSet;
     }
 
     /// <summary>What became of a publish that was set to happen on its own.</summary>
@@ -1483,55 +1635,48 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         "A date as YYYY-MM-DD, for example 2026-09-15. Leave empty for no limit.";
 
     [McpServerTool(Name = "plan_publish_pages", Title = "Plan publishing pages", ReadOnly = true, Destructive = false)]
-    [Description("Work out exactly what publishing pages would do, WITHOUT changing anything. " +
-                 "Always call this before publish_pages and show the teacher the result. " +
-                 "Choose pages by name, or by date with onOrAfter/before — \"every class from September 15th\" is one " +
-                 "call, and the dates are compared for you. Accepts any page, not just class pages, and can follow " +
-                 "their links, so you never need to work out which pages are linked.")]
+    [Description("Work out exactly what publishing pages would do, WITHOUT changing anything.")]
     public CallToolResult PlanPublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also publish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "")
-        => Plan(course, section, pages, includeLinked, draft: false, onOrAfter, before);
+        => Plan(course, section, pages, draft: false, onOrAfter, before);
 
     [McpServerTool(Name = "plan_unpublish_pages", Title = "Plan unpublishing pages", ReadOnly = true, Destructive = false)]
-    [Description("TEACHERS SAY: \"what happens if I take that down?\", \"check before you hide Unit 3, Day 2\". " +
-                 "Work out exactly what unpublishing pages from students would do, WITHOUT changing anything. " +
-                 "Always call this before unpublish_pages and show the teacher the result. " +
-                 "Choose pages by name, or by date with onOrAfter/before — \"hide everything from next Monday on\" is " +
-                 "one call. Note that a page linked from a class you are unpublishing may also be linked from one that must " +
-                 "stay up; the plan lists every page, so check it before agreeing.")]
+    [Description("TEACHERS SAY: \"what happens if I take that down?\", \"check before you hide Unit 3, Day 2\". Work " +
+                 "out exactly what unpublishing pages from students would do, WITHOUT changing anything.")]
     public CallToolResult PlanUnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also unpublish every page these pages link to. Choose deliberately; there is no default.")]
-        bool includeLinked = false,
         [Description("The page titles, for example [\"Unit 2, Day 3\"]. May be empty if you give dates instead.")]
         string[]? pages = null,
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "")
-        => Plan(course, section, pages, includeLinked, draft: true, onOrAfter, before);
+        => Plan(course, section, pages, draft: true, onOrAfter, before);
 
-    private CallToolResult Plan(string course, int section, string[]? pages, bool includeLinked,
+    // No `includeLinked` on any of the four (#420): links are always followed,
+    // as the contract says (followingLinks) and as the mac's schema has it
+    // (toolSchemas.departures.absentHere). An old client that still sends the
+    // key is harmless: the SDK's binder drops an argument a tool does not
+    // declare.
+    private CallToolResult Plan(string course, int section, string[]? pages,
                                 bool draft, string onOrAfter, string before)
     {
         if (WholeUnitPlan(course, section, pages, publishing: !draft) is { } whole)
             return whole;
 
         return Guarded(() => Proposing(workspace.PlanPublish(
-            course, section, pages ?? Array.Empty<string>(), includeLinked, draft,
+            course, section, pages ?? Array.Empty<string>(), draft,
             publishes: !draft, onOrAfter: ParseDate(onOrAfter, "onOrAfter"), before: ParseDate(before, "before"))));
     }
 
     private CallToolResult? WholeUnitPlan(string course, int section, string[]? pages, bool publishing)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         if (unit == null) return null;
 
         var result = workspace.PlanWholeUnit(course, section, unit.Value, publishing);
@@ -1585,14 +1730,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [McpServerTool(Name = "undo_last_change", Title = "Undo the last change",
                    Destructive = false, Idempotent = false)]
     [Description("TEACHERS SAY: \"undo that\", \"put it back\", \"that was wrong, revert it\", \"never mind, undo\". " +
-                 "Take back the most recent change this conversation made — the fix for publishing the wrong " +
-                 "class in a hurry. Puts exactly those pages back the way they were, without disturbing anything " +
-                 "else. Can be called more than once to step further back. " +
-                 "\n\nOnly changes made in THIS conversation can be undone this way; the history is not kept " +
-                 "afterwards. For anything older, Plantoir's Backups list has a full copy of the course taken " +
-                 "before the conversation's first change. " +
-                 "\n\nIf the teacher had already published the section themselves, undoing the pages does not " +
-                 "un-publish the live site — they need to publish again in Plantoir to bring it back in step.")]
+                 "Take back the most recent change this conversation made — the fix for publishing the wrong class in " +
+                 "a hurry.")]
     public CallToolResult UndoLastChange()
     {
         if (workspace.History is not { } history)
@@ -1601,6 +1740,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         var result = history.Undo();
         if (!result.Succeeded && result.Restored.Count == 0 && result.Skipped.Count == 0)
             return Answering(AssistWording.NothingToUndo);
+        // #355: an undo of getting a section ready leaves its own line.
+        AssistWorkspace.NoteIfItUndidAStartOfYear(result, StartOfYearAskedFrom.AnOutsideAssistant);
 
         // Nothing went back, because every file has been edited since. This
         // must not read like a success, and a count of files put back reads
@@ -1648,10 +1789,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [McpServerTool(Name = "plan_publish_class_on", Title = "Plan publishing a day's class",
                    ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what would publishing tomorrow's class do?\", \"show me before you put Monday up\". " +
-                 "Work out what publishing the class taught on a given day would do, WITHOUT changing anything. " +
-                 "This is the tool for \"publish tomorrow's class\" or \"publish today's class\": it finds the class " +
-                 "by date, follows its links, gives pages no other class uses that class's date, and points the " +
-                 "section's front page at it. Always show the teacher the result before using publish_class_on.")]
+                 "Work out what publishing the class taught on a given day would do, WITHOUT changing anything.")]
     public CallToolResult PlanPublishClassOn(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -1661,15 +1799,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [McpServerTool(Name = "publish_class_on", Title = "Publish a day's class",
                    Destructive = false, Idempotent = true)]
     [Description("TEACHERS SAY: \"publish tomorrow's class\", \"put up Monday's lesson\", \"put Unit 2, Day 3 up\", " +
-                 "\"make Friday's class visible\", \"post next class\", \"put the class live for students\". " +
-                 "Publish the class taught on a given day, along with the pages it links to, then rebuild the " +
-                 "section's preview. Pages that no other class links to take the class's date, and the section's " +
-                 "front page is pointed at the most recent published class. The course is backed up first, " +
-                 "automatically. Only call this after plan_publish_class_on and after the teacher has agreed. " +
-                 "\n\nThis changes the teacher's files and rebuilds their PREVIEW. It does not put anything in " +
-                 "front of students: only the teacher can do that, from Plantoir. Tell them to look the preview " +
-                 "over and publish it there when they are happy. " +
-                 "This takes a few minutes.")]
+                 "\"make Friday's class visible\", \"post next class\", \"put the class live for students\". Publish " +
+                 "the class taught on a given day, along with the pages it links to, then rebuild the section's " +
+                 "preview.")]
     public async Task<CallToolResult> PublishClassOn(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -1698,12 +1830,21 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // class on tomorrow", which is not a date anybody can check
             // against their timetable a week later.
             return result.Succeeded
-                ? Answering($"Published the class on {day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}.",
+                ? Answering(AssistWording.PublishedTheClassOn(DateText.Iso(day)),
                             text.ToString())
                 : Answering(text.ToString());
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, null, publishing: true, error));
+        }
     }
 
     /// <summary>
@@ -1735,8 +1876,8 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         string page = workspace.ClassOn(found, number, when);
 
         return workspace.PlanPublish(course, number,
-            new[] { Path.GetFileNameWithoutExtension(page) },
-            includeLinked: true, draft: false, publishes: publishes);
+            new[] { workspace.Relative(Path.GetFullPath(page)) },
+            draft: false, publishes: publishes);
     }
 
     // ---- Acting ----------------------------------------------------------
@@ -1750,7 +1891,6 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> PublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also publish every page these pages link to.")] bool includeLinked = false,
         IProgress<ProgressNotificationValue> progress = null!,
         CancellationToken cancellation = default,
         [Description("The page titles to publish. May be empty if you give dates instead.")]
@@ -1758,7 +1898,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "",
         [Description("False to change the pages without rebuilding the preview.")] bool preview = true)
-        => Act(course, section, pages, includeLinked, draft: false, preview, onOrAfter, before,
+        => Act(course, section, pages, draft: false, preview, onOrAfter, before,
                progress, cancellation);
 
     [McpServerTool(Name = "unpublish_pages", Title = "Unpublish pages", Destructive = false, Idempotent = true)]
@@ -1772,7 +1912,6 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public Task<CallToolResult> UnpublishPages(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("True to also unpublish every page these pages link to.")] bool includeLinked = false,
         IProgress<ProgressNotificationValue> progress = null!,
         CancellationToken cancellation = default,
         [Description("The page titles to unpublish. May be empty if you give dates instead.")]
@@ -1780,7 +1919,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("Only classes on or after this date. " + DateHelp)] string onOrAfter = "",
         [Description("Only classes strictly before this date. " + DateHelp)] string before = "",
         [Description("False to change the pages without rebuilding the preview.")] bool preview = true)
-        => Act(course, section, pages, includeLinked, draft: true, preview, onOrAfter, before,
+        => Act(course, section, pages, draft: true, preview, onOrAfter, before,
                progress, cancellation);
 
     // The cues cover STARTING a preview as well as refreshing one. The first
@@ -1788,12 +1927,9 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     // every cue here assuming a preview already existed, the model matched
     // nothing — and wrote a paragraph describing a rebuild it never did.
     [McpServerTool(Name = "rebuild_preview", Title = "Rebuild the preview", Destructive = false, Idempotent = true)]
-    [Description("TEACHERS SAY: \"preview the site\", \"show me the preview\", \"start the preview\", " +
-                 "\"open the preview\", \"rebuild the preview\", \"refresh what I'm looking at\", " +
-                 "\"update the preview\", \"build it again\". " +
-                 "Build a section's preview and put it on screen, without changing any page. " +
-                 "Use this after a batch of publish_pages or unpublish_pages calls made with preview=false. " +
-                 "This takes several minutes.")]
+    [Description("TEACHERS SAY: \"preview the site\", \"show me the preview\", \"start the preview\", \"open the " +
+                 "preview\", \"rebuild the preview\", \"refresh what I'm looking at\", \"update the preview\", \"build " +
+                 "it again\". Build a section's preview and put it on screen, without changing any page.")]
     public async Task<string> RebuildPreview(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -1810,9 +1946,10 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     }
 
     [McpServerTool(Name = "back_up_course", Title = "Back up a course", Destructive = false, Idempotent = false)]
-    [Description("Make a full backup of one course, which the teacher can restore from inside Plantoir. " +
-                 "Do this before any bulk editing of a course's files — including edits you make directly rather than " +
-                 "through these tools. Course folders are not in version control, so a backup is the only undo.")]
+    [Description("Make a full copy of one course, which the teacher can restore from inside Plantoir. Do this before " +
+                 "any bulk editing of a course's files — INCLUDING edits you make directly rather than through these " +
+                 "tools, which nothing else backs up. Course folders are not in version control, so a copy is the only " +
+                 "way back.")]
     public CallToolResult BackUpCourse(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section)
@@ -1820,9 +1957,55 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             workspace.Course(course).Code,
             System.IO.Path.GetFileName(workspace.BackUp(course, section))));
 
+    // ---- The How I Teach page (#340, mac #209), MCP only -----------------
+    //
+    // The local model is never shown these: a small router drafting a
+    // teacher's pedagogy is the wrong job for it, and a prompt change would
+    // owe a routing re-measurement (howITeachPage.tools.surface).
+
+    [McpServerTool(Name = "read_how_i_teach", Title = "Read the How I Teach page", ReadOnly = true, Destructive = false)]
+    [Description("Read the teacher's How I Teach page for a course: their own account of how the course is taught. " +
+                 "Read it before drafting or revising any page in the course, and keep to it. If there is none yet, " +
+                 "it says how to offer to draft one. Changes nothing.")]
+    public CallToolResult ReadHowITeach(
+        [Description("The course code, for example ICS3U.")] string course)
+        => GuardedResult(() => workspace.ReadHowITeach(course));
+
+    [McpServerTool(Name = "plan_write_how_i_teach", Title = "Plan saving the How I Teach page",
+                   ReadOnly = true, Destructive = false)]
+    [Description("Shows where the teacher's How I Teach page would be saved and whether it replaces one they " +
+                 "already have, changing nothing. Use it before write_how_i_teach, and show the teacher the whole text.")]
+    public CallToolResult PlanWriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        // MARKED, so the window would offer Go if anything ever gated on it.
+        => Guarded(() => Proposing(workspace.PlanWriteHowITeach(course, text, replacing)));
+
+    [McpServerTool(Name = "write_how_i_teach", Title = "Save the How I Teach page", Destructive = false, Idempotent = false)]
+    [Description("Save the teacher's How I Teach page for a course, once they have read the whole text and agreed. " +
+                 "Call plan_write_how_i_teach FIRST. The course is backed up first, and the page is never put on the website.")]
+    public CallToolResult WriteHowITeach(
+        [Description("The course code, for example ICS3U.")] string course,
+        [Description(HowITeachTextHelp)] string text,
+        [Description(HowITeachReplacingHelp)] string replacing = "")
+        => Guarded(() =>
+        {
+            var result = workspace.WriteHowITeach(course, text, replacing);
+            return Answering(result.Message,
+                result.BackupPath is null ? result.Message : result.Message + "\n\n" + AssistWorkspace.BackedUpNote);
+        });
+
+    private const string HowITeachTextHelp =
+        "The whole page, in Markdown, as the teacher agreed to it — words only, with no --- settings block at the top.";
+
+    private const string HowITeachReplacingHelp =
+        "Only when replacing a page the teacher already has: the mark plan_write_how_i_teach gave for it, passed " +
+        "only after the teacher agreed to replace their page. Leave empty for a new page.";
+
     // ---- Shared ----------------------------------------------------------
 
-    private async Task<CallToolResult> Act(string course, int section, string[]? pages, bool includeLinked,
+    private async Task<CallToolResult> Act(string course, int section, string[]? pages,
                                            bool draft, bool preview, string onOrAfter, string before,
                                            IProgress<ProgressNotificationValue> progress,
                                            CancellationToken cancellation)
@@ -1833,7 +2016,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                 return whole;
 
             var plan = workspace.PlanPublish(
-                course, section, pages ?? Array.Empty<string>(), includeLinked, draft, publishes: !draft,
+                course, section, pages ?? Array.Empty<string>(), draft, publishes: !draft,
                 ParseDate(onOrAfter, "onOrAfter"), ParseDate(before, "before"));
 
             // Four words, when four words are the whole answer.
@@ -1854,6 +2037,48 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         }
         catch (AssistRefusal refusal) { return Answering(refusal.Message); }
         catch (OperationCanceledException) { return Answering("The publish was stopped before it finished."); }
+        // A page Obsidian moved between the plan and the write, a file
+        // another program holds, a permission changed (#165): every other
+        // changing tool answers these through Guarded, and this one let them
+        // leave the tool altogether -- a protocol error, a half-published
+        // section, and no word of the copy that puts it back.
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            return Answering(OnlyPartlyDone(course, section, pages, publishing: !draft, error));
+        }
+    }
+
+    /// <summary>
+    /// What a publish that stopped part way says (#165). Shaped on the mac's
+    /// inline sentence in <c>AssistToolRunner</c> ("Unit 4 was only partly
+    /// published: ...") -- the mac has no <c>AssistWording</c> key for it, so
+    /// this is Windows' own until a key is proposed (the bundle-5b handover to the mac).
+    /// Names the conversation's copy when there is one, because the undo
+    /// entry is abandoned on a throw and that copy is what puts it back.
+    /// </summary>
+    private string OnlyPartlyDone(string course, int section, string[]? pages, bool publishing, Exception error)
+    {
+        string verb = publishing ? "published" : "unpublished";
+        string? unitWord = null;
+        int? unit = null;
+        if (pages is { Length: 1 })
+        {
+            try
+            {
+                unitWord = workspace.UnitWordForCourse(course);
+            }
+            catch { /* the unit word is a nicety; the sentence stands without it */ }
+            if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
+        }
+        string what = unit is { } number ? $"{unitWord} {number}" : "The pages";
+        string reason = error is UnauthorizedAccessException
+            ? "Plantoir doesn’t have permission to change one of them."
+            : error.Message;
+        string said = $"{what} {(unit is null ? "were" : "was")} only partly {verb}: {reason}";
+        if (workspace.ConversationBackupPath is not null)
+            said += $" A copy from before this conversation changed anything is saved — " +
+                    $"{AssistSectionRestore.ButtonTitle(section)} puts the section back.";
+        return said;
     }
 
     private async Task<CallToolResult?> WholeUnitRequested(
@@ -1861,7 +2086,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         IProgress<ProgressNotificationValue> progress, CancellationToken cancellation)
     {
         if (pages == null || pages.Length != 1) return null;
-        int? unit = PublishPlan.UnitNamed(pages[0], workspace.UnitWordForCourse(course));
+        int? unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         if (unit == null) return null;
 
         var result = await workspace.ApplyWholeUnit(course, section, unit.Value, publishing, preview,
@@ -2014,6 +2239,22 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         Meta = new JsonObject
         {
             [AssistToolAnswer.TeacherSummaryKey] = plan,
+            [AssistToolAnswer.IsPlanKey] = true,
+        },
+    });
+
+    /// <summary>
+    /// A PLAN whose teacher's card differs from the model's copy — a club's
+    /// "meeting" card (#274). The text content, which the model and Claude Code
+    /// read, is the class form byte for byte; the teacher's card travels only in
+    /// <c>_meta</c>, which the window shows and never forwards to the model.
+    /// </summary>
+    private CallToolResult Proposing(string forModel, string forTeacher) => CarryingTheConversationBackup(new()
+    {
+        Content = [new TextContentBlock { Text = forModel + "\n\n" + AskBeforeGoingAhead }],
+        Meta = new JsonObject
+        {
+            [AssistToolAnswer.TeacherSummaryKey] = forTeacher,
             [AssistToolAnswer.IsPlanKey] = true,
         },
     });

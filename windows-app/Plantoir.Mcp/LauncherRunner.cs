@@ -61,10 +61,94 @@ public sealed class LauncherRunner : ILauncherRunner
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
 
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
+        var running = new Running(process, workingFolder, launcher, arguments);
+        lock (RunningGate) { RunningNow.Add(running); }
+        try
+        {
+            return await RunStarted(process, script, progress, cancellation);
+        }
+        finally
+        {
+            lock (RunningGate) { RunningNow.Remove(running); }
+        }
+    }
+
+    // ---- Leaving mid-build (#289) -----------------------------------------
+
+    private sealed record Running(Process Process, string WorkingFolder, string Launcher, IReadOnlyList<string> Arguments);
+
+    private static readonly object RunningGate = new();
+    private static readonly List<Running> RunningNow = new();
+
+    /// <summary>
+    /// Stop every launcher this server started and is still waiting on, and
+    /// then the section's own processes — BEFORE its leases are given back.
+    /// </summary>
+    /// <remarks>
+    /// <para>#289 (mac #156, <c>AssistMCPServer.stopOwnWorkBeforeLeaving</c>).
+    /// When the client closes stdin mid-build, the host shuts down, and the
+    /// lease files go with it — telling Plantoir the course is free while a
+    /// <c>--build-only</c> this process started is still writing the section's
+    /// build folder. A Preview pressed in that moment would build over it.</para>
+    ///
+    /// <para>Killing the launcher's tree is not the whole job: the build's
+    /// node and python children can outlive a <c>powershell.exe</c> killed from
+    /// outside, which is why <c>preview.ps1 --stop</c> exists (it ends the
+    /// section's processes by working directory). Each stop is waited for, up to
+    /// fifteen seconds — the ceiling PreviewStopper uses — so a wedged stop
+    /// cannot hold the exit for ever. A KILL of this process skips all of it,
+    /// on both platforms; that is the known limit.</para>
+    /// </remarks>
+    public static void StopEverythingItStarted()
+    {
+        List<Running> running;
+        lock (RunningGate) { running = RunningNow.ToList(); }
+
+        foreach (var run in running)
+        {
+            try { if (!run.Process.HasExited) run.Process.Kill(entireProcessTree: true); } catch { }
+        }
+
+        foreach (var run in running.Where(run => run.Arguments.Count >= 2)
+                                   .DistinctBy(run => (run.WorkingFolder, run.Arguments[0], run.Arguments[1])))
+        {
+            string script = Path.Combine(run.WorkingFolder, "preview.ps1");
+            if (!OperatingSystem.IsWindows() || !File.Exists(script)) continue;
+            try
+            {
+                var info = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    WorkingDirectory = run.WorkingFolder,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                Plantoir.Core.Scripting.NativeRuntime.Apply(info);
+                foreach (string argument in new[] { "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+                                                    run.Arguments[0], run.Arguments[1], "--stop" })
+                    info.ArgumentList.Add(argument);
+                using var stop = Process.Start(info);
+                if (stop is null) continue;
+                stop.OutputDataReceived += (_, _) => { };
+                stop.ErrorDataReceived += (_, _) => { };
+                stop.BeginOutputReadLine();
+                stop.BeginErrorReadLine();
+                if (!stop.WaitForExit(15_000)) { try { stop.Kill(entireProcessTree: true); } catch { } }
+            }
+            catch { /* leaving anyway: a stop that cannot start must not keep the server alive */ }
+        }
+    }
+
+    private async Task<LaunchOutcome> RunStarted(Process process, string script, IProgress<string>? progress,
+                                                 CancellationToken cancellation)
+    {
         var tail = new Queue<string>();
         var gate = new object();
         var findings = new List<Plantoir.Core.Models.SiteHealthFinding>();
         var findingsSeen = new HashSet<string>(StringComparer.Ordinal);
+        Plantoir.Core.Assist.LinksChecklistMarker? linksChecklist = null;
 
         void Capture(string? line)
         {
@@ -76,6 +160,24 @@ public sealed class LauncherRunner : ILauncherRunner
             // (CLAUDE.md rule 1). The human sentence it carries is reported
             // properly, by the caller, out of Findings — and site_health.py
             // prints its own sentence separately besides.
+            // #395: deploy.py's PLANTOIR_CLOUDFLARE_REMADE: from a deploy this
+            // server ran - the same trail line the app writes from its own runs.
+            if (Plantoir.Core.Models.CloudflareProjectRemade.Parse(line) is { } remade)
+            {
+                Plantoir.Core.Scripting.ActivityTrail.Note(
+                    Plantoir.Core.Scripting.ActivityTrail.Event.CloudflareProjectMadeAgain,
+                    remade.TrailSentence, remade.Course, remade.Section);
+                return;
+            }
+
+            // The links checklist's marker (#392): kept, so the assistant
+            // can say the checklist WILL be offered only when this build made one.
+            if (Plantoir.Core.Assist.LinksChecklistMarker.Parse(line) is { } checklist)
+            {
+                lock (gate) linksChecklist = checklist;
+                return;
+            }
+
             if (Plantoir.Core.Models.SiteHealthFinding.Parse(line) is { } finding)
             {
                 lock (gate)
@@ -138,8 +240,8 @@ public sealed class LauncherRunner : ILauncherRunner
         }
 
         return process.ExitCode == 0
-            ? new LaunchOutcome(true, transcript, found)
-            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found);
+            ? new LaunchOutcome(true, transcript, found, 0, linksChecklist)
+            : new LaunchOutcome(false, Explain(process.ExitCode, transcript), found, process.ExitCode, linksChecklist);
     }
 
     /// <summary>

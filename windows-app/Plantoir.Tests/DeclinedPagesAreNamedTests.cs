@@ -1,0 +1,352 @@
+using Plantoir.Core.Assist;
+using Plantoir.Core.Scripting;
+
+namespace Plantoir.Tests;
+
+/// <summary>
+/// #308 (the mac's #186): a page whose settings have no column-0 place for a
+/// new line is DECLINED by the writer — and every caller then NAMES it, on the
+/// plan and in the reply, rather than promising it, counting it as done, or
+/// answering "already hidden" about it. The trail records the count.
+/// </summary>
+/// <remarks>
+/// The shape used throughout is the contract's own (<c>file-formats.json</c> →
+/// <c>pageVisibility.writingCases</c>, <c>expectOutcome: noRoomForAKey</c>): a
+/// settings block whose first line is indented, so a new key has nowhere to go.
+/// </remarks>
+[Collection(SharedActivityState.Name)]
+public sealed class DeclinedPagesAreNamedTests : IDisposable
+{
+    private const string NoRoom = "---\n  a: 1\n---\nBody.\n";
+
+    private readonly string _folder = Path.Combine(Path.GetTempPath(), "plantoir-declined-" + Guid.NewGuid().ToString("N"));
+    private readonly string _trail;
+    private readonly FakeLauncher _launcher = new();
+
+    public DeclinedPagesAreNamedTests()
+    {
+        Directory.CreateDirectory(Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes"));
+        File.WriteAllText(Path.Combine(_folder, "preview.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "course_config.json"),
+            """
+            {
+              "course_code": "ICS3U",
+              "course_name": "Computer Science",
+              "deploy_target": "netlify",
+              "num_sections": 1,
+              "per_section_folders": ["All Classes"],
+              "per_section_files": [],
+              "section_numbers": [1]
+            }
+            """);
+        TimetableMemory.Write(_folder, "ICS3U", 1,
+            Enumerable.Range(0, 12).Select(i => new DateOnly(2026, 9, 8).AddDays(i * 2)),
+            "block H", new DateOnly(2026, 8, 14));
+        _trail = Path.Combine(_folder, "trail.txt");
+        ActivityTrail.SetCustomLogPathForTesting(_trail);
+    }
+
+    public void Dispose()
+    {
+        ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+        try { Directory.Delete(_folder, recursive: true); } catch { }
+    }
+
+    private AssistWorkspace Open() => new(_folder, _launcher);
+
+    private string ClassPath(string title) =>
+        Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md");
+
+    private void Class(string title, string date) =>
+        File.WriteAllText(ClassPath(title), $"---\ntitle: {title}\npublish: true\ncreated: {date}T07:00:00.000-0400\n---\nBody.\n");
+
+    private string TrailText => File.Exists(_trail) ? File.ReadAllText(_trail) : "";
+
+    [Fact]
+    public async Task HidingAPageWithNoRoomForAKeyNamesItOnThePlanAndInTheReplyAndWritesNothing()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), NoRoom);
+        string sentence = AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 1, Day 2" });
+
+        var workspace = Open();
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, draft: true, publishes: false);
+
+        Assert.Equal(new[] { "Unit 1, Day 2" }, plan.CannotBeAddedTo.Select(p => p.Title));
+        Assert.Empty(plan.Changes);
+        Assert.Null(plan.NothingToDoSentence);              // never "already hidden" about it
+        Assert.Contains(sentence, plan.Describe());
+        Assert.DoesNotContain("No page's visibility would change", plan.Describe());
+
+        var result = await workspace.Apply(plan, preview: false);
+        Assert.Equal(sentence, result.Message);
+        Assert.Equal(NoRoom, File.ReadAllText(ClassPath("Unit 1, Day 2")));
+        Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("hiding pages", 1), TrailText);
+    }
+
+    [Fact]
+    public async Task APageThatCanBeWrittenIsWrittenAndTheDeclinedOneIsNamedBesideIt()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), NoRoom);
+
+        var workspace = Open();
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1", "Unit 1, Day 2" },
+            draft: true, publishes: false);
+        var result = await workspace.Apply(plan, preview: false);
+
+        Assert.Contains("Unpublished “Unit 1, Day 1”.", result.Message);
+        Assert.EndsWith(AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 1, Day 2" }), result.Message);
+        Assert.True(Plantoir.Core.Models.PageFrontmatter.IsDraft(File.ReadAllText(ClassPath("Unit 1, Day 1")), 1));
+    }
+
+    [Fact]
+    public async Task AWholeUnitNeverSaysAlreadyHiddenAboutPagesItDeclined()
+    {
+        File.WriteAllText(ClassPath("Unit 3, Day 1"), NoRoom);
+        File.WriteAllText(ClassPath("Unit 3, Day 2"), NoRoom);
+        string sentence = AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 3, Day 2", "Unit 3, Day 1" });
+
+        var workspace = Open();
+        var planned = workspace.PlanWholeUnit("ICS3U", 1, 3, publishing: false);
+        Assert.Equal(0, planned.MovingCount);
+        Assert.Equal(sentence, planned.AlreadyDoneSentence);
+
+        var result = await workspace.ApplyWholeUnit("ICS3U", 1, 3, publishing: false, preview: false);
+        Assert.Equal(sentence, result.Message);
+        Assert.Equal(NoRoom, File.ReadAllText(ClassPath("Unit 3, Day 1")));
+    }
+
+    [Fact]
+    public void ReDatingNamesTheClassItCouldNotDate()
+    {
+        Class("Unit 1, Day 1", "2026-09-01");
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), NoRoom);
+
+        var workspace = Open();
+        var remembered = TimetableMemory.Read(workspace.FolderPath, "ICS3U", 1)!;
+        var plan = workspace.PlanReDate("ICS3U", 1, Timetable.FromDates(remembered.Dates, remembered.Source),
+            Array.Empty<string>(), Array.Empty<int>());
+        var result = workspace.ApplyReDate(plan);
+
+        Assert.Contains(AssistWording.PageWhoseNewDateCouldNotBeSet("Unit 1, Day 2"), result.Message);
+        Assert.Equal(NoRoom, File.ReadAllText(ClassPath("Unit 1, Day 2")));
+        Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("re-dating classes", 1), TrailText);
+    }
+
+    [Fact]
+    public void MakingRoomNamesTheClassItCouldNotDateByItsNewName()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        File.WriteAllText(ClassPath("Unit 1, Day 3"), NoRoom);
+
+        var workspace = Open();
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+        var result = workspace.ApplyInsertClasses(plan);
+
+        // Unit 1, Day 3 became Unit 1, Day 4 and could not be given a date.
+        Assert.Contains(AssistWording.PageWhoseNewDateCouldNotBeSet("Unit 1, Day 4"), result.Message);
+        Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("making room for a class", 1), TrailText);
+    }
+
+    /// <summary>
+    /// Review N-a: a class the writer declines stays as it is, so the plan works
+    /// the section's front page out from its CURRENT state. Measured here in the
+    /// hide direction. The publish direction is reachable too (bundle 9 fix
+    /// review, note 1: a section-local class page whose first settings line is
+    /// indented and which carries a top-level <c>publishForSection1: false</c>
+    /// reads certainly hidden, and publishing it is declined because its write
+    /// key <c>publish</c> has nowhere to go); the same exclusion covers it, but
+    /// no test here exercises it.
+    /// </summary>
+    [Fact]
+    public void ADeclinedClassIsNeverPlannedOntoTheFrontPage()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        // No top-level place for a new key (its first line is indented), but a
+        // date this app reads, later than Day 1's.
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), "---\n  a: 1\ncreated: 2026-09-10T07:00:00.000-0400\n---\nBody.\n");
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md"),
+            "---\ntitle: Home\n---\n# Most Recent Class\n![[Unit 1, Day 2]]\n");
+
+        // A HIDE of the newest class, which the writer declines: Day 2 stays
+        // visible, so the front page must not be planned back onto Day 1.
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, draft: true, publishes: false);
+
+        Assert.Equal(new[] { "Unit 1, Day 2" }, plan.CannotBeAddedTo.Select(p => p.Title));
+        Assert.True(plan.Index is null || plan.Index.ToClass == "Unit 1, Day 2",
+            $"the front page was planned away from a class that stays visible: {plan.Index?.Describe()}");
+    }
+
+    /// <summary>
+    /// #421: getting a section ready for the year NAMES a class the writer
+    /// declines, rather than saying it went into draft while students can
+    /// still see it (the damaging direction). Counted among the pages left as
+    /// they were — one trail line, not a second one.
+    /// </summary>
+    [Fact]
+    public void StartOfYearNamesAClassItCouldNotPutIntoDraft()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        // Visible (no key at all) and no column-0 place for a new one.
+        File.WriteAllText(ClassPath("Unit 1, Day 2"), "---\n  a: 1\ncreated: 2026-09-10T07:00:00.000-0400\n---\nBody.\n");
+        Class("Unit 1, Day 3", "2026-09-12");
+        File.WriteAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md"),
+            "---\ntitle: Home\n---\n# Most Recent Class\n![[Unit 1, Day 3]]\n");
+        string before = File.ReadAllText(ClassPath("Unit 1, Day 2"));
+
+        var workspace = Open();
+        var proposal = workspace.PlanStartOfYear("ICS3U", 1);
+        Assert.Equal(2, proposal.Plan.Classes.Count());
+        var outcome = workspace.PrepareForStartOfYear("ICS3U", 1, proposal.Code, StartOfYearAskedFrom.TheAssistant);
+
+        Assert.True(outcome.Changed);
+        Assert.Equal(before, File.ReadAllText(ClassPath("Unit 1, Day 2")));
+        Assert.True(Plantoir.Core.Models.PageFrontmatter.IsDraft(File.ReadAllText(ClassPath("Unit 1, Day 3")), 1));
+        Assert.Equal(StartOfYearWording.Fill(StartOfYearWording.Done, ("pages", StartOfYearWording.PagesCounted(1)))
+            + " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Unit 1, Day 2" }), outcome.Message);
+        Assert.Contains($"— {StartOfYearWording.ClassesCounted(1)} and", TrailText);
+        // Everything but the one page put into draft — the declined class among them.
+        Assert.Contains($"{proposal.Plan.Pages.Count - 1} left as they were", TrailText);
+        Assert.DoesNotContain(ActivityTrail.PageSettingsLeftAsTheyWereLine("getting ready for the start of the year", 1), TrailText);
+    }
+
+    /// <summary>
+    /// #421: the links checklist's Publish NAMES a ticked page the writer
+    /// declines, instead of counting it as left hidden (or remembering it as
+    /// unticked), and records the count on the trail.
+    /// </summary>
+    [Fact]
+    public void TheLinksChecklistNamesAPageItCouldNotPublish()
+    {
+        string concepts = Path.Combine(_folder, "courses", "ICS3U", "Concepts");
+        Directory.CreateDirectory(concepts);
+        File.WriteAllText(Path.Combine(concepts, "Ohm.md"), "---\npublishForSection1: false\n---\nA sentence.\n");
+        // Hidden (the build reads `publish:` on any page) and no column-0
+        // place for this page's own key, publishForSection1.
+        string noRoom = "---\n  a: 1\npublish: false\n---\nA sentence.\n";
+        File.WriteAllText(Path.Combine(concepts, "Watt.md"), noRoom);
+
+        var workspace = Open();
+        LinksChecklistRow Row(string place) =>
+            new(place, LinksChecklist.NotReachedGroup, true, Array.Empty<string>(), Path.GetFileName(place), null, null, null);
+        var sheet = workspace.OpenLinksChecklist(new LinksChecklistOffer("ICS3U", 1, "build-1",
+            new[] { Row("Concepts/Ohm"), Row("Concepts/Watt") }));
+        Assert.Equal(2, sheet.Rows.Count);
+
+        var published = workspace.PublishAndRemember(sheet);
+
+        Assert.Equal(noRoom, File.ReadAllText(Path.Combine(concepts, "Watt.md")));
+        Assert.Equal(new[] { "Concepts/Ohm" }, published.Written);
+        Assert.Equal(new[] { "Watt" }, published.Declined);
+        Assert.Empty(published.RememberedUnticked);
+        Assert.Empty(published.LeftWithTheirPage);
+        Assert.EndsWith(AssistWording.PagesWhoseSettingsCannotBeAddedTo(new[] { "Watt" }), published.Reply(sheet));
+        Assert.Contains(ActivityTrail.PageSettingsLeftAsTheyWereLine("publishing pages that links lead to", 1), TrailText);
+    }
+
+    /// <summary>
+    /// Review F1: "moved N onto later class days" counts what was WRITTEN, as
+    /// the mac counts — never a class it declined or a write that failed.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheClassesItActuallyMoved()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        File.WriteAllText(ClassPath("Unit 1, Day 3"), NoRoom);       // declined at the write
+        Class("Unit 2, Day 1", "2026-09-14");
+        string locked = ClassPath("Unit 2, Day 1");
+        File.SetAttributes(locked, FileAttributes.ReadOnly);         // its write fails
+        try
+        {
+            var workspace = Open();
+            var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+            Assert.Contains(plan.Moves, m => m.Title == "Unit 1, Day 4");
+            Assert.Contains(plan.Moves, m => m.Title == "Unit 2, Day 1");
+            var result = workspace.ApplyInsertClasses(plan);
+
+            Assert.Contains($"moved {plan.Moves.Count - 2} onto later class days", result.Message);
+            // #422: the write that FAILED is named, not swallowed.
+            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 2, Day 1" }), result.Message);
+            Assert.Contains("making room for a class did not finish 1 page: 0 not renamed, 1 not re-dated", TrailText);
+        }
+        finally { File.SetAttributes(locked, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// #422: "Renamed N" counts the renames that HAPPENED. A teacher's page
+    /// made under a new name after the plan was shown blocks the rename onto
+    /// it (and so the chain below it); nothing is overwritten, the teacher's
+    /// page is not given a class's date, and every page left unfinished is
+    /// named — the blank class that could not be added among them.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheRenamesThatHappenedAndNamesTheRest()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        Class("Unit 1, Day 3", "2026-09-12");
+
+        var workspace = Open();
+        var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+        Assert.Equal(2, plan.Renames.Count);
+        string teachers = "---\ntitle: Unit 1, Day 4\npublish: false\n---\nMy own page.\n";
+        File.WriteAllText(ClassPath("Unit 1, Day 4"), teachers);   // made after the plan was shown
+
+        var result = workspace.ApplyInsertClasses(plan);
+
+        Assert.Equal(teachers, File.ReadAllText(ClassPath("Unit 1, Day 4")));
+        Assert.StartsWith("Renamed 0, moved", result.Message);
+        Assert.Contains("updated 0 links", result.Message);
+        Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 1, Day 3", "Unit 1, Day 2" }), result.Message);
+        Assert.Contains("making room for a class did not finish 2 pages: 2 not renamed, 0 not re-dated, 0 with links not updated, 1 new not added",
+            TrailText);
+    }
+
+    /// <summary>
+    /// #422: "updated N links" counts links on pages that were SAVED, and a
+    /// page whose rewritten links could not be saved is named.
+    /// </summary>
+    [Fact]
+    public void MakingRoomCountsOnlyTheLinksItSavedAndNamesThePageItCouldNot()
+    {
+        Class("Unit 1, Day 1", "2026-09-08");
+        Class("Unit 1, Day 2", "2026-09-10");
+        Class("Unit 1, Day 3", "2026-09-12");
+        string notes = Path.Combine(_folder, "courses", "ICS3U", "section1", "Notes.md");
+        File.WriteAllText(notes, "---\npublish: true\n---\nSee [[Unit 1, Day 3]].\n");
+        File.SetAttributes(notes, FileAttributes.ReadOnly);
+        try
+        {
+            var workspace = Open();
+            var plan = workspace.PlanInsertClasses("ICS3U", 1, unit: 1, atDay: 2, count: 1);
+            Assert.Equal(1, plan.LinksToRewrite);
+
+            var result = workspace.ApplyInsertClasses(plan);
+
+            Assert.Contains("Renamed 2,", result.Message);
+            Assert.Contains("updated 0 links", result.Message);
+            Assert.Contains(AssistWording.PagesAChangeCouldNotFinish(new[] { "Notes" }), result.Message);
+        }
+        finally { File.SetAttributes(notes, FileAttributes.Normal); }
+    }
+
+    /// <summary>
+    /// #422 (bundle 9 fix review, note 3): a declined page is matched to the
+    /// planned pages by PATH. Two folders' <c>index.md</c> share a title; taking
+    /// one out must not take the other with it.
+    /// </summary>
+    [Fact]
+    public void ADeclinedPageIsMatchedByPathNotByItsFileName()
+    {
+        var concepts = new PlannedPage("index", "courses/ICS3U/Concepts/index.md", "publishForSection1", true, false, false);
+        var labs = new PlannedPage("index", "courses/ICS3U/Labs/index.md", "publishForSection1", true, false, true);
+
+        var left = AssistWorkspace.WithoutDeclined(new[] { concepts, labs }, new[] { concepts });
+
+        Assert.Equal(new[] { labs }, left);
+    }
+}

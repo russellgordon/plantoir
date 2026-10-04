@@ -90,7 +90,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true,
              body: "Concept: [[Ohm's Law]]");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.Equal("publish", Assert.Single(plan.Named).FrontmatterKey);
         Assert.Equal("publishForSection1", Assert.Single(plan.Linked).FrontmatterKey);
@@ -103,7 +103,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true,
              body: "Concept: [[Ohm's Law]]");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         // Every changing page names its display title and transition.
         Assert.Equal(
@@ -121,7 +121,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false,
              body: "Concept: [[Ohm's Law]]");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.True(plan.ChangesNothing);
         Assert.Contains("No page's visibility would change.", plan.Describe());
@@ -137,7 +137,7 @@ public class AssistWorkspaceTests : IDisposable
              body: "[[Ohm's Law]] and [[Ohm's Law Practice]]");
 
         string description = Open()
-            .PlanPublish("ICS3U", 1, new[] { "Unit 4, Day 5" }, includeLinked: true).Describe();
+            .PlanPublish("ICS3U", 1, new[] { "Unit 4, Day 5" }).Describe();
 
         Assert.Contains("1 page would change:\n“Ohm's Law” will become visible.", description);
         Assert.Contains("2 pages are already visible.", description);
@@ -149,7 +149,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true,
              body: "Concept: [[A Page That Does Not Exist]]");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.Equal("“A Page That Does Not Exist” doesn’t match any page in this section.",
             Assert.Single(plan.Problems));
@@ -160,7 +160,7 @@ public class AssistWorkspaceTests : IDisposable
     public void HidingIsPlannedWithTheOppositePolarity()
     {
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false, draft: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, draft: true);
         Assert.StartsWith("ICS3U Section 1: unpublishing.", plan.Describe());
         Assert.Contains("“Unit 2, Day 3” will become hidden.", plan.Describe());
         Assert.True(Assert.Single(plan.Named).WillChange);
@@ -177,7 +177,7 @@ public class AssistWorkspaceTests : IDisposable
 
         var plan = Open().PlanPublish("ICS3U", 1,
             new[] { "Unit 1, Day 2", "Unit 1, Day 3", "Unit 1, Day 4", "Unit 1, Day 5" },
-            includeLinked: false, draft: true);
+            draft: true);
 
         Assert.Equal(4, plan.Named.Count());
         Assert.StartsWith("ICS3U Section 1: unpublishing.\n\n4 pages would change:", plan.Describe());
@@ -193,7 +193,7 @@ public class AssistWorkspaceTests : IDisposable
         // constraint was unsatisfiable.
         Page("ICS3U", "Setup/Safety Contract.md", draftSection1: true);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Safety Contract" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Safety Contract" });
 
         var page = Assert.Single(plan.Named);
         Assert.Equal("publishForSection1", page.FrontmatterKey);
@@ -208,7 +208,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 1, Day 3.md", draft: false, body: "[[Safety Contract]]");
 
         var plan = Open().PlanPublish("ICS3U", 1,
-            new[] { "Unit 1, Day 2", "Unit 1, Day 3" }, includeLinked: true, draft: true);
+            new[] { "Unit 1, Day 2", "Unit 1, Day 3" }, draft: true);
 
         Assert.Single(plan.Linked);
         Assert.Equal(3, plan.Pages.Count);
@@ -227,7 +227,7 @@ public class AssistWorkspaceTests : IDisposable
         string concept = Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Ohm's Law.md");
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: true, publishes: false));
+            publishes: false));
         Assert.Contains("publish: true", File.ReadAllText(page));
         Assert.Contains("publishForSection1: true", File.ReadAllText(concept));
 
@@ -256,7 +256,7 @@ public class AssistWorkspaceTests : IDisposable
         string page = Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", "Unit 1, Day 2.md");
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: false, publishes: false));
+            publishes: false));
         File.AppendAllText(page, "\nA sentence the teacher typed afterwards.\n");
 
         var result = history.Undo();
@@ -277,9 +277,9 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 1, Day 2.md", draft: true);
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" },
-            includeLinked: false, publishes: false));
+            publishes: false));
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: false, publishes: false));
+            publishes: false));
         Assert.Equal(2, history.Entries.Count);
 
         history.Undo();
@@ -313,7 +313,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 1, Day 2.md", draft: false);
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: false, publishes: false));
+            publishes: false));
 
         Assert.Empty(history.Entries);
     }
@@ -335,7 +335,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Just Mine.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: true, draft: true);
+            draft: true);
 
         Assert.DoesNotContain(plan.Pages, p => p.Title == "Safety Contract");
         Assert.Contains(plan.Pages, p => p.Title == "Just Mine");
@@ -355,7 +355,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Setup/Shared Only With Hidden.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: true, draft: true);
+            draft: true);
 
         Assert.Contains(plan.Pages, p => p.Title == "Shared Only With Hidden");
     }
@@ -370,7 +370,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Shared.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1,
-            new[] { "Unit 1, Day 1", "Unit 1, Day 2" }, includeLinked: true, draft: true);
+            new[] { "Unit 1, Day 1", "Unit 1, Day 2" }, draft: true);
 
         Assert.Contains(plan.Pages, p => p.Title == "Shared");
     }
@@ -383,7 +383,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Ontario Curriculum/B2.1.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: true, draft: true);
+            draft: true);
 
         Assert.DoesNotContain(plan.Pages, p => p.Title == "B2.1");
         Assert.Contains(plan.Problems, p => p.Contains("the curriculum"));
@@ -401,7 +401,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Curriculum/E2.6.md", draftSection1: true);
         Page("ICS3U", "Curriculum/E2.2.md", draftSection1: true);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.Contains(plan.Pages, p => p.Title == "E2.6" && !p.Draft);
         Assert.Contains(plan.Pages, p => p.Title == "E2.2" && !p.Draft);
@@ -418,7 +418,7 @@ public class AssistWorkspaceTests : IDisposable
               "draftSection1: false\ncreatedSection1: 2026-01-05T07:00:00.000-0400");
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true, body: "Concept: [[Recursion]]");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.DoesNotContain(plan.Pages, p => p.Title == "E2.6");
         Assert.DoesNotContain(plan.InheritedDates, d => d.Title == "E2.6");
@@ -432,7 +432,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Recursion.md", draftSection1: true, body: "See [[E2.6]].");
         Page("ICS3U", "Curriculum/E2.6.md", draftSection1: true);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.Equal(new DateOnly(2026, 10, 5),
             Assert.Single(plan.InheritedDates, d => d.Title == "E2.6").New);
@@ -448,7 +448,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Curriculum/E2.6.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" },
-            includeLinked: true, draft: true);
+            draft: true);
 
         Assert.Contains(plan.Pages, p => p.Title == "Recursion");
         Assert.DoesNotContain(plan.Pages, p => p.Title == "E2.6");
@@ -465,7 +465,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Recursion.md", draftSection1: true, body: "See [[Unit 2, Day 9]].");
         Page("ICS3U", "section1/All Classes/Unit 2, Day 9.md", draft: true);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
         Assert.DoesNotContain(plan.Pages, p => p.Title == "Unit 2, Day 1");   // one hop
         Assert.DoesNotContain(plan.Pages, p => p.Title == "Unit 2, Day 9");   // two hops
@@ -523,11 +523,11 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
 
         // Publishing the FIRST class dates it to that class.
-        var first = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true);
+        var first = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
         Assert.Equal(new DateOnly(2026, 10, 5), Assert.Single(first.InheritedDates).New);
 
         // Publishing the SECOND leaves it on the first class's date.
-        var second = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" }, includeLinked: true);
+        var second = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" });
         Assert.Equal(new DateOnly(2026, 10, 5), Assert.Single(second.InheritedDates).New);
     }
 
@@ -543,9 +543,9 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
 
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" },
-            includeLinked: true, publishes: false));
+            publishes: false));
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" },
-            includeLinked: true, publishes: false));
+            publishes: false));
 
         string concept = File.ReadAllText(
             Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Recursion.md"));
@@ -564,7 +564,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Recursion.md", draftSection1: true);   // no date at all
         Index("ICS3U", 1, "", "2026-10-01");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 4" });
 
         var dated = Assert.Single(plan.InheritedDates);
         Assert.Equal("Recursion", dated.Title);
@@ -584,7 +584,7 @@ public class AssistWorkspaceTests : IDisposable
         Index("ICS3U", 1, "Unit 1, Day 1", "2026-09-08");
 
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: true);
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" });
 
         // Only Mine is used by this class alone, so it takes this class's date.
         Assert.Equal(new DateOnly(2026, 9, 9),
@@ -611,7 +611,7 @@ public class AssistWorkspaceTests : IDisposable
 
         var workspace = Open();
         await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: false, publishes: false));
+            publishes: false));
 
         string index = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "section1", "index.md"));
         Assert.Contains("# Most Recent Class\n![[Unit 1, Day 2]]", index);
@@ -630,7 +630,7 @@ public class AssistWorkspaceTests : IDisposable
         DatedClass("ICS3U", "Unit 1, Day 5", "2026-09-14", draft: false);
         Index("ICS3U", 1, "Unit 1, Day 5", "2026-09-14");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" });
 
         Assert.Equal("Unit 1, Day 5", plan.Index!.ToClass);
         Assert.False(plan.Index.WillChange);
@@ -645,7 +645,7 @@ public class AssistWorkspaceTests : IDisposable
         Index("ICS3U", 1, "Unit 1, Day 2", "2026-09-09");
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: false, draft: true);
+            draft: true);
 
         Assert.Equal("Unit 1, Day 1", plan.Index!.ToClass);
         Assert.Equal(new DateOnly(2026, 9, 8), plan.Index.ToDate);
@@ -658,7 +658,7 @@ public class AssistWorkspaceTests : IDisposable
         File.WriteAllText(EnsurePath("ICS3U", "section1/index.md"),
             "---\ntitle: Section 1\ncreated: 2026-09-08T07:00:00.000-0400\ndraft: false\n---\n");
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: false);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" });
 
         Assert.True(plan.Index!.HeadingMissing);
         Assert.False(plan.Index.WillChange);
@@ -755,8 +755,30 @@ public class AssistWorkspaceTests : IDisposable
 
         var refusal = Assert.Throws<AssistRefusal>(() => workspace.Course("SNC1W"));
 
-        Assert.Equal("This session is working on ICS3U only, so SNC1W can’t be reached from here. " +
-                     "Start again from SNC1W in Plantoir to work on that course.", refusal.Message);
+        Assert.Equal(AssistWording.AskedAboutAnotherCourse("ICS3U", "SNC1W"), refusal.Message);
+    }
+
+    [Fact]
+    public void ALockedSessionNamesTheFoldersSpellingAndDoesNotSendATeacherToACourseThatIsNotHere()
+    {
+        AddCourse("SNC1W", "Science", 1);
+        var workspace = new AssistWorkspace(_folder, _launcher, lockedCourse: "ICS3U");
+
+        Assert.Equal(AssistWording.AskedAboutAnotherCourse("ICS3U", "SNC1W"),
+                     Assert.Throws<AssistRefusal>(() => workspace.Course("snc1w")).Message);
+        Assert.Equal(AssistWording.AskedAboutACourseThatIsNotHere("ICS3U", "ZZZ9Z"),
+                     Assert.Throws<AssistRefusal>(() => workspace.Course(" ZZZ9Z\n")).Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ACallNamingNoCourseSaysSoPlainly(string code)
+    {
+        var refusal = Assert.Throws<AssistRefusal>(() => Open().Course(code));
+        Assert.Equal(AssistWording.NoCourseNamed, refusal.Message);
+        var locked = new AssistWorkspace(_folder, _launcher, lockedCourse: "ICS3U");
+        Assert.Equal(AssistWording.NoCourseNamed, Assert.Throws<AssistRefusal>(() => locked.Course(code)).Message);
     }
 
     [Fact]
@@ -805,7 +827,7 @@ public class AssistWorkspaceTests : IDisposable
         {
             WriteWorkLease("ICS3U", WorkLease.Building, child.Id, child.ProcessName);
             var workspace = Open();
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.Apply(plan)).Result;
 
@@ -833,7 +855,7 @@ public class AssistWorkspaceTests : IDisposable
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
             var workspace = Open();
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var result = workspace.Apply(plan).Result;
 
@@ -858,7 +880,7 @@ public class AssistWorkspaceTests : IDisposable
             var workspace = Open();
 
             Assert.NotEmpty(workspace.Pages(workspace.Course("ICS3U"), 1));
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
             Assert.Single(plan.Changing);
         }
         finally { try { child.Kill(entireProcessTree: true); } catch { } }
@@ -874,11 +896,74 @@ public class AssistWorkspaceTests : IDisposable
         {
             WriteWorkLease("SNC1W", WorkLease.Publishing, child.Id, child.ProcessName);
             var workspace = Open();
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var result = workspace.Apply(plan).Result;
 
             Assert.True(result.Succeeded);
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
+    public void AnotherProgramsPreviewDeclinesTheAssistantsRebuild()
+    {
+        // #289 (mac #156): a --build-only first ends that section's serving
+        // preview, so an assistant's rebuild would take down the page the
+        // teacher is reading. Another program's PREVIEW lease declines a
+        // build — never a write.
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
+            var workspace = Open();
+
+            var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.RebuildPreview("ICS3U", 1)).Result;
+
+            Assert.Equal(AssistWording.CourseIsBusy("ICS3U"), refusal.Message);
+            Assert.Empty(_launcher.Runs);
+            Assert.Empty(Directory.EnumerateFiles(Path.Combine(_folder, "courses", ".internal", "activity"),
+                $"*.{Environment.ProcessId}.lease"));   // its own claim was given back
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
+    public void AWriteGoesAheadWhileAnotherProgramPreviewsAndOnlyItsRebuildIsDeclined()
+    {
+        // The write lands (Markdown never conflicts with a build); the rebuild
+        // after it is declined, and the note where the preview would have been
+        // refreshed says the course is busy.
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
+            var workspace = Open();
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
+
+            var result = workspace.Apply(plan).Result;
+
+            Assert.True(result.Succeeded);
+            Assert.EndsWith(AssistWording.CourseIsBusy("ICS3U"), result.Message);
+            Assert.Empty(_launcher.Runs);
+            Assert.Contains("publish: true",
+                File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U",
+                    "section1", "All Classes", "Unit 2, Day 3.md")));
+        }
+        finally { try { child.Kill(entireProcessTree: true); } catch { } }
+    }
+
+    [Fact]
+    public void AnAssistLeaseNeverDeclinesABuild()
+    {
+        using var child = StartALongRunningChild();
+        try
+        {
+            WriteWorkLease("ICS3U", WorkLease.Assisting, child.Id, child.ProcessName);
+            var result = Open().RebuildPreview("ICS3U", 1).Result;
+            Assert.True(result.Succeeded);
+            Assert.Single(_launcher.Runs);
         }
         finally { try { child.Kill(entireProcessTree: true); } catch { } }
     }
@@ -1024,7 +1109,7 @@ public class AssistWorkspaceTests : IDisposable
             "section1", "All Classes", "Unit 1, Day 2.md"), "See [[How Marks Work]].\n");
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" },
-            includeLinked: true, draft: true);
+            draft: true);
 
         Assert.DoesNotContain(plan.Pages, p => p.Title == "How Marks Work");
         Assert.Contains(plan.Problems, p => p.Contains("left published"));
@@ -1039,7 +1124,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Setup/How Marks Work.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "How Marks Work" },
-            includeLinked: false, draft: true);
+            draft: true);
 
         Assert.Contains(plan.Problems, p => p.Contains("“How Marks Work” is never hidden"));
         Assert.Empty(plan.Pages);
@@ -1053,7 +1138,7 @@ public class AssistWorkspaceTests : IDisposable
         // which is a different refusal and would hide what this is testing.)
         Page("ICS3U", "section1/All Classes/index.md", draft: false);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "index" }, includeLinked: false, draft: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "index" }, draft: true);
 
         Assert.Contains(plan.Problems, p => p.Contains("is never hidden"));
         Assert.Empty(plan.Pages);
@@ -1066,7 +1151,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Setup/How Marks Work.md", draftSection1: true);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "How Marks Work" },
-            includeLinked: false, draft: false);
+            draft: false);
 
         Assert.True(Assert.Single(plan.Named).WillChange);   // publishing it is fine
         Assert.Empty(plan.Problems);
@@ -1084,7 +1169,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Curriculum/E2.6.md", draftSection1: true, body: "Source: [[About These Expectations]].");
         Page("ICS3U", "Curriculum/About These Expectations.md", draftSection1: true);
 
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" });
 
         // Transitive link following publishes all reachable pages so students never hit a dead end
         Assert.Contains(plan.Pages, p => p.Title == "E2.6");
@@ -1104,7 +1189,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "Concepts/Photosynthesis.md", draftSection1: false);
 
         var plan = Open().PlanPublish("ICS3U", 1, new[] { "Photosynthesis" },
-            includeLinked: false, draft: true);
+            draft: true);
 
         var dangling = Assert.Single(plan.Dangling);
         Assert.EndsWith("Unit 1, Day 1.md", dangling.From, StringComparison.Ordinal);
@@ -1114,7 +1199,7 @@ public class AssistWorkspaceTests : IDisposable
     public void AConsistentPlanWarnsAboutNothing()
     {
         Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
-        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, includeLinked: true, draft: true);
+        var plan = Open().PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 2" }, draft: true);
         Assert.Empty(plan.Dangling);
         Assert.DoesNotContain("point at an unpublished page", plan.Describe());
     }
@@ -1235,7 +1320,7 @@ public class AssistWorkspaceTests : IDisposable
         Class("ICS3U", "Unit 1, Day 4", "2026-09-16");
 
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, onOrAfter: new DateOnly(2026, 9, 15));
+            draft: true, onOrAfter: new DateOnly(2026, 9, 15));
 
         Assert.Equal(new[] { "Unit 1, Day 3", "Unit 1, Day 4" },
             plan.Named.Select(p => p.Title));
@@ -1248,7 +1333,7 @@ public class AssistWorkspaceTests : IDisposable
         Class("ICS3U", "Unit 1, Day 2", "2026-09-15");
 
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, before: new DateOnly(2026, 9, 15));
+            draft: true, before: new DateOnly(2026, 9, 15));
 
         Assert.Equal("Unit 1, Day 1", Assert.Single(plan.Named).Title);
     }
@@ -1267,7 +1352,7 @@ public class AssistWorkspaceTests : IDisposable
         Dated("ICS3U", "section1/Key Links.md", "2026-09-08");
 
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, onOrAfter: new DateOnly(2026, 9, 1));
+            draft: true, onOrAfter: new DateOnly(2026, 9, 1));
 
         Assert.Equal("Unit 1, Day 1", Assert.Single(plan.Named).Title);
         Assert.DoesNotContain(plan.Pages, p => p.RelativePath.EndsWith("index.md", StringComparison.Ordinal));
@@ -1281,7 +1366,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Scratch.md", draft: false);   // no date at all
 
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, onOrAfter: new DateOnly(2026, 1, 1));
+            draft: true, onOrAfter: new DateOnly(2026, 1, 1));
 
         Assert.Equal("Unit 1, Day 1", Assert.Single(plan.Named).Title);
     }
@@ -1292,7 +1377,7 @@ public class AssistWorkspaceTests : IDisposable
         Class("ICS3U", "Unit 1, Day 1", "2026-09-08");
 
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, onOrAfter: new DateOnly(2027, 1, 1));
+            draft: true, onOrAfter: new DateOnly(2027, 1, 1));
 
         Assert.Contains("No class in ICS3U Section 1 falls in that date range.", plan.Problems);
         Assert.Contains("No page's visibility would change.", plan.Describe());
@@ -1304,7 +1389,7 @@ public class AssistWorkspaceTests : IDisposable
     {
         Class("ICS3U", "Unit 1, Day 1", "2026-09-08");
         var refusal = Assert.Throws<AssistRefusal>(() => Open().PlanPublish("ICS3U", 1,
-            Array.Empty<string>(), includeLinked: false, draft: true,
+            Array.Empty<string>(), draft: true,
             onOrAfter: new DateOnly(2026, 10, 1), before: new DateOnly(2026, 9, 1)));
         Assert.Equal("No class can be on or after 2026-10-01 and also before 2026-09-01.", refusal.Message);
     }
@@ -1313,7 +1398,7 @@ public class AssistWorkspaceTests : IDisposable
     public void NamingNothingAndGivingNoDatesIsRefused()
     {
         var refusal = Assert.Throws<AssistRefusal>(() => Open().PlanPublish("ICS3U", 1,
-            Array.Empty<string>(), includeLinked: false));
+            Array.Empty<string>()));
         Assert.Equal("No page was named, and no dates were given to choose classes by.", refusal.Message);
     }
 
@@ -1322,7 +1407,7 @@ public class AssistWorkspaceTests : IDisposable
     {
         Class("ICS3U", "Unit 1, Day 2", "2026-09-09");
         var plan = Open().PlanPublish("ICS3U", 1, Array.Empty<string>(),
-            includeLinked: false, draft: true, onOrAfter: new DateOnly(2026, 9, 1));
+            draft: true, onOrAfter: new DateOnly(2026, 9, 1));
         Assert.Contains("“Unit 1, Day 2” will become hidden.", plan.Describe());
     }
 
@@ -1355,7 +1440,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
         var workspace = Open();
 
-        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
         Assert.Equal(new[] { "preview" }, _launcher.Runs.Select(r => r.Launcher));   // publishing: preview only
 
         var result = await workspace.Deploy("ICS3U", 1);
@@ -1366,6 +1451,36 @@ public class AssistWorkspaceTests : IDisposable
         // the contract while porting multi-destination deploy (entry 305).
         Assert.Equal(AssistWording.Deployed("ICS3U", "1"), result.Message);
         Assert.Equal(new[] { "preview", "preview", "deploy" }, _launcher.Runs.Select(r => r.Launcher));
+    }
+
+    /// <summary>
+    /// #391 (mac #378): nobody is at a window to answer a question, so every
+    /// launcher this headless path runs is --non-interactive, and a question
+    /// (exit 3) is named rather than reported as a failed deploy.
+    /// </summary>
+    [Fact]
+    public async Task AWindowlessDeployAndRebuildRefuseAtAQuestion()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var workspace = Open();
+
+        await workspace.Deploy("ICS3U", 1);
+        Assert.All(_launcher.Runs, run => Assert.Contains("--non-interactive", run.Arguments));
+
+        _launcher.Runs.Clear();
+        _launcher.QuestionOn = "deploy";
+        var destinationAsked = await workspace.Deploy("ICS3U", 1);
+        Assert.False(destinationAsked.Succeeded);
+        Assert.Equal(AssistWording.DeployNeedsAnAnswer("ICS3U", "1"), destinationAsked.Message);
+
+        _launcher.QuestionOn = "preview";
+        var buildAsked = await workspace.Deploy("ICS3U", 1);
+        Assert.Equal(AssistWording.DeployNeedsAnAnswer("ICS3U", "1"), buildAsked.Message);
+        Assert.DoesNotContain(_launcher.Runs.Skip(2), run => run.Launcher == "deploy");   // the build leg asked: nothing went out
+
+        var rebuildAsked = await workspace.RebuildPreview("ICS3U", 1);
+        Assert.False(rebuildAsked.Succeeded);
+        Assert.Equal(AssistWording.PreviewBuildNeedsAnAnswer("ICS3U", "1"), rebuildAsked.Message);
     }
 
     [Fact]
@@ -1400,10 +1515,10 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
         var workspace = Open();
 
-        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.Equal(new[] { "preview" }, _launcher.Runs.Select(r => r.Launcher));
-        Assert.Equal(new[] { "ICS3U", "1", "--build-only" }, _launcher.Runs[0].Arguments);
+        Assert.Equal(new[] { "ICS3U", "1", "--build-only", "--non-interactive" }, _launcher.Runs[0].Arguments);   // #391: nobody can answer a question here
     }
 
     [Fact]
@@ -1421,7 +1536,7 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
 
         var result = await workspace.Apply(
-            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false), preview: false);
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }), preview: false);
 
         Assert.True(result.Succeeded);
         Assert.Empty(_launcher.Runs);
@@ -1441,7 +1556,7 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
 
         var result = await workspace.Apply(
-            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
         Assert.Contains(AssistWording.WhereTheOutputIs, result.Message);
@@ -1501,7 +1616,7 @@ public class AssistWorkspaceTests : IDisposable
         var tools = new Plantoir.Mcp.PlantoirTools(workspace);
 
         string first = tools.ExplainPublishing("ICS3U", 1);
-        Assert.Contains("built into your site", first);
+        Assert.Equal(AssistWording.WhatPublishingMeans, first);
 
         string second = tools.ExplainPublishing("ICS3U", 1);
         Assert.Equal(AssistWording.PublishingAlreadyExplained("ICS3U", "1"), second);
@@ -1509,40 +1624,54 @@ public class AssistWorkspaceTests : IDisposable
         Assert.DoesNotContain("Don’t repeat", second);
     }
 
+    /// <summary>
+    /// #157: the first answer is the contract's <c>whatPublishingMeans</c>,
+    /// for every destination — the mac's sentence names none, so the answer
+    /// cannot promise a place the deploy does not go. (This app used to say
+    /// its own three paragraphs, <c>Briefing.Words</c>, naming the destination.)
+    /// </summary>
     [Fact]
-    public void TheBriefingSeparatesPublishingFromDeploying()
+    public void ExplainingPublishingSaysTheContractsSentenceWhereverTheCourseDeploys()
     {
-        string words = Briefing.Words("ICS3U", 1, "Netlify");
+        string directory = Path.Combine(_folder, "courses", "TEJ2O");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "course_config.json"),
+            """
+            {
+              "course_code": "TEJ2O",
+              "course_name": "Technology",
+              "deploy_target": "local_folder",
+              "deploy_folder_path": "C:\\Sites\\tej2o",
+              "num_sections": 1,
+              "section_numbers": [1]
+            }
+            """);
+        var tools = new Plantoir.Mcp.PlantoirTools(Open());
+        Assert.Equal(AssistWording.WhatPublishingMeans, tools.ExplainPublishing("TEJ2O", 1));
+        Assert.Equal(AssistWording.WhatPublishingMeans, tools.ExplainPublishing("ICS3U", 1));
+    }
 
-        // Publishing is explained by WHERE THE PAGE APPEARS — the teacher's own
-        // preview — because that is what it actually does.
-        Assert.Contains("built into your site", words);
-        Assert.Contains("shows up in your preview", words);
-
-        // And never by who may edit it. An earlier wording said unpublished
-        // pages "stay yours to edit", which is true of every page and so
-        // implied, wrongly, that publishing one gives it away.
-        Assert.Contains("stays yours to edit", words);
-        Assert.DoesNotContain("Unpublished pages stay in your folder", words);
-
-        // Deploying is the only thing students ever see, and the briefing must
-        // describe what the assistant ACTUALLY does. It said "I never do it",
-        // which was true until deploy_section went back into the local tool
-        // set — a promise the tools no longer kept, and worse than the jargon
-        // this exists to explain.
-        Assert.Contains("Deploying", words);
-        Assert.Contains("Netlify", words);
-        Assert.DoesNotContain("I never do it", words);
-        Assert.Contains("only if you ask me to", words);
-        Assert.Contains("never deploy without being asked", words);
-        Assert.Contains("Nothing reaches students until you say so", words);
+    /// <summary>#157: an empty working folder is answered with <c>noCoursesYet</c>, which says what to do next.</summary>
+    [Fact]
+    public void ListingCoursesInAnEmptyFolderSaysTheContractsSentence()
+    {
+        string empty = Directory.CreateTempSubdirectory("plantoir-empty").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(empty, "courses"));
+            File.WriteAllText(Path.Combine(empty, "preview.ps1"), "");
+            var tools = new Plantoir.Mcp.PlantoirTools(new AssistWorkspace(empty, new FakeLauncher()));
+            Assert.Equal(AssistWording.NoCoursesYet, tools.ListCourses());
+        }
+        finally { try { Directory.Delete(empty, true); } catch { } }
     }
 
     [Fact]
-    public void TheBriefingNamesWhereThisCourseActuallyDeploys()
+    public void TheDestinationIsNamedRatherThanDescribed()
     {
         // Not "the folder you publish into", which describes rather than names
         // and tells a teacher with two courses going to two places nothing.
+        // (DestinationOf still names what an approval-card plan says.)
         string directory = Path.Combine(_folder, "courses", "TEJ2O");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, "course_config.json"),
@@ -1559,11 +1688,6 @@ public class AssistWorkspaceTests : IDisposable
 
         string toFolder = AssistWorkspace.DestinationOf(Open().Course("TEJ2O"));
         Assert.Equal(@"C:\Sites\tej2o", toFolder);
-        Assert.Contains(@"C:\Sites\tej2o", Briefing.Words("TEJ2O", 1, toFolder));
-
-        // And the other two destinations say their own names.
-        Assert.Contains("Cloudflare Pages", Briefing.Words("ICS3U", 1, "Cloudflare Pages"));
-        Assert.Contains("Netlify", Briefing.Words("ICS3U", 1, "Netlify"));
     }
 
     [Fact]
@@ -1702,7 +1826,7 @@ public class AssistWorkspaceTests : IDisposable
         // undo is a real button rather than advice.
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
         var workspace = Open();
-        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false, publishes: false);
+        var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, publishes: false);
 
         var result = await workspace.Apply(plan);
 
@@ -1718,7 +1842,7 @@ public class AssistWorkspaceTests : IDisposable
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true, body: "Concept: [[Ohm's Law]]");
 
         var workspace = Open();
-        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: true, publishes: false));
+        await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, publishes: false));
 
         string text = File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U", "Concepts", "Ohm's Law.md"));
         Assert.Contains("publishForSection1: true", text);
@@ -1733,7 +1857,7 @@ public class AssistWorkspaceTests : IDisposable
         _launcher.FailOn = "preview";
         var workspace = Open();
 
-        var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+        var result = await workspace.Apply(workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
         Assert.Contains("the preview couldn’t be built", result.Message);
@@ -1753,7 +1877,7 @@ public class AssistWorkspaceTests : IDisposable
         var workspace = Open();
 
         var result = await workspace.Apply(
-            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }, includeLinked: false));
+            workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }));
 
         Assert.False(result.Succeeded);
         Assert.StartsWith("No page needed changing, and the course was backed up", result.Message);
@@ -1845,11 +1969,19 @@ internal sealed class FakeLauncher : ILauncherRunner
     /// <summary>Which launcher, if any, should report failure.</summary>
     public string? FailOn { get; set; }
 
+    /// <summary>
+    /// Which launcher, if any, stops at a question nobody can answer — exit 3
+    /// under --non-interactive (#391).
+    /// </summary>
+    public string? QuestionOn { get; set; }
+
     Task<LaunchOutcome> ILauncherRunner.Run(string launcher, IReadOnlyList<string> arguments,
                                             string workingFolder, IProgress<string>? progress,
                                             CancellationToken cancellation)
     {
         Runs.Add(new Run(launcher, arguments.ToArray()));
+        if (launcher == QuestionOn)
+            return Task.FromResult(new LaunchOutcome(false, "It asked a question.", null, LaunchOutcome.NeedsAnAnswerExitCode));
         return Task.FromResult(launcher == FailOn
             ? new LaunchOutcome(false, "It went wrong.")
             : new LaunchOutcome(true, "Done."));

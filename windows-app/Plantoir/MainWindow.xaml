@@ -38,6 +38,10 @@
                 <MenuFlyoutItem x:Name="NewWindowItem" Text="New Window" Click="NewWindow_Click" KeyboardAcceleratorTextOverride="Ctrl+N" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="RestoreFromArchiveItem" Text="Restore from Archive…" Click="RestoreFromArchive_Click" IsEnabled="False" />
+                <!-- #244: beside Open Working Folder's neighbours, as on the
+                     mac, because it begins by choosing a folder. -->
+                <MenuFlyoutItem x:Name="ImportForReferenceItem" Text="Import Courses for Reference…" Click="ImportForReference_Click"
+                                AutomationProperties.AutomationId="fileImportForReference" />
                 <!-- File, not an Edit menu: on Windows a top-level Edit holds
                      Cut/Copy/Paste, and one holding a single item reads as
                      broken; File already holds a selection-scoped action.
@@ -49,6 +53,8 @@
                 <MenuFlyoutItem x:Name="ReloadCoursesItem" Text="Reload Courses" Click="ReloadCourses_Click" KeyboardAcceleratorTextOverride="Ctrl+Shift+R" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="SettingsItem" Text="Settings…" Click="Settings_Click" KeyboardAcceleratorTextOverride="Ctrl+," />
+                <MenuFlyoutItem x:Name="CheckForUpdatesItem" Click="CheckForUpdates_Click" Visibility="Collapsed"
+                                AutomationProperties.AutomationId="fileCheckForUpdates" />
             </MenuBarItem>
             <!-- Acts on whichever section's preview is currently shown in
                  DetailHost, matching mac's Preview menu; the accelerator

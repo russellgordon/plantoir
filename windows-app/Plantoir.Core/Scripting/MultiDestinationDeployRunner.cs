@@ -196,6 +196,11 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         string workingDirectory,
         bool needsBuild)
     {
+        // Before the first destination, whatever door started this (#241):
+        // a course kept for reference is never deployed. Asked of the file,
+        // not of the copy the caller holds.
+        if (ReferenceCourse.KeptOnDisk(course.DirectoryPath) is { } kept) throw new ReferenceCourse.Refused(kept);
+
         Legs = destinations.Select(d => new Leg(d, _ui)).ToList();
         CurrentLegIndex = 0;
         IsRunning = true;

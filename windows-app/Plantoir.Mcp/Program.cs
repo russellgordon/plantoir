@@ -19,6 +19,9 @@ for (int i = 0; i < args.Length; i++)
     if ((args[i] == "--folder" || args[i] == "-f") && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--folder=", StringComparison.Ordinal)) folder = args[i]["--folder=".Length..];
     else if ((args[i] == "--course" || args[i] == "-c") && i + 1 < args.Length) course = args[++i];
+    // outsideAgents.serverArguments: `--mcp-stdio <folder>`, the shape the
+    // contract gives every door, and the one the Codex door passes (#210).
+    else if (args[i] == "--mcp-stdio" && i + 1 < args.Length) folder = args[++i];
     else if (args[i].StartsWith("--course=", StringComparison.Ordinal)) course = args[i]["--course=".Length..];
 }
 
@@ -45,7 +48,11 @@ try
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
-    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory());
+    workspace = new AssistWorkspace(folder, new LauncherRunner(), course, new UndoHistory())
+    {
+        ServesTheLocalWindow = Environment.GetEnvironmentVariable(AssistWorkspace.LocalWindowVariable) == "1",
+        RecordsHeldBackups = true,
+    };
 }
 catch (Exception error)
 {
@@ -61,7 +68,14 @@ IDisposable? lease = workspace.LockedCourse is { } locked
     ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, locked,
         Plantoir.Core.Assist.WorkLease.Assisting)
     : null;
-AppDomain.CurrentDomain.ProcessExit += (_, _) => lease?.Dispose();
+// Its own work stops BEFORE any lease goes (#289): a build this server started
+// must not keep writing the section's folder after the course reads as free.
+AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+{
+    LauncherRunner.StopEverythingItStarted();
+    Plantoir.Core.Models.HeldBackups.ForgetRecords(workspace.FolderPath);
+    lease?.Dispose();
+};
 
 var builder = Host.CreateApplicationBuilder();
 
@@ -71,10 +85,30 @@ builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogL
 
 builder.Services.AddSingleton(workspace);
 builder.Services.AddMcpServer(options =>
-        options.ServerInfo = new Implementation { Name = "plantoir", Version = "0.1.0" })
+    {
+        options.ServerInfo = new Implementation { Name = "plantoir", Version = "0.1.0" };
+        // The procedure the tool descriptions used to carry (#352): read by an
+        // outside assistant, never by the local router.
+        options.ServerInstructions = McpInstructions.Text;
+    })
     .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+    .WithToolsFromAssembly()
+    // Nothing writes to a course kept for reference (#241), asked BEFORE the
+    // tool is dispatched: ReferenceWriteGate.
+    .WithRequestFilters(filters => filters.AddCallToolFilter(next => async (context, cancellation) =>
+    {
+        var arguments = context.Params?.Arguments is { } given
+            ? new Dictionary<string, System.Text.Json.JsonElement>(given) : null;
+        if (context.Params?.Name is { } tool && ReferenceWriteGate.Refusal(tool, arguments, workspace) is { } refusal)
+            return new CallToolResult { Content = [new TextContentBlock { Text = refusal }] };
+        return await next(context, cancellation);
+    }));
 
 try { await builder.Build().RunAsync(); }
-finally { lease?.Dispose(); }
+finally
+{
+    LauncherRunner.StopEverythingItStarted();
+    Plantoir.Core.Models.HeldBackups.ForgetRecords(workspace.FolderPath);
+    lease?.Dispose();
+}
 return 0;

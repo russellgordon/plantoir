@@ -76,9 +76,9 @@ A representative example:
 | `curriculum_folders` | string[] or absent | setup (the manifest's one folder, for a course with nothing recorded), either app's "Curriculum folders" checkboxes, and a rename in Course Settings | build, both apps | The course's curriculum folders in its own order (#128). Each one holding an expectation page gets a coverage map; the FIRST is the primary, whose map keeps the title `Curriculum Coverage`, and every other is `<Folder> Coverage`. Read unioned with the legacy `curriculum_folder` (the list first). ABSENT means none declared: the build maps the one folder the old scan finds (alphabetically first top-level folder mentioning `curriculum` that holds a page) — not additive. A setup re-run keeps a saved list exactly. Contract: `file-formats.json` → `courseConfigKeys`, `shared-rules.json` → `specialNames.curriculumFoldersResolution`; the deep dive is `05-build-pipeline.md` → "The curriculum coverage maps". |
 | `curriculum_folder` | string or null | LEGACY in meaning, still WRITTEN: whenever `curriculum_folders` is written (setup, either app's checkboxes, a rename) it names the list's FIRST (primary) folder | build, both apps | One curriculum folder's name. Still read forever, unioned after `curriculum_folders`, so a folder an older Plantoir wrote down still counts. Written beside the list for the other direction (Russell's ruling on the #128 review): an older Plantoir on a second Mac reads only this key, and without it a primary folder renamed to a name without "curriculum" would leave that Mac publishing no map. A course with only this key keeps it as it is; setup no longer writes it from the manifest over a name a rename had recorded. |
 | `class_folder` | string or null | setup, and a rename in Course Settings | build, both apps | Which per-section folder holds this course's class pages. **Absent falls back to the GUESS** — the first per-section folder whose name contains `class`, else the first, else the literal `All Classes` — which is what every course made before 2026-09-01 relies on. The key exists because the guess quietly decided what a teacher was allowed to CALL the folder: somebody whose vocabulary is "Thread 2, Day 3" would sensibly call it `All Days`, and the guess would then point the next-class button and the coverage map at whatever folder happened to be first. **A rename writes this key even on a course that never had one**, because a rename is the one moment Plantoir witnesses the change. A stale name loses to the guess; a name differing only in case yields the folder LIST's spelling, because file paths are built from the answer. **A club (#267) writes the name the teacher chose — `All Meetings` by default — and `setup_course.py` keeps a RECORDED name on a re-run** rather than rebuilding it from the guess, which reads `["Resources", "All Meetings"]` as `Resources` (measured). |
-| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — mac; Windows: [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. **Under `class_page_scheme: "numbered"` it is the whole word of a ONE-number name** — a club writes `Week`, so its pages are `Week 3` — reused rather than joined by a second word key, so the key's name under-describes it. A numbered course's word is not renamed afterwards: Course Settings disables Rename… for it. |
-| `class_page_scheme` | string (`unit_day` or `numbered`) | setup (a club only, #267) | build, both apps | The SHAPE of a class page's name: `unit_day` is `<unit_word> 2, Day 3`; `numbered` is `<unit_word> 3`, one number counting meetings. **Absent, empty and unknown all mean `unit_day`**, so a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages — degraded, never corrupting) and nothing is rewritten. Written by the wizard for a club only; every other course's file is byte-identical to before. **Not switchable after creation**, and an existing course — Russell's `CODING` included — can never become numbered from the app. In a numbered course there are NO units: "publish Week 1" acts on one page, "start a new unit" and "add days to a unit" are refused, and make-room keeps the section's date gaps ([10](10-local-ai-assistant.md) → "A numbered course has no units"). |
-| `front_page_heading` | string | setup (a club only, #267) | setup only | The heading a new numbered course's section front pages are created with, above the embed of the newest page: a club writes `Most Recent Meeting`. **Absent means nothing is recorded**: the course's front pages keep whatever heading they have (`Most Recent Class` for a course set up before #267, or whatever it was edited to — CODING's reads `Most Recent Meeting`), and Course Settings shows no row for it (#376) rather than naming a default. Read only when a course is created; the assistant's repointing finds the embed by the class page it names, never by the heading, so it never reads or writes this. Not switchable afterwards; Course Settings shows it locked, when recorded (#376). |
+| `unit_word` | string | setup (new courses); Course Settings → Rename… (a course in use — both apps; Windows since 2026-09-30, [#158](https://github.com/russellgordon/plantoir/issues/158)); Import Courses for Reference… for a class kept a website folder per class (#256, only when its class pages agree on one word) | build, both apps | What this course calls the first half of a class page's name — `Unit 2, Day 3`, or `Module 2, Day 3`. **Absent means `Unit`**, and so does an empty string; unlike `graded_folders`, the two are not distinguished, because there is no sensible reading of "the teacher cleared the word". Chosen when the course is made, where the ready-made pages are written in that word as they are poured; changed later from Course Settings → Rename…, which renames every class page and follows the links before writing the key (see [09-mac-app.md](09-mac-app.md) → "Renaming a course's word for a unit"). `Day` is deliberately fixed. **Under `class_page_scheme: "numbered"` it is the whole word of a ONE-number name** — a club writes `Week`, so its pages are `Week 3` — reused rather than joined by a second word key, so the key's name under-describes it. A numbered course's word is not renamed afterwards: Course Settings disables Rename… for it. |
+| `class_page_scheme` | string (`unit_day` or `numbered`) | setup (a club only, #267; the Windows wizard since 2026-10-01, #274) | build, both apps | The SHAPE of a class page's name: `unit_day` is `<unit_word> 2, Day 3`; `numbered` is `<unit_word> 3`, one number counting meetings. **Absent, empty and unknown all mean `unit_day`**, so a scheme a newer app wrote, opened by an older one, reads as today's shape (it then sees no class pages — degraded, never corrupting) and nothing is rewritten. Written by the wizard for a club only; every other course's file is byte-identical to before. **Not switchable after creation**, and an existing course — Russell's `CODING` included — can never become numbered from the app. In a numbered course there are NO units: "publish Week 1" acts on one page, "start a new unit" and "add days to a unit" are refused, and make-room keeps the section's date gaps ([10](10-local-ai-assistant.md) → "A numbered course has no units"). |
+| `front_page_heading` | string | setup (a club only, #267) | setup only | The heading a new numbered course's section front pages are created with, above the embed of the newest page: a club writes `Most Recent Meeting`. **Absent means nothing is recorded**: the course's front pages keep whatever heading they have (`Most Recent Class` for a course set up before #267, or whatever it was edited to — CODING's reads `Most Recent Meeting`), and Course Settings shows no row for it (#376) rather than naming a default. Read only when a course is created; the assistant's repointing finds the embed by the class page it names, never by the heading, so it never reads or writes this — with ONE Windows exception: where no line on the front page names a class, Windows' pointer INSERTS one on the line after the course's heading, and this key (absent → `Most Recent Class`) is how it knows which heading that is (`class-planning.json` → `sectionIndexPointer.whenNoClassIsTransclusion`, #274). Not switchable afterwards; Course Settings shows it locked, when recorded (#376). |
 | `class_noun` | string (`class` or `meeting`) | setup (a club only, #267) | both apps | What the assistant calls one page when it talks to the teacher: a club writes `meeting`. **Absent and unknown mean `class`.** A closed pair, not free text, because the sentences carry articles and plurals. The build never reads it, and it moves no byte of what the assistant's model is shown. Not switchable afterwards; Course Settings shows it locked, when recorded (#376). |
 | `excluded_items` | object with `shared` and/or `per_section` arrays | Course Settings | build | Folder and file names the teacher removed in Settings, kept out of previews and deploys. **Authoritative at build time**: preflight drops an excluded name it finds back in the folder lists rather than re-adding it, and never un-hides it. Keyed by scope because the same bare name can legitimately exist in both, and the two are found by different scans. An exclusion does NOT expire when the folder is deleted and re-created — discovery is name-based, so the build cannot tell "the folder I excluded" from "the new folder I just made". **Matched EXACTLY, case included, at every consumer** — the drop pass, the discovery filters, the index.md note, the give-up path of preflight's compare-and-swap (`_dropping_excluded_items`, which lower-cased both sides until [#152](https://github.com/russellgordon/plantoir/issues/152)) and both apps' `isExcluded` and Marks walk (`contracts/shared-rules.json` → `excludedItems.matching`). So an exclusion is escaped by making the folder again in a different capitalisation (`Old Tests` removed, `old tests` made later, discovered and published): accepted and recorded there, not changed. A removal or an add-back is written on the trail (`item excluded` / `item re-included`) on the CLICK, saved or not, and a Revert that takes exclusions back writes `exclusions reverted` with how many (`excludedItems.recordedOnClick`; Russell's decision of 2026-09-06). |
 | `graded_folders` | array of strings | setup (the command line), each app's new-course wizard for every course it creates (a course taking ready-made pages included since [#292](https://github.com/russellgordon/plantoir/issues/292) — the payload manifest's own pool, `gradedFolders.newCourse`; Windows owes it), and the Marks checklist in Course Settings | build, both apps | The folders whose work counts for marks, which is what makes an expectation "assessed" on the coverage map. **Absent is not empty.** Absent means the teacher has never been asked, so the historical rule applies (any folder whose name contains `task`) and an existing course keeps exactly the marks it had; `[]` means they were asked and cleared it. Seeding existing courses would not have been safe — the mathematics skeleton ships `Thinking Tasks`, which the old rule counted and a pool of `["Tasks"]` does not. **The first tick FREEZES the pool**: the moment a teacher touches the checklist, the key is written with everything the course was already counting, and the historical rule stops applying to it. **A REMOVAL does not** — taking a folder out of the course in Settings is not an answer to the marks question, so a never-asked course is left with the key ABSENT rather than frozen to the historical answer minus that folder (which, on the ordinary course whose only marked folder is `Tasks`, would be `[]`: nothing counting for marks, permanently, from a gesture the teacher was told would do one narrow thing). The rule, its second exception and what it deliberately leaves unpinned are `gradedFolders.removingAFolder`, seven cases, run on both platforms (six since 2026-09-18, the seventh since 2026-09-19). The second exception — a name the checklist STILL OFFERS keeps its place — is asked CASE-INSENSITIVELY, the way the build asks it, since 2026-09-19 ([#172](https://github.com/russellgordon/plantoir/issues/172), raised from Windows): the checklist returns names as they are spelled on disk, so an exact test drops a pooled `Tasks` when `Portfolios/tasks` survives while the build goes on counting that folder. What remains unpinned is the DROP's own comparison, which the mac makes exactly and Windows with `OrdinalIgnoreCase`. **A re-run of `setup.sh` / `setup.ps1` writes a saved pool back exactly as it was** (a saved `null` as `[]`, an absent key left absent, and only entries that cannot name a folder — null, blank, non-string, an exact repeat — removed) — it used to re-check the pool against the top-level folder lists and emptied every pool naming a folder found inside another; `gradedFolders.rerunningSetup`, eleven cases ([#192](https://github.com/russellgordon/plantoir/issues/192)). Which is why what the checklist OFFERS matters as much as what it writes — the build matches a folder at any depth, so the apps offer the two folder lists plus every folder found inside the course, four levels deep. That rule, its skip list and what it deliberately leaves out are in [`contracts/shared-rules.json`](../contracts/shared-rules.json) → `gradedFolders.choices`, and both apps run its 14 cases. Two parts of it are easy to leave out and cost a teacher their marks: a folder named in `excluded_items` is NOT offered (it is still on disk, so the walk hands back a folder they just removed unless it is told not to), and each folder's children are sorted ORDINALLY and case-insensitively — see [`04-course-setup.md`](04-course-setup.md) for the measured table of which comparison, because the natural call on each platform is a different one. |
@@ -97,6 +97,8 @@ A representative example:
 | `additional_deploy_targets` | array of `{type, path}` objects | app (Publishing, "Also publish to, for redundancy") | the app — currently config/UI only; nothing yet triggers a second deploy from it (see below) | Extra destinations this course ALSO publishes to, beyond `deploy_target` (the primary), for redundancy against one host having a bad day. `type` uses the same spellings as `deploy_target`; `path` is only present for a `local_folder` entry. **Absent entirely** (never written as `[]`) for the overwhelming majority of courses that have not opted in, so an untouched course writes the exact same file it always has. At most one entry per known type, and never a type that is already the primary — `CourseConfiguration.deployTarget`'s own setter enforces this, dropping a type from this list the moment it becomes the primary. |
 
 ### Reference courses: kept, never deployed
+
+> **Windows reads `kept_for_reference` strictly too** — a JSON `true` and nothing else (Newtonsoft gives an Integer for `1` and a String for `"true"`) — and since bundle 6b a settings file starting with a byte-order mark is read rather than skipped.
 
 A reference course is last year's course — or a course full of example content
 — sitting in this year's sidebar so the teacher can read it, and which Plantoir
@@ -400,9 +402,9 @@ right:
 * **Anything REPORTING to a teacher collapses it to VISIBLE.** The section
   graph (`AssistSectionGraph`; `AssistWorkspace.Plan` on Windows), Windows'
   scheduled deploy's "classes students cannot see yet"
-  (`ScheduledDeploy.UnpublishedClassesIn` — so a page whose flag cannot be
-  read is NOT listed there as one students cannot see; the mac has had no
-  such list since #396, and Windows' #396 issue removes theirs), the index pointer, the dangling-link check,
+  (`ScheduledDeploy.UnpublishedClassesIn`, until it went with #400 on
+  2026-09-30 — neither app has such a list since #396; what is left is the
+  classes a caller NAMES, each said as published or not), the index pointer, the dangling-link check,
   the "N linked pages stay visible" sweep (`AssistWorkspace.cs:692`), and the
   re-date planner. (No VIEW reads a page's flag — a sentence here said "the
   sidebar" until 2026-09-18 and there is no such reader; the sidebar lists
@@ -548,19 +550,31 @@ separately from the reader:
   count — the old arithmetic, pointed at the lenient finder, left `…-0400e`
   on the new date and made a Windows-line-ending page lose its frontmatter
   entirely. The cases are `contracts/course-management.json` →
-  `sectionNumbers.addingKeysToAPage`; Windows' `FrontmatterLines` is still
-  strict and owes the same change (the `windows` issue from #175).
-  `CourseRestorer`'s
-  is strict on Windows and, since the mac's `PageFrontmatter.block` was
-  loosened for the reason above, lenient on the mac — so a restore reaches
+  `sectionNumbers.addingKeysToAPage`; Windows' `SectionAdder.FrontmatterLines`
+  and `ExtendFrontmatter` made the same change on 2026-09-30 (#282, bundle 2:
+  shared finder, splice by line index, each new line taking the ending of the
+  line it follows, inserted after the last key's whole value), and
+  `SectionAdderContractTests` runs the eight cases as bytes. `CourseRestorer`'s
+  finder was strict on Windows and, since the mac's `PageFrontmatter.block` was
+  loosened for the reason above, lenient on the mac — so a restore reached
   different pages on the two platforms, which is
   [issue #177](https://github.com/russellgordon/plantoir/issues/177). Russell
-  decided it on 2026-09-19: the restore uses the SHARED finder, on both
-  platforms. The mac's has since #140; since #182 (2026-09-25) it also carries
-  and drops each key WITH the lines it owns (below), and Windows owes both in
-  one change (the `windows` issue from #182). The trap to avoid is reading
-  "one fence finder" and making the MAC strict, which puts the second-block bug
-  straight back.
+  decided it on 2026-09-19 (and again 2026-09-25): the restore uses the SHARED
+  finder, on both platforms. The mac's has since #140; since #182 (2026-09-25)
+  it also carries and drops each key WITH the lines it owns (below). Windows
+  took both on 2026-09-30 (#177/#308, bundle 2): `CourseRestorer
+  .FrontmatterBounds` is gone, `SettingPerSectionKeys` walks
+  `PageVisibilityReader.LinesOwnedByKey`, and `SectionRestoreTests` runs
+  `backups.restoringOneSectionsKeys`. Blank lines before the opening fence
+  are DROPPED by both restores: the mac's `settingPerSectionKeys` starts its
+  rebuilt page at the fence, and Windows' does the same since 2026-10-01
+  (parity bundle 10). Windows had kept them from bundle 2 and asked the mac
+  whether to keep them too; Russell chose one behaviour, the mac's, and the
+  ask was withdrawn. Harmless to the build either way — the case is
+  `restoringOneSectionsKeys` → "a blank line before the opening fence is
+  dropped from the restored page". The trap to avoid
+  is reading "one fence finder" and making the MAC strict, which puts the
+  second-block bug straight back.
 
 * **A writer must take a value's CONTINUATION lines with the key.**
   Replacing a key's line alone orphans the indented line below it onto the new
@@ -699,8 +713,9 @@ separately from the reader:
   measured on a real page; they are named here rather than coded for.
   [Issue #188](https://github.com/russellgordon/plantoir/issues/188).
 
-  **Windows fixed all of this — everything above except the indented-dashes
-  shape, which it owes with #188 — on 2026-09-19** — `PageVisibilityReader
+  **Windows fixed all of this on 2026-09-19 — and the indented-dashes shape
+  on 2026-09-30 (#308, bundle 2: `IsFence` for the close, `IsOpeningFence`
+  for the open)** — `PageVisibilityReader
   .ReadScalar` for the reading, `PageFrontmatter.ContinuationLines` for the
   sweep, used by both of `SetDraft`'s branches; tests in
   `PageVisibilityReadingTests` →
@@ -864,9 +879,92 @@ separately from the reader:
     `atBuildTime.writingCases`.
     [Issue #186](https://github.com/russellgordon/plantoir/issues/186).
 
-  All three were pre-existing and all three are shared with Windows (which
-  inserts at `open + 1` too, and owes #182 and #186 with #188 — one `windows`
-  issue). The first two are not reached by the fixed reader or writer at all
+  All three were pre-existing and all three were shared with Windows, which
+  took #182, #186 and #188 together on 2026-09-30 (#308, bundle 2):
+  `PageVisibilityReader.PlaceForANewTopLevelKey` / `NamesATopLevelKey`, and
+  `SetDraft` / `SetCreated` answer `FrontmatterWriteOutcome.NoRoomForAKey`.
+  **Windows' callers have NAMED the declined pages since 2026-10-01** (#308,
+  bundle 9; the four `pagesWhose…` / `pageWhose…` keys left the ledger the
+  same day): `PlanPublish` asks the real `SetDraft` at plan time and moves a
+  declined page out of `Changes` into `PublishPlan.CannotBeAddedTo`, so the
+  card names it and never says "no page's visibility would change" or
+  "already hidden" about it; the publish/hide reply, a whole unit (plan and
+  apply), a re-date (`PagesWhoseNewDatesCouldNotBeSet`, and the hide an
+  overflowing class could not take) and a make-room (by the class's NEW name)
+  name them too, a page declined only at the WRITE (edited since the plan)
+  included; the undo label leaves plan-time declines out; and the trail
+  records `page settings left as they were` with the act ("publishing
+  pages", "hiding pages", "re-dating classes", "making room for a class")
+  and the count. Pinned by `DeclinedPagesAreNamedTests`. The make-room
+  reply's "moved N onto later class days" counts only classes actually
+  written, as the mac's `ClassInsertionPlanner` does (a declined class, one
+  already on its date and a failed write are not "moved"; review F1).
+  **Since 2026-10-01 every count in that reply is of what was WRITTEN**
+  (#422, bundle 10): "Renamed N" counts renames that happened (a rename
+  whose new name is taken — a page the teacher made after the plan was
+  shown — is not one, and the chain of renames below it fails with it,
+  which is the "highest day first" rule refusing to land on a name in use);
+  links are rewritten only for renames that happened and "updated N links"
+  counts them on pages that were SAVED; a class whose rename did not happen
+  is re-dated at its OLD path, never under the new name (which may be the
+  teacher's own page); a blank class whose name is still taken is not
+  written and not counted in "Made room for N" (the sentence is left out
+  when none was); and every page a write did not finish — a rename, a
+  date, a page of links, a blank class — is NAMED with Windows' own
+  sentence `AssistWording.PagesAChangeCouldNotFinish` (no contract key
+  yet; proposed to the mac as `pagesAChangeCouldNotFinish`), and the trail
+  records `making room did not finish every page` with counts by kind
+  (`appliesOn: ["windows"]` until the mac records it). The bare `catch { }`
+  that swallowed a failed date write is gone. And `PlanPublish` now leaves a
+  declined page out of the pages the front page and dates are worked out
+  from by PATH (`AssistWorkspace.WithoutDeclined`), not by file name, so a
+  second `index.md` is not taken out with it (fix review note 3). The test
+  pins `WithoutDeclined` itself (`ADeclinedPageIsMatchedByPathNotByItsFileName`)
+  because, when #422 was written, the planner kept one page per file name
+  upstream and the collision was not reachable end to end. **That changed
+  in the same bundle:** keying the WHOLE planner on paths — first set aside
+  here as larger than #422 asked — was taken up by the bundle 10 review
+  (R5), because once #420 made every publish follow links, a file-name key
+  let publishing one of two same-named pages follow the OTHER one's links
+  (more published than the plan showed). `PlanPublish` now keys pages,
+  `chosen`, `linksFrom`, `referrers`, the walks and Key Links by path, asks
+  about a name that fits two pages, and names same-named pages with their
+  folder in the contract's `pageNameInFolder` shape; measured by
+  `PublishFollowsLinksTests.TwoPagesWithOneNameEachBringOnlyTheirOwnLinks`
+  and `.ThePlanSaysWhichOfTwoSameNamedPagesGoes`, both red against the old
+  planner (it planned the other index page's "Answer Key"). Doc 10 → "And
+  the walk is keyed by PATH". Left as the product question #422 records
+  (Russell, 2026-10-01: leave it): a declined class's linked material is
+  still published by the walk and keeps its own date — wider now that
+  every publish follows links.
+  **Getting a section ready for the start of the year and the links
+  checklist's Publish name them too since 2026-10-01** (#421, bundle 10 —
+  the two callers bundle 9 found still dropping the outcome). Start of year
+  (`AssistWorkspace.StartOfYear.cs`) used to discard the `DraftEdit`, so the
+  reply could say a class went into draft while students could still see it
+  — the damaging direction; now a declined page is NOT saved (not even the
+  half of a two-key write that succeeded: `publish: false` beside a stray
+  `publishForSection<N>: true` still leaves the page up), is named with
+  `pagesWhoseSettingsCannotBeAddedTo` after the `done` sentence (alone, when
+  nothing at all went into draft), and the "Put into draft: N" count and the
+  trail line's class/page counts are what WAS put into draft; the declined
+  page is one of the line's "N left as they were", as
+  `activityTrail.mustRecord` says, never a second line. The links checklist
+  (`PublishLinksChecklist`) used to count a declined ticked page as "left
+  hidden" and remember it as if the teacher had left it; now it collects the
+  ticked classes' plan-time `CannotBeAddedTo`, any write-time decline of a
+  class's page or a ticked row (a declined row gets no date either), keeps
+  them out of `Written`, the remembered-unticked list and the
+  left-with-their-page list, names them at the end of the reply
+  (`LinksChecklistPublished.Reply`, which the dialog now calls), and records
+  `page settings left as they were` with the act "publishing pages that
+  links lead to". Rejected: naming them on the start-of-year PLAN (the
+  contract's `startOfYear` says nothing of declines, and probing the writer
+  for every page at plan time changes no code the plan hashes — left for the
+  mac to decide, not invented here). Pinned by
+  `DeclinedPagesAreNamedTests.StartOfYearNamesAClassItCouldNotPutIntoDraft`
+  and `.TheLinksChecklistNamesAPageItCouldNotPublish`.
+  The first two are not reached by the fixed reader or writer at all
   — neither calls `setting`. The rule above is now kept by every one of them.
 
   **The same rule for the DATE and TITLE writers (#199, 2026-09-25, mac).**
@@ -920,9 +1018,12 @@ separately from the reader:
   date either, so nothing a teacher could see is lost); duplicate keys — the writer and `rawValue` take the
   FIRST `created:`, PyYAML keeps the LAST (measured) — is a separate
   disagreement; and the time of a folded or below-key date is not read, so the
-  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows'
-  `SetTitle`/`SetCreated` still replace one line (the `windows` issue from
-  #199).
+  rewrite uses the fallback `T07:00:00.000-0400`, which is harmless. Windows
+  matched it on 2026-09-30 (#284, bundle 2): one `PageFrontmatter.ReplaceKeyLine`
+  for `SetTitle`, `SetCreated` and `SectionAdder`'s copy and scaffold, with
+  `LinesUntilOpenValueCloses` (a port of the mac's `OpenValueScanner`) and
+  `ScalarText`; `FileFormatContractTests.TheDateAndTitleWritingCasesAreFollowed`
+  runs all 16 cases as bytes.
 
 * **A `#` inside quotes is not a comment**, wherever a writer looks for one.
   Windows' `ReplaceValue` split the line at the first `#` on it, so hiding a

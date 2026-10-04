@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Plantoir.Core.Models;
 
@@ -68,7 +69,9 @@ public static class DeployCommand
         if (destination.Type == "local_folder")
         {
             args.Add("--to-folder");
-            args.Add(destination.Path);
+            // TRIMMED, the way DeployFolderProblem checked it (#304): a
+            // trailing space names another folder.
+            args.Add(destination.Path.Trim());
             return args;
         }
 
@@ -107,6 +110,44 @@ public static class DeployCommand
         if (destination.Type == "cloudflare_pages")
             return "Cloudflare Pages";
         return "Netlify";
+    }
+
+    /// <summary>
+    /// A destination by TYPE, in the words an approval card and list_courses
+    /// use: "Netlify", "Cloudflare Pages", "a folder on this computer" — never a
+    /// path, which is machinery on those surfaces and blank for a folder not
+    /// chosen yet (<c>scheduledDeployRefusals.planOpening.cardNaming</c>).
+    /// </summary>
+    public static string CardWords(CourseConfiguration.DeployDestination destination) => destination.Type switch
+    {
+        "local_folder" => "a folder on this computer",
+        "cloudflare_pages" => "Cloudflare Pages",
+        _ => "Netlify",
+    };
+
+    /// <summary>
+    /// Every destination a course deploys to, by TYPE, primary first then each
+    /// additional in the order saved, joined "A", "A and B", "A, B and C" (#400,
+    /// #404). Built from <see cref="CourseConfiguration.AllDeployDestinations"/>,
+    /// the list every deploy walks.
+    /// </summary>
+    public static string EveryDestinationByType(CourseConfiguration configuration) =>
+        Plantoir.Core.Scripting.MultiDestinationDeployRunner.JoinedWithAnd(
+            configuration.AllDeployDestinations.Select(CardWords).ToList());
+
+    /// <summary>
+    /// <see cref="EveryDestinationByType(CourseConfiguration)"/>, read from the
+    /// course's settings ON DISK at the moment of the call (#344 / mac #322).
+    /// The assistant window's own copy of a course is a snapshot taken when it
+    /// opened; a destination changed in Course Settings afterwards left the
+    /// approval card naming the OLD one. Falls back to <paramref name="opened"/>
+    /// only when the course can no longer be found.
+    /// </summary>
+    public static string EveryDestinationByTypeAtTheCall(string workspacePath, string courseCode, CourseConfiguration opened)
+    {
+        var now = Workspace.DiscoverCourses(workspacePath)
+            .FirstOrDefault(course => string.Equals(course.Code, courseCode, StringComparison.OrdinalIgnoreCase));
+        return EveryDestinationByType(now?.Configuration ?? opened);
     }
 
     /// <summary>Where this course's PRIMARY destination deploys to, in the teacher's words.</summary>

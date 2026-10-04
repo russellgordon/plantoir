@@ -134,6 +134,37 @@ public static class CourseArchiver
     /// </summary>
     public static string ArchiveAndRemoveCourse(Course course, string coursesDirectory)
     {
+        // CANCEL FIRST (#239): every deploy this working folder has set for
+        // the course, asked of the scheduler. A cancel that fails throws
+        // before anything is archived or removed.
+        var turnedOff = Plantoir.Core.Assist.ScheduledDeployRemoval.TurnOffFirst(
+            WorkingFolderOf(coursesDirectory), course.Code, section: null, "the course was removed");
+        try
+        {
+            return RemoveCourse(course, coursesDirectory);
+        }
+        catch (Exception error) when (turnedOff.Count > 0)
+        {
+            throw new InvalidOperationException(
+                Plantoir.Core.Assist.ScheduledDeployRemoval.RemovalFailedAfterTurningItOff(course.Code, turnedOff, error.Message), error);
+        }
+    }
+
+    /// <summary>The working folder a courses directory belongs to — its parent.</summary>
+    private static string WorkingFolderOf(string coursesDirectory) =>
+        Path.GetDirectoryName(coursesDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        ?? coursesDirectory;
+
+    private static string RemoveCourse(Course course, string coursesDirectory)
+    {
+        // A reference course is locked (#241): UNLOCK after the cancel and
+        // before the archive, so the one thing that can stop a removal is
+        // still the cancel, and a locked tree never meets the delete. Asked of
+        // what is ON DISK rather than of the marker, so a course marked by
+        // hand, or carried from another computer, is released all the same;
+        // a course with nothing locked costs one walk. The teacher is told
+        // nothing about it.
+        ReferenceLock.Unlock(course.DirectoryPath);
         string archivePath = ArchiveCourseWithoutRemoving(course, coursesDirectory);
         CourseRestorer.DeleteTree(course.DirectoryPath);
         // A build outlives the content it was made from. Archive this course
@@ -176,18 +207,33 @@ public static class CourseArchiver
     /// </summary>
     public static string ArchiveAndRemoveSection(Course course, int sectionNumber, string coursesDirectory)
     {
+        // A reference course stays as it is (#241): removing a section
+        // changes the course. The sidebar does not offer it; this is what any
+        // other caller meets, in a sentence rather than the file system's own.
+        if (ReferenceCourse.IsKeptForReference(course))
+            throw new InvalidOperationException(ReferenceCourse.StaysAsItIs(ReferenceCourse.ShownCode(course)));
+        // CANCEL FIRST (#239), and only this working folder's deploy of this
+        // section. This used to cancel AFTER archiving and ignore a failure.
+        var turnedOff = Plantoir.Core.Assist.ScheduledDeployRemoval.TurnOffFirst(
+            WorkingFolderOf(coursesDirectory), course.Code, sectionNumber, "the section was removed");
+        try
+        {
+            return RemoveSection(course, sectionNumber, coursesDirectory);
+        }
+        catch (Exception error) when (turnedOff.Count > 0)
+        {
+            throw new InvalidOperationException(
+                Plantoir.Core.Assist.ScheduledDeployRemoval.RemovalFailedAfterTurningItOff(course.Code, turnedOff, error.Message), error);
+        }
+    }
+
+    private static string RemoveSection(Course course, int sectionNumber, string coursesDirectory)
+    {
         string sectionDir = course.SectionDirectory(sectionNumber);
         string archivePath = Archive(sectionDir, $"{course.Code}-section{sectionNumber}",
                                      coursesDirectory, course.Code);
         if (Directory.Exists(sectionDir)) CourseRestorer.DeleteTree(sectionDir);
         DiscardBuilds(coursesDirectory, course.Code, sectionNumber);
-        // A scheduled deploy for a section that no longer exists cannot do
-        // anything useful, and left alone it wakes up nightly to fail. Taking
-        // the section's number out of the configuration is what makes the
-        // launcher ask "Continue anyway?" about it, so this is also the other
-        // half of the reason the wrapper runs non-interactively.
-        Plantoir.Core.Assist.TaskScheduling.Cancel(
-            Plantoir.Core.Assist.TaskScheduling.NameFor(course.Code, sectionNumber));
         var remaining = course.Configuration.SectionNumbers.Where(n => n != sectionNumber).ToList();
         course.Configuration.SetSectionNumbers(remaining);
         course.Configuration.Write(course.ConfigFilePath);
@@ -203,10 +249,21 @@ public static class CourseArchiver
         // in the same one — an assistant publishing two classes in a row does
         // it every time. Without this the second backup throws, which (because
         // no backup means no edits) turns a routine sequence into a refusal.
+        //
+        // On a collision, WAIT for the next second and stamp again (#187). This
+        // used to append "-2", "-3"… to the name, which neither reader parses —
+        // so the second backup was invisible in the Backups list, uncounted by
+        // pruning, and (on the mac, which reads the same folder) invisible
+        // there too. Rejected: teaching both readers a "-N" suffix (the MAC's
+        // reader would then hide a zip Windows wrote until it learned it too),
+        // and a millisecond stamp (it changes the frozen zipNames format). The
+        // cost is at most a second's wait, only when two land in one second.
         string archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now, suffix));
-        for (int attempt = 2; File.Exists(archivePath) && attempt < 100; attempt++)
-            archivePath = Path.Combine(backupsDir,
-                TimestampedName(prefix, DateTime.Now, suffix).Replace(".zip", $"-{attempt}.zip"));
+        for (int attempt = 0; File.Exists(archivePath) && attempt < 3; attempt++)
+        {
+            Thread.Sleep(1000 - DateTime.Now.Millisecond + 10);
+            archivePath = Path.Combine(backupsDir, TimestampedName(prefix, DateTime.Now, suffix));
+        }
 
         ZipFolder(folderPath, archivePath);
         return archivePath;

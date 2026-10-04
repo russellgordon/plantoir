@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -16,7 +17,37 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public interface IChatModel
 {
-    Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation);
+    /// <summary>
+    /// One reply, and WHY the engine stopped writing it — or null when the
+    /// engine could not be reached or timed out.
+    /// </summary>
+    Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation);
+}
+
+/// <summary>
+/// What the model wrote, and the engine's <c>finish_reason</c> for stopping.
+/// </summary>
+/// <remarks>
+/// <para><b>The reason is the only signal that tells a finished answer from a
+/// fragment</b> (#196). Every request carries <c>max_tokens</c> 512, so a reply
+/// can be stopped part way — and llama.cpp closes the arguments object before
+/// the tool-call wrapper, so for a token or two a stopped call PARSES
+/// perfectly (measured on the mac: cut at 28 tokens, <c>deploy_section
+/// {course, section}</c>). <c>undo_last_change</c> takes no arguments at all,
+/// so any parse check would pass a stopped call to it. Until 2026-09-30
+/// <c>LocalModel.Ask</c> returned <c>choices[0].message</c> and dropped the
+/// rest, so this app acted on a stopped reply as if it were finished.</para>
+///
+/// <para>A null <see cref="FinishReason"/> means the engine did not say, which
+/// is read as finished — the scripted test models build replies that way.</para>
+/// </remarks>
+public sealed record ModelReply(JsonObject Message, string? FinishReason = null, int? CompletionTokens = null)
+{
+    /// <summary>The engine stopped because it reached the cap, not because the answer was done.</summary>
+    public bool WasCutOff => string.Equals(FinishReason, "length", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A finished reply from a message alone; null stays null.</summary>
+    public static implicit operator ModelReply?(JsonObject? message) => message is null ? null : new ModelReply(message);
 }
 
 /// <summary>
@@ -137,6 +168,12 @@ public sealed class AssistAgent
     {
         "add_next_class.duplicate",
         "plan_add_next_class.duplicate",
+        // "What does <page> link to?" (#305 / mac #167): filled in code by
+        // the links phrasing; the mac keeps answer: "links" out of every
+        // schema, and this is that, on a server whose binder needs it declared.
+        "read_page.answer",
+        "read_page.asTyped",
+        "read_page.onlyIfFound",
     };
 
     /// <summary>
@@ -165,7 +202,8 @@ public sealed class AssistAgent
 
             var copy = tool.DeepClone();
             if (copy["function"]?["description"]?.GetValue<string>() is { } description)
-                copy["function"]!["description"] = Briefly(description).Replace(ExampleCourse, courseCode);
+                copy["function"]!["description"] =
+                    (StillShortened.Contains(name) ? Briefly(description) : description).Replace(ExampleCourse, courseCode);
             MakeExamplesReal(copy["function"]?["parameters"], courseCode);
             HideCardOnlyArguments(copy["function"]?["parameters"], name);
             kept.Add(copy);
@@ -223,7 +261,34 @@ public sealed class AssistAgent
     }
 
     /// <summary>
-    /// The part of a tool description a ROUTER needs, and no more.
+    /// The tools whose description the local model still reads SHORTENED
+    /// (#352, 2026-10-01). Every other tool is shown its description as served,
+    /// which since #352 is the contract's one description per tool
+    /// (assist-cases.json → toolDescriptions) — measured before and after on
+    /// this PC's tier with no regression and no polarity inversion
+    /// (research/ai-assist/windows-description-convergence-results.txt).
+    /// These two keep their Windows text, shortened. They were held first for
+    /// behaviour (#352: Windows' includeLinked defaulted to false, so the
+    /// contract's sentences were untrue here); #420 step (a) made the
+    /// behaviour match on 2026-10-01, and step (b) then MEASURED the move to
+    /// the contract text and it failed its pre-registered criteria on this
+    /// PC's tier (an unpublish_pages trial lost on the hide-inversion probe,
+    /// research/ai-assist/windows-description-convergence-results.txt, the
+    /// #420 section). So they stay, recorded as contracts/assist-cases.json →
+    /// toolDescriptions.measuredDepartures with those numbers — a PERMANENT
+    /// measured departure by Russell's decision (2026-10-01; #420 closed). It
+    /// changes only with a new pre-registered measurement. The held text's
+    /// untrue "optionally" and its stray "section's website" fragment stay for
+    /// the same reason.
+    /// </summary>
+    internal static readonly HashSet<string> StillShortened = new(StringComparer.Ordinal)
+    {
+        "publish_pages", "unpublish_pages",
+    };
+
+    /// <summary>
+    /// The part of a tool description a ROUTER needs, and no more. Since #352
+    /// applied only to <see cref="StillShortened"/>.
     ///
     /// The descriptions are written for Claude Code, and most of their length
     /// is instruction: plan before you write, tell the teacher what it said,
@@ -324,6 +389,10 @@ public sealed class AssistAgent
         ["remember_timetable"] = "plan_remember_timetable",
         ["re_date_classes"] = "plan_re_date_classes",
         ["make_room_for_classes"] = "plan_make_room_for_classes",
+        // Irregular, as the mac's AssistToolDefinition.irregularPlanTwins says:
+        // the twin is NOT plan_ + the write's name, and deriving it that way is
+        // how add_curriculum_mentions ran with no plan on the mac (#327 / #350).
+        ["add_curriculum_mentions"] = "plan_curriculum_mentions",
     };
 
     /// <summary>
@@ -336,6 +405,13 @@ public sealed class AssistAgent
     private const int MostStepsPerTurn = 6;
 
     private readonly string _courseCode;
+
+    /// <summary>
+    /// The window's course's page word when that course is NUMBERED (a club's
+    /// "Week"), else null — so the numbered make-room phrasing matches only
+    /// there (#274). Set by the window, which has the course.
+    /// </summary>
+    public string? NumberedPageWord { get; init; }
     private readonly int _section;
 
     public AssistAgent(IChatModel model, IToolServer tools, JsonArray schemas, string courseCode, int section)
@@ -425,6 +501,86 @@ public sealed class AssistAgent
         return priming;
     }
 
+    /// <summary>
+    /// What "assistant chose a tool" carries (#164; <c>shared-rules.json</c> →
+    /// <c>activityTrail.mustRecord</c>): the tool, the argument NAMES, the
+    /// seconds, the completion tokens and whether it waited for the button.
+    /// NAMES, never values: which tool with which arguments filled in answers
+    /// the routing question completely, and the values are a teacher's page
+    /// titles. The names are what tell "duplicate Unit 3, Day 2 as my next
+    /// class" from a plain "add the next class" — the same tool either way.
+    /// </summary>
+    internal static string ChoseAToolLine(string tool, JsonObject call, TimeSpan took, int? tokens, bool waited) =>
+        $"the assistant chose {tool.Replace('_', ' ')} {WithArguments(ArgumentsOf(call).Select(pair => pair.Key))}, " +
+        "in " + took.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " +
+        (tokens is { } n ? n.ToString(CultureInfo.InvariantCulture) + " tokens" : "tokens not reported") + ", " +
+        (waited ? "waiting for the teacher's button" : "without waiting for a button");
+
+    /// <summary>"with course, section, pages" — argument names only, in the order given.</summary>
+    internal static string WithArguments(IEnumerable<string> names)
+    {
+        var listed = names.ToList();
+        return listed.Count == 0 ? "with no arguments" : "with " + string.Join(", ", listed);
+    }
+
+    /// <summary>
+    /// Whether a word is a course code that EXISTS in the shipped course
+    /// lists (Ontario and British Columbia). Set by the window from the same
+    /// catalogs the New Course wizard reads; used only to tell "in SPH3U" (a
+    /// course) from "in Lab01" (part of a page's name) in a links question.
+    /// </summary>
+    public Func<string, bool>? IsACourseCode { get; set; }
+
+    /// <summary>
+    /// "What does &lt;page&gt; link to?", answered in code and in full (#305 /
+    /// mac #167). TRANSCRIPT ONLY: a code-matched turn never puts the
+    /// teacher's sentence into the model's conversation, so handing the
+    /// answer back would give the model a tool result with no question in
+    /// front of it, which is the lap on which the smaller assistant turned
+    /// this read-only question into a publish plan. Every branch ends the
+    /// turn; the one exception is "the quiz" when no page is called that,
+    /// which goes to the model as the sentence it was.
+    /// </summary>
+    private async Task<List<Line>?> LinksQuestion(string text, CancellationToken cancellation)
+    {
+        if (AssistCardCommand.LinksQuestion(text, _courseCode, _section, IsACourseCode) is not { } asked) return null;
+
+        if (asked.OtherCourse is { } other)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantWasAskedAboutAnotherCourse,
+                $"matched in code, not sent to the model \u2014 asked what a page links to in {other} in this " +
+                $"{_courseCode} window; nothing was read", _courseCode, _section);
+            string? here = CoursesInTheFolder()
+                .FirstOrDefault(code => code.Equals(other, StringComparison.OrdinalIgnoreCase));
+            string? kept = ReferenceCourseNamed(other);
+            return new List<Line>
+            {
+                new("assistant", kept is not null ? AssistWording.AskedAboutAReferenceCourse(_courseCode, kept)
+                    : here is not null
+                    ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
+                    : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, other)),
+            };
+        }
+
+        var arguments = new JsonObject
+        {
+            ["course"] = _courseCode,
+            ["section"] = _section,
+            ["page"] = asked.Page,
+            ["answer"] = "links",
+        };
+        if (asked.AsTyped is { } typed) arguments["asTyped"] = typed;
+        if (asked.OnlyIfAPageIsCalled) arguments["onlyIfFound"] = "yes";
+
+        var answer = await _tools.CallTool("read_page", arguments, OnToolProgress, cancellation);
+        if (answer.NoPageFound) return null;   // "the quiz": the model has the conversation to read it against
+
+        ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+            "matched in code, not sent to the model \u2014 ran read_page " + WithArguments(arguments.Select(pair => pair.Key)),
+            _courseCode, _section);
+        return new List<Line> { new("tools", answer.Summary) };
+    }
+
     /// <summary>A line for the transcript.</summary>
     public sealed record Line(string Speaker, string Text, bool NeedsApproval = false, string? Pending = null);
 
@@ -510,6 +666,20 @@ public sealed class AssistAgent
     public Func<bool>? SectionIsBusy { get; set; }
 
     /// <summary>
+    /// Whether THIS copy of the app is deploying this very section (#386 /
+    /// mac #381, layer <c>assistant</c>): asked before the assistant opens a
+    /// preview, so the conversation never says the preview is on its way
+    /// while the window refuses it. Answered with
+    /// <see cref="AssistWording.SectionIsBeingDeployed"/>.
+    /// </summary>
+    public Func<bool>? SectionIsBeingDeployed { get; set; }
+
+    private bool ThisSectionIsBeingDeployed() => SectionIsBeingDeployed?.Invoke() == true;
+
+    private string SectionIsBeingDeployedSentence =>
+        AssistWording.SectionIsBeingDeployed(_courseCode, _section.ToString());
+
+    /// <summary>
     /// Whether this section's preview is on screen right now, asked of the
     /// window. It decides what a page edit must do about the preview: the
     /// served site is a COPY, merged at build time, so a running preview
@@ -536,6 +706,37 @@ public sealed class AssistAgent
     /// </summary>
     public Func<bool> ConfirmationMode { get; set; } = () => true;
 
+    /// <summary>
+    /// This class's ONE clock: today, read when it is needed rather than
+    /// stored.
+    /// </summary>
+    /// <remarks>
+    /// <para>A function rather than a date because a window stays open longer
+    /// than a calendar day, and a stored "today" would answer "publish
+    /// tomorrow's class" against the day the conversation BEGAN — a wrong day
+    /// that reports success. <c>PlantoirTools.Today</c> on the server is the
+    /// same shape for the same reason.</para>
+    ///
+    /// <para><b>One clock, not two.</b> Everything in this class that needs a
+    /// day asks this: the dateline the model reasons from, the scheduled
+    /// deploy a card sets up, the card's own relative word, and
+    /// <see cref="WithTheDaySettled"/>. Two clocks in one conversation is two
+    /// answers to what today is, differing on one night in a thousand, with no
+    /// test able to pin the one a teacher's request actually used — the mac
+    /// met exactly that in an earlier draft of its own settler.</para>
+    /// </remarks>
+    public Func<DateOnly> Today { get; init; } = () => DateOnly.FromDateTime(DateTime.Now);
+
+    /// <summary>
+    /// The wall clock, for the one thing a day cannot answer: whether a time
+    /// of day is still to come TODAY (#193). Read only by
+    /// <see cref="WithTheMomentSettled"/>, together with <see cref="Today"/>.
+    /// </summary>
+    public Func<DateTime> Now { get; init; } = () => DateTime.Now;
+
+    /// <summary>The zone the wall clock is in — the machine's own, unless a test says otherwise.</summary>
+    public TimeZoneInfo TimeZone { get; init; } = TimeZoneInfo.Local;
+
     /// <summary>Invoked whenever a pending plan/write action is accepted by the teacher.</summary>
     public Action? OnPlanAccepted { get; set; }
 
@@ -545,6 +746,14 @@ public sealed class AssistAgent
     /// then on. Any thread.
     /// </summary>
     public Action<string>? OnConversationBackup { get; set; }
+
+    /// <summary>
+    /// Given the moment a scheduled card asks for, when the deploy it would
+    /// REPLACE is set for — or null when there is none to mention (#261).
+    /// The window answers it from <c>TaskScheduling.MomentItWouldReplace</c>,
+    /// which reads by task name across the whole computer.
+    /// </summary>
+    public Func<DateTime, DateTime?>? ScheduleDeployItWouldReplace { get; set; }
 
     /// <summary>Provides the human-readable destination for publishing/deploying (e.g. "Netlify", "Cloudflare Pages", "a folder on this computer").</summary>
     public Func<string>? DestinationProvider { get; set; }
@@ -578,6 +787,40 @@ public sealed class AssistAgent
 
     private JsonObject? _awaiting;      // a write the teacher has not agreed to yet
 
+    /// <summary>
+    /// Every tool the SERVER serves — the full surface, not the narrowed list
+    /// the model is shown. Set by the window from the server's own listing.
+    ///
+    /// <para>It exists for one refusal (#350 / mac #327): a name that is on
+    /// this list and NOT on the list the model was shown is refused, nothing
+    /// runs and the turn is wound back. The server answers Claude Code as
+    /// well, so it serves every tool either client may call; before this, a
+    /// model that named <c>re_date_classes</c> — kept off its list because
+    /// re-dating a whole section is too big for a router right four times in
+    /// five — simply had it run. Null (the tests' default) means "not told",
+    /// and then nothing is refused, because a refusal decided from a list the
+    /// agent was never given would be a guess.</para>
+    ///
+    /// <para>A name that exists NOWHERE is unchanged: it goes to the server
+    /// and comes back as "no tool by that name", for the model to read.
+    /// Refusing those too was rejected on the mac — it changes documented
+    /// behaviour for no failure anyone has seen. Fixed phrasings never come
+    /// through here, so a tool only a card reaches keeps working.</para>
+    /// </summary>
+    public IReadOnlyCollection<string>? ServedTools { get; set; }
+
+    /// <summary>The names on the list the model was shown.</summary>
+    private HashSet<string> OfferedTools() => new(
+        _schemas.Select(tool => tool?["function"]?["name"]?.GetValue<string>())
+                .Where(name => name is not null)!,
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Whether <paramref name="name"/> exists here but was not shown to the model.</summary>
+    internal bool WasNotOffered(string name) =>
+        ServedTools is { } served &&
+        served.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+        !OfferedTools().Contains(name);
+
     public bool IsAwaitingApproval => _awaiting is not null;
     public string? PendingTool => _awaiting?["function"]?["name"]?.GetValue<string>();
 
@@ -606,12 +849,47 @@ public sealed class AssistAgent
         if (PreviewAskedForPlainly(text) is { } handled) return handled;
         if (await CardCommand(text, cancellation) is { } commanded) return commanded;
 
-        var today = DateTime.Now;
-        _dateline = $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)";
+        // "deploy at 6:30" — morning or evening, and nobody can tell which
+        // (#281). Asked in code; and "deploy at 6.30 pm" — a time the family
+        // reads but does not set — answered with the spelling to use (#288).
+        // Both go into the TRANSCRIPT ONLY. Appending either to the model's
+        // conversation "for context" passes every wording test and lets the
+        // model act on the time a turn later: measured, every such sentence
+        // reached deploy_section 10 of 10 on the smaller assistant. Nothing is
+        // set and nothing waits; the sentence named matches in code next turn.
+        if (AssistCardCommand.MorningOrEvening(text) is { } question)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked whether the time was morning or evening; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.MorningOrEvening(question)) };
+        }
+        if (AssistCardCommand.TimeToSayAs(text) is { } respelling)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked for the time in a spelling it can set; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.SayTheTimeAs(respelling)) };
+        }
+
+        // InvariantCulture, and this class's one clock. A machine whose
+        // default calendar is not Gregorian renders "yyyy" in ITS year —
+        // 2569 for Thai Buddhist — so an affected teacher's assistant would
+        // be told the wrong year on every single message, in the one sentence
+        // it does all its date arithmetic from. Byte-identical on a Gregorian
+        // machine, which is what keeps the routing measurements standing.
+        // (The writer half of that trap is issue #144.) DayOfWeek is an enum
+        // name and carries no culture of its own.
+        _turnBeganAt = _messages.Count;
+        _typedThisTurn = text;
+        var today = Today();
+        _dateline = string.Create(CultureInfo.InvariantCulture,
+            $" (Today is {today:yyyy-MM-dd}, a {today.DayOfWeek}.)");
+        _sentThisTurn = text + _dateline;
         _messages.Add(new JsonObject
         {
             ["role"] = "user",
-            ["content"] = text + _dateline,
+            ["content"] = _sentThisTurn,
         });
         return await Run(cancellation);
     }
@@ -634,37 +912,65 @@ public sealed class AssistAgent
     /// </summary>
     private async Task<List<Line>?> CardCommand(string text, CancellationToken cancellation)
     {
-        if (AssistCardCommand.Matching(text) is { } match)
+        if (await LinksQuestion(text, cancellation) is { } answered) return answered;
+
+        // The links family is answered ONLY by LinksQuestion above, which reads
+        // the window. When that declined — another section, a title that is
+        // this window's own place, "the quiz" with no such page — the sentence
+        // belongs to the model; Matching's window-free reading of the same
+        // sentence must not run it as a card, or the answer (and a tool call)
+        // lands in the model's conversation (review finding, 2026-09-30).
+        if (AssistCardCommand.Matching(text, NumberedPageWord) is { } match && !match.IsALinksQuestion)
         {
+            var cardArguments = match.ToJsonObject(_courseCode, _section, Today());
+            // "deploy at 6:30 am" carries a time of day, never a date: the
+            // moment is settled HERE, once, so the card, the trail line and
+            // the act all carry the same one (#193).
+            string? moment = SettleTheMoment(cardArguments);
             ActivityTrail.Note(
                 ActivityTrail.Event.AssistantMatchedAFixedPhrase,
-                "matched in code, not sent to the model — ran " + match.ToolName,
+                "matched in code, not sent to the model — ran " + match.ToolName +
+                (moment is null ? "" : " for " + moment) +
+                " " + WithArguments(match.Arguments.Keys),
                 _courseCode,
                 _section);
 
-            if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase))
+            if (match.ToolName.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) ||
+                match.ToolName.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
             {
-                return AskFirst(text, "deploy_section", match.ToJsonObject(_courseCode, _section));
+                // No card for a deploy that cannot happen (#241): the refusal
+                // is said instead of a question it would then take back.
+                if (CourseIsKeptForReference())
+                {
+                    string refused = AssistWording.DeployRefusedForAReferenceCourse(_courseCode);
+                    _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
+                    _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = refused });
+                    return new List<Line> { new("assistant", refused) };
+                }
+                return AskFirst(text, match.ToolName, cardArguments);
             }
             if (match.ToolName.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
             {
-                ShowPreviewInApp.Invoke();
-                const string said = "The preview is opening in Plantoir's main window — the build shows its progress there.";
+                string said = ThisSectionIsBeingDeployed()
+                    ? SectionIsBeingDeployedSentence
+                    : "The preview is opening in Plantoir's main window — the build shows its progress there.";
+                if (!ThisSectionIsBeingDeployed()) ShowPreviewInApp.Invoke();
                 _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
                 _messages.Add(new JsonObject { ["role"] = "assistant", ["content"] = said });
                 return new List<Line> { new("assistant", said) };
             }
 
-            return await RunCommand(text, match.ToolName, match.ToJsonObject(_courseCode, _section), cancellation);
+            // The card settles its own relative word at match time, and it is
+            // handed this class's clock to settle it against rather than
+            // reading one of its own.
+            return await RunCommand(text, match.ToolName,
+                                    match.ToJsonObject(_courseCode, _section, Today()), cancellation);
         }
 
         string request = text.Trim().TrimEnd('.', '!');
 
         var withLinks = System.Text.RegularExpressions.Regex.Match(request,
             @"^(?<verb>publish|unpublish)\s+(?<title>.+?),?\s+and everything it links to$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var named = System.Text.RegularExpressions.Regex.Match(request,
-            @"^(?<verb>publish|unpublish)\s+(?<title>unit\s+\d+,\s*day\s+\d+)$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         var planned = System.Text.RegularExpressions.Regex.Match(request,
             @"^what would publishing\s+(?<title>.+?)\s+change\??$",
@@ -681,19 +987,19 @@ public sealed class AssistAgent
         {
             string tool = withLinks.Groups["verb"].Value.StartsWith("un", StringComparison.OrdinalIgnoreCase)
                 ? "unpublish_pages" : "publish_pages";
-            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value, includeLinked: true),
+            // "…and everything it links to" is what every publish does since
+            // #420; the phrasing is still answered, with the same call.
+            return await RunCommand(text, tool, PageArguments(withLinks.Groups["title"].Value),
                                     cancellation);
         }
-        if (named.Success)
-        {
-            string tool = named.Groups["verb"].Value.StartsWith("un", StringComparison.OrdinalIgnoreCase)
-                ? "unpublish_pages" : "publish_pages";
-            return await RunCommand(text, tool, PageArguments(named.Groups["title"].Value, includeLinked: false),
-                                    cancellation);
-        }
+        // The old "publish|unpublish Unit N, Day M" shape lived here and was
+        // deleted in bundle 5a's fix round: it answered "publish unit 4, day
+        // 3" in code, where hideIsUnpublish.refused sends that sentence to the
+        // model (publishing is the direction the contract deliberately did not
+        // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
-                                    PageArguments(planned.Groups["title"].Value, includeLinked: true),
+                                    PageArguments(planned.Groups["title"].Value),
                                     cancellation);
         if (scheduled.Success)
         {
@@ -701,7 +1007,11 @@ public sealed class AssistAgent
             int minute = scheduled.Groups["minute"].Success ? int.Parse(scheduled.Groups["minute"].Value) : 0;
             if (scheduled.Groups["half"].Value.Equals("pm", StringComparison.OrdinalIgnoreCase) && hour < 12) hour += 12;
             if (scheduled.Groups["half"].Value.Equals("am", StringComparison.OrdinalIgnoreCase) && hour == 12) hour = 0;
-            string when = $"{DateTime.Now.AddDays(1):yyyy-MM-dd} {hour:00}:{minute:00}";
+            // Same clock and same culture as the dateline above: this one is a
+            // date the app WRITES, into a scheduled deploy that fires while
+            // nobody is watching.
+            string when = string.Create(CultureInfo.InvariantCulture,
+                $"{Today().AddDays(1):yyyy-MM-dd} {hour:00}:{minute:00}");
             return AskFirst(text, "schedule_deploy", new JsonObject
             {
                 ["course"] = _courseCode,
@@ -712,11 +1022,10 @@ public sealed class AssistAgent
         return null;
     }
 
-    private JsonObject PageArguments(string title, bool includeLinked) => new()
+    private JsonObject PageArguments(string title) => new()
     {
         ["course"] = _courseCode,
         ["section"] = _section,
-        ["includeLinked"] = includeLinked,
         ["pages"] = new JsonArray(JsonValue.Create(TidyTitle(title))),
     };
 
@@ -790,10 +1099,17 @@ public sealed class AssistAgent
     {
         _awaiting = call;
         string tool = call["function"]?["name"]?.GetValue<string>() ?? "";
+        // Chosen by the tool's NAME, not by "needs approval" (#260): a
+        // scheduled card names a moment that is not now, and "Shall I
+        // deploy?" reads as now. A third approval tool falls to the "now"
+        // question, which is the safe reading for a deploy.
+        string question = tool.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase)
+            ? AssistWording.ScheduleQuestion
+            : AssistWording.DeployQuestion;
         return new List<Line>
         {
             new("assistant", Explain(call)),
-            new("assistant", AssistWording.DeployQuestion, NeedsApproval: true, Pending: tool),
+            new("assistant", question, NeedsApproval: true, Pending: tool),
         };
     }
 
@@ -812,13 +1128,23 @@ public sealed class AssistAgent
 
         var arguments = ArgumentsOf(call);
         string when = arguments["when"]?.GetValue<string>() ?? "";
-        string moment = DateTime.TryParse(when, out var parsed)
+        // ONE reader, shared with the server that actually schedules it —
+        // see ScheduledDeploy.ReadTheMoment. This card and that tool read
+        // the same string, and a card that names a different moment than
+        // the thing it authorises is worse than a card that says nothing.
+        string moment = ScheduledDeploy.ReadTheMoment(when) is { } parsed
             ? parsed.ToString("dddd d MMMM, h:mm tt")
             : when;
         string destination = DestinationProvider?.Invoke() ?? "the web";
+        // #261: scheduling a section that already has one REPLACES it, and
+        // until now nothing said so before or after.
+        string replaces = ScheduleDeployItWouldReplace?.Invoke(ScheduledDeploy.ReadTheMoment(when) ?? DateTime.MinValue)
+            is { } was
+            ? " " + AssistWording.ScheduleReplaces(was.ToString("dddd d MMMM, h:mm tt"))
+            : "";
         return $"Set this computer to deploy {_courseCode} Section {_section} to {destination} at {moment}. " +
                "It has to be on and awake then — plugged in if it is a laptop, lid open. " +
-               "Plantoir cannot wake it up.";
+               "Plantoir cannot wake it up." + replaces;
     }
 
     /// <summary>A tool call's arguments, which arrive as a JSON string.</summary>
@@ -827,6 +1153,309 @@ public sealed class AssistAgent
         if (call["function"]?["arguments"]?.GetValue<string>() is not { } raw) return new JsonObject();
         try { return JsonNode.Parse(raw) as JsonObject ?? new JsonObject(); }
         catch { return new JsonObject(); }
+    }
+
+    // ---- Rewriting what the model filled in ------------------------------
+
+    /// <summary>
+    /// Let <paramref name="rewrite"/> change one tool call's arguments, and
+    /// put them back on the call.
+    /// </summary>
+    /// <remarks>
+    /// <para>The round trip every rewrite at this seam needs, written once:
+    /// the arguments are a JSON STRING inside the call, so changing one means
+    /// parse, edit, re-serialise. <see cref="WithTheDaySettled"/> is the first
+    /// of these and is not expected to be the last — binding the model's
+    /// <c>course</c> and <c>section</c> to the window's own is the next
+    /// (issue #180), and it belongs here beside it rather than parsing the
+    /// same string a second time.</para>
+    ///
+    /// <para>Anything it cannot read it leaves exactly as it arrived: a small
+    /// model sends malformed JSON often enough that <see cref="ArgumentsOf"/>
+    /// and <c>RunTool</c> both already defend against it, and a rewrite is
+    /// the last place that should be the one to throw.</para>
+    ///
+    /// <para>The call is changed IN PLACE and returned, for chaining. That is
+    /// safe: the message history holds its own deep clone of the model's
+    /// reply, taken before this runs, so nothing rewrites what the model is
+    /// shown next turn.</para>
+    ///
+    /// <para><b><paramref name="rewrite"/> returns whether it changed
+    /// anything, and nothing is written back when it did not.</b> So a call
+    /// this leaves alone is byte-for-byte the string the model sent, rather
+    /// than a re-serialisation of it, and "untouched" means untouched in a
+    /// test as well as in meaning. A rewrite that changes something and says
+    /// it did not would have that change dropped — which is the trade for
+    /// that property, and is why the flag is the rewrite's own business
+    /// rather than a comparison made out here.</para>
+    ///
+    /// <para><b>A rewrite that DOES change something re-serialises the
+    /// whole object</b>, and a JSON round trip is not text-preserving:
+    /// whitespace goes, key order follows the object, and non-ASCII escapes
+    /// (a page title's curly quotes become <c>\uXXXX</c>). Harmless, because
+    /// every consumer parses the string rather than reading it — but a test
+    /// that compares arguments TEXTUALLY after a rewrite will differ, and
+    /// should compare the parsed values instead.</para>
+    /// </remarks>
+    private static JsonObject WithArgumentsRewritten(JsonObject call, Func<JsonObject, bool> rewrite)
+    {
+        if (call["function"] is not JsonObject function) return call;
+        if (function["arguments"] is not JsonValue raw || !raw.TryGetValue(out string? json)) return call;
+
+        // Blank arguments are an EMPTY call, not an unreadable one: the
+        // window supplies course and section, and whether an empty call may
+        // run at all is decided before this (#262).
+        JsonObject? arguments;
+        if (string.IsNullOrWhiteSpace(json)) arguments = new JsonObject();
+        else
+        {
+            try { arguments = JsonNode.Parse(json) as JsonObject; }
+            catch { return call; }
+        }
+        if (arguments is null) return call;
+
+        if (rewrite(arguments)) function["arguments"] = arguments.ToJsonString();
+        return call;
+    }
+
+    /// <summary>
+    /// Turn a relative day the MODEL filled in — <c>date: "tomorrow"</c> —
+    /// into the date it means, ONCE, where the call is created.
+    /// </summary>
+    /// <remarks>
+    /// <para>The card path settles its own word at match time
+    /// (<c>AssistCardCommand.ToJsonObject</c>). This is the other path: a
+    /// <c>date</c> the model wrote itself, which <c>ClassDateHelp</c> tells it
+    /// not to write relatively and which a small model does anyway. One call
+    /// object is then read three times — the approval card, the <c>plan_</c>
+    /// twin, and the act the teacher presses Go on — and each of those used to
+    /// reach the server's <c>DayFor</c>, which reads the clock per call. A plan
+    /// shown at 23:59 and agreed to at 00:01 described one class and published
+    /// the next. Settled here, the three carry the same argument BY
+    /// CONSTRUCTION, and the clock may then be read as freely as it likes.</para>
+    ///
+    /// <para><b>The gate asks the tool surface, and what it really tracks is
+    /// WHAT CONSULTS THE CLOCK.</b> A tool is touched only if its own schema
+    /// declares a <c>date</c> property, so a list kept beside this code cannot
+    /// fall behind the tools. Today that is exactly <c>publish_class_on</c>,
+    /// whose <c>date</c> goes to <c>PlantoirTools.DayFor</c> — the one place a
+    /// relative word is read against the clock. <c>schedule_deploy</c>'s
+    /// <c>when</c> is a day AND a time and declares no <c>date</c>, so it is
+    /// excluded by construction rather than by being remembered.
+    /// <c>publish_pages</c> and <c>unpublish_pages</c> take <c>before</c> and
+    /// <c>onOrAfter</c>, which reach <c>ParseDate</c> — strict, invariant, and
+    /// it REFUSES "tomorrow" — so they consult no clock and want no settling.
+    /// The trap to know: a future forgiving parser behind one of those names
+    /// would reopen this hole with the gate shut, because the gate is spelled
+    /// <c>date</c> and the exposure is not. <c>TheSettlerTouchesExactlyTheToolsDeclaringADate</c>
+    /// makes that at least a visible decision.</para>
+    ///
+    /// <para>A word the reader cannot make a day of — "next monday", which is
+    /// refused rather than guessed — passes through untouched, so the tool
+    /// answers with its own sentence about it. An absolute date settles to
+    /// itself. A <c>date</c> that is not a string at all (a model that sends
+    /// <c>20260920</c> as a number) passes through untouched too, rather than
+    /// throwing where nothing would catch it.</para>
+    ///
+    /// <para>Nothing the model SEES changes: no schema, no description, no
+    /// <c>ClassDateHelp</c>. It has already chosen the tool by the time this
+    /// runs, so no routing re-measurement is owed.</para>
+    /// </remarks>
+    private JsonObject WithTheDaySettled(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name) return call;
+        if (!DeclaresAClassDay(name)) return call;
+
+        return WithArgumentsRewritten(call, arguments =>
+        {
+            if (arguments["date"] is not JsonValue given || !given.TryGetValue(out string? word)) return false;
+            if (SectionScheduleSource.ReadRelativeDay(word, Today()) is not { } day) return false;
+
+            // InvariantCulture: the tool must not be sent looking for a class
+            // on a day no course has — see the dateline above.
+            string settled = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (settled == word) return false;
+
+            arguments["date"] = settled;
+            return true;
+        });
+    }
+
+    /// <summary>
+    /// The same settling for a <c>when</c> the MODEL wrote — "06:30" from a
+    /// model is the same trap as "06:30" from a card (#193): read as today,
+    /// silently, by the server's lenient reader. Gated on the tool declaring
+    /// <c>when</c>. A whole moment, or anything the settler cannot read, is
+    /// left exactly as the model wrote it.
+    /// </summary>
+    private JsonObject WithTheMomentSettled(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name || !Declares(name, "when")) return call;
+        return WithArgumentsRewritten(call, arguments => SettleTheMoment(arguments) is not null);
+    }
+
+    /// <summary>
+    /// Settle <c>arguments["when"]</c> in place against this class's clock, and
+    /// return the whole moment — or null when there was none to settle. A
+    /// moment that was already whole is returned too, untouched.
+    /// </summary>
+    private string? SettleTheMoment(JsonObject arguments)
+    {
+        if (arguments["when"] is not JsonValue given || !given.TryGetValue(out string? when)) return null;
+        if (ScheduledMoment.Settle(when, Today(), Now(), TimeZone) is { } settled)
+        {
+            arguments["when"] = settled;
+            return settled;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the tool the model chose declares a <c>date</c> — asked of the
+    /// schemas this conversation was built with, which are the ones the model
+    /// was shown.
+    /// </summary>
+    internal bool DeclaresAClassDay(string tool) => Declares(tool, "date");
+
+    /// <summary>
+    /// Whether the tool's own schema - the one the model was shown -
+    /// declares <paramref name="argument"/>. Every rewrite at this seam is
+    /// gated this way rather than on a list of tool names, so a list kept
+    /// beside the code cannot fall behind the tools.
+    /// </summary>
+    internal bool Declares(string tool, string argument) =>
+        SchemaOf(tool)?["parameters"]?["properties"]?[argument] is not null;
+
+    /// <summary>The <c>function</c> half of the named tool's schema, or null.</summary>
+    private JsonObject? SchemaOf(string tool)
+    {
+        foreach (var schema in _schemas)
+        {
+            if (schema?["function"] is not JsonObject function) continue;
+            if (function["name"]?.ToString() is not { } named) continue;
+            if (named.Equals(tool, StringComparison.OrdinalIgnoreCase)) return function;
+        }
+        return null;
+    }
+
+    // ---- Binding the model's call to this window (#180) -------------------
+
+    /// <summary>
+    /// The course codes in this window's working folder, as the folder spells
+    /// them. Asked only when the model names a course that is not this
+    /// window's, to tell "another course that is here" from "no such
+    /// course" - two different sentences, because "open MCV4U" is false
+    /// advice for a code that names nothing.
+    /// </summary>
+    public Func<IReadOnlyList<string>> CoursesInTheFolder { get; init; } = () => Array.Empty<string>();
+
+    /// <summary>
+    /// The code a teacher reads when <c>name</c> — as the model or the
+    /// teacher wrote it — names a course KEPT FOR REFERENCE and no course
+    /// being taught; otherwise null (#241). Such a course is answered with
+    /// <see cref="AssistWording.AskedAboutAReferenceCourse"/>, never with the
+    /// #180 sentence's "open it and ask me there": the assistant is not offered
+    /// on a reference course at all.
+    /// </summary>
+    public Func<string, string?> ReferenceCourseNamed { get; init; } = _ => null;
+
+    /// <summary>
+    /// Whether this window's course is, NOW, kept for reference (#241, doors
+    /// 2–4). Asked first in the deploy hand-back, BEFORE a preview is stopped:
+    /// a refusal any later kills a preview the teacher was reading, for nothing.
+    /// </summary>
+    public Func<bool> CourseIsKeptForReference { get; init; } = () => false;
+
+    /// <summary>
+    /// For a call the MODEL made in this window, <c>course</c> and
+    /// <c>section</c> are this window's - or the turn is refused.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The section is always the window's</b>, present or absent:
+    /// "Unpublish Unit 4, Day 12" was read by the small assistant as section
+    /// 4, and changed the wrong section's pages while reporting success. No
+    /// tool reads an omitted section as "every section", so an absent one is
+    /// bound too.</para>
+    ///
+    /// <para><b>The course is the window's or nothing runs.</b> Rebinding a
+    /// different course to this window would publish an ICS3U class off
+    /// "publish MCV4U's class" and say so - the one failure a teacher cannot
+    /// catch. Russell decided 2026-09-19 that refusing is right on both
+    /// platforms (#208). The same code in another casing is not another
+    /// course: it runs, with the WINDOW's spelling, because the approval card
+    /// prints the code verbatim. Whitespace and newlines are trimmed before
+    /// comparing, as the tools trim.</para>
+    ///
+    /// <para><b>In the agent, not the tool server.</b> <c>plantoir-mcp</c>
+    /// also serves an outside client that legitimately names any course its
+    /// lock allows; this window is the only thing that knows which section
+    /// the teacher is looking at. Gated on the tool's own schema declaring
+    /// each argument, never on a list - <c>undo_last_change</c> declares
+    /// neither and is left exactly as the model wrote it.</para>
+    ///
+    /// <para>Nothing the model SEES changes, so no routing re-measurement is
+    /// owed.</para>
+    /// </remarks>
+    /// <returns>The sentence to say when the turn is refused; null when it runs.</returns>
+    private string? BoundToThisWindow(JsonObject call)
+    {
+        if (call["function"]?["name"]?.ToString() is not { } name) return null;
+        bool course = Declares(name, "course");
+        bool section = Declares(name, "section");
+        if (!course && !section) return null;
+
+        string? refusal = null;
+        WithArgumentsRewritten(call, arguments =>
+        {
+            bool changed = false;
+            if (course)
+            {
+                string? wrote = arguments["course"] switch
+                {
+                    null => null,
+                    JsonValue value when value.TryGetValue(out string? text) => text,
+                    var other => other.ToJsonString(),
+                };
+                string trimmed = wrote?.Trim() ?? "";
+                if (trimmed.Length > 0 && !trimmed.Equals(_courseCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    refusal = RefuseAnotherCourse(name, wrote!, trimmed);
+                    return false;
+                }
+                if (wrote != _courseCode)
+                {
+                    arguments["course"] = _courseCode;
+                    changed = true;
+                }
+            }
+            if (section && !(arguments["section"] is JsonValue given &&
+                             given.TryGetValue(out int number) && number == _section))
+            {
+                arguments["section"] = _section;
+                changed = true;
+            }
+            return changed;
+        });
+        return refusal;
+    }
+
+    private string RefuseAnotherCourse(string tool, string asTheModelWroteIt, string trimmed)
+    {
+        // The trail keeps the MODEL's spelling - it is evidence about the
+        // model, and normalising it throws away the only record it spelt the
+        // code oddly. The sentence names the folder's spelling instead.
+        ActivityTrail.Note(ActivityTrail.Event.AssistantWasAskedAboutAnotherCourse,
+            $"the assistant named {asTheModelWroteIt.Trim()} for {tool.Replace('_', ' ')} in this " +
+            $"{_courseCode} window - nothing was run from it",
+            _courseCode, _section);
+
+        if (ReferenceCourseNamed(trimmed) is { } kept)
+            return AssistWording.AskedAboutAReferenceCourse(_courseCode, kept);
+        string? here = CoursesInTheFolder()
+            .FirstOrDefault(code => code.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
+        return here is not null
+            ? AssistWording.AskedAboutAnotherCourse(_courseCode, here)
+            : AssistWording.AskedAboutACourseThatIsNotHere(_courseCode, trimmed);
     }
 
     /// <summary>
@@ -877,6 +1506,172 @@ public sealed class AssistAgent
         };
     }
 
+    /// <summary>
+    /// Refuse a reply that cannot be acted on: run nothing, say so, record
+    /// why, and take the turn back out of what the model is sent — so the
+    /// shorter retry the sentence asks for is not sent with the request that
+    /// ran away still in front of it (#196).
+    /// </summary>
+    private List<Line> NothingRanFromIt(List<Line> lines, string said, string trailLine)
+    {
+        ActivityTrail.Note(ActivityTrail.Event.AssistantAnswerWasCutOff, trailLine, _courseCode, _section);
+        WindTheTurnBack();
+        lines.Add(new Line("assistant", said));
+        return lines;
+    }
+
+    private static string Spaced(string tool) => tool.Replace('_', ' ');
+
+    /// <summary>The teacher's message as SENT this turn (date line and all), or null for a lap that began with a tool result.</summary>
+    private string? _sentThisTurn;
+
+    /// <summary>
+    /// What the teacher TYPED this turn, before the date line — kept in a
+    /// field rather than recomputed, because recomputing the date line means
+    /// reading the clock a second time.
+    /// </summary>
+    private string? _typedThisTurn;
+
+    /// <summary>
+    /// Whether a reply is the teacher's request handed back (#217) —
+    /// <c>assist-cases.json</c> → <c>echoedRequest</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>Compared against the message the TURN BEGAN WITH, never the last
+    /// user message anywhere: a lap that began with a tool result has none,
+    /// which is what makes a second lap safe by construction. A reply that
+    /// chooses a tool is an instruction whatever its text says, so
+    /// <paramref name="hasToolCall"/> is an argument rather than an
+    /// assumption.</para>
+    ///
+    /// <para>Exact after folding, deliberately not fuzzy: an echo with a
+    /// preamble ("Sure: hide unit 4, day 21") gets through, because a rule
+    /// that fires on a legitimate answer throws a real reply away.</para>
+    /// </remarks>
+    internal static bool IsTheRequestBackAgain(string? sent, string? typed, string reply, bool hasToolCall)
+    {
+        if (hasToolCall) return false;
+        string said = ForComparing(reply);
+        if (said.Length == 0) return false;
+        if (sent is not null && said == ForComparing(sent)) return true;
+        return !string.IsNullOrEmpty(typed) && said == ForComparing(typed);
+    }
+
+    /// <summary>Whitespace and newlines off, . ! ? off both ends, whitespace again, lower-cased.</summary>
+    private static string ForComparing(string text) =>
+        text.Trim().Trim('.', '!', '?').Trim().ToLowerInvariant();
+
+    /// <summary>What a finished tool call's arguments amount to.</summary>
+    internal enum WhatTheModelWrote
+    {
+        /// <summary>Something to act on — however little; binding and the tool's own refusals decide the rest.</summary>
+        Readable,
+        /// <summary>Not a JSON object: bad JSON, or a fragment.</summary>
+        Unreadable,
+        /// <summary>Nothing at all, for a tool that needs more than the window supplies (#262).</summary>
+        NothingForWhatItNeeds,
+    }
+
+    /// <summary>The two arguments the section window supplies on its own.</summary>
+    private static readonly HashSet<string> TheWindowSupplies = new(StringComparer.Ordinal) { "course", "section" };
+
+    /// <summary>
+    /// Optional arguments that only EXTEND a write that already has a sensible
+    /// default, as <c>tool.argument</c> — so they do not make an empty call
+    /// "need more" (bundle 5a fix round, ruling 2). Windows' local
+    /// <c>add_next_class</c> declares <c>unit</c> and <c>days</c> where the
+    /// mac's declares only course and section; counted, they refused an empty
+    /// call the mac runs — an unchosen difference. Named rather than inferred
+    /// from "optional", because <c>publish_pages</c>' <c>pages</c> is optional
+    /// too and an empty publish must still be refused.
+    /// </summary>
+    internal static readonly HashSet<string> OptionalExtras = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "add_next_class.unit", "add_next_class.days",
+    };
+
+    /// <summary>
+    /// Judge a call's arguments against the tool's own schema —
+    /// <c>app-rules.json</c> → <c>modelTiers.requirements</c> → "A finished
+    /// reply that wrote nothing runs a tool only when the window supplies
+    /// everything that tool needs", whose cases this is tested against.
+    /// </summary>
+    /// <remarks>
+    /// <para>Nothing written — an empty string, only whitespace, or an object
+    /// with no keys — runs only when the window can supply everything. A tool
+    /// needs more when its schema REQUIRES anything besides course and section
+    /// (a date, a page, a time), or when it CHANGES PAGES and declares anything
+    /// besides them (which pages, which dates): a write told only its section
+    /// has nothing to act on. A schema with no <c>required</c> key requires
+    /// nothing.</para>
+    ///
+    /// <para><b>The trap, either way round:</b> keying on <c>required</c>
+    /// alone. Refusing every tool with a required list refuses rebuild and
+    /// deploy, which the window supplies in full; running whenever the
+    /// required arguments are window-supplied runs an empty
+    /// <c>publish_pages</c>, whose real content is optional in its schema.</para>
+    /// </remarks>
+    internal static WhatTheModelWrote Judge(string? arguments, IEnumerable<string> required,
+                                            IEnumerable<string> properties, bool readOnly)
+    {
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            JsonNode? parsed;
+            try { parsed = JsonNode.Parse(arguments); }
+            catch (System.Text.Json.JsonException) { return WhatTheModelWrote.Unreadable; }
+            if (parsed is not JsonObject written) return WhatTheModelWrote.Unreadable;
+            if (written.Count > 0) return WhatTheModelWrote.Readable;
+        }
+
+        bool needsMore = required.Any(name => !TheWindowSupplies.Contains(name)) ||
+                         (!readOnly && properties.Any(name => !TheWindowSupplies.Contains(name)));
+        return needsMore ? WhatTheModelWrote.NothingForWhatItNeeds : WhatTheModelWrote.Readable;
+    }
+
+    /// <summary>
+    /// <see cref="Judge"/> for a call the model made, asked of the schema it
+    /// was shown. "Changes pages" is this app's own list of writes, since the
+    /// schemas the server hands out carry no read-only flag.
+    /// </summary>
+    private WhatTheModelWrote WhatTheModelWroteFor(JsonObject call)
+    {
+        string name = call["function"]?["name"]?.ToString() ?? "";
+        string? arguments = call["function"]?["arguments"] is JsonValue raw && raw.TryGetValue(out string? text)
+            ? text
+            : call["function"]?["arguments"]?.ToJsonString();
+        var parameters = SchemaOf(name)?["parameters"];
+        var required = (parameters?["required"] as JsonArray)?.Select(item => item?.ToString() ?? "") ?? Enumerable.Empty<string>();
+        var properties = ((parameters?["properties"] as JsonObject)?.Select(pair => pair.Key) ?? Enumerable.Empty<string>())
+            .Where(property => !OptionalExtras.Contains($"{name}.{property}"));
+        return Judge(arguments, required, properties, readOnly: !IsWriteTool(name));
+    }
+
+    /// <summary>
+    /// How many messages the conversation held when this turn began - the
+    /// mark <see cref="WindTheTurnBack"/> returns to.
+    /// </summary>
+    private int _turnBeganAt = 1;
+
+    /// <summary>
+    /// Take the whole turn back out of what the MODEL is sent: the teacher's
+    /// sentence, the model's reply, and any read a second lap made.
+    /// </summary>
+    /// <remarks>
+    /// <para>The transcript the teacher reads is not touched - it is the
+    /// window's, not this list - so their sentence stays above the answer.
+    /// Only the model's copy goes. Safe because no lap can follow a write:
+    /// a turn comes back to the model only after a read or a refusal made
+    /// before anything was written.</para>
+    ///
+    /// <para>Not called on an engine failure (unreachable, timed out): that
+    /// path reports the engine rather than asking for a rephrase, and the
+    /// context is worth keeping.</para>
+    /// </remarks>
+    private void WindTheTurnBack()
+    {
+        while (_messages.Count > _turnBeganAt) _messages.RemoveAt(_messages.Count - 1);
+    }
+
     /// <summary>This turn's date note, remembered so a parroting reply can have it stripped.</summary>
     private string _dateline = "";
 
@@ -903,8 +1698,11 @@ public sealed class AssistAgent
     {
         if (ShowPreviewInApp is null || !PreviewCommands.Contains(Plainly(text))) return null;
 
-        ShowPreviewInApp.Invoke();
-        const string said = "The preview is opening in Plantoir's main window — the build shows its progress there.";
+        bool deploying = ThisSectionIsBeingDeployed();
+        if (!deploying) ShowPreviewInApp.Invoke();
+        string said = deploying
+            ? SectionIsBeingDeployedSentence
+            : "The preview is opening in Plantoir's main window — the build shows its progress there.";
         // The exchange still goes in the transcript the model sees, so a
         // follow-up question knows the preview is already on screen.
         _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
@@ -939,6 +1737,13 @@ public sealed class AssistAgent
         var answer = await RunTool(call, lines, cancellation);
         lines.Add(new Line("tools", answer.Summary));
         if (TurnEnded(lines)) return lines;
+        // A lap after an approved call begins at its result: winding back
+        // past it would erase a call that has already run. It begins with a
+        // TOOL RESULT and no message from the teacher, so there is nothing for
+        // a reply to echo.
+        _turnBeganAt = _messages.Count;
+        _sentThisTurn = null;
+        _typedThisTurn = null;
         return lines.Concat(await Run(cancellation)).ToList();
     }
 
@@ -993,18 +1798,88 @@ public sealed class AssistAgent
 
         for (int step = 0; step < MostStepsPerTurn; step++)
         {
-            var reply = await _model.Ask(_messages, _schemas, cancellation);
-            if (reply is null)
+            var asking = System.Diagnostics.Stopwatch.StartNew();
+            var modelAnswer = await _model.Ask(_messages, _schemas, cancellation);
+            asking.Stop();
+            if (modelAnswer?.Message is not { } reply)
             {
+                // An ENGINE failure, and deliberately not wound back: the
+                // sentence is usually not the cause, and the context is worth
+                // keeping for the next turn (#196).
                 ActivityTrail.Note(ActivityTrail.Event.AssistantCouldNotAnswer,
                     "the assistant did not answer", _courseCode, _section);
                 lines.Add(new Line("assistant", "The assistant didn’t answer. Try again in a moment."));
                 return lines;
             }
-            _messages.Add(reply.DeepClone()!);
 
             var calls = reply["tool_calls"] as JsonArray;
             bool acting = calls is { Count: > 0 };
+            string begun = (acting ? calls![0]?["function"]?["name"]?.ToString() : null) ?? "";
+
+            // ABOVE the tool-call branch, and whether or not a tool was named
+            // (#196). A reply cut before the tool name was written arrives
+            // with NO tool call and a raw fragment in its content, which the
+            // branch below would show to the teacher; one cut a token after
+            // its arguments closed parses perfectly. The finish reason is the
+            // only signal that tells either from a finished answer.
+            if (modelAnswer.WasCutOff)
+            {
+                return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff, begun.Length > 0
+                    ? $"the assistant's answer was cut off part way through {Spaced(begun)} — nothing was run from it"
+                    : "the assistant's answer was cut off part way — nothing was run from it");
+            }
+            // Below the cut-off gate and above the readability and course
+            // gates (the mac's order), and BEFORE the reply joins the
+            // conversation: a tool that exists but was not offered is
+            // refused, the turn is wound back, and nothing runs — no plan, no
+            // button (#350 / mac #327).
+            if (acting && calls![0]?["function"]?["name"]?.GetValue<string>() is { } named &&
+                WasNotOffered(named))
+            {
+                WindTheTurnBack();
+                ActivityTrail.Note(ActivityTrail.Event.AssistantNamedAToolItWasNotOffered,
+                    $"the assistant named {named.Replace('_', ' ')}, which it was not offered; nothing ran",
+                    _courseCode, _section);
+                lines.Add(new Line("assistant", AssistWording.DidNotFollowThat));
+                return lines;
+            }
+
+            if (acting && calls![0] is JsonObject chosen)
+            {
+                switch (WhatTheModelWroteFor(chosen))
+                {
+                    case WhatTheModelWrote.Unreadable:
+                        // A finished answer whose arguments are not JSON: the
+                        // model wrote bad JSON of its own accord. Same sentence,
+                        // its own line — whoever reads a report needs to tell
+                        // the two apart.
+                        return NothingRanFromIt(lines, AssistWording.AnswerWasCutOff,
+                            $"the assistant finished answering but what it wrote for {Spaced(begun)} could not be read — nothing was run from it");
+                    case WhatTheModelWrote.NothingForWhatItNeeds:
+                        // #262: it wrote NOTHING, and this tool needs more than
+                        // the window supplies. Not answerWasCutOff, whose advice
+                        // is about the teacher's request.
+                        return NothingRanFromIt(lines, AssistWording.AnswerLeftOutWhatItWasFor,
+                            $"the assistant finished answering but wrote nothing for {Spaced(begun)} — nothing was run from it");
+                }
+            }
+            // #217: BELOW the tool-call branch (an echo is by definition a
+            // reply with no tool call) and ABOVE the append — the whole point
+            // is that it must not get into the history, because the model
+            // copies the pattern it can see: measured, after one echo even a
+            // sentence it answers correctly in a fresh conversation echoed.
+            if (!acting && IsTheRequestBackAgain(_sentThisTurn, _typedThisTurn,
+                                                 reply["content"]?.ToString() ?? "", hasToolCall: false))
+            {
+                // Never show the echoed text, not even inside an apology.
+                ActivityTrail.Note(ActivityTrail.Event.AssistantRepeatedTheRequestBack,
+                    "the assistant repeated the request back — nothing was run, and the turn was taken back out of the conversation",
+                    _courseCode, _section);
+                WindTheTurnBack();
+                lines.Add(new Line("assistant", AssistWording.DidNotFollowThat));
+                return lines;
+            }
+            _messages.Add(reply.DeepClone()!);
 
             // Content alongside a tool call is almost always the request
             // parroted back — measured as "Unpublishing Unit 4, Day 5
@@ -1026,9 +1901,27 @@ public sealed class AssistAgent
             var call = calls![0] as JsonObject;
             if (call is null) return lines;
 
+            // Where the model's call is made is where its arguments are put
+            // right — once, before the card, the plan twin and the act each
+            // read this same object. Today that is the relative day; a
+            // section binding belongs beside it.
+            call = WithTheDaySettled(call);
+            call = WithTheMomentSettled(call);
+            if (BoundToThisWindow(call) is { } refused)
+            {
+                // Nothing runs: no plan, no card, no tool. The turn comes back
+                // out of what the model is sent, so its next answer is not
+                // made in front of a request it was refused.
+                WindTheTurnBack();
+                lines.Add(new Line("assistant", refused));
+                return lines;
+            }
+
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
-                $"the assistant chose {name.Replace('_', ' ')}", _courseCode, _section);
+                ChoseAToolLine(name, call, asking.Elapsed, modelAnswer.CompletionTokens,
+                               waited: NeedsApproval(name) || (ConfirmationMode() && PlanTwins.ContainsKey(name))),
+                _courseCode, _section);
             if (NeedsApproval(name))
             {
                 // The one rule this loop owns whatever the settings say. A
@@ -1119,11 +2012,25 @@ public sealed class AssistAgent
         // after reading one of these, a small model restates it, and the
         // teacher saw the same sentence twice. There is nothing next: the
         // main window has the work.
+        if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ThisSectionIsBeingDeployed())
+        {
+            // Before a window is opened, a preview stopped or a no-window
+            // rebuild run (#386): the same publish record the window asks.
+            _handedToApp = true;
+            return Answer(call, SectionIsBeingDeployedSentence);
+        }
         if (name.Equals("rebuild_preview", StringComparison.OrdinalIgnoreCase) && ShowPreviewInApp is not null)
         {
             ShowPreviewInApp.Invoke();
             _handedToApp = true;
             return Answer(call, AssistWording.PreviewIsRebuilding(_courseCode, _section.ToString()));
+        }
+        if ((name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase)
+             || name.Equals("schedule_deploy", StringComparison.OrdinalIgnoreCase))
+            && CourseIsKeptForReference())
+        {
+            _handedToApp = true;
+            return Answer(call, AssistWording.DeployRefusedForAReferenceCourse(_courseCode));
         }
         if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) &&
             (StartDeployInApp is not null || StartDeployInAppAsync is not null))
@@ -1197,7 +2104,8 @@ public sealed class AssistAgent
         {
             _handedToApp = true;
         }
-        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null)
+        if (edits && (hadPreview || AlwaysStartsPreview.Contains(name)) && ShowPreviewInApp is not null &&
+            !ThisSectionIsBeingDeployed())
         {
             ShowPreviewInApp.Invoke();
         }

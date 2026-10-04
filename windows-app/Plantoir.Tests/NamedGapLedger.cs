@@ -32,9 +32,9 @@ namespace Plantoir.Tests;
 /// <c>ContractTests.SharedRules_ActivityTrailEvents_Exist</c> honours it. That
 /// is the right tool for a difference that is DELIBERATE and permanent — "built
 /// site moved out of the working folder" is mac-only because Windows has never
-/// built inside the working folder, so there is no moment to record. Neither
-/// gap listed below is like that. Windows OWES both of them, at v1.3.0, and
-/// writing <c>appliesOn: ["mac"]</c> would therefore be a lie in the file both
+/// built inside the working folder, so there is no moment to record. None of the
+/// gaps listed below is like that. Windows OWES every one of them, on the parity
+/// milestone, and writing <c>appliesOn: ["mac"]</c> would therefore be a lie in the file both
 /// platforms read as the truth. It would also be a permanent one: <c>appliesOn</c>
 /// has no mend-check, so on the day Windows implemented the event the contract
 /// would still say the event was none of its business, both suites would stay
@@ -84,41 +84,73 @@ internal static class NamedGapLedger
     /// <summary><c>shared-rules.json</c> → <c>specialNames.platformWording.keys</c>, by key.</summary>
     internal const string PlatformWordedKeys = "shared-rules.json → specialNames.platformWording.keys";
 
+    /// <summary><c>assist-wording.json</c> → <c>wording</c>, by key: a sentence with no same-named member on <c>AssistWording</c> or <c>ClassChangeWording</c>.</summary>
+    internal const string AssistWordingKeys = "assist-wording.json → wording";
+
+    /// <summary><c>file-formats.json</c> → <c>courseConfigKeys.keys</c>, by key.</summary>
+    internal const string CourseConfigKeys = "file-formats.json → courseConfigKeys.keys";
+
+    /// <summary><c>app-rules.json</c> → <c>modelTiers.requirements</c>, by <c>rule</c>.</summary>
+    internal const string ModelTierRequirements = "app-rules.json → modelTiers.requirements";
+
+    /// <summary><c>class-planning.json</c> → <c>sectionIndexPointer.dateCases</c>, by case <c>name</c>.</summary>
+    internal const string FrontPageDateCases = "class-planning.json → sectionIndexPointer.dateCases";
+
+    /// <summary><c>shared-rules.json</c> → <c>gradedFolders.newCourse.cases</c>, by case <c>name</c>.</summary>
+    internal const string GradedFoldersNewCourseCases = "shared-rules.json → gradedFolders.newCourse.cases";
+
+    /// <summary>
+    /// The milestone every entry below names. While no Windows release is
+    /// being cut, an entry may name an open issue on this milestone itself:
+    /// the entries are that milestone's BURN-DOWN LIST, and the milestone
+    /// cannot close — nor a Windows release be cut — while any remains
+    /// (Russell, 2026-09-25, reconfirmed 2026-09-30; <c>contracts/README.md</c>
+    /// → "Named gaps"; <c>WINDOWS-PARITY.md</c> → section 8).
+    /// </summary>
+    private const string Parity = "Windows: parity with mac v1.4.0";
+
     /// <summary>
     /// One thing the contract names and this app does not have yet.
     /// </summary>
     /// <param name="Area">Which contract list the key belongs to.</param>
     /// <param name="Key">The event name or sentence key, spelled as the contract spells it.</param>
     /// <param name="Issue">The open GitHub issue that owns the work.</param>
-    /// <param name="Milestone">The milestone that issue carries — LATER than the release being cut.</param>
+    /// <param name="Milestone">The milestone that issue carries. Normally LATER
+    /// than the release being cut; while no Windows release is being cut it may
+    /// be the parity milestone itself, and then the entries ARE that
+    /// milestone's burn-down list — it cannot close while any remains
+    /// (<c>contracts/README.md</c> → "Named gaps").</param>
     /// <param name="Reason">Why it is not built here yet, in a sentence.</param>
     internal sealed record Entry(string Area, string Key, int Issue, string Milestone, string Reason);
 
-    private static readonly Entry[] Entries =
+    /// <summary>Several keys of one area owned by one issue, for one reason.</summary>
+    private static IEnumerable<Entry> Owed(string area, int issue, string reason, params string[] keys) =>
+        keys.Select(key => new Entry(area, key, issue, Parity, reason));
+
+    private static readonly Entry[] Entries = new IEnumerable<Entry>[]
     {
+        // ---- activityTrail.mustRecord: events this app does not declare yet.
+        // Mapped 2026-09-30 (bundle 1) from each event's own #references to
+        // the open `windows` issue that carries that mac piece. Each goes when
+        // its feature lands, and its mend-check says so.
 
+        // ---- specialNames.platformWording.keys
 
-        // Renaming a course's word for a unit landed on the mac 2026-09-10
-        // (issue #100) and arrived here as the contract moving: the event and
-        // the sentence are both parts of a feature this app has none of yet.
-        // Issue #158 is the whole handover — the renamer, the plan, the sheet,
-        // the sentences and this event — and it is milestoned v1.3.0, after
-        // the v1.2.0 cut. Both entries go when that feature lands; neither can
-        // be deleted on its own without the other's check noticing.
-        new Entry(
-            ActivityTrailEvents,
-            "word for a unit renamed",
-            158,
-            "v1.3.0",
-            "this app cannot rename a course's word for a unit yet, so there is no moment to record"),
+        // ---- file-formats.json → courseConfigKeys: keys CourseConfiguration.cs does not name.
 
-        new Entry(
-            PlatformWordedKeys,
-            "renameUnitWord.explanation",
-            158,
-            "v1.3.0",
-            "the sentence belongs to a sheet this app does not have yet, so there is nothing here to word"),
-    };
+        // ---- class-planning.json → sectionIndexPointer.dateCases (pointAt cases)
+
+        // ---- shared-rules.json → gradedFolders.newCourse.cases (#317's runner)
+
+        // ---- app-rules.json → modelTiers.requirements
+
+        // ---- assist-wording.json → wording: sentences with no same-named
+        // member here, each held open by the issue that owns the feature
+        // that says it.
+        // Empty since 2026-10-01: #157's two keys (noCoursesYet,
+        // whatPublishingMeans) and #308's four (the pages a plan, a re-date
+        // and a make-room name when the writer declines them) are said here.
+    }.SelectMany(group => group).ToArray();
 
     /// <summary>
     /// Checks the ledger's entries for one contract list, in BOTH directions,

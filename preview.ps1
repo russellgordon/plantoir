@@ -469,6 +469,157 @@ function Get-SectionProcessesToStop {
     return $ordered
 }
 
+# ---- Ports and the trail ---------------------------------------------
+
+# Every TCP port listening on this PC, read ONCE. Get-NetTCPConnection lists
+# every owner's listeners, SYSTEM services included (measured for #319 - see
+# documentation/03-launcher-scripts.md). A listing that cannot be read counts
+# as empty: build_site.py's own bind re-probe still refuses a taken port.
+function Get-ListeningPorts {
+    $ports = New-Object 'System.Collections.Generic.HashSet[int]'
+    try {
+        foreach ($row in @(Get-NetTCPConnection -State Listen -ErrorAction Stop)) {
+            $null = $ports.Add([int]$row.LocalPort)
+        }
+    } catch {}
+    return ,$ports
+}
+
+# The first block from -From whose site port and websocket (+1000) are both
+# free, walking hostBlockCount (40) steps of hostBlockStep (10). $null when
+# every one is taken. Kept a pure function of its arguments so
+# windows-app\test_launcher_rules.ps1 can run the contract's cases on it.
+function Find-FreePreviewPort {
+    param([int]$From, $Listening, [int]$Count = 40, [int]$Step = 10, [int]$WebsocketOffset = 1000)
+    for ($i = 0; $i -lt $Count; $i++) {
+        $candidate = $From + ($i * $Step)
+        if (-not $Listening.Contains($candidate) -and -not $Listening.Contains($candidate + $WebsocketOffset)) {
+            return $candidate
+        }
+    }
+    return $null
+}
+
+# One line on the teacher's activity trail, for a refusal made HERE - a
+# preview typed at a command line has no app to read a marker, and a refusal
+# a teacher met there is exactly the one nobody else saw. Same file, same
+# stamp, same lock as the app's own writer (ActivityTrail.Append: the named
+# mutex Local\PlantoirActivityTrail, an append opened to share), so two
+# writers cannot tear a line. Never fails the launcher.
+function Write-TrailLine {
+    param([string]$What)
+    try {
+        $dir = Join-Path $env:LOCALAPPDATA 'Plantoir\Logs'
+        if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Force -Path $dir }
+        $line = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) + ' ' + [char]0x00B7 + ' ' + $What + [Environment]::NewLine
+        $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($line)
+        $mutex = New-Object System.Threading.Mutex($false, 'Local\PlantoirActivityTrail')
+        $held = $false
+        try {
+            try { $held = $mutex.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+            $share = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+            $stream = New-Object IO.FileStream((Join-Path $dir 'activity.txt'), [IO.FileMode]::Append, [IO.FileAccess]::Write, $share)
+            try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+        } finally {
+            if ($held) { $mutex.ReleaseMutex() }
+            $mutex.Dispose()
+        }
+    } catch {}
+}
+
+# ---- A section being deployed cannot be previewed (#386 / mac #381) ----
+# contracts/shared-rules.json -> previewWhileItsSectionDeploys, the launcher
+# layer: a serving run reads the LIVE process table (Win32_Process - never a
+# remembered process id) for a deploy of this course and section:
+#   * deploy.ps1 run as a PROGRAM (-File <...\deploy.ps1>), whose own
+#     arguments BEGIN with the course, read whole ("AP CALC" is two words;
+#     CALC 2 is not AP CALC 2), then exactly this section (1 is not 12) -
+#     not --reset-token, --logout or --help, which deploy nothing. Its folder
+#     is the script's own directory when the path names one; a relative path
+#     names none, and a deploy of this very section whose folder cannot be
+#     told still counts (the safe side for the deploy).
+#   * a deploy set for later of C/S: the wrapper Task Scheduler runs, named
+#     SafeName(TaskScheduling.NameFor(C, S)) + '.ps1' - the name is BUILT the
+#     way the app builds it (#401's note 2: the contract's labelCodeCases
+#     describe the mac's launchd label, not this task name, and are not run
+#     here). The task name carries no folder, so it counts for every folder
+#     holding that course and section (the mac's pre-#237 limit).
+# preview.ps1 --build-only is NOT a deploy: it is also the assistant's
+# "rebuild the preview". A process that merely MENTIONS deploy.ps1, and this
+# run's own ancestors, never count. A table that cannot be read - the query
+# fails, or its answer does not list this run ($PID) - lets the preview
+# THROUGH (#401's note 1): failing closed blocks every preview until it reads.
+function Split-CommandLine([string]$Line) {
+    $words = New-Object System.Collections.Generic.List[string]
+    if (-not $Line) { return ,$words }
+    foreach ($m in [regex]::Matches($Line, '"([^"]*)"|(\S+)')) {
+        if ($m.Groups[1].Success) { $words.Add($m.Groups[1].Value) } else { $words.Add($m.Groups[2].Value) }
+    }
+    return ,$words
+}
+
+function Get-ScheduledDeployScriptName([string]$Course, [string]$Section) {
+    # TaskScheduling.NameFor, then SafeName: letters and digits kept, anything
+    # else '-'. Must stay the app's own shape.
+    $taskName = 'Plantoir deploy ' + $Course.ToUpperInvariant() + ' section ' + $Section
+    $safe = -join ($taskName.ToCharArray() | ForEach-Object { if ([char]::IsLetterOrDigit($_)) { $_ } else { '-' } })
+    return $safe + '.ps1'
+}
+
+function Test-SectionIsBeingDeployed {
+    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [uint32]$Self)
+    if ($null -eq $Snapshot) { return $false }
+    $rows = @($Snapshot)
+    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $false }
+
+    # This run's own ancestors never count.
+    $ancestors = New-Object 'System.Collections.Generic.HashSet[uint32]'
+    $cursor = $Self
+    for ($depth = 0; $depth -lt 64; $depth++) {
+        $row = $rows | Where-Object { [uint32]$_.ProcessId -eq $cursor } | Select-Object -First 1
+        if (-not $row -or $null -eq $row.ParentProcessId) { break }
+        $parent = [uint32]$row.ParentProcessId
+        if ($parent -eq 0 -or -not $ancestors.Add($parent)) { break }
+        $cursor = $parent
+    }
+
+    $courseWords = @(($Course.Trim() -split '\s+') | Where-Object { $_ })
+    $scheduledName = Get-ScheduledDeployScriptName (($courseWords -join ' ')) $Section
+    foreach ($proc in $rows) {
+        $processId = [uint32]$proc.ProcessId
+        if ($processId -eq $Self -or $ancestors.Contains($processId)) { continue }
+        $words = Split-CommandLine ([string]$proc.CommandLine)
+        # The program is the script handed to -File; anything else only
+        # mentions it.
+        $at = -1
+        for ($i = 0; $i -lt $words.Count - 1; $i++) { if ($words[$i] -ieq '-File') { $at = $i + 1; break } }
+        if ($at -lt 0) { continue }
+        $script = $words[$at]
+        $leaf = ($script -split '[\\/]')[-1]
+        if ($leaf -ieq $scheduledName) { return $true }
+        if ($leaf -ine 'deploy.ps1') { continue }
+
+        $own = @()
+        if ($words.Count -gt $at + 1) { $own = @($words.GetRange($at + 1, $words.Count - $at - 1)) }
+        if ($own.Count -lt $courseWords.Count + 1) { continue }
+        $same = $true
+        for ($w = 0; $w -lt $courseWords.Count; $w++) { if ($own[$w] -ine $courseWords[$w]) { $same = $false; break } }
+        if (-not $same -or $own[$courseWords.Count] -cne $Section) { continue }
+        $deploysNothing = $false
+        foreach ($flag in $own) { if ($flag -in @('--reset-token', '--logout', '--help', '-h')) { $deploysNothing = $true } }
+        if ($deploysNothing) { continue }
+
+        if ($script -match '^[A-Za-z]:[\\/]|^[\\/][\\/]') {
+            try {
+                $folder = Get-PhysicalPath (Split-Path -Parent $script)
+                if ($folder -and $Here -and ($folder -ine $Here)) { continue }
+            } catch {}
+        }
+        return $true
+    }
+    return $false
+}
+
 # ---- Stop mode -------------------------------------------------------
 # .\preview.ps1 CODE N --stop : kill this section's preview processes.
 # Ending the host-side script leaves the build or server running; this
@@ -496,6 +647,22 @@ if ($NATIVE_RUNTIME -and $STOP_MODE) {
 
 
 
+
+# ---- Refuse while this section is being deployed (#386) ----
+# Serving runs only, after the arguments are checked and before anything is
+# changed. The cross is written as a code point: this file is read by
+# Windows PowerShell 5.1 without a BOM, so only ASCII may appear in strings.
+if (-not $BUILD_ONLY) {
+    $table = $null
+    try { $table = @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId, ParentProcessId, CommandLine) } catch { $table = $null }
+    if (Test-SectionIsBeingDeployed -Snapshot $table -Course $COURSE -Section ([string]$SECTION) -Here $WORKDIR_PHYSICAL -Self ([uint32]$PID)) {
+        $cross = [char]::ConvertFromUtf32(0x274C)
+        Write-Host ("{0} {1} section {2} is being deployed right now, so it cannot be previewed until that has finished." -f $cross, $COURSE, $SECTION)
+        Write-Host "   Nothing was changed."
+        Write-TrailLine ("{0}/{1} {2} the preview stopped before building {2} this section was being deployed" -f $COURSE, $SECTION, [char]0x00B7)
+        exit 1
+    }
+}
 
 # ---- Validate SECTION against course_config.json ----
 Write-Host "Checking allowed timetable sections for $COURSE ..."
@@ -563,16 +730,25 @@ $argList += "--port=$PREVIEW_PORT"
 # address is resolved from the container rather than assumed. The exact
 # phrase below is what the app watches for.
 $HOST_PREVIEW_PORT = $null
-# Probe a free site+websocket pair, walking 10-apart blocks (8081/8091/...).
-# build_site.py re-probes and re-announces moments before the bind - this
-# early answer only feeds the pre-build announcement below.
+# Probe a free site+websocket pair, walking 10-apart blocks from the port
+# asked for - FORTY of them, as the mac launchers and build_site.py's own
+# first_free_preview_port do (contracts/app-rules.json -> previewPorts:
+# hostBlockCount, hostBlockStep; GitHub #286 / mac #280). The native path
+# binds ONE pair, not a published block of four, so a block here is the site
+# port and its websocket (+1000). build_site.py re-probes and re-announces
+# moments before the bind - this early answer only feeds the pre-build
+# announcement below. The listening ports are read ONCE for all forty blocks.
 if (-not $BUILD_ONLY) {
-    foreach ($candidate in @($PREVIEW_PORT, ($PREVIEW_PORT+10), ($PREVIEW_PORT+20), ($PREVIEW_PORT+30), ($PREVIEW_PORT+40), ($PREVIEW_PORT+50))) {
-        $siteBusy = Get-NetTCPConnection -State Listen -LocalPort $candidate -ErrorAction SilentlyContinue
-        $wsBusy   = Get-NetTCPConnection -State Listen -LocalPort ($candidate + 1000) -ErrorAction SilentlyContinue
-        if (-not $siteBusy -and -not $wsBusy) { $HOST_PREVIEW_PORT = $candidate; break }
+    $listening = Get-ListeningPorts
+    $HOST_PREVIEW_PORT = Find-FreePreviewPort -From $PREVIEW_PORT -Listening $listening
+    if (-not $HOST_PREVIEW_PORT) {
+        # previewPorts.whenNoBlockIsFree, word for word except the machine
+        # (proposed to the contract as its Windows line), and its exit code.
+        Write-Host "Every address Plantoir can use for a preview is taken."
+        Write-Host "Close Plantoir's windows for your other working folders, or restart this PC, then try again."
+        Write-TrailLine ("{0}/{1} {2} stopped before starting {2} every address Plantoir can use for a preview was taken" -f $COURSE, $SECTION, [char]0x00B7)
+        exit 1
     }
-    if (-not $HOST_PREVIEW_PORT) { Write-Host "Could not find free ports for this folder's previews."; exit 1 }
     $argList = @($argList | Where-Object { $_ -notlike '--port=*' }) + "--port=$HOST_PREVIEW_PORT"
 }
 if (-not $HOST_PREVIEW_PORT) { $HOST_PREVIEW_PORT = $PREVIEW_PORT }

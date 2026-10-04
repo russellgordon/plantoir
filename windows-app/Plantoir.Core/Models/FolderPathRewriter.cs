@@ -47,19 +47,33 @@ public static class FolderPathRewriter
     /// up to the first <c>]</c>, <c>|</c> or <c>#</c>, so an alias, a heading
     /// and a block reference stay where they are.
     /// </summary>
-    private static readonly Regex WikiLink =
-        new(@"(!?\[\[)([^\]|#]+)", RegexOptions.Compiled);
+    // The one wikilink target pattern (#318): an escaped pipe is a link, and
+    // its backslash stays outside the match so it is never rewritten away.
+    private static readonly Regex WikiLink = WikiLinks.TargetPattern;
 
     /// <summary>
     /// A Markdown link or embed's target: everything between <c>](</c> and the
     /// closing bracket. Titles (<c>](path "title")</c>) are left in place
     /// because the path is taken only up to the first space.
     /// </summary>
-    private static readonly Regex MarkdownLink =
-        new(@"(\]\()([^)\s]+)", RegexOptions.Compiled);
+    // Not a link whose target opens with `<`: that one is read by
+    // AngleLink, so every link is read by exactly one pattern (#338, the
+    // mac's #97). Before, this read `<Tasks/Quiz` and missed a first-segment
+    // folder, and missed the scheme of `<https://…>` — a live defect that
+    // repointed a teacher's link at somebody else's site.
+    internal static readonly Regex MarkdownLink =
+        new(@"(\]\()(?!<)([^)\s]+)", RegexOptions.Compiled);
+
+    // `[q](<Tasks/Quiz 1.md>)`. The `>` is a LOOKAHEAD: the rewriter copies on
+    // from the end of the match, so consuming it would drop it from every
+    // rewritten link (the mac's must-fail M6). Unterminated is plain text.
+    internal static readonly Regex AngleLink =
+        new(@"(\]\(<)([^<>\r\n]+)(?=>)", RegexOptions.Compiled);
+
+    private enum Style { Wiki, Angle, Markdown }
 
     /// <summary>A URL scheme: http:, https:, mailto:, obsidian: and friends.</summary>
-    private static readonly Regex Scheme =
+    internal static readonly Regex Scheme =
         new(@"^[A-Za-z][A-Za-z0-9+.\-]*:", RegexOptions.Compiled);
 
     /// <summary>
@@ -135,8 +149,25 @@ public static class FolderPathRewriter
         if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName)) return text;
         if (oldName.Equals(newName, StringComparison.Ordinal)) return text;
 
-        string once = WikiLink.Replace(text, match => Replaced(match, oldName, newName, markdown: false));
-        return MarkdownLink.Replace(once, match => Replaced(match, oldName, newName, markdown: true));
+        // Wikilink, angle, plain — in that order — and never inside code or
+        // a %% comment (#339): an example of a link is not a link, and each
+        // pass masks the text it is given.
+        string result = ReplacedOutside(WikiLink, text, match => Replaced(match, oldName, newName, Style.Wiki));
+        result = ReplacedOutside(AngleLink, result, match => Replaced(match, oldName, newName, Style.Angle));
+        return ReplacedOutside(MarkdownLink, result, match => Replaced(match, oldName, newName, Style.Markdown));
+    }
+
+    private static string ReplacedOutside(Regex pattern, string text, Func<Match, string> replacement)
+    {
+        var builder = new StringBuilder();
+        int carried = 0;
+        foreach (Match match in MarkdownCode.MatchesOutside(pattern, text))
+        {
+            builder.Append(text, carried, match.Index - carried).Append(replacement(match));
+            carried = match.Index + match.Length;
+        }
+        builder.Append(text, carried, text.Length - carried);
+        return builder.ToString();
     }
 
     /// <summary>
@@ -148,18 +179,18 @@ public static class FolderPathRewriter
     {
         if (string.IsNullOrEmpty(text) || string.IsNullOrWhiteSpace(folderName)) return 0;
         int found = 0;
-        foreach (Regex pattern in new[] { WikiLink, MarkdownLink })
-            foreach (Match match in pattern.Matches(text))
+        foreach (Regex pattern in new[] { WikiLink, AngleLink, MarkdownLink })
+            foreach (Match match in MarkdownCode.MatchesOutside(pattern, text))
                 if (NamesTheFolder(match.Groups[2].Value, folderName))
                     found++;
         return found;
     }
 
-    private static string Replaced(Match match, string oldName, string newName, bool markdown)
+    private static string Replaced(Match match, string oldName, string newName, Style style)
     {
         string opening = match.Groups[1].Value;
         string target = match.Groups[2].Value;
-        return opening + RewrittenTarget(target, oldName, newName, markdown);
+        return opening + RewrittenTarget(target, oldName, newName, style);
     }
 
     /// <summary>
@@ -169,7 +200,7 @@ public static class FolderPathRewriter
     /// candidate, so a page called <c>Tasks.md</c> survives a rename of the
     /// folder <c>Tasks</c>.</para>
     /// </summary>
-    private static string RewrittenTarget(string target, string oldName, string newName, bool markdown)
+    private static string RewrittenTarget(string target, string oldName, string newName, Style style)
     {
         if (PointsOutsideTheCourse(target)) return target;
 
@@ -180,7 +211,7 @@ public static class FolderPathRewriter
         for (int i = 0; i < segments.Count - 1; i++)
         {
             if (!SegmentIs(segments[i], oldName)) continue;
-            segments[i] = Spelled(newName, wasEncoded: WasEncoded(segments[i]), markdown: markdown);
+            segments[i] = Spelled(newName, wasEncoded: WasEncoded(segments[i]), style);
             changed = true;
         }
         return changed ? string.Join("/", segments) : target;
@@ -215,9 +246,16 @@ public static class FolderPathRewriter
     /// segment happened to arrive encoded. The contract has a case for each
     /// branch.</para>
     /// </summary>
-    private static string Spelled(string newName, bool wasEncoded, bool markdown)
+    private static string Spelled(string newName, bool wasEncoded, Style style)
     {
-        if (markdown && WouldBreakAMarkdownTarget(newName)) return PercentEncoded(newName);
+        if (wasEncoded) return PercentEncoded(newName);
+        // Inside angle brackets the name goes in PLAIN — spaces, brackets and
+        // all — unless it holds what would end the brackets or the line.
+        // The trap: keeping the Markdown rule here writes `<All%20Tasks/…>`,
+        // which resolves on the site and fails five plain-spelling cases.
+        if (style == Style.Angle)
+            return newName.IndexOfAny(new[] { '<', '>', '\r', '\n' }) >= 0 ? PercentEncoded(newName) : newName;
+        if (style == Style.Markdown && WouldBreakAMarkdownTarget(newName)) return PercentEncoded(newName);
         return wasEncoded ? PercentEncoded(newName) : newName;
     }
 

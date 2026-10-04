@@ -289,6 +289,19 @@
           },
           "expectCouldNotBePutBack": false,
           "why": "The guard: what every restore did before #182 and must go on doing. Passes on the old code too, on purpose."
+        },
+        {
+          "name": "a blank line before the opening fence is dropped from the restored page",
+          "section": 1,
+          "live": "\n---\ncreatedSection1: 2026-09-01\npublishForSection1: true\ntitle: x\n---\n\nThe lesson.\n",
+          "backup": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "after": "---\ncreatedSection1: 2026-09-01\npublishForSection1: false\ntitle: x\n---\n\nThe lesson.\n",
+          "expectSite": {
+            "1": "hidden",
+            "2": "visible"
+          },
+          "expectCouldNotBePutBack": false,
+          "why": "The shared finder reaches a page with blank lines before its fence (#177), and the build reads it the same either way. The mac's restore rebuilds the page from the fence and so drops them; Windows kept them from parity bundle 2 until Russell chose one behaviour on 2026-10-01 (Windows matched the mac). Proposed from Windows; the mac already behaves this way, so it should pass there unchanged."
         }
       ]
     }

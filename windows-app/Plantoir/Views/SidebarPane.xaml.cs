@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
+using Plantoir.Core.Scripting;
 using Plantoir.Services;
 using Plantoir.ViewModels;
 
@@ -42,12 +43,21 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
 
     public required string Title { get; init; }
     public required string Glyph { get; init; }
-    public string? Tooltip { get; init; }
+    private string? _tooltip;
+    /// <summary>Settable after creation: backup sizes arrive from a measurement off the UI thread (#283).</summary>
+    public string? Tooltip
+    {
+        get => _tooltip;
+        set { if (_tooltip != value) { _tooltip = value; Raise(nameof(Tooltip)); } }
+    }
     public bool IsExpanded { get; set; }   // mutable: user toggles are recorded (row 99)
     public string AutomationId { get; init; } = "";
     public ObservableCollection<SidebarRow> Children { get; init; } = new();
     public SidebarSelection? Selection { get; init; }
     public ArchivedItem? Archived { get; init; }
+
+    /// <summary>The key a group row's fold is remembered under, for rows that are not a course (#241's reference groups).</summary>
+    public string? FoldKey { get; init; }
 
     private MenuFlyout? _menu;
     /// <summary>
@@ -182,7 +192,13 @@ public sealed partial class SidebarPane : UserControl
     /// <summary>Write a group/course toggle into the window's memory.</summary>
     private void RecordExpansion(SidebarRow row, bool expanded)
     {
-        if (row.Selection is SidebarSelection.CourseItem(var code))
+        if (row.FoldKey is { } key)
+        {
+            if (Workspace.IsCourseExpanded(key) == expanded) return;
+            Workspace.SetCourseExpanded(key, expanded);
+            App.RememberOpenWindows();
+        }
+        else if (row.Selection is SidebarSelection.CourseItem(var code))
         {
             if (Workspace.IsCourseExpanded(code) == expanded) return;
             Workspace.SetCourseExpanded(code, expanded);
@@ -269,11 +285,14 @@ public sealed partial class SidebarPane : UserControl
             Tree.ItemsSource = _roots;
         }
         ReconcileCourses();
+        ReconcileReference();
         ReconcileBackups();
         ReconcileArchived();
 
-        // Root order: courses, then Backups, then Archived (row 106).
+        // Root order: courses, then Reference Courses (#241), then Backups,
+        // then Archived (row 106).
         var desiredRoots = new List<SidebarRow> { _coursesGroup };
+        if (_referenceGroup is not null) desiredRoots.Add(_referenceGroup);
         if (_backupsGroup is not null) desiredRoots.Add(_backupsGroup);
         if (_archivedGroup is not null) desiredRoots.Add(_archivedGroup);
         ApplyDesiredOrder(_roots, desiredRoots);
@@ -301,6 +320,7 @@ public sealed partial class SidebarPane : UserControl
             AutomationId = "backupsGroup",
         };
         if (!_roots.Contains(_backupsGroup)) _roots.Add(_backupsGroup);
+        _backupsGroup.Menu = BackupsGroupMenu();
 
         var byId = new Dictionary<string, SidebarRow>();
         foreach (var row in _backupsGroup.Children)
@@ -322,7 +342,194 @@ public sealed partial class SidebarPane : UserControl
             desired.Add(row);
         }
         ApplyDesiredOrder(_backupsGroup.Children, desired);
+        MeasureBackupSizes(desired);
     }
+
+    // ---- Backups: what they take, and All Backups (#283) -------------------
+
+    private readonly MeasurementGeneration _backupSizeGeneration = new();
+
+    /// <summary>
+    /// Sizes are read OFF the UI thread (a folder in OneDrive can be slow to
+    /// answer) and applied only if no newer list has been read since — a slow
+    /// measurement of the old list must not overwrite the new one.
+    /// </summary>
+    private void MeasureBackupSizes(IReadOnlyList<SidebarRow> rows)
+    {
+        var group = _backupsGroup;
+        var items = Workspace.BackupItems.ToList();
+        int generation = _backupSizeGeneration.Begin();
+        _ = Task.Run(() => items.Select(i => (Item: i, Bytes: BackupSizes.LogicalSize(i.FilePath))).ToList())
+            .ContinueWith(task =>
+            {
+                if (task.IsFaulted) return;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (!_backupSizeGeneration.IsCurrent(generation) || group is null) return;
+                    var summary = BackupSizes.Summarize(task.Result);
+                    group.Tooltip = BackupsSummarySentence(summary);
+                    foreach (var (item, bytes) in task.Result)
+                        if (rows.FirstOrDefault(r => r.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id) is { } row)
+                            row.Tooltip = $"{item.Subtitle} · " +
+                                (bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeRead);
+                });
+            });
+    }
+
+    /// <summary>"4 backups take 29.3 MB together." — the number the Backups list can act on.</summary>
+    internal static string BackupsSummarySentence(BackupSizes.Summary summary)
+    {
+        string sentence = $"{summary.TotalCount} backup{(summary.TotalCount == 1 ? "" : "s")} " +
+                          $"take{(summary.TotalCount == 1 ? "s" : "")} {BackupSizes.Describe(summary.TotalBytes)} together.";
+        if (!summary.EverySizeKnown)
+            sentence += $" {summary.Unknown} not counted: {AssistWording.BackupSizeCouldNotBeRead.ToLowerInvariant()}.";
+        return sentence;
+    }
+
+    private MenuFlyout BackupsGroupMenu()
+    {
+        var menu = new MenuFlyout();
+        menu.Items.Add(MenuItem("All Backups…", RestoreGlyph, () => _ = ShowAllBackups()));
+        return menu;
+    }
+
+    /// <summary>
+    /// All Backups: one line per backup — course, when, who made it, size —
+    /// with Extended selection, and ONE button whose label carries the count.
+    /// A WinUI ListView rather than the mac's Table; the confirmation names a
+    /// backup an open assistant conversation can restore from as KEPT, and
+    /// "together" counts only what will go.
+    /// </summary>
+    public async Task ShowAllBackups()
+    {
+        string? askedIn = Workspace.WorkspacePath;
+        if (askedIn is null) return;
+        var items = Workspace.BackupItems.ToList();
+        var measured = await Task.Run(() => items.Select(i => (Item: i, Bytes: BackupSizes.LogicalSize(i.FilePath))).ToList());
+        var sizes = measured.ToDictionary(m => m.Item.FilePath, m => m.Bytes);
+        var summary = BackupSizes.Summarize(measured);
+
+        var panel = new StackPanel { Spacing = 8, MinWidth = 520 };
+        panel.Children.Add(new TextBlock { Text = BackupsSummarySentence(summary), TextWrapping = TextWrapping.Wrap });
+        foreach (var course in summary.Courses)
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"{course.CourseCode}: {course.Count} backup{(course.Count == 1 ? "" : "s")}, {BackupSizes.Describe(course.Bytes)}",
+                Opacity = 0.8,
+            });
+        if (CloudSyncedFolder.ServiceFor(askedIn) is { } service)
+            panel.Children.Add(new TextBlock
+            {
+                Text = $"This folder is kept in {service}, so these backups also take space in your {service} storage.",
+                TextWrapping = TextWrapping.Wrap,
+            });
+
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Extended, MaxHeight = 360 };
+        AutomationProperties.SetAutomationId(list, "allBackupsList");
+        foreach (var (item, bytes) in measured)
+        {
+            var grid = new Grid { ColumnSpacing = 12 };
+            foreach (var width in new[] { 80, 200, 150, 90 })
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+            string who = item.Maker is BackupMaker.Assistant a ? $"Assistant, Section {a.SectionNumber}" : "You";
+            string[] cells = { item.CourseCode, item.WhenDescription, who,
+                               bytes is { } b ? BackupSizes.Describe(b) : AssistWording.BackupSizeCouldNotBeReadShort };
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = new TextBlock { Text = cells[i], TextTrimming = TextTrimming.CharacterEllipsis };
+                if (i == 3 && bytes is null) ToolTipService.SetToolTip(cell, AssistWording.BackupSizeCouldNotBeRead);
+                Grid.SetColumn(cell, i);
+                grid.Children.Add(cell);
+            }
+            var row = new ListViewItem { Content = grid, Tag = item };
+            AutomationProperties.SetAutomationId(row, $"allBackups-{Path.GetFileName(item.FilePath)}");
+            AutomationProperties.SetName(row, $"{item.CourseCode} {item.WhenDescription}");
+            list.Items.Add(row);
+        }
+        panel.Children.Add(list);
+
+        var dialog = new ContentDialog
+        {
+            Title = "All Backups",
+            Content = panel,
+            PrimaryButtonText = DeleteBackupsLabel(0),
+            IsPrimaryButtonEnabled = false,
+            CloseButtonText = "Done",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        list.SelectionChanged += (_, _) =>
+        {
+            dialog.PrimaryButtonText = DeleteBackupsLabel(list.SelectedItems.Count);
+            dialog.IsPrimaryButtonEnabled = list.SelectedItems.Count > 0;
+        };
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+        var chosen = list.SelectedItems.OfType<ListViewItem>().Select(r => (BackupItem)r.Tag).ToList();
+        await ConfirmDeleteBackups(chosen, sizes, askedIn);
+    }
+
+    /// <summary>"Delete 2 Backups…" — the one button, carrying the count. With
+    /// nothing selected it is greyed and says "Delete Backups…", never "Delete 0
+    /// Backups…", which offers to delete nothing — the mac's own wording
+    /// (<c>AllBackupsView.deleteButtonTitle</c>); bundle 11, rulings U9 and V4.</summary>
+    internal static string DeleteBackupsLabel(int count) =>
+        count == 0 ? "Delete Backups…" : count == 1 ? "Delete 1 Backup…" : $"Delete {count} Backups…";
+
+    private async Task ConfirmDeleteBackups(IReadOnlyList<BackupItem> chosen, IReadOnlyDictionary<string, long?> sizes, string askedIn)
+    {
+        if (chosen.Count == 0) return;
+        var held = HeldBackups.For(askedIn, Workspace.BackupItems);
+        var going = chosen.Where(b => !held.Contains(Path.GetFullPath(b.FilePath))).ToList();
+        var kept = chosen.Except(going).ToList();
+        var goingSizes = going.Select(b => sizes.TryGetValue(b.FilePath, out var s) ? s : null).ToList();
+        string together = going.Count > 0 && goingSizes.All(s => s is not null)
+            ? $", {BackupSizes.Describe(goingSizes.Sum(s => s!.Value))} together"
+            : "";
+        string content = going.Count == 0
+            ? ""
+            : $"{going.Count} backup{(going.Count == 1 ? " is" : "s are")} deleted for good{together}. " +
+              "The courses themselves stay put.";
+        if (kept.Count > 0)
+            content += (content.Length > 0 ? "\n\n" : "") + string.Join("\n", kept.Select(k =>
+                $"The backup of {k.CourseCode} made {k.WhenDescription} is kept: an open assistant conversation can still " +
+                $"restore from it. {KeptBackupAdvice(k)}"));
+        var dialog = new ContentDialog
+        {
+            Title = going.Count == 0 ? "These backups are kept" : $"Delete {going.Count} backup{(going.Count == 1 ? "" : "s")}?",
+            Content = new TextBlock { Text = content, TextWrapping = TextWrapping.Wrap },
+            PrimaryButtonText = going.Count == 0 ? "" : "Delete",
+            CloseButtonText = going.Count == 0 ? "OK" : "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
+        if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
+
+        // Re-read the hold at the moment of deleting: a conversation that made
+        // its backup while the confirmation was up must not lose it.
+        var outcome = BackupDeleter.Delete(chosen, HeldBackups.For(askedIn, Workspace.BackupItems));
+        ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes));
+        if (Workspace.Selection is SidebarSelection.BackupEntry(var id) && outcome.Deleted.Any(b => b.Id == id))
+            Workspace.Selection = null;
+        Workspace.Reload();
+        _window.ApplyState();
+        // Every other window on this folder re-reads its Backups list ONLY.
+        foreach (var other in App.OpenWindows.Where(w => !ReferenceEquals(w, _window)
+                     && w.Workspace.WorkspacePath is { } path
+                     && string.Equals(Path.GetFullPath(path), Path.GetFullPath(askedIn), StringComparison.OrdinalIgnoreCase)))
+        {
+            other.Workspace.ReloadBackupsOnly();
+            other.SidebarPane.Refresh();
+        }
+        if (outcome.Failed.Count > 0)
+            await ShowError("Some backups could not be deleted",
+                string.Join("\n", outcome.Failed.Select(f => $"{f.Item.CourseCode}, {f.Item.WhenDescription}: {f.Problem}")));
+    }
+
+    /// <summary>The words a second assistant window is refused with, turned to this case.</summary>
+    private static string KeptBackupAdvice(BackupItem item) =>
+        item.Maker is BackupMaker.Assistant a
+            ? $"Close the assistant for {item.CourseCode} Section {a.SectionNumber} first if you want to delete it."
+            : $"Close the assistant for {item.CourseCode} first if you want to delete it.";
 
     private void ReconcileCourses()
     {
@@ -330,7 +537,8 @@ public sealed partial class SidebarPane : UserControl
         foreach (var row in _coursesGroup!.Children) byCode[row.Title] = row;
 
         var desired = new List<SidebarRow>();
-        foreach (var course in Workspace.FilteredCourses)
+        // A course kept for reference lives in its own group (#241).
+        foreach (var course in Workspace.FilteredCourses.Where(c => !ReferenceCourse.IsKeptForReference(c)))
         {
             if (!byCode.TryGetValue(course.Code, out var row))
                 row = new SidebarRow
@@ -368,7 +576,7 @@ public sealed partial class SidebarPane : UserControl
                     Selection = new SidebarSelection.SectionItem(course.Code, number),
                     AutomationId = $"sidebar-{course.Code}-section{number}",
                 };
-            row.Menu = SectionMenu(course, number);
+            row.Menu = ReferenceCourse.IsKeptForReference(course) ? ReferenceSectionMenu(course, number) : SectionMenu(course, number);
             // Re-read on EVERY pass, not only when the row is first created —
             // rows are reconciled, not recreated, so an existing row's clock
             // badge would otherwise stay stuck at whatever was true the
@@ -376,14 +584,18 @@ public sealed partial class SidebarPane : UserControl
             // rather than anything of ours being written down: the teacher
             // can delete the task themselves, and a badge promising a deploy
             // that will not happen is worse than no badge.
-            row.ScheduledDeploy = TaskScheduling.NextRun(course.Code, number);
+            row.ScheduledDeploy = Workspace.WorkspacePath is { } scheduledIn
+                ? TaskScheduling.NextRun(scheduledIn, course.Code, number)
+                : null;
             // Re-read on every pass for the same reason as the clock above, and
             // read rather than remembered: the record is on disk, an overnight
             // run writes it with nothing of ours alive, and the teacher can
             // clear it from inside the section — so anything cached here would
             // be wrong within a click. FAILURES only; a run that worked leaves a
             // notice inside the section and no badge.
-            var outcome = ScheduledPublishOutcome.Read(course.Code, number);
+            var outcome = Workspace.WorkspacePath is { } recordedIn
+                ? ScheduledPublishOutcome.Read(course.Code, number, recordedIn)
+                : null;
             row.PublishStopped =
                 outcome is { } result && ScheduledPublishOutcome.NeedsAttention(result.Outcome)
                     ? result.When
@@ -527,6 +739,11 @@ public sealed partial class SidebarPane : UserControl
         menu.Items.Add(new MenuFlyoutSeparator());
         // Backing up stays available mid-preview — it only reads (row 106).
         menu.Items.Add(MenuItem("Back Up Now", RestoreGlyph, () => _ = BackUpCourse(course)));
+        // #241: a frozen copy, kept beside the live course. Offered on a live
+        // course only; a copy of a frozen copy has no purpose.
+        menu.Items.Add(MenuItem(ReferenceCourse.KeepACopyMenuItem, Glyphs.Star, () => _ = KeepACopy(course)));
+        // On EVERY course row, a reference course's included: it only reads (#247).
+        menu.Items.Add(MenuItem(CopyPageWording.Templates["menuItem"], Glyphs.Copy, () => _ = OpenCopyAPage(course)));
 
         var reviseItems = ReviseItems(course, section: null);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
@@ -573,6 +790,17 @@ public sealed partial class SidebarPane : UserControl
             "If Claude Code was updated or moved recently, restarting Plantoir may be enough.");
     }
 
+    /// <summary>"Revise with Codex…": the second outside door (#210, mac #205).</summary>
+    private void ReviseWithCodex(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
+
+        _ = ShowError("Codex didn’t open",
+            $"Plantoir couldn’t start a Codex session for {course.Code}. " +
+            "If Codex was updated or moved recently, restarting Plantoir may be enough.");
+    }
+
     private MenuFlyout BackupMenu(BackupItem item)
     {
         var menu = new MenuFlyout();
@@ -604,7 +832,9 @@ public sealed partial class SidebarPane : UserControl
         // Scheduling without going through the assistant: the same act, and
         // most teachers setting a 6:30 deploy know exactly what they want and
         // should not have to describe it in a sentence first.
-        var scheduled = TaskScheduling.NextRun(course.Code, number);
+        var scheduled = Workspace.WorkspacePath is { } scheduledIn
+            ? TaskScheduling.NextRun(scheduledIn, course.Code, number)
+            : null;
         if (scheduled is { } when)
         {
             menu.Items.Add(MenuItem($"Change Deploy Time ({when:h:mm tt})…", Glyphs.Clock,
@@ -617,6 +847,21 @@ public sealed partial class SidebarPane : UserControl
             menu.Items.Add(MenuItem("Schedule Deploy…", Glyphs.Clock,
                                      () => AskWhenToDeploy(course, number, existing: null)));
         }
+
+        // The links checklist on demand (#392, linksChecklist.offeredWhen.onDemand):
+        // whenever an offer exists, so Not Now is not a one-way door.
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, number) is not null)
+            menu.Items.Add(MenuItem(Plantoir.Core.Assist.LinksChecklistWording.MenuItem, Glyphs.Star,
+                                     () => _ = OpenLinksChecklist(course, number)));
+
+        // Get Ready for the Start of the Year (#355, mac #96), and its undo
+        // BESIDE it — never in its place — while one is held for this section.
+        menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.MenuItem, "\uE787",
+                                 () => _ = OpenStartOfYear(course, number)));
+        if (Workspace.WorkspacePath is { } undoIn
+            && Plantoir.Core.Assist.StartOfYearSessionUndo.For(undoIn, course.Code, number) is not null)
+            menu.Items.Add(MenuItem(Plantoir.Core.Assist.StartOfYearWording.UndoMenuItem, "\uE7A7",
+                                     () => _ = UndoStartOfYear(course, number)));
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
@@ -654,10 +899,18 @@ public sealed partial class SidebarPane : UserControl
     /// at that moment is stated in the dialog rather than discovered at
     /// 6:31, either way.
     /// </summary>
-    private async void AskWhenToDeploy(Course course, int number, DateTime? existing)
+    private async void AskWhenToDeploy(Course windowCourse, int number, DateTime? existing)
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // The sheet works from the SAVED settings (#357 / mac #335): what it
+        // shows, what it refuses and what it sets. Unreadable: refuse.
+        if (SavedSettings.Read(windowCourse) is not { } course)
+        {
+            await ShowError("That couldn't be scheduled", SavedSettings.CouldNotBeReadToDeploy(windowCourse.Code));
+            return;
+        }
+        bool unsavedSomewhere = Plantoir.ViewModels.WorkspaceViewModel.AnyCopyHasUnsavedChanges(windowCourse.ConfigFilePath);
         var initial = existing ?? DateTime.Today.AddDays(1).AddHours(6).AddMinutes(30);
         bool isChange = existing is not null;
 
@@ -681,37 +934,17 @@ public sealed partial class SidebarPane : UserControl
             Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 "SystemFillColorCautionBrush"],
         };
-        // Advice, not a refusal: the classes a deploy would put the site up
-        // without. The assistant's tool has said this since it existed
-        // (ScheduledDeploy.Describe), and so has the mac's sheet; this door
-        // said nothing, so a teacher scheduled 6:30 AM without being told
-        // tomorrow's page was unpublished — the one thing the description
-        // exists to tell them. Date-independent, so it is read once; the
-        // button stays enabled, because "publish first" is advice the teacher
-        // may have a reason to ignore. Shown only while there is no refusal,
-        // as on the mac, where the problem is shown alone.
-        string? advice = ScheduledDeploy.UnpublishedClassesSentence(
-            ScheduledDeploy.UnpublishedClassesIn(course, number));
-        var unpublished = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Visibility = Visibility.Collapsed,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                "SystemFillColorCautionBrush"],
-        };
-        AutomationProperties.SetAutomationId(unpublished, "unpublishedClassesNote");
-
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            Text = $"{course.Code} Section {number} will deploy on its own at the time you pick. " +
-                   "This computer must be switched on and awake then — plugged in if it is a laptop, " +
-                   "with the lid open. Plantoir does not wake it up.",
+            // Names EVERY destination (#400); nothing about unpublished classes.
+            Text = ScheduledDeploy.DialogOpening(course, number),
         });
+        if (unsavedSomewhere)
+            body.Children.Add(new TextBlock { TextWrapping = TextWrapping.Wrap, Text = SavedSettings.SchedulingUsesSavedSettings });
         body.Children.Add(day);
         body.Children.Add(time);
-        body.Children.Add(unpublished);
         body.Children.Add(warning);
 
         var dialog = new ContentDialog
@@ -731,13 +964,16 @@ public sealed partial class SidebarPane : UserControl
             string? problem = chosen is null
                 ? "Pick a day."
                 : ScheduledDeploy.Problem(course, number, chosen.Value, DateTime.Now, Workspace.Settings.CloudflareAccountId);
-            warning.Text = problem ?? "";
-            warning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+            // #261: what this replaces, said before anything is written — read
+            // by task name across the computer, never through a folder filter.
+            string? replaces = problem is null && chosen is { } at && Workspace.WorkspacePath is { } here &&
+                               TaskScheduling.MomentItWouldReplace(here, course.Code, number, at, DateTime.Now) is { } was
+                ? AssistWording.ScheduleReplaces(was.ToString("dddd d MMMM, h:mm tt"))
+                : null;
+            warning.Text = problem ?? replaces ?? "";
+            warning.Visibility = problem is null && replaces is null ? Visibility.Collapsed : Visibility.Visible;
             dialog.IsPrimaryButtonEnabled = problem is null;
 
-            bool showAdvice = problem is null && advice is not null;
-            unpublished.Text = showAdvice ? advice! : "";
-            unpublished.Visibility = showAdvice ? Visibility.Visible : Visibility.Collapsed;
         }
 
         DateTime? Chosen() => day.Date is { } picked
@@ -753,10 +989,15 @@ public sealed partial class SidebarPane : UserControl
         if (Chosen() is not { } when) return;
 
         if (Workspace.WorkspacePath is not { } folder) return;
-        if (TaskScheduling.Schedule(TaskScheduling.NameFor(course.Code, number),
-                                    folder, course.Code, number, when, course.DirectoryPath,
-                                    course.Configuration.AllDeployDestinations,
-                                    Workspace.Settings.CloudflareAccountId) is { } failure)
+        if (SavedSettings.Read(windowCourse) is { } savedAtThePress) course = savedAtThePress;   // again at the press
+        if (unsavedSomewhere)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.DeployUsedTheSavedSettings,
+                SavedSettings.DeployUsedTheSavedSettingsLine("set a deploy for a moment", course, windowCourse),
+                course.Code, number);
+        // Where it goes and the Account ID are read when it RUNS (#347); the
+        // destinations handed over here are only what the teacher was told.
+        if (TaskScheduling.Schedule(folder, course.Code, number, when,
+                                    course.Configuration.AllDeployDestinations) is { } failure)
         {
             await ShowError("That couldn't be scheduled", failure);
             return;
@@ -789,7 +1030,13 @@ public sealed partial class SidebarPane : UserControl
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
 
-        if (TaskScheduling.Cancel(TaskScheduling.NameFor(course.Code, number)) is { } problem)
+        if (Workspace.WorkspacePath is not { } cancelIn
+            || TaskScheduling.For(cancelIn, course.Code, number) is not { } scheduled)
+        {
+            Refresh();   // gone already — the clock goes with it
+            return;
+        }
+        if (TaskScheduling.Cancel(scheduled) is { } problem)
         {
             await ShowError("That couldn't be cancelled",
                 $"Windows would not remove the scheduled task: {problem}");
@@ -884,6 +1131,12 @@ public sealed partial class SidebarPane : UserControl
             items.Add(MenuItem("Revise with Claude…", Glyphs.Star,
                 () => ReviseWithClaude(course)));
 
+        // Hidden independently when Codex is not installed
+        // (outsideAgents.hiddenWhenNotInstalled, #210).
+        if (CodexLauncher.IsAvailable)
+            items.Add(MenuItem("Revise with Codex…", Glyphs.Star,
+                () => ReviseWithCodex(course)));
+
         // "Local" is the word doing the work: it is what separates this from
         // the Claude item above, and it is the privacy promise in one word.
         items.Add(MenuItem("Revise with local AI assistant…", Glyphs.Star,
@@ -915,6 +1168,9 @@ public sealed partial class SidebarPane : UserControl
         string title;
         string message;
         int? sectionNumber = (Workspace.Selection as SidebarSelection.SectionItem)?.Number;
+        // A reference course's section is never removed on its own (#241,
+        // staysAsItIs): the footer's Remove means the whole course there.
+        if (ReferenceCourse.IsKeptForReference(course)) sectionNumber = null;
         if (sectionNumber is int n && course.SectionNumbers.Count > 1)
         {
             title = $"Remove Section {n} of {course.Code}?";
@@ -931,6 +1187,15 @@ public sealed partial class SidebarPane : UserControl
             title = $"Remove {course.Code}?";
             message = $"Nothing is deleted. {course.Code} and all of its sections move to Archived, at the bottom of the sidebar, where you can get them back.";
         }
+
+        // Said BEFORE anything happens (#239): removing turns this folder's
+        // scheduled deploys for it off, first. Asked of the scheduler, so a
+        // section removed earlier that left one behind is named too.
+        var scheduled = ScheduledDeployRemoval.ScheduledSections(askedIn!, course.Code, sectionNumber);
+        if (scheduled.Count > 0)
+            message += "\n\n" + (sectionNumber is int removing
+                ? ScheduledDeployRemoval.ConfirmationSectionRemoved(removing)
+                : ScheduledDeployRemoval.ConfirmationCourseRemoved(course.Code, scheduled));
 
         var dialog = new ContentDialog
         {
@@ -958,6 +1223,17 @@ public sealed partial class SidebarPane : UserControl
         }
     }
 
+    /// <summary>Copy a Page from This Course… (#247): the dialog does the rest.</summary>
+    private async Task OpenCopyAPage(Course course)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        await CopyAPageDialog.ShowAsync(course, Workspace.Courses, folder, ShowDialogSafelyAsync);
+        // The dialog acted on the folder it was handed; only redraw this one if it still shows it.
+        if (TheFolderMovedUnderThisConfirmation(folder)) return;
+        Workspace.Reload();
+        _window.ApplyState();
+    }
+
     // ---- Backups (row 106) -------------------------------------------------
 
     /// <summary>Zip the whole course, leave it untouched, show it in Backups.</summary>
@@ -967,7 +1243,10 @@ public sealed partial class SidebarPane : UserControl
         string when;
         try
         {
-            string zipPath = CourseArchiver.BackUpCourse(course, Workspace.CoursesDirectory());
+            // Off the UI thread (ruling 10): zipping takes seconds, and a backup
+            // landing in the same second waits up to a second for the next (#187).
+            string courses = Workspace.CoursesDirectory();
+            string zipPath = await Task.Run(() => CourseArchiver.BackUpCourse(course, courses));
             when = BackupItem.From(zipPath, course.Code)?.WhenDescription ?? "just now";
         }
         catch (Exception error)
@@ -1187,6 +1466,58 @@ public sealed partial class SidebarPane : UserControl
 
     private XamlRoot? EffectiveXamlRoot => XamlRoot ?? _window.Content?.XamlRoot;
 
+    /// <summary>"Publish Pages That Links Lead To…": a stale offer asks for a preview first.</summary>
+    private async Task OpenLinksChecklist(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        if (Plantoir.Core.Assist.LinksChecklistShowing.Offer(course, section) is not { } offer) return;
+        string? said;
+        if (!Plantoir.Core.Assist.LinksChecklistShowing.IsFresh(course, section))
+            said = Plantoir.Core.Assist.LinksChecklistWording.Fill(Plantoir.Core.Assist.LinksChecklistWording.NeedsAPreviewFirst,
+                new Dictionary<string, string> { ["course"] = course.Code, ["section"] = section.ToString() });
+        else
+            said = await LinksChecklistDialog.OfferAsync(folder, course, section, offer, "from the menu", ShowDialogSafelyAsync,
+                                                         () => TheFolderMovedUnderThisConfirmation(folder));
+        if (said is null) return;
+        // folder-check: not needed — an OK that tells what already happened, and acts on nothing.
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = Plantoir.Core.Assist.LinksChecklistWording.MenuItem.TrimEnd('\u2026'),
+            Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap },
+            CloseButtonText = "OK",
+        });
+    }
+
+    /// <summary>"Get Ready for the Start of the Year…": the sheet, Go, and what happened.</summary>
+    private async Task OpenStartOfYear(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        string? said = await StartOfYearDialog.OfferAsync(folder, course, section, ShowDialogSafelyAsync,
+                                                          () => TheFolderMovedUnderThisConfirmation(folder));
+        await SayAfterStartOfYear(said);
+    }
+
+    /// <summary>"Undo Getting Ready for the Start of the Year…".</summary>
+    private async Task UndoStartOfYear(Course course, int section)
+    {
+        if (Workspace.WorkspacePath is not { } folder) return;
+        string? said = await StartOfYearDialog.UndoAsync(folder, course, section, ShowDialogSafelyAsync,
+                                                         () => TheFolderMovedUnderThisConfirmation(folder));
+        await SayAfterStartOfYear(said);
+    }
+
+    private async Task SayAfterStartOfYear(string? said)
+    {
+        if (said is null) return;
+        // folder-check: not needed — an OK that tells what already happened, and acts on nothing.
+        await ShowDialogSafelyAsync(new ContentDialog
+        {
+            Title = Plantoir.Core.Assist.StartOfYearWording.MenuItem.TrimEnd('\u2026'),
+            Content = new ScrollViewer { Content = new TextBlock { Text = said, TextWrapping = TextWrapping.Wrap }, MaxHeight = 480 },
+            CloseButtonText = "OK",
+        });
+    }
+
     private async Task<ContentDialogResult?> ShowDialogSafelyAsync(ContentDialog dialog)
     {
         if (EffectiveXamlRoot is { } root)
@@ -1294,6 +1625,9 @@ public sealed partial class SidebarPane : UserControl
     public async Task OpenRenameCourseDialog(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        // Never a course kept for reference, from ANY route (#241): its folder
+        // and its code are allowed to disagree only there.
+        if (ReferenceCourse.IsKeptForReference(course)) return;
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = folder;
 

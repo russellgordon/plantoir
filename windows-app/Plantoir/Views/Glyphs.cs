@@ -16,6 +16,7 @@ public static class Glyphs
     public const string Play = "\uE768";   // Preview
     public const string Stop = "\uE71A";
     public const string Send = "\uE724";   // Deploy / publish
+    public const string Copy = "\uE8C8";   // Copy a Page
     public const string Globe = "\uE774";   // open in browser / no-preview
     public const string Library = "\uE8F1";   // course (books)
     public const string Document = "\uE8A5";   // section

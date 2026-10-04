@@ -209,25 +209,10 @@ public class GradedFolderContractTests
 
     // ---- The curriculum folder -----------------------------------------
 
-    [Fact]
-    public void CurriculumFolderResolution_MatchesContract()
-    {
-        var resolution = SharedRules["specialNames"]!["curriculumFolderResolution"]!;
-        var cases = resolution["cases"]!.AsArray();
-        Assert.True(cases.Count >= 5,
-            $"The contract lost curriculum-resolution cases: {cases.Count} present, 5 expected at least.");
-
-        foreach (var c in cases)
-        {
-            string? configured = c!["configured"] is null || c["configured"] is JsonValue v && v.ToJsonString() == "null"
-                ? null : c["configured"]!.ToString();
-            var folders = c["folders"]!.AsArray().Select(f => f!.ToString()).ToList();
-            string? expected = c["resolved"] is null ? null : c["resolved"]!.ToString();
-            string why = c["why"]!.ToString();
-
-            Assert.Equal(expected, CurriculumFolderRule.Resolve(configured, folders));
-        }
-    }
+    // CurriculumFolderResolution_MatchesContract read
+    // specialNames.curriculumFolderResolution, which #345 (mac #128) DELETED
+    // from the contract in favour of the plural curriculumFoldersResolution —
+    // run in CurriculumFoldersContractTests.
 
     /// <summary>
     /// A configured name the course no longer has must not be protected: the

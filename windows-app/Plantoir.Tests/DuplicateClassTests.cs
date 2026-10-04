@@ -198,7 +198,102 @@ public sealed class DuplicateClassTests : IDisposable
 
         string copy = File.ReadAllText(ClassPath("Unit 2, Day 3"));
         Assert.True(PageFrontmatter.IsDraft(copy, 1));
-        Assert.Contains("publishForSection1: false", copy);
+        // #200 B: the inherited per-section key is REMOVED, never overridden
+        // with a publishForSection1: false — which the plain publish: a later
+        // publish writes can never beat, so the copy could never be published.
+        Assert.DoesNotContain("publishForSection1", copy);
+
+        // And the proof: publishing it afterwards, the way the publish path
+        // does (the plain key, because the copy is section-local), shows it.
+        string published = PageFrontmatter.SetDraft(copy, "publish", draft: false, 1).Text;
+        Assert.False(PageFrontmatter.IsDraft(published, 1));
+    }
+
+    [Fact]
+    public void AQuotedPerSectionKeyIsStrippedToo()
+    {
+        // Bundle 2 review, finding 1: `"publishForSection1": false` is the
+        // same key to YAML and to the reader, and left on the copy it beats
+        // every later plain publish — #200 B again, for one spelling.
+        FourClasses();
+        Write("Unit 2, Day 2",
+              "---\ntitle: Unit 2, Day 2\n\"publishForSection1\": false\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\n---\nShared.\n");
+        var workspace = Open();
+
+        workspace.ApplyDuplicateClass(workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 2"));
+
+        string copy = File.ReadAllText(ClassPath("Unit 2, Day 3"));
+        Assert.DoesNotContain("publishForSection1", copy);
+        Assert.True(PageFrontmatter.IsDraft(copy, 1));
+        string published = PageFrontmatter.SetDraft(copy, "publish", draft: false, 1).Text;
+        Assert.False(PageFrontmatter.IsDraft(published, 1));
+    }
+
+    [Fact]
+    public void AnInheritedPerSectionDateGoesTooSoTheSiteShowsTheCopysOwnDay()
+    {
+        FourClasses();
+        Write("Unit 2, Day 2",
+              "---\ntitle: Unit 2, Day 2\npublish: true\ncreatedSection1: 2026-09-14T07:00:00.000-0400\n" +
+              "draftSection1: >-\n  false\n---\nShared.\n");
+        var workspace = Open();
+
+        workspace.ApplyDuplicateClass(workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 2"));
+
+        string copy = File.ReadAllText(ClassPath("Unit 2, Day 3"));
+        Assert.DoesNotContain("createdSection1", copy);
+        Assert.DoesNotContain("draftSection1", copy);
+        Assert.DoesNotContain("  false", copy);
+        Assert.True(PageFrontmatter.IsDraft(copy, 1));
+    }
+
+    [Fact]
+    public void ASourceThisAppCannotReadIsNotCopiedAtAll()
+    {
+        // #200 B's abandon: a TAB used as indentation makes the block
+        // unreadable to the build and to the reader, and nothing written to
+        // the copy can mend it — so the copy is refused, the blank the
+        // insertion wrote stays (hidden), and no undo entry is left.
+        FourClasses();
+        Write("Unit 2, Day 2",
+              "---\ntitle: Unit 2, Day 2\npublish: true\ncreated: 2026-09-14T07:00:00.000-0400\ntags:\n\t- a\n---\nThe secret.\n");
+        var workspace = Open();
+
+        var refusal = Assert.Throws<AssistRefusal>(() =>
+            workspace.ApplyDuplicateClass(workspace.PlanDuplicateClass("ICS3U", 1, "Unit 2, Day 2")));
+
+        Assert.Equal(ClassChangeWording.TheCopyCouldNotBeMadeHidden("Unit 2, Day 2", "Unit 2, Day 3",
+            workspace.ConversationBackupPath), refusal.Message);
+        string standing = File.ReadAllText(ClassPath("Unit 2, Day 3"));
+        Assert.DoesNotContain("The secret.", standing);
+        Assert.True(PageFrontmatter.IsDraft(standing, 1));
+        Assert.Empty(_history.Entries);
+    }
+
+    [Fact]
+    public void ALinkRewrittenInsideTheLessonCannotFoolTheGuard()
+    {
+        // #200 A, the mac's deterministic construction with a FOLDER standing in
+        // for invalid UTF-8 (which .NET reads without complaint): Unit 1 Days
+        // 1-6, duplicate Day 2, so the copy is to become Day 3 — a real lesson
+        // linking to Day 6. Day 5 cannot be read, so Day 6 -> 7 is the only
+        // rename; the link pass then rewrites [[Unit 1, Day 6]] inside Day 3,
+        // and the old text comparison read the lesson as "not the same page".
+        var dates = new[] { "2026-09-08", "2026-09-10", "2026-09-12", "2026-09-14", "2026-09-16", "2026-09-18" };
+        for (int day = 1; day <= 6; day++)
+            Lesson($"Unit 1, Day {day}", dates[day - 1],
+                   day == 3 ? "The real Day 3. See [[Unit 1, Day 6]].\n" : $"Body of day {day}.\n");
+        var workspace = Open();
+        var plan = workspace.PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 2");
+
+        // Day 5 becomes something that cannot be read as a page (a folder of
+        // the same name) after the plan, so its rename is skipped.
+        File.Delete(ClassPath("Unit 1, Day 5"));
+        Directory.CreateDirectory(ClassPath("Unit 1, Day 5"));
+        var refusal = Assert.Throws<AssistRefusal>(() => workspace.ApplyDuplicateClass(plan));
+
+        Assert.StartsWith("“Unit 1, Day 3” is still there", refusal.Message);
+        Assert.Contains("The real Day 3.", File.ReadAllText(ClassPath("Unit 1, Day 3")));
     }
 
     // ---- Undo, and when it is deliberately not offered ---------------------
@@ -274,7 +369,7 @@ public sealed class DuplicateClassTests : IDisposable
         var refusal = Assert.Throws<AssistRefusal>(
             () => Open().PlanDuplicateClass("ICS3U", 1, "Field Trip"));
 
-        Assert.Equal(ClassChangeWording.NotANumberedClassPage("Field Trip", "Unit"), refusal.Message);
+        Assert.Equal(ClassChangeWording.NotANumberedClassPage("Field Trip"), refusal.Message);
     }
 
     [Fact]
@@ -358,6 +453,19 @@ public sealed class DuplicateClassTests : IDisposable
             ClassChangeWording.WouldBeCopiedTo("Unit 2, Day 2", "Unit 2, Day 3", new DateOnly(2026, 9, 16)),
             described);
         Assert.Contains(ClassChangeWording.TheCopyStartsHidden, described);
+        // Duplicating the course's last class moves nothing, so the undo is
+        // offered and the card must NOT warn (#346, duplication.undoRule).
+        Assert.DoesNotContain(AssistWording.MakingRoomCannotBeUndone, described);
+    }
+
+    [Fact]
+    public void APlanThatMovesOtherClassesWarnsTheUndoWillNotHelp()
+    {
+        // #346 (the mac's #185): exactly the condition that withholds the undo.
+        FourClasses();
+        var plan = Open().PlanDuplicateClass("ICS3U", 1, "Unit 1, Day 1");
+        Assert.True(plan.MovesOtherClasses);
+        Assert.EndsWith(AssistWording.MakingRoomCannotBeUndone, plan.Describe());
     }
 
     [Fact]

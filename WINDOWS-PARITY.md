@@ -246,6 +246,17 @@ item 5).
 
 ### Phase 3: the trail, leases, scheduled publish and quit (4 issues, plus #238 when it lands)
 
+**Status, 2026-09-30 (bundle 3, branch `issue/bundle3-trail-leases`):** built —
+#303 (the #238 twin; the share-flag fix was MEASURED to lose lines and a named
+mutex is what landed), #289, #239, #309, #297, #347, #218, #231, #400, #404.
+Not built: #324 (needs the toast, #212's Windows half, first). Two answers
+differ from this table's expectations: #239's lateness cases are RUN rather
+than recorded as exempt (Windows' task does not run a missed start late —
+measured, doc 07 — but the check is kept as a guard and costs nothing); and
+#347 took option (a), the task launching Plantoir. The manuals are doc 07 →
+"On Windows since bundle 3" and doc 09 → the two "On Windows since bundle 3"
+subsections.
+
 | # | What it is | Kind | Where the rule lives |
 |---|---|---|---|
 | **#238** (incoming) | Trail lines are dropped when two processes write at once: `File.AppendAllText` opens with `FileShare.Read`, and an empty `catch` swallows the sharing violation. **Measure first** (kept X of Y, on what hardware), then fix with `FileShare.ReadWrite` plus a single `Write`, or a named `Mutex`. No retry loop. **Not a blocker for anything**: the race loses lines whatever order events are added in, so events added in Phases 0–2 need not wait for it. It sits here, with the rest of the trail work. No Windows issue exists yet; it is opened when the mac piece lands | MATCH in effect | doc 09 → "Two writers at once: the trail never loses a line" |

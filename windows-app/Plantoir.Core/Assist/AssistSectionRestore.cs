@@ -45,10 +45,28 @@ public static class AssistSectionRestore
         $"Anything YOU changed in Section {sectionNumber} since this conversation started goes back " +
         "too — work done in Obsidian included. Plantoir cannot bring that part back.";
     public static string GoAheadTitle(int sectionNumber) => $"Restore Section {sectionNumber}";
-    public static string DoneMessage(string courseCode, int sectionNumber) =>
-        $"Put {courseCode} Section {sectionNumber} back to how it was when this conversation " +
-        "started. Nothing in your other sections was touched. Ask me to rebuild the preview to " +
-        "see it.";
+    public static string DoneMessage(string courseCode, int sectionNumber, int settingsNotPutBack = 0)
+    {
+        string done = $"Put {courseCode} Section {sectionNumber} back to how it was when this conversation " +
+            "started. Nothing in your other sections was touched. Ask me to rebuild the preview to " +
+            "see it.";
+        return settingsNotPutBack <= 0
+            ? done
+            : done + " " + AssistWording.SharedPagesWhoseSettingsCouldNotBePutBack(settingsNotPutBack, sectionNumber.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// The trail's count of shared pages that kept their setting (#308,
+    /// `page settings left as they were`) - never which pages, and nothing
+    /// when the count is 0.
+    /// </summary>
+    public static void NotePagesNotPutBack(int count, string courseCode, int sectionNumber)
+    {
+        if (count <= 0) return;
+        Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.PageSettingsLeftAsTheyWere,
+            Plantoir.Core.Scripting.ActivityTrail.PageSettingsLeftAsTheyWereLine("putting the section back", count),
+            courseCode, sectionNumber);
+    }
 
     /// <summary>
     /// Puts the section back, or throws a <see cref="Problem"/> saying why
@@ -56,15 +74,19 @@ public static class AssistSectionRestore
     /// teacher to ask, and a version that rebuilt on its own would contradict
     /// the sentence it had just shown.
     /// </summary>
-    public static void Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory)
+    /// <returns>How many shared pages kept their current setting; see <see cref="DoneMessage"/>.</returns>
+    public static int Restore(string? backupPath, string courseCode, int sectionNumber, string? coursesDirectory)
     {
         if (backupPath is null) throw new Problem(NothingToRestore);
         if (coursesDirectory is null) throw new Problem(NoWorkingFolder);
         if (!File.Exists(backupPath) || BackupItem.From(backupPath, courseCode) is not { } item)
             throw new Problem(UnreadableBackup(Path.GetFileName(backupPath)));
-        try { CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory); }
+        int notPutBack;
+        try { notPutBack = CourseRestorer.RestoreSection(sectionNumber, item, coursesDirectory); }
         catch (CourseRestorer.RestoreException error) { throw new Problem(error.Message); }
         catch (IOException error) { throw new Problem(error.Message); }
         catch (UnauthorizedAccessException error) { throw new Problem(error.Message); }
+        NotePagesNotPutBack(notPutBack, courseCode, sectionNumber);
+        return notPutBack;
     }
 }

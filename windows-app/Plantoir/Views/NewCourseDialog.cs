@@ -64,6 +64,24 @@ public sealed class NewCourseDialog : ContentDialog
         ClassPageTerm.Caption(null));
     private readonly TextBlock _unitWordWarning = FormBuilders.WarningCaption("");
     private readonly TextBlock _sectionsCaption;
+
+    // ---- "This is a club" (#274, mac #267; #390, mac #368) ----------------
+    // Shown for EVERY code, pre-ticked by ClubCodeRule until the teacher
+    // touches it. The panel's words follow THE BOX, never the code.
+    private readonly CheckBox _clubBox = new() { Content = WizardWording.ClubToggleLabel };
+    private bool _clubTouched;
+    private bool _settingClubInCode;
+    private readonly StackPanel _clubRows = new() { Spacing = 4, Visibility = Visibility.Collapsed };
+    private readonly TextBox _classFolderBox = new() { Text = ClubVocabulary.Course.ClassFolder };
+    private readonly TextBlock _classFolderWarning = FormBuilders.WarningCaption("");
+    private readonly TextBox _headingBox = new() { Text = ClubVocabulary.Course.FrontPageHeading };
+    private readonly ComboBox _nounBox = new() { MinWidth = 160, Items = { "class", "meeting" }, SelectedIndex = 0 };
+    private TextBlock? _codeLabel, _nameLabel, _unitWordLabel, _markerCaption, _gradeCaption, _namingHeading;
+
+    /// <summary>Whether the teacher is making a club — the BOX, never the code.</summary>
+    private bool IsClub => _clubBox.IsChecked == true;
+
+    private ClassNoun ChosenNoun => _nounBox.SelectedIndex == 1 ? ClassNoun.Meeting : ClassNoun.Class;
     private readonly ComboBox _localeBox = new() { MinWidth = 300 };
     private readonly StackPanel _suggestionsRow = new() { Spacing = 4, Visibility = Visibility.Collapsed };
     private readonly TextBlock _validationText;
@@ -116,8 +134,7 @@ public sealed class NewCourseDialog : ContentDialog
     /// turning the toggle off can put the defaults back for exactly the lists
     /// the teacher has NOT edited since. Null until a skeleton is adopted.
     /// </summary>
-    private (List<string> SharedFolders, List<string> SharedFiles, List<string> PerSectionFolders,
-             List<string> PerSectionFiles, List<string> GradedFolders)? _adopted;
+    private WizardStructure.Lists? _adopted;
     private bool _includeCurriculum = true;
     private bool _includeCurriculumCoverage = true;
     private bool _includeCoverageNotes = true;
@@ -172,7 +189,7 @@ public sealed class NewCourseDialog : ContentDialog
     /// none — or when there is example content, which always wins.
     /// </summary>
     private SkeletonCatalog.Family? SkeletonForCode() =>
-        SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, NormalizedCode)
+        SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent)
             ? SkeletonCatalog.GetFamily(SkeletonsRoot, NormalizedCode)
             : null;
 
@@ -181,13 +198,23 @@ public sealed class NewCourseDialog : ContentDialog
     /// folders and files — the pages were written for one exact layout, and
     /// a hand-edited structure would strand their links.
     /// </summary>
-    private bool StructureComesFromExampleContent =>
-        _prepopulate && ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+    private bool StructureComesFromExampleContent => TakingExampleContent;
+
+    /// <summary>
+    /// Whether the teacher is TAKING the ready-made pages: they exist for the
+    /// typed code and the pre-populate toggle is on. The question #250 is
+    /// about — "does example content exist?" was asked where this belongs.
+    /// </summary>
+    private bool TakingExampleContent =>
+        NewCourseAnswers.TakesExampleContent(ExampleContentRoot, NormalizedCode, _prepopulate);
 
     public NewCourseDialog(MainWindow window)
     {
         _window = window;
-        _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current));
+        _creator = new NewCourseCreator(new ScriptRunner(System.Threading.SynchronizationContext.Current))
+        {
+            SkeletonsRoot = SkeletonsRoot,
+        };
         _nameCatalog = CourseNameCatalogs.Shared;
         _codeBox.ItemTemplate = BuildCodeSuggestionTemplate();
         // AutoSuggestBox does NOT write the chosen row's text into Text by
@@ -208,7 +235,7 @@ public sealed class NewCourseDialog : ContentDialog
         // This project is not reachable from Plantoir.Tests at all — different
         // target framework, and a ContentDialog cannot be built off a XAML
         // thread — so a string that must FAIL when it drifts has to live there.
-        PrimaryButtonText = WizardWording.CreateCourseButton;
+        PrimaryButtonText = WizardWording.Panel(isClub: false).CreateButton;
         CloseButtonText = "Cancel";
         DefaultButton = ContentDialogButton.Primary;
         PrimaryButtonClick += OnPrimaryButton;
@@ -230,8 +257,7 @@ public sealed class NewCourseDialog : ContentDialog
         };
         _gradeWarningSlot = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
         _structureCaption = FormBuilders.ExampleCaption("Defaults are fine for most courses");
-        _structureLockedNote = FormBuilders.ExampleCaption(
-            "The example content chooses the folders and files for this course, so every page lands where its links expect it. Turn off pre-populating to choose your own structure.");
+        _structureLockedNote = FormBuilders.ExampleCaption(WizardWording.StructureFromExampleNote);
         _structureLockedNote.Visibility = Visibility.Collapsed;
         AutomationProperties.SetAutomationId(_structureLockedNote, "structureFromExampleNote");
         _shortRow = FormBuilders.LabeledRow("Short label beside emoji (≤ 12 characters)", _shortBox);
@@ -322,7 +348,8 @@ public sealed class NewCourseDialog : ContentDialog
         bool codeOk = _codeBox.Text.Trim().Length > 0 && CourseCodeProblem() is null;
         bool sectionsOk = SectionNumbersProblem(_sectionsBox.Text) is null;
         bool publishingOk = _publishingChoice?.Problem is null;   // a bad folder blocks Create (row 102)
-        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable;
+        IsPrimaryButtonEnabled = codeOk && sectionsOk && publishingOk && UnitWordIsUsable
+                                 && (!IsClub || ClubClassFolderProblem() is null);
     }
 
     /// <summary>
@@ -390,19 +417,29 @@ public sealed class NewCourseDialog : ContentDialog
         provinceRow.Children.Add(FormBuilders.ExampleCaption("Narrows the course-code search below — typing a code straight through still works either way"));
         form.Children.Add(provinceRow);
 
-        var codeRow = FormBuilders.LabeledRow("Course code", _codeBox);
+        var codeRow = FormBuilders.LabeledRow(WizardWording.ForACourse.CodeLabel, _codeBox);
+        _codeLabel = (TextBlock)codeRow.Children[0];
         codeRow.Children.Add(FormBuilders.ExampleCaption(
             "e.g. ICS3U — or a club name like CODING. Start typing to search known course codes and names."));
         codeRow.Children.Add(_codeWarning);
         form.Children.Add(codeRow);
+
+        AutomationProperties.SetAutomationId(_clubBox, "clubToggle");
+        var clubRow = new StackPanel { Spacing = 2, Margin = new Thickness(0, 6, 0, 0) };
+        clubRow.Children.Add(_clubBox);
+        clubRow.Children.Add(FormBuilders.ExampleCaption(WizardWording.ClubToggleCaption));
+        form.Children.Add(clubRow);
+        _clubBox.Checked += (_, _) => OnClubBoxChanged();
+        _clubBox.Unchecked += (_, _) => OnClubBoxChanged();
         _codeBox.TextChanged += (_, args) =>
         {
             if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput) RefreshCodeSuggestions();
-            AutoFillCourseName(); RefreshClubRow(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
+            AutoFillCourseName(); RefreshClubRow(); PreTickTheClubBox(); RefreshGradeWarning(); RefreshCodeValidation(); RefreshCreateEnabled();
             RefreshStartingContent(); AdoptSkeletonStructure(); RefreshStructureArea(); RefreshFontSample();
         };
 
-        var nameRow = FormBuilders.LabeledRow("Course name", _nameBox);
+        var nameRow = FormBuilders.LabeledRow(WizardWording.ForACourse.NameLabel, _nameBox);
+        _nameLabel = (TextBlock)nameRow.Children[0];
         nameRow.Children.Add(FormBuilders.ExampleCaption("e.g. Introduction to Computer Science"));
         nameRow.Children.Add(_suggestionsRow);
         form.Children.Add(nameRow);
@@ -415,7 +452,23 @@ public sealed class NewCourseDialog : ContentDialog
         form.Children.Add(sectionsRow);
         _sectionsBox.TextChanged += (_, _) => { RefreshSectionsValidation(); RefreshCreateEnabled(); RefreshFontSample(); };
 
+        _namingHeading = new TextBlock { Text = WizardWording.ForAClub.NamingHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
+        _clubRows.Children.Add(_namingHeading);
+        _clubRows.Children.Add(FormBuilders.ExampleCaption(WizardWording.ForAClub.NamingCaption));
+        AutomationProperties.SetAutomationId(_classFolderBox, "clubClassFolderField");
+        AutomationProperties.SetAutomationId(_classFolderWarning, "clubClassFolderProblem");
+        AutomationProperties.SetAutomationId(_headingBox, "clubFrontPageHeadingField");
+        AutomationProperties.SetAutomationId(_nounBox, "clubNounPicker");
+        var classFolderRow = FormBuilders.LabeledRow(WizardWording.ClubClassFolderRow, _classFolderBox);
+        classFolderRow.Children.Add(_classFolderWarning);
+        _clubRows.Children.Add(classFolderRow);
+        _clubRows.Children.Add(FormBuilders.LabeledRow(WizardWording.ClubFrontPageHeadingRow, _headingBox));
+        _clubRows.Children.Add(FormBuilders.LabeledRow(WizardWording.ClubNounRow, _nounBox));
+        form.Children.Add(_clubRows);
+        _classFolderBox.TextChanged += (_, _) => { RenameClubClassFolder(); RefreshCreateEnabled(); };
+
         var unitWordRow = FormBuilders.LabeledRow("What do you call a unit?", _unitWordBox);
+        _unitWordLabel = (TextBlock)unitWordRow.Children[0];
         unitWordRow.Children.Add(_unitWordCaption);
         unitWordRow.Children.Add(_unitWordWarning);
         form.Children.Add(unitWordRow);
@@ -424,7 +477,7 @@ public sealed class NewCourseDialog : ContentDialog
 
         foreach (string code in LocaleCatalog.Codes) _localeBox.Items.Add(LocaleCatalog.DisplayName(code));
         _localeBox.SelectedIndex = LocaleCatalog.Codes.ToList().IndexOf(WizardDefaults.DefaultLocale);
-        form.Children.Add(FormBuilders.LabeledRow("Language / region", _localeBox));
+        form.Children.Add(FormBuilders.LabeledRow(CourseSettingsWording.LocaleLabel, _localeBox));
 
         // -------- Starting Content (offered per course code) --------
         form.Children.Add(FormBuilders.SectionHeaderWithCaption("Starting Content", null));
@@ -516,14 +569,16 @@ public sealed class NewCourseDialog : ContentDialog
         var markerToggle = new ToggleSwitch { IsOn = _showsMarker, OnContent = "", OffContent = "" };
         markerToggle.Toggled += (_, _) => { _showsMarker = markerToggle.IsOn; RefreshFontSample(); };
         var markerRow = FormBuilders.LabeledRow("Show section marker in the site title", markerToggle);
-        markerRow.Children.Add(FormBuilders.ExampleCaption("e.g. \"S1\" appears beside the course code"));
+        _markerCaption = FormBuilders.ExampleCaption(WizardWording.ForACourse.SectionMarkerCaption);
+        markerRow.Children.Add(_markerCaption);
         form.Children.Add(markerRow);
 
         var gradeToggle = new ToggleSwitch { IsOn = _showsGrade, OnContent = "", OffContent = "" };
         gradeToggle.Toggled += (_, _) => { _showsGrade = gradeToggle.IsOn; RefreshGradeWarning(); RefreshFontSample(); };
         var gradeRow = FormBuilders.LabeledRow("Show the grade in the site title", gradeToggle);
         gradeRow.Children.Add(_gradeWarningSlot);
-        gradeRow.Children.Add(FormBuilders.ExampleCaption("e.g. \"Grade 12\" before the course name"));
+        _gradeCaption = FormBuilders.ExampleCaption(WizardWording.ForACourse.GradeCaption);
+        gradeRow.Children.Add(_gradeCaption);
         form.Children.Add(gradeRow);
 
         // -------- Behaviour --------
@@ -616,14 +671,29 @@ public sealed class NewCourseDialog : ContentDialog
     // ---- Starting content and structure ----------------------------------
 
     /// <summary>
-    /// The Starting Content section follows the typed course code: the two
-    /// toggles when a bundled payload exists for it, a quiet note when none
-    /// does yet. Rebuilt on every code change; toggle values survive.
+    /// The Starting Content section follows the typed course code, in three
+    /// blocks that are SIBLINGS rather than branches of one if (#250): the
+    /// ready-made pages toggle when a payload exists for the code; the
+    /// subject's skeleton whenever one is OFFERED — which, since #250, includes
+    /// a code whose ready-made pages were just turned down; and the curriculum
+    /// toggles below the skeleton toggle (#252), because a declined payload
+    /// keeps its curriculum when the skeleton is kept. Rebuilt on every code
+    /// change; toggle values survive in the fields.
     /// </summary>
     private void RefreshStartingContent()
     {
         _startingContentBody.Children.Clear();
-        if (ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode))
+        if (IsClub)
+        {
+            // No skeleton, no ready-made pages, no curriculum (#274): both are
+            // Unit/Day pages, which a numbered course does not read as class pages.
+            var note = FormBuilders.ExampleCaption(WizardWording.ClubStartingContentNote);
+            AutomationProperties.SetAutomationId(note, "clubStartingContentNote");
+            _startingContentBody.Children.Add(note);
+            return;
+        }
+        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+        if (hasContent)
         {
             var prepopToggle = new ToggleSwitch { IsOn = _prepopulate, OnContent = "", OffContent = "" };
             AutomationProperties.SetAutomationId(prepopToggle, "prepopulateToggle");
@@ -632,123 +702,66 @@ public sealed class NewCourseDialog : ContentDialog
                 "Working pages written for this course — keep, edit, or delete them as you build your own site. The example content also chooses the course's folders and files, so they fit the pages."));
             _startingContentBody.Children.Add(prepopRow);
 
-            ToggleSwitch? curriculumToggle = null;
-            ToggleSwitch? coverageToggle = null;
-            ToggleSwitch? coverageNotesToggle = null;
-
-            if (ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode))
-            {
-                curriculumToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCurriculum,
-                    IsEnabled = _prepopulate,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(curriculumToggle, "curriculumToggle");
-                // Named by SpecialNames.CurriculumFolderBlockedByCurriculumPages,
-                // so the label has to be built the same way the sentence is -
-                // and it is per-province, because a BC teacher told to turn off
-                // "Include Ontario curriculum pages" has no such switch.
-                var curriculumRow = FormBuilders.LabeledRow(
-                    SpecialNames.CurriculumPagesSwitchLabel(JurisdictionForCode()), curriculumToggle);
-                curriculumRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Every expectation as its own page, so lessons and tasks can link to exactly what they address"));
-                _startingContentBody.Children.Add(curriculumRow);
-
-                coverageToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCurriculumCoverage,
-                    IsEnabled = _prepopulate && _includeCurriculum,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(coverageToggle, "curriculumCoverageToggle");
-                // Named by SpecialNames.CurriculumFolderBlockedByCoverageMap and
-                // LastGradedFolderBlockedWizard - see the note in CourseSettingsView.
-                var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInWizard, coverageToggle);
-                coverageRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Generates a page showing which specific and overall expectations are addressed"));
-                _startingContentBody.Children.Add(coverageRow);
-
-                coverageNotesToggle = new ToggleSwitch
-                {
-                    IsOn = _includeCoverageNotes,
-                    IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage,
-                    OnContent = "",
-                    OffContent = "",
-                };
-                AutomationProperties.SetAutomationId(coverageNotesToggle, "curriculumCoverageNotesToggle");
-                var coverageNotesRow = FormBuilders.LabeledRow("Include explanations on Curriculum Coverage page", coverageNotesToggle);
-                coverageNotesRow.Children.Add(FormBuilders.ExampleCaption(
-                    "Shows “What counts” and “Reading it honestly” sections on the page"));
-                _startingContentBody.Children.Add(coverageNotesRow);
-
-                curriculumToggle.Toggled += (_, _) =>
-                {
-                    _includeCurriculum = curriculumToggle.IsOn;
-                    RebuildFolderEditors();
-                    if (coverageToggle is not null)
-                    {
-                        coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
-                        if (!_includeCurriculum) coverageToggle.IsOn = false;
-                    }
-                    if (coverageNotesToggle is not null)
-                    {
-                        coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
-                        if (!_includeCurriculum) coverageNotesToggle.IsOn = false;
-                    }
-                };
-
-                coverageToggle.Toggled += (_, _) =>
-                {
-                    _includeCurriculumCoverage = coverageToggle.IsOn;
-                    // Named by two of the blocked sentences, so the rows have
-                    // to be redrawn against the new answer.
-                    RebuildFolderEditors();
-                    if (coverageNotesToggle is not null)
-                    {
-                        coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
-                        if (!_includeCurriculumCoverage) coverageNotesToggle.IsOn = false;
-                    }
-                };
-
-                coverageNotesToggle.Toggled += (_, _) =>
-                {
-                    _includeCoverageNotes = coverageNotesToggle.IsOn;
-                };
-            }
-
+            // The example-content toggle moves the editor exactly as the
+            // skeleton toggle does, in both directions: OFF adopts the
+            // skeleton it has just revealed, ON restores (wizard.skeletonToggle
+            // → declineExampleContent / takeExampleContent). The way back is
+            // not optional — without it a teacher who declines and then changes
+            // their mind gets a different file from the one they would have got.
             prepopToggle.Toggled += (_, _) =>
             {
+                if (prepopToggle.IsOn == _prepopulate) return;
                 _prepopulate = prepopToggle.IsOn;
+                if (_prepopulate) RestoreGenericStructure();
+                else AdoptSkeletonStructure();
+                RefreshSkeletonBlock();
+                RefreshCurriculumBlock();
                 RebuildFolderEditors();
-                if (curriculumToggle is not null) curriculumToggle.IsEnabled = _prepopulate;
-                if (coverageToggle is not null) coverageToggle.IsEnabled = _prepopulate && _includeCurriculum;
-                if (coverageNotesToggle is not null) coverageNotesToggle.IsEnabled = _prepopulate && _includeCurriculum && _includeCurriculumCoverage;
                 RefreshStructureArea();
             };
         }
-        else if (SkeletonForCode() is { } skeleton)
+        _startingContentBody.Children.Add(_skeletonBlock);
+        _startingContentBody.Children.Add(_curriculumBlock);
+        RefreshSkeletonBlock();
+        RefreshCurriculumBlock();
+    }
+
+    private readonly StackPanel _skeletonBlock = new() { Spacing = 6 };
+    private readonly StackPanel _curriculumBlock = new() { Spacing = 6 };
+
+    /// <summary>
+    /// The skeleton toggle, shown whenever a skeleton is OFFERED
+    /// (<see cref="SkeletonCatalog.HasSkeleton"/> with whether the teacher is
+    /// taking the ready-made pages), and the note for a course starting empty.
+    /// </summary>
+    private void RefreshSkeletonBlock()
+    {
+        _skeletonBlock.Children.Clear();
+        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode);
+        if (TakingExampleContent) return;
+
+        if (SkeletonForCode() is { } skeleton)
         {
-            // The mac's two sentences, verbatim: one question, one wording,
-            // on both platforms. The toggle survives a code change the same
-            // way the pre-populate toggle does — the field keeps the answer
-            // and the control is rebuilt from it.
             var skeletonToggle = new ToggleSwitch { IsOn = _startsFromSkeleton, OnContent = "", OffContent = "" };
             AutomationProperties.SetAutomationId(skeletonToggle, "skeletonToggle");
-            var skeletonRow = FormBuilders.LabeledRow(
-                $"Start from a {skeleton.Label.ToLowerInvariant()} skeleton", skeletonToggle);
-            skeletonRow.Children.Add(FormBuilders.ExampleCaption(
-                "There is no ready-made course for this code, but there is a starting point shaped for the subject: folders that suit it, four units of class pages to rename, a page explaining what the site can do, and placeholders saying what belongs where."));
-            _startingContentBody.Children.Add(skeletonRow);
+            var skeletonRow = FormBuilders.LabeledRow(SkeletonToggleLabel(skeleton), skeletonToggle);
+            AutomationProperties.SetAutomationId(skeletonRow.Children[0], "skeletonToggleLabel");
+            // The caption's opening clause ("There is no ready-made course for
+            // this code") is false for a code whose pages were declined one
+            // question ago, so that code reads its own sentence.
+            var caption = FormBuilders.ExampleCaption(hasContent
+                ? WizardWording.SkeletonToggleCaptionWhenExampleContentIsDeclined
+                : WizardWording.SkeletonToggleCaption);
+            AutomationProperties.SetAutomationId(caption, hasContent
+                ? "skeletonToggleCaptionWhenExampleContentIsDeclined"
+                : "skeletonToggleCaption");
+            skeletonRow.Children.Add(caption);
+            _skeletonBlock.Children.Add(skeletonRow);
 
-            // With the toggle off the teacher is in exactly the situation the
-            // no-content note describes, so it says so — the same sentence,
-            // not a third one.
-            var offNote = NoExampleContentNote();
+            // With the toggle off the course starts empty, and says so.
+            var offNote = CourseStartingEmptyNote(hasContent);
             offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
-            _startingContentBody.Children.Add(offNote);
+            _skeletonBlock.Children.Add(offNote);
 
             skeletonToggle.Toggled += (_, _) =>
             {
@@ -757,20 +770,128 @@ public sealed class NewCourseDialog : ContentDialog
                 offNote.Visibility = _startsFromSkeleton ? Visibility.Collapsed : Visibility.Visible;
                 if (_startsFromSkeleton) AdoptSkeletonStructure();
                 else RestoreGenericStructure();
+                RefreshCurriculumBlock();
             };
         }
         else
         {
-            _startingContentBody.Children.Add(NoExampleContentNote());
+            _skeletonBlock.Children.Add(CourseStartingEmptyNote(hasContent));
         }
     }
 
-    private static TextBlock NoExampleContentNote()
+    /// <summary>
+    /// "Start from a … skeleton" for a family. The GENERAL family reads its
+    /// own sentence outright, since its label ("This Course") was written for
+    /// the skeleton's pages and rendered "Start from a this course skeleton".
+    /// </summary>
+    private static string SkeletonToggleLabel(SkeletonCatalog.Family skeleton) =>
+        WizardWording.SkeletonToggleLabel(skeleton.Name, skeleton.Label);
+
+    /// <summary>
+    /// The note for a course that will start with empty folders: THREE
+    /// situations, TWO sentences (<c>wizard.whenTheNoteIsShown</c>). A code
+    /// with ready-made pages that were declined, and whose skeleton was then
+    /// declined too, reads <see cref="WizardWording.NoStartingContentNote"/> —
+    /// "isn't available for this course code yet" is false to somebody who was
+    /// offered it one question ago — under its OWN automation id, so a UI test
+    /// can say which sentence a teacher is reading.
+    /// </summary>
+    private static TextBlock CourseStartingEmptyNote(bool readyMadePagesWereDeclined)
     {
-        var note = FormBuilders.ExampleCaption(
-            "Example content isn’t available for this course code yet, so the course will start with empty folders ready for your own pages.");
-        AutomationProperties.SetAutomationId(note, "noExampleContentNote");
+        var note = FormBuilders.ExampleCaption(readyMadePagesWereDeclined
+            ? WizardWording.NoStartingContentNote
+            : WizardWording.NoExampleContentNote);
+        AutomationProperties.SetAutomationId(note, readyMadePagesWereDeclined
+            ? "noStartingContentNote"
+            : "noExampleContentNote");
         return note;
+    }
+
+    /// <summary>
+    /// Whether the curriculum pages are on offer for this course
+    /// (<see cref="CourseConfiguration.CurriculumPagesOffered"/>, #252): taking
+    /// the ready-made pages, or declining them and keeping the skeleton.
+    /// </summary>
+    private bool CurriculumPagesOffered => CourseConfiguration.CurriculumPagesOffered(
+        ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent, _startsFromSkeleton);
+
+    /// <summary>
+    /// The three curriculum toggles, for a code whose payload declares a
+    /// curriculum folder. They sit BELOW the skeleton toggle (#252).
+    /// </summary>
+    private void RefreshCurriculumBlock()
+    {
+        _curriculumBlock.Children.Clear();
+        if (!ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode)) return;
+        bool offered = CurriculumPagesOffered;
+
+        var curriculumToggle = new ToggleSwitch
+        {
+            IsOn = _includeCurriculum,
+            IsEnabled = offered,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(curriculumToggle, "curriculumToggle");
+        // Named by SpecialNames.CurriculumFolderBlockedByCurriculumPages,
+        // so the label has to be built the same way the sentence is -
+        // and it is per-province, because a BC teacher told to turn off
+        // the Ontario switch has no such switch.
+        var curriculumRow = FormBuilders.LabeledRow(
+            SpecialNames.CurriculumPagesSwitchLabel(JurisdictionForCode()), curriculumToggle);
+        curriculumRow.Children.Add(FormBuilders.ExampleCaption(
+            "Every expectation as its own page, so lessons and tasks can link to exactly what they address"));
+        _curriculumBlock.Children.Add(curriculumRow);
+
+        var coverageToggle = new ToggleSwitch
+        {
+            IsOn = _includeCurriculumCoverage,
+            IsEnabled = offered && _includeCurriculum,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(coverageToggle, "curriculumCoverageToggle");
+        // Named by SpecialNames.CurriculumFolderBlockedByCoverageMap and
+        // LastGradedFolderBlockedWizard - see the note in CourseSettingsView.
+        var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInWizard, coverageToggle);
+        coverageRow.Children.Add(FormBuilders.ExampleCaption(
+            "Generates a page showing which specific and overall expectations are addressed"));
+        _curriculumBlock.Children.Add(coverageRow);
+
+        var coverageNotesToggle = new ToggleSwitch
+        {
+            IsOn = _includeCoverageNotes,
+            IsEnabled = offered && _includeCurriculum && _includeCurriculumCoverage,
+            OnContent = "",
+            OffContent = "",
+        };
+        AutomationProperties.SetAutomationId(coverageNotesToggle, "curriculumCoverageNotesToggle");
+        var coverageNotesRow = FormBuilders.LabeledRow("Include explanations on Curriculum Coverage page", coverageNotesToggle);
+        coverageNotesRow.Children.Add(FormBuilders.ExampleCaption(
+            "Shows “What counts” and “Reading it honestly” sections on the page"));
+        _curriculumBlock.Children.Add(coverageNotesRow);
+
+        curriculumToggle.Toggled += (_, _) =>
+        {
+            _includeCurriculum = curriculumToggle.IsOn;
+            RebuildFolderEditors();
+            coverageToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum;
+            if (!_includeCurriculum) coverageToggle.IsOn = false;
+            coverageNotesToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum && _includeCurriculumCoverage;
+            if (!_includeCurriculum) coverageNotesToggle.IsOn = false;
+        };
+
+        coverageToggle.Toggled += (_, _) =>
+        {
+            _includeCurriculumCoverage = coverageToggle.IsOn;
+            // Named by two of the blocked sentences, so the rows have
+            // to be redrawn against the new answer.
+            RebuildFolderEditors();
+            coverageNotesToggle.IsEnabled = CurriculumPagesOffered && _includeCurriculum && _includeCurriculumCoverage;
+            if (!_includeCurriculumCoverage) coverageNotesToggle.IsOn = false;
+        };
+
+        coverageNotesToggle.Toggled += (_, _) => _includeCoverageNotes = coverageNotesToggle.IsOn;
     }
 
     /// <summary>
@@ -789,19 +910,31 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private void AdoptSkeletonStructure()
     {
+        // The guard is HERE, at the entry point, not on the toggle: adoption
+        // runs on every code change, so a teacher who declined the skeleton
+        // and then corrected a typo must not be handed it back.
         if (!_startsFromSkeleton) return;
+        if (IsClub) return;   // a club takes no skeleton (wizard.clubToggle.fillRule)
         var skeleton = SkeletonCatalog.StructureToAdopt(
-            ExampleContentRoot, SkeletonsRoot, NormalizedCode, _sharedFolders,
+            ExampleContentRoot, SkeletonsRoot, NormalizedCode, TakingExampleContent, _sharedFolders,
             WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders);
         if (skeleton is null) return;
-        _sharedFolders = skeleton.SharedFolders.ToList();
-        _sharedFiles = skeleton.SharedFiles.ToList();
-        _perSectionFolders = skeleton.PerSectionFolders.ToList();
-        _perSectionFiles = skeleton.PerSectionFiles.ToList();
-        _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(skeleton);
-        _adopted = (_sharedFolders.ToList(), _sharedFiles.ToList(), _perSectionFolders.ToList(),
-                    _perSectionFiles.ToList(), _gradedFolders.ToList());
+        _adopted = WizardStructure.Adopting(skeleton);
+        ApplyLists(_adopted);
         RebuildStructureLists();
+    }
+
+    /// <summary>The editor's five lists, as the pure seam reads them.</summary>
+    private WizardStructure.Lists CurrentLists() =>
+        new(_sharedFolders, _sharedFiles, _perSectionFolders, _perSectionFiles, _gradedFolders);
+
+    private void ApplyLists(WizardStructure.Lists lists)
+    {
+        _sharedFolders = lists.SharedFolders.ToList();
+        _sharedFiles = lists.SharedFiles.ToList();
+        _perSectionFolders = lists.PerSectionFolders.ToList();
+        _perSectionFiles = lists.PerSectionFiles.ToList();
+        _gradedFolders = lists.GradedFolders?.ToList();
     }
 
     /// <summary>
@@ -820,17 +953,8 @@ public sealed class NewCourseDialog : ContentDialog
     /// </summary>
     private void RestoreGenericStructure()
     {
-        if (_adopted is not { } adopted) return;
-        if (_sharedFolders.SequenceEqual(adopted.SharedFolders))
-            _sharedFolders = (_useLcs ? WizardDefaults.LcsSharedFolders : WizardDefaults.SharedFolders).ToList();
-        if (_sharedFiles.SequenceEqual(adopted.SharedFiles))
-            _sharedFiles = (_useLcs ? WizardDefaults.LcsSharedFiles : WizardDefaults.SharedFiles).ToList();
-        if (_perSectionFolders.SequenceEqual(adopted.PerSectionFolders))
-            _perSectionFolders = WizardDefaults.PerSectionFolders.ToList();
-        if (_perSectionFiles.SequenceEqual(adopted.PerSectionFiles))
-            _perSectionFiles = WizardDefaults.PerSectionFiles.ToList();
-        if (_gradedFolders is not null && _gradedFolders.SequenceEqual(adopted.GradedFolders))
-            _gradedFolders = null;      // re-inferred from the restored lists
+        if (_adopted is null) return;
+        ApplyLists(WizardStructure.RestoringDefaults(CurrentLists(), _adopted, _useLcs));
         _adopted = null;
         RebuildStructureLists();
     }
@@ -845,7 +969,7 @@ public sealed class NewCourseDialog : ContentDialog
         bool locked = StructureComesFromExampleContent;
         _structureLockedNote.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
         _structureEditorArea.Visibility = locked ? Visibility.Collapsed : Visibility.Visible;
-        _structureCaption.Text = locked ? "Chosen by the example content" : "Defaults are fine for most courses";
+        _structureCaption.Text = locked ? "Chosen by the example content" : WizardWording.Panel(IsClub).StructureCaption;
     }
 
     /// <summary>
@@ -878,29 +1002,44 @@ public sealed class NewCourseDialog : ContentDialog
     /// `include_curriculum_pages` likewise, so the rule and the file cannot
     /// disagree about what is on.</para>
     /// </summary>
+    /// <summary>
+    /// The wizard's curriculum folders: the payload's declared folder (and any
+    /// the teacher ticked), counted as holding pages while the curriculum pages
+    /// are being installed.
+    /// </summary>
+    private CurriculumFolderRule.Resolution WizardCurriculum()
+    {
+        string? declared = ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode);
+        var withPages = CurriculumPagesOffered && _includeCurriculum && declared is not null
+            ? new[] { declared } : Array.Empty<string>();
+        return CurriculumFolderRule.Resolve(WizardCurriculumNames(), _sharedFolders, withPages);
+    }
+
+    /// <summary>The names the wizard's course will declare: the payload's folder, then whatever the teacher ticked.</summary>
+    private List<string> WizardCurriculumNames()
+    {
+        string? declared = ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode);
+        var names = (_curriculumFoldersChosen ?? new List<string>()).ToList();
+        if (declared is not null && !names.Contains(declared, StringComparer.OrdinalIgnoreCase)) names.Insert(0, declared);
+        return names;
+    }
+
+    /// <summary>The curriculum folders the teacher ticked in the wizard, or null when they never touched the list.</summary>
+    private List<string>? _curriculumFoldersChosen;
+
     private ProtectionContext WizardProtection() => new(
         InWizard: true,
-        CurriculumCoverageEnabled: CourseConfiguration.CurriculumCoverageEnabled(
-            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
-            _prepopulate,
-            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
-            _includeCurriculum,
-            _includeCurriculumCoverage),
-        CurriculumPagesEnabled: CourseConfiguration.CurriculumPagesEnabled(
-            ExampleContentCatalog.HasContent(ExampleContentRoot, NormalizedCode),
-            _prepopulate,
-            ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, NormalizedCode),
-            _includeCurriculum),
+        CurriculumCoverageEnabled: CourseConfiguration.NewCourseCoverageEnabled(
+            CurriculumPagesOffered, _includeCurriculum, _includeCurriculumCoverage),
+        CurriculumPagesEnabled: CurriculumPagesOffered && _includeCurriculum,
         Jurisdiction: JurisdictionForCode(),
-        // null, not the payload's or skeleton's declared `curriculum_folder`:
-        // this app has no ExampleContentCatalog.CurriculumFolder or
-        // SkeletonCatalog equivalent to ask, so the resolver falls back to the
-        // "alphabetically first name containing curriculum" branch. A skeleton
-        // family whose folder is called something else — "Expectations" — is
-        // protected on the mac and NOT protected here. A KNOWN GAP, written
-        // down in documentation/12-windows-app.md rather than left for somebody to rediscover;
-        // it protects too little, never the wrong folder.
-        ResolvedCurriculumFolder: CurriculumFolderRule.Resolve(null, _sharedFolders),
+        // #345: the payload's DECLARED folder, not null — the wizard has no
+        // disk, so it counts that folder as holding pages while they are being
+        // installed (curriculumFoldersResolution), and protects it by name
+        // (curriculumFolderProtection's DeclaredPayloadFolder).
+        ResolvedCurriculumFolder: WizardCurriculum().Resolved.FirstOrDefault(),
+        ResolvedCurriculumFolders: WizardCurriculum().Resolved,
+        DeclaredPayloadFolder: ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode),
         GradedFolders: CurrentGradedFolders(),
         PerSectionFolders: _perSectionFolders,
         ResolvedClassFolder: ClassFolderRule.Name(null, _perSectionFolders));
@@ -981,7 +1120,33 @@ public sealed class NewCourseDialog : ContentDialog
             name => ItemProtectionRule.For(name, ItemList.GradedFolders, WizardProtection()),
             (name, reason) => RecordWizardRemovalBlocked("the marks list", name, reason)));
         // Below the list, for the reason in GradedFolderRule.Caption.
-        _marksArea.Children.Add(FormBuilders.ExampleCaption(GradedFolderRule.Caption));
+        _marksArea.Children.Add(FormBuilders.ExampleCaption(WizardWording.Panel(IsClub).GradedFolderCaption));
+
+        // Curriculum folders (#345, specialNames.curriculumFoldersOffer): only
+        // with two or more candidates — an LCS course from scratch has Ontario
+        // AND College Board — and nothing ticked for the teacher until they
+        // tick it, since the wizard has no pages yet. The key is written only
+        // when they touched the list (_curriculumFoldersChosen).
+        var names = WizardCurriculumNames();
+        var offered = CurriculumFoldersOffer.Offered(_sharedFolders, names);
+        if (offered.Count > 0)
+        {
+            List<string> Ticked() => CurriculumFoldersOffer.Ticked(_sharedFolders, WizardCurriculumNames(), WizardCurriculum().Mapped);
+            var list = FormBuilders.MembershipToggleList(CurriculumFoldersOffer.Label, offered, Ticked,
+                v => _curriculumFoldersChosen = v.ToList(),
+                RebuildFolderEditors,
+                name =>
+                {
+                    var ticked = Ticked();
+                    return ticked.Count == 1 && ticked.Contains(name, StringComparer.OrdinalIgnoreCase)
+                        ? ItemProtection.Blocked(CurriculumFoldersOffer.LastStaysTicked)
+                        : ItemProtection.Ordinary;
+                },
+                (name, reason) => RecordWizardRemovalBlocked("the curriculum folders", name, reason));
+            AutomationProperties.SetAutomationId(list, "curriculumFoldersList");
+            _marksArea.Children.Add(list);
+            _marksArea.Children.Add(FormBuilders.ExampleCaption(CurriculumFoldersOffer.Caption));
+        }
     }
 
     // ---- Validation and auto-fill ---------------------------------------
@@ -1065,6 +1230,103 @@ public sealed class NewCourseDialog : ContentDialog
 
     private bool IsClubCode(string code) => ClubCodeRule.IsClub(code, _nameCatalog);
 
+    /// <summary>
+    /// The box starts ticked for a code ClubCodeRule calls a club — until the
+    /// teacher touches it; after that the box is theirs.
+    /// </summary>
+    private void PreTickTheClubBox()
+    {
+        if (_clubTouched) return;
+        bool club = IsClubCode(NormalizedCode);
+        if (IsClub == club) return;
+        _settingClubInCode = true;
+        try { _clubBox.IsChecked = club; }
+        finally { _settingClubInCode = false; }
+    }
+
+    /// <summary>
+    /// The box moved: give up an adopted skeleton FIRST (the toggle's own
+    /// restore), then fill the words the box carries (ClubFill — a field
+    /// moves only while it still holds the other choice's value), then let
+    /// every word on the panel follow the box (#390).
+    /// </summary>
+    private void OnClubBoxChanged()
+    {
+        if (!_settingClubInCode) _clubTouched = true;
+        if (IsClub) RestoreGenericStructure();
+
+        var filled = ClubFill.Applying(IsClub, new ClubFillFields(
+            _sharedFolders, _perSectionFolders,
+            IsClub ? ClassFolderRule.Name(null, _perSectionFolders) : _classFolderBox.Text.Trim(),
+            ClassPageTerm.Cleaned(_unitWordBox.Text), _headingBox.Text, ChosenNoun), _useLcs);
+        _sharedFolders = filled.SharedFolders.ToList();
+        _perSectionFolders = filled.PerSectionFolders.ToList();
+        _renamingClassFolderInCode = true;
+        try { _classFolderBox.Text = filled.ClassFolder; }
+        finally { _renamingClassFolderInCode = false; }
+        _lastClassFolder = filled.ClassFolder;
+        _unitWordBox.Text = filled.UnitWord == ClassPageTerm.DefaultWord && !IsClub ? "" : filled.UnitWord;
+        _headingBox.Text = filled.FrontPageHeading;
+        _nounBox.SelectedIndex = filled.Noun == ClassNoun.Meeting ? 1 : 0;
+
+        if (!IsClub) AdoptSkeletonStructure();
+        RebuildStructureLists();
+        RefreshPanelWords();
+        RefreshStartingContent();
+        RefreshStructureArea();
+        RefreshUnitWord();
+        RefreshCreateEnabled();
+    }
+
+    /// <summary>Every course-or-club word on the panel, from the BOX (#390).</summary>
+    private void RefreshPanelWords()
+    {
+        var words = WizardWording.Panel(IsClub);
+        if (!_started) PrimaryButtonText = words.CreateButton;
+        if (_codeLabel is not null) _codeLabel.Text = words.CodeLabel;
+        if (_nameLabel is not null) _nameLabel.Text = words.NameLabel;
+        if (_markerCaption is not null) _markerCaption.Text = words.SectionMarkerCaption;
+        if (_gradeCaption is not null) _gradeCaption.Text = words.GradeCaption;
+        if (_unitWordLabel is not null) _unitWordLabel.Text = IsClub ? WizardWording.ClubPageWordRow : "What do you call a unit?";
+        _clubRows.Visibility = IsClub ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private bool _renamingClassFolderInCode;
+    private string _lastClassFolder = ClubVocabulary.Course.ClassFolder;
+
+    /// <summary>
+    /// The club's class-folder field renames ITS entry in the per-section list
+    /// in place, so the folder keeps its place and the recorded name follows.
+    /// </summary>
+    private void RenameClubClassFolder()
+    {
+        if (_renamingClassFolderInCode || !IsClub) return;
+        string typed = _classFolderBox.Text.Trim();
+        int at = _perSectionFolders.IndexOf(_lastClassFolder);
+        if (typed.Length > 0 && at >= 0)
+        {
+            _perSectionFolders[at] = typed;
+            _lastClassFolder = typed;
+            RebuildStructureLists();
+        }
+        string? problem = ClubClassFolderProblem();
+        _classFolderWarning.Text = problem ?? "";
+        _classFolderWarning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// The folder-rename checks on the club's class folder — empty, a
+    /// separator, hidden, Media, section-like, another per-section folder's
+    /// name (mac <c>NewCourseWizardView.clubClassFolderProblem</c>).
+    /// </summary>
+    private string? ClubClassFolderProblem()
+    {
+        string typed = _classFolderBox.Text.Trim();
+        var others = _perSectionFolders.ToList();
+        others.Remove(_lastClassFolder);
+        return SpecialFolderRenamer.Problem(typed, "", others);
+    }
+
     private void RefreshClubRow() =>
         _shortRow.Visibility = IsClubCode(_codeBox.Text.Trim().ToUpperInvariant())
             ? Visibility.Visible : Visibility.Collapsed;
@@ -1105,7 +1367,9 @@ public sealed class NewCourseDialog : ContentDialog
     private void RefreshUnitWord()
     {
         string typed = _unitWordBox.Text;
-        _unitWordCaption.Text = ClassPageTerm.Caption(typed);
+        _unitWordCaption.Text = IsClub
+            ? WizardWording.ClubPageWordCaption(ClassPageTerm.Cleaned(typed))
+            : ClassPageTerm.Caption(typed);
         string? problem = ClassPageTerm.Problem(typed);
         _unitWordWarning.Text = problem ?? "";
         _unitWordWarning.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
@@ -1177,9 +1441,9 @@ public sealed class NewCourseDialog : ContentDialog
         { ShowValidation("No working folder is selected."); return; }
 
         string name = _nameBox.Text.Trim();
-        if (name.Length == 0) name = WizardDefaults.FallbackCourseName;
+        if (name.Length == 0) name = WizardWording.Panel(IsClub).DefaultSiteName;
 
-        BeginProgress("Creating your course");
+        BeginProgress(WizardWording.Panel(IsClub).CreatingTitle);
         await _creator.CreateCourse(BuildConfiguration(code, name), workspacePath);
         if (_creator.PreparationProblem is { } preparationProblem)
         {
@@ -1252,53 +1516,20 @@ public sealed class NewCourseDialog : ContentDialog
             ? LocaleCatalog.Codes[_localeBox.SelectedIndex]
             : WizardDefaults.DefaultLocale;
 
-        // Adopt once more, here, whether or not the code box's TextChanged
-        // ever ran — it does not for a programmatic Text on an untemplated
-        // box (AutoCreate, and StageForCapture's own comment). A config that
-        // disagreed with the pages about to be installed would leave empty
-        // folders beside them. The guard is StructureToAdopt's own, so a list
-        // the teacher edited is still theirs. Mirrors the mac's
-        // buildConfiguration.
-        if (_startsFromSkeleton
-            && SkeletonCatalog.StructureToAdopt(ExampleContentRoot, SkeletonsRoot, code, _sharedFolders,
-                                                WizardDefaults.SharedFolders, WizardDefaults.LcsSharedFolders) is { } lateAdopted)
-        {
-            _sharedFolders = lateAdopted.SharedFolders.ToList();
-            _sharedFiles = lateAdopted.SharedFiles.ToList();
-            _perSectionFolders = lateAdopted.PerSectionFolders.ToList();
-            _perSectionFiles = lateAdopted.PerSectionFiles.ToList();
-            _gradedFolders = SkeletonCatalog.AdoptedGradedFolders(lateAdopted);
-        }
-
-        // The skeleton decides its own sidebar, whatever the teacher has
-        // since done to the folder list — mirrors the mac. The lists written
-        // are the editor's: adoption already put the skeleton's folders there,
-        // and a list the teacher edited since is theirs.
-        var skeletonInUse = _startsFromSkeleton ? SkeletonForCode() : null;
-        List<string> hidden;
-        List<string> expandable;
-        if (skeletonInUse is not null)
-        {
-            var plan = SkeletonCatalog.Sidebar(skeletonInUse, _sharedFolders, _sharedFiles, _perSectionFolders, _perSectionFiles);
-            hidden = plan.Hidden.ToList();
-            expandable = plan.Expandable.ToList();
-        }
-        else
-        {
-            var allItems = _sharedFolders.Concat(_sharedFiles).Concat(_perSectionFolders).Concat(_perSectionFiles).ToHashSet();
-            hidden = WizardDefaults.HiddenItems
-                .Where(i => allItems.Contains(i)
-                            || string.Equals(i, "Media", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            var expandableSource = _sharedFolders.Concat(_perSectionFolders).ToHashSet();
-            expandable = WizardDefaults.ExpandableItems.Where(expandableSource.Contains).ToList();
-        }
-
-        // The real wizard reads these as its defaults, exactly like every
-        // other answer here. False when no content exists for the code, so a
-        // stale true can never mean anything.
-        bool hasContent = ExampleContentCatalog.HasContent(ExampleContentRoot, code);
-        bool includesCurriculum = ExampleContentCatalog.IncludesCurriculum(ExampleContentRoot, code);
+        // The starting-content keys, the lists and the marks pool are decided
+        // in Core (NewCourseAnswers), where a test can pin them — the goldens
+        // in Plantoir.Tests/Goldens are what a teacher TAKING the ready-made
+        // pages must still get (#250). The lists come back as they stand after
+        // the last-moment adoption, which the editor then shows too.
+        // A club takes no ready-made pages, no skeleton and no curriculum pages
+        // (#274): all three answered "no" here, so the keys say so.
+        var answers = NewCourseAnswers.Decide(ExampleContentRoot, SkeletonsRoot, NewCourseAnswers.ForAClub(
+            new NewCourseAnswers.Choices(code, _prepopulate, _startsFromSkeleton, _includeCurriculum, CurrentLists()),
+            IsClub));
+        ApplyLists(answers.Lists);
+        // Offered-and-kept is exactly what include_curriculum_pages says.
+        bool coverageEnabled = CourseConfiguration.NewCourseCoverageEnabled(
+            answers.Keys["include_curriculum_pages"]!.Value<bool>(), true, _includeCurriculumCoverage);
 
         var result = new JObject
         {
@@ -1309,24 +1540,25 @@ public sealed class NewCourseDialog : ContentDialog
             ["emojis"] = PerSection(_ => _emoji),
             ["num_sections"] = sections.Count,
             ["section_numbers"] = new JArray(sections),
-            ["shared_folders"] = new JArray(_sharedFolders),
-            ["shared_files"] = new JArray(_sharedFiles),
-            ["per_section_folders"] = new JArray(_perSectionFolders),
-            ["per_section_files"] = new JArray(_perSectionFiles),
-            ["hidden"] = new JArray(hidden),
-            ["expandable"] = new JArray(expandable),
+            ["shared_folders"] = answers.Keys["shared_folders"],
+            ["shared_files"] = answers.Keys["shared_files"],
+            ["per_section_folders"] = answers.Keys["per_section_folders"],
+            ["per_section_files"] = answers.Keys["per_section_files"],
+            ["hidden"] = answers.Keys["hidden"],
+            ["expandable"] = answers.Keys["expandable"],
             ["expandOnFolderClick"] = _expandOnFolderClick,
             ["footer_html"] = _footerHtml,
             ["show_reading_time"] = _showReadingTime,
             ["show_grade_in_title"] = PerSection(_ => _showsGrade),
-            ["prepopulate_example_content"] = hasContent && _prepopulate,
-            // The same capabilityExists && teacherSaidYes shape as the two
-            // above — contracts/file-formats.json -> wizardAnswerKeys.
-            ["use_skeleton"] = SkeletonCatalog.HasSkeleton(ExampleContentRoot, SkeletonsRoot, code) && _startsFromSkeleton,
-            ["include_curriculum_pages"] = hasContent && _prepopulate && includesCurriculum && _includeCurriculum,
-            ["include_curriculum_coverage"] = PerSection(_ => _includeCurriculumCoverage),
-
-            ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(_includeCurriculumCoverage, _includeCoverageNotes)),
+            ["prepopulate_example_content"] = answers.Keys["prepopulate_example_content"],
+            ["use_skeleton"] = answers.Keys["use_skeleton"],
+            ["include_curriculum_pages"] = answers.Keys["include_curriculum_pages"],
+            // The coverage map is drawn from the curriculum pages, so it is on
+            // only where they are offered and kept (#252, the mac's
+            // curriculumCoverageEnabled): before this a course with no pages
+            // to draw from was written with the map ON.
+            ["include_curriculum_coverage"] = PerSection(_ => coverageEnabled),
+            ["include_coverage_notes"] = PerSection(_ => CourseConfiguration.CoverageNotesEnabled(coverageEnabled, _includeCoverageNotes)),
             ["use_lcs_terminology"] = _useLcs,
             ["deploy_target"] = _deployTarget,
             ["deploy_folder_path"] = _deployFolderPath,
@@ -1343,28 +1575,32 @@ public sealed class NewCourseDialog : ContentDialog
             // TODAY, written down so that reordering the folder list later
             // cannot silently move where class pages are written.
             ["unit_word"] = ClassPageTerm.Cleaned(_unitWordBox.Text),
-            ["class_folder"] = ClassFolderRule.Name(null, _perSectionFolders),
+            // A club records the folder from ITS row: "All Meetings" says no
+            // "class", so the guess would never find it (#274).
+            ["class_folder"] = IsClub ? _classFolderBox.Text.Trim() : ClassFolderRule.Name(null, _perSectionFolders),
         };
 
-        // The marks pool is written ONLY when the teacher chose it — which
-        // means only when the structure did not come from example content.
-        //
-        // A payload declares its own `graded_folders` in its manifest, and
-        // `setup_course.py:graded_folders_for` prefers a pool already present in
-        // the saved config over the manifest's. So writing one here for a
-        // pre-populated course would silently OVERRIDE a manifest that had
-        // declared the right answer — and the value written would be an
-        // inference from the wizard's DEFAULT folders, because the structure
-        // editors are collapsed for such a course and never showed the teacher
-        // the payload's real ones. If the payload calls its assessed folder
-        // anything but exactly "Tasks", reconciliation would then leave `[]`:
-        // the explicit "asked, and nothing counts" state, from a teacher who was
-        // never asked. Mirrors the mac's own guard.
-        if (!StructureComesFromExampleContent)
+        // The three club keys, for a CLUB only: every other course's file
+        // stays byte for byte what it was, which absence already describes.
+        if (IsClub)
+            foreach (var (key, value) in ClubFill.ClubKeys(_headingBox.Text, ChosenNoun))
+                result[key] = value;
+
+        // The marks pool, written for EVERY new course before setup runs (#317)
+        // — absent only when a payload's manifest could not be read.
+        if (answers.Keys["graded_folders"] is { } pool) result["graded_folders"] = pool;
+
+        // The curriculum folders the teacher ticked (#345) — only when they
+        // touched the list, and only those the course will have; both keys,
+        // the legacy one naming the primary (CourseConfiguration.CurriculumFolders).
+        if (_curriculumFoldersChosen is { } chosen && !StructureComesFromExampleContent)
         {
-            result["graded_folders"] = new JArray(
-                GradedFolderRule.Reconciled(CurrentGradedFolders(),
-                    _sharedFolders.Concat(_perSectionFolders)));
+            var kept = chosen.Where(name => _sharedFolders.Contains(name, StringComparer.OrdinalIgnoreCase)).ToList();
+            if (kept.Count > 0)
+            {
+                result["curriculum_folders"] = new JArray(kept);
+                result["curriculum_folder"] = kept[0];
+            }
         }
 
         // Pruned once more, defensively, at the point this actually gets

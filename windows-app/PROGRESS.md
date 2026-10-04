@@ -1,5 +1,41 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-03 — the 1.4.2 release branch
+
+Branch `issue/windows-1.4.2-release`. The Windows version is 1.4.2 and its installer joins the v1.4.2 release; #424 moved to milestone v1.4.3. The updater (#337) is switched on: the feed and the public key are set, and `website/updates/windows.xml` is signed and committed. Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200): `dotnet test` Failed 0, Passed 2243, Skipped 0, Total 2243; the UI suite 44 of 44 (20 m 35 s); `verify-deploy.ps1` 37 passed, 0 failed, 0 skipped; `NamedGapLedger` empty. The installer paths `/PLANTOIRUPDATE`, `/RELAUNCH`, `/NOCLOSEAPPLICATIONS` and `/RETURNTO` were run for the first time (documentation/11 has the table). The UI suite's first run was 41 of 44: at 200% display scale the Copy a Page picker gave its clickable point at twice its real coordinates, so three tests clicked the window behind and typed there — a harness fault, fixed in `DrivenApp.ClickMiddleOf` (documentation/12 → "Driving the real interface"). #380: the hero and the two colour figures are whole native window captures (`website/shots/windowshot`). #370: the six availability flags are true and the Windows card is unpinned. Still open on #380: the single-window Windows shots; on #370: Windows scenes for the v1.4.0 pictures.
+
+## 2026-10-01 — bundle 10 ("parity remainder")
+
+Branch `issue/bundle10-parity`. Done: #421 (start of year and the links checklist's Publish name a page whose settings cannot be added to, and count only what was put into draft or published), #422 (make room counts renames and links from what was written, names a write it could not finish — trail `making room did not finish every page`, `appliesOn: ["windows"]` — and matches declined pages by path), #420 step (a) (`includeLinked` gone: publish always takes what a page links to; the `followingLinks` cases run with no flag). #420 step (b), the two held descriptions, was MEASURED (pre-registered; this PC, the smaller assistant) and FAILED — EXC2O 161→150/220, ICS3U 160→123/220, teachers-say 220→210/250, `unpublish_pages` −11 trials, 0 inversions — so the text stays held in `measuredDepartures` — a permanent measured departure by Russell's decision, and #420 closes; the surface that ships (flag gone, text held) is better on EXC2O (161→190/220), level on ICS3U (160→160: `card: plan a publish` gained, `schedule a deploy` LOST 10→0 to `deploy_section`) and 4 points lower on teachers-say (220→210: `ctl cancel_scheduled` 10→0, declined) with, separately, ten turns at the token cap on "next day's lesson" that the score cannot see — those three regressions have their own issue (`research/ai-assist/windows-description-convergence-results.txt`, the dated note). Also (review R5): `PlanPublish` keys pages and links by path, so two pages sharing a file name no longer swap links, and an ambiguous name is asked about, each page named with its folder in the contract's `pageNameInFolder` shape. Also from Russell's answers: a section restore drops blank lines before a shared page's fence, as the mac does (Q8); the installer is per-user only (Q9); the club noun's `_meta` decision is in `file-formats.json` (Q10). `NamedGapLedger` still **empty**.
+
+## 2026-10-01 — bundle 9 ("finish")
+
+Branch `issue/bundle9-finish`. Done: #419 (the robocopy scan reads tracked files), #417 (the watcher's reds were a refused READ, not a partial record — the record is now read sharing ReadWrite|Delete; 30 of 30 runs green), #157 (`noCoursesYet`, `whatPublishingMeans`; `Briefing` retired), #308 (declined pages named on the plan and in every reply), #318 (already wired since bundle 5b; confirmed by a must-fail), #356 (SHA-256 pins in `fetch-runtime.ps1`). `NamedGapLedger` is **empty**. Open by ruling: #191 and #214 (a `[UiFact]` now MAKES each measurement — owed one run on an unlocked desktop), #414 (the one-process re-run found 0; the 856 run's certified count proves it ran a binary no commit contains, but not which part differed, and that is not a reproduction). #352: measured (pre-registered; this PC, the smaller assistant: model-seen 160→161 and 150→160 of 220, teachers-say 210→220 of 250, 0 inversions, 0 cut-offs) and moved — one description per tool, except `publish_pages`/`unpublish_pages`, held for the `includeLinked` behaviour (`research/ai-assist/windows-description-convergence-results.txt`). New: a `windows` issue for `publish_pages`' `includeLinked` (the behaviour #352's check found).
+
+## 2026-10-01 — overnight parity run
+
+Windows parity run, 2026-09-30 to 2026-10-01: eight bundles landed on `dev` in ten merges (every merge `--no-ff`), 106 issues worked. The suite went from **61 red to 0**: baseline `Failed: 61, Passed: 1486, Total: 1547` at `0d040a81`; now `Failed: 0, Passed: 2209, Skipped: 1, Total: 2210` at `0d36bd84` (the skip is the native-build test, which needs a runtime).
+
+| Bundle | dev | Totals after |
+|---|---|---|
+| 1 plumbing | `cce2ca9e` | 53 / 1509 / 1562 |
+| 2 writers | `8f35af79` | 34 / 1576 / 1610 |
+| 3 trail, leases, scheduled deploys, quit | `53d22566` | 32 / 1636 / 1668 |
+| 4 preview and publish | `84c23dac` | 27 / 1697 / 1724 |
+| 5a assistant chain | `9ddf2a7b` | 19 / 1774 / 1793 |
+| 5b assistant, the rest | `8752e296` | 17 / 1940 / 1957 |
+| 6a course creation | `3d946d0d` | 9 / 2016 / 2025 |
+| 6b reference, import, Copy a Page | `ed2da05e` | 7 / 2118 / 2126 |
+| 7 clubs and settings | `905a20c3` | 0 / 2159 / 2160 |
+| 8 Windows-only UI, runner, updates | `0d36bd84` | 0 / 2209 / 2210 |
+
+- **Handed to the mac** (issues labelled `mac`): #407, #408, #409, #410, #411, #412, #413, #415, #416, #418.
+- **`verify-deploy.ps1`** was run three times, after bundles 4, 5b and 6b: 37 passed, 0 failed, 0 skipped each time.
+- **UI tests written and UNPROVEN** (the desktop was locked, so none has been seen passing): `ReferenceCourseUiTests`, `CopyAPageDialogUiTests`, `ClubSettingsUiTests`, `CourseSettingsSaveUiTests`, `ListTablesUiTests`, `MarksPoolRemovalUiTests` (updated), the four new `[UiFact]`s in `NewCourseWizardUiTests`, and the toast and All Backups dialog tests from bundle 8. `LinksChecklistUiTests` is the one that was run (passed 1/1, bundle 5b). Their first green run is owed on an unlocked desktop.
+- **Leftover worktree folders** that `git worktree remove` could not delete (path too long; git no longer lists them, delete by hand): `plantoir-bundle5a`, `plantoir-bundle5b`, `plantoir-bundle5b-b`, `plantoir-bundle5b-c`, `plantoir-bundle6a`, `plantoir-bundle6b`, `plantoir-bundle6b-copy`, `plantoir-bundle7`, `plantoir-bundle8`, all beside the main clone in `Desktop\Developer`.
+- **Still open:** #157 (two wording keys kept against it), #308 and #318 (partly landed), #352 (the #114 half needs a routing measurement), #370 and #380 (website flags and picture retake; no installer cut), #191 and #214 (unmeasured), #414 (Copy a Page fuzz: reproduce or explain the 856), #417 (a timing flake in `ScheduledPublishWatcherTests`).
+- **#337 (updates)** was on `dev` but inert on this date (switched on 2026-10-03, above): no feed, no key, no release, and the download stays at 1.1.0. What Russell must do and test before a release is in the closing comment on #337 (key generation, the feed, and the unexercised installer paths `/PLANTOIRUPDATE`, `/RELAUNCH`, `/NOCLOSEAPPLICATIONS`, `/RETURNTO`, the refusal relaunch).
+
 What each project in the solution is, and what state the app is in. First take
 built overnight 2026-08-11 by Claude Code, per `WINDOWS-HANDOFF.md` — a file
 since absorbed into [`documentation/`](../documentation/README.md) and deleted;
@@ -13,7 +49,7 @@ Docker Desktop) unless marked otherwise.
 | Project | Role |
 |---|---|
 | `Plantoir/` | The WinUI 3 app (unpackaged, self-contained Windows App SDK, PerMonitorV2 DPI). Bundles the full toolchain recipe under `Toolchain/` and mirrors it into each working folder's `.toolchain/`. |
-| `Plantoir.Core/` | All logic, UI-free: config round-trip, container naming, port leases, build freshness, archiver/restorer, section adder, ConPTY process, transcript builder, script runner, milestones, question parsing, failure explainer, catalogs, workspace/toolchain services — **and the whole assist subsystem** under `Assist/` (18 files): `AssistWorkspace`, `AssistAgent`, the plans (`PublishPlan`, `ReDatePlan`, `SyncPlan`, `InsertPlan`, `NewClassesPlan`, `CurriculumMentionsPlan`), `LinkGraph`, `SectionIndex`, `Timetable` and `TimetableMemory`, `DateAudit`, `UndoHistory`, `ScheduledDeploy` and `TaskScheduling`, `Briefing`, and `WorkLease`. |
+| `Plantoir.Core/` | All logic, UI-free: config round-trip, container naming, port leases, build freshness, archiver/restorer, section adder, ConPTY process, transcript builder, script runner, milestones, question parsing, failure explainer, catalogs, workspace/toolchain services — **and the whole assist subsystem** under `Assist/` (18 files): `AssistWorkspace`, `AssistAgent`, the plans (`PublishPlan`, `ReDatePlan`, `SyncPlan`, `InsertPlan`, `NewClassesPlan`, `CurriculumMentionsPlan`), `LinkGraph`, `SectionIndex`, `Timetable` and `TimetableMemory`, `DateAudit`, `UndoHistory`, `ScheduledDeploy` and `TaskScheduling`, and `WorkLease` (`Briefing` was retired on 2026-10-01, #157: `explain_publishing` says `AssistWording.WhatPublishingMeans`). |
 | `Plantoir.Tests/` | xUnit suite that runs **without Docker**: `dotnet test`. No count is given here on purpose — it rots. Classes touching process-wide state (preview leases, the publish registry) share a serialized collection — see `SharedActivityState`. |
 | `PtyDriver/` | Console harness that drives the launchers under a ConPTY with scripted prompt replies — how the E2E runs below were performed. |
 | `Plantoir.UiTests/` | Drives the REAL built app through UI Automation (FlaUI/UIA3), for what a unit test cannot reach — see "Driving the real interface" below. Opt-in: skipped unless `PLANTOIR_UI_TESTS=1`, and compiled by a SOLUTION build (not by the per-project commands used day to day). References `Plantoir.Core` only, never the app project — the Windows App SDK has no business in a test host. |
@@ -185,7 +221,226 @@ Grep for callers and you will find none — that is the expected answer, and it
 is written here so nobody concludes they have missed a wiring step or deletes
 the types as dead code.
 
+## Parity run, bundle 8: test hygiene, backups, the toast, updates (2026-10-01)
+
+Branch `issue/bundle8-windows-ui`. Manual: doc 12 → "Bundle 8"; doc 11 →
+"Updating itself on Windows".
+
+- **The unit suite keeps out of the teacher's state** (#285, #179): a
+  module-initializer redirect, a per-file source tripwire (Plantoir, Core,
+  Mcp; PowerShell-in-strings too), a guard that throws on a real schtasks
+  registration, and the wrapper's two run-time folders behind a TEMP-only test
+  variable.
+- **Backups** (#283, #187, #161): sizes (logical), All Backups with Extended
+  selection and one counted button, held backups kept (this app's open
+  conversations; an outside assistant's newest via its `assist` lease); a
+  same-second backup waits for the next second; zipNames moments read against
+  the Gregorian calendar. #101 confirmed by test, no change.
+- **The scheduled-publish toast** (#324): posted by the run, a click decided
+  from the contract's `onClick` cases. Unproven on a real click.
+- **Accelerators** (#191): guarded under a ContentDialog; NOT measured.
+  **#302**: the picker path bar's 520 limit dropped; not checked by eye.
+  **#214**: not measured. (Bundle 9: both now have a `[UiFact]` that MAKES
+  the measurement — `AcceleratorUnderDialogUiTests`,
+  `PanelHeightUnderSqueezeUiTests` — owed one run on an unlocked desktop.)
+- **The UI-test runner** (#155): startup.log says when stdio is redirected;
+  never closes a busy Plantoir; sweeps only the killed pid's leases;
+  `ConPtyProcess.Start` zeroes its std handles (measured: leak reproduced, then
+  gone).
+- **Updates** (#337): the rules, gates, wording, installer flags, the
+  NetSparkle engine with our own dialogs, Check for Updates…, and all eight
+  trail events. Inactive by design: the feed and key are empty until the
+  first release that ships it.
+
+## Parity run, bundle 6a: course creation and the smaller course pieces (2026-09-30)
+
+Issues #169, #250, #252, #349 (the wizard's skeleton: declining the ready-made
+pages offers the subject's skeleton and keeps its curriculum, the toggle
+restores both ways, "an English skeleton"), #348 (the marks floor counts
+folders on disk; Revert records the exclusions it put back), #316 (an
+unreadable trail in a problem report), #320 (reopening the last working
+folder, or saying why not), #355 + #389 (Get Ready for the Start of the Year:
+the rule, the MCP pair, the section menu sheet and its undo; check_section's
+third group), #345 (one coverage map per curriculum folder: the code rule,
+plural resolution from the disk, protection, checkboxes, the rename, the
+folders help, `curriculum maps built`) and #360 (the How I Teach row; every
+assistant zip on the trail). The Starting Content decisions moved into Core
+(`WizardStructure`, `NewCourseAnswers`) with six goldens from the old rule.
+Ledger entries deleted: ten trail events, three wording keys from #355 plus
+two from #360, `curriculum_folders`, and the declined-skeleton newCourse case.
+Still open from these issues, said in `documentation/12-windows-app.md`: the
+start-of-year Go does not stop and restart the preview, the club case waits for
+#274, and
+`courseIsBeingCopied` (the course is not counted busy while `plantoir-mcp`
+zips it).
+## Parity run, bundle 6b: reference courses, importing, Copy a Page (2026-10-01)
+
+- **#241 / #298 — courses kept for reference.** Marker read strictly, school
+  years, the shelf rule, Keep a Copy (staged, claimed, one failure line), the
+  NTFS lock (deny entries; `ReferenceLock`), every deploy door refusing on the
+  marker alone (15, tabled in `documentation/12-windows-app.md`), the MCP write
+  gate on each tool's own ReadOnly flag, the withheld interface and the
+  read-only summary, upkeep on every folder read. The shared build no longer
+  publishes a hidden page whose file is read-only (`_writable`).
+- **#244 / #245 — Import Courses for Reference….** Modern layout only (the
+  older layouts are mac-only by decision). Stream copy with a bytes progress
+  bar and Stop; 507 MB in ~5.4 s on this PC.
+- **#247 / #258 / #384 — Copy a Page** (see the bundle's ready note).
+- **Not measured yet:** OneDrive with locked files, an elevated token, and
+  what Obsidian for Windows shows on a locked page (so
+  `obsidianOpensThemForReading` is not said here).
+
+## Parity run, bundle 5a: the assistant chain through AssistAgent (2026-09-30)
+
+Branch `issue/bundle5a-assistant-chain` (built on `issue/159-settle-the-day-once`).
+Done, in order, all at the seam where `AssistAgent` makes a call: #159 (the day
+settled once — reviewed, and #144's four excusals retired), #180 (course and
+section bound to the window, another course refused), #196 (`finish_reason`
+carried out of `IChatModel.Ask`; stopped or unreadable replies run nothing and
+are wound back), #262 (an empty call runs only when the window supplies
+everything; `noCourseNamed`), #217 (hide is unpublish; an echoed reply refused
+and wound back), #193 + #260 (deploy at a time in code, settled once with DST
+handled, scheduled card asks about the moment; `plantoir-mcp` refuses a bare
+time), #281 + #288 (asked, or spelled, in the transcript only), #261 (what a
+schedule replaces, read by task name). New test classes:
+`WindowBindingContractTests`, `CutOffAnswerTests`, `HideAndEchoContractTests`,
+`DeployAtATimeContractTests`, `TimeAskedInCodeTests`, `ScheduleReplacesTests`.
+The reasoning is in `documentation/10-local-ai-assistant.md` → "The Windows
+half of the assistant chain".
+
+## Parity run, bundle 5b: the assistant, the rest (2026-09-30)
+
+Branch `issue/bundle5b-assistant-rest` (with bundle 5a merged in). Done: #350
+(a tool the model was not offered is refused), #352's #197 half (a page list
+naming no page; whole-unit openings; an open-ended publish refusal Windows never
+had), #344 (settings read at the call; the schedule card read the window's
+snapshot), #165 (a partial publish answers), #164 (argument names on the
+trail), #203/#342 (the walk stops at a class both ways, and says so), #359
+(Markdown-style links; check_section names ten), #305 ("What does X link to?"
+in code, transcript only), #340 (How I Teach tools), #210 (Codex door; start-up
+not measured, Codex not installed). Partly: #114 (needs a routing
+measurement), #392/#399/#405 (the links checklist's LOGIC, record and release
+are done and contract-tested; the WinUI sheet, the menu item and when it is
+shown are not built). Manuals: doc 10's "On Windows" sections; doc 12 → "The
+links checklist on Windows".
+
+## Parity run, bundle 4: preview and publish mechanics (2026-09-30)
+
+Branch `issue/bundle4-preview-publish`. Done: #278 (address read by whole
+lines), #233 (the quiet after the server line bounded, three outcomes, trail
+line), #286 (forty port blocks, the sentence, the launcher trail line),
+#386 (no preview of a section being deployed: window, assistant, preview.ps1),
+#391 (windowless deploy/rebuild `--non-interactive`, exit 3 named), #395
+(Cloudflare remade, from the app's and plantoir-mcp's own runs), #304 (partial
+publish folder refused; deploy.ps1 resolves once), #358 (fingerprint rule 2),
+#319 and #307 (measured; the re-probe now binds loopback too). Checked, nothing
+to change: #393, #401. Then completed on the same branch: #272 (Preview
+Again, the saved-settings sentences, both events), #357 (Deploy and the
+schedule sheet read the saved file), #395 (the overnight Cloudflare leg is
+captured). Measurements and reasons:
+`documentation/12-windows-app.md` → "Preview and publish mechanics that match
+the mac (bundle 4)" and `documentation/03-launcher-scripts.md` →
+"preview.ps1's own port walk…".
+
+## Parity run, bundle 3: the trail, leases, scheduled deploys and quit (2026-09-30)
+
+Branch `issue/bundle3-trail-leases`. The scheduled deploy is Plantoir now, not a
+baked PowerShell script, and every rule decided at its moment lives there.
+
+- **The trail keeps every line** (#303): a named mutex round each append.
+  Measured two processes × 500 lines: 4,444 of 5,000 kept before, 5,000 after;
+  the share-flag fix alone kept 4,512 and was rejected.
+- **Leases both ways, take-then-check** (#289): another program's build,
+  publish OR preview declines a build (never a write); Deploy claims before it
+  stops the preview; `plantoir-mcp` stops its own launcher before leaving.
+  `workLeases.declining` (29), `.liveness` (17 of 19), `workLease.bodyCases` (7).
+- **A scheduled task runs `Plantoir.exe --run-scheduled-deploy "<name>"`**
+  (#347): the lateness window (#239), a ten-minute wait for the course (#289),
+  whether it still stands, the settings as they are now, then the wrapper.
+  Verified end to end through the real Task Scheduler on this PC. Old tasks
+  drain. `theDestination` (11 of 12), `howLateIsTooLate` (10),
+  `storedValueCases` (7), `savingSettings.scheduledDeploys` (5).
+- **One task per section per working folder** (#309), found by the folder its
+  job names; records filed under the folder id.
+- **Removing a course turns its deploys off FIRST** (#239), asked of the
+  scheduler, this folder only; the contract's sentences.
+- **A failed build is `buildDidNotFinish`** (#297); `whichKind` (6) through the
+  real wrapper.
+- **The notice arrives while the section is open** (#218): one app-wide
+  watcher; records moved in whole (40 of 40 readable at the first event,
+  against 18–21 of 40 written in place).
+- **Quitting asks** before leaving a publish or preview build (#231), never on
+  a log-off; the WSL release is hardened (leases, a launcher scan, docker must
+  answer, System32 paths). Both `appliesOn: ["mac"]` keys deleted.
+- **Every destination named** (#400, #404); the unpublished-classes note gone.
+
+Not built: #324 (clicking the toast — the toast itself, #212's Windows half, is
+first; both built minimally in bundle 8). Manuals: doc 07 → "On Windows since bundle 3"; doc 09 → "On Windows
+since bundle 3 (#289)" and "(#231)"; doc 09 → "On Windows: a sharing violation".
+
+## Parity run, bundle 2: frontmatter and page writers (2026-09-30)
+
+Branch `issue/bundle2-writers` (on top of bundle 1). Every writer of a page's
+frontmatter now finds the block the way the build does and takes a key's whole
+value with it; every link reader and rewriter shares one definition of code.
+
+- **Dates are Gregorian whatever the PC's region** (#144): `DateText`, taken
+  from the cloud branch `claude/nifty-mendel-q8ixto` (cherry-picked, not
+  re-derived).
+- **One fence rule, asymmetric** (#308/#188): the closing fence is column-0
+  dashes only; the opening may be indented. **One `ReplaceKeyLine`** (#284) for
+  `SetTitle`, `SetCreated` and the section copy and scaffold. **No key goes
+  where the block has no column-0 place for it** (#186): `SetDraft` and
+  `SetCreated` answer `NoRoomForAKey`. *Not yet*: the plan, re-date and
+  make-room callers naming the declined pages (four wording keys still ledgered
+  on #308).
+- **Adding a section** (#282) finds `----`, a blank line before the fence and a
+  trailing space, splices by line, keeps CR LF, and records `section added`.
+- **Restoring a section** (#177/#182) uses the shared finder, carries each key
+  WITH its lines, and counts and says the pages it had no room on.
+- **Duplicating a class** (#200): a forced-hidden copy can be published again
+  (B), the guard asks what the insertion created (A), the refusal admits other
+  classes may have moved (C); the plan card warns the undo will not help (#346).
+- **Renaming the word for a unit** (#158): Course Settings → Rename…, the whole
+  feature, off the UI thread. The sheet is compiled, not driven.
+- **Links** (#339/#318/#338): `MarkdownCode` (0 disagreements with
+  `markdown_code.py` over 12,490 pages), escaped pipes, angle-bracket links in a
+  folder rename.
+- **The unreadable front page gets its own card** (#300).
+
+Contract lists run here for the first time: `datesAndTitles.writingCases` (16),
+`sectionNumbers.addingKeysToAPage` (8), `backups.restoringOneSectionsKeys` (6),
+`readingALink.cases` (52), `renamingTheUnitWord.cases` + `.linkCases` (7 + 6).
+
+## Parity run, bundle 1: red means something again (2026-09-30)
+
+The suite pulled on 2026-09-30 (dev `0d040a81`) was **61 failed, 1486 passed**,
+every red mapped to an open issue (`plantoir-windows-run\logs\baseline-red-list.md`
+on Russell's machine). Bundle 1 (branch `issue/bundle1-plumbing`) was plumbing,
+so that "did I break something?" has an answer again:
+
+- **`NamedGapLedger` is the parity milestone's burn-down list** — 58 trail
+  events, 140 wording keys, 7 config keys, 3 model requirements and 3 contract
+  cases held open BY NAME against their issues; `documentation/12-windows-app.md`
+  → "Named gaps" has the table. A green totals line now means "green with the
+  debts the ledger names", and the ledger fails the day one is paid.
+- **`AssistWording_MatchesContract` walks `assist-wording.json`** by reflection
+  in both directions (#157); green since parity bundle 5a (#193's `deployApproval`).
+- **`ActivityTrailWiringTests`** is the source scan the mac has: every declared
+  event must have a call site. All do; `assistant asked` is written by
+  `NotePrompt`, and the scan knows that.
+- **`PLANTOIR_DATED:`** is hidden from the console and recorded on the trail,
+  from the console and from a scheduled publish's record (#279).
+- **A payload course gets its manifest's marks pool** (#317).
+- **Five shared Python test files that failed on Windows pass or skip with a
+  reason** — one was a real shared bug (`build_site._is_draft` did not read
+  CR LF, and the native build writes CR LF copies).
+
 ## ONE activity-trail event is declared without an emitter (2026-09-06; six were then, and all six have callers since 2026-09-07)
+
+> **Superseded 2026-09-30:** `ActivityTrailWiringTests` now checks this on
+> every run, including `AssistantAsked`'s helper; the paragraph below is kept
+> as the history of why the scan exists.
 
 `ActivityTrail.Event` named `folder renamed`, `folder created`,
 `synced folder noticed`, `synced folder accepted` — and, found 2026-09-06,
@@ -262,6 +517,18 @@ count parsed from launcher output); and the wizard's answer pump against the
 real `setup_course.py`, exit 0 with a full course scaffolded, using the same
 `NewCourseCreator.PumpAnswers` the Create Course button uses.
 
+**Since bundle 11 (2026-10-01) through the real window, by `[UiFact]`s that run
+the real launchers** (opt-in, `run-ui-tests.ps1`): the wizard's Create then
+Preview, with the served front page read back over HTTP, the preview pane
+shown to have loaded that same address (status 200), and Stop silencing it (`WizardToPreviewUiTests`); Import Courses for
+Reference… through the Windows folder picker, the course shelved by year and
+locked on disk (`ImportForReferenceUiTests`); a course kept for reference —
+summary, no Deploy, pages locked, Keep a Copy and its refusal
+(`ReferenceCourseUiTests`); Copy a Page through its checklist, both copies
+hidden, the published destination without them, and three refusals
+(`CopyAPageEndToEndUiTests`); and Deploy to a folder, the published folder
+read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
+
 ## The hard-won platform lessons (do not relearn these)
 
 1. **ConPTY std-handle hygiene.** A process whose own stdio is redirected leaks
@@ -294,6 +561,28 @@ days after the log passed 250.
 this app's source from the mac, read rather than run — `dotnet` is not
 installed there — so treat it as a starting point, and report anything it gets
 wrong in a `mac` issue.
+
+## Work done from a cloud (Linux) session — 2026-09-27
+
+The first piece of this port built off the Windows PC: [#144](https://github.com/russellgordon/plantoir/issues/144),
+in a Claude Code cloud session (Ubuntu 24.04, no Windows App SDK). What that
+kind of session can do, measured on the day and written for the next one in
+[`WINDOWS-DIRECTOR-PROMPT.md`](../WINDOWS-DIRECTOR-PROMPT.md) → "Working from a
+cloud session":
+
+- `Plantoir.Core`, `Plantoir.Mcp`, `PtyDriver` and `Plantoir.Tests` build and
+  run on Linux with the .NET 10 SDK (Microsoft's apt repository no longer
+  carries 9.0) plus the .NET 9 runtime from `dotnet-install.sh`. `Plantoir/`
+  (WinUI 3) and `Plantoir.UiTests` do not build there at all.
+- `dotnet test` on Linux: **1538 tests, 111 red before the change** — every
+  red one either a Windows path (`C:\Users\…` expected, `CreateFileW` in
+  `FolderContainers`) or a handover the parity plan already lists. The gate
+  for a cloud session is therefore **"no NEW red"**, judged by diffing the
+  failing-test list before and after, not by the totals line alone.
+- The WinUI project's edits (#144: one line in `App.xaml.cs`, one line plus a
+  refusal block in `SectionScheduleDialog.cs`) were NOT compiled. The first
+  `dotnet build Plantoir/Plantoir.csproj -c Debug -p:Platform=x64` on the PC
+  is the check, and "PT - Dev" is stale until then.
 
 ## Known rough edges for the next session
 
@@ -353,3 +642,27 @@ wrong in a `mac` issue.
   `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`,
   `--auto-wizard`, `--auto-createcourse CODE [SECTIONS]`,
   `--auto-addsection CODE`.
+
+## Parity run, bundle 7: clubs, Course Settings, today's class (2026-10-01)
+
+- **#274 — clubs.** `ClassPageNaming` on every class-planning path with no
+  default; numbered next page after the latest date, make room keeping gaps,
+  no whole-unit path, numbered refusals before the dates are asked for; the 60
+  class/meeting sentences in the teacher's copy only (`_meta`), the model's
+  copy byte-identical (`ClubNounTests`); the meeting card phrasings and the
+  numbered make-room family; a club's shelf; "This is a club" in the wizard;
+  Course Settings' locked rows and the disabled Rename…; `course created` says
+  a club; the front-page pointer found by the class it names (`writtenAs`).
+- **#390** — the panel's words follow the box. **#387** — `SettingsSaveState`,
+  `settings save held back`, legacy per-section seeding, "Language and region",
+  "Standard colours", the label-word scan. **#269** — the lists are tables
+  (+/−, Delete) and Hide/Expandable one table. **#406** — Preview offers today's
+  class (42 cases), Not Today, two trail events.
+- **#392 / #399 remainders** — published-before pages keep their date in the
+  assistant's publish; `linksIntoHiddenPagesWillBeOffered` only when the build
+  made the checklist; the two laid-out naming cases run.
+- Ledger entries deleted: every one owned by #274, #387, #392 and #406
+  (3 config keys, 51 wording keys + 1, 3 trail events, 2 case lists).
+  [UiFact]s written and UNPROVEN (desktop locked): `ClubSettingsUiTests`,
+  `CourseSettingsSaveUiTests`, `ListTablesUiTests`, `MarksPoolRemovalUiTests`
+  (updated).

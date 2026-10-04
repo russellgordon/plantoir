@@ -66,7 +66,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
     }
 
     private static string RecordPath(string dir, string course, int section) =>
-        Path.Combine(dir, TaskScheduling.HealthRecordName(course, section));
+        Path.Combine(dir, TaskScheduling.OldHealthRecordName(course, section));
 
     // ---- The record ------------------------------------------------------
 
@@ -260,9 +260,25 @@ public class ScheduledPublishOutcomeTests : IDisposable
     {
         string path = RecordPath(_dir, "ICS3U", 1);
         File.WriteAllText(path, "   \r\n");
+        File.SetLastWriteTime(path, DateTime.Now.AddMinutes(-2));
 
         Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
         Assert.False(File.Exists(path), "An unusable record must not be re-read every morning.");
+    }
+
+    /// <summary>
+    /// ...but one written in the last minute is left alone (#218): the watcher
+    /// reads a record the moment it appears, and a wrapper from an older build
+    /// writes in place, so the empty file may be a record still being written.
+    /// </summary>
+    [Fact]
+    public void AnEmptyRecordWrittenJustNowIsLeftForItsContent()
+    {
+        string path = RecordPath(_dir, "ICS3U", 1);
+        File.WriteAllText(path, "");
+
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
+        Assert.True(File.Exists(path), "a record still being written was thrown away");
     }
 
     /// <summary>
@@ -274,6 +290,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
     {
         string path = RecordPath(_dir, "ICS3U", 1);
         File.WriteAllText(path, "needed-an-answer\r\n\r\n");
+        File.SetLastWriteTime(path, DateTime.Now.AddMinutes(-2));
 
         Assert.Null(ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1));
         Assert.False(File.Exists(path));
@@ -316,26 +333,41 @@ public class ScheduledPublishOutcomeTests : IDisposable
     /// whole reason that file exists: a literal here is the copy that keeps
     /// passing after the product's words change.
     /// </remarks>
-    [Theory]
-    [InlineData(ScheduledPublishOutcome.Kind.NeededAnAnswer, "neededAnAnswer", "Netlify")]
-    [InlineData(ScheduledPublishOutcome.Kind.BuildNeededAnAnswer, "buildNeededAnAnswer", "")]
-    [InlineData(ScheduledPublishOutcome.Kind.DidNotFinish, "didNotFinish", "Netlify")]
-    [InlineData(ScheduledPublishOutcome.Kind.Succeeded, "succeeded", "Netlify")]
-    public void EachSentenceIsTheContractsOwn(
-        ScheduledPublishOutcome.Kind kind, string key, string destination)
+    /// <remarks>
+    /// EVERY kind, walked through <see cref="ScheduledPublishOutcome.ContractKey"/>
+    /// — the one exhaustive switch the kinds test walks too — rather than a
+    /// Theory of hand-written rows. A Theory of four is what let a fifth
+    /// sentence go unrun on both platforms (#239's note); a new kind cannot now
+    /// reach one test without the other.
+    /// </remarks>
+    [Fact]
+    public void EachSentenceIsTheContractsOwn()
     {
         var sentences = ContractLoader.LoadJson("shared-rules.json")
             ["scheduledPublishStopped"]!["sentences"]!;
 
-        string expected = sentences[key]!.ToString()
-            .Replace("{course}", "ICS3U")
-            .Replace("{section}", "2")
-            .Replace("{destination}", destination);
+        foreach (var kind in Enum.GetValues<ScheduledPublishOutcome.Kind>())
+        {
+            string key = ScheduledPublishOutcome.ContractKey(kind);
+            string destination = kind switch
+            {
+                ScheduledPublishOutcome.Kind.BuildNeededAnAnswer or ScheduledPublishOutcome.Kind.BuildDidNotFinish
+                    or ScheduledPublishOutcome.Kind.TooLateToRun or ScheduledPublishOutcome.Kind.CourseWasBusy => "",
+                ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow => "its settings could not be read when the time came",
+                _ => "Netlify",
+            };
 
-        string said = ScheduledPublishOutcome.Sentence(
-            "ICS3U", 2, new ScheduledPublishOutcome.Result(kind, destination, DateTime.Now, "ICS3U", 2));
+            string expected = sentences[key]!.ToString()
+                .Replace("{course}", "ICS3U")
+                .Replace("{section}", "2")
+                .Replace("{destination}", destination)
+                .Replace("{reason}", destination);
 
-        Assert.Equal(expected, said);
+            string said = ScheduledPublishOutcome.Sentence(
+                "ICS3U", 2, new ScheduledPublishOutcome.Result(kind, destination, DateTime.Now, "ICS3U", 2));
+
+            Assert.True(expected == said, $"{key}: contract [{expected}] here [{said}]");
+        }
     }
 
     /// <summary>
@@ -360,7 +392,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
             // The contract's keys are lower-camel; the file format's words are
             // hyphenated and the enum's are Pascal. Compared on the CONTRACT's
             // spelling, since that is the shared one.
-            .Select(kind => char.ToLowerInvariant(kind.ToString()[0]) + kind.ToString()[1..])
+            .Select(ScheduledPublishOutcome.ContractKey)
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.Equal(named, served);
@@ -384,6 +416,12 @@ public class ScheduledPublishOutcomeTests : IDisposable
         Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.BuildNeededAnAnswer));
         Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.DidNotFinish));
         Assert.False(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.Succeeded));
+        // A run that STOOD DOWN is not a failure and still earns the badge:
+        // the site is other than the teacher expects (attention's own test).
+        Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.BuildDidNotFinish));
+        Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.TooLateToRun));
+        Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.CourseWasBusy));
+        Assert.True(ScheduledPublishOutcome.NeedsAttention(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow));
     }
 
     /// <summary>
@@ -410,6 +448,16 @@ public class ScheduledPublishOutcomeTests : IDisposable
         Assert.Equal("scheduled publish finished",
             ActivityTrail.KeyFor(ScheduledPublishOutcome.EventFor(
                 ScheduledPublishOutcome.Kind.Succeeded)));
+        // #297: a failed build files under "did not finish", naming no destination.
+        Assert.Equal("scheduled publish did not finish",
+            ActivityTrail.KeyFor(ScheduledPublishOutcome.EventFor(
+                ScheduledPublishOutcome.Kind.BuildDidNotFinish)));
+        // The stand-downs write the event a removal writes (scheduledPublishStopped.trail).
+        foreach (var stoodDown in new[] { ScheduledPublishOutcome.Kind.TooLateToRun,
+                                          ScheduledPublishOutcome.Kind.CourseWasBusy,
+                                          ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow })
+            Assert.Equal("scheduled deploy turned off",
+                ActivityTrail.KeyFor(ScheduledPublishOutcome.EventFor(stoodDown)));
     }
 
     /// <summary>
@@ -420,6 +468,10 @@ public class ScheduledPublishOutcomeTests : IDisposable
     [InlineData(ScheduledPublishOutcome.Kind.BuildNeededAnAnswer)]
     [InlineData(ScheduledPublishOutcome.Kind.DidNotFinish)]
     [InlineData(ScheduledPublishOutcome.Kind.Succeeded)]
+    [InlineData(ScheduledPublishOutcome.Kind.BuildDidNotFinish)]
+    [InlineData(ScheduledPublishOutcome.Kind.TooLateToRun)]
+    [InlineData(ScheduledPublishOutcome.Kind.CourseWasBusy)]
+    [InlineData(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow)]
     public void NoSentenceNamesTheMachinery(ScheduledPublishOutcome.Kind kind)
     {
         string said = ScheduledPublishOutcome.Sentence(
@@ -540,8 +592,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
         string script = File.ReadAllText(
             GenerateWrapper(new CourseConfiguration.DeployDestination("netlify", "")));
 
-        Assert.Contains("if ($LASTEXITCODE -eq 3) {", script);
-        Assert.Contains("} elseif ($LASTEXITCODE -ne 0) {", script);
+        Assert.Contains("if ($legExit -eq 3) {", script);   // #395: a leg's exit is saved as $legExit (a captured Cloudflare leg has no $LASTEXITCODE)
+        Assert.Contains("} elseif ($legExit -ne 0) {", script);
         Assert.Contains("if ($buildExit -eq 3) {", script);
         Assert.Contains("} elseif ($buildExit -ne 0) {", script);
     }
@@ -590,7 +642,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
             new CourseConfiguration.DeployDestination("cloudflare_pages", ""),
             new CourseConfiguration.DeployDestination("local_folder", _dir)), work);
 
-        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1);
+        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
         Assert.NotNull(result);
         Assert.Equal(ScheduledPublishOutcome.Kind.NeededAnAnswer, result!.Outcome);
         Assert.Contains("Cloudflare", result.Destination, StringComparison.OrdinalIgnoreCase);
@@ -611,18 +663,17 @@ public class ScheduledPublishOutcomeTests : IDisposable
     {
         if (!PowerShellIsAvailable) return;
 
-        ScheduledPublishOutcome.Record(
-            _dir, "ICS3U", 1, ScheduledPublishOutcome.Kind.NeededAnAnswer, "Netlify");
-
         string work = Path.Combine(_dir, "work ok");
         Directory.CreateDirectory(work);
+        ScheduledPublishOutcome.Record(
+            _dir, "ICS3U", 1, ScheduledPublishOutcome.Kind.NeededAnAnswer, "Netlify", work);
         File.WriteAllText(Path.Combine(work, "preview.ps1"), "Write-Host 'built'\nexit 0");
         File.WriteAllText(Path.Combine(work, "deploy.ps1"), "Write-Host 'published'\nexit 0");
 
         Run(Runnable(work, "runnable-ok.ps1",
             new CourseConfiguration.DeployDestination("local_folder", _dir)), work);
 
-        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1);
+        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
         Assert.NotNull(result);
         Assert.Equal(ScheduledPublishOutcome.Kind.Succeeded, result!.Outcome);
         Assert.Equal(_dir, result.Destination);
@@ -659,7 +710,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
         Run(Runnable(work, "runnable-failing.ps1",
             new CourseConfiguration.DeployDestination("local_folder", _dir)), work);
 
-        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1);
+        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
         Assert.NotNull(result);
         Assert.Equal(ScheduledPublishOutcome.Kind.DidNotFinish, result!.Outcome);
         Assert.Equal(_dir, result.Destination);
@@ -693,15 +744,21 @@ public class ScheduledPublishOutcomeTests : IDisposable
         Run(Runnable(work, "runnable-build-asked.ps1",
             new CourseConfiguration.DeployDestination("local_folder", _dir)), work);
 
-        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1);
+        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
         Assert.NotNull(result);
         Assert.Equal(ScheduledPublishOutcome.Kind.BuildNeededAnAnswer, result!.Outcome);
         Assert.False(File.Exists(proof), "Nothing may be published when the build did not happen.");
     }
 
-    /// <summary>A build that failed ORDINARILY is recorded too, naming every destination.</summary>
+    /// <summary>
+    /// A build that failed ORDINARILY is <c>buildDidNotFinish</c>, naming NO
+    /// destination (#297, mac #137). This test used to assert the opposite —
+    /// <c>DidNotFinish</c> with "Netlify and Cloudflare Pages" — which is the
+    /// shape #132 recorded as REJECTED: a teacher read that publishing to
+    /// Netlify stopped when Netlify was never reached.
+    /// </summary>
     [Fact]
-    public void ABuildThatFailedIsRecordedAgainstEveryDestination()
+    public void ABuildThatFailedIsRecordedAsABuildThatDidNotFinishNamingNoDestination()
     {
         if (!PowerShellIsAvailable) return;
 
@@ -714,12 +771,55 @@ public class ScheduledPublishOutcomeTests : IDisposable
             new CourseConfiguration.DeployDestination("netlify", ""),
             new CourseConfiguration.DeployDestination("cloudflare_pages", "")), work);
 
-        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1);
+        var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
         Assert.NotNull(result);
-        Assert.Equal(ScheduledPublishOutcome.Kind.DidNotFinish, result!.Outcome);
-        // Nothing went up at EITHER, so both are named — and joined the way a
-        // teacher would say them.
-        Assert.Equal("Netlify and Cloudflare Pages", result.Destination);
+        Assert.Equal(ScheduledPublishOutcome.Kind.BuildDidNotFinish, result!.Outcome);
+        // Nothing was contacted, so nothing is named.
+        Assert.Equal("", result.Destination);
+        Assert.DoesNotContain("Netlify", ScheduledPublishOutcome.Sentence("ICS3U", 1, result));
+    }
+
+    /// <summary>
+    /// <c>scheduledPublishStopped.whichKind.cases</c> (#297, mac #137), each
+    /// played through the REAL generated wrapper with stand-in launchers and
+    /// one configured destination, as <c>whichKind.note</c> says. This app's
+    /// wrapper builds unconditionally, so every row's build stub exits its
+    /// code (0 for the destination and none rows). The 127 row is the one that
+    /// catches a wrapper testing <c>-eq 1</c> rather than not-3.
+    /// </summary>
+    [Fact]
+    public void EveryWhichKindCaseIsRecordedAsTheContractSays()
+    {
+        if (!PowerShellIsAvailable) return;
+        var cases = ContractLoader.LoadJson("shared-rules.json")
+            ["scheduledPublishStopped"]!["whichKind"]!["cases"]!.AsArray();
+        Assert.Equal(6, cases.Count);
+
+        int row = 0;
+        foreach (var c in cases)
+        {
+            row++;
+            string leg = c!["leg"]!.ToString();
+            int code = c["exitCode"]!.GetValue<int>();
+            string work = Path.Combine(_dir, $"which kind {row}");
+            Directory.CreateDirectory(work);
+            File.WriteAllText(Path.Combine(work, "preview.ps1"), $"Write-Host 'build'\nexit {(leg == "build" ? code : 0)}");
+            File.WriteAllText(Path.Combine(work, "deploy.ps1"),
+                "Set-Content -LiteralPath (Join-Path $PSScriptRoot 'deploy-ran.txt') -Value 'ran'\n" +
+                $"exit {(leg == "destination" ? code : 0)}");
+
+            Run(Runnable(work, $"runnable-which-{row}.ps1", new CourseConfiguration.DeployDestination("netlify", "")), work);
+
+            var result = ScheduledPublishOutcome.ReadFrom(_dir, "ICS3U", 1, work);
+            Assert.NotNull(result);
+            Assert.True(c["kind"]!.ToString() == ScheduledPublishOutcome.ContractKey(result!.Outcome),
+                $"{leg} exit {code}: recorded {ScheduledPublishOutcome.ContractKey(result.Outcome)}, contract {c["kind"]}");
+            bool names = result.Destination.Length > 0
+                         && ScheduledPublishOutcome.Sentence("ICS3U", 1, result).Contains(result.Destination);
+            Assert.True(c["namesADestination"]!.GetValue<bool>() == names, $"{leg} exit {code}: names={names}");
+            bool published = File.Exists(Path.Combine(work, "deploy-ran.txt")) && !(leg == "destination" && code != 0);
+            Assert.True(c["anythingPublished"]!.GetValue<bool>() == published, $"{leg} exit {code}: published={published}");
+        }
     }
 
     // ---- Fixture ---------------------------------------------------------
@@ -776,6 +876,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
             UseShellExecute = false,
             WorkingDirectory = workingDirectory,
         };
+        // #179: the wrapper's $healthDir and $pendingDir follow this in the CHILD only.
+        info.Environment[TaskScheduling.TestStateDirVariable] = AppDataRoot.Current;
         foreach (string a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script })
             info.ArgumentList.Add(a);
 

@@ -389,6 +389,29 @@ public class CourseBackupTests
         Assert.Null(ArchivedItem.From(wizard, "ICS3U"));
     }
 
+    /// <summary>#187: two backups inside one second both get a name the
+    /// readers parse (the second waits for the next second), so both list and
+    /// both count toward pruning.</summary>
+    [Fact]
+    public void Archive_SameSecondTwice_BothListAndPrune()
+    {
+        string root = Temp();
+        try
+        {
+            string coursesDir = Path.Combine(root, "courses");
+            var course = MakeCourse(coursesDir, "ICS3U");
+            string first = CourseArchiver.BackUpCourse(course, coursesDir);
+            string second = CourseArchiver.BackUpCourse(course, coursesDir);
+            var a = BackupItem.From(first, "ICS3U");
+            var b = BackupItem.From(second, "ICS3U");
+            Assert.NotNull(a);
+            Assert.True(b is not null, $"The second backup's name is not one the readers parse: {Path.GetFileName(second)}");
+            Assert.NotEqual(first, second);
+            Assert.NotEqual(a!.BackedUpAt, b!.BackedUpAt);
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
     [Fact]
     public void BackingUpTouchesNothingAndSkipsTheRebuildableBulk()
     {
@@ -1007,16 +1030,18 @@ public class BuildFreshnessTests
             var course = SectionAdderTests.MakeCourse(root, "ICS3U", """{"course_code":"ICS3U"}""");
             string buildsRoot = Path.Combine(root, "builds");
             string index = BuiltIndex(buildsRoot, "ICS3U", 1);
-            File.WriteAllText(index,
-                "<script>const socket = new WebSocket('ws://localhost:9081')</script>");
+            // The client as Quartz writes it (#272): a retyped
+            // <script>...new WebSocket(...)</script> is (rightly) not matched.
+            File.WriteAllText(index, ContractLoader.LoadJson("app-rules.json")["buildFreshness"]!["previewBuild"]!
+                ["signature"]!["asQuartzWritesIt"]!.ToString());
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
 
-            Assert.True(BuildFreshness.BuiltForPreview(index));
+            Assert.True(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
             Assert.True(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
 
             File.WriteAllText(index, "a clean production page");
             File.SetLastWriteTimeUtc(index, DateTime.UtcNow.AddMinutes(5));
-            Assert.False(BuildFreshness.BuiltForPreview(index));
+            Assert.False(BuildFreshness.BuiltForPreview(Path.GetDirectoryName(index)!));
             Assert.False(BuildFreshness.NeedsRebuild(course, 1, buildsRoot));
         }
         finally { try { Directory.Delete(root, recursive: true); } catch { } }
@@ -1059,7 +1084,7 @@ public class FolderContainerTests
             string joined = string.Join(" ", command);
             Assert.Contains("docker stop -t 2 teaching-quartz-", joined);
             Assert.Contains("docker ps -q", joined);          // the emptiness check
-            Assert.Contains("wsl --terminate", joined);       // only fires when idle
+            Assert.Contains("--terminate", joined);           // only fires when idle (#231: it must ANSWER)
             // De-duplicated: one container name, mentioned once.
             int count = joined.Split("teaching-quartz-").Length - 1;
             Assert.Equal(1, count);

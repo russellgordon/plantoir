@@ -8,14 +8,19 @@ namespace Plantoir.Core.Scripting;
 public static class FailureExplainer
 {
     public static string? Explanation(string output) =>
-        SetupExplanation(output)
+        ReferenceCourseExplanation(output)
+        ?? SectionIsBeingDeployedExplanation(output)
+        ?? FolderCopyExplanation(output)
+        ?? SetupExplanation(output)
         ?? VaultLinkExplanation(output)
         ?? RateLimitExplanation(output)
         ?? AccountExplanation(output)
         ?? ConnectionExplanation(output)
         ?? FolderAccessExplanation(output)
+        ?? UnreadableFrontPageExplanation(output)
         ?? MissingFrontPageExplanation(output)
-        ?? MissingBuildExplanation(output);
+        ?? MissingBuildExplanation(output)
+        ?? WorkspaceNotCreatedExplanation(output);
 
     /// <summary>
     /// The one-time Windows setup (the launchers' Install-WindowsSubsystem)
@@ -34,6 +39,66 @@ public static class FailureExplainer
     private static string? VaultLinkExplanation(string output) =>
         output.Contains("untrusted mount point")
             ? "Part of this course folder is a link to another folder, and Windows won't let the website builder follow it. Replace the link with the real folder (the details above name which one), then try again."
+            : null;
+
+    /// <summary>
+    /// A launcher refused a course kept for reference (#241,
+    /// <c>app-rules.json → failureExplanations</c> cases 0–2): the refusal is
+    /// LIFTED with its cross taken off, and the "cannot tell" refusal, which
+    /// the launchers print over two lines, is joined into the teacher's one.
+    /// deploy.sh ends its first line with an em dash; deploy.ps1 with a plain
+    /// hyphen, because Windows PowerShell 5.1 reads a script without a
+    /// byte-order mark in the machine's code page — both read the same here.
+    /// Matters most for a deploy set to happen on its own, which runs with the
+    /// app closed: without it the teacher meets "did not finish".
+    /// </summary>
+    private static string? ReferenceCourseExplanation(string output)
+    {
+        const string refusalTail = "is kept for reference, so it is never deployed. Deploy the course you are teaching instead.";
+        string[] lines = output.Replace("\r", "").Split('\n');
+        for (int index = 0; index < lines.Length; index++)
+        {
+            string line = lines[index].Trim().TrimStart('❌', ' ');
+            if (line.EndsWith(refusalTail, StringComparison.Ordinal)) return line;
+            if (line.StartsWith("Plantoir cannot tell whether ", StringComparison.Ordinal)
+                && line.TrimEnd('-', '—', ' ').EndsWith("is kept for reference", StringComparison.Ordinal)
+                && index + 1 < lines.Length)
+            {
+                return line.TrimEnd('-', '—', ' ') + " — " + lines[index + 1].Trim();
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// preview.ps1 refused because this very section is being deployed (#386,
+    /// shared-rules.json -> previewWhileItsSectionDeploys.failureExplanationCases):
+    /// the launcher's first line, LIFTED with its cross taken off - never
+    /// reworded, so one refusal is said one way.
+    /// </summary>
+    private static string? SectionIsBeingDeployedExplanation(string output)
+    {
+        const string sign = "is being deployed right now, so it cannot be previewed until that has finished.";
+        foreach (string raw in output.Split('\n'))
+        {
+            string line = raw.Trim();
+            if (!line.EndsWith(sign, StringComparison.Ordinal)) continue;
+            return line.TrimStart('❌', ' ');
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A folder publish whose copy did not finish (#304, mac #227): deploy.sh's
+    /// cross line, and deploy.ps1's own robocopy-failure line, both mean the
+    /// folder is not up to date. Matched on the launcher's words; the copy's
+    /// error number means nothing to a teacher.
+    /// </summary>
+    private static string? FolderCopyExplanation(string output) =>
+        output.Contains("Not every page could be copied into the publishing folder", StringComparison.Ordinal)
+            ? "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try " +
+              "publishing again; if the same thing happens, one of your pages may not open or the folder may " +
+              "not be taking new files."
             : null;
 
     private static string? SetupExplanation(string output)
@@ -124,8 +189,59 @@ public static class FailureExplainer
     /// built yet" is the wrong thing to say to somebody who just watched it
     /// build. The build's own reason is the specific one, so it wins.
     /// </summary>
+    /// <summary>
+    /// The mac's builder could not be handed the working folder at all
+    /// (#221, #230): the daemon refused the bind mount with
+    /// "bind source path does not exist". This app builds natively and has no
+    /// mount, so the output cannot appear here today; the case is implemented
+    /// anyway so the two explainers stay ONE list of troubles, exactly as the
+    /// mac implements the Windows-only "untrusted mount point" case.
+    ///
+    /// <para>Matched NARROWLY and asked LAST, both copied from the mac rather
+    /// than re-derived: "Error response from daemon" was the tempting
+    /// substring and would tell a teacher whose disk was full to check where
+    /// their folder is kept, and a matcher placed earlier could shadow the
+    /// specific troubles above it. The sentence is the contract's, and it
+    /// reads mac-shaped (the home-folder advice is the mac VM's limit); said
+    /// so on #230 rather than forked.</para>
+    /// </summary>
+    private static string? WorkspaceNotCreatedExplanation(string output) =>
+        output.Contains("bind source path does not exist")
+            ? "Plantoir could not get this folder ready for building. Check that it is inside your home folder — on your Desktop or in Documents, for example — and not on an external drive or in a shared location, then try again."
+            : null;
+
     private static string? MissingFrontPageExplanation(string output) =>
         output.Contains("no front page, so no website was produced")
             ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
             : null;
+
+    /// <summary>
+    /// A section whose FRONT PAGE's settings cannot be read (#300, the mac's
+    /// #246): the build hides such a page, so there is no website to publish.
+    /// Asked before the missing-front-page and missing-build cards — the
+    /// build's line deliberately never says "no front page", and it is
+    /// followed by "Built site not found" — and the line number is read only
+    /// from the same line as the sign. The mac's
+    /// <c>FailureExplainer.unreadableFrontPageExplanation</c>, word for word.
+    /// </summary>
+    private static string? UnreadableFrontPageExplanation(string output)
+    {
+        const string sign = "the settings at the top of its front page could not be read";
+        int at = output.IndexOf(sign, StringComparison.Ordinal);
+        if (at < 0) return null;
+        const string headline = "The settings at the top of this section's front page could not be read, "
+            + "so there is no website to publish. ";
+        return LineNumberAfter("(near line ", output[(at + sign.Length)..]) is { } line
+            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then publish again."
+            : headline + "Open the front page in Obsidian, fix its settings, then publish again.";
+    }
+
+    /// <summary>The number after <paramref name="marker"/>, only when the marker is on the same line.</summary>
+    private static int? LineNumberAfter(string marker, string text)
+    {
+        int at = text.IndexOf(marker, StringComparison.Ordinal);
+        if (at < 0 || text[..at].Contains('\n')) return null;
+        string digits = new(text[(at + marker.Length)..].TakeWhile(char.IsAsciiDigit).ToArray());
+        return int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int line) ? line : null;
+    }
 }

@@ -13,8 +13,10 @@
     has for publishing.
 
     They are still COMPILED by every build: the project is in the solution and
-    the tests carry [UiFact], which skips unless PLANTOIR_UI_TESTS=1. A suite
-    nothing compiles is a suite that quietly stops matching the code.
+    every test that drives the window carries [UiFact], which skips unless
+    PLANTOIR_UI_TESTS=1 (three plain facts, AssertAbsentRuleTests, pin the
+    harness's absence rule and run anywhere). A suite nothing compiles is a
+    suite that quietly stops matching the code.
 
     WHAT THEY COVER, AND WHAT THEY DO NOT
     =====================================
@@ -37,12 +39,15 @@
     remembered windows and window positions are not read or written.
 
     The exception worth knowing: the LAUNCHERS compute the builds root
-    themselves. ONE test runs one — NewCourseWizardUiTests presses the wizard's
-    Create button, which runs setup.ps1 — and it is safe only because
-    setup_course.py never resolves merged_output_root, so PLANTOIR_BUILD_ROOT
-    is set and the folder it names is never made. Nothing enforces that. Do not
-    write a test that previews or schedules without reading "The flags the app
-    answers" in documentation/12-windows-app.md first.
+    themselves. Since bundle 11 (2026-10-01) the end-to-end tests run them on
+    purpose - the wizard's Create (setup.ps1), Preview (preview.ps1) and
+    Deploy to a folder (deploy.ps1) - and preview and deploy build into the
+    REAL %LOCALAPPDATA%\Plantoir\builds\<id of the test's temp working folder>.
+    DrivenApp's Dispose stops each serve with the launcher's own --stop, ends
+    anything still naming the run's folders, and deletes that builds folder,
+    failed test or not. No test schedules a deploy: that would register a real
+    Task Scheduler task. Read "Driving the real interface" in
+    documentation/12-windows-app.md before writing one that runs a launcher.
 
     WHEN ONE FAILS
     ==============
@@ -81,10 +86,51 @@ $repo = $PSScriptRoot
 
 $running = Get-Process -Name Plantoir -ErrorAction SilentlyContinue
 if ($running) {
+    # #155: never close a BUSY copy. The rule is MachineWork's (Plantoir.Core),
+    # and DrivenApp applies it in full before every test; this is the coarse
+    # half the script can see without a second copy of the liveness rule: a
+    # lease named for a process that is running right now (so it is live by
+    # construction), in a folder the REAL settings name, or any running
+    # plantoir-mcp at all (it may be publishing anywhere).
+    $mcp = @(Get-Process -Name plantoir-mcp -ErrorAction SilentlyContinue)
+    if ($mcp.Count -gt 0) {
+        Write-Host "An outside assistant's Plantoir server is running (pid $($mcp.Id -join ', ')); it may be publishing." -ForegroundColor Red
+        Write-Host "Not closing Plantoir; run again when it finishes." -ForegroundColor Red
+        exit 2
+    }
+    $livePids = @($running.Id)
+    $settingsFile = Join-Path $env:LOCALAPPDATA 'Plantoir\settings.json'
+    $folders = @()
+    if (Test-Path $settingsFile) {
+        try {
+            $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
+            if ($settings.WorkspacePath) { $folders += $settings.WorkspacePath }
+            foreach ($w in @($settings.RememberedWindows)) { if ($w.Path) { $folders += $w.Path } }
+        } catch { }
+    }
+    foreach ($folder in ($folders | Select-Object -Unique)) {
+        $activity = Join-Path $folder 'courses\.internal\activity'
+        if (-not (Test-Path $activity)) { continue }
+        foreach ($lease in Get-ChildItem $activity -Filter '*.lease' -ErrorAction SilentlyContinue) {
+            $parts = $lease.Name.Split('.')
+            if ($parts.Count -ge 4 -and $parts[-2] -match '^\d+$' -and ($livePids -contains [int]$parts[-2])) {
+                Write-Host "Plantoir is $($parts[-3])-ing $($parts[0..($parts.Count - 4)] -join '.') (pid $($parts[-2]))." -ForegroundColor Red
+                Write-Host "Not closing it; run again when it finishes." -ForegroundColor Red
+                exit 2
+            }
+        }
+    }
     Write-Host "Closing your running Plantoir (pid $($running.Id -join ', ')) - two copies" -ForegroundColor Yellow
     Write-Host "would fight over the foreground. It is not reopened afterwards." -ForegroundColor Yellow
     $running | Stop-Process -Force
     Start-Sleep -Milliseconds 800
+    # The leases the kill orphaned: the killed pids' own, never *.lease.
+    foreach ($folder in ($folders | Select-Object -Unique)) {
+        foreach ($killed in $livePids) {
+            Get-ChildItem (Join-Path $folder 'courses\.internal\activity') -Filter "*.$killed.lease" -ErrorAction SilentlyContinue |
+                ForEach-Object { Write-Host "Removed the lease it left: $($_.Name)"; Remove-Item $_.FullName -ErrorAction SilentlyContinue }
+        }
+    }
 }
 
 # The tests drive the x64 Debug build - the same binary the "PT - Dev"

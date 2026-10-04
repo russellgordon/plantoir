@@ -130,15 +130,26 @@ public class AssistScenarioTests : IDisposable
         bool sectionWindowOpen = given?["sectionWindowOpen"]?.GetValue<bool>() ?? false;
         bool sectionBusy = given?["sectionBusy"]?.GetValue<bool>() ?? false;
         string? pending = given?["pending"]?.ToString();
+        // #391: the launcher refuses a question with exit 3 under --non-interactive.
+        if (given?["theDeployMeetsAQuestion"]?.GetValue<bool>() == true) _launcher.QuestionOn = "deploy";
 
         SetUpWhatThisCaseNeeds(when, pending);
+        // #355: `given.visibleClasses` lays out those class pages, published,
+        // in section 1 before the call (the first is the first class).
+        if (given?["visibleClasses"] is JsonArray visibleClasses)
+        {
+            int day = 8;
+            foreach (var title in visibleClasses)
+                Class(title!.ToString(), $"2026-09-{day++:00}", published: true);
+        }
 
         // ONE workspace and one tool server for the whole case, because that is
         // what the window holds for a conversation: the backup taken before the
         // first change is per-server, so a fresh one per call would back the
         // course up again on every turn.
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
-        var agent = new AssistAgent(new ScriptedModel(), tools, new JsonArray(), Course, SectionNumber)
+        var model = new ScriptedModel();
+        var agent = new AssistAgent(model, tools, new JsonArray(), Course, SectionNumber)
         {
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
@@ -178,12 +189,15 @@ public class AssistScenarioTests : IDisposable
         }
         else
         {
-            toolAnswer = await RunOneTool(agent, transcript, when);
+            toolAnswer = await RunOneTool(agent, transcript, when, given?["arguments"] as JsonObject);
         }
 
         AssertEvents(scenario, scenarioName);
         AssertReply(scenario, toolAnswer, transcript);
         AssertTranscript(scenario, scenarioName, transcript);
+        if (scenario["expectModelRequests"] is JsonValue requests)
+            Assert.True(requests.GetValue<int>() == model.Requests,
+                $"{scenarioName}: the engine was asked {model.Requests} time(s), and the case says {requests}.");
     }
 
     // ---- What a case needs on disk ---------------------------------------
@@ -201,6 +215,15 @@ public class AssistScenarioTests : IDisposable
             // event sequence at the moment it actually happens on disk.
             Class("Unit 1, Day 1", "2026-09-08", published: true);
             _window.Watch(PagePath("Unit 1, Day 1"));
+        }
+
+        if (pending == "unpublish_pages" && when != "unpublish_pages")
+        {
+            // "hide Unit 1, Day 1" has nothing to propose unless the page is
+            // there and PUBLISHED: no card appears otherwise, and the case
+            // fails a second time looking like the phrasing did not match
+            // (#217 — the requirement is in the scenario's own `why`).
+            Class("Unit 1, Day 1", "2026-09-08", published: true);
         }
 
         if (pending == "publish_class_on")
@@ -223,6 +246,16 @@ public class AssistScenarioTests : IDisposable
             var today = DateOnly.FromDateTime(DateTime.Now);
             Class("Unit 1, Day 1", today.AddDays(1).ToString("yyyy-MM-dd"), published: false);
             Class("Unit 1, Day 2", today.AddDays(2).ToString("yyyy-MM-dd"), published: false);
+        }
+
+        if (pending == "read_page")
+        {
+            // "what does Unit 1, Day 1 link to?": a published Unit 1, Day 1
+            // whose body links to Unit 1, Day 2, a draft (the scenario's why).
+            Class("Unit 1, Day 2", "2026-09-09", published: false);
+            string day1 = PagePath("Unit 1, Day 1");
+            Directory.CreateDirectory(Path.GetDirectoryName(day1)!);
+            File.WriteAllText(day1, "---\ndraft: false\ncreated: 2026-09-08T07:00:00.000-0400\n---\nNext: [[Unit 1, Day 2]]\n");
         }
 
         if (pending == "re_date_classes")
@@ -331,10 +364,14 @@ public class AssistScenarioTests : IDisposable
         }
     }
 
-    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, List<string> transcript, string when)
+    private async Task<AssistToolAnswer> RunOneTool(AssistAgent agent, List<string> transcript, string when,
+                                                    JsonObject? givenArguments = null)
     {
         var arguments = new JsonObject { ["course"] = Course, ["section"] = SectionNumber };
         if (when == "unpublish_pages") arguments["pages"] = new JsonArray("Unit 1, Day 1");
+        // `given.arguments` is merged into the direct call's arguments (#355).
+        foreach (var (key, value) in givenArguments ?? new JsonObject())
+            arguments[key] = value?.DeepClone();
 
         var call = new JsonObject
         {
@@ -601,8 +638,18 @@ public class AssistScenarioTests : IDisposable
     /// <summary>Never answers: every message a scenario sends is a card phrasing, matched in code.</summary>
     private sealed class ScriptedModel : IChatModel
     {
-        public Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
-            => Task.FromResult<JsonObject?>(null);
+        /// <summary>
+        /// How many requests reached the engine over the whole conversation —
+        /// the contract's <c>expectModelRequests</c>. A transcript cannot show
+        /// an ABSENCE, so this is what proves the model was never asked (#305).
+        /// </summary>
+        public int Requests { get; private set; }
+
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+        {
+            Requests++;
+            return Task.FromResult<ModelReply?>(null);
+        }
     }
 
     /// <summary>
@@ -686,10 +733,11 @@ public class AssistScenarioTests : IDisposable
             bool isPlan = meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
             string? summary = meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
             string? backup = meta?[AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
+            bool noPage = meta?[AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
 
             return string.IsNullOrWhiteSpace(summary)
-                ? AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup }
-                : new AssistToolAnswer(summary, detail, isPlan, backup);
+                ? AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
+                : new AssistToolAnswer(summary, detail, isPlan, backup, noPage);
         }
 
         private static object?[] Bind(MethodInfo method, JsonObject arguments, CancellationToken cancellation)

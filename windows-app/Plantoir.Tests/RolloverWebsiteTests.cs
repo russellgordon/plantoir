@@ -28,49 +28,24 @@ public class RolloverWebsiteTests : IDisposable
     private readonly string _folder = Directory.CreateTempSubdirectory("plantoir-rollover").FullName;
     private readonly FakeLauncher _launcher = new();
 
-    /// <summary>Task names the fake scheduler believes exist.</summary>
-    private readonly HashSet<string> _scheduled = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Task names /Delete was asked to remove.</summary>
-    private readonly List<string> _deleted = new();
-
-    /// <summary>When set, every /Delete fails, which is the branch that must say something else.</summary>
-    private bool _deletingFails;
+    /// <summary>The scheduler and the job folder, stood in for (#309: tasks are found by their folder).</summary>
+    private readonly FakeScheduler _scheduler;
 
     public RolloverWebsiteTests()
     {
         File.WriteAllText(Path.Combine(_folder, "preview.ps1"), "# marker");
         File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
         AddCourse("ICS3U", 1);
-
-        TaskScheduling.SchtasksForTests = arguments =>
-        {
-            string name = NamedTask(arguments);
-            if (arguments.Contains("/Query"))
-                return _scheduled.Contains(name) ? (0, "") : (1, "ERROR: The system cannot find the file specified.");
-            if (arguments.Contains("/Delete"))
-            {
-                if (_deletingFails) return (1, "ERROR: Access is denied.");
-                _deleted.Add(name);
-                _scheduled.Remove(name);
-                return (0, "");
-            }
-            return (1, "unexpected call");
-        };
+        _scheduler = new FakeScheduler(_folder);
     }
 
     public void Dispose()
     {
-        TaskScheduling.SchtasksForTests = null;
+        _scheduler.Dispose();
         try { Directory.Delete(_folder, recursive: true); } catch { }
         GC.SuppressFinalize(this);
     }
 
-    private static string NamedTask(IReadOnlyList<string> arguments)
-    {
-        int at = arguments.ToList().IndexOf("/TN");
-        return at >= 0 && at + 1 < arguments.Count ? arguments[at + 1] : "";
-    }
 
     // ---- The question is asked of rollovers only -------------------------
 
@@ -322,6 +297,33 @@ public class RolloverWebsiteTests : IDisposable
         Assert.Contains(AssistWording.RolloverWebsiteQuestion, TeacherSummary(result));
     }
 
+    /// <summary>
+    /// #392: a rollover releases the published-pages record INSIDE the
+    /// re-date's own undo entry, so ONE "undo that" puts the dates and the
+    /// record back together. A separate entry would let the first undo
+    /// restore last year's record over this year's dates.
+    /// </summary>
+    [Fact]
+    public async Task TheRecordIsReleasedInsideTheReDatesOwnUndoEntry()
+    {
+        string record = Path.Combine(_folder, "courses", "ICS3U", ".publish_state", "section1.published-pages");
+        Directory.CreateDirectory(record);
+        string fragment = Path.Combine(record, "20260901T120000Z-netlify.json");
+        File.WriteAllText(fragment, "{}");
+        var undo = new UndoHistory();
+        var tools = new PlantoirTools(new AssistWorkspace(_folder, _launcher, undo: undo));
+        int before = undo.Entries.Count;
+
+        await tools.ReDateClasses("ICS3U", 1, timetable: "", block: "", cancellation: default,
+                                  pages: null, meetings: null, firstDay: "", startYear: 0,
+                                  website: "same", rollover: "yes");
+
+        Assert.False(File.Exists(fragment), "a rollover releases the record");
+        Assert.Equal(before + 1, undo.Entries.Count);
+        Assert.True(undo.Undo().Succeeded);
+        Assert.True(File.Exists(fragment), "one undo puts the record back with the dates");
+    }
+
     [Fact]
     public async Task KeepingTheSameWebsiteLeavesItAlone()
     {
@@ -383,12 +385,12 @@ public class RolloverWebsiteTests : IDisposable
     [Fact]
     public async Task StartingANewWebsiteTurnsOffAScheduledPublish()
     {
-        _scheduled.Add(TaskScheduling.NameFor("ICS3U", 1));
+        _scheduler.AddNew(_folder, "ICS3U", 1);
 
         string said = await ReDate(rollover: "yes", website: "new");
 
         Assert.Contains(AssistWording.RolloverTurnedOffTheScheduledPublish, said);
-        Assert.Equal(TaskScheduling.NameFor("ICS3U", 1), Assert.Single(_deleted));
+        Assert.Equal(TaskScheduling.NameFor("ICS3U", 1, _folder), Assert.Single(_scheduler.Deleted));
     }
 
     /// <summary>
@@ -398,8 +400,8 @@ public class RolloverWebsiteTests : IDisposable
     [Fact]
     public async Task AScheduledPublishThatCouldNotBeTurnedOffSaysSo()
     {
-        _scheduled.Add(TaskScheduling.NameFor("ICS3U", 1));
-        _deletingFails = true;
+        _scheduler.AddNew(_folder, "ICS3U", 1);
+        _scheduler.DeletingFails = true;
 
         string said = await ReDate(rollover: "yes", website: "new");
 
@@ -424,9 +426,9 @@ public class RolloverWebsiteTests : IDisposable
     [Fact]
     public async Task KeepingTheSameWebsiteLeavesAScheduledPublishAlone()
     {
-        _scheduled.Add(TaskScheduling.NameFor("ICS3U", 1));
+        _scheduler.AddNew(_folder, "ICS3U", 1);
         await ReDate(rollover: "yes", website: "same");
-        Assert.Empty(_deleted);
+        Assert.Empty(_scheduler.Deleted);
     }
 
     // ---- The answer turn, which is the second one ------------------------
@@ -588,7 +590,7 @@ public class RolloverWebsiteTests : IDisposable
     [Fact]
     public async Task RollOverSectionLeavesAScheduledPublishAloneWhenItCouldNotRelease()
     {
-        _scheduled.Add(TaskScheduling.NameFor("ICS3U", 1));
+        _scheduler.AddNew(_folder, "ICS3U", 1);
         string marker = Path.Combine(_folder, "courses", "ICS3U", ".netlify_sites", "section1.json");
         using var held = new FileStream(marker, FileMode.Open, FileAccess.Read, FileShare.Read);
 
@@ -596,7 +598,7 @@ public class RolloverWebsiteTests : IDisposable
             "ICS3U", 1, timetable: ATimetableFile(), block: "F", cancellation: default,
             pages: null, meetings: null, firstDay: "", startYear: 2026);
 
-        Assert.Empty(_deleted);
+        Assert.Empty(_scheduler.Deleted);
     }
 
     // ---- Fixture ---------------------------------------------------------

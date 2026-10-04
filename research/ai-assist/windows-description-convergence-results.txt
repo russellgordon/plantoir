@@ -1,0 +1,211 @@
+#352 (the #114 half) on WINDOWS: one description per tool - RESULTS.
+Measured 2026-10-01, 07:46-10:41 EDT, against the pre-registration beside
+this file (windows-description-convergence-preregistration.txt, committed
+3a96054b before the first request; dated F4 note 3ccfc58f appended before any
+result was read). Raw per-trial logs: plantoir-windows-run\logs\
+bundle9-352-S{1,2,3}-{before,after}.txt on Russell's Windows PC.
+
+CONDITIONS (as registered)
+  Lenovo, Intel Core i5-8365U (4C/8T), 16 GB, Samsung 980 NVMe, Intel UHD 620,
+  Windows 11 Pro 26200. llama-server b10435, LocalModel.BuildArguments' small-
+  tier flags (--ctx-size 8192 --threads 4 --reasoning off --reasoning-budget 0
+  --jinja --parallel 1 --n-gpu-layers 999). The server log at default verbosity
+  does not say which backend held the layers; ~140 ms/token generation and a
+  103 s cold read of the 2,942-token prompt. Weights qwen2.5-1.5b-instruct
+  q4_k_m (the smaller assistant, this PC's tier). Larger tier NOT measured.
+  Median turn 5.5-6.2 s; median 49-50 completion tokens (thinking is off).
+  The flags are INFERRED, not read off a log: neither server log carries the
+  full command line (PowerShell's error echo truncates it at --ctx-size), and
+  the registered "the results file says which backend ran" cannot be met. The
+  evidence for --reasoning off is indirect: median 49 and max 79 completion
+  tokens per run, max 272 of the 512 cap over every request in both logs
+  (final review's recount). Both arms of every suite ran on the same server
+  process, so the comparison is like for like. Next time: log argv or /props
+  at server start.
+
+DEVIATION, said plainly: the server was started as a background task with a
+  2-hour limit and was killed at ~09:45, three minutes into S3. Both S3 arms
+  failed on connection errors (logs kept as *-serverdied.txt), the server was
+  restarted with the same flags and weights, and S3 was re-run in full,
+  BEFORE then AFTER, 09:47-10:41. No other run was affected (S1 and S2 had
+  finished at 09:42).
+
+RESULTS (10 trials per probe, greedy)
+                                            BEFORE          AFTER
+  S1 trimmed-surface, course EXC2O
+     the 22 the model sees                  160/220 (72.7%) 161/220 (73.2%)
+     all 29                                 230/290         221/290
+     polarity inversions                    0               0
+     cut off (truncated / 'length')         0 / 0           0 / 0
+     probes that differ:  "card: undo" 10 -> 0 (ANSWERED IN CODE, never routed
+       in the app); "HIDE - the inversion case" 0 -> 1 (1x unpublish_pages).
+  S2 teachers-say (EXC2O-rewritten surface)
+     TEST (10)                              90/100          90/100
+     CONTROL (15)                           120/150         130/150
+     OVERALL                                210/250 (84%)   220/250 (88%)
+     wrong course / malformed / truncated   0/0/0           0/0/0
+     probes that differ:  "ctl cancel_scheduled" 0 -> 10.
+  S3 trimmed-surface, course ICS3U (the course spread)
+     the 22 the model sees                  150/220 (68.2%) 160/220 (72.7%)
+     all 29                                 220/290         220/290
+     polarity inversions                    0               0
+     cut off                                0 / 0           0 / 0
+     probes that differ:  "card: undo" 10 -> 0 (answered in code);
+       "schedule a deploy" 0 -> 10.
+
+  The date spread (#352's "three dates") was NOT run, as pre-registered.
+
+CRITERIA (pre-registration with the F4 note)
+  (a) any polarity inversion in AFTER ............ none (0, 0; S2 routed no
+      hide to a publishing tool)                                      PASS
+  (b) a changed tool losing >=3 trials net (check_section, add_next_class,
+      read_remembered_timetable) ...................... none lost a trial PASS
+  (c) model-seen total falling >5 percentage points .. S1 +0.5, S2 +4.0,
+      S3 +4.5                                                         PASS
+  (d) new cut-offs in AFTER ............................ none            PASS
+
+DECISION: the descriptions MOVE (bundle 9 ruling P2). Windows' served
+  descriptions become the contract text for every shared tool except
+  publish_pages and unpublish_pages, which wait for the behaviour (#420,
+  includeLinked; recorded in toolDescriptions.measuredDepartures); NarrowToLocal stops shortening every
+  description except those two; the procedural sentences Windows' MCP
+  descriptions carried for Claude Code move to the server's MCP instructions.
+  The "card: undo" loss is not a router change the app sees: that sentence is
+  answered in code (AssistCardCommand) before any model reads it - the mac's
+  own measurement (description-convergence-results.txt, arm C) saw the same
+  probe move the other way for the same reason.
+
+WHAT THIS DOES NOT MEASURE: what Claude Code does with the converged MCP text
+  and the new instructions field (no model of that kind was run here); the
+  larger tier; dates other than 2026-10-01.
+
+======================================================================
+#420 STEP (b) - publish_pages and unpublish_pages - RESULTS.
+Measured 2026-10-01, 13:49-19:50 EDT, against the #420 section of the
+pre-registration beside this file (committed aa71836c at 13:48:59, before
+the first request at 13:49:43). Raw per-trial logs: plantoir-windows-run\logs\
+bundle10-420-S{1,2,3}-{before,after,middle}.txt on Russell's Windows PC.
+
+CONDITIONS (as registered, and this time READ OFF THE LOGS, ruling Q4)
+  Intel Core i5-8365U (4C/8T), 16 GB, Samsung 980 NVMe, Intel UHD 620,
+  Windows 11 Pro 26200. Each suite's server log opens with the full command
+  line, written by the runner before the server started:
+    llama-server.exe --model ...\qwen2.5-1.5b-instruct-q4_k_m.gguf --port 8099
+    --host 127.0.0.1 --ctx-size 8192 --threads 4 --reasoning off
+    --reasoning-budget 0 --jinja --parallel 1 --n-gpu-layers 999
+  then `--list-devices` ("Vulkan0: Intel(R) UHD Graphics 620 (8062 MiB, 7403
+  MiB free)") and /props. The server log at default verbosity still does not
+  say where the layers were held; the timings are #352's (prompt ~24-32
+  tokens/s, generation ~7.6 tokens/s), so this measured the same backend as
+  #352, whichever it was. A fresh server per suite; a server per suite-run
+  for the conditional MIDDLE arms of S1 and S2 (run after S3).
+
+DEVIATION, said plainly: S1's first run died at 14:33 after its BEFORE arm
+  had finished (a watcher held the progress file open; the runner's write
+  failed and it stopped, taking its server with it). Its BEFORE output is
+  kept (bundle10-420-S1-before-run1-scriptdied.txt, 161/220 - the same as
+  the re-run). S1 was re-run in full, BEFORE then AFTER, on one fresh server.
+  The S1 and S2 server logs were later overwritten by their MIDDLE runs'
+  (same runner, same command line); S2's and S3's were copied first.
+
+RESULTS (10 trials per probe, greedy)
+                                       BEFORE           AFTER            MIDDLE (flag gone, text held)
+  S1 trimmed-surface, course EXC2O
+     the 22 the model sees             161/220 (73.2%)  150/220 (68.2%)  190/220 (86.4%)
+     all 29                            221/290          210/290          260/290
+     polarity inversions               0                0                0
+     cut off / malformed               0 / 0            0 / 0            0 / 0
+     probes that differ BEFORE->AFTER: "HIDE - the inversion case" 1 -> 0
+       (the one unpublish_pages trial became a decline); "schedule a deploy"
+       10 -> 0 (all to deploy_section).
+  S2 teachers-say (EXC2O-rewritten surface)
+     TEST (10)                         90/100           90/100           90/100
+     CONTROL (15)                      130/150          120/150          120/150
+     OVERALL                           220/250 (88%)    210/250 (84%)    210/250 (84%)
+     wrong course / malformed / truncated  0/0/0        0/0/0            0/0/0
+     probes that differ: "ctl cancel_scheduled" 10 -> 0 (declined).
+  S3 trimmed-surface, course ICS3U
+     the 22 the model sees             160/220 (72.7%)  123/220 (55.9%)  160/220 (72.7%)
+     all 29                            220/290          183/290          220/290
+     polarity inversions               0                0                0
+     cut off / malformed               0 / 0            0 / 37           0 / 0
+     probes that differ BEFORE->AFTER: "no course named: hide" 10 -> 0 (10x
+       malformed), "typos" 10 -> 0 (malformed), "no course named: publish"
+       10 -> 3 (7x malformed), "deletion - no such tool" 0 -> 0 (cancel ->
+       malformed), "schedule a deploy" 10 -> 0 (deploy_section). The 37
+       malformed turns are the SERVER refusing the model's output mid-call
+       ("Unexpected empty grammar stack after accepting piece: ?", 37 times in
+       the S3 server log, none in BEFORE): an HTTP error the app would answer
+       as a turn it could not complete.
+     BEFORE->MIDDLE: "card: plan a publish" 0 -> 10 (publish_pages),
+       "schedule a deploy" 10 -> 0; promise-card model-seen 30/50 -> 40/50.
+
+CRITERIA (pre-registration, #420 section)
+  (a) VETO, any polarity inversion in AFTER ...... none (0, 0, 0)      PASS
+  (b) a changed tool losing a trial ............ unpublish_pages LOSES 11
+      (S1 "HIDE - the inversion case" 1 -> 0; S3 "no course named: hide"
+      10 -> 0); publish_pages loses none                              FAIL
+  (c) model-seen total falling >5 percentage points .. S1 -5.0 (not more
+      than 5), S2 -4.0, S3 -16.8                                      FAIL
+  (d) new cut-offs in AFTER ....................... none (but 37 new
+      malformed turns in S3, recorded above)                          PASS
+
+DECISION: the two descriptions DO NOT MOVE. publish_pages and unpublish_pages
+  keep their Windows text (shortened through Briefly() for the local model,
+  AssistAgent.StillShortened); the two toolDescriptions.measuredDepartures
+  entries stay, re-measured with these numbers; #420 stays open for the
+  description half (ruling Q3). The behaviour half (step a) has landed.
+  MIDDLE - the surface that therefore ships (the flag gone, the text held) -
+  is no worse than BEFORE: S1 161 -> 190/220 (+13.2 points: 'card: publish by name' and 'card: plan a publish' 0 -> 10 to publish_pages, the hide-inversion probe 1 -> 10 to unpublish_pages, 'card: undo' 0 -> 10), S2 220 -> 210/250 (-4.0: 'ctl cancel_scheduled' 10 -> 0, declined - the same loss as AFTER, so it comes from the schema, not the text; the probe went 0 -> 10 in #352's run, so it is a sensitive one), S3 160 -> 160/220; 0 inversions, 0 cut-offs, 0 malformed in all three. Measured against the AFTER criteria it would pass (a), (b) (unpublish_pages GAINS 9, publish_pages 20) and (d), and (c) on every suite.
+  Where the loss came from, as far as these logs show: the contract text in
+  full is longer than Briefly()'s first sentence, and with it the S3 course
+  turned two hide/publish requests into server-rejected calls; MIDDLE, which
+  differs from AFTER only in the two descriptions, shows none of it.
+
+WHAT THIS DOES NOT MEASURE: the larger tier; dates other than 2026-10-01;
+  what Claude Code does with either text (the MCP description is what it
+  reads, and it is unchanged by this decision).
+
+NOTE ADDED 2026-10-01 (bundle 10 fix round, implementation review findings 1,
+N2 and N5; director's ruling R1). Appended, not edited in place; the numbers
+above are unchanged and the review recounted them independently.
+  - MIDDLE is NOT "0 cut-offs": the S2-MIDDLE server log has TEN requests that
+    ran to the 512-token cap, every trial of "next: next day's lesson" (61-89 s
+    each, against 24-36 s declines in BEFORE and AFTER). The score did not
+    move (0/10 declined in all three arms) because teachers-say-suite.py reads
+    no finish_reason. Under the registered criterion (d) MIDDLE would FAIL.
+  - MIDDLE also LOST a probe on S3: "schedule a deploy" 10 -> 0 (all
+    deploy_section), beside the gain "card: plan a publish" 0 -> 10. So
+    MIDDLE is: better on S1 (161 -> 190), level on S3 (160 -> 160, one probe
+    gained, one lost), 4 points lower on S2 (220 -> 210) with ten new
+    cut-offs - not "routes better" without qualification. It still ships
+    (ruling Q3); the two regressions are a windows + assistant issue of their
+    own (R2).
+  - The 37 rejected ICS3U calls in AFTER are a llama.cpp grammar fault
+    ("Unexpected empty grammar stack after accepting piece", 74 log lines,
+    two per call) seen only under the AFTER surface. Criterion (c) for S3 is
+    entirely them (123 + 37 = 160), and 10 of unpublish_pages' 11 lost trials
+    are them. Without them the FAIL rests on criterion (b) alone, on ONE
+    trial: S1's hide-inversion probe, which BEFORE passed once in ten.
+  - S1's re-run server (14:33-15:43, which produced S1 BEFORE and AFTER) left
+    no log: its log was overwritten by the S1-MIDDLE server's. The dead first
+    run's log survives with both reasoning flags, and its BEFORE equals the
+    re-run's row for row.
+  - "card: undo" is wrongly listed among MIDDLE's model-seen gains above; it
+    is answered in code and not in the model-seen total. The +13.2 points are
+    publish by name +10, plan a publish +10 and the hide probe +9 = 29/220.
+
+NOTE ADDED 2026-10-01 evening (Russell's decision; bundle 10 rulings R7/S3).
+  - #420 CLOSES when bundle 10 lands. The decision above stands (the two
+    descriptions do not move), and is now PERMANENT: Windows keeps its own
+    publish_pages / unpublish_pages text for the smaller assistant as a
+    measured departure (toolDescriptions.measuredDepartures, issue 420). It
+    changes only with a new pre-registered measurement; the untrue
+    "optionally" and the stray "section's website" fragment stay with it.
+    "#420 stays open for the description half" above is superseded by this.
+  - The shipped (MIDDLE) surface has THREE regressions against BEFORE, not
+    two: S3 "schedule a deploy" 10 -> 0 (deploy_section); S2 "ctl
+    cancel_scheduled" 10 -> 0 (declined - the whole of teachers-say's
+    220 -> 210; the safe direction); and, separately, ten S2 turns at the
+    512-token cap on "next: next day's lesson" that the score cannot see.
+    They are one windows + assistant issue.

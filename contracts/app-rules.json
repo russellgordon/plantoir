@@ -339,6 +339,15 @@
             "index.html" : "<html><body>Welcome</body></html>",
             "notes/day-1.html" : "<html><body><script type=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n        // reload(true) ensures resources like images and scripts are fetched again in firefox\n        socket.addEventListener('message', () => document.location.reload(true))\n      </script></body></html>"
           }
+        },
+        {
+          "expectPreview" : false,
+          "name" : "the tag in capital letters is not the client's tag",
+          "pages" : {
+            "index.html" : "<html><body>Welcome</body></html>",
+            "notes/day-1.html" : "<html><body><SCRIPT TYPE=\"application/javascript\">\n        const socket = new WebSocket('ws://localhost:9081')\n      </SCRIPT></body></html>"
+          },
+          "why" : "PROPOSED from Windows (bundle 4 review L3, 2026-09-30): pins that every checker matches the tag and the client CASE-SENSITIVELY, as bytes. Quartz writes the tag in lower case; a page written in capitals is a teacher's raw HTML, not the client. A case-insensitive mutant of deploy.ps1's Test-CarriesLiveReload (RegexOptions IgnoreCase, or -match in place of -cmatch) passed all fifteen earlier cases; this one fails it. Proposed in the bundle 4 mac issue."
         }
       ],
       "note" : "One rule for 'this built site is a preview's', read by every checker: BuildFreshness in each app, the mac's scheduled publish (its own shell check, because the app is closed when it runs), deploy.sh (three times), deploy.py and deploy.ps1. Serve mode bakes the live-reload client into EVERY page and the built tree is replaced file by file, so a clean front page in front of a preview's pages is a real state — deploy.sh found it on 2026-09-05 and has read the whole tree since, as has deploy.py. The apps read the front page alone until issue #136: they called that state deploy-fresh, skipped their build, and the LAUNCHER then rebuilt under the destination's leg — the build's milestones missing from the panel, and on the mac a question the build asked overnight reported as the destination's. A reader narrower than the launchers is the fault, whichever side it is on. Issue #291 then narrowed WHAT is looked for: the bare address matched any page that mentions it, and the rule is now the client's tag and first statement (`signature`). Each case is a tree under the section's public/ folder; `unreadable` names pages that exist but cannot be opened; `invalidUTF8Before` names pages that begin with the bytes FF 0A, which are not UTF-8.",
@@ -2730,7 +2739,7 @@
       "that before anything is changed the matching plan tool is used first, shown to the teacher in plain words, and agreed to",
       "that the session should read the teacher's How I Teach page for the course and keep to it (greetingHowITeachSentence, verbatim)"
     ],
-    "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
+    "handedToATerminal" : "The mac writes an executable .command script into the app's own data directory and hands it to iTerm (when it is already running) or Terminal, through LaunchServices rather than AppleScript so that no Automation permission is asked for. Windows has no such file: it hands the command line straight to `wt.exe -d <folder> cmd /k …`, or to cmd when Windows Terminal is absent — the Claude door. Its Codex door (#210) starts cmd.exe /s /k directly, because Windows Terminal's own parsing (a ; starts a new tab, and it re-joins arguments with its own quoting) would be a third escaping layer on top of TOML and cmd that no test can run without opening a window. The SCRIPT is therefore the mac's mechanism, which is why it is listed separately from what is written for the CONNECTION.",
     "hiddenWhenNotInstalled" : true,
     "hiddenWhenNotInstalledWhy" : "A teacher who does not have the tool is not shown the menu item at all, rather than being shown one that is greyed out or that opens onto an error. Each door is hidden INDEPENDENTLY: with one installed a teacher sees one item, with both they see both, with neither they see no sign that either exists.",
     "neverInstalled" : "Plantoir never installs an outside assistant and never offers to. These are developer tools with accounts, sign-ins and their own update paths; an app that puts one onto a teacher's machine has taken on a support surface nobody wants, and the teacher has not agreed to it. The door opens onto something they chose to install themselves.",
@@ -3446,6 +3455,11 @@
         "Every address Plantoir can use for a preview is taken.",
         "Close Plantoir's windows for your other working folders, or restart this Mac, then try again."
       ],
+      "sentenceOnWindows" : [
+        "Every address Plantoir can use for a preview is taken.",
+        "Close Plantoir's windows for your other working folders, or restart this PC, then try again."
+      ],
+      "sentenceOnWindowsWhy" : "PROPOSED from Windows (GitHub #286, 2026-09-30) as an authored case rather than a local rewording: the same two lines with the machine named the way specialNames.platformWording names it there ('this PC'). preview.ps1 prints it word for word and exits exitCode; windows-app/test_launcher_rules.ps1 pins it against this key. On Windows a block is held only by a preview that is LISTENING (there are no workspaces), so both remedies the sentence names are true there too: closing a folder's windows stops its previews, and a restart stops every one. A mac-side test that pins this object's keys will want the key named. Proposed from Windows; the mac issue for bundle 4 carries the request.",
       "why" : "The old advice - 'stop another preview (or another app using ports 8081+)' - was false: a block belongs to a workspace that EXISTS, running a preview or not, and six idle workspaces held all six blocks on the development Mac. Closing a folder's last window stops its workspace, and a restart stops every workspace (they are made with no restart policy); the second pass of the walk (hostBlockPasses) then counts a stopped workspace's block as free, so both remedies the sentence names really do free room - a window closes for a folder open now, a restart for workspaces left running by a scheduled publish, the command line or a Plantoir from before 2026-09-19. What is left after both is ports other APPS are listening on. Printed by all three launchers - a PUBLISH that cannot get a workspace prints it too, which is why it says 'a preview' rather than naming what was pressed. Written on the trail as the launcher line of the existing 'preview did not appear' event (shared-rules.json -> activityTrail.mustRecord), not as a new event. No machinery words (rule 1)."
     },
     "whenThePreviewNeverAppears" : {

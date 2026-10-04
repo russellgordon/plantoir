@@ -45,9 +45,27 @@ public sealed class TranscriptBuilder
         get
         {
             string line = _currentLine.ToString();
-            return CarriesTheHealthMarker(line) ? "" : line;
+            return CarriesTheHealthMarker(line) || MachineLineStillArriving.IsMatch(line) ? "" : line;
         }
     }
+
+    /// <summary>
+    /// <c>shared-rules.json → transcriptStripping.machineLines.rule</c>: a line
+    /// carrying <c>PLANTOIR_</c>, capital letters or underscores and a colon,
+    /// anywhere in it, is machinery and is kept out WHOLE, whatever its name —
+    /// so a marker the shared Python adds tomorrow never reaches a teacher's
+    /// console as raw text before this app learns its name (#395 relies on it
+    /// for <c>PLANTOIR_CLOUDFLARE_REMADE:</c>).
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex MachineLine =
+        new("PLANTOIR_[A-Z_]+:", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>"…while it is still arriving": the line ends in what may yet become a marker.</summary>
+    private static readonly System.Text.RegularExpressions.Regex MachineLineStillArriving =
+        new("PLANTOIR_[A-Z_]*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>Whether a whole line is machinery by the contract's one rule.</summary>
+    public static bool IsMachineLine(string line) => MachineLine.IsMatch(line);
 
     /// <summary>
     /// Whether this line is a health finding's machine-readable half.
@@ -60,7 +78,15 @@ public sealed class TranscriptBuilder
     /// this builder.</para>
     /// </summary>
     private static bool CarriesTheHealthMarker(string line) =>
-        line.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal);
+        IsMachineLine(line)
+        || line.Contains(Plantoir.Core.Models.SiteHealthFinding.Marker, StringComparison.Ordinal)
+        // PLANTOIR_DATED: (#279) is hidden the same way and for the same
+        // reason: a JSON line a teacher would otherwise read, with the build's
+        // plain sentence printed beside it. The report is read from the RAW
+        // text by ScriptRunner before this builder sees it.
+        || Plantoir.Core.Models.PagesDatedByTheBuild.IsMarkerLine(line)
+        // PLANTOIR_KEPT_OFF: (#340, howITeachPage.keptOffMarker), the same way.
+        || Plantoir.Core.Models.HowITeachKeptOffReport.IsMarkerLine(line);
 
     /// <summary>Monotonic counter bumped on every append — cheap change detection.</summary>
     public long Version => _version;

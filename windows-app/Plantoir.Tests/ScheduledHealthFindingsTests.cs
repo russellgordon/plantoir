@@ -41,7 +41,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         $"\"detail\": \"Some detail.\", \"fixable\": true, \"course\": \"{course}\", \"section\": {section}}}";
 
     private void WriteRecord(string course, int section, params string[] lines) =>
-        File.WriteAllLines(Path.Combine(_dir, TaskScheduling.HealthRecordName(course, section)), lines);
+        File.WriteAllLines(Path.Combine(_dir, TaskScheduling.OldHealthRecordName(course, section)), lines);
 
     // ---- Reading it back -------------------------------------------------
 
@@ -87,7 +87,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         WriteRecord("ICS3U", 1, "this is not a finding at all");
 
         Assert.Empty(ScheduledHealthFindings.TakeFrom(_dir, "ICS3U", 1));
-        Assert.False(File.Exists(Path.Combine(_dir, TaskScheduling.HealthRecordName("ICS3U", 1))));
+        Assert.False(File.Exists(Path.Combine(_dir, TaskScheduling.OldHealthRecordName("ICS3U", 1))));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         // A trail that dated an overnight problem to whenever somebody opened
         // the app would file it under the wrong night — and this line is the
         // ONLY record of it, since the run happened with the app closed.
-        string path = Path.Combine(_dir, TaskScheduling.HealthRecordName("ICS3U", 1));
+        string path = Path.Combine(_dir, TaskScheduling.OldHealthRecordName("ICS3U", 1));
         File.WriteAllLines(path, new[] { MarkerLine("mediaFolderMissing") });
         var lastNight = DateTime.Now.AddHours(-9);
         File.SetLastWriteTime(path, lastNight);
@@ -114,8 +114,8 @@ public class ScheduledHealthFindingsTests : IDisposable
         // The generated wrapper and this reader both call HealthRecordName.
         // A mismatch would fail in the quietest way available: written
         // faithfully every night, read never.
-        Assert.EndsWith(TaskScheduling.HealthRecordName("ICS3U", 3),
-                        ScheduledHealthFindings.SentinelPath("ICS3U", 3));
+        Assert.EndsWith(TaskScheduling.HealthRecordName("ICS3U", 3, _dir),
+                        ScheduledHealthFindings.SentinelPath("ICS3U", 3, _dir));
     }
 
     // ---- The wrapper's own ordering --------------------------------------
@@ -275,5 +275,59 @@ public class ScheduledHealthFindingsTests : IDisposable
 
         Assert.Contains("-SimpleMatch 'PLANTOIR_HEALTH:'", script);
         Assert.DoesNotContain("ConvertFrom-Json", script);
+    }
+
+    /// <summary>
+    /// #279: the wrapper's own scan line keeps the build's PLANTOIR_DATED:
+    /// lines too, and what it keeps reaches the trail. The generated
+    /// Select-String line is run for real in Windows PowerShell over a build
+    /// log carrying a dated line, a health line and chatter; what it selects is
+    /// written as the record, and <see cref="ScheduledHealthFindings.TakeFrom"/>
+    /// reads it back. Without the pattern the dated line never reaches the
+    /// record, and an overnight publish — the build likeliest to rewrite pages
+    /// — leaves no trail line.
+    /// </summary>
+    [Fact]
+    public void TheWrappersScanKeepsTheDatedLineAndItReachesTheTrail()
+    {
+        string script = GenerateWrapper();
+        string scanLine = script.Split('\n').Single(line => line.TrimStart().StartsWith("$markers = @(Select-String", StringComparison.Ordinal)).Trim();
+
+        string folder = Path.Combine(Path.GetTempPath(), "wrapper-dated-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        string trail = Path.Combine(folder, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            string log = Path.Combine(folder, "build.log");
+            string record = Path.Combine(folder, TaskScheduling.OldHealthRecordName("ICS4U", 1));
+            File.WriteAllLines(log, new[]
+            {
+                "Building step 3 of 7",
+                "Gave 1 of your pages the date of the first class that links to them",
+                "PLANTOIR_DATED: {\"course\": \"ICS4U\", \"section\": 1, \"pages\": [\"section1/index\"]}",
+                "done",
+            });
+            string command = $"$scanned = @('{log}'); {scanLine}; Set-Content -LiteralPath '{record}' -Value $markers -Encoding utf8";
+            var start = new System.Diagnostics.ProcessStartInfo("powershell.exe", new[] { "-NoProfile", "-NonInteractive", "-Command", command })
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            using (var process = System.Diagnostics.Process.Start(start)!)
+            {
+                process.WaitForExit(60_000);
+            }
+
+            Assert.True(File.Exists(record), "the wrapper's scan selected nothing");
+            ScheduledHealthFindings.TakeFrom(folder, "ICS4U", 1);
+            Assert.Contains("the build gave 1 page the date of their class: section1/index", File.ReadAllText(trail));
+        }
+        finally
+        {
+            ActivityTrail.SetCustomLogPathForTesting(null);
+            try { Directory.Delete(folder, recursive: true); } catch { }
+        }
     }
 }

@@ -76,9 +76,24 @@ public static class SpecialFoldersHelp
     /// disappearing, because a course with no curriculum folder is exactly
     /// the course whose coverage map is missing.
     /// </summary>
-    public static IReadOnlyList<SpecialFolderEntry> Entries(CourseConfiguration config)
+    /// <summary>The coverage row's name while the course has no map yet.</summary>
+    public const string CoveragePlaceholder = "Curriculum Coverage";
+
+    /// <summary>The coverage row's explanation when the course has more than one map (#345).</summary>
+    public const string CoverageWhyForSeveral =
+        "Do not write your own pages with these names — they are replaced each time, so anything you put there would be lost.";
+
+    /// <param name="curriculum">
+    /// The course's curriculum folders, decided from the disk
+    /// (<see cref="CurriculumFolderRule.ForCourse"/>, #345): the curriculum row
+    /// lists every resolved folder and the coverage row every map's title.
+    /// Null reads the folders by name alone — no folder is known to hold a page.
+    /// </param>
+    public static IReadOnlyList<SpecialFolderEntry> Entries(CourseConfiguration config,
+                                                            CurriculumFolderRule.Resolution? curriculum = null)
     {
         ArgumentNullException.ThrowIfNull(config);
+        curriculum ??= CurriculumFolderRule.Resolve(config.CurriculumFolders, config.SharedFolders, null);
 
         var rows = new List<SpecialFolderEntry>
         {
@@ -88,8 +103,8 @@ public static class SpecialFoldersHelp
                 + "folder, keeps them in date order, and uses them to work out which "
                 + "pages your course actually teaches."),
 
-            new(config.ResolvedCurriculumFolder is { Length: > 0 } curriculum
-                    ? curriculum
+            new(curriculum.Resolved.Count > 0
+                    ? Listed(curriculum.Resolved)
                     : NoCurriculumFolderYet,
                 "Your curriculum expectations",
                 "One page per expectation. The curriculum map is built from these — "
@@ -126,10 +141,12 @@ public static class SpecialFoldersHelp
                 "Plantoir adds the curriculum map to this list when it builds your "
                 + "site. Your own copy is left exactly as you wrote it."),
 
-            new("Curriculum Coverage",
+            new(curriculum.Titles.Count > 0 ? Listed(curriculum.Titles) : CoveragePlaceholder,
                 "Written for you, every time you build",
-                "Do not write your own page with this name — it is replaced each time, "
-                + "so anything you put there would be lost."),
+                curriculum.Titles.Count > 1
+                    ? CoverageWhyForSeveral
+                    : "Do not write your own page with this name — it is replaced each time, "
+                      + "so anything you put there would be lost."),
         };
 
         return rows;

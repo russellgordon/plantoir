@@ -41,6 +41,15 @@ public sealed class AppSettings
 
     public string? WorkspacePath { get; set; }
 
+    /// <summary>The version the last launch was, so the first launch of a new one writes `app updated` (#337).</summary>
+    public string? LastLaunchedVersion { get; set; }
+
+    /// <summary>The version the teacher chose Skip This Version for (#337).</summary>
+    public string? SkippedUpdateVersion { get; set; }
+
+    /// <summary>When the daily update check last ran, UTC (#337: the wall clock, not process time).</summary>
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
     /// <summary>
     /// The teacher's Cloudflare account, asked for once and remembered for
     /// every course. It belongs here rather than in a course's settings for
@@ -185,10 +194,13 @@ public sealed class AppSettings
             if (File.Exists(file) &&
                 JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(file)) is { } settings)
             {
-                // A stored folder that no longer exists must not be presented
-                // as the working folder.
-                if (settings.WorkspacePath is not null && !Directory.Exists(settings.WorkspacePath))
-                    settings.WorkspacePath = null;
+                // A remembered working folder that cannot be reached is KEPT
+                // (#320, the mac's #311): the window shows the picker with one
+                // sentence naming it and why (LastWorkingFolder), and it stays
+                // remembered until another folder is chosen or reopened.
+                // Forgetting it here was the silent prune that landed a teacher
+                // on the picker with nothing said — after a USB drive was
+                // simply not plugged in yet.
                 settings.RememberedWindows.RemoveAll(w => !Directory.Exists(w.Path));
                 settings.PruneAssistWindowPlacements(Directory.Exists);
                 return settings;

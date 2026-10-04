@@ -210,6 +210,9 @@ public class PublishAndLauncherContractTests
             // a scheduled deploy takes. Both of the latter are answered by
             // named tests rather than by an outcome.
             if (entry!["when"] is null) continue;
+            // "the stamp is written" records WHAT goes in it (fingerprintRule,
+            // #358), answered by FingerprintRuleTests.ANewStampRecordsTheCurrentRule.
+            if (entry["alsoRecords"] is not null) continue;
 
             string when = entry["when"]!.ToString();
             if (!outcomes.TryGetValue(when, out var outcome)) { unanswered.Add(when); continue; }
@@ -782,5 +785,36 @@ public class PublishAndLauncherContractTests
         foreach (var port in ports["containerPorts"]!.AsArray()) expected.Add(port!.GetValue<int>());
 
         Assert.Equal(expected, PreviewLeases.AvailablePorts.ToList());
+    }
+
+    /// <summary>
+    /// Rule 1 over what the three PowerShell launchers PRINT: no line a
+    /// <c>Write-Host</c> carries names the machinery. The mac pins the same
+    /// whole-word list over its first-run block
+    /// (<c>AppRulesContractTests.testTheFirstRunLinesNameNoMachinery</c>, #263);
+    /// this is its Windows twin (#296), and when it was written it found
+    /// exactly the two lines #296 named, <c>deploy.ps1</c> "...bakes in a
+    /// live-reload script" and "...still carries the preview's live-reload
+    /// script". The one line exempted is <c>preview.ps1</c>'s <c>--image</c>
+    /// refusal: a developer flag the app never passes, so no teacher reads it.
+    /// </summary>
+    [Fact]
+    public void NoLineTheLaunchersPrintNamesTheMachinery()
+    {
+        var machinery = new Regex(
+            @"\b(toolchain|script|scripts|docker|container|containers|colima|lima|buildx|buildkit|virtual machine|image|images)\b",
+            RegexOptions.IgnoreCase);
+        var offending = new[] { "setup.ps1", "preview.ps1", "deploy.ps1" }
+            .SelectMany(file => File.ReadAllLines(Path.Combine(RepoRoot, file))
+                .Select((line, index) => (file, number: index + 1, line)))
+            .Where(entry => entry.line.Contains("Write-Host", StringComparison.OrdinalIgnoreCase))
+            .Where(entry => !entry.line.TrimStart().StartsWith("#"))
+            .Where(entry => !entry.line.Contains("--image requires a value"))
+            .Where(entry => machinery.IsMatch(entry.line))
+            .Select(entry => $"{entry.file}:{entry.number}: {entry.line.Trim()}")
+            .ToList();
+
+        Assert.True(offending.Count == 0,
+            "A launcher prints a line naming the machinery (CLAUDE.md rule 1):\n" + string.Join("\n", offending));
     }
 }

@@ -129,7 +129,7 @@ public sealed class SectionRestoreTests : IDisposable
     [InlineData("body only", "---\ntitle: x\n---\n", "body only")]                        // nothing to restore, nothing touched
     public void SettingPerSectionKeysMatchesTheMacLineForLine(string live, string backup, string expected)
     {
-        Assert.Equal(expected, CourseRestorer.SettingPerSectionKeys(1, live, backup));
+        Assert.Equal(expected, CourseRestorer.SettingPerSectionKeys(1, live, backup).Text);
     }
 
     // ---- The copy is saved once, and survives six changes -------------------
@@ -142,7 +142,7 @@ public sealed class SectionRestoreTests : IDisposable
         for (int change = 0; change < 7; change++)   // odd, so it ends unpublished; more than MostBackupsKept
         {
             bool draft = change % 2 == 0;        // starts published, so the first change unpublishes
-            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, includeLinked: false, draft: draft);
+            var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 1, Day 1" }, draft: draft);
             var result = await workspace.Apply(plan, preview: false);
             Assert.True(result.Succeeded, result.Message);
         }
@@ -190,5 +190,57 @@ public sealed class SectionRestoreTests : IDisposable
             .ToString().ToLowerInvariant();
         foreach (string word in new[] { "toolchain", "script", "docker", "container", "zip", "backup file", "process" })
             Assert.DoesNotContain(word, said);
+    }
+
+    // ---- The shared cases (#177, #182, #186 via #308) -------------------------
+
+    /// <summary>
+    /// course-management.json → backups.restoringOneSectionsKeys, compared as
+    /// BYTES, with whether the page must be counted as not put back.
+    /// </summary>
+    [Fact]
+    public void EveryRestoringOneSectionsKeysCaseIsFollowed()
+    {
+        var cases = ContractLoader.LoadJson("course-management.json")["backups"]!["restoringOneSectionsKeys"]!["cases"]!.AsArray();
+        Assert.True(cases.Count >= 6, $"{cases.Count} restore cases; 6 were there on 2026-09-25.");
+        var failures = new List<string>();
+        foreach (var testCase in cases)
+        {
+            var (text, couldNotBePutBack) = CourseRestorer.SettingPerSectionKeys(
+                testCase!["section"]!.GetValue<int>(), testCase["live"]!.ToString(), testCase["backup"]!.ToString());
+            if (text != testCase["after"]!.ToString()
+                || couldNotBePutBack != testCase["expectCouldNotBePutBack"]!.GetValue<bool>())
+                failures.Add($"{testCase["name"]}: got {text.Replace("\n", "\\n")} (not put back: {couldNotBePutBack})");
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    /// <summary>
+    /// #177: a restore reaches the pages the build reads — a <c>----</c> fence,
+    /// and a blank line before the fence, which the restored page DROPS, as
+    /// the mac's does (Russell, 2026-10-01; bundle 2 had kept it). The shared
+    /// case is in <c>restoringOneSectionsKeys</c>.
+    /// </summary>
+    [Theory]
+    [InlineData("----\ntitle: x\npublishForSection1: true\n----\nbody", "----\ntitle: x\npublishForSection1: false\n----\nbody")]
+    [InlineData("\n---\ntitle: x\npublishForSection1: true\n---\nbody", "---\ntitle: x\npublishForSection1: false\n---\nbody")]
+    [InlineData("\n\n---\ntitle: x\npublishForSection1: true\n---\nbody", "---\ntitle: x\npublishForSection1: false\n---\nbody")]
+    public void ARestoreReachesAPageTheBuildReads(string live, string expected)
+    {
+        Assert.Equal(expected, CourseRestorer.SettingPerSectionKeys(1, live, "---\npublishForSection1: false\n---\n").Text);
+    }
+
+    [Fact]
+    public void TheDoneMessageCountsThePagesNotPutBack()
+    {
+        var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
+        Assert.Equal(wording["sharedPageWhoseSettingCouldNotBePutBack"]!.ToString(),
+            AssistWording.SharedPageWhoseSettingCouldNotBePutBack("{section}"));
+        Assert.Equal(wording["sharedPagesWhoseSettingsCouldNotBePutBack"]!.ToString(),
+            AssistWording.SharedPagesWhoseSettingsCouldNotBePutBack(2, "{section}"));
+        Assert.EndsWith(AssistWording.SharedPagesWhoseSettingsCouldNotBePutBack(3, "1"),
+            AssistSectionRestore.DoneMessage("ICS3U", 1, 3));
+        Assert.Equal("left the settings of 1 page as they were while putting the section back: no room at the top for a new setting",
+            Plantoir.Core.Scripting.ActivityTrail.PageSettingsLeftAsTheyWereLine("putting the section back", 1));
     }
 }

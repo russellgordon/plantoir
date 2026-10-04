@@ -17,6 +17,90 @@ happens. This page is not a status report and should not be read as one.
 
 ---
 
+## Preview and publish mechanics that match the mac (bundle 4, 2026-09-30)
+
+One place for what changed on the preview and publish path in bundle 4, so a
+reader of the code finds the reasons. Hardware for every number: Intel Core
+i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
+
+- **The address (#278).** `ScriptRunner.CapturePreviewAddress` reads COMPLETE
+  lines only: the unfinished tail waits for the next piece, colour codes come out
+  per line, the carry is flushed when the run ends, and nothing is read back off
+  the end of the transcript. Chunk-wise parsing (the old code) takes the wrong
+  port when a piece ends after `:8`, `:81` or `:810` — the must-fail reproduced
+  `:810`. The wait never starts from the lease's port.
+- **The wait (#233).** `PreviewReachability.NextStep` decides each tick; the
+  view only acts. The run is never bounded (a first build here: server line at
+  43.6 s); the QUIET after `Started a Quartz server` is (45 s, restarted by
+  output). Server line to site answering, measured: 0.60 s first build, 0.40 s
+  and 0.38 s warm. No announced address when the server starts: give up at once.
+  Giving up stops the run the Stop way (so the trail's `task finished` line says
+  "stopped by the teacher" right after the `preview did not appear` line that
+  explains it — accepted rather than adding a third stop path), then the alert.
+  Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
+  anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
+  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac).
+- **A typed publish folder (#304, review L1).** `deploy.ps1`'s
+  `Resolve-PublishFolder` takes a plain relative name from the working folder
+  (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
+  drive-relative (`C:foo`) or root-relative (`\out`) one: `IsPathRooted`
+  calls both rooted and `GetFullPath` then resolves them against the PROCESS
+  directory (verified: `C:\Windows\foo` with that working directory).
+  Rejected: refusing every relative name as the app does — the command line
+  and deploy.sh accept one, and #304 asked for it resolved once.
+- **Freshness (#272).** `.build-started` beside `public\` is written natively,
+  so one clock stamps it and the Save. `BuiltForPreview` reads bytes; the
+  `SearchOption.AllDirectories` overload does not skip Hidden items (a default
+  `EnumerationOptions` does — the must-fail proved it once the test gave the
+  dot folder the Hidden attribute, which NTFS does not do by itself). A
+  folder under `public\` that cannot be LISTED answers "rebuild" (review L2):
+  its pages were never looked at, and the throw used to escape NeedsRebuild
+  and fail the Deploy. Case-sensitivity is pinned by a proposed 16th case
+  (the tag in capitals).
+- **Two windows (#272).** Measured by reading and then by test before writing:
+  Ctrl+N opens a second window on the same folder and each `WorkspaceViewModel`
+  loads its own `CourseConfiguration`, so the whole-file `Write` lost the other
+  window's Save exactly as on the mac. `Write` now merges per top-level key and
+  returns what it kept or replaced; `WorkspaceViewModel.OtherCopiesReread`
+  re-reads every other unchanged copy; Revert reads the file. After a Save,
+  Course Settings says `settingsSaveReplacedSidebarChange` first, then
+  `settingsSavedWhilePublishing` or `settingsSavedWhilePreviewing` with a
+  Preview Again button (stops and restarts every open preview of the course,
+  in whichever window; `settingsPreviewAgainNothingOpen` and the button
+  disabled once none is open); a preview started with unsaved edits in ANY
+  window says `previewUsesSavedSettings`. Events: `preview started with
+  unsaved settings`, `preview again after settings saved`.
+- **The acts read the saved file (#357 / mac #335).** `SavedSettings.Read` at
+  the Deploy press (and the assistant pressing it) and in the schedule sheet
+  (on open and again at the press); unreadable refuses with
+  `settingsCouldNotBeReadToDeploy`, never the window's copy. Unsaved edits
+  anywhere: `deployUsesSavedSettings` / `schedulingUsesSavedSettings` and
+  `deploy used the saved settings` (kinds only). The section's notices have
+  their own InfoBar, never cleared by a preview's end (the mac's F3 trap).
+- **Overnight Cloudflare remake (#395).** The wrapper runs a Cloudflare leg
+  captured (Start-Process redirection, as the build leg) and appends any
+  `PLANTOIR_CLOUDFLARE_REMADE:` line to the section's record; the app writes
+  `cloudflare project made again` when it reads it. Every leg's exit is
+  `$legExit`.
+- **Windowless work (#391, #386).** `AssistWorkspace` runs every leg
+  `--non-interactive`; `LaunchOutcome.ExitCode` 3 becomes the contract's
+  sentences. The window refuses a preview while `CourseActivity.IsPublishingSection`
+  (this process's own Deploys, any window); the in-app assistant asks the same
+  record. On Windows the in-app assistant's DEPLOY runs in plantoir-mcp.exe, a
+  separate process, so it is the work leases (#289) that refuse a window's
+  preview of it — not the in-process record — and the contract's window case for
+  that deployer is skipped by name in `PreviewWhileDeployingTests`.
+- **The '— Edited' rule 2 (#358).** C#, the wrapper (`--rule 2`, and the rule
+  written into its sentinel so an old wrapper's value is recorded as rule 1) and
+  the stamp moved together. Found on the way: `section_fingerprint.py` could not
+  import `how_i_teach` under the bundled EMBEDDABLE Python (its `._pth` replaces
+  `sys.path`), so every scheduled publish recorded no fingerprint; it now adds
+  its own folder, as `build_site.py` does.
+- **One folder, one id (#307).** A case variant gives the same id (`3566e628`
+  both ways) and compares equal; NTFS does not normalise Unicode, so an NFD
+  spelling of an NFC-named folder is another (nonexistent) folder — ids
+  `b7e56301` / `bbdbaf32` — and there is no second spelling to disagree about.
+
 ## The solution
 
 | Project | Role |
@@ -189,19 +273,24 @@ marker jumped it forward several steps at once.
 
 ## Scheduled deploys
 
-There is no `launchd`. `TaskScheduling` writes a wrapper script into
-`%LOCALAPPDATA%\Plantoir\scheduled\` and registers it with **Task Scheduler**
-(`schtasks`). The wrapper fingerprints the section, builds it, deploys to each
-destination un-chained (one failing must not stop the others), and writes a
-sentinel the app picks up next time it runs.
+There is no `launchd`. `TaskScheduling` registers a task with **Task Scheduler**
+(`schtasks /Create /XML`), and since parity bundle 3 (#347, #289, #239) what
+the task starts is PLANTOIR: `Plantoir.exe --run-scheduled-deploy "<task
+name>"`, with no window, like the mac's launchd job. `ScheduledRun` decides at
+the moment itself (too late to be worth doing, another program building the
+course, whether the task still stands, where the course deploys NOW) and only
+then writes the wrapper script into `%LOCALAPPDATA%\Plantoir\scheduled\` from
+the settings as they are at that moment and runs it. The wrapper fingerprints
+the section, builds it, deploys to each destination un-chained (one failing
+must not stop the others), and writes a record the app picks up.
 
-What it registers is the SHELL: `schtasks /TR` gets
-`powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
-"<wrapper>"`. (The mac's equivalent lesson — register the job as the APP, or
-the operating system announces that "bash" wants to run in the background —
-belongs to macOS Background Items and has no counterpart here. It is recorded
-as something to weigh, not as something this code
-does; do not go looking for app-registration code.)
+The task is registered from XML (`TaskScheduling.TaskXml`) so that it carries
+three settings the command-line switches cannot set: it may start on battery
+(`DisallowStartIfOnBatteries` false), is not stopped by going onto battery
+(`StopIfGoingOnBatteries` false) and starts as soon as possible after a missed
+start (`StartWhenAvailable` true). The older description here — a task that
+runs `powershell.exe -File "<wrapper>"` — is how a task set before bundle 3
+still runs until it drains; do not read it as the current design.
 
 Two rules learned the hard way, and they cover different halves of the same
 problem — **nobody answers a question at 6 a.m.**
@@ -234,6 +323,10 @@ problem — **nobody answers a question at 6 a.m.**
 
   It records **four outcomes**, not one: a question went unanswered, the BUILD
   asked a question, it did not finish for some other reason, and it WORKED.
+  (Eight since 2026-09-30, bundle 3: a build that failed outright is
+  `buildDidNotFinish`, naming no destination, and a run that stood down is
+  `tooLateToRun`, `courseWasBusy` or `couldNotRunAsSetNow` — the run is
+  Plantoir itself now; see 07-deployment → "On Windows since bundle 3".)
   The last is there for the same reason as the failures read backwards — a
   scheduled publish that leaves no trace cannot be told from one that never
   happened, so the trail could answer *"why did my site not update?"* and
@@ -384,17 +477,28 @@ spaces.
 **The LAUNCHERS are the sharp edge, and they are the exception most likely to
 catch somebody out.** `preview.ps1`, `deploy.ps1` and `setup.ps1` compute the
 builds root from `$env:LOCALAPPDATA` themselves, and `TaskScheduling` bakes the
-same into the wrapper script it registers. So a redirected run that PREVIEWED
-would look for its build where the launcher did not put it, and one that
-SCHEDULED a deploy would register a REAL Task Scheduler task whose sentinels
-land in the teacher's real pending folder. Neither is done by any test, and a
-test that drives Preview is the obvious next thing somebody writes — this is
-the paragraph they will have read first. `plantoir-mcp.exe` resolves its own
-paths too.
+same into the wrapper script it registers. So a redirected run that PREVIEWS
+builds into the REAL `%LOCALAPPDATA%\Plantoir\builds\<folder id>` while the
+app's own idea of that folder is under the state directory (so
+`BuildFreshness` always says "build", harmlessly), and one that SCHEDULED a
+deploy would register a REAL Task Scheduler task whose sentinels land in the
+real pending folder. **No test schedules a deploy.** `plantoir-mcp.exe`
+resolves its own paths too.
 
-**One launcher IS run from a test now**, and the reasons that is safe are
-narrower than they look. `NewCourseWizardUiTests` presses the wizard's Create
-button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
+**Previewing and publishing from a test ARE done, since bundle 11
+(2026-10-01).** Until then this paragraph said neither was, and that a test
+which drove Preview "would NOT be safe". Russell lifted that rule — "I don't
+care if you have real build folders. We need to test this. End to end." —
+because course import, reference courses, Copy a Page, preview and publishing
+had never been proven through the window, and this PC holds no teacher's real
+work. What remains is hygiene, and it is `DrivenApp.Dispose`'s job, so it runs
+when a test fails as well: see "Driving the real interface" → "A test that
+runs a launcher".
+
+**`setup.ps1` was the first launcher run from a test**, and the reasons it
+was safe even before that ruling are narrower than they look.
+`NewCourseWizardUiTests` presses the wizard's Create button, which runs
+`setup.ps1`. **Two guards, neither enforced by anything:**
 
 1. `setup.ps1` sets `PLANTOIR_BUILD_ROOT` to the real
    `%LOCALAPPDATA%\Plantoir\builds\<id>` like every other launcher — but
@@ -408,8 +512,13 @@ button, which runs `setup.ps1`. **Two guards, neither enforced by anything:**
    the shared runtime.
 
 Checked rather than assumed, 2026-09-07: after a create there was no new folder
-under the real builds root and the real breadcrumb trail was untouched. Check
-both again before a test runs a different launcher.
+under the real builds root and the real breadcrumb trail was untouched. The
+preview and deploy launchers DO make a folder under the real builds root (it is
+deleted afterwards, see below), and they write to the REAL trail
+(`%LOCALAPPDATA%\Plantoir\Logs\activity.txt`) only on their refusals — "the
+preview stopped before building…", "every address … was taken" — which no
+end-to-end test provokes; bundle 11 measured the trail's size before and after
+its runs (the ready note has the numbers).
 
 Two things about it are worth more than the flag itself.
 
@@ -588,7 +697,7 @@ holds one entry per key, carrying the key, the issue, the milestone and the
 reason. Everything else is asserted exactly as before, and the ledger fails
 both ways — if a ledgered thing starts existing here (saying to delete the
 entry) and if it stops being in the contract. **So a green totals line on this
-suite can mean "green, with two written debts"**, and the ledger file is the
+suite can mean "green, with the debts the ledger names"**, and the ledger file is the
 one place that says which. `contracts/README.md` → "Named gaps" carries the
 boundary: a named gap is allowed only while an open issue milestoned LATER
 than the release being cut owns the work, and never for a difference a teacher
@@ -596,6 +705,49 @@ can see at the current milestone. Softening the contract instead — an
 `appliesOn: ["mac"]` that would be untrue and, having no mend-check, permanent
 — was rejected there and the reasoning is worth reading before proposing it
 again.
+
+**Since 2026-09-30 the ledger is the parity milestone's BURN-DOWN LIST**
+(Russell: no Windows release before parity, so an entry may name an open issue
+on "Windows: parity with mac v1.4.0" itself; `contracts/README.md` → "Named
+gaps"). Bundle 1 of the parity run widened it from two entries to every debt
+the suite could name, so that a red run means something again:
+
+| Area | What is held open | Wired into |
+|---|---|---|
+| `activityTrail.mustRecord` | 58 events this app does not declare yet, each against the issue carrying its mac piece | `ContractTests.SharedRules_ActivityTrailEvents_Exist` |
+| `specialNames.platformWording.keys` | `renameUnitWord.explanation` (#158) | `SpecialFolderRenamerTests` |
+| `assist-wording.json` → `wording` | 140 keys with no same-named member on `AssistWording` or `ClassChangeWording` — 34 of them sentences this app says today in words built inline, owned by #157's remaining half (hoist them), the rest by their features' issues | `ContractTests.AssistWording_MatchesContract` |
+| `courseConfigKeys` | 7 keys `CourseConfiguration.cs` did not name (#345, #274, #239, #241) when bundle 1 took the count; `curriculum_folders` (#345) left with bundle 6a, the three club keys (#274) with bundle 7 | `ContractTests.FileFormats_CourseConfigKeys_MatchesContract` |
+| `modelTiers.requirements` | none since parity bundle 5a (2026-09-30), which answered #196's and #262's three; the area stays so the next mac requirement can be held by name | `AssistSurfaceContractTests.EveryRequirementOfTheLocalAssistantIsAnsweredOrSaidToBeUnexecutable` |
+| `sectionIndexPointer.dateCases` | none since parity bundle 7 (the club front-page case runs) | `PagesDatedByTheBuildTests.ThePointerFollowsTheContractsDateCases` |
+| `gradedFolders.newCourse.cases` | none since parity bundle 7: the club case runs through `NewCourseAnswers.ForAClub`, the declined-skeleton case (#250) since bundle 6a | `GradedFoldersNewCourseContractTests` |
+
+Bundle 5a (2026-09-30) paid five of those events (`assistant was asked about
+another course`, `assistant answer was cut off`, `assistant repeated the request
+back`, `scheduled deploy replaced`, `scheduled deploy could not be set`) and
+eleven wording keys (#180, #196, #262, #217, #260, #261, #281, #288); the counts
+in the table are the ones bundle 1 took, and the ledger file is the live list.
+
+The event-to-issue mapping was made from each event's own `#` references in
+the contract, matched to the open `windows` issue that names that mac piece;
+where two issues could own one, the choice is the entry's to change. An entry
+goes when its issue lands, and the mend-check says so.
+
+**`AssistWording_MatchesContract` walks the file now (#157).** Every key of
+`assist-wording.json` → `wording` is resolved by reflection to a public static
+member of the same name (first letter upper-cased) on `AssistWording`, then on
+`ClassChangeWording`; a constant is compared WHOLE, and the methods keep their
+hand-written calls because their example values live in the file, not in a
+signature. In the other direction every member of `AssistWording` must have a
+key, except the three multi-destination sentences this app words differently
+(`WindowsOnlyWording` in the test, mend-checked both ways; owed on #165).
+REJECTED: resolving only against `AssistWording` (seven duplicate-and-copy
+sentences live in `ClassChangeWording` and would have been ledgered as absent
+while being said); a reverse check over `ClassChangeWording` too (it carries
+three helpers with no key by design, and the issue asked for the file to be
+the list, not for a second allow-list); searching the whole codebase for each
+sentence's text (a sentence built inline from pieces cannot be found by its
+text, and a text search would call a stale copy present).
 
 ## Driving the real interface
 
@@ -608,9 +760,11 @@ bottom, that a panel follows the course a teacher selected rather than
 going stale, and that a sentence the contract pins is actually RENDERED where
 a teacher can see it rather than merely held in a constant.
 
-**It is opt-in and belongs to no gate.** Every test carries `[UiFact]`, which
-skips unless `PLANTOIR_UI_TESTS=1`, so a plain `dotnet test` builds them and
-runs none. The project is in the solution so a SOLUTION build compiles it —
+**It is opt-in and belongs to no gate.** Every test that drives the window
+carries `[UiFact]`, which skips unless `PLANTOIR_UI_TESTS=1`, so a plain
+`dotnet test` builds them and runs none of those — only
+`AssertAbsentRuleTests`, three plain facts that pin the harness's absence rule
+and need no desktop (bundle 11). The project is in the solution so a SOLUTION build compiles it —
 compile-rot is what actually kills a suite nothing builds. Be honest about the
 limit, though: the per-project commands used day to day (`dotnet build
 Plantoir/Plantoir.csproj`, `dotnet test Plantoir.Tests/...`, `publish.ps1`)
@@ -679,6 +833,152 @@ caught by the same match because `setup.ps1` runs it as `python.exe -u
 the temporary folder, so it is on the command line even though the folder is
 otherwise only python's working directory.
 
+### Real input goes where the pointer is: click the rectangle, with the window in front (2026-10-03)
+
+Much of the suite acts through UI Automation patterns (Invoke, Toggle,
+Select), which reach the app whatever is in front of it. FlaUI's
+`element.Click()` and `RightClick()` are different: they send REAL mouse
+input to the element's "clickable point", and typed keys follow the focus —
+so both go to whatever window is under the pointer and in front.
+
+On 2026-10-03 the suite ran 41 of 44 on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), reached over a
+3840-pixel-wide remote session at 200% scale. All three failures were Copy a
+Page tests saying Copy was never offered. What happened, measured by logging
+the front window, the pointer and Plantoir's rectangle every 150 ms:
+`picker.Click()` moved the pointer to x=3839 (the screen's edge), y=1168, for
+a search box whose middle was at y=584 — the element's "clickable point" came
+back at TWICE its real coordinates. The click landed on the terminal behind
+Plantoir, which took the focus, and "Big", "Ohms" and "Watt" were typed into
+it (and, with the terminal minimised, into Windows Search, which opened Edge).
+The dialog itself was drawn correctly; the product was not at fault. The same
+tests had passed 13 of 13 two days earlier on a smaller desktop.
+
+So: **a test that clicks and then TYPES calls
+`DrivenApp.ClickMiddleOf(element)`, never `element.Click()`.** It brings the window to the front first
+(`BringToFront`, which joins the input queue of the window that is in front —
+Windows refuses a plain `SetForegroundWindow` from a process that is not —
+and throws, naming the window in the way, rather than typing into it), then
+clicks the middle of the element's bounding rectangle, which is in real
+pixels at every scale. Rejected: FlaUI's `Window.SetForeground()` and
+`Focus()` (measured: the terminal stayed in front); minimising the terminal
+from the runner (the click still went to the doubled point).
+
+**Only the two Copy a Page pickers were changed.** About twenty other
+`Click()` and `RightClick()` calls remain (the helpers in `DrivenApp.cs`,
+`AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`, `EndToEnd.cs` and
+others), none with `BringToFront`. They passed in the 44 of 44 run on the same
+200% session, so the doubled point is not general — it was measured on the
+picker (an AutoSuggestBox inside a dialog) and nowhere else — but nothing
+proves the others cannot meet it. Moving them to `ClickMiddleOf` is owed
+(#428).
+
+### A test that runs a launcher (bundle 11, 2026-10-01)
+
+Until bundle 11 the suite drove no Preview and no Deploy, so course import,
+courses kept for reference, Copy a Page, preview and publishing had never been
+proven through the window. Russell lifted the rule against it — "I don't care
+if you have real build folders. We need to test this. End to end." — and five
+classes now run the real launchers:
+
+| Class | What it drives | What it reads back |
+|---|---|---|
+| `WizardToPreviewUiTests` | the wizard's Create, a line added to the front page, Preview, Stop | the SERVED front page over HTTP (the marker line), the address the window's preview pane LOADED (equal to it, status 200), the build in the real builds root, the address going quiet after Stop; the pane's page text is reported, not asserted |
+| `ImportForReferenceUiTests` | File › Import Courses for Reference…, the Windows folder picker, the sheet, Import; the open folder and an empty folder | the done screen's contract sentences, the row under Reference Courses › 2025–26, the copied config's marker and year, the page LOCKED on disk, `.merged_output` left behind, the source untouched |
+| `ReferenceCourseUiTests` | the summary, a reference section, Keep a Copy for Reference… twice, Copy a Page from both kinds of row | the contract sentences, Deploy absent/present, pages locked on disk, `codeAlreadyInThatYear` beside a greyed button, `thereIsNoCourseToCopyInto` |
+| `CopyAPageEndToEndUiTests` | Copy a Page through its checklist, then Deploy of the destination to a folder; the three refusals | both copies `publishForSection1: false` + `publish: false`, the backup zip, the PUBLISHED folder without either copy, each refusal's contract sentence (the deploying one with a real publishing lease held by the test process) |
+| `PublishToFolderUiTests` | Deploy to a folder | the published folder: front page and visible page in, the hidden page nowhere (pages or search index) |
+
+**What a test that runs a launcher owes, and where it is done.** The launchers
+build into the REAL `%LOCALAPPDATA%\Plantoir\builds\<id of the test's temp
+working folder>` (`DrivenApp.RealBuildsRoot`) whatever `--state-dir` says. So
+`DrivenApp.Dispose` — which runs when a test FAILS too — after killing the app:
+runs `preview.ps1 CODE N --stop` for every section the test declared with
+`WillServe` (the launcher's own sweep, by the directories the build and serve
+work in); ends any process whose command line still names the run's
+temporary folder or that builds folder (a deploy's launcher, its python);
+deletes that builds folder; and unlocks the working folder's courses so a
+reference course the app locked can be deleted with it. (Before bundle 11 the
+reference tests' temporary folders outlived their runs for exactly that
+reason.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
+launchers would build under the state folder — it would have stopped the
+tests exercising the real path the ruling asked for, and node and npm resolve
+caches from the same variable.
+
+**Still never done from a test:** scheduling a deploy (it registers a REAL
+Task Scheduler task), and publishing to Netlify or Cloudflare (a real token, a
+real globally unique site — `verify-deploy.ps1` owns those).
+
+**What the first unlocked runs taught (bundle 11, 2026-10-01, this PC: Intel
+i5-8365U, 16 GB, Windows 11 26200).** Eleven tests written while the desktop
+was locked had never run; the first whole run failed 9 of 33, and every one of
+these is now written into the harness rather than left to be rediscovered:
+
+- **A ContentDialog is a `Window` of class `Popup`, named by its title.** There
+  is no "ContentDialog" class in the UIA tree, and an empty `Popup` sits beside
+  it; `DrivenApp.OpenDialog` tells them apart by the dialog's own buttons.
+- **A panel has no automation peer.** An `AutomationId` set on a `StackPanel`
+  or a `UserControl` never reaches the tree (`clubLockedRows`,
+  `referenceSummary` — the latter moved to its `ScrollViewer`). A test that
+  asserts such an element ABSENT passes whatever the screen shows.
+- **A folded TreeView item has no children in the tree.** The sidebar's
+  Backups group starts folded; unfold it (ExpandCollapse) before asserting a
+  backup row is there or gone.
+- **`AutomationProperties.AutomationId` replaces `x:Name`, case-sensitively.**
+  `DeployButton` matched nothing; the id is `deployButton`.
+- **`SetScrollPercent(-1, 100)` on Course Settings' form stuck at 2.8 %**; a
+  `LargeIncrement` walk reaches the bottom.
+- **An empty `TextBlock` has no Name** (`PropertyNotSupportedException`), and a
+  UIA query can time out (`COMException 0x80131505`) while the app draws a
+  dialog — both mean "nothing yet", not a fault, for something AWAITED
+  (`FindOrNull`). Never for an absence: a negative check built on
+  `FindOrNull` passed whenever every query timed out, so negative checks use
+  `DrivenApp.AssertAbsent`, which says "absent" only when the tree ANSWERED
+  empty and fails when it never answers (`AssertAbsentRuleTests`, plain facts
+  that run without a desktop; the timeout case is the must-fail). It also
+  keeps watching for 2 s after the first empty answer, so a control drawn a
+  moment late is not declared absent.
+- **An id set on a ContentDialog's TEMPLATE button once, at Opened, does not
+  always stick**: Copy a Page's Cancel was found as the template's own
+  "CloseButton" in 2 of 5 runs (17, 18). The app now re-tags its two buttons
+  on every layout pass while the dialog is up, and the tests close it by
+  `copyPageClose` only (`EndToEnd.CloseCopyAPage`, which fails when there is
+  no dialog or no id) — a "whichever id" fallback had hidden the race.
+- **Click a control only once it has a clickable point**; a dialog opened
+  straight after another closed is still arriving (`NoClickablePointException`).
+- **WebView2's page text** arrives through UIA lazily, sometimes as Text and
+  sometimes as another element's name — and in 3 of 8 runs it did not arrive
+  in time (once 0 named elements for 120 s, focused or not). That is Chromium's
+  accessibility tree, not the app's, so `WizardToPreviewUiTests` REPORTS it.
+  What it ASSERTS is the address the preview pane loaded: in a `--state-dir`
+  run the app writes "loaded 200 <address>" into Open in Browser's ItemStatus
+  on every completed navigation (the WebView2's own peer drops an ItemStatus
+  set on it — measured empty), and the test compares it with the address it
+  read the page from (must-fail: a wrong port in it turns the test red). It
+  also asserts the served page over HTTP carries the
+  teacher's line, and the web view is on screen with a size.
+- **A closing dialog's smoke layer** leaves the sidebar with no clickable
+  point for a moment; `PressRowMenuItem` waits for one.
+
+Three PRODUCT faults the same runs found, all fixed in bundle 11: Keep a Copy
+for Reference… (and Import, same shape) closed the app on its first progress
+report — a `Progress<T>` made inside `Task.Run` reports on a pool thread
+(`ProgressMadeOnTheInterfaceThreadTests` now refuses the shape); choosing a
+folder and then Netlify again in Course Settings left Revert on
+(`CourseConfiguration.DeployTarget` now restores the saved spelling); and
+every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
+
+Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
+29–32 s; its first preview served 52–61 s after Preview was pressed;
+publishing a one-section course to a folder 1 m 52 s – 3 m 3 s per test (build
+included); the end-to-end set of 13 tests 16 m 47 s – 20 m 33 s; the whole
+suite of 40, 43 m 38 s – 48 m 43 s (with the PC also busy with other work).
+After the harness lessons above and the review's fixes (absences need an
+answer; the preview pane's loaded address asserted), and on a tree merged with
+bundle 10, the end-to-end set ran 13 of 13 five times in a row (7 m 2 s –
+7 m 17 s each on a quiet PC) and the whole suite 44 of 44 (19 m 39 s), with no
+launcher left running, no new folder under the real builds root and the real
+trail untouched.
+
 ### Never start the app with its output redirected
 
 `ConPtyProcess.Start` already carries this as a CAUTION, and it is repeated
@@ -709,9 +1009,39 @@ Measured 2026-09-07 (Lenovo 20QES70500, Intel Core i5-8365U @ 1.60 GHz,
 this section said the opposite — that any console broke it — which is why the
 experiment above is written down rather than the conclusion alone.
 `Plantoir.UiTests` is the case that meets it in practice, and `DrivenApp`
-launches with `UseShellExecute = true` for exactly this reason. Whether
-`ConPtyProcess.Start` should defend itself is
-[issue #89](https://github.com/russellgordon/plantoir/issues/89).
+launches with `UseShellExecute = true` for exactly this reason. Whether `ConPtyProcess.Start` should defend itself was
+[issue #89](https://github.com/russellgordon/plantoir/issues/89), and it now does:
+
+**Since bundle 8 (#155), `ConPtyProcess.Start` defends itself.** It zeroes
+this process's three std handles around `CreateProcessW`, under one
+process-wide lock (`s_stdHandleGate`), and puts them back in `finally`.
+Measured 2026-10-01 on this machine (Windows 11 Pro build 26200, 8 logical
+CPUs), from the `dotnet test` host, whose stdout and stderr are pipes:
+`ConPtyRedirectedParentTests` started `cmd.exe /c echo PTY-OK`. **Before**:
+the child exited and the transcript held only ConPTY's two mode sequences
+(`ESC[?9001h ESC[?1004h`), no `PTY-OK`, within 10 s. **After**: `PTY-OK`
+arrives; both tests together took 118 ms. Rejected: `FreeConsole` (it detaches
+the whole process) and the per-instance `_ptyGate` (it would not serialise two
+Starts). The cost: while the lock is held, another thread writing to
+`Console` loses that output — the GUI app writes none. Launching harnesses
+with ShellExecute is still the better habit, and `DrivenApp` keeps doing it.
+
+The app also says so now: when it starts with stdout, stderr or stdin
+redirected to a pipe or a file, `startup.log` gets one line
+(`StdioState.Describe`), after the `--state-dir` redirect so it lands in the
+run's own log. It is for a developer; it is not a trail event.
+
+**The UI-test runner will not close a busy Plantoir.** Busy is
+`MachineWork.WhyBusy` (Plantoir.Core, shared with the updater): any live lease
+of another process, of any kind, in a working folder the REAL settings name
+(read from the unredirected path, never through `AppDataRoot`), or any running
+`plantoir-mcp` at all. `DrivenApp` applies it in full and throws "… Not
+closing it; run again when it finishes."; `run-ui-tests.ps1` applies the half
+it can see without a second copy of the liveness rule — a lease named for a
+process that is running right now, or any `plantoir-mcp` — and exits 2. After
+a kill, only `*.<killed pid>.lease` is swept, never `*.lease`. Known limit: a
+folder opened only through an outside assistant or under `--state-dir` is not
+a known folder.
 
 ### The new-site dialog: a hand-driven check
 
@@ -885,8 +1215,9 @@ as work happens:
   [its "other doors" section](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has)
   for what each door launches, what was measured and what was rejected.
 - **Window and state restoration**, archived courses, problem reporting, and
-  the `WorkLease` protocol that keeps two windows from building the same
-  section at once.
+  the `WorkLease` protocol that keeps two programs from building the same
+  course at once — since bundle 3 the mac's rules both ways, take-then-check
+  (09-mac-app → "On Windows since bundle 3 (#289)").
 - **What is built and what is missing.** Outstanding work is in [GitHub
   issues](https://github.com/russellgordon/plantoir/issues) labelled `windows`;
   the rest of this folder carries the reasoning behind past decisions.
@@ -1031,18 +1362,19 @@ What replaces the old container concepts:
   sentence); a process table that cannot be read lets the preview THROUGH
   (the opposite of the remake's rule, and why is in
   [03](03-launcher-scripts.md) → "A section being deployed cannot be
-  previewed (#381)"); and never a remembered process id. Until it is done the
-  cases are a named gap against the `windows` issue opened with #381.
+  previewed (#381)"); and never a remembered process id. Built in bundle 4
+  (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
+  window's `CourseActivity.IsPublishingSection` — see "Preview and publish
+  mechanics that match the mac (bundle 4)" above.
 - **Concurrent previews are still isolated by port, exactly as before.**
-  `preview.ps1` still probes a free host port block (8081/8091/8101/8111/8121/8131,
-  base..base+3 for the site, base+1000..+1003 for Quartz's live-reload
-  websocket — six blocks, where the mac launchers walk forty since GitHub
-  #280 and `preview.ps1` owes the same walk: `contracts/app-rules.json` →
-  `previewPorts.hostBlockCases`, and 03 → "How a folder finds its ports, and
-  when it cannot"; whether its probe sees ANOTHER signed-in account's
-  listeners is the open question the mac answered for itself in #310 — the
-  `windows` issue from #310 asks for the two-account measurement) and prints the exact "Preview will be available at:" line the
-  app watches for. What changed is only what is listening on that port: a
+  `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
+  8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
+  `contracts/app-rules.json` → `previewPorts.hostBlockCases`, and 03 → "How a
+  folder finds its ports, and when it cannot"). Natively a block is the site
+  port and its websocket (+1000). Whose listeners the probe sees (#319) was
+  measured in bundle 4: SYSTEM and NETWORK SERVICE listeners yes; a second
+  signed-in account was NOT measured (03 → "preview.ps1's own port walk…").
+  It prints the exact "Preview will be available at:" line the app watches for. What changed is only what is listening on that port: a
   Node process running directly on the PC, bound to `127.0.0.1` (patched at
   runtime-build time in `fetch-runtime.ps1`, native-only — see the favicon
   entry below), not a container's forwarded port.
@@ -1095,11 +1427,10 @@ as history, not as what Windows does today.
   "teaching-quartz-$WORKDIR_ID"` variable is still assigned in each script,
   matching the mac's naming scheme, but nothing native reads it today —
   don't build app logic around a container name existing.
-- **Port blocks**: `preview.ps1` still probes a free host port block
-  (bases 8081, 8091, 8101, 8111, 8121, 8131 — the mac's six until GitHub #280
-  made it forty, 8081 … 8471; `preview.ps1` owes that walk, and
-  `build_site.py`'s own native re-probe already walks forty blocks from the
-  port it is given): base..base+3 for the preview
+- **Port blocks**: `preview.ps1` walks forty blocks (8081 … 8471, since
+  bundle 4 / #286, matching the mac's walk from GitHub #280 and
+  `build_site.py`'s own native re-probe, which also binds `127.0.0.1` since
+  #319): base..base+3 for the preview
   site (four concurrent previews per folder) and base+1000..+1003 for
   Quartz's live-reload websockets. What is listening on those ports is now
   a native Node process bound to `127.0.0.1`, not a container's forwarded
@@ -1181,7 +1512,7 @@ Windows figures are the v1.1.0 release assets.
 | Carried inside | app, llama.cpp (25 MB), the build recipe | + Colima, Lima, Docker CLI, buildx, the Ubuntu disk (Apple silicon) | app, llama.cpp, `plantoir-mcp.exe`, the native runtime (Node 20, Python 3.11 and packages, patched Quartz and its node_modules, wrangler, the emoji font) |
 | Downloaded on a first run, for building | ~857 MB | ~390 MB (the website builder's image build) | none |
 | Update delivery | download the DMG by hand | Sparkle, a delta of 0.1–3.7 MB for a Swift-only release (measured) from the release after v1.4.0 | installer by hand |
-| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | none in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine) |
+| Downloads checked against a pinned SHA-256 | none | every helper, both kinds of Mac, and the disk | since 2026-10-01 (#356): the Node zip, the Python embeddable zip and the emoji font in `fetch-runtime.ps1` (a build-time fetch, not on a teacher's machine); `get-pip.py` deliberately not (below) |
 | When the building downloads happen (bundle B) | at the first preview | in the BACKGROUND at first launch, and again when the recipe changes (`setup.sh --prepare-builder`; one sidebar line, four trail events) | nothing to get ready: `builderWarmUp` and its trail events are `appliesOn: ["mac"]` |
 | The image itself (#334, bundle B) | full Quartz history, a spare scaffold copy, base tag unpinned | Quartz at depth 1 (≈342 MB first download), no `/opt/quartz-site`, base pinned by digest | no image; the runtime is bundled |
 
@@ -1193,10 +1524,30 @@ the same day.)
 1. **The mac installer is now almost twice Windows'**, because the mac still
    needs a Linux virtual machine and Windows does not.
 2. **The mac now checks every helper download against a pinned SHA-256**
-   (the launchers' shared first-run block). `fetch-runtime.ps1` fetches Node,
-   Python, get-pip.py and the emoji font without checksums. It runs when the
-   Windows app is BUILT, not on a teacher's PC, so this is a judgement call
-   rather than a defect — the Windows issue from #312 asks for it.
+   (the launchers' shared first-run block). **`fetch-runtime.ps1` now does
+   the same for the three FIXED downloads (#356, 2026-10-01)** — the Node zip,
+   the Python embeddable zip and the emoji font — and refuses (deleting the
+   file) on a mismatch. The pins were measured on the build PC (i5-8365U,
+   Windows 11 26200), not copied: Node's equals nodejs.org's own
+   `SHASUMS256.txt` for v20.18.1; the Python zip's `python.exe` and
+   `python311.dll` are byte-identical to the runtime that has shipped; the font
+   equals the shipped font. Proven by running the script's own `Fetch` (lifted
+   out of the file by its syntax tree, against a `file://` copy): the right pin
+   keeps the file, one wrong hex digit refuses it and leaves nothing behind.
+   **`get-pip.py` is NOT hashed, deliberately**: `bootstrap.pypa.io` serves one
+   moving file with no versioned URL, so a hash would break the build on pip's
+   next release while protecting nothing the exact package versions (fetched by
+   pip from PyPI over TLS) do not. **Also rejected:** hashing the Quartz clone
+   (it is a tag on GitHub fetched by git, which checks its own objects) and
+   wrangler (`npm install` of an exact version; npm checks each package
+   against the registry's own integrity hash). It runs when the Windows app is BUILT, not on a teacher's PC;
+   the reason to do it anyway is that the build PC is where a swapped file
+   would enter every installer.
+3. **What #356 asked Windows to confirm, confirmed (2026-10-01):**
+   `scripts/test_helper_bootstrap.py` SKIPS here (`python
+   scripts\test_helper_bootstrap.py`: 5 tests, OK, skipped=5) and
+   `ContractTests.SharedRules_ActivityTrailEvents_Exist` is green with the two
+   mac-only events filtered by `appliesOn`.
 
 ## Behaviours with platform-specific mechanics
 
@@ -1245,7 +1596,11 @@ the same day.)
 - **New windows** (entry 84): inherit the folder of the window that was
   key when the command ran; with no windows open, show the folder picker.
   Decide the folder BEFORE first paint or the picker flashes.
-- **Updates** (#204): **NetSparkleUpdater**, not WinSparkle — corrected
+- **Updates** (#204, #337): **switched on with v1.4.2, 2026-10-03** — what
+  was built, measured and rejected is `11-release-strategy.md` → the Windows
+  updater, and the release side is `RELEASING.md` → "The update feed
+  (Windows)". What follows is the brief it was built from, kept for its
+  reasoning. **NetSparkleUpdater**, not WinSparkle — corrected
   2026-09-25, when the mac shipped Sparkle and the Windows half was drafted as
   its own `windows` issue (milestone v1.4.0). NetSparkle reads the same feed
   format and can run the per-user Inno installer silently
@@ -1487,20 +1842,22 @@ fenced with `----` got a second block PREPENDED and the teacher's real
 frontmatter became body text on the student's site.
 
 One fence finder and one key matcher now serve the reader and every
-VISIBILITY writer — and that qualifier is load-bearing, because two other
-finders are still hand-rolled and were deliberately left alone:
-`CourseRestorer.FrontmatterBounds` (strict here, lenient on the mac since
-#140, so a restore reaches different pages on the two platforms — that is
-[issue #177](https://github.com/russellgordon/plantoir/issues/177), which
-Russell decided on 2026-09-19: adopt the shared finder; it is owed together
-with #182's carry-the-value-lines restore, see the `windows` issue from #182)
-and `SectionAdder.FrontmatterLines` (strict here; it was strict
-on the mac too until #175, 2026-09-25, when that strictness was measured to
-PUBLISH a page hidden in section 1 into a newly added section — the mac now
-uses the shared finder and splices by line, and this one owes the same, see
-`documentation/08-course-config-reference.md` → "A writer must find the BLOCK").
-Four finders, two unified here, three on the mac. Check which one you
-are looking at before "tidying" any of them.
+writer. Until 2026-09-30 two finders were hand-rolled and strict here:
+`CourseRestorer.FrontmatterBounds`, which a restore used — lenient on the mac
+since #140, so a restore reached different pages on the two platforms
+([issue #177](https://github.com/russellgordon/plantoir/issues/177), decided
+2026-09-19: adopt the shared finder) — and `SectionAdder.FrontmatterLines`,
+whose strictness was measured on the mac (#175) to PUBLISH a page hidden in
+section 1 into a newly added section. Parity bundle 2 removed
+`FrontmatterBounds` and pointed both at `PageVisibilityReader.FenceIndices`
+(#177/#308 with #182's carry-the-value-lines restore; #282 with the splice by
+line), and since the fix round a per-section key is named by ONE helper,
+`SectionAdder.PerSectionKey`, which accepts the quoted spelling too — see
+`documentation/08-course-config-reference.md` → "A writer must find the BLOCK".
+`AssistWorkspace.BodyAfterFrontmatter` is still hand-rolled (it trims and
+accepts `...`); the #188 rule is what it should agree with if it is touched.
+Only `BodyAfterFrontmatter` is still its own finder here (the mac keeps
+several). Check which one you are looking at before "tidying" any of them.
 
 A third fault was shared with the mac and **was fixed here first, on
 2026-09-19; the mac followed the same day.**
@@ -1578,6 +1935,19 @@ should mirror it:
   assembly the way the mac test uses `#filePath`). Include a guard that the
   scan actually found a plausible number of source files, so a moved folder
   fails loudly instead of passing vacuously.
+  **Mirrored on Windows 2026-09-30** as
+  `Plantoir.Tests/ActivityTrailWiringTests.cs`: every `ActivityTrail.Event`
+  member must be referenced as `Event.X` on a non-comment line of product
+  source (`windows-app/` minus the test projects and build output) other than
+  its `KeyFor` arm, with a floor of 100 files so a moved folder fails. One
+  event is written through a helper rather than `Note(Event.X, …)` —
+  `assistant asked`, by `ActivityTrail.NotePrompt` — and is listed with its
+  helper, which must itself be called. An event the contract names that this
+  app has not DECLARED is the other test's business
+  (`SharedRules_ActivityTrailEvents_Exist`, or a ledger entry), so together
+  they say: every event the contract asks of Windows is declared and
+  referenced, or ledgered by name. On the day it was written every declared
+  event was referenced.
 - **Its honest limit, so nobody oversells it**: the scan proves a call site
   EXISTS, not that it is reached. The mac additionally runs `noteLaunch()`
   and `noteHelpers(_:)` (split since #222, because the helpers line waits for
@@ -1950,6 +2320,19 @@ phrasing made a teacher the caller:
   and living exactly as long: one assistant window, or one `plantoir-mcp`
   process. Old `.explained` files are inert and are not cleaned up; nothing
   reads them.
+- **The first answer is now the mac's sentence (#157, 2026-10-01).**
+  `explain_publishing` said this app's own three paragraphs (`Briefing.Words`,
+  which named the course's destination) while the mac said
+  `wording.whatPublishingMeans`; `list_courses` in an empty folder said "This
+  working folder has no courses yet." where the mac says `wording.noCoursesYet`,
+  which also says what to do next. Both are teacher-visible through the fixed
+  phrasings, so they were matched rather than ledgered: `AssistWording` carries
+  both constants, the wording walker compares them with the contract, and
+  `Briefing` is gone. What was given up on purpose: naming the destination in
+  that answer. The mac's sentence names none, so it cannot promise a place the
+  deploy does not go — which was the only reason the old answer looked it up.
+  The unknown-course refusal still ends "This working folder has no courses
+  yet." — a clause in a different sentence, with no contract key of its own.
 
 ### Two more the same pass turned up
 
@@ -2107,7 +2490,8 @@ is readable by neither parser, so such a zip is invisible to both sidebar lists
 and to pruning; for a whole-course archive, `ArchiveAndRemoveCourse` then
 deletes the course folder and the only copy never appears in Archives. The mac
 has no collision retry at all, so it is Windows-only and no `zipNames` case
-covers the form.
+covers the form. **Fixed in bundle 8**: the retry now waits for the next
+second instead of adding `-N` (below, "Same-second backups wait for the next second").
 
 ### The check that found the one still open — and how it was closed
 
@@ -2176,6 +2560,178 @@ stayed green because its example says "two classes". A form one side supports
 and does not DECLARE is invisible to the other. If a family here accepts
 something the contract's `shape` does not spell out, that is a case to propose,
 not a detail to leave in the code.
+
+## Dates are written in the Gregorian calendar, by one helper (#144)
+
+Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
+from a cloud session on Linux (see "Working from a cloud session" in
+`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+The mac needs nothing from this and owes nothing back; it is written up here
+because the REASON is what a future reader of the C# needs, and the reason
+cannot be read off the code.
+
+**The fault.** `date.ToString("yyyy-MM-dd")` and `$"{date:yyyy-MM-dd}"` render
+the year in the current culture's DEFAULT CALENDAR. The `-` is a literal and
+is safe; the `yyyy` is not. On a Windows 11 PC whose regional format is Thai
+(default calendar Buddhist), 2026-09-09 renders as `2569-09-09`, measured in
+the issue; under `ar-SA` (Umm al-Qura) the same day is `1448-03-27`. Sixty-six
+sites in this app's product code formatted a date that way and none passed a
+culture. Most only DISPLAY a sentence — wrong once, and not corrupting. The
+ones that mattered WROTE:
+
+| Writer | What it wrote on a Thai PC | What read it back |
+|---|---|---|
+| `TimetableMemory.Write` | `"dates": ["2569-09-08", …]`, `"recorded": "2569-09-09"` | `TimetableMemory.Read`, which was ALREADY invariant — so every remembered class landed 543 years out, "when are my next classes?" answered from a list matching nothing, and `add_next_class` continued from a date no teacher gave it. Symmetric-looking, broken in one file, nothing reported |
+| `PageFrontmatter.SetCreated` and `AssistWorkspace.ClassSkeleton` | `created: 2569-09-09T07:00:00.000-0400` into every re-dated and every new class page | The build, which sorts and dates the site by it |
+| `ProblemReportStore.SaveRunTranscript` | the transcript's FILE NAME, `2569-09-19 120000 setup.ps1.txt`, and its "Started" line | `RunFilePaths` and `PruneRuns`, which sorted by name ordinally and deleted past twenty |
+| `ActivityTrail.Note`, `ProblemReportBuilder.Stamp` / `About`, `AssistWorkspace.ReleaseSite` | every trail timestamp, the report's folder name and "Made on" line, the released-marker stamp | A person reading a problem report |
+
+**A second column had the same fault.** The `:` in a custom format is the
+culture's TIME SEPARATOR, so a bare `HH:mm:ss` renders `14.15.30` on a
+Finnish or Danish machine. Every trail line and every transcript carried it.
+Found by the plan review, not by the issue.
+
+**The shape of the fix: one helper, `Plantoir.Core/Models/DateText.cs`**, and
+every product site goes through it — `Iso(DateOnly)` for the ISO day,
+`Stamp(DateTime)` for the trail's `yyyy-MM-dd HH:mm:ss`, `Invariant(…, format)`
+for the four other shapes that exist (`yyyy-MM-dd_HHmmss`, `yyyy-MM-dd HHmmss`,
+`yyyy-MM-dd 'at' HH.mm.ss`, `yyyy-MM-dd HH:mm:ss zzz`), and `TryReadDay` for
+the reader half. The issue proposed the name `Dates`; three classes
+(`TimetableMemory`, `ReDatePlan`, `ScheduleReading`) already have a `Dates`
+property, which shadowed the type inside exactly the files that needed it
+most, so it is `DateText`. The mac is immune by construction (`CalendarDay.text`
+is three integers through `String(format:)`) and this is how the C# reaches the
+same place. Two decisions inside the helper, both from the plan review:
+
+- **No `Iso(DateTime)`.** It would drop the time silently, and the next site
+  written as `DateText.Iso(DateTime.Now)` would be exactly the kind of call
+  that looks right and is not. A caller with a moment says which shape it
+  wants.
+- **`TryReadDay` is EXACT, not lenient.** A lenient invariant parse reads
+  `09/08/2026` as September the 8th — US order — while the cultural parse it
+  replaced read it as the 9th of August on a Canadian or British machine.
+  Switching the two `remember_timetable` readers to lenient-invariant would
+  have silently swapped day and month for those teachers. The tools ask for
+  `YYYY-MM-DD` by name and refuse anything else by name, so exact is what
+  they meant. (Under `ar-SA` the old bare parse did not misread the app's own
+  spelling; it FAILED outright, so every date was refused on such a machine.)
+
+**Two things the fix itself would have broken, and what was done about them.**
+A fixed writer beside an unchanged reader can be worse than the old state,
+and this piece had two of those:
+
+- **The runs folder becomes MIXED on every affected machine** — twenty old
+  transcripts named `2569-…` beside the new `2026-…` ones — and ordinally the
+  old names win, so `PruneRuns` would have kept the old twenty for ever and
+  deleted each new transcript on arrival, with the problem report showing the
+  twenty oldest runs and never the one being reported. The second comment on
+  the issue had judged this reachable only after a locale change; the fix
+  reaches it on day one. Both readers now order by the file's write time
+  (`File.GetLastWriteTimeUtc`, name descending as the tie-break), which has
+  no calendar. **This reverses a mac decision on purpose**: the mac's
+  `runFileURLs` (`ProblemReport.swift`) sorts by NAME so that "nothing a copy
+  or a restore from a backup could disturb" is involved. That reason does not
+  hold here, because this folder never travels — `ProblemReportStore.LogsDirectory`
+  is `%LOCALAPPDATA%\Plantoir\Logs`, not the working folder — while the
+  mixed-calendar folder is real on the day the fix lands. Two consequences
+  worth knowing: the order is by when a task FINISHED (the file is written
+  once, at the end), so a long preview started earlier lists above a short
+  task that ended after it; and a file deleted between the listing and the
+  sort reads as 1601-01-01 and drops to the bottom, harmless. Rejected:
+  skipping implausible names the way `ArchiveStamp` does — a name is only a
+  label here, and the write time is what "the last twenty tasks" means anyway.
+- **A timetable already remembered in the other calendar** is still on that
+  teacher's disk, and the invariant reader takes `2569-09-08` as the year
+  2569. `TimetableMemory.Read` now returns null — "not remembered" — when any
+  date is before `EarliestBelievable` (2000-01-01) or more than
+  `YearsAheadBelievable` (3) years past today, the same shape as
+  `ArchiveStamp`: a date that cannot be true does not get to decide anything.
+  The assistant asks for the timetable again, and the next `Write` replaces
+  the file with one it can read. **`Write` refuses the same list**
+  (`TimetableMemory.Unbelievable` is the one rule both consult), because the
+  implementation review found what a reader-only guard does: `remember_timetable`
+  saved the file, read it back for its reply, and dereferenced the null —
+  a crash after the write, where before there had been a working tool. The
+  two MCP tools and the section-schedule dialog now refuse first, naming the
+  date. The window is contract data since this piece —
+  `contracts/file-formats.json` → `sectionTimetable.believable` (the two
+  bounds and eight cases, run here by `DateTextTests`) — because a working
+  folder travels, so a file written by a pre-#144 Windows on a Thai PC can be
+  restored on a mac, whose `SectionTimetable` reads it just as invariantly;
+  the `mac` issue opened with this piece says so. The floor is 2000, not
+  `ArchiveStamp`'s 2025, because a teacher may keep last year's timetable;
+  it is still centuries clear of every wrong reading (2569, 1483, 1448). The
+  ceiling is three years, not two days, because future class dates are the
+  point of the file. **It leaves a trail line** — `remembered timetable set
+  aside`, `appliesOn: ["windows"]` in `shared-rules.json` → `activityTrail.mustRecord`,
+  carrying the date it refused — written by the reader, once per read of
+  such a file until the teacher answers and the file is replaced. Windows
+  only because only this app ever wrote such a file; the mac's guard, when
+  it adopts one, meets a file that arrived rather than one it wrote, and
+  can decide its own line then.
+
+**What is deliberately left in the machine's culture**, so nobody "fixes"
+it: `TaskScheduling.All` parses the `Next Run Time` column of `schtasks /Query
+/FO CSV` that Windows wrote in its own culture (since bundle 3 `Schedule`
+registers from XML with an invariant StartBoundary, so no date format is
+guessed any more) — that program
+accepts nothing else. `BackupItem.Subtitle` and `ArchivedItem.Subtitle` show
+a month by name to the teacher and say `CurrentCulture` out loud. Sentences
+of the shape `dddd d MMMM, h:mm tt` (no year) are read by a person in their
+language and carry nothing a calendar can shift. Worth knowing, not fixed:
+`/ST when.ToString("HH:mm")` in `TaskScheduling.Schedule` renders `14.15` on
+a Finnish machine, and whether `schtasks` takes that is unmeasured.
+
+**Five sites were left to `origin/issue/159-settle-the-day-once`**, the
+unmerged Windows branch from 2026-09-19 that `WINDOWS-PARITY.md` Phase 5
+step 1 says to take up as it stands: the model's dateline (`AssistAgent`
+:610), the "deploy tomorrow at" card's moment (:704), that card's reader
+(:815), and the two `DateTime.TryParse(when)` readers in `PlantoirTools`
+(`plan_scheduled_deploy`, `schedule_deploy`), which #159 routes through one
+reader, `ScheduledDeploy.ReadTheMoment`. Changing them here would have put
+the same lines in conflict for no gain. **The order matters**: once this
+piece is on `dev`, tool output the model reads is Gregorian while the
+dateline and the `when` readers are still cultural, so on a Thai PC a model
+echoing `2026-09-20 06:30` into `schedule_deploy` is refused as "already
+passed" (the cultural reader takes it as 1483). #159 merges first, or the two
+merge together; on a Gregorian machine neither order changes anything.
+**Whichever lands second needs one follow-up commit**: if #159 is already on
+`dev`, this branch's five `DeliberatelyCultural` entries excuse lines that
+no longer exist, and #159's `ReadTheMoment` carries a cultural FALLBACK that
+the source scan will flag — one entry to add, five to remove. (And #159's
+middle step, an invariant LENIENT parse, is the very `09/08/2026` month/day
+swap `TryReadDay` rejects; a comment on #159 says so.)
+
+**What keeps it fixed** is `DateTextTests`, and the two tests that matter are
+not the ones about the helper:
+
+- `NoProductSourceRendersOrReadsAYearInTheMachinesCalendar` walks every `.cs`
+  under `Plantoir.Core`, `Plantoir.Mcp` and `Plantoir` (never `bin/` or
+  `obj/`, never a `//` line) and fails on any line that renders a year
+  (`ToString("…yyyy`, `{x:yyyy…}`, `.ToString(format)`) or parses a date
+  (`DateTime`/`DateOnly`/`DateTimeOffset` `.Parse`/`.TryParse`/`…Exact(`)
+  without `InvariantCulture` or an explicit `CurrentCulture` on the same line,
+  or `string.Create(CultureInfo.InvariantCulture, …)` on the line before
+  (#159's shape). `DeliberatelyCultural` excuses one line per entry, by file
+  name and a substring of the line, with the reason; the five #159 lines are
+  in it until that branch lands, when its `ReadTheMoment` will want an entry
+  of its own for its cultural FALLBACK. Its blind spot is a format passed
+  through a variable, which is why `TaskScheduling`'s `when.ToString(format)`
+  is matched by name. Three more, none with a site today: a second bare
+  `yyyy` on a line that also says `InvariantCulture` gets through; the line
+  after a `string.Create(CultureInfo.InvariantCulture, …)` is skipped
+  whatever it holds; and `{x:MMMM d, yyyy}` is missed because the pattern
+  wants `yyyy` right after the colon. A bare `{date}`, `ToString("d")` or
+  `ToShortDateString()` is not scanned at all, and the greps found none.
+- `EveryExcuseStillExcusesALineThatExists` fails the moment an entry matches
+  nothing, so a dead excuse cannot one day excuse a new site by accident. The
+  #159 entries are exempt from it, for the reason above.
+- Every culture test FIRST asserts that the bare rendering really does shift
+  under the swapped culture on this machine (`2569` under `th-TH`, `14.15.30`
+  under `fi-FI`). A machine running with invariant globalization would
+  otherwise pass every assertion while proving nothing. Measured on Linux
+  with ICU 74 and on Windows 11 alike: `new CultureInfo("th-TH")` has the
+  Buddhist calendar as its default on both.
 
 ## What a window lets go of when its working folder changes
 
@@ -2409,8 +2965,10 @@ The fix is structural, and two notes rather than one:
 right all along; only the folder-keyed sweep beside it had to change.
 
 **It is gated by a source scan, and the shape of the scan matters.** No
-`SectionDetailView` mounts in a unit test, and CLAUDE.md forbids a `[UiFact]`
-that drives Preview, so `SectionDetailTeardownSourceTests` reads the file and
+`SectionDetailView` mounts in a unit test, and when this was written CLAUDE.md
+forbade a `[UiFact]` that drives Preview (lifted in bundle 11, 2026-10-01; a
+UI test still does not switch a window's working folder under a running preview,
+which is what this guards), so `SectionDetailTeardownSourceTests` reads the file and
 asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
@@ -2476,6 +3034,747 @@ Plantoir's folders are chosen from the ordinary Windows picker.
 act, its line is still true, and a selection being let go is not something a
 teacher DID — it is the consequence of what they did, recorded one line up.
 
+## Course creation and the smaller course pieces (parity bundle 6a)
+
+Bundle 6a (2026-09-30) brought eleven mac pieces across: the wizard's skeleton
+rules (#169, #250, #252, #349), the marks floor (#348), the problem report's
+unreadable trail (#316), reopening the last working folder (#320), Get Ready
+for the Start of the Year (#355, #389), one coverage map per curriculum folder
+(#345) and the How I Teach row (#360). The rules are contract data and the
+rows in `GUI-IMPROVEMENTS.md` (666–672) say what a teacher sees; this section
+is the Windows MECHANICS — what had to change shape here, what differs from the
+mac on purpose, and what was rejected.
+
+### The view could not be pinned, so the decisions moved into Core
+
+`NewCourseDialog` is a `ContentDialog` in the WinUI project, which
+`Plantoir.Tests` cannot reference (different target framework, and a
+`ContentDialog` cannot be built off a XAML thread). Three pure seams now carry
+what the dialog decides, and the dialog is thin call sites around them:
+
+- `WizardStructure` — `Adopting(family)` and `RestoringDefaults(current,
+  adopted, useLcs)`, the restore that used to be private to
+  `RestoreGenericStructure`. `wizard.skeletonToggle` runs against it.
+- `NewCourseAnswers.Decide` — the five structure lists, the sidebar, the three
+  starting-point keys and the marks pool, i.e. everything the Starting Content
+  answers decide in `course_config.json`.
+- `CourseSettingsProtection` / `CourseSettingsExclusions` — the context Course
+  Settings protects its rows with, and the click recorders and Revert.
+
+**Goldens before the fix, the mac's technique.** Before a line of #250 was
+written, a throwaway test ran the OLD rule over `NewCourseAnswers` for ADA1O,
+MCV4U, MCMPR11 and ICS4U with the pages taken, and AMU3M with the skeleton on
+and off, and wrote `Plantoir.Tests/Goldens/*.json`. `NewCourseAnswersTests`
+asserts those bytes afterwards: a teacher TAKING the ready-made pages must get
+exactly what they got before. The throwaway test was deleted in the same
+commit; the goldens are what it leaves.
+
+**One behaviour changed that no case asked for, and why it was taken.** Windows
+wrote `include_curriculum_coverage` from the raw switch, so a course with no
+curriculum pages to draw from was made with the map ON (the comment beside it
+called this "deliberately left alone" and raised it as a product question).
+#252's rule answers that question: the mac writes the map on only where the
+pages are offered and kept (`curriculumCoverageEnabled`), and the two apps must
+write the same file for the same clicks. Windows now does too. Rejected:
+keeping the raw switch for courses with no payload — it would be the one key
+the two apps disagree on for ~1,900 codes.
+
+### The marks floor walks the disk twice, on purpose
+
+`gradedFolders.floor` depends on which pooled folders exist on disk, so Course
+Settings walks the course ONCE per drawing (`GradedFolderChoices.WalkedFolders`,
+every occurrence kept with its course-level folder and the folder directly
+inside a section) and shares it between the checklist and the three lists — and
+walks AGAIN at the click (`StringListEditor` / `MembershipToggleList` gained a
+`protectionWhenActedOn`; the wizard passes none and its drawing rule is asked
+again). Whether to ASK is decided at the click too: the old editor decided
+"confirm or not" from the drawing, and a folder deleted in Explorer while
+Settings was open would then ask about the wrong thing. Rejected: a walk per
+row (the mac measured 53 ms per walk on a 400-folder course, ten-plus rows per
+drawing).
+
+One difference the runner absorbs rather than hides: with no `class_folder`
+recorded, Windows protects the first per-section folder as the class folder
+(`ClassFolderRule.Name`'s guess), where the mac protects only the literal "All
+Classes" or a recorded name. `floor`'s per-section fixtures say none of their
+folders is the class folder, so `MarksFloorContractTests` sets the resolved
+class folder to null for those cases. Whether the two apps should agree on
+which folder an unrecorded course protects is a separate question and was not
+taken here.
+
+### Reopening the last working folder: a path, not a bookmark
+
+Windows remembers the PATH. A folder moved on the same disk therefore reads as
+`gone`, which is honest; the mac's bookmark follows it. `unreadable` is said
+ONLY where listing the folder threw `UnauthorizedAccessException` —
+`Directory.Exists` cannot tell a denied folder from a missing one in every
+case, and the contract's one hard rule is that a denied folder is never called
+gone. `driveNotConnected` is the path's drive root not existing (an unplugged
+USB disk, an unmapped network letter). The Trash, privacy and outside-home
+reasons are `appliesOn: ["mac"]`. `AppSettings.Load` no longer nulls a
+`WorkspacePath` it cannot reach — that silent prune was the bug — and
+`NoteBecameKey` writes it, so "last" is the folder last in front. A Ctrl+N
+window goes through `AdoptInheritedPath`, which writes no trail line.
+
+### Get Ready for the Start of the Year: what the app's Go does NOT do yet
+
+The rule, the MCP pair and the sheet MATCH (`StartOfYearPlan`,
+`AssistWorkspace.PrepareForStartOfYear`, `StartOfYearDialog`). One part of the
+mac's app-side behaviour is not built here, and is said so rather than
+implied:
+
+- **Go does not stop and restart the preview.** The pages are written; a
+  preview that is showing keeps showing the old state until the next build.
+
+The undo ends at the next deploy started from THIS app (`SectionDetailView`
+ends it as the publish begins), at a scheduled deploy — the one set at the time
+of the act reaching its moment, or the section's outcome record showing a run
+since (`StartOfYearSessionUndo.EndedByAScheduledDeploy`, read when the undo
+sheet opens) — at the next change to the section's pages from anywhere (the
+section's plan code no longer matches the one taken after the write), and at
+quit (it lives in memory only).
+
+The plan code is SHA-256 over every page of the section, path and bytes, eight
+hex digits. Rejected: a code over the plan's own entries only — a page the plan
+does not touch can change what step 3 decides (a link added to a leftover page
+keeps it), and the code exists to say "the section is the one you were shown".
+
+The MCP write takes a FRESH backup for the act through the same door as every
+other assistant zip (`AssistantBackup`), then works the plan out AGAIN after
+the copy and refuses with `changedWhileSavingACopy` when it no longer matches
+or can no longer be made. The app's Go uses the teacher's own backup
+(`BackupMaker.Teacher`), since the teacher pressed the button.
+
+### One coverage map per folder: decided from the disk, in Core
+
+`CurriculumFolderRule` is plural (`Resolve(declared, folders, withPages,
+withLetterFirstPages)`) and `FoldersWithPages` reads which SHARED folders hold
+an expectation page, recursively — the same thing the build reads. Course
+Settings reads it once per drawing and again at the click, like the walk. The
+wizard has no disk, so it counts the payload's declared folder while the
+curriculum pages are being installed (the old `null` at the protection's call
+site was the gap the issue named). A rename reads the pages BEFORE the move —
+afterwards the old name is not on disk — and passes them to
+`SpecialFolderRenamer.Renaming`, which writes `curriculum_folders` and the
+legacy `curriculum_folder` naming the primary.
+
+`PLANTOIR_MAPS:` is read from the console (`ScriptRunner`) and from a scheduled
+publish's record (`ScheduledHealthFindings`); the scheduled wrapper's
+`Select-String` marker scan gained `PLANTOIR_MAPS:`, without which the second
+reader would never see the line. A wrapper written before this keeps its old
+scan until its schedule is set again.
+
+The build prints the line from the contract's own prefix
+(`build_site.announce_coverage_maps` reads `coverageMapsBuilt.marker.prefix`
+through `contracts.section`), which is why a search of `scripts/` for the
+literal string finds only the tests — a review of this bundle read that as
+"the build never prints it", and it was checked and found false.
+
+### The How I Teach row, and the CHECK items of #360
+
+The row writes with `FileMode.CreateNew` and opens THE PAGE
+(`FolderActions.OpenInObsidian` gained a `page` argument), never the vault.
+`HowITeachSettingsRowTests.ACreatedPageNeverWritesOverOneMadeAMomentEarlier`
+injects a page between the look and the write through a test-only overload.
+
+The CHECK items, answered by reading this app rather than measuring the mac's
+numbers onto it: Windows' assistant window drives its tools through
+`plantoir-mcp` (`McpClient`), so the zip runs in that process and never on the
+app's UI thread — the mac's 9.7 s main-thread zip has no analogue, and nothing
+was measured holding the window. Every assistant zip now leaves an `assistant
+backed up a course` line with its seconds, which is how that claim will be
+checked against a real course. (This said counting the course busy while
+the zip runs in `plantoir-mcp` was not built and that `courseIsBeingCopied`
+stayed in the ledger against #360. It was built in parity bundle 6a —
+`AssistWording.CourseIsBeingCopied`, `WorkLease`, `CourseBeingCopiedTests` —
+and `NamedGapLedger` has been empty since bundle 9.)
+
 ---
 
 [◀ Previous: Release Strategy](11-release-strategy.md) · [Back to index](README.md)
+
+## The links checklist on Windows (#392, #399, #405)
+
+The mac's sheet (documentation/09-mac-app.md → "The links checklist (#379)") is,
+on this side, split in two, and only the first half is built.
+
+**Built and contract-tested** — everything that decides what a press WRITES:
+`Plantoir.Core/Assist/LinksChecklist.cs` (offer reader, the pure gate, the
+answered file, the record release), `LinksChecklistWording.cs`, and
+`AssistWorkspace.LinksChecklist.cs` (`OpenLinksChecklist`, `PublishLinksChecklist`,
+`PublishAndRemember`, `NotNow`, the trail lines). Runners:
+`LinksChecklistGateContractTests` (followingARow 10, comingWithAClass 12),
+`LinksChecklistPublishContractTests` (publishCases 15, through the sheet model),
+`LinksChecklistWordingContractTests`, `PublishedPagesRecordTests`.
+
+Three decisions worth knowing before changing any of it:
+
+- **A page a ticked class brings is dated by THAT class, directly.** The
+  assistant's `InheritedDates` picks the earliest class anywhere that can reach
+  a page, and in the contract's fixture a visible "Unit 1, Day 1" reaches the
+  worksheet through "How Marks Work", so iv-b, iv-d, iv-j, iv-k and iv-m were
+  dated 2026-09-08 instead of the ticked class's 2026-10-20. The publisher
+  walks each ticked class's own reach (stopping at classes) and dates the
+  pages the class plan changes; the first class in the sheet's order wins.
+- **"Locked" is "has a parent row, NONE of which goes".** A row under a row
+  that goes, with its own tick off, is simply unticked (followingARow case 7);
+  reading locked as "has a parent and does not go" fails it.
+- **Places are compared in composed form (Form C)** on both sides, the trap
+  #405 names: C#'s string equality is ordinal, Swift's is canonical.
+
+**Not built** — the WinUI sheet (grouped checkboxes over `LinksChecklistSheet`,
+`ShownOrder` for the indent, `SecondLine` for each row's second line), showing
+it after a watched build when the `PLANTOIR_LINKS_CHECKLIST:` marker's buildId
+equals the file's (holding the #333 finding until then), on section open for
+an unwatched publish when the offer is fresh and holds something new
+(`LinksChecklist.HoldsSomethingNew`), the menu item, and
+`linksIntoHiddenPagesWillBeOffered` in the assistant. `NoteOffered` has no
+caller until the sheet exists. (Superseded: bundle 5b built the sheet; parity
+bundle 7 added the rest — the assistant says `linksIntoHiddenPagesWillBeOffered`
+only when the SAME build printed the marker, the offer is that build's and holds
+something new, `plantoir-mcp`'s `LauncherRunner` now keeping the marker on
+`LaunchOutcome.LinksChecklist`; the assistant's publish keeps the date of a page
+in the published-pages record, `LinksChecklist.PublishedPlaces`; and
+`linksChecklist.naming`'s two laid-out cases run in
+`LinksChecklistNamingContractTests`.)
+
+**The folder deploy's record.** `deploy.ps1`'s `Record-PublishedPages` (between
+BEGIN/END markers so the test runs it as written) reads `.build-id` and
+`.visible-pages.json` from `PLANTOIR_BUILD_ROOT\<CODE>\section<N>\` — no
+`.merged_output` level on this platform — and records only when the list's
+buildId is the site's. **Every rollover** (same website or new, not only
+`ReleaseSite`) moves the fragments to `.published-pages.previous-<stamp>/`,
+keeps the folder, removes the answered file, and records it all in the undo
+history.
+
+## Courses kept for reference on Windows (#241, #244, #245, #298)
+
+The rule is the contract's (`shared-rules.json → referenceCourses`) and the
+mac's write-up is `09-mac-app.md` → "A reference course, and what FROZEN
+means on disk". This section is what Windows does DIFFERENTLY, and why.
+Code: `Plantoir.Core/Models/Reference*.cs`, `ObsidianAddOns.cs`,
+`SchoolYear.cs`, `Plantoir.Mcp/ReferenceWriteGate.cs`,
+`Plantoir/Views/SidebarPane.Reference.cs`, `ReferenceSummaryView.cs`.
+Tests: `ReferenceCourseTests`, `ReferenceLockTests`, `ReferenceRefusalTests`,
+`ReferenceMarkerAgreementTests`, `ReferenceCopierTests`, `ReferenceImportTests`,
+`ReferenceInterfaceTests`, `ReferenceBuildKeepsHiddenPagesHiddenTests`,
+`scripts/test_build_keeps_a_readonly_hidden_page_hidden.py`, and the UI tests
+`ReferenceCourseUiTests`.
+
+### The lock is deny entries, not the read-only attribute (design A5)
+
+NTFS has no `uchg`. Measured on this PC (i5-8365U, 16 GB, Samsung 980 NVMe,
+Windows 11 26200) before anything was written:
+
+| | Read-only attribute | Deny on the file only | **Deny on the file + deny delete-child on its folder (chosen)** |
+|---|---|---|---|
+| write in place | refused | refused | refused |
+| rename-over (`File.Replace`, `os.replace`) | refused | refused | refused |
+| rename | allowed | allowed | refused |
+| delete, `Remove-Item -Force`, Explorer | allowed (they clear the bit first) | allowed (the parent's inherited FILE_DELETE_CHILD wins) | refused |
+| add a new file beside it | allowed | allowed | allowed |
+| replace the UNLOCKED `course_config.json` from a `.tmp` | n/a | n/a | allowed |
+| make and remove the `.merged_output` junction | n/a | n/a | allowed |
+| does a COPY carry it? | **yes** (`File.Copy`, `shutil.copy2`) | no | no |
+
+So: on every content file an explicit DENY of `WriteData, AppendData,
+WriteExtendedAttributes, WriteAttributes, Delete` for this account, and on
+every folder holding a locked file a DENY of `DeleteSubdirectoriesAndFiles`
+for that folder only — never inherited by its contents, which would stop the
+preview's link and Obsidian's `workspace.json` (the mac's "never lock the
+directories" finding again).
+
+**Rejected: the read-only attribute.** It TRAVELS. The native build copies
+each page with `shutil.copy2`, the copy is read-only, the frontmatter rewrite
+fails, the copy keeps `draft: true`, and the page the teacher HID is
+published. Reproduced end to end with a real native build
+(`ReferenceBuildKeepsHiddenPagesHiddenTests`; must-fail: without the fix
+below, the hidden page is in `public/`). **Rejected: a lock file** that
+Plantoir's own writers check — Obsidian, Explorer and editors never read it,
+and the marker already is the in-app gate.
+
+**Belt and braces in the shared build.** `build_site._writable` makes the
+BUILD's own copy writable before every write it makes to a page
+(`process_frontmatter`, the dating write, the unreadable page's hide, the
+wikilink rewrite). A no-op on the mac. A read-only page can still reach any
+course from OneDrive, a zip, or another tool.
+
+**Never-locked names**: the contract's six, plus `desktop.ini` and
+`Thumbs.db` (Windows' twins of `.DS_Store`), plus anything ending `.tmp`.
+
+**Unlock matches the SHAPE, whoever it names** (bundle-6 ruling 3). Windows
+MERGES two deny entries for one account into one (measured: a teacher's own
+`ReadData` deny plus ours came back as a single entry carrying both), so
+Unlock takes OUR bits out of any explicit deny entry that carries all of
+them and leaves the rest of that entry — a teacher's own rule survives. A
+course carried from another account, whose entries name a SID that is not
+this user, still unlocks.
+
+**Cost, .NET 9 ACL API**, 1,200 files: lock 808–820 ms (every file read back,
+plus the census), a pass with nothing to do 113–129 ms, unlock 409–473 ms.
+The planner's PowerShell 5.1 probe: 607 / 209 / 397 ms. The mac: 59.5 ms and
+23 ms. So every pass runs off the UI thread, on folder read and on an act,
+never on a timer.
+
+**The census** is a separate plain listing (recursive, links skipped)
+classified by the never-locked rule alone, so a walk that skipped a folder
+cannot agree with itself (the mac's 842-of-934 fault).
+
+**Honest limits, never in the GUI.** New files can be added. The owner can
+remove the entries (Properties → Security). An entry does not sync, so the
+lock is per-machine. Another account is not denied. **`robocopy /SEC`,
+`/COPYALL` and `/COPY:…S` CARRY the lock — and then stall on it**, retrying
+a file whose attributes it cannot set (by default a million times at 30 s;
+measured by the plan review). `Copy-Item`, Explorer and a zip do not carry
+it. Nothing in this repository may use those flags:
+`ReferenceLockTests.NoRobocopyInThisRepositoryCopiesSecurity` (must-fail:
+`/SEC` on deploy.ps1's mirror turns it red). Since #419 (2026-10-01) it reads
+the files git TRACKS (`git ls-files`) rather than walking the folder: the walk
+reached the gitignored `courses/`, where an old build output held a WSL
+symlink (reparse tag `0xa000001d`) Windows cannot open, and the test threw
+`IOException` about a teacher's leftover folder rather than this repository's
+code (reproduced through a junction to that tree: old code red, new green; a
+STAGED file carrying `/SEC` still turns it red). A teacher's own script that
+does is answered by Unlock, which matches the shape. **And the refusal to
+deploy never depends on any of it**: every door asks the marker.
+
+**Not measured, owed:** OneDrive with locked files under it (whether its
+client keeps the entries, and whether a deny on `WriteAttributes`/`Delete`
+stops it dehydrating or syncing — the fallback is to drop `WriteAttributes`);
+an elevated token (the deny is by user SID, so it should still apply); and
+what Obsidian for Windows shows on a page it cannot save — which is why
+`referenceCourses.wording.obsidianOpensThemForReading`, a macOS measurement,
+is NOT said on Windows yet.
+
+### A byte-order mark used to hide a course
+
+`CourseConfiguration.FromBytes` kept a BOM as U+FEFF and Newtonsoft refused
+it, so a settings file saved by Notepad made its course vanish from the
+sidebar — and a reference course with one was not a course at all
+(`markerAgreement`, "a byte-order mark at the head of the file"). The BOM is
+stripped before parsing now.
+
+### The fifteen doors on Windows
+
+| # | Door | Windows chokepoint | Test |
+|---|---|---|---|
+| 1 | section window's Deploy | `SectionDetailView.DeployAsync`, first check (and the button is not drawn) | `TheDeployButtonsFlowRefusesFirst`, UI `AReferenceCourseHasNoDeployButtonAndNoRepairButton` |
+| — | the runner behind it | `MultiDestinationDeployRunner.RunAsync`, before the first destination | `TheMultiDestinationRunnerRefusesBeforeTheFirstDestination` |
+| 2–4 | local assistant's deploy and its card's Go | `AssistAgent`: no card for such a course; the hand-back refuses BEFORE any preview stop | `TheLocalAssistantsDeployIsRefusedBeforeThePreviewIsStopped`, `TheApprovalCardsGoIsRefusedToo` |
+| 3 | headless deploy | `AssistWorkspace.Deploy`, first | `TheHeadlessDeployRefusesFirst` |
+| 5, 7 | MCP `deploy_section`, `schedule_deploy` | plantoir-mcp's call-tool filter, `ReferenceWriteGate` | `TheWriteGateRefusesEveryWriteAndSaysWhichKind`, `TheGateIsChosenByEachToolsOwnReadOnlyFlag` |
+| 6, 8, 10 | assistant scheduling, the Schedule Deploy… dialog, `plan_scheduled_deploy` | `ScheduledDeploy.Problem`, first — before "that time has already passed" | `TheScheduleSheetRefusesWhateverTimeWasAsked`, `PlanningAScheduledDeployRefusesToo` |
+| 9, 11, 12, 13 | an alarm firing, `deploy.bat` by hand, `--to-folder` | `deploy.ps1`'s host-side check | `ReferenceMarkerAgreementTests` — all 26 rows against the REAL launcher (must-fail: the check off, and "the marker, plainly" goes past it) |
+| 14 | `deploy.py` | inherited | `scripts/test_reference_course.py` |
+| 15 | `verify-deploy.ps1` | inherits the above | opt-in, not run by bundle 6b |
+
+**The MCP write gate** reads each tool's OWN `ReadOnly` flag off its
+`[McpServerTool]` attribute, over all 42 tools plantoir-mcp serves (not the
+mac's 22), and takes the three exemptions from the contract. A test adds a
+fake write tool and sees it gated without being named. `undo_last_change` is
+the only write tool with no course argument and is gated by the course its
+newest recorded change touched. The local window is told nothing about a
+reference course in `list_courses`; an outside session is told its folder,
+code, kind and year. A bare code with no live course is refused naming the
+candidates.
+
+### Staging and the claim (#245)
+
+As the mac: `courses/.plantoir-importing-<FOLDER>`, renamed into place last.
+Two Windows choices: the folder is made with `CreateDirectoryW`, which refuses
+an existing folder atomically (`Directory.CreateDirectory` does not), and the
+in-app key is the courses folder's `GetFinalPathNameByHandle` spelling folded
+to upper case (NTFS is case-insensitive). The import lease carries line 4 —
+the owner's start, the mac's spelling — and an import lease with no name line
+is judged as written by Plantoir.
+
+### The import
+
+The copy is a 1 MB-chunk STREAM copy, never `File.Copy` from the source
+(which carries the read-only bit and alternate streams; CopyFileEx was
+rejected for the same reason). Opened read-only with ReadWrite|Delete
+sharing; only attributes and times are read. The walk is our own, one folder
+at a time, hidden and system entries INCLUDED, and never lists what it leaves
+behind. **Every reparse point is left behind**: the mac copies a symlink as a
+link, but making one needs a privilege a teacher lacks (WinError 1314) and a
+junction cannot be copied faithfully; the only link in a modern course is
+`.merged_output`, left behind by name anyway. A `.lnk` is an ordinary file
+and comes.
+
+**Measured** end to end through `ReferenceImport.ImportCourses` (walk, copy,
+clear, settings, lock, rename): a generated course of 507 MB in 605 files
+(4 × 110 MB, 300 × 150 KB, 300 pages) beside a 110 MB `.merged_output` that is
+skipped — **5.21 s and 5.63 s, 97 and 90 MB/s**, 24–31 progress reports, on
+the NVMe above with Defender on and freshly written random data. The
+planner's warm-cache probe of the bare copy was 431 MB/s by stream and
+670 MB/s by `File.Copy`; the gap is the lock pass and the scanner reading new
+files. A cold USB disk is estimated at 20–100 MB/s, so the bar is in BYTES,
+reports at most every 100 ms, and Stop answers within one chunk. The trail's
+"course imported" line carries the size and the seconds, so real speeds come
+back in problem reports.
+
+The import's CLEAR step (unlock, drop read-only bits) is a guard: a stream
+copy carries neither today, which a test asserts directly
+(`AStreamCopyCarriesNeitherTheBitNorTheLock`); the must-fail (switch to
+`File.Copy` and drop the clear) turns it and
+`ImportFromAFolderHoldingAReferenceCourse` red.
+
+### What the interface withholds
+
+Hidden, never greyed, on a reference course: the Deploy button, Schedule
+Deploy…, Rename (the File menu item, F2 and the context menu all ask
+`CourseThatCanBeRenamed`), Add Section…, Keep a Copy…, every Revise item,
+the Site Health REPAIR button (and `SiteHealthRepair.OutcomeOfRepairing`
+refuses on its own), and the Course Settings form, replaced by
+`ReferenceSummaryView`. Cancel Scheduled Deploy… stays (gate by direction).
+The footer's Remove on a reference course's section removes the whole course;
+`ArchiveAndRemoveSection` refuses with `staysAsItIs` for any other caller.
+Import Courses for Reference… is on the File menu, beside Restore from
+Archive…. The calm note is shown before Obsidian opens, once per course,
+remembered in the state folder.
+## Copy a Page on Windows: exclusive creates, accent twins, and a Python oracle (#247, #384)
+
+What a Windows implementer needs that the mac's write-up cannot give; the
+rules and the reasoning are in `documentation/09-mac-app.md` → "Copying a page
+from one course into another", and its "On Windows" subsection has the numbers.
+
+- **"Already here" is an HResult, not a check.** Every page and picture is
+  written by stream into `new FileStream(path, FileMode.CreateNew, …)`. An
+  `IOException` whose `HResult` is `0x80070050` (`ERROR_FILE_EXISTS`) — or
+  `0x800700B7` — is the ordinary skip, in the index's words. `File.Exists` then
+  `File.WriteAllText` has a window; `File.Copy` carries the read-only attribute.
+- **NTFS creates an NFD twin of an NFC name** (and refuses a case twin). The
+  name index (`CoursePageCopy.Fold`: `Normalize(FormC)` then
+  `ToUpperInvariant`, ordinal) is therefore the only guard, and it is updated
+  after every successful write. Run every comparison ordinally:
+  `string.Contains(string)` is ordinal; `IndexOf(string)` without a
+  `StringComparison` is culture-sensitive and is what would fuse a combining
+  mark with the space after a colon — Swift's trap, inverted.
+- **The guard is fuzzed against the real build, in one Python pool.**
+  `Plantoir.Tests/BuildFrontmatterOracle.cs` writes the pages to a temp folder
+  and runs a `multiprocessing.Pool` that imports `scripts/build_site.py`, calls
+  `frontmatter.load` and the real `process_frontmatter` for sections 1–4, and
+  reads `publish` as `patches/publish.ts` does. It caches
+  `_get_excluded_note_config` (which re-reads the contracts on every call) and
+  nothing else. Single-process it took 78 s for 2,017 pages × 4 sections on this
+  PC — every file open pays for Defender — and 30 s across the pool. Set
+  `PLANTOIR_FUZZ_N` to go bigger; **One 80-minute run (PLANTOIR_FUZZ_N=1000000, seed 20260930, sources 0-999,999) reported 856 pages certified hidden that the build would publish; two later half-range runs (0-399,999 and 400,000-999,999, same seed) reported 0.** **Re-run 2026-10-01 (bundle 9, #414) over the ORIGINAL range in ONE process, seed 20260930, on dev `684993aa`: 399,417 certified, 600,583 refused, 0 certified-and-not-hidden, 1 h 8 m** (this PC, i5-8365U, 16 GB, Windows 11 26200; failing-page dump empty). **What differed is the binary, not the luck:** the generator is seeded and the guard deterministic, so the certified count is a fingerprint of the code — and the 856 run certified 401,096. Every committed state gives 399,417 (measured compose-only at `9f788524`, the very commit that recorded the 856, and at dev; the 400,000-999,999 tail at dev gives 239,722, exactly the clean tail run's count), and nothing the guard reads changed between them. So the 856 came from a binary no commit contains. WHICH part of it differed is NOT known: the guard, the generator, or both on the C# side (the count proves one of them did), and possibly an oracle from before `20adc020` (23:22, "the build oracle's workers share one temp folder"), which falls inside the window the run started in. If the difference was a wider generator, the committed guard may never have been tested on the inputs that failed. Not reproducible, so not explained; the issue stays open on that ruling. The read-back guard - a page not certainly hidden after it is written is deleted - is the safety net either way. Set PLANTOIR_FUZZ_DUMP to a path to write failing pages out, and PLANTOIR_FUZZ_SKIP to run part of the seeded sequence.
+- **The dialog** is a `ContentDialog` whose primary button cancels its own
+  close (`args.Cancel = true` under a deferral) so one dialog walks the three
+  stages; the picker is an `AutoSuggestBox` fed only on
+  `AutoSuggestionBoxTextChangeReason.UserInput`, so nothing opens on focus.
+
+## Clubs, Course Settings and today's class on Windows (parity bundle 7: #274, #390, #387, #269, #406)
+
+What the mac's pieces became here, and the seams a later reader needs. The
+rules are the contract's; this is where they live in the C#.
+
+### One naming value, with no default on any path that writes a page (#274)
+
+`ClassPageNaming` (`Plantoir.Core/Models/ClassPageNaming.cs`) is word AND
+scheme together, read from `CourseConfiguration.Naming`. Every parse site that
+used to pass `UnitWord` beside a title now asks the naming
+(`Naming.Parse(title)`), and every title is built by `Naming.Title(unit, day)`.
+`InsertPlan` and `NewClassesPlan` carry a `required Naming`, so a plan cannot
+be made without saying whose naming it uses — the mac's #267 plan review found
+that with a default a missed site writes "Week 1, Day 10" and every test stays
+green. A numbered page is held as unit 1 with the number as its day; nothing
+may treat that unit as a real one:
+
+- `PublishPlan.UnitNamed(raw, naming)` returns null in a numbered course, so
+  "publish Week 1" goes to the page path (`wholeUnit`). The mac measured 4 of 4
+  meetings published from that sentence before its fix.
+- `PlanAddNextClass` refuses "start a new unit" and "add N days to Unit M" with
+  `NextClassPlanner.NoUnitsInANumberedCourse` BEFORE the timetable is read.
+- `PlanAddClasses` dates a numbered course's next page on the first class day
+  after the LATEST dated page; `PlanInsertClasses` reads the frozen
+  `unit`/`atDay` through `NumberedPosition` and plans with
+  `PlanNumberedInsert` (renames only the run the new numbers land on; a later
+  page moves only when its date collides; an undated page is placed by its
+  number and never given a date).
+
+**"meeting" never reaches the model.** The `…ForAMeeting` sentences
+(`AssistWording.Meetings.cs`) are rendered only into the TEACHER's copy:
+`Describe(ClassNoun)` on the plans, the start-of-year `TeacherText`, and in
+`plantoir-mcp` the `_meta` teacher summary (`Proposing(forModel, forTeacher)`).
+The text content — what the in-app model and Claude Code read — is the class
+form byte for byte; `ClubNounTests` flips `class_noun` and compares. Refusals
+are one string for both and keep the ordinary wording. Whether "never in
+plantoir-mcp's results" was meant to include `_meta` was asked of Russell
+(bundle 7, ruling 4) and DECIDED on 2026-10-01: it was not — the teacher's
+summary is the teacher's copy. The in-app window's only channel is that result,
+so the teacher's meeting card travels there; Claude Code ignores `_meta`. The
+decision is written into the contract as `file-formats.json` →
+`courseConfigKeys` → `class_noun.whatTheModelReads` (parity bundle 10).
+
+### The wizard and Course Settings (#274, #390, #387)
+
+`ClubFill.Applying` (Core) is the fill rule; the dialog calls it when the box
+moves, after giving up an adopted skeleton, and `AdoptSkeletonStructure` does
+nothing while the box is ticked. `NewCourseAnswers.ForAClub` turns off
+example content, skeleton and curriculum for a club, so the wizard and
+`GradedFoldersNewCourseContractTests` take the same path. Every word that
+follows the box comes from `WizardWording.Panel(IsClub)` — never from
+`ClubCodeRule`, which only pre-ticks the box until the teacher touches it.
+
+Course Settings: `ClubSettingsRows.Shown` (locked rows only when recorded),
+Rename… disabled with `renameLockedNumbered` for a numbered course, and
+`SettingsSaveState.Decide` for Save. Measured/decided: the old
+`dirty && Problem is null` held Save back for a course whose folder is missing
+on THIS PC even for a colour scheme; now only an edit that moves
+`deploy_target`, `deploy_folder_path` or `additional_deploy_targets` (compared
+with the file as last read or written, a missing key equal to an empty one)
+is held back, with `courseSettingsWording.saveHeldBack` in the Save status
+line and `settings save held back` on the trail once per visit. The legacy
+course-wide `show_grade_in_title`/`include_curriculum_coverage` Bool is SEEDED
+into every section before one is changed (it was replaced by an empty map,
+the mac's finding 10, and Windows had the same shape). The emoji field now
+compares with the stored value's FIRST emoji, so a hand-edited "📚🔬" is not
+written back when focus passes through it.
+
+The label scan (`CourseSettingsSaveTests.NoLabelNamesTheMachinery`) reads
+EVERY string literal under `Plantoir/Views` and `Plantoir/*.cs` rather than the
+mac's "literal passed to a label call", and sets aside space-free paths and
+file names and lines that MATCH output (`Contains`/`StartsWith`…). Measured
+2026-10-01: the two #369 labels were the only hits, plus the About credit.
+REJECTED: a list of label-setting calls (WinUI sets text through property
+initialisers as often as calls, so a call list misses most labels).
+
+### The lists as tables (#269)
+
+`FormBuilders.StringListEditor` is a single-selection `ListView` with +/− at
+its lower left; + opens a flyout with the old add rules; − and Delete share
+`RemoveSelected`, which asks the protection again at the moment of acting, and
+a blocked row explains itself (and records `removal blocked`) rather than
+having a disabled −. A disabled list ignores both keys, asked in the handler
+(the mac found `.disabled` did not stop its keys). Hide and Expandable are
+`FormBuilders.SidebarVisibilityTable`, de-duplicated by exact name. Unproven on
+screen: `ListTablesUiTests`, `MarksPoolRemovalUiTests` (now select-then-−).
+
+### The front page's class line, and today's class (#274, #406)
+
+`SectionIndex.Repointed(text, Pointer)` replaces `WithMostRecent`: the line is
+found by the CLASS PAGE it names, outside code and `%%` comments
+(`MarkdownCode.NotALinkRanges`, UTF-16 offsets on both sides), below the
+frontmatter, and rewritten in place by position in the form the teacher wrote
+(`writtenAs`). `Pointer` carries the section's class titles, the class's place
+INSIDE the course folder (`AssistWorkspace.PointerFor`) and the course's
+recorded `front_page_heading`, which only the insert fallback reads: Windows
+still INSERTS under `#… <heading>` (absent → "Most Recent Class") when no line
+names a class — the contract's `expectBodyOnWindows`. A "Help Sessions" embed
+directly under the heading is no longer replaced (it was, until this bundle).
+
+`TodaysClassOnTheFrontPage` (Core) decides and writes; the section window's
+`PreviewOrStop_Click` is its only asker, after the deploy/other-program
+refusals and before any lease is taken, and the preview starts after the
+question has gone. Findings and the links checklist wait while it is up.
+`OnlyThePreviewButtonAsks` pins the callers by source. The day is the first
+ten characters of `created` as written; `cannotTell` visibility is not offered;
+a front page that is a reparse point or read-only, or a course kept for
+reference, is not asked about.
+
+## Bundle 8: test hygiene, backups, the toast, accelerators, updates (2026-10-01)
+
+Windows-only pieces of the parity run, on `issue/bundle8-windows-ui`. Each
+says what was measured and what was rejected; the update design is in
+[`11-release-strategy.md`](11-release-strategy.md) → "Updating itself on
+Windows".
+
+### The unit suite keeps its state in a scratch folder (#285, #179)
+
+`Plantoir.Tests/TestAppDataRedirect.cs` is a `[ModuleInitializer]`: before any
+test runs, `AppDataRoot.RedirectTo(%TEMP%\plantoir-tests-<pid>)`. Settings,
+models, builds and scheduled-publish state a test touches land there, not in
+the teacher's `%LOCALAPPDATA%\Plantoir`. Per process id, so two worktrees'
+suites do not share a settings file. `AppDataRedirectTests` pins it. The redirect has one documented limit: during
+a redirected UI test the launchers (`preview.ps1:512`) still write their trail
+lines to the real `Logs` folder, because they resolve it themselves.
+
+Two things the redirect cannot see, and what covers each:
+
+- **Code that computes a per-user folder for itself.**
+  `RealStateTripwireTests` scans `Plantoir`, `Plantoir.Core` and
+  `Plantoir.Mcp` for `Environment.GetFolderPath(`, `SpecialFolder.`,
+  `GetEnvironmentVariable("LOCALAPPDATA"|"APPDATA"|"USERPROFILE")`,
+  `ExpandEnvironmentVariables`, and — because #179's leak was PowerShell text
+  inside a C# string — `$env:LOCALAPPDATA`, `$env:APPDATA`, `%LOCALAPPDATA%`,
+  `%APPDATA%`. Comment lines are skipped. Every hit outside `AppDataRoot.cs`
+  must be on an allow-list counted per file and per occurrence, each with its
+  reason, and an allowance larger than what the scan finds fails too, so the
+  list cannot rot into a blanket pass.
+- **A real Task Scheduler registration.** The initializer also sets
+  `TaskScheduling.RealSchtasksGuardForTests`, which throws on any real
+  `schtasks.exe` call other than `/Query`. It caught one on its first run:
+  `TaskDefinitionTests.TheRegisteredTaskKeepsTheThreeSettingsAndCarriesItsToken`
+  registers a real probe task ON PURPOSE (ruling 7 of an earlier bundle) and
+  now lifts the guard for itself, by name.
+
+**The scheduled wrapper (#179).** `$healthDir` and `$pendingDir` resolve
+`$env:LOCALAPPDATA` at RUN time, so a test that ran the wrapper wrote into the
+teacher's real `scheduled\folder-problems`. Both now come from
+`TaskScheduling.StateDirExpression`: `PLANTOIR_TEST_WRAPPER_STATE_DIR` when it
+is set AND inside `$env:TEMP`, else exactly the old path. The name is chosen
+not to read like `--state-dir` (which moves the app's state; this moves only
+two folders of a child script), and the TEMP condition means a variable left
+set system-wide cannot send a teacher's 6 a.m. records somewhere the app
+never looks. The suite sets it only on the CHILD `powershell.exe`, to the
+redirected `AppDataRoot.Current`, so the app-side reader and the wrapper agree.
+Rejected: baking the paths at write time — cheaper, but a teacher's wrapper is
+then only right while the baked path stays right.
+`ScheduledWrapperRunTests.ARunUnderTheSuiteLeavesTheRealFolderProblemsFolderAlone`
+runs the wrapper for real and compares the real folder before and after; with
+the override disabled it went red naming the file it leaked (that one file was
+deleted). Two orphans from 2026-09-09 (`Plantoir-wraprun-a093729a…`) were left
+on Russell's machine for him to remove.
+
+### Same-second backups wait for the next second (#187)
+
+Two backups stamped in one second used to get `…_221530-2.zip`, a name
+neither reader parses: invisible in the Backups list, uncounted by pruning,
+and invisible on the mac reading the same folder. `CourseArchiver.Archive` now
+waits for the next second (at most three tries) and stamps again. Rejected:
+teaching both readers a `-N` suffix (the mac's reader would hide a zip Windows
+wrote until it learned it too), and a millisecond stamp (it changes the frozen
+`zipNames` format). `ContractTests.CourseManagement_ZipNames` also takes each
+case's `moment` apart field by field against `GregorianCalendar` (#161 part 2);
+re-formatting with our own writer would stay green while both halves were
+wrong.
+
+### Backups: what they take, and deleting several (#283)
+
+The mac's design (09 → "Backups: what they take") in WinUI terms. What
+differs, and why:
+
+- **All Backups is a dialog**, opened from the Backups group's context menu,
+  not a sidebar row with its own pane. A `ListView` with
+  `SelectionMode="Extended"` (Ctrl- and Shift-click) and columns course /
+  when / who / size; the dialog's one primary button carries the count
+  ("Delete 2 Backups…") and is disabled at zero. The confirmation is a second
+  dialog, because WinUI shows one `ContentDialog` at a time.
+- **The total is on the group's tooltip**, and each backup's size on its own
+  row's tooltip (`SidebarRow.Tooltip` became a notifying property for this).
+- **Sizes are `FileInfo.Length`** — the end of file, never the allocation —
+  measured off the UI thread and applied only if no newer measurement began
+  (`MeasurementGeneration`). The contract's sparse case is made with
+  `FSCTL_SET_SPARSE` then `SetLength(467 MB)`; counted by allocation
+  (`GetCompressedFileSizeW`) it read 0 bytes, which is the must-fail. It needs
+  NTFS and FAILS, naming why, anywhere else rather than skipping.
+- **An unreadable size is left out of the total**, shown as
+  `backupSizeCouldNotBeReadShort`, and counted in a sentence beside the total.
+- **What is held** (`HeldBackups`): each open assistant window holds the zip
+  its conversation made, from the moment it exists until the window closes.
+  An outside assistant (`plantoir-mcp`) leaves no record of which zip it made,
+  so while another process holds a live `assist` lease on a course, the
+  NEWEST assistant-made backup of that course is held too — it can hold one
+  too many, never let the one it made go (bundle-8 ruling 4). The hold is read
+  again at the moment of deleting.
+- **After a delete**, every other window on the same folder re-reads its
+  Backups list only (`WorkspaceViewModel.ReloadBackupsOnly`), not its courses.
+
+Trail: `backups deleted` (`BackupDeleter.TrailLine`). The UI test
+`AllBackupsUiTests` compiles and has never run (the desktop was locked).
+
+### The scheduled-publish toast (#324)
+
+#212's Windows half had not been built, so the toast is built minimally:
+the scheduled run (Plantoir.exe started by Task Scheduler with no window)
+posts ONE toast when it finishes, whatever happened, whose text is the
+section's own sentence (`ScheduledPublishOutcome.Sentence`) — no new words.
+Its launch argument is `section=<CODE>/<n>&folder=<escaped path>`, the tag is
+the section-per-folder record name, so a later run replaces it. A click is
+decided by `ScheduledPublishToast.Decide`, played from the 14 non-mac
+`onClick` cases; `App.OnLaunched` registers `NotificationInvoked` (a click
+while running, marshalled to the UI thread) and reads
+`AppInstance.GetActivatedEventArgs()` for a click that started Plantoir.
+Approximations, said plainly: an inactive app has no key window, so "front to
+back" is newest window first; "the section is still in the folder" is
+`courses\<CODE>\section<n>` existing. The announcing cases (`notification.announcing`)
+are still #212's. Unproven on a real click.
+
+### Accelerators under a dialog (#191)
+
+Ctrl+O, Ctrl+N, Ctrl+Shift+R and F2 now return at once while a
+`ContentDialog` is open (`Services/DialogGate`: the open popups whose child
+IS a ContentDialog, so a context menu or tooltip does not block Ctrl+O).
+Rejected: a counter every `ShowAsync` call site increments — right only while
+all of them remember. **Whether WinUI delivers the keys under a dialog at all
+was NOT measured** (locked desktop); `AcceleratorUnderDialogUiTests` is that
+measurement. The guard costs nothing if they do not fire.
+
+**How the measurement is made, with the guard in place (bundle 9,
+2026-10-01).** The handlers ask `DialogGate.Holds(root, "<key>")` — `IsOpen`
+plus a record: in a run whose state is redirected (`--state-dir`, which only
+the UI tests pass) every key it holds is appended to
+`accelerators-held-under-a-dialog.txt` in that state folder. The UiFact puts
+the Back Up Now confirmation on screen, presses all four keys (Ctrl+O last,
+because a failed guard would open the native picker over everything), and
+reports per key "DELIVERED under the dialog (the guard held it)" or "not
+delivered (the dialog kept it)" — in the test output and in
+`%TEMP%\plantoir-191-measurement.txt` — while ASSERTING the behaviour either
+way: no rename dialog, no new top-level window, the confirmation still up.
+**Rejected:** removing the guard for one run to see whether the keys act (a
+test that must be edited to measure is not one Russell can run from the
+script), an automation property carrying a count (a screen reader would
+announce it), and a trail line (a teacher-visible record of a key that did
+nothing, with a contract entry and a mac issue for a measurement aid). A
+teacher's run never redirects, so it never writes the file.
+
+**Measured, 2026-10-01 13:40 (bundle 11, run 1, unlocked desktop, Intel
+i5-8365U, Windows 11 26200), verbatim:** "F2: not delivered (the dialog kept
+it) / Ctrl+Shift+R: not delivered (the dialog kept it) / Ctrl+N: not delivered
+(the dialog kept it) / Ctrl+O: not delivered (the dialog kept it)". That
+first reading had NO control — a key missing from the held list could have
+meant only that the keystroke went to another window (fix-round review,
+ruling W2). So since bundle 11's last round `DialogGate.Holds` records every
+ARRIVAL in a `--state-dir` run (`accelerators-arrived.txt`, "<key>
+passed|held"), and the test first presses the four keys with NO dialog up and
+requires each to arrive (closing the rename dialog, the second window and the
+folder picker they open). Measured 2026-10-01 22:28, verbatim:
+"Ctrl+Shift+R / F2 / Ctrl+N / Ctrl+O: not delivered (the dialog kept it);
+control (no dialog): all four arrived at their handlers". So keys from the
+test DO reach the window's handlers, and under a ContentDialog the same four
+do not, on this build; the guard is belt and braces, and costs nothing.
+
+### A wrapping panel squeezed narrow (#214, the mac's #211)
+
+Read, not measured: `TaskProgressView.xaml`'s Done panel and the section's
+`ScheduledPublishNotice` (an `InfoBar`) are wrapping `TextBlock`s in Auto rows
+and StackPanels, with no construct that makes a text's height rigid — so
+nothing was changed (bundle 9 ruling P1: change layout only if the XAML shows
+an unbounded height by reading). WinUI measures a wrapping `TextBlock` at the
+width its column ACTUALLY has, not at the near-zero width SwiftUI's
+`NavigationSplitView` PROPOSED while measuring the mac's; but a teacher can
+still squeeze the window until the content column is narrow (the sidebar
+column keeps `MinWidth="180"`), and how tall the notice gets then is exactly
+what reading cannot settle. `PanelHeightUnderSqueezeUiTests` is
+the measurement: it writes a scheduled-publish SUCCESS record naming a long
+folder path and Netlify into the run's own state folder, opens the section,
+squeezes the window to 500 px and reports the notice's height against the
+window's (`%TEMP%\plantoir-214-measurement.txt`), asserting the notice stays
+inside it. Until bundle 11 the folder publish's Done panel was left
+unmeasured because putting it on screen needs a real publish; tests may run one
+since then (see "A test that runs a launcher"), so a second fact,
+`TheFolderPublishsDonePanelStaysInsideASqueezedWindow`, publishes a course to a
+folder, squeezes the window the same way and measures the Done panel's five
+parts — the phase, the folder sentence (given its own id for this), Show in
+File Explorer, the render note and Show details — each an element with an
+automation peer, a missing one FAILING the test (`%TEMP%\plantoir-214-donepanel.txt`).
+Measured 2026-10-01 22:31 (bundle 11, last round), verbatim: "window 900x737;
+taskPhaseLabel 33x20 (bottom 167); publishedFolderSentence 631x19 (bottom
+209); publishedFolderButton 153x32 (bottom 247); publishedFolderRenderNote
+631x32 (bottom 285); taskDetailsDisclosure 655x29 (bottom 328)" — all inside
+the window at the narrowest width it allows. Why #214's own two methods do
+not apply here: there is no splitter to drag (the sidebar is a fixed 230 px)
+and WinUI does not measure a TextBlock at a proposed near-zero width; with a
+900 px minimum window the detail column cannot get narrower than about
+670 px. Height was not squeezed (737 of a 600 px minimum), and the lowest
+part sits at 328 px.
+
+**Measured, 2026-10-01 13:51 (bundle 11, run 1, same PC), verbatim:**
+"window 900x737; notice 631x157 (top 135 below the window's top)". The
+resize to 500 px was NOT honoured: the window would go no narrower than 900,
+so the squeeze a teacher can make is bounded there, and at that width the
+notice is 157 px of a 737 px window, inside it. The test's own wait for the
+width to reach 520 times out silently; it should say so if the window's
+minimum ever drops (left as it is: the assertion that matters — the notice
+stays inside the window — holds at the narrowest width a teacher can reach).

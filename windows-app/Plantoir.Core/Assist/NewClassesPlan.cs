@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -14,6 +16,9 @@ public sealed class NewClassesPlan
     public required string CourseCode { get; init; }
     public required int SectionNumber { get; init; }
     public required int Unit { get; init; }
+
+    /// <summary>The course's naming — required, so no plan falls back to "Unit … Day …".</summary>
+    public required ClassPageNaming Naming { get; init; }
 
     /// <summary>The pages that would be created, in order.</summary>
     public required IReadOnlyList<NewClass> Classes { get; init; }
@@ -35,24 +40,36 @@ public sealed class NewClassesPlan
 
     public bool ChangesNothing => Classes.Count == 0;
 
-    /// <summary>The proposal, as a teacher would read it.</summary>
-    public string Describe()
+    /// <summary>The proposal in the class form — what the MODEL reads, in every course.</summary>
+    public string Describe() => Describe(ClassNoun.Class);
+
+    /// <summary>
+    /// The proposal in a course's own noun. The meeting form is the TEACHER's
+    /// copy only (#274); the model's copy is always <see cref="Describe()"/>.
+    /// </summary>
+    public string Describe(ClassNoun noun)
     {
         var lines = new List<string>();
+        string? unitName = Naming.UnitName(Unit);
 
         if (Classes.Count == 0)
         {
-            lines.Add($"Nothing to add — every class asked for in Unit {Unit} of {CourseCode} " +
+            lines.Add($"Nothing to add — every class asked for in {(unitName is null ? "" : unitName + " of ")}{CourseCode} " +
                       $"Section {SectionNumber} already exists.");
             foreach (string problem in Problems) lines.Add("• " + problem);
             return string.Join("\n", lines);
         }
 
-        lines.Add($"Add {Classes.Count} class page{(Classes.Count == 1 ? "" : "s")} to Unit {Unit} of " +
-                  $"{CourseCode} Section {SectionNumber}, on the {(Classes.Count == 1 ? "day" : "days")} this class actually meets:");
+        string section = SectionNumber.ToString();
+        lines.Add(noun == ClassNoun.Meeting
+            ? AssistWording.WouldAddPagesForAMeeting(Classes.Count, CourseCode, section)
+            : unitName is null
+                ? $"Add {Classes.Count} class page{(Classes.Count == 1 ? "" : "s")} to {CourseCode} Section {SectionNumber}, " +
+                  $"on the {(Classes.Count == 1 ? "day" : "days")} this class actually meets:"
+                : AssistWording.WouldAddPages(Classes.Count, unitName, CourseCode, section));
         lines.Add("");
         foreach (var created in Classes)
-            lines.Add($"  {created.Title}  ({created.Date:yyyy-MM-dd} {created.Date.DayOfWeek})");
+            lines.Add($"  {created.Title}  ({DateText.Iso(created.Date)} {created.Date.DayOfWeek})");
 
         if (AlreadyThere.Count > 0)
         {
@@ -69,7 +86,11 @@ public sealed class NewClassesPlan
         lines.Add("They start unpublished, so they stay off the site until you publish them — " +
                   "write them first, publish when they are ready.");
 
-        if (SharingTheLastDay > 0)
+        if (SharingTheLastDay == 1)
+        {
+            lines.Add(ClassPageSchemes.Say(noun, AssistWording.SharingTheLastDay, AssistWording.SharingTheLastDayForAMeeting));
+        }
+        else if (SharingTheLastDay > 1)
         {
             lines.Add($"{(SharingTheLastDay == 1 ? "This one has" : $"{SharingTheLastDay} of these have")} " +
                       $"no class date left, so {(SharingTheLastDay == 1 ? "it shares" : "they share")} " +
@@ -79,11 +100,9 @@ public sealed class NewClassesPlan
         }
         else
         {
-            string sourceNote = string.IsNullOrEmpty(TimetableSource)
-                ? ""
-                : $", out of the timetable recorded from {TimetableSource}";
-            lines.Add($"{SpareDatesLeft} more class date{(SpareDatesLeft == 1 ? "" : "s")} " +
-                      $"{(SpareDatesLeft == 1 ? "is" : "are")} spare after these{sourceNote}.");
+            lines.Add(noun == ClassNoun.Meeting
+                ? AssistWording.SpareDatesAfterTheseForAMeeting(SpareDatesLeft, TimetableSource ?? "")
+                : AssistWording.SpareDatesAfterThese(SpareDatesLeft, TimetableSource ?? ""));
         }
 
         return string.Join("\n", lines);

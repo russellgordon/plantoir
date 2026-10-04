@@ -65,8 +65,15 @@ public sealed partial class MainWindow : Window
         try { AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Plantoir.ico")); }
         catch { /* a missing icon must never stop the window */ }
 
+        // Quitting asks first when work is under way (#231, the mac's #220/#232).
+        // Quitting here is closing the LAST window. Never when Windows itself
+        // is ending the session: SessionEnding hears WM_QUERYENDSESSION first.
+        Services.SessionEnding.Watch(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        AppWindow.Closing += AskBeforeQuittingThroughWork;
+
         Picker.Attach(this);
         Sidebar.Attach(this);
+        ShowUpdateMenuItemIfActive();
 
         Activated += (_, args) =>
         {
@@ -116,10 +123,31 @@ public sealed partial class MainWindow : Window
         }
         Views.SectionDetailView.SectionOutcomeDismissed += OutcomeDismissed;
 
+        // A scheduled run finished while this window was open and in front
+        // (#218): the one app-wide watch says a record changed, and the band
+        // and the badge are re-read together, on this window's own thread.
+        // A burst of events (create, then size) is one refresh, not three.
+        bool refreshQueued = false;
+        void ScheduledRecordsChanged()
+        {
+            if (IsClosed || refreshQueued) return;
+            refreshQueued = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                refreshQueued = false;
+                if (IsClosed || Workspace.State != WorkspaceState.Ready) return;
+                Sidebar.Refresh();
+                if (DetailHost.Content is Views.SectionDetailView detail) detail.ShowHowTheScheduledPublishTurnedOut();
+            });
+        }
+        Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += ScheduledRecordsChanged;
+
         Closed += (_, _) =>
         {
             IsClosed = true;
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
+            // The event is static: a subscription left behind would root this window.
+            Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
             Workspace.UnregisterWindow();
         };
 
@@ -146,12 +174,21 @@ public sealed partial class MainWindow : Window
         Workspace.ExpandedCourseCodes = WindowMemoryCodec.ParseExpandedCourses(frame?.ExpandedCourses);
         Workspace.IsShowingArchived = frame?.ShowsArchived ?? false;
         Workspace.IsShowingBackups = frame?.ShowsBackups ?? false;
-        if (folderPath is not null && Directory.Exists(folderPath))
+        if (folderPath is not null)
         {
-            App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
-            Workspace.AdoptRestoredPath(folderPath);
-            App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
-            ShowSyncNoticeIfNeeded();
+            // Reopened, or the picker with one sentence saying why not (#320).
+            bool windowsOwn = frame is not null;
+            if (LastWorkingFolder.WhyItCannotBeReopened(folderPath) is { } reason)
+            {
+                Workspace.NoteNotReopened(reason, folderPath, windowsOwn);
+            }
+            else
+            {
+                App.LogDiagnostic($"MainWindow ctor: AdoptRestoredPath('{folderPath}') starting");
+                Workspace.AdoptRestoredPath(folderPath, windowsOwn);
+                App.LogDiagnostic("MainWindow ctor: AdoptRestoredPath done");
+                ShowSyncNoticeIfNeeded();
+            }
         }
         App.LogDiagnostic("MainWindow ctor: ApplyState starting");
         ApplyState();
@@ -241,6 +278,50 @@ public sealed partial class MainWindow : Window
                 detail.ShowDetailsForAutomation();
             }
         });
+    }
+
+    /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
+    private bool _quitConfirmed;
+
+    /// <summary>
+    /// The quit question (#231; <c>quittingWhileWorkIsUnderWay</c>). Only when
+    /// closing THIS window quits the app, only for the teacher's own quit, and
+    /// only for a publish or a preview being BUILT — never a preview merely
+    /// open. Keep Working is the default: Return without reading keeps the work.
+    /// </summary>
+    private async void AskBeforeQuittingThroughWork(Microsoft.UI.Windowing.AppWindow sender,
+                                                    Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    {
+        try
+        {
+            if (_quitConfirmed || !App.ClosingThisQuits(this)) return;
+            var underWay = CourseActivity.UnderWay();
+            var reason = Services.SessionEnding.IsEnding
+                ? QuitConfirmation.Reason.TheSystemIsEnding
+                : QuitConfirmation.Reason.TheTeacherAskedToQuit;
+            if (!QuitConfirmation.ShouldAsk(underWay, reason)) return;
+
+            args.Cancel = true;
+            var (title, message) = QuitConfirmation.Question(underWay);
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                PrimaryButtonText = QuitConfirmation.QuitAnyway,
+                CloseButtonText = QuitConfirmation.KeepWorking,
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot,
+            };
+            bool quit = await dialog.ShowAsync() == ContentDialogResult.Primary;
+            ActivityTrail.Note(ActivityTrail.Event.QuitAskedAboutWorkUnderWay, QuitConfirmation.TrailLine(underWay, quit));
+            if (!quit) return;
+            _quitConfirmed = true;
+            Close();
+        }
+        catch (Exception ex)
+        {
+            App.LogDiagnostic($"AskBeforeQuittingThroughWork exception: {ex}");
+        }
     }
 
     /// <summary>True once this window has closed; a closed window cannot show anything.</summary>
@@ -649,6 +730,15 @@ public sealed partial class MainWindow : Window
                 break;
             case SidebarSelection.CourseItem(var code)
                 when Workspace.Courses.FirstOrDefault(c => c.Code == code) is { } course:
+                // A reference course's row opens a short READ-ONLY summary,
+                // never the settings form (#241, interface.theReadOnlySummary).
+                if (ReferenceCourse.IsKeptForReference(course))
+                {
+                    if (DetailHost.Content is ReferenceSummaryView summary &&
+                        string.Equals(summary.CourseCode, code, StringComparison.OrdinalIgnoreCase)) break;
+                    DetailHost.Content = new ReferenceSummaryView(this, course);
+                    break;
+                }
                 if (DetailHost.Content is CourseSettingsView currentSettings &&
                     string.Equals(currentSettings.CourseCode, code, StringComparison.OrdinalIgnoreCase))
                 {
@@ -1004,7 +1094,11 @@ public sealed partial class MainWindow : Window
     /// section has not stopped meaning the course (the mac's
     /// <c>courseThatCanBeRenamed</c>).
     /// </summary>
-    private Course? CourseThatCanBeRenamed => Workspace.SelectedCourse;
+    private Course? CourseThatCanBeRenamed =>
+        // Never a course kept for reference, by ANY route (#241): its folder
+        // carries the year and course_code the real code, and a rename would
+        // collapse the two. The menu item, F2 and the context menu all ask here.
+        Workspace.SelectedCourse is { } course && !ReferenceCourse.IsKeptForReference(course) ? course : null;
 
     /// <summary>
     /// Read at the moment of asking, never captured earlier (the staleness
@@ -1024,6 +1118,9 @@ public sealed partial class MainWindow : Window
         var course = CourseThatCanBeRenamed;
         string? reason = course is null ? null : WhyRenameIsUnavailable(course);
         RenameCourseItem.IsEnabled = course is not null && reason is null;
+        // Withheld, not greyed, when the selection is a reference course.
+        RenameCourseItem.Visibility = Workspace.SelectedCourse is { } selected && ReferenceCourse.IsKeptForReference(selected)
+            ? Visibility.Collapsed : Visibility.Visible;
         RenameCourseItem.Text = course is null ? "Rename Course…" : $"Rename {course.Code}…";
         RenameCourseReason.Text = reason ?? "";
         RenameCourseReason.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
@@ -1053,11 +1150,14 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void RenameCourseAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "F2")) return;   // #191: never under a dialog
         var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
         if (focused is TextBox or RichEditBox or PasswordBox or AutoSuggestBox or NumberBox) return;
         RenameSelectedCourse();
         args.Handled = true;
     }
+
+    private void ImportForReference_Click(object sender, RoutedEventArgs e) => _ = Sidebar.OpenImportForReference();
 
     private void RestoreFromArchive_Click(object sender, RoutedEventArgs e)
     {
@@ -1179,18 +1279,33 @@ public sealed partial class MainWindow : Window
 
     private void OpenWorkingFolderAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+O")) return;   // #191: never under a dialog
         OpenWorkingFolder_Click(sender, null!);
         args.Handled = true;
     }
 
+    /// <summary>Check for Updates… (#337): shown only when the engine has a feed to read.</summary>
+    private void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.Updater is { } updater) _ = updater.CheckAsync(teacherAsked: true);
+    }
+
+    private void ShowUpdateMenuItemIfActive()
+    {
+        CheckForUpdatesItem.Text = Plantoir.Core.Assist.UpdateWording.MenuItem;
+        CheckForUpdatesItem.Visibility = App.Updater?.IsActive == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void NewWindowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+N")) return;   // #191: never under a dialog
         App.OpenNewWindow();
         args.Handled = true;
     }
 
     private void ReloadCoursesAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+Shift+R")) return;   // #191: never under a dialog
         Workspace.Reload();
         ApplyState();
         args.Handled = true;

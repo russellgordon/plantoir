@@ -496,18 +496,46 @@ public sealed class LocalModel : IChatModel, IDisposable
     }
 
     /// <summary>
-    /// One turn of the conversation. Returns the raw assistant message.
+    /// The body of one request to the local engine. Every request carries
+    /// max_tokens 512 — <c>app-rules.json</c> → <c>modelTiers.requirements</c>
+    /// → "Every request caps how much the model may write", whose <c>cap</c>
+    /// a test reads.
     /// </summary>
-    public async Task<JsonObject?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+    internal static JsonObject Request(JsonArray messages, JsonArray tools) => new()
     {
-        var request = new JsonObject
-        {
-            ["model"] = "local",
-            ["temperature"] = 0,
-            ["max_tokens"] = 512,
-            ["messages"] = messages.DeepClone(),
-            ["tools"] = tools.DeepClone(),
-        };
+        ["model"] = "local",
+        ["temperature"] = 0,
+        ["max_tokens"] = 512,
+        ["messages"] = messages.DeepClone(),
+        ["tools"] = tools.DeepClone(),
+    };
+
+    /// <summary>
+    /// The engine's response body, read into the message AND the reason it
+    /// stopped. The finish reason travels with the message (#196): a reply
+    /// the engine stopped at the cap must never be acted on as finished, and
+    /// returning <c>choices[0].message</c> alone is exactly how it was.
+    /// </summary>
+    internal static ModelReply? ReadReply(string body)
+    {
+        var choice = JsonNode.Parse(body)?["choices"]?[0];
+        if (choice?["message"] is not JsonObject message) return null;
+        string? finished = choice["finish_reason"] is JsonValue reason && reason.TryGetValue(out string? text)
+            ? text : null;
+        // The completion-token count rides along for the trail (#164): it is
+        // the honest check on thinking having been switched back on, since
+        // the engine parses the thinking OUT of the content.
+        int? tokens = JsonNode.Parse(body)?["usage"]?["completion_tokens"] is JsonValue used &&
+                      used.TryGetValue(out int count) ? count : null;
+        return new ModelReply((JsonObject)message.DeepClone(), finished, tokens);
+    }
+
+    /// <summary>
+    /// One turn of the conversation: the assistant message and why it ended.
+    /// </summary>
+    public async Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
+    {
+        var request = Request(messages, tools);
 
         using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
         try
@@ -516,7 +544,7 @@ public sealed class LocalModel : IChatModel, IDisposable
             if (!response.IsSuccessStatusCode) return null;
 
             string body = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
-            return JsonNode.Parse(body)?["choices"]?[0]?["message"] as JsonObject;
+            return ReadReply(body);
         }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
         {

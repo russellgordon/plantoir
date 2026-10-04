@@ -769,8 +769,8 @@ def build(check_only: bool) -> int:
     # never parsed and rewritten, which would break their signatures.
     feed_source = WEBSITE / "updates"
     # Only the MAC's feed is checked: the checker reads Sparkle's shape, and
-    # NetSparkle's windows.xml (v1.4.0) will need a checker of its own (the
-    # slice-2 review's L6). Copied either way.
+    # NetSparkle's windows.xml (in the site since Windows 1.4.2) still needs a
+    # checker of its own (the slice-2 review's L6; #428). Copied either way.
     mac_feed = feed_source / "macos.xml"
     if mac_feed.is_file():
         for problem in update_feeds.problems_with(mac_feed):
@@ -920,12 +920,10 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     question (`shots/corners.py`, about 6 s, Pillow only) and refuses on any
     failing picture, whoever made it.
 
-    The `-windows-` pictures are not judged, the same scope as the test: they
-    are taken on Windows, whose own harness owes the rule (the `windows` issue
-    opened from #375's hand-over). The three drawn ones — hero, colour-schemes
-    and light-and-dark — are `windows: false` in shots.json meanwhile, so no
-    visitor is shown them; the square single-window shots are Windows' to
-    retake.
+    Of the `-windows-` pictures, the same scope as the test: the three
+    figures Windows has retaken as whole native captures — hero,
+    colour-schemes and light-and-dark (#380) — are judged; the square
+    single-window shots are still Windows' to retake and are not.
     """
     sys.path.insert(0, str(website / "shots"))
     try:
@@ -936,6 +934,7 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     pictures = corners.images_the_pages_show(website, image_dir)
     if not pictures:
         return f"Not deploying: no pictures found in {image_dir} to check."
+    pictures = pictures + corners.windows_figures_retaken(image_dir)
     problems: list[str] = []
     for picture in pictures:
         problems.extend(corners.corner_problems(picture))
