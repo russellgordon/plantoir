@@ -59,10 +59,11 @@ public class ClaudeCodeLauncherTests
 
             var args = plantoir["args"]?.AsArray();
             Assert.NotNull(args);
-            Assert.Contains(args, a => a?.ToString() == "--folder");
-            Assert.Contains(args, a => a?.ToString() == tempWorkspace);
-            Assert.Contains(args, a => a?.ToString() == "--course");
-            Assert.Contains(args, a => a?.ToString() == courseCode);
+            // The folder only (#430, outsideAgents.serverArguments): the
+            // course is named in the greeting, never handed to the server.
+            Assert.Equal(new[] { "--mcp-stdio", tempWorkspace }, args!.Select(a => a?.ToString()));
+            Assert.DoesNotContain(args, a => a?.ToString() == "--course");
+            Assert.EndsWith($"mcp-{courseCode}.json", configPath);
         }
         finally
         {

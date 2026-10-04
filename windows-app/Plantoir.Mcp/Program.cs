@@ -41,10 +41,13 @@ if (string.IsNullOrWhiteSpace(folder))
 AssistWorkspace workspace;
 try
 {
-    // --course locks the session to one course. Plantoir passes it when a
-    // teacher starts an assistant from that course's menu: the request was
-    // about that course, so a lock is a stronger guarantee than an
-    // instruction in a prompt the model might drift from.
+    // --course locks the session to one course. Only Plantoir's OWN assistant
+    // window passes it now (McpClient, with PLANTOIR_LOCAL_WINDOW=1): since
+    // v1.4.3 (#430) both outside doors pass `--mcp-stdio <folder>` and name
+    // the course in their greeting only (app-rules.json → outsideAgents.
+    // courseIsNamedInTheGreetingOnly), so an outside session can reach every
+    // course in the folder and takes no `assist` lease below — as the Codex
+    // door never did.
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
