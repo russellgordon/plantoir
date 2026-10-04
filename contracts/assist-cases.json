@@ -1211,6 +1211,22 @@
         "today" : "2026-09-19",
         "when" : "half six",
         "why" : "Unreadable, so it travels on exactly as it arrived and the teacher meets the runner's own refusal rather than a silent change of subject."
+      },
+      {
+        "expectMoment" : "2026-03-08 03:30",
+        "now" : "2026-03-08 01:00",
+        "timeZone" : "America/Toronto",
+        "today" : "2026-03-08",
+        "when" : "02:30",
+        "why" : "02:30 does not exist that night. Moved FORWARD by the gap, as Foundation's Calendar does - not to 03:00, the first minute that exists, which is a different moment for the same sentence. .NET throws on the conversion, so Windows does this itself. (Proposed by Windows on #411, added 2026-10-03.)"
+      },
+      {
+        "expectMoment" : "2026-11-02 01:30",
+        "now" : "2026-11-01 01:45",
+        "timeZone" : "America/Toronto",
+        "today" : "2026-11-01",
+        "when" : "01:30",
+        "why" : "Asked in the FIRST 01:00 hour, the repeated 01:30 is taken as its earlier instant, already gone, so it is tomorrow's - the mac's Calendar convention. The `now` here is itself an ambiguous wall time and a runner reads it as its EARLIER instant (the first 01:00 hour, as this row says); read as the later one, every reading of 01:30 is already gone and the row stops telling the two conventions apart. (Proposed by Windows on #411, added 2026-10-03.)"
       }
     ],
     "sayItAs" : [
