@@ -193,6 +193,26 @@ public class ContractTests
         Assert.Equal(wording["pagesWhoseNewDatesCouldNotBeSet"]!.ToString(),
                      AssistWording.PagesWhoseNewDatesCouldNotBeSet(new[] { "Unit 2, Day 4", "Unit 2, Day 5" }));
 
+        // #436 (mac #433 / #412 / #425): what an outside assistant meets, a
+        // publish that stopped part way, and making room's unfinished pages —
+        // rendered with the contract's own placeholders and example titles.
+        Assert.Equal(wording["courseIsBeingBuilt"]!.ToString(), AssistWording.CourseIsBeingBuilt("{course}"));
+        Assert.Equal(wording["changesAreSavedPreviewShowsTheOldPages"]!.ToString(),
+                     AssistWording.ChangesAreSavedPreviewShowsTheOldPages("{course}", "{section}"));
+        Assert.Equal(wording["changesAreSavedWhileTheCourseIsBuilt"]!.ToString(),
+                     AssistWording.ChangesAreSavedWhileTheCourseIsBuilt("{course}", "{section}"));
+        Assert.Equal(wording["deployClosedAnOpenPreview"]!.ToString(),
+                     AssistWording.DeployClosedAnOpenPreview("{course}", "{section}"));
+        Assert.Equal(wording["publishStoppedPartWay"]!.ToString(), AssistWording.PublishStoppedPartWay("{what}", "{problem}"));
+        Assert.Equal(wording["restoreSectionPutsItBack"]!.ToString(), AssistWording.RestoreSectionPutsItBack("{section}"));
+        Assert.Equal(wording["openEndedPublishRefused"]!.ToString(), AssistWording.OpenEndedPublishRefused("{day}"));
+        Assert.Equal(wording["pagesAChangeCouldNotFinish"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 1, Day 3" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinish(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+        Assert.Equal(wording["pagesAChangeCouldNotFinishNamingSeveral"]!.ToString(),
+                     AssistWording.PagesAChangeCouldNotFinishNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
@@ -257,9 +277,6 @@ public class ContractTests
             "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
         ["DeployToMultipleDestinationsDidNotFinish"] =
             "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
-        ["PagesAChangeCouldNotFinish"] =
-            "this app's own sentence for a make-room write that did not finish (#422); proposed to the mac as " +
-            "wording.pagesAChangeCouldNotFinish in parity bundle 10's mac issue",
     };
 
     /// <summary>The public static member a wording key names, or null.</summary>
