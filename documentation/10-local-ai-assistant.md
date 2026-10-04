@@ -876,6 +876,21 @@ caught — and takes a repeated hour as its earlier instant. Both are pinned in
 `DeployAtATimeContractTests` against `America/Toronto`, and proposed back to
 the mac as `resolving` rows in the bundle's mac draft.
 
+*And both are contract rows now* ([#411](https://github.com/russellgordon/plantoir/issues/411),
+accepted by Russell 2026-10-03, landed 2026-10-04): `deployAtATime.resolving`
+11 → 13. The mac's product already settled both as the rows say — nothing in
+`AssistToolRunner.momentText` changed. What did change is how the mac's RUNNER
+reads the fall-back row's `now`, "2026-11-01 01:45", which is itself an
+ambiguous wall time: `DateFormatter` reads it as the LATER instant (06:45 UTC,
+measured on this Mac), and read that way every "01:30" is already gone, so the
+row would pass under either convention and test nothing. `ScheduleDeployCardTests.givenNow`
+reads it as the EARLIER instant, as the row says ("asked in the FIRST 01:00
+hour") and as Windows reads it. That is a statement about the given `now` only.
+Must-fails, run 2026-10-04: settling a nonexistent 02:30 onto 03:00 turns the
+spring row red ("2026-03-08 03:00" is not "2026-03-08 03:30"); taking a
+repeated hour's LATER instant turns the fall-back row red ("2026-11-01 01:30"
+is not "2026-11-02 01:30").
+
 **`AssistMCPServer` deliberately settles nothing**, so `Plantoir --mcp-stdio`
 still refuses a bare `when: "06:30"` with the runner's own "I could not read
 that time". That is a deliberate divergence from the `publish_class_on`
@@ -956,14 +971,33 @@ model in the loop — the same ambiguity used two paragraphs down to reject `sho
 unit 4`. Re-run after the gate on a wider 36,864-input sweep: **0 lost, 0
 changed, 0 new `publish_pages`**, 2,850 new `unpublish_pages`. Five of the 141
 are pinned as `refused` rows so the gate is data rather than a comment, and
-`HideIsUnpublishCardTests.testPublishStillTakesAWholeUnitAndNoPage` asserts the
+`HideIsUnpublishCardTests.testPublishTakesAWholeUnitOrOneExactPageAndNoWiderSpelling`
+(named `testPublishStillTakesAWholeUnitAndNoPage` until #411) asserts the
 TOLERANCE as well as the reference — a test naming only the reference did not
 catch it.
 
 The reason for the asymmetry, underneath all of that: unpublishing errs safe — a
 page nobody can see — while publishing puts a page in front of students, and
-"Publish Unit 2, Day 3" is 10/10 on this tier today, so there was nothing to
+"Publish Unit 2, Day 3" was 10/10 on this tier then, so there was nothing to
 buy by widening the dangerous direction on the same day.
+
+**#411 answered that one sentence in code, and widened nothing** (decided by
+Russell, 2026-10-03: "a sentence that needs no model should not be sent to
+one"). `wholeUnitToPublish` reads `publish unit <number>, day <number>` after
+the literal opening `"publish unit "` only — exactly a number, the six
+characters `, day ` and a number, through `AssistCardCommand.unitAndDay` — and
+nothing else: the hide arm's tolerances (a courtesy word, a `?`, a missing or
+doubled comma, doubled spaces) stay rejected for publishing, and so does a
+course named after it, for the load-bearing reason below. `hideIsUnpublish`'s
+first refused row moved to accepted, two more spellings of it were added there
+(the shelf's capitalised card, and a trailing full stop the shared tidier has
+always removed), and fifteen near misses are new refused rows.
+`testNoHideOrUnpublishSentenceEverReachesPublishPages` holds the damaging
+direction across every hide or unpublish sentence in the table. Must-fails
+run 2026-10-04 (`ready/B.md` in the v1.4.3 run has the red lines): drop the arm,
+swap unit and day, strip a `?`, read past the day number (which takes "… in
+ICS3U" and binds this window's course), and send the hide arm's day form to
+`publish_pages` each turn a contract row red.
 
 **What the frame tolerates was decided rather than left to taste**, because
 spellings are the whole question for a family like this — the same argument
@@ -971,7 +1005,8 @@ spellings are the whole question for a family like this — the same argument
 words are counted (`makeRoom`'s reading), so `unit 4 , day 21` and `unit 4 day
 21` are the same request and odd spacing is read the same way; a trailing `?`
 comes off; `please` is courtesy at either end; and `day21` is refused, because
-that is not a word this frame has. 13 accepted and 20 refused rows are DATA, in
+that is not a word this frame has. 16 accepted and 34 refused rows (13 and 20
+before #411) are DATA, in
 `contracts/assist-cases.json` → `hideIsUnpublish`.
 
 **The refusals are the safety half, and one of them is load-bearing.**
@@ -1001,7 +1036,8 @@ course's own word.
 `publish_pages`' description — the measured precedent is 110/110 → 90/110, with
 three previously-perfect probes broken, because a small model reads a
 description naming another tool as a recommendation rather than a boundary.
-Mirroring the frame on the publish side, for the reason above. `show` and
+Mirroring the frame on the publish side, for the reason above (#411 added the
+day form's EXACT spelling only, which is not a mirror). `show` and
 `unhide` as publish-side synonyms, which are worse again: "show unit 4" is at
 least as likely to mean "display it to me", and resolving that guess by
 publishing is the wrong way to be wrong.
@@ -1009,7 +1045,9 @@ publishing is the wrong way to be wrong.
 **The cost, said plainly.** Every phrasing answered in code leaves the routing
 denominator. The shelf's split moves 16/3 → **17/2** — "Unpublish Unit 2, Day
 3" is answered in code now, and only "Publish Unit 2, Day 3" and "Cancel
-scheduled deploy" still go to the model — and the research suites' intercepted
+scheduled deploy" still go to the model (since #411 "Publish Unit 2, Day 3" is
+answered in code too, so the split is **18/1** and the suites' "card: publish
+by name" probe is intercepted) — and the research suites' intercepted
 count moves from five of 29 probes to six, with the promise-card line they
 print dropping from 6 of 11 to 5 of 11. A score taken after this is not
 comparable to one taken before it without saying so.
@@ -7350,11 +7388,31 @@ one line. `LocalModel.ReadReply` is the body reader, testable without a
 server. A #159 test that pinned unreadable arguments REACHING a tool was
 changed on purpose: they no longer do.
 
+*The scripted cut-off case is shared now* ([#411](https://github.com/russellgordon/plantoir/issues/411),
+accepted by Russell 2026-10-03, landed on the mac 2026-10-04):
+`assist-cases.json` → `scenarios.cases` "an answer the engine stopped part way
+runs nothing", with one new `given` key, `modelReply` (the engine's whole
+reply: `finishReason`, and a `toolCall` whose `arguments` are the model's own
+text, `{course}` for the fixture's course). The mac's runner
+(`AssistScenarioTests.engineReply(scriptedBy:)`) serves it from a `StubEngine`,
+no longer requires `pending` when `saying` is given, and for a `"length"` reply
+also asserts no launcher run and no window action — so the case cannot pass
+vacuously. Must-fail, run 2026-10-04: with `AssistAgent`'s `answer.wasCutOff`
+branch disabled, the case goes red three ways — a card was put up, the deploy
+RAN once it was pressed ("a cut-off answer deployed": 1, not 0), and no line
+says `wording.answerWasCutOff`. Windows wires `given.modelReply` into its
+`AssistScenarioTests`' `ScriptedModel` (#432).
+
 **#262 — the same rule as the mac, after a fix round.** The rule reads each tool's
 own schema. Windows' local `add_next_class` first declared `unit` and `days`
 where the mac's declares only course and section, so an EMPTY model call to it
 was refused here and ran there; the fix round made it run as on the mac, so
-there is no difference left to know. "Add the next class page" is a card and
+there is no difference left to know. *(#411: Russell decided on 2026-10-03
+that the mac should match Windows' ORIGINAL schema instead — declare both, and
+refuse the empty call. It was built and measured on 2026-10-04 and failed the
+pre-registered routing rule, so it is PARKED on the branch
+`issue/411-add-next-class-unit-days` and nothing changed on either app; see
+"#411: `add_next_class` with `unit` and `days`, measured and parked" below.)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
