@@ -499,6 +499,9 @@
         "event": "build declined, course busy elsewhere",
         "lineWhenItsSectionIsBeingDeployed": "declined Preview — this section is being deployed by this copy of Plantoir",
         "launcherLineWhenItsSectionIsBeingDeployed": "{course}/{section} · the preview stopped before building — this section was being deployed",
+      "launcherLineWhenALaterDeployIsStillWorking": "{course}/{section} · the {leg} stopped before it started — this section was still being deployed by a deploy that was set for later",
+      "launcherLineWhenItsSectionIsAlreadyBeingDeployed": "{course}/{section} · the {leg} stopped before it started — this section was already being deployed",
+      "launcherLineWhenItsSectionIsStillBeingDeployedWhy": "GitHub #439: shared-rules.json -> deployWhileItsSectionDeploys. Under THIS event for #381's reason: a build (or a deploy) was declined because something else is working on this section. {leg} is 'deploy' when deploy.sh refused and 'build' when preview.sh --build-only did. Written by the launcher itself (note_on_the_trail): a refusal met in Terminal, or by a scheduled run's own leg, has no app to write it. scripts/test_deploy_while_its_section_deploys.py checks both launchers against these fields.",
         "lineWhenItsSectionIsBeingDeployedWhy": "GitHub #381 (decision 4 on #378): shared-rules.json -> previewWhileItsSectionDeploys. Filed under THIS event rather than a new one, as the #378 plan decided: it already means 'a build was declined because something else is working on this course', and a second name for the same fact would split what a report reads. The window writes it with the course and section; preview.sh writes the launcher line itself (note_on_the_trail), because a preview typed at a command line has no app to read a marker, and a refusal a teacher met there is exactly the one nobody else saw. No process id: the window's own deploy is this program, and the launcher's line comes from the process table, which a teacher's report cannot use. scripts/test_preview_while_deploying.py checks the launcher against this field; PreviewWhileDeployingTests the window.",
         "why": "Added with #156, when the mac began reading the work leases other programs write. The program in the way is invisible from where the teacher is: an outside assistant, another copy of Plantoir, a publish set for later. A teacher who reports 'Preview said somebody else was using it' can be answered only by the process id - on the lease file itself, and on this line; the window's own 'app opened' line names it too when the other program is a copy of the app, while the --mcp-stdio and scheduled processes write no opening line - and without a line at all a declined press reads exactly like a button that did nothing. Written by whichever program declined; the MCP process writes the same trail."
       },
@@ -20904,6 +20907,437 @@
       "windows"
     ],
     "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows owes the same guard in preview.ps1 (its own process table, never a remembered process id). Until Windows implements it, its cases are a named gap against the windows issue opened with #381."
+  },
+  "deployWhileItsSectionDeploys": {
+    "rule": "A deploy of a section refuses, before anything is changed, while that same section is still being deployed in this working folder: by a deploy that was set for later whose script is still running - including one whose run was ended by setting the section again (a 'leftover run') - or by deploy.sh for that course and section. It is asked by the launchers, so every caller is covered: the window's Deploy and an assistant's deploy (their build leg, preview.sh --build-only, and their deploy.sh legs), a scheduled run's own legs, and a deploy typed in Terminal. A preview being served is not this rule's (previewWhileItsSectionDeploys). Before it starts its script, a newly set run waits for a leftover run of its own section to finish (scheduledDeployWaitsForItsEarlierRun).",
+    "why": "GitHub #439, decided by Russell 2026-10-04: fix it in the next release. Setting a section's deploy again while its run works boots the job out first (#237's 'never briefly two agents'; #409), and the job IS the running app, so the run ends there. The wrapper script it started is a process group of its own and keeps building and uploading - measured on an Apple M4 Pro, macOS 26.6, 2026-10-04, with stand-in launchers under a path holding a space: after SIGKILL of the pretend run, its script and legs kept running, and the process table showed them. The ended run's leases name a process that is gone, so they read as stale (workLeases.liveness), deploy.sh had no same-section guard, and preview.sh asked only on a serving run: two builds and uploads of one section could run at once, the fault #156's leases exist to prevent.",
+    "sentences": {
+      "launcher": {
+        "laterDeploy": [
+          "❌ {course} section {section} is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished.",
+          "   Nothing was changed."
+        ],
+        "laterBuild": [
+          "❌ {course} section {section} is still being deployed by a deploy that was set for later, so it cannot be built until that has finished.",
+          "   Nothing was changed."
+        ],
+        "anotherDeploy": [
+          "❌ {course} section {section} is already being deployed, so it cannot be deployed again until that has finished.",
+          "   Nothing was changed."
+        ],
+        "anotherBuild": [
+          "❌ {course} section {section} is already being deployed, so it cannot be built until that has finished.",
+          "   Nothing was changed."
+        ]
+      },
+      "panel": "The window's failure explanation is the launcher's first line with the cross taken off (failureExplanationCases), lifted as previewWhileItsSectionDeploys lifts its own.",
+      "assistant": "wording.deployRefusedWhileALaterDeployWorks when the deploy set for later was the reason, wording.deployRefusedWhileItsSectionDeploys otherwise - said by the in-app assistant and an outside assistant's deploy_section instead of 'did not finish', when every leg that ran was refused this way.",
+      "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1)."
+    },
+    "launcherLines": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> launcherLineWhenALaterDeployIsStillWorking and launcherLineWhenItsSectionIsAlreadyBeingDeployed, with {leg} 'deploy' (deploy.sh) or 'build' (preview.sh --build-only).",
+    "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default) or 'build'. The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild) or 'another' (anotherDeploy/anotherBuild). parentArgs is this run's parent's command line (default '-bash').",
+    "launcherCases": [
+      {
+        "name": "a leftover run's script, under Application Support (a path with a space), refuses a deploy",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "refused",
+        "who": "later",
+        "why": "The real place: '/bin/bash' then the path splits into three words, so the script's name is word 3. A rule reading word 2 passes every other case and lets the real leftover through, which is the damaging direction (#439 plan review 3a). Parent 1: the run that started it was ended by a re-set."
+      },
+      {
+        "name": "a leftover run's script refuses the build leg too",
+        "leg": "build",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "refused",
+        "who": "later",
+        "why": "The window's Deploy and an assistant's deploy build first with preview.sh --build-only, which rebuilds the very folder the leftover is uploading from."
+      },
+      {
+        "name": "a leftover run in its deploy leg",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ],
+          [
+            802,
+            801,
+            "/bin/bash {here}/deploy.sh ICS4U 2 --to-folder /Users/t/Sites/ics4u --non-interactive"
+          ]
+        ],
+        "cwd": {
+          "802": "here"
+        },
+        "expect": "refused",
+        "who": "later",
+        "why": "Its own deploy.sh is in the table beside its script; the sentence names the deploy set for later, which wins."
+      },
+      {
+        "name": "a working run (the app line AND its script) refuses",
+        "processes": [
+          [
+            800,
+            1,
+            "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh --scheduled-section {here} ICS4U 2"
+          ],
+          [
+            801,
+            800,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "refused",
+        "who": "later",
+        "why": "A run that was not ended holds leases too; the launcher sees its script all the same."
+      },
+      {
+        "name": "the app line alone, with its trailing words, does not count: that run is still waiting for the course",
+        "processes": [
+          [
+            800,
+            1,
+            "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh --scheduled-section {here} ICS4U 2"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "A run waits up to ten minutes for the course BEFORE it starts its script. Counting this line would refuse the window's own deploy leg half way through, while that run waits for the window; the leases already order the two."
+      },
+      {
+        "name": "the new run's own leg while the leftover works is refused",
+        "parentArgs": "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh",
+        "processes": [
+          [
+            800,
+            1,
+            "/Applications/Plantoir.app/Contents/MacOS/Plantoir --run-scheduled-deploy /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh --scheduled-section {here} ICS4U 2"
+          ],
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "refused",
+        "who": "later",
+        "why": "Same label, same folder, two scripts: this run's parent is the NEW run's script (its ancestor, never counted), and the other one, with parent 1, is the leftover. This is the case that tells 'same label, my ancestor' from 'same label, not mine'. The new run waits for the leftover before starting its script (scheduledDeployWaitsForItsEarlierRun), so this is the backstop."
+      },
+      {
+        "name": "this run's own script never counts (a scheduled run's own legs)",
+        "parentArgs": "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh",
+        "processes": [],
+        "expect": "allowed",
+        "why": "The script that started this deploy.sh is its ancestor."
+      },
+      {
+        "name": "a deploy set for later of ANOTHER folder does not count",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{elsewhereID}.sh"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "#237: one job per section per working folder, and another folder's deploy builds another folder.",
+        "appliesOn": [
+          "mac"
+        ]
+      },
+      {
+        "name": "a deploy set for later before #237, whose script names no folder, counts",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.sh"
+          ]
+        ],
+        "expect": "refused",
+        "who": "later",
+        "appliesOn": [
+          "mac"
+        ]
+      },
+      {
+        "name": "an editor, a pager or bash -x on the script is not the script running",
+        "processes": [
+          [
+            801,
+            1,
+            "/usr/bin/vim /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ],
+          [
+            802,
+            1,
+            "/usr/bin/less /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ],
+          [
+            803,
+            1,
+            "/bin/bash -x /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "Only the script as the PROGRAM counts: the first word, or the script a shell was handed before any word starting with '-'."
+      },
+      {
+        "name": "a log of the deploy set for later being read is not the deploy",
+        "processes": [
+          [
+            801,
+            1,
+            "/usr/bin/tail -f /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.log"
+          ]
+        ],
+        "expect": "allowed"
+      },
+      {
+        "name": "a deploy set for later of section 12, or of another course, does not count",
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section12.{hereID}.sh"
+          ],
+          [
+            802,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS3U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "Section 12 is not section 2, and ICS3U is another course."
+      },
+      {
+        "name": "deploy.sh for the section, from a command line in this folder",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another",
+        "why": "The Terminal pair (#439 ruling 9): a bare launcher writes no lease, so only the process table sees it."
+      },
+      {
+        "name": "deploy.sh for the section refuses the build leg",
+        "leg": "build",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --target netlify"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "refused",
+        "who": "another"
+      },
+      {
+        "name": "deploy.sh whose working folder cannot be asked still counts",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {},
+        "expect": "refused",
+        "who": "another",
+        "why": "A deploy of this very section is proved; only its folder is not. As #381."
+      },
+      {
+        "name": "deploy.sh of the section in ANOTHER folder does not count",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "elsewhere"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "deploy.sh only clearing a token, or printing its help, does not count",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --reset-token"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --logout"
+          ],
+          [
+            702,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 2 --help"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here",
+          "702": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "deploy.sh merely named on a line is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "claude -p run ./deploy.sh ICS4U 2 for me"
+          ]
+        ],
+        "cwd": {
+          "700": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "this run's own ancestor deploy.sh never counts (a folder deploy's own rebuild)",
+        "leg": "build",
+        "parentArgs": "/bin/bash {here}/deploy.sh ICS4U 2 --to-folder /Users/t/Sites/ics4u",
+        "processes": [],
+        "expect": "allowed",
+        "why": "deploy.sh reruns preview.sh --build-only itself for a folder deploy of a preview's build (#136); the deploy.sh that started it is this run's parent."
+      },
+      {
+        "name": "deploy.sh of section 12, or of another course, does not count",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./deploy.sh ICS4U 12"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./deploy.sh ICS3U 2"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here"
+        },
+        "expect": "allowed"
+      },
+      {
+        "name": "a preview of the section is not a deploy",
+        "processes": [
+          [
+            700,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2"
+          ],
+          [
+            701,
+            1,
+            "/bin/bash ./preview.sh ICS4U 2 --build-only"
+          ]
+        ],
+        "cwd": {
+          "700": "here",
+          "701": "here"
+        },
+        "expect": "allowed",
+        "why": "Not this guard's question: a preview being served is #381's, the other way round, and a second build is the leases'."
+      },
+      {
+        "name": "an unreadable table lets the deploy through",
+        "psFails": true,
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "Failing closed would refuse every deploy, and every scheduled run's own legs, while ps fails. NOT because the leases cover it: for a leftover run they do not."
+      },
+      {
+        "name": "a table that does not list this run lets the deploy through",
+        "psOmitsThisRun": true,
+        "processes": [
+          [
+            801,
+            1,
+            "/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh"
+          ]
+        ],
+        "expect": "allowed",
+        "why": "#388: a ps answering with a table that lacks this very run cannot be trusted to have listed anything else."
+      }
+    ],
+    "failureExplanationCases": [
+      {
+        "output": "❌ ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished.",
+        "assistant": "deployRefusedWhileALaterDeployWorks"
+      },
+      {
+        "output": "❌ ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be built until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is still being deployed by a deploy that was set for later, so it cannot be built until that has finished.",
+        "assistant": "deployRefusedWhileALaterDeployWorks"
+      },
+      {
+        "output": "❌ ICS4U section 2 is already being deployed, so it cannot be deployed again until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is already being deployed, so it cannot be deployed again until that has finished.",
+        "assistant": "deployRefusedWhileItsSectionDeploys"
+      },
+      {
+        "output": "❌ ICS4U section 2 is already being deployed, so it cannot be built until that has finished.\n   Nothing was changed.",
+        "expect": "ICS4U section 2 is already being deployed, so it cannot be built until that has finished.",
+        "assistant": "deployRefusedWhileItsSectionDeploys"
+      }
+    ],
+    "knownLimits": [
+      "A leftover run that HANGS refuses that section's deploys until it ends, and nothing in the app ends it: cancelling or setting the deploy again boots out the job, which is already gone, and the script is a process group of its own. Logging out of the Mac, or restarting it, ends it. Its legs run with --non-interactive, so a question cannot hold it; a destination that never answers could. While its run lived, its leases blocked the same way - what is new is that it survives a re-set.",
+      "A leftover run's own after-work is still lost: the app's record that the section was deployed (it stays ' — Edited', the harmless direction), the run's trail line and its notification. Its script does write the section's outcome record, and since #439 never over a newer run's (scheduledPublishStopped.newerRecordWins).",
+      "A deploy set for later before #237 names no folder in its label, so its leftover run refuses that course and section in every working folder until it ends; and a newly set run does not wait for it (it waits for its OWN script), so its legs are refused by this guard and the run is recorded as stopped.",
+      "A scheduled run does not wait for a deploy typed in Terminal (it writes no lease); its legs are refused here and the run is recorded as stopped, which is better than two deploys of one section at once.",
+      "The look is the live process table: a process another account runs is not seen, as everywhere else the launchers look."
+    ],
+    "rejected": [
+      "Leases naming the wrapper's process id (#439 option 2): misses a deploy typed in Terminal or run by an outside assistant's own command line, leaves a gap between the script starting and the leases being rewritten, and touches the leases both platforms read.",
+      "Refusing or deferring a re-set while the run works: blocks a teacher changing a schedule during a long deploy, needs a pending state, and leaves the overlap itself untouched.",
+      "Letting the run survive a re-set and finish its after-work, as Windows' ClearIfStillMine does: the boot-out-first order is what keeps #237's 'never briefly two agents' true. Not reopened.",
+      "Counting the app's --run-scheduled-deploy line: a run still waiting for the course would refuse the window's deploy leg half way through, while that run waits for the window.",
+      "Refusing when the table cannot be read: every deploy and every scheduled run's own legs refused while ps fails."
+    ],
+    "appliesOn": [
+      "mac",
+      "windows"
+    ],
+    "appliesOnWhy": "The rule is for both apps; the launcherCases are the mac's deploy.sh and preview.sh. Windows owes the same guard in deploy.ps1 (and preview.ps1's build leg), from its own process table. Cases marked appliesOn ['mac'] name a script label's folder id, which Windows' scheduled task name does not carry. Windows' run survives a re-set (ClearIfStillMine), so its 'leftover run' never exists; the Terminal pair and a working scheduled run still do."
   },
   "publishPlanNaming": {
     "rule": "Publishing or hiding pages BY NAME (publish_pages, unpublish_pages and their plan_ twins) finds pages by FILE name and keys them by PATH. A name that fits more than one page's file is never guessed: nothing is written, and the answer is wording.morePagesThanOneAreCalled followed by one line per page - '• ', the page as startOfYear.wording.pageNameInFolder names it, ' — ', then its folder and file name joined by '/', which is the 'name at the end' the sentence asks for and which, given back, fits that page alone. A plan names a page whose shown title another page of the section also has with pageNameInFolder (the rule start of year uses, startOfYear.planShows), and every other page with pageName.",

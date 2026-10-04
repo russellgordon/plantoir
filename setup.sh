@@ -437,7 +437,14 @@ say_this_folder_cannot_be_reached() {
 #   program  1 when the launcher is the PROGRAM — the first word, or the
 #            script a shell was handed before any word starting with "-" —
 #            and 0 when the line merely names it (a `claude -p` prompt, a
-#            `bash -c` wrapper whose own child is the launcher).
+#            `bash -c` wrapper whose own child is the launcher). For a
+#            publish set for later, 1 when its SCRIPT is the program the same
+#            way — the wrapper the run started, `/bin/bash …/<label>.sh`,
+#            which outlives a run ended by a re-set (#439) — and 0 for the
+#            app's own `Plantoir --run-scheduled-deploy <script> …` line, an
+#            editor, or `bash -x <script>`. The script's path may hold a
+#            space ("Application Support"), so the word that ends in the
+#            name is looked for, never word 2.
 #   flags    the launcher's OWN words among --stop, --build-only,
 #            --builder-tag, --reset-token, --logout and --help (-h), without
 #            their dashes, ","-joined; "-" when none.
@@ -602,7 +609,22 @@ the_launchers_running() {
           for (j = 1; j <= asked; j++) {
             if (usable[j] && wanted_code[j] == code && wanted_section[j] == label_section) for_places = joined(for_places, j)
           }
-          print pid, origin_of(pid), "scheduled", 0, "-", folder, or_dash(for_places)
+          # Is the script the PROGRAM? The word that ENDS in its name (a path
+          # with a space splits into several words, so not word 2), as the
+          # first word or as the script a shell was handed before any "-" word.
+          program = 0
+          for (w = 1; w <= n; w++) {
+            if (word[w] !~ /ca\.russellgordon\.Plantoir\.deploy\.[A-Za-z0-9-]+\.section[0-9]+(\.[0-9a-f]+)?\.sh$/) continue
+            program = (w == 1)
+            if (w > 1 && word[1] ~ /(^|\/)(ba|z|da|k)?sh$/) {
+              program = 1
+              for (v = 2; v < w; v++) {
+                if (word[v] ~ /^-/) program = 0
+              }
+            }
+            break
+          }
+          print pid, origin_of(pid), "scheduled", program, "-", folder, or_dash(for_places)
         }
         # A docker exec aimed at this website builder, by its name or its id.
         if (name != "" || id != "") {
