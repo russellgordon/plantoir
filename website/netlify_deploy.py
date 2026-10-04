@@ -243,24 +243,28 @@ def verify_feeds_live() -> str:
     """Every update feed in site/updates/ is live as built, and its newest
     download exists (#204). Advisory after a deploy, like verify_live."""
     import update_feeds
+    import windows_feed
     config = read_config()
     base_url = config.get("base_url", "").strip()
     outcome = "match"
-    # Both feeds since Windows 1.4.2 (#337). verify_live reads only what the
-    # two shapes share — the bytes, and the newest item's download and length —
-    # and NetSparkle keeps the feed's signature in a file of its own, which
-    # must be live as built too: without it the Windows app refuses the feed.
+    # Both feeds since Windows 1.4.2 (#337), each by its own checker since
+    # #428: the mac's compares the bytes and the newest download's length;
+    # the Windows one also verifies the live windows.xml.signature against the
+    # live feed, picks the newest item by real version order, and READS the
+    # newest installer to verify its signature (about 240 MB).
     feeds = [SITE_DIR / "updates" / "macos.xml", SITE_DIR / "updates" / "windows.xml"]
     for feed in feeds:
         if not feed.is_file():
             continue
-        result = update_feeds.verify_live(base_url, feed)
         signature = feed.with_name(feed.name + ".signature")
-        if feed.name == "windows.xml" and not signature.is_file():
-            print(f"❌ site/updates/{signature.name} is missing: the Windows app refuses a feed with no signature file.")
-            result = "mismatch"
-        elif result == "match" and signature.is_file():
-            result = update_feeds.verify_file_live(base_url, signature)
+        if feed.name == "windows.xml":
+            if not signature.is_file():
+                print(f"❌ site/updates/{signature.name} is missing: the Windows app refuses a feed with no signature file.")
+                result = "mismatch"
+            else:
+                result = windows_feed.verify_live(base_url, feed)
+        else:
+            result = update_feeds.verify_live(base_url, feed)
         if result == "mismatch":
             outcome = "mismatch"
         elif result == "unknown" and outcome == "match":
