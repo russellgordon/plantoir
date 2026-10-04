@@ -50,9 +50,11 @@ checker reads Sparkle's shape, and NetSparkle's `windows.xml` still has no
 checker of its own at build time (its two signatures are verified with the
 generator at the cut, `RELEASING.md` → "The update feed (Windows)"). `--deploy` refuses when the mac
 feed's newest version is not `MARKETING_VERSION`, and afterwards — like
-`--verify-deploy` — fetches the live mac feed, compares its SHA-256 with `site/`,
+`--verify-deploy` — fetches each live feed, compares its SHA-256 with `site/`,
 and follows its newest download to a 200 of the right length: the check for a
-feed deployed before its release was published.
+feed deployed before its release was published. For the Windows feed it also
+checks `windows.xml.signature` is live as built, and counts a missing one as a
+failure.
 
 `updates/macos-notes.html` is the cumulative release notes the feed is built
 from, and is NOT served. Both files are written only by

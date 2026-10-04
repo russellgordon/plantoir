@@ -769,8 +769,8 @@ def build(check_only: bool) -> int:
     # never parsed and rewritten, which would break their signatures.
     feed_source = WEBSITE / "updates"
     # Only the MAC's feed is checked: the checker reads Sparkle's shape, and
-    # NetSparkle's windows.xml (v1.4.0) will need a checker of its own (the
-    # slice-2 review's L6). Copied either way.
+    # NetSparkle's windows.xml (in the site since Windows 1.4.2) still needs a
+    # checker of its own (the slice-2 review's L6; #428). Copied either way.
     mac_feed = feed_source / "macos.xml"
     if mac_feed.is_file():
         for problem in update_feeds.problems_with(mac_feed):
