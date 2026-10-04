@@ -810,7 +810,8 @@ def unit_or_class_page(tidied):
     arm drops commas before counting words, takes a trailing question mark off
     and allows "please" at either end (so "day21" is refused, not being a word
     this frame has). The PUBLISH arm gets none of that: a literal opening
-    `"publish unit "` and a bare number, exactly as it shipped, because
+    `"publish unit "` and a bare number, exactly as it shipped (plus, since
+    #411, the exact "publish unit 4, day 3" and nothing looser), because
     publishing is the direction that reaches students and "publish unit 4?" is
     plausibly a teacher asking. Both are pinned by
     `assert_hide_is_unpublish_matches_contract()` below, whose refused rows
@@ -828,7 +829,15 @@ def whole_unit_to_publish(tidied):
     if not tidied.startswith(opening):
         return None
     rest = tidied[len(opening):].strip(" \t")
-    if not rest or "," in rest or not swift_int(rest):
+    if not rest:
+        return None
+    # "publish unit 4, day 3" since #411 (`AssistCardCommand.unitAndDay`):
+    # EXACTLY a number, ", day " and a number - none of the hide arm's
+    # tolerance.
+    unit, separator, day = rest.partition(", day ")
+    if separator and swift_int(unit) and swift_int(day):
+        return "publish_pages"
+    if "," in rest or not swift_int(rest):
         return None
     return "publish_pages"
 

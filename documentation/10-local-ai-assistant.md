@@ -7454,7 +7454,7 @@ that the mac should match Windows' ORIGINAL schema instead — declare both, and
 refuse the empty call. It was built and measured on 2026-10-04 and failed the
 pre-registered routing rule, so it is PARKED on the branch
 `issue/411-add-next-class-unit-days` and nothing changed on either app; see
-"#411: `add_next_class` with `unit` and `days`, measured and parked" below.)* "Add the next class page" is a card and
+"#411: `add_next_class` with `unit` and `days`, measured and parked" above.)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.

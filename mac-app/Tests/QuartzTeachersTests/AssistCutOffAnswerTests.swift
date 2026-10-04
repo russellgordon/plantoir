@@ -234,7 +234,13 @@ final class AssistCutOffAnswerTests: XCTestCase {
             "An abandoned turn left something behind — only the system prompt should remain."
         )
 
-        await agent.say("Publish Unit 1, Day 1")
+        // A sentence that still goes to the MODEL: since #411 the bare
+        // "Publish Unit 1, Day 1" is answered in code and would never reach
+        // the engine this test is reading. "… please" is a refused row in
+        // `hideIsUnpublish`, so it stays a model sentence by contract.
+        let retry: String = "Publish Unit 1, Day 1 please"
+        XCTAssertNil(AssistCardCommand.matching(retry), "The retry must reach the model for this test to mean anything.")
+        await agent.say(retry)
 
         // Exactly one new message: the retry, and nothing of the turn that
         // was abandoned.
@@ -603,7 +609,11 @@ final class AssistCutOffAnswerTests: XCTestCase {
         let agent: AssistAgent = AssistFixture.makeAgent(
             tools: made.runner, engineAt: engine.baseURL, asksBeforeChanging: false
         )
-        await agent.say("Publish Unit 1, Day 1")
+        // A model sentence, not a card (#411 answers the bare form in code),
+        // so this stays the control for a FINISHED model answer.
+        let request: String = "Publish Unit 1, Day 1 please"
+        XCTAssertNil(AssistCardCommand.matching(request), "This control must reach the model.")
+        await agent.say(request)
 
         let onDisk: String = try String(
             contentsOf: AssistFixture.pageURL(of: "Unit 1, Day 1", in: made.course), encoding: .utf8
