@@ -188,9 +188,10 @@ final class SectionRestoredTrailTests: XCTestCase {
     }
 
     /// The case this filter was added for: a windows-only event must NOT hold
-    /// the mac suite red. There is none in the contract as this is written —
-    /// `section restored` dropped its `appliesOn` when the mac adopted it —
-    /// which is exactly why this is pinned here rather than left to the data.
+    /// the mac suite red. Which windows-only entries the contract holds
+    /// changes as the mac adopts them (`section restored`, then `remembered
+    /// timetable set aside` with #377), which is exactly why this is pinned
+    /// here rather than left to the data.
     @MainActor
     func testAWindowsOnlyEventIsNotRequiredOfTheMac() {
         XCTAssertFalse(SharedRulesContractTests.macMustRecord([

@@ -687,6 +687,44 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertEqual(nextRun.timeIntervalSince1970, later.timeIntervalSince1970, accuracy: 1)
     }
 
+    /// Setting a section again while its run is WORKING (GitHub #409, a check
+    /// asked from Windows). By then the run's wrapper has already removed the
+    /// job's plist — its first line — so nothing on disk says a job is there.
+    /// Scheduling must STILL boot the label out, and before the new plist
+    /// exists: the running job IS that label, so launchd ends the run then,
+    /// and a run that has ended cannot boot out or delete the deploy just
+    /// set. A boot-out asked only when a plist was found would leave the run
+    /// alive, and its own boot-out at the end would unload the new job.
+    ///
+    /// Measured 2026-10-03 (Apple M4 Pro, macOS 26.6), with a throwaway
+    /// agent shaped like the run — a Swift binary waiting on a `Process`:
+    /// `launchctl bootout` returned in 0.02 s, exit 0, the job unloaded and
+    /// the binary gone. Its `Process` child SURVIVED, in a process group of
+    /// its own — so the wrapper finishes the old deploy as an orphan. It
+    /// cannot remove the new deploy (its only plist line is its first, long
+    /// since run, and it boots nothing out), but it is not harmless: the
+    /// ended run's leases read as stale while it works, so a second deploy
+    /// of the section can overlap it (doc 07, "Set again while the run
+    /// works (#409)"). This test pins only the boot-out order.
+    func testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let launchControl: PlistWatchingLaunchControl = PlistWatchingLaunchControl()
+        let label: String = ScheduledDeploy.agentLabel(courseCode: "ICS3U", sectionNumber: 1, workingFolder: workspaceURL)
+        let plistURL: URL = ScheduledDeploy.plistURL(label: label)
+        launchControl.plistURL = plistURL
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plistURL.path), "the run's wrapper took the plist away")
+
+        ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: launchControl
+        )
+
+        XCTAssertEqual(launchControl.bootOuts, [label], "the running job is booted out even with no plist on disk")
+        XCTAssertEqual(launchControl.plistExistedAtBootOut, [false], "and before the new plist is written")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: plistURL.path))
+    }
+
     func testCancellingRemovesTheAgent() throws {
         try prepare()
         let course: Course = try makeCourse()
@@ -1613,5 +1651,30 @@ final class FakeLaunchControl: LaunchControlRunning {
 
     func bootOut(label: String) {
         bootedOutLabels.append(label)
+    }
+}
+
+/// `launchctl`, stood in for, noting whether the job's plist was on disk at
+/// each boot-out — the ORDER #409's check depends on.
+@MainActor
+final class PlistWatchingLaunchControl: LaunchControlRunning {
+
+    // MARK: - Stored properties
+
+    /// The plist to look for when a boot-out is asked.
+    var plistURL: URL = URL(fileURLWithPath: "/")
+
+    var bootOuts: [String] = []
+    var plistExistedAtBootOut: [Bool] = []
+
+    // MARK: - Functions
+
+    func bootstrap(plistURL: URL) -> String? {
+        return nil
+    }
+
+    func bootOut(label: String) {
+        bootOuts.append(label)
+        plistExistedAtBootOut.append(FileManager.default.fileExists(atPath: plistURL.path))
     }
 }

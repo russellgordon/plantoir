@@ -492,16 +492,12 @@ enum SectionAdder {
 
     /// Does this page already carry the new section's keys?
     static func alreadyHasKeys(for sectionNumber: Int, in lines: [String]) -> Bool {
-        let prefixes: [String] = [
-            "createdSection\(sectionNumber):",
-            "publishForSection\(sectionNumber):",
-            "draftSection\(sectionNumber):",
-        ]
+        // The same matcher as every other per-section question (#408), so a
+        // page already carrying a QUOTED key for this section is not given a
+        // second, unquoted copy of it.
         for line in lines {
-            for prefix in prefixes {
-                if line.hasPrefix(prefix) {
-                    return true
-                }
+            if perSectionKeyNumber(in: line) == sectionNumber {
+                return true
             }
         }
         return false
@@ -596,16 +592,29 @@ enum SectionAdder {
     }
 
     /// The section number in a per-section key.
+    ///
+    /// Asked of the READER's matcher (`AssistPageVisibility.perSectionKey`),
+    /// so a QUOTED key — `"publishForSection1": false` — counts as the key it
+    /// is to YAML and to the build (GitHub #408). This used to be a bare
+    /// prefix test, which missed that spelling: a page carrying only quoted
+    /// keys was skipped when a section was added, the new section had no key,
+    /// and a page with no key is SHOWN — so a page the teacher hid in section
+    /// 1 was published in section 2. The section adder, the restore and the
+    /// "already has keys" check all ask this one function, so they cannot
+    /// disagree about which lines are per-section keys.
     static func perSectionKeyNumber(in line: String) -> Int? {
-        for prefix in ["createdSection", "publishForSection", "draftSection"] {
-            guard line.hasPrefix(prefix) else {
+        // A carriage return is trimmed first: the reader's matcher wants a
+        // space or the end of the line after the colon, and `publishForSection1:`
+        // on a page saved with Windows line endings ends in "\r".
+        let bare: String = PageFrontmatter.trimmingCarriageReturn(line)
+        guard let key = AssistPageVisibility.perSectionKey(namedIn: bare) else {
+            return nil
+        }
+        for family in ["createdSection", "publishForSection", "draftSection"] {
+            guard key.hasPrefix(family) else {
                 continue
             }
-            let rest: Substring = line.dropFirst(prefix.count)
-            guard let colon = rest.firstIndex(of: ":") else {
-                continue
-            }
-            return Int(rest[rest.startIndex..<colon])
+            return Int(key.dropFirst(family.count))
         }
         return nil
     }

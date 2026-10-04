@@ -1078,12 +1078,13 @@ final class SharedRulesContractTests: XCTestCase {
     /// that cannot go green stops being read. The mac met the mirror image on
     /// 2026-09-07, the day Windows proposed its first windows-only event.
     ///
-    /// There is no windows-only entry in the contract as this is written —
-    /// `section restored` dropped its `appliesOn` when the mac adopted it —
-    /// so `SectionRestoredTrailTests` exercises this with entries of its own
-    /// rather than leaving it to be discovered wrong by whoever adds the next
-    /// one. (Windows' filter is still exercised by the data, because the
-    /// mac-only `built site moved out of the working folder` remains.)
+    /// Windows-only entries come and go — `section restored` and `remembered
+    /// timetable set aside` (#377) each dropped their `appliesOn` when the mac
+    /// adopted them — so `SectionRestoredTrailTests` exercises this with
+    /// entries of its own rather than depending on whichever ones the
+    /// contract holds today. (Windows' filter is exercised by the data too,
+    /// because the mac-only `built site moved out of the working folder`
+    /// remains.)
     ///
     /// **Anything it cannot READ as a platform list means "both".** Not just a
     /// value of the wrong type: an EMPTY list, or one naming no platform this
