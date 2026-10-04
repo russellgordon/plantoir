@@ -6213,8 +6213,17 @@ class" — sent `"unit": "next", "days": 0` in 50 of 50 calls, and
 `AssistWorkspace` reads unit "next" as the first day of a NEW unit. So on
 Windows today a routed "add the next class" starts Unit N+1 and reports
 success. The fixed phrasing "add the next class page" (code, no `unit`) is
-not affected. Nothing changed in bundle A; it is for Russell (#440), with the
-numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+not affected. **Settled in code (bundle A fix round 2, settler S2):**
+`AssistAgent.WithoutAnUnaskedNewUnit` drops a model-sent `unit: "next"` on
+`add_next_class` unless the teacher's own sentence says "unit"; the call then
+runs as if no unit were given (the next day of the current unit). A model-sent
+`days: 0` is kept and means nothing — `PlanAddNextClass` reads `days` only when
+it is above 0 beside a NUMBERED unit — so one class is added. The surface and
+`OptionalExtras` are unchanged, so no routing measurement was owed. Pinned by
+the authored scenario "a model-sent unit 'next' on add_next_class is ignored
+unless the teacher said unit". Rejected: dropping `unit`/`days` from the local
+surface (a routing change to re-measure), and keying on phrasings. The rest
+is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
 
 ### #424: schedule, cancel, and a reply that runs to the cap
 
@@ -6255,8 +6264,26 @@ All three fixes are CODE; no description moved.
   tomorrow morning, before school starts." — ICS3U 0/10; "Don't send it in the
   morning after all." — 0/10), so they still reach a model shown the same
   surface. Zero polarity inversions; every other probe equal to MIDDLE but one
-  the app answers in code. What remains is Russell's on #424: a pre-registered
-  description change, or a broader code rule.
+  the app answers in code.
+- **Fix round 2, settler S1: what the model SENT is settled in code.** When
+  its answer is `deploy_section` and the teacher's own sentence carries a
+  later-time word — schedule, scheduled, later, tonight, tomorrow, morning,
+  afternoon, evening, noon, midnight, a weekday — or "at" and a clock, no
+  Deploy-now card is shown, nothing runs, the turn is wound back, the time is
+  asked for (`ScheduleADeployNeedsATime`), and the trail says "chose to deploy
+  now for a request that named a later time — no deploy card was shown…".
+  The measured ICS3U sentence is covered; a sentence with none of the words
+  behaves as before (`AssistAgent.SaysALaterTime`, `TheLaterTimeWordsAreShortAndExact`).
+  Rejected: "next" (the next section), "soon", "after" ("after all"), "today"
+  alone (a deploy today is plausibly now), and turning the call into a
+  `schedule_deploy` card (it would have to guess the moment). Pinned by the
+  authored scenario "a deploy-now answer to a request that named a later time
+  is asked about, never offered"; the mac must make it pass.
+- **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
+  it in the morning after all.") is still declined by the model — the safe
+  direction, since nothing is claimed — and the 30 s limit works only for a
+  reply that has written a line break (5 of 10). Both are Russell's: a
+  pre-registered description change, a broader code rule, or a streaming stop.
 
 ### What was MEASURED for the Codex door
 
