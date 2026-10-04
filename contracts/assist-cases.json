@@ -4014,9 +4014,17 @@
                 "description" : "The course code, for example ICS3U.",
                 "type" : "string"
               },
+              "days" : {
+                "description" : "Pass a number to add that many days to the specified unit number. Leave 0 for a single class.",
+                "type" : "integer"
+              },
               "section" : {
                 "description" : "The section number, for example 1.",
                 "type" : "integer"
+              },
+              "unit" : {
+                "description" : "Pass \"next\" to start a new unit. Leave empty to continue the current unit.",
+                "type" : "string"
               }
             },
             "required" : [
@@ -4560,9 +4568,17 @@
                 "description" : "The course code, for example ICS3U.",
                 "type" : "string"
               },
+              "days" : {
+                "description" : "Pass a number to add that many days to the specified unit number. Leave 0 for a single class.",
+                "type" : "integer"
+              },
               "section" : {
                 "description" : "The section number, for example 1.",
                 "type" : "integer"
+              },
+              "unit" : {
+                "description" : "Pass \"next\" to start a new unit. Leave empty to continue the current unit.",
+                "type" : "string"
               }
             },
             "required" : [
@@ -4584,9 +4600,17 @@
                 "description" : "The course code, for example ICS3U.",
                 "type" : "string"
               },
+              "days" : {
+                "description" : "Pass a number to add that many days to the specified unit number. Leave 0 for a single class.",
+                "type" : "integer"
+              },
               "section" : {
                 "description" : "The section number, for example 1.",
                 "type" : "integer"
+              },
+              "unit" : {
+                "description" : "Pass \"next\" to start a new unit. Leave empty to continue the current unit.",
+                "type" : "string"
               }
             },
             "required" : [
