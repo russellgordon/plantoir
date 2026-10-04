@@ -58,10 +58,13 @@ sys.dont_write_bytecode = True
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 LAUNCHERS = ("setup.sh", "preview.sh", "deploy.sh")
 
-# The same list as the first-run test on the mac, less "script": deploy.sh
-# rightly calls a preview's live-reload code a script, which is the web's
-# word, not ours.
+# The same list as the first-run test on the mac, less "script", plus
+# "live-reload" (#407): deploy.sh used to tell a teacher a preview "bakes in a
+# live-reload script", and now says it "adds live updating", the words
+# deploy.ps1 took first (#296). "script" alone stays allowed: it is the web's
+# word, and a line a teacher reads may still need it.
 FORBIDDEN_WORDS = (
+    "live-reload",
     "toolchain", "toolchains",
     "docker", "container", "containers",
     "colima", "lima", "buildx", "buildkit",

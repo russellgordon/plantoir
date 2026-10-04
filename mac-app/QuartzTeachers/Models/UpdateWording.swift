@@ -88,7 +88,10 @@ nonisolated enum UpdateWording {
     /// Phrased as what PLANTOIR is doing — waiting — so the title's "once it
     /// is done …" is about Plantoir and not the other program (the slice-1
     /// review's L7).
+    ///
+    /// The machine's name is `MachineWord`'s, because the contract writes it
+    /// as `{machine}` for both apps to fill (#418).
     static func elsewhereWork(course: String) -> String {
-        return "waiting for \(course) to finish building somewhere else on this Mac"
+        return "waiting for \(course) to finish building somewhere else on this \(MachineWord.onThisPlatform)"
     }
 }
