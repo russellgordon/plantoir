@@ -3810,7 +3810,17 @@ there afterwards. `ScheduledRunAnnouncementTests` plays
 `notification.announcing` (the `allowed`/`notAllowed` rows, every kind) and
 drives real runs through `FakeScheduler`, asserting the job file is gone
 before it asserts the post; putting the old order back (reading the job after
-`Execute`) turns them red. **Rejected:** keeping the job file until the toast
+`Execute`) turns them red. **Proved for real, 2026-10-04 11:49** (same PC):
+a real Task Scheduler run of the fixed x64 Debug build (task action
+`Plantoir.exe --run-scheduled-deploy "<task name>" --token …`, set through
+the branch's own `plantoir-mcp.exe` with `PLANTOIR_APP_PATH` pointing at
+that build) wrote its record, cleared its task, and posted: an entry with tag
+`ICS4U-section1.<folder id>`, group `scheduled`, under the app identity whose
+display name is "Plantoir" (`HKCU\Software\Classes\AppUserModelId\{GUID}`),
+was in the notification database Notification Center reads
+(`%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db`), carrying
+the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
+a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
 is posted (moving the clearing out of `Execute`) — the clearing is what makes
 the task one-shot and is guarded by the job's token; a second caller in charge
 of it is a deploy that can recur. Still owed from #212: withdrawing the toast
