@@ -245,8 +245,9 @@ are the signed installer's).
 | At quit | `DecideAtQuit`: never refuses; work under way sets the update aside | Refusing the quit (decision 7). |
 
 **What the contract and Windows disagree about** (proposed to the mac, not
-changed under it): `elsewhereWork` says "on this Mac"; `needsAdministratorExplanation`
-names a Mac and its menu; a running plantoir-mcp holds the install on Windows
+changed under it): `needsAdministratorExplanation` names a Mac and its menu
+(`elsewhereWork` used to say "on this Mac" too; since v1.4.3 it says "on this
+{machine}" and Windows fills it, #438); a running plantoir-mcp holds the install on Windows
 only; `postponedAtInstall` — the instant between the last check and the
 installer starting — exists on Windows too, because Inno's
 `CloseApplications` still closes `*Plantoir*` (a scheduled run included).

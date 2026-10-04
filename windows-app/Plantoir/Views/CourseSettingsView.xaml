@@ -24,6 +24,7 @@
             <Button x:Name="ObsidianButton" Grid.Column="1" Background="Transparent" BorderThickness="0"
                     MinWidth="34" MinHeight="30" Click="Obsidian_Click"
                     ToolTipService.ToolTip="Edit this course's pages in Obsidian"
+                    AutomationProperties.Name="Edit this course's pages in Obsidian"
                     AutomationProperties.AutomationId="openCourseInObsidianButton">
                 <FontIcon Glyph="&#xE70F;" FontSize="14" />
             </Button>

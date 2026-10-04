@@ -1743,8 +1743,10 @@ sentence of `whenThePreviewNeverAppears`), and
 `SharedRulesContractTests.testEveryMachinePlaceholderIsRecorded` walks every
 file so the list cannot fall behind. Fill from the record and drive the fill off
 `usedIn`; do not add a second, per-platform copy of the sentence — that is what
-`elsewhereWorkOnWindows` and `sentenceOnWindows` were, and both are marked
-superseded for Windows to delete when its fill lands. The mac's word lives in
+`elsewhereWorkOnWindows` and `sentenceOnWindows` were, and Windows deleted both
+when its fill landed (v1.4.3, #438: `MachineWord`, and
+`MachineWordContractTests`, which walks `usedIn` both ways — every listed
+sentence said filled, every `{machine}` in `contracts/` listed). The mac's word lives in
 `MachineWord`; the bash launchers print it literally, and
 `scripts/test_port_blocks.py` fills the contract before comparing.
 ## The scripts can read the contract — and it travels differently on Windows
