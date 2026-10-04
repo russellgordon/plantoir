@@ -42,7 +42,7 @@ public class PanelHeightUnderSqueezeUiTests
             "ICS3U", 1, ScheduledPublishOutcome.Kind.Succeeded, longFolder + "|Netlify", app.WorkspacePath);
 
         app.SelectCourse("ICS3U");
-        app.Find("sidebar-ICS3U-section1", "ICS3U Section 1").Click();
+        app.ClickMiddleOf(app.Find("sidebar-ICS3U-section1", "ICS3U Section 1"));
         var notice = app.Find("scheduledPublishNotice", "the scheduled-publish notice");
 
         var window = app.Window;

@@ -85,7 +85,7 @@ public class LinksChecklistUiTests
         AutomationElement? classRow = null;
         for (int attempt = 0; attempt < 3 && classRow is null; attempt++)
         {
-            section.Click();
+            app.ClickMiddleOf(section);
             classRow = app.FindOrNull(RowId(ClassPlace), TimeSpan.FromSeconds(8));
         }
         Assert.True(classRow is not null, "the links checklist was not offered when the section opened");
