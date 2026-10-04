@@ -240,12 +240,11 @@ class ReleaseReadinessTests(unittest.TestCase):
 
 
 # A Windows picture that cannot be taken yet, each with what blocks it. Every
-# other id must be `windows: true` (Russell, 2026-10-04).
-WINDOWS_PICTURE_OWED = {
-    "schedule": "Windows' notification is no window Windows.Graphics.Capture can be given: a real scheduled "
-                "deploy's toast (#448's fix, 2026-10-04 12:07) showed no new or uncloaked HWND through "
-                "EnumWindows and no element through UI Automation; Russell rules on the route",
-}
+# other id must be `windows: true` (Russell, 2026-10-04). Empty since that day:
+# `schedule`, the last, is the sheet alone on Windows, because Windows'
+# notification is no window Windows.Graphics.Capture can be given (Russell's
+# ruling, 2026-10-04).
+WINDOWS_PICTURE_OWED: dict = {}
 
 
 class WindowsSwapTests(unittest.TestCase):

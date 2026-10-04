@@ -181,10 +181,10 @@ mode back, and it ends every process it started.
   teacher's setting or trail is touched. The preview, the progress and the
   coverage maps are REAL previews built by the launchers; the assistant's plan
   is the app's own answer to the promise card's "Unpublish Unit 2, Day 3"
-  (matched in code, so no assistant has to be downloaded). The schedule's
-  notification is still owed (`SCREENSHOTS.md` → "The one rule");
-  `--schedule` sets a REAL scheduled deploy of ICS3U to a folder and waits for
-  it, cancelling the schedule afterwards. The hero's middle card is the one staged
+  (matched in code, so no assistant has to be downloaded). Windows' `schedule`
+  picture is the Schedule a deploy sheet alone, with Windows words of its own
+  (`SCREENSHOTS.md` → "The one rule" says why the notification cannot be
+  photographed whole). The hero's middle card is the one staged
   state (a deploy would put a site online). This replaced
   `--capture-marketing-shots`, which rendered window CONTENT with
   `RenderTargetBitmap` — no window, square corners, bubbles typed by hand.

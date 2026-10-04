@@ -3836,8 +3836,8 @@ window of that process and ends it, and everything still naming the folder
   still not a window Windows.Graphics.Capture can be given: EnumWindows found
   no new, visible or uncloaked window, FindWindowEx by
   `Windows.UI.Core.CoreWindow` and UI Automation's desktop root found no
-  notification. The route is Russell's to choose (a person picking it in
-  `GraphicsCapturePicker`, or a screen crop the picture rule forbids).
+  notification. Russell's ruling (2026-10-04): Windows' `schedule` picture is
+  the sheet alone, with its own alt text (`shots.json` → `windowsAlt`).
 - **Staged in one place only:** the hero's middle card is a deploy in
   progress, staged with `ScriptRunner.StageAsRunningForCapture`, because a
   real deploy would put a site online to take a photograph.

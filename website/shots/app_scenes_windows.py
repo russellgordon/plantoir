@@ -96,6 +96,7 @@ class ShownAsTeaching:
                     pass   # a reference course is locked, and deploys nowhere
 
     def __enter__(self) -> Path:
+        self.had_websites = (SHOWN / "Websites").exists()
         if COURSES_SET_ASIDE.exists():
             raise SystemExit(f"{COURSES_SET_ASIDE} is still there from an earlier run: put it back first.")
         if (SHOWN / "courses").exists():
@@ -106,6 +107,8 @@ class ShownAsTeaching:
         return SHOWN
 
     def __exit__(self, *_) -> bool:
+        if not self.had_websites:
+            shutil.rmtree(SHOWN / "Websites", ignore_errors=True)
         self.rewrite(SHOWN / "courses", SHOWN, self.folder)
         (SHOWN / "courses").rename(self.folder / "courses")
         if COURSES_SET_ASIDE.exists():
@@ -125,7 +128,12 @@ SCENES: dict[str, tuple[str, Path]] = {
     "both-curricula": ("both-curricula", MARKETING),
     "map-ontario": ("map-ontario", MARKETING),
     "map-college-board": ("map-college-board", MARKETING),
-    "schedule-sheet": ("schedule-sheet", MARKETING),
+    # The Schedule a deploy sheet in its window, alone: Windows' notification
+    # is no window Windows.Graphics.Capture can be given (EnumWindows, UI
+    # Automation and FindWindowEx found none while a real one showed), so the
+    # Windows picture is the sheet, with words of its own (shots.json
+    # `windowsAlt`) — Russell's ruling of 2026-10-04.
+    "schedule": ("schedule-sheet", MARKETING),
     "progress": ("progress", DEMO),
     "preview": ("preview", DEMO),
     "assistant": ("assistant", DEMO),
@@ -276,6 +284,10 @@ def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Pat
     """One scene, in its folder already moved to SHOWN (ShownAsTeaching)."""
     scene, _ = SCENES[identifier]
     folder = SHOWN
+    if scene == "schedule-sheet":
+        # Where ICS3U deploys while it is shown here: a sheet that offers to
+        # deploy to a folder that does not exist says so instead.
+        (SHOWN / "Websites" / "ICS4U").mkdir(parents=True, exist_ok=True)
     if scene == "progress":
         # The progress picture is a build caught part-way, and the build is
         # then ended; a scaffold ended part-way refuses the next build ("the
@@ -305,8 +317,8 @@ def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Pat
 
 # Parts of a figure, not pictures of their own: the two coverage maps side by
 # side make `two-maps`, the way the mac's figure is made (the maps placed,
-# never cut or redrawn), and the Schedule a Deploy sheet is `schedule`'s window.
-PARTS_ONLY = ("map-ontario", "map-college-board", "schedule-sheet")
+# never cut or redrawn).
+PARTS_ONLY = ("map-ontario", "map-college-board")
 
 
 def assemble(parts: Path, theme: str) -> None:
@@ -346,8 +358,6 @@ def capture_app_scenes(exe: Path, only: list[str] | None = None, parts: Path | N
         print("   Windows colour mode put back")
     if not only or "how-i-teach" in only:
         capture_how_i_teach(parts)
-    if not only or "schedule" in only:
-        capture_schedule_notifications(exe, parts)
 
 
 # ---- How I Teach, in Obsidian ---------------------------------------------

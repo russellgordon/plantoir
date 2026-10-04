@@ -127,15 +127,17 @@ rounds are already transparent: nothing is cropped, masked or drawn, and a
 single-window shot carries no shadow of its own (the page's stylesheet gives
 a Windows single-window picture its drop-shadow; `website/test_shot_shadows.py`).
 The figures (`hero`, `colour-schemes` and its dark version, `light-and-dark`,
-`two-maps`) are such captures placed whole. **One picture is still owed:**
-`schedule` — Windows' notification is not a window Windows.Graphics.Capture
-can be given: during a real scheduled deploy's toast (2026-10-04 12:07, with
-#448's fix, which makes the toast appear at all) EnumWindows showed no new,
-visible or uncloaked window and UI Automation's desktop root no notification
-element. The route (a person picking the surface in `GraphicsCapturePicker`,
-or a screen crop the rule forbids) is Russell's to choose.
-It stays `windows: false`, named in `test_build_data.py` →
-`WINDOWS_PICTURE_OWED`, until both are settled. The gate judges every
+`two-maps`) are such captures placed whole. **`schedule` on Windows is the
+Schedule a deploy sheet in its window, alone** (Russell's ruling, 2026-10-04):
+Windows' notification is not a window Windows.Graphics.Capture can be given.
+Measured on Windows 11 26200 during a real scheduled deploy's toast
+(2026-10-04 12:07, with #448's fix, which makes the toast appear at all),
+polling every 0.3 s for nine minutes: EnumWindows showed no new, visible or
+uncloaked window; FindWindowEx by `Windows.UI.Core.CoreWindow` and UI
+Automation's desktop root showed no notification. A screen crop is what the
+rule forbids. Its Windows alt (`windowsAlt`) says what the picture shows and
+that Windows tells the teacher with a notification once the deploy has run;
+the shared caption is true of both pictures, so it is not swapped. The gate judges every
 `-windows` picture (`corners.images_the_pages_show(..., include_windows=True)`
 in `test_native_corners.py` and in `build.py`'s `native_corners_refusal`);
 the interim list of three retaken figures, `WINDOWS_FIGURES_RETAKEN`, is gone.
@@ -180,8 +182,8 @@ Windows", has the commands):
   holds it; `app_scenes_windows.py` photographs it. The preview, the progress
   and the two coverage maps are real previews built by the launchers; the
   assistant's plan is the app's own answer to a promise-card phrasing; the
-  schedule's sheet is the real Schedule a deploy sheet (its notification is
-  owed, above). Rejected: `RenderTargetBitmap` of a window's content (what
+  schedule's picture is the real Schedule a deploy sheet (its notification
+  cannot be captured whole, above). Rejected: `RenderTargetBitmap` of a window's content (what
   `--capture-marketing-shots` did until #380 — no window at all, so square
   corners and no title bar, and the assistant's bubbles and buttons typed by
   hand), and photographing the desktop region a window covers (desktop pixels
@@ -365,8 +367,8 @@ Every screenshot on plantoir.app has both a macOS version (Safari / SwiftUI) and
 Added for v1.4.0 (macOS first; every one has had its Windows picture since
 2026-10-04, #370 — `app_scenes_windows.py`, scene names as below with the
 Windows `--stage-scene` names `map-ontario`, `map-college-board` and
-`schedule-sheet` for the parts; `schedule` alone is still owed — see "The one
-rule"):
+`schedule-sheet` for the parts; Windows' `schedule` is the sheet alone — see
+"The one rule"):
 
 | ID | Subject | Scene(s) |
 |---|---|---|
