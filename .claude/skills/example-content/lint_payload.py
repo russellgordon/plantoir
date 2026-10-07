@@ -78,6 +78,8 @@ HEADING_MARK_MISSING = re.compile(r"(?:Every|and)  \(level [1-6]\)")
 HEADING_MARK_MUST_BE_ACCEPTED = [
     "> Every `##` (level 2) and `###` (level 3) heading you use on this page",
     "> Every heading you use on this page automatically becomes an entry",
+    "a subheading (level 3) sits under its section",
+    "> (level 3) heading you use on this page",
 ]
 HEADING_MARK_MUST_BE_REFUSED = [
     "> Every  (level 2) and  (level 3) heading you use on this page",
