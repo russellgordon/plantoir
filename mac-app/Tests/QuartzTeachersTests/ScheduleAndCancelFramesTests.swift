@@ -149,16 +149,34 @@ final class ScheduleAndCancelFramesTests: XCTestCase {
         agent.declinePending()
     }
 
-    /// The prompt shelf's own card cancels in code, with no model asked.
-    func testTheShelfsCancelCardRunsWithNoModel() async throws {
+    /// The prompt shelf's own card cancels in code, with no model asked —
+    /// and the deploy set beforehand is really gone afterwards. The trail
+    /// line alone would not prove it: it is written BEFORE the tool runs.
+    func testTheShelfsCancelCardCancelsTheScheduledDeployWithNoModel() async throws {
         let (made, _, engine) = try prepare()
         defer { engine.stop() }
+        let set: AssistToolOutcome = await made.runner.run(call: AssistToolCall(
+            id: "set", type: "function",
+            function: AssistToolCall.Function(
+                name: "schedule_deploy",
+                arguments: #"{"course":"ICS3U","section":1,"when":"2030-09-09 06:30"}"#
+            )
+        ))
+        XCTAssertTrue(set.summary.contains("Scheduled:"), set.summary)
+        XCTAssertNotNil(
+            ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root),
+            "the fixture did not set a deploy to cancel"
+        )
         let agent: AssistAgent = AssistFixture.makeAgent(tools: made.runner, engineAt: engine.baseURL)
 
         await agent.say("Cancel scheduled deploy")
 
         XCTAssertEqual(engine.requestCount, 0, "the model was asked")
         XCTAssertNil(agent.pendingApproval, "cancelling needs no card")
+        XCTAssertNil(
+            ScheduledDeploy.nextRun(courseCode: "ICS3U", sectionNumber: 1, inWorkingFolder: made.root),
+            "the shelf's cancel card left the scheduled deploy in place"
+        )
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
         XCTAssertTrue(trail.contains("matched in code, not sent to the model — ran cancel_scheduled_deploy"), trail)
     }
