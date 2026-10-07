@@ -300,7 +300,11 @@ nonisolated enum WorkLeaseFiles {
             if path.isEmpty {
                 continue
             }
-            let courseCode: String = String(name.split(separator: ".")[0])
+            let marker: String = "." + heldBackupRecordMarker + "."
+            var courseCode: String = name
+            if let range = name.range(of: marker, options: .backwards) {
+                courseCode = String(name[name.startIndex..<range.lowerBound])
+            }
             held.append((path: path, courseCode: courseCode))
         }
         return held

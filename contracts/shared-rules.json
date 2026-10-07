@@ -100,6 +100,12 @@
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
       {
+        "carries": "the course a Claude session opened from Plantoir is holding - nothing else: no page, no section, no process id in the sentence",
+        "event": "outside session held a course",
+        "line": "a Claude session started from Plantoir is holding {course} while it is open",
+        "why": "#458 (the mac) and #430 (Windows): while a Claude session is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server, so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp owes the same line."
+      },
+      {
         "carries": "course, section, and how long the engine took",
         "event": "assistant ready",
         "why": "A slow start and a failed start read identically to a teacher ('it just sat there'). The seconds tell them apart."
@@ -480,7 +486,7 @@
         "why": "Added with #397. When students see yesterday's class, the trail shows the teacher was asked and chose, or that the answer could not be carried out. A question never answered changed nothing, and a question not asked (Not Today already said for that class today) is not an action: neither writes a line."
       },
       {
-        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from, and how many could not be deleted",
+        "carries": "the course code or codes, how many were deleted, what they took together when every size is known (the LOGICAL size), each deleted file's NAME - a course code, a moment and who made it, never anything written on a page - and, when some were asked for and kept, which ones the open assistant conversation could still restore from and, separately, which ones a Claude session still open made (#458), and how many could not be deleted",
         "event": "backups deleted",
         "why": "A teacher's own backups are never pruned (Russell's decision on #242, 2026-09-21: keep every backup a teacher makes, and make the space visible), so a backup that has gone was deleted by a person - and 'my backup is gone' is answered by this line and nothing else. Until #242 there was no line for deleting a backup at all, one or many. The file NAMES are recorded rather than only a count (the #242 plan review's L2): a name is a course code, a timestamp and a maker, carries no content, and answers 'which one' exactly - the same reason 'section restored from the start of an assistant conversation' records its backup's file name. Written by the single delete and the delete-several alike, because the single one is the one-item case of the same function. One line per delete, and none when nothing was deleted. No appliesOn: Windows lists backups too and owes the same line - the red suite that follows is the request, said so in the windows issue drafted from #242."
       },
@@ -18145,7 +18151,7 @@
         {"name": "another program is publishing (build and publish held): declined", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}, {"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "a publish lease alone still declines a build: it uploads what its build wrote", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "publish", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
         {"name": "ANOTHER program's preview declines a build here (#156, stricter than Windows' 'only build blocks') - a build ends that section's serving preview, and a preview is the teacher's live work", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "preview", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "declined"},
-        {"name": "an assist lease never declines a build (Windows' plantoir-mcp holding a course only greys structural items)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
+        {"name": "an assist lease never declines a build (a Claude session holding its course - Windows' plantoir-mcp since #430, the mac's Plantoir --mcp-stdio since #458 - only greys the Revise items and structural work: doorCourseHold)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "assist", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "an import lease is about a staging folder, never a build", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "import", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
         {"name": "a build lease whose owner is gone is ignored (workLeases.liveness decides who is gone)", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "ICS3U", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": false}], "expect": "allowed"},
         {"name": "a build of ANOTHER course is not in the way", "asker": "aBuild", "me": {"pid": 100, "claim": null}, "others": [{"course": "MPM2D", "kind": "build", "pid": 4321, "moment": "2026-09-25T06:30:00.4000000Z", "alive": true}], "expect": "allowed"},
@@ -20998,6 +21004,180 @@
           "written": []
         }
       }
+    ]
+  },
+  "doorCourseHold": {
+    "issue": "#458 (the mac, 2026-10-07), matching Windows' #430 (v1.4.3).",
+    "rule": "The Claude door names the course it was opened from in its MCP configuration's env, as PLANTOIR_DOOR_COURSE (app-rules.json -> outsideAgents.doorCourseVariable). The server - Plantoir --mcp-stdio on the mac, plantoir-mcp on Windows - takes an assist lease on that course for the life of the session, WITHOUT locking to it: the session still reaches every course in the folder (#430). The lease is what keeps the protections a session opened from Plantoir had before #430: the backup its conversation made is kept (#283), a second session on the course is refused, and structural work on the course waits.",
+    "whichDoors": {
+      "claude": true,
+      "codex": false,
+      "why": "Matches Windows, where the Codex door names no course and holds none (Program.cs; documentation/10). The Codex door's argv is unchanged on both platforms, so a Codex session holds nothing: its backups are ordinary backups, and nothing is greyed while it is open. Ruled 2026-10-07 for #458 (ruling 3); Russell's comment on #458 said 'both doors', and that difference is put to him in the piece's ready note rather than decided here."
+    },
+    "courseToHold": {
+      "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a Codex session does.",
+      "courses": [
+        "ICS3U",
+        "MPM2D"
+      ],
+      "cases": [
+        {
+          "name": "the door's course, as the folder spells it",
+          "doorCourse": "ICS3U",
+          "expect": "ICS3U"
+        },
+        {
+          "name": "matched without regard to case",
+          "doorCourse": "ics3u",
+          "expect": "ICS3U"
+        },
+        {
+          "name": "spaces around the value are trimmed",
+          "doorCourse": " ICS3U ",
+          "expect": "ICS3U"
+        },
+        {
+          "name": "the other course in the folder",
+          "doorCourse": "mpm2d",
+          "expect": "MPM2D"
+        },
+        {
+          "name": "empty holds nothing",
+          "doorCourse": "",
+          "expect": null
+        },
+        {
+          "name": "blank holds nothing",
+          "doorCourse": "   ",
+          "expect": null
+        },
+        {
+          "name": "unset holds nothing (a Codex session, or a server started by hand)",
+          "doorCourse": null,
+          "expect": null
+        },
+        {
+          "name": "a course the folder does not have holds nothing - never a refusal",
+          "doorCourse": "NOPE1",
+          "expect": null
+        }
+      ]
+    },
+    "holds": {
+      "backups": "Each backup the session's conversation made is recorded beside its lease (file-formats.json -> heldBackupRecord); a delete keeps it while that process holds a live assist lease on any course in the folder. Said with assist-wording.json -> backupKeptForAClaudeSession / backupsKeptForAClaudeSession before a delete-several, and finishTheClaudeSessionToDeleteItsBackup(s) after one, or at once for the single Delete Backup. A backup the in-app assistant window holds keeps its own sentences - the two are told apart, never merged.",
+      "reviseItems": "All three Revise items on the course - Revise with Claude, Revise with Codex, Revise with Local AI Assistant - are greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
+      "structuralWork": [
+        "Rename Course",
+        "Add Section",
+        "restoring a backup of the course"
+      ],
+      "structuralWorkSays": "availableOnceYouFinishRevisingWithClaude under the greyed menu items; at the click, claudeIsRevisingTheCourseRename, claudeIsRevisingTheCourseRestore or claudeIsRevisingTheCourseAddSection.",
+      "notHeld": [
+        "removing the course",
+        "removing a section",
+        "renaming the course's word for a unit"
+      ],
+      "notHeldWhy": "Windows holds none of them (#458 ruling 2: match Windows). Removing archives first, and the unit-word rename has its own checks; neither is the folder move or the setup re-run the hold exists for."
+    },
+    "neverHolds": {
+      "aBuild": "workLeases.declining.cases -> 'an assist lease never declines a build': a preview, a deploy, the assistant's rebuild and a deploy set for later all go ahead. On the mac this is why the hold is a separate question (CourseActivity.structuralHoldReason) from the one a build asks (busyDescription).",
+      "anOutsideChange": "workLeases.declining.outsideChanges.cases -> 'an assist lease holds nothing back'.",
+      "quit": "quittingWhileWorkIsUnderWay counts only this app's own work, so another program's assist lease never makes quitting ask - and the app's quit removes only its own leases, never a session's.",
+      "update": "appUpdates.mayNotInstallWhile.doesNotCount: 'a lease of any other kind (assist, import)'."
+    },
+    "reviseCasesNote": "item is claude, codex or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item.",
+    "reviseCases": [
+      {
+        "name": "nothing open: every item may be used",
+        "item": "claude",
+        "revisedElsewhere": false,
+        "active": null,
+        "expect": null
+      },
+      {
+        "name": "a Claude session holds the course: the Claude door is greyed",
+        "item": "claude",
+        "revisedElsewhere": true,
+        "active": null,
+        "expect": "availableOnceYouFinishRevisingWithClaude"
+      },
+      {
+        "name": "a Claude session holds the course: the Codex door is greyed too",
+        "item": "codex",
+        "revisedElsewhere": true,
+        "active": null,
+        "expect": "availableOnceYouFinishRevisingWithClaude"
+      },
+      {
+        "name": "a Claude session holds the course: the local assistant is greyed too",
+        "item": "local",
+        "revisedElsewhere": true,
+        "active": null,
+        "expect": "availableOnceYouFinishRevisingWithClaude"
+      },
+      {
+        "name": "the in-app assistant is open on this course: the Claude door names that window",
+        "item": "claude",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "ICS3U",
+          "section": 2
+        },
+        "expect": "closeTheAssistantFirst"
+      },
+      {
+        "name": "the in-app assistant is open on this course: the Codex door names that window",
+        "item": "codex",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "ICS3U",
+          "section": 2
+        },
+        "expect": "closeTheAssistantFirst"
+      },
+      {
+        "name": "the in-app assistant is open on ANOTHER course: the doors on this one may be used",
+        "item": "claude",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "MPM2D",
+          "section": 1
+        },
+        "expect": null
+      },
+      {
+        "name": "the in-app assistant open on this very section: the local item brings it forward",
+        "item": "local",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "ICS3U",
+          "section": 1
+        },
+        "expect": null
+      },
+      {
+        "name": "the in-app assistant open elsewhere: the local item names that window (one at a time)",
+        "item": "local",
+        "revisedElsewhere": false,
+        "active": {
+          "course": "MPM2D",
+          "section": 1
+        },
+        "expect": "closeTheAssistantFirst"
+      }
+    ],
+    "release": {
+      "order": [
+        "stop this session's own runs and wait for them",
+        "remove its held-backup records",
+        "remove its leases"
+      ],
+      "why": "Windows' order (Program.cs). A build the session started must not go on writing after the course reads as free (#289, #156), and a record never outlives its lease on the clean path.",
+      "measured": "Measured on the mac 2026-10-07 (#458) with a scratch build, Claude Code 2.1.292, macOS 26 on Apple silicon: the lease is removed when the server's input closes (a pipe closed under it). But every way a teacher ends a real Claude session KILLS the server instead - /exit, Control-C twice, closing the Terminal window (Command-W, Terminate) and quitting Terminal (Command-Q, Terminate): in all four the server was gone within six seconds and its lease was still on disk. So the clean release is the exception, and no 'let go' line is written to the trail."
+    },
+    "knownLimits": [
+      "A session ended the ordinary way leaves its assist lease and any held-backup record behind (release.measured). Both hold nothing: every reader skips a lease whose owner has gone (workLeases.liveness - the process id with its name and start time, so a recycled id is not mistaken for it), and a record counts only while its process holds a live assist lease. One lease file, and at most one record per course backed up, accumulate per session; nothing sweeps them, as for a killed build lease.",
+      "A session's lease appears and disappears while Terminal is in front, and another program's file changes nothing the app observes; the mac re-reads which courses are held when the folder is shown, when Plantoir becomes the active app, and at every click that acts on it. A menu opened without Plantoir ever being left can show the answer from the last of those; the click is still refused."
     ]
   }
 }

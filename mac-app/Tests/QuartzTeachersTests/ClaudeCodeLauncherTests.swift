@@ -172,7 +172,10 @@ final class ClaudeCodeLauncherTests: XCTestCase {
                 "--mcp-stdio",
                 "\\/Users\\/teacher\\/Teaching"
               ],
-              "command" : "\\/Applications\\/Plantoir.app\\/Contents\\/MacOS\\/Plantoir"
+              "command" : "\\/Applications\\/Plantoir.app\\/Contents\\/MacOS\\/Plantoir",
+              "env" : {
+                "PLANTOIR_DOOR_COURSE" : "ICS3U_GOLDEN"
+              }
             }
           }
         }
