@@ -2017,7 +2017,10 @@ time. The window lifts that line into its failure explanation
 (`FailureExplainer.sectionDeployRefusal`); the in-app and outside assistants
 say `deployRefusedWhileALaterDeployWorks` or
 `deployRefusedWhileItsSectionDeploys` instead of "did not finish" when every
-leg that ran was refused this way. The launcher writes its own trail line,
+leg that ran was refused this way, and instead of "could not be built" when the
+build leg was (a refused `--build-only` run exits 1 like a broken build, so
+`MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish` asks for the
+refusal first, for both assistants). The launcher writes its own trail line,
 under "build declined, course busy elsewhere".
 
 **Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
