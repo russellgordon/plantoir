@@ -38,9 +38,10 @@ public enum UpdateAnswer { Install, NotNow, Skip }
 ///
 /// <list type="bullet">
 /// <item><b>The feed is read from ONE place</b>, <see cref="AppUpdates.ConfiguredFeed"/>,
-/// which is EMPTY until a release sets it. Empty means no
+/// set since v1.4.2 (with its key). An EMPTY feed still means no
 /// <see cref="SparkleUpdater"/> is ever constructed and nothing is fetched
-/// (<c>AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork</c>).</item>
+/// (<c>AppUpdaterTests.AnEmptyFeedNeverReachesTheNetwork</c>), which is what a
+/// test or a build without one gets.</item>
 /// <item><b>Ed25519, Strict</b>: an unsigned feed or download is refused.</item>
 /// <item><b>Once a day</b> (<see cref="AppUpdates.CheckEverySeconds"/>), plus the
 /// menu item. It asks first and never downloads before the teacher's Install.</item>
@@ -95,7 +96,7 @@ public sealed class AppUpdater : IDisposable
     /// <summary>The executable a refused update reopens (ruling 12).</summary>
     public string? ReturnTo { get; set; } = Environment.ProcessPath;
 
-    /// <summary>Whether NetSparkle was ever constructed (never, while the feed is empty).</summary>
+    /// <summary>Whether NetSparkle was ever constructed (never for an empty feed).</summary>
     public bool HasEngine => _sparkle is not null;
 
     public AppUpdater(string feed, string publicKey, IUpdatePrompts prompts,
@@ -199,7 +200,7 @@ public sealed class AppUpdater : IDisposable
                     ActivityTrail.Note(ActivityTrail.Event.UpdateFound,
                         $"found {newest.Version}, running {_running}; {(teacherAsked ? "the teacher asked" : "the daily check")}" +
                         (newest.IsCriticalUpdate ? "; marked important" : ""));
-                await OfferAsync(newest);
+                await OfferAsync(newest, info.Updates!.OrderByDescending(u => u).ToList());
                 break;
             case UpdateStatus.UpdateNotAvailable:
             case UpdateStatus.UserSkipped:
@@ -218,9 +219,11 @@ public sealed class AppUpdater : IDisposable
         }
     }
 
-    private async Task OfferAsync(AppCastItem item)
+    private async Task OfferAsync(AppCastItem item, IReadOnlyList<AppCastItem> newerNewestFirst)
     {
-        var answer = await _prompts.OfferAsync(item.Version ?? "", item.Description);
+        // Every newer release's notes, not only the newest's (appUpdates.notes, #428 item 2).
+        string notes = AppUpdates.NotesFor(newerNewestFirst.Select(u => (u.Version, u.Description)));
+        var answer = await _prompts.OfferAsync(item.Version ?? "", notes);
         ActivityTrail.Note(ActivityTrail.Event.UpdateAnswered, $"{item.Version}: " + answer switch
         {
             UpdateAnswer.Install => "install",

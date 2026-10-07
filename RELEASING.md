@@ -468,28 +468,88 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   half means no installed copy can ever accept another update.** Never print
   it: `netsparkle-generate-appcast --export` does.
 - **Built at the cut, from the EXACT `PlantoirSetup.exe` being uploaded**, on
-  the Windows PC, after `publish.ps1 -Sign`:
+  the Windows PC, after `publish.ps1 -Sign`, ADDING an item to the committed
+  feed (since 1.4.3; #428 item 2):
 
       dotnet tool install --global NetSparkleUpdater.Tools.AppCastGenerator   # once
+      # this release's notes, PLAIN TEXT (the offer shows them as written):
+      #   windows-app/release-notes/<version>.md
       netsparkle-generate-appcast --single-file windows-app/dist/PlantoirSetup.exe `
-        --file-version <version> --os windows --product-name Plantoir `
+        --reparse-existing --change-log-path windows-app/release-notes `
+        --os windows --product-name Plantoir `
         --description-tag "Plantoir for Windows" `
         --base-url "https://github.com/russellgordon/plantoir/releases/download/v<version>/" `
         --appcast-output-directory website/updates --output-file-name windows `
         --key-path "$env:USERPROFILE\.plantoir-release"
 
-  It writes `website/updates/windows.xml` and `windows.xml.signature`. Check
-  both signatures before committing: `--verify <the installer> --signature
-  <the item's sparkle:signature>` and `--verify website/updates/windows.xml
-  --signature <the contents of the .signature file>` must each say
-  "Signature valid".
-- **As run for v1.4.2 it REPLACES the feed with one item.** That was right for
-  the first feed. From the next release the item needs its notes — the app
-  shows the item's `<description>` in its offer, and the contract promises a
-  skipped release's warning is not lost — and the earlier items should stay:
-  look at the generator's `--reparse-existing` and change-log options then,
-  and write down here what was used. Nothing has been offered through this
-  feed yet, so none of that has been exercised.
+  It rewrites `website/updates/windows.xml` and `windows.xml.signature`. What
+  it does, rehearsed on 2026-10-04 (generator 2.9.0, on a SCRATCH copy of the
+  1.4.2 feed, never the committed one; the 1.4.2 installer standing in under a
+  pretend 1.4.3, Intel i5-8365U, Windows 11 Pro 26200):
+  - `--reparse-existing` KEEPS the earlier items and writes the NEWEST FIRST.
+    It does rewrite them: the kept 1.4.2 enclosure's `type` came back as
+    `application/octet-stream` (was `application/x-msdos-program`), harmless
+    — the app reads neither — but the old items' bytes are not untouched.
+  - `--change-log-path` puts the text of `<version>.md` into the new item's
+    `<description>` AS IS, Markdown included (no conversion), and only into
+    that item. The app shows it in a plain text box, so write plain
+    sentences. The app gathers the notes of every newer item itself
+    (`AppUpdates.NotesFor`, `appUpdates.notes.cumulative`), so each file
+    carries only its own release's notes.
+  - The VERSION is read from the installer's own version resource
+    (`ProductVersion`, which `publish.ps1` sets from `<Version>`).
+  - **The item's `pubDate` is the installer FILE's creation time on disk, not
+    its build time.** Met at the 1.4.3 cut (2026-10-07): `publish.ps1`
+    overwrote a `dist\PlantoirSetup.exe` left from the 1.4.2 cut, Windows
+    kept the OLD creation time, and the new item was dated four days
+    earlier than the build. **Delete `windows-app\dist\PlantoirSetup.exe`
+    before `publish.ps1 -Sign`**, or the feed will say the release is older
+    than it is. (Setting the creation time by hand afterwards also works
+    and does not change the bytes, so the signature stays valid.)
+  - **`--reparse-existing` will NOT replace an item of the same version.**
+    If the installer is rebuilt after the feed was generated (it was, at
+    the 1.4.3 cut, for a fix the UI suite found), the generator says "already
+    in the file, not adding it again" and leaves the OLD length and
+    signature in place — a feed that then points at bytes nobody uploaded.
+    Restore the feed to the previous release's committed bytes first
+    (`git checkout <previous release's commit> -- website/updates/windows.xml
+    website/updates/windows.xml.signature`) and generate again; check the
+    item's `length` against the installer's size before committing.
+    `--file-version` is NOT used, and was rejected on measurement: given
+    `--file-version 1.4.3` with the 1.4.2 installer, it wrote nothing new and
+    said "An app cast item with version 1.4.2 is already in the file". (The
+    rehearsal put the stand-in in a `1.4.3\` folder and passed `-f` instead,
+    which reads the version from the path; a real cut needs neither.)
+  - **The Windows app does NOT yet honour an important ("critical") mark.**
+    `--critical-versions <version>` marks the item
+    `sparkle:criticalUpdate="true"`, but all the app does with it is add
+    "; marked important" to the `update found` trail line: the offer still
+    shows Skip This Version, and a version the teacher skipped is not offered
+    again by the daily check. So a warning that must not be skipped CANNOT be
+    made so on Windows today — `appUpdates.notes.requiredWarningMarksTheUpdateImportant`
+    is owed there (its own `windows` issue, v1.4.4). Do not rely on the mark;
+    put the warning in the notes, which every later offer carries. Not
+    rehearsed, and 1.4.3 is not marked.
+
+  Check before committing: `python website/build.py --check` runs
+  `website/windows_feed.py`'s checker — the feed's signature against
+  `AppUpdates.PublicKey`, every item signed and under its own release, the
+  newest first — and the generator's own `--verify <the installer>
+  --signature <the new item's sparkle:signature>` and `--verify
+  website/updates/windows.xml --signature <the .signature file's contents>`
+  must each say "Signature valid" (both did in the rehearsal, and the pure-
+  Python check agreed: valid on the CR LF bytes, invalid once converted to
+  LF). `build.py --deploy` then refuses if the newest item's version is not
+  `<Version>` in `Plantoir.csproj`.
+
+  **Rejected:** `--overwrite-old-items` (rewrites an existing version's item
+  from whatever binary is on disk — the way to re-point 1.4.2 at a 1.4.3
+  installer by accident); generating a fresh one-item feed as 1.4.2 did (it
+  drops the earlier items, and with them their notes); a hand-written
+  `<description>` added after generating (the signature covers the bytes, so
+  any edit after the generator means re-signing by hand). The generator
+  cannot write notes as HTML or gather them across items itself; neither is
+  needed, because the app does the gathering.
 - **Do not rebuild or re-sign the installer after the feed is made**, and
   never let the feed's line endings change: `.gitattributes` marks
   `website/updates/*.xml` and `*.xml.signature` `-text` for that reason
@@ -504,12 +564,19 @@ what was measured and what was not is `documentation/11-release-strategy.md`
   complete until both lines are ✅. Then open the installed app and choose
   File ▸ Check for Updates…: it must say Plantoir is up to date, which is the
   only end-to-end proof that the app accepts the live feed and its signature.
-  The deploy's check compares the download's LENGTH, not its signature, picks
-  the "newest" item as the FIRST one in the file (a Windows item's version is
-  not a whole number), and does not compare the feed's version with the
-  csproj: with more than one item in the feed, read those three by hand until
-  `windows.xml` has a checker of its own.
-- **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card.
+  Since #428 the deploy's check is `website/windows_feed.py`'s own: it
+  verifies the live `.signature` against the live feed, takes the newest item
+  by real version order, and — on Windows, where the installer is cut, or
+  anywhere with `PLANTOIR_VERIFY_WINDOWS_INSTALLER=1` — READS that installer
+  (about 240 MB, so allow a minute or two) to verify its Ed25519 signature,
+  not only its length. From the mac it compares the length, as before, and
+  its line says the signature was not read.
+  Before uploading anything, `build.py --deploy` also refuses a working copy
+  whose feed files are not byte for byte the committed ones.
+- **A mac-only cut leaves `windows.xml` alone**, and pins the Windows card
+  — and the deploy is REFUSED if `<Version>` in `Plantoir.csproj` was raised
+  without its feed (`windows_feed.version_refusal`): raise it only in the
+  Windows cut that also rebuilds `windows.xml`.
 
 ## The dress rehearsal (#204 — once, before the first release with an updater)
 

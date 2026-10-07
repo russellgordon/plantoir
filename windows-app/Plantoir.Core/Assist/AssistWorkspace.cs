@@ -620,10 +620,9 @@ public sealed partial class AssistWorkspace
         // tomorows class" chose exactly this 10 times in 10, which would have
         // put the rest of the term in front of students. An open-ended
         // UNPUBLISH is allowed: it hides work rather than exposing it.
+        // In the contract's words since #436 (mac #412: wording.openEndedPublishRefused).
         if (!draft && pageTitles.Count == 0 && onOrAfter is { } openFrom && before is null)
-            throw new AssistRefusal(
-                $"Nothing was published: every class from {DateText.Iso(openFrom)} to the end of the course is " +
-                "more than one request should put in front of students. Name the pages, or give an end date too.");
+            throw new AssistRefusal(AssistWording.OpenEndedPublishRefused(DateText.Iso(openFrom)));
         if (onOrAfter is { } from && before is { } until && until <= from)
             throw new AssistRefusal(
                 $"No class can be on or after {DateText.Iso(from)} and also before {DateText.Iso(until)}.");
@@ -780,14 +779,19 @@ public sealed partial class AssistWorkspace
                         && ComparableName(FolderOf(course, p)) == ComparableName(inFolder.Groups["folder"].Value)).ToList();
             if (candidates.Count > 1)
             {
-                // Each named so the answer can be typed back: by its own name
-                // when those differ (two landing pages read as their folders),
-                // with its folder when they do not.
-                bool namesDiffer = candidates.Select(c => ComparableName(c.DisplayTitle)).Distinct().Count() == candidates.Count;
+                // shared-rules.json → publishPlanNaming (#436, mac #425): one
+                // line per page, "• " + pageNameInFolder + " — " + its folder
+                // and file name joined by "/". The folder/name is "the name at
+                // the end" the sentence asks for: on a FILE-name collision
+                // every bare name is the same, so asking again with one would
+                // ask the same question again; given back, folder/name fits
+                // that page alone (the by-path reading above). Windows first
+                // listed bare names when the shown titles differed — that
+                // shape is gone (it settled bundle 10's `decision` wrinkle).
                 throw new AssistRefusal(AssistWording.MorePagesThanOneAreCalled(course.Code, section.ToString(), bare) + "\n" +
-                    string.Join("\n", candidates.Select(c => "• " + (namesDiffer
-                        ? StartOfYearWording.PageName(c.DisplayTitle)
-                        : StartOfYearWording.PageNameInFolder(c.DisplayTitle, FolderOf(course, c))))));
+                    string.Join("\n", candidates.Select(c => "• " +
+                        StartOfYearWording.PageNameInFolder(c.DisplayTitle, FolderOf(course, c)) +
+                        " — " + FolderAndName(course, c))));
             }
             if (candidates.Count == 0)
             {
@@ -1080,6 +1084,18 @@ public sealed partial class AssistWorkspace
         string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, page.RelativePath));
         string folder = Path.GetRelativePath(course.DirectoryPath, Path.GetDirectoryName(full)!).Replace('\\', '/');
         return folder == "." ? course.Code : folder;
+    }
+
+    /// <summary>
+    /// A page's folder and file name joined by "/", relative to its course and
+    /// without ".md" — "Concepts/Notes", "section1/All Classes/Notes"
+    /// (<c>publishPlanNaming</c>). Read back by the planner's by-path reading.
+    /// </summary>
+    private string FolderAndName(Course course, PlannedPage page)
+    {
+        string full = Path.GetFullPath(PagePaths.ResolveInside(_folder, page.RelativePath));
+        string relative = Path.GetRelativePath(course.DirectoryPath, full).Replace('\\', '/');
+        return relative.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? relative[..^3] : relative;
     }
 
     /// <summary>A name as the contract compares names: trimmed, ignoring case, in one Unicode form.</summary>
@@ -1521,7 +1537,18 @@ public sealed partial class AssistWorkspace
         if (ReferenceCourse.IsKeptForReference(course))
             throw new AssistRefusal(AssistWording.DeployRefusedForAReferenceCourse(ReferenceCourse.ShownCode(course)));
         int section = Section(course, sectionNumber);
-        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's deploy");
+        // An OUTSIDE deploy goes ahead while a preview is only being served
+        // (#436, Russell on mac #433: "if the teacher asks Claude or Codex to
+        // deploy, it should be allowed to go ahead, even if a preview is
+        // running"); a build, publish or copy still holds it back. What ends
+        // the open preview is the deploy's own build: build_site.py's
+        // stop_preview_serving runs to completion before it builds, as it does
+        // for a deploy set for later, so nothing is left to wait for and
+        // nothing is restarted. Read once, here, for the sentence at the end.
+        var asker = IsOutside ? WorkLease.Asker.AnOutsideDeploy : WorkLease.Asker.ABuild;
+        bool aPreviewWasOpenElsewhere = IsOutside &&
+            WorkLease.WhatAnOutsideChangeMeets(_folder, course.Code) == WorkLease.OutsideMeeting.AServedPreview;
+        RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's deploy", asker);
 
         var destinations = course.Configuration.AllDeployDestinations;
 
@@ -1560,7 +1587,7 @@ public sealed partial class AssistWorkspace
         }
 
         progress?.Report($"Building Section {section} of {course.Code}…");
-        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy");
+        using var claim = ClaimTheBuildOrDecline(course, section, "an assistant's deploy", asker);
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
         if (build.NeededAnAnswer)
@@ -1640,10 +1667,16 @@ public sealed partial class AssistWorkspace
         // Findings come from the BUILD, not from a destination's upload: every
         // destination publishes the same built site, and the checks run inside
         // the build. Said after the outcome, never instead of it.
-        return result with
+        string message = AppendingFindings(course, section, build, result.Message);
+        // Said to an outside assistant, which has no window to see the preview
+        // close in (#436): appended to the success sentence, "if" because
+        // leases name the course and the open preview may be another section's.
+        if (aPreviewWasOpenElsewhere && result.Succeeded)
         {
-            Message = AppendingFindings(course, section, build, result.Message),
-        };
+            NoteAnOutsideAssistantMetAServedPreview(course, section, "deployed, which may have closed that section's preview");
+            message += " " + AssistWording.DeployClosedAnOpenPreview(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return result with { Message = message };
     }
 
     public async Task<AssistResult> RebuildPreview(string courseCode, int sectionNumber,
@@ -1652,6 +1685,18 @@ public sealed partial class AssistWorkspace
     {
         var course = Course(courseCode);
         int section = Section(course, sectionNumber);
+        // An outside assistant's rebuild while a preview is only SERVED builds
+        // nothing (#436, mac #433): every build first ends that section's
+        // serving preview, and the outside door restarting it by any means
+        // was rejected by Russell — the teacher stops and starts it. A build
+        // in flight holds it back like anything else (below).
+        if (IsOutside && WorkLease.WhatAnOutsideChangeMeets(_folder, course.Code) == WorkLease.OutsideMeeting.AServedPreview)
+        {
+            NoteAnOutsideAssistantMetAServedPreview(course, section, "asked for a rebuild, and nothing was built");
+            return new AssistResult(true,
+                AssistWording.ChangesAreSavedPreviewShowsTheOldPages(course.Code, section.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                null);
+        }
         RefuseIfAnotherProgramStandsInTheWay(course, section, "an assistant's rebuild");
 
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
@@ -1809,11 +1854,13 @@ public sealed partial class AssistWorkspace
         // The pages are already written: Markdown never conflicts with a
         // build, so only the REBUILD is declined when another program is
         // building, publishing or previewing this course (#289), and the note
-        // where the preview would have been refreshed says so.
-        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        // where the preview would have been refreshed says so — for an
+        // outside assistant in the words of #436 (never a refusal word).
+        var (claim, note) = ClaimTheRebuildAfterAWrite(course, section);
+        using var claimHeld = claim;
         if (claim is null)
             return new AssistResult(true,
-                Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined) + " " + AssistWording.CourseIsBusy(course.Code),
+                Summary(changed, previewed: false, course.Code, section, plan.Hiding, declined) + " " + note,
                 backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
@@ -2054,9 +2101,10 @@ public sealed partial class AssistWorkspace
             return new AssistResult(true, summary, backup);
 
         // Written already; only the rebuild is declined (#289), as above.
-        using var claim = ClaimTheBuildUnlessDeclined(course, section, "an assistant's rebuild after a change");
+        var (claim, note) = ClaimTheRebuildAfterAWrite(course, section);
+        using var claimHeld = claim;
         if (claim is null)
-            return new AssistResult(true, summary + " " + AssistWording.CourseIsBusy(course.Code), backup);
+            return new AssistResult(true, summary + " " + note, backup);
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
@@ -2142,6 +2190,15 @@ public sealed partial class AssistWorkspace
         // change while asking for the next one.
         if (!WorkLease.HeldBy(_folder, course.Code).Contains(WorkLease.Building)) return;
 
+        // An outside assistant is normally held back at the server's door
+        // (OutsideChangeGate, before any backup); reaching here means a build
+        // started after it looked, and it is told in #436's words.
+        if (IsOutside)
+        {
+            ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                $"an outside assistant's change to {course.Code} held back — another program on this computer is building the course");
+            throw new AssistRefusal(AssistWording.CourseIsBeingBuilt(course.Code));
+        }
         throw new AssistRefusal(
             $"Plantoir is building {course.Code} right now, and building it here at the same time would " +
             "spoil both — they write to the same folder. Try again in a moment. " +
@@ -2162,13 +2219,25 @@ public sealed partial class AssistWorkspace
     /// The guarantee is <see cref="ClaimTheBuildOrDecline"/>; this only saves a
     /// backup and a message that would then be thrown away.
     /// </remarks>
-    private void RefuseIfAnotherProgramStandsInTheWay(Course course, int section, string asked)
+    private void RefuseIfAnotherProgramStandsInTheWay(Course course, int section, string asked,
+                                                      WorkLease.Asker asker = WorkLease.Asker.ABuild)
     {
-        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim: null) is not { } other) return;
+        if (WorkLease.InTheWay(asker, _folder, course.Code, claim: null) is not { } other) return;
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
             WorkLease.DeclineTrailLine(asked, other), course.Code, section);
-        throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, other.Kind));
+        throw new AssistRefusal(IsOutside
+            ? WorkLease.HeldBackForAnOutsideAssistant(course.Code, other.Kind)
+            : WorkLease.DeclinedForTheAssistant(course.Code, other.Kind));
     }
+
+    /// <summary>
+    /// Whether this server answers an OUTSIDE assistant (Claude or Codex) —
+    /// every caller but Plantoir's own window, which sets
+    /// <see cref="ServesTheLocalWindow"/>. The outside rules of #436 (mac
+    /// #433) apply only here: by the director's ruling the in-app window KEEPS
+    /// #289's rule, as the mac's in-app assistant keeps #156's.
+    /// </summary>
+    public bool IsOutside => !ServesTheLocalWindow;
 
     /// <summary>
     /// Claim the build for as long as it runs, so Plantoir's own Preview and
@@ -2179,25 +2248,77 @@ public sealed partial class AssistWorkspace
     /// back, the trail says why, and the caller is refused with the sentence an
     /// assistant working from outside is told (<c>wording.courseIsBusy</c>).
     /// </summary>
-    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked)
+    private WorkLease.Held ClaimTheBuildOrDecline(Course course, int section, string asked,
+                                                  WorkLease.Asker asker = WorkLease.Asker.ABuild)
     {
-        var (held, declinedBy) = ClaimTheBuild(course, section, asked);
-        return held ?? throw new AssistRefusal(WorkLease.DeclinedForTheAssistant(course.Code, declinedBy!));
+        var (held, declinedBy) = ClaimTheBuild(course, section, asked, asker);
+        return held ?? throw new AssistRefusal(IsOutside
+            ? WorkLease.HeldBackForAnOutsideAssistant(course.Code, declinedBy!)
+            : WorkLease.DeclinedForTheAssistant(course.Code, declinedBy!));
     }
 
-    /// <summary>The same, answering null rather than refusing — for a rebuild after a write that already happened.</summary>
-    private WorkLease.Held? ClaimTheBuildUnlessDeclined(Course course, int section, string asked) =>
-        ClaimTheBuild(course, section, asked).Held;
+    /// <summary>
+    /// The rebuild after a write that already happened: the claim, or — when
+    /// it cannot run — null and the note said where the preview would have
+    /// been refreshed.
+    /// </summary>
+    /// <remarks>
+    /// <para>Plantoir's own window keeps #289's rule and its sentence
+    /// (<see cref="AssistWording.CourseIsBusy"/>).</para>
+    /// <para>An OUTSIDE assistant (#436, mac #433) is never told "busy" after a
+    /// change that succeeded — a model reads that as a refusal. A preview only
+    /// being SERVED is left exactly as it is, the trail says so, and the note
+    /// is <see cref="AssistWording.ChangesAreSavedPreviewShowsTheOldPages"/>; a
+    /// build that started between the check at the door and the write is
+    /// <see cref="AssistWording.ChangesAreSavedWhileTheCourseIsBuilt"/>.
+    /// Checked BEFORE a claim is taken, so a served preview is not written on
+    /// the trail as a declined build: nothing was declined.</para>
+    /// </remarks>
+    private (WorkLease.Held? Claim, string? Note) ClaimTheRebuildAfterAWrite(Course course, int section)
+    {
+        const string asked = "an assistant's rebuild after a change";
+        if (!IsOutside)
+        {
+            var claimed = ClaimTheBuild(course, section, asked).Held;
+            return (claimed, claimed is null ? AssistWording.CourseIsBusy(course.Code) : null);
+        }
+
+        string sectionText = section.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        switch (WorkLease.WhatAnOutsideChangeMeets(_folder, course.Code))
+        {
+            case WorkLease.OutsideMeeting.ABuild:
+                ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,
+                    $"{asked} declined — another program on this computer began building the course after the change was checked",
+                    course.Code, section);
+                return (null, AssistWording.ChangesAreSavedWhileTheCourseIsBuilt(course.Code, sectionText));
+            case WorkLease.OutsideMeeting.AServedPreview:
+                NoteAnOutsideAssistantMetAServedPreview(course, section, "changed pages, and left the open preview as it was");
+                return (null, AssistWording.ChangesAreSavedPreviewShowsTheOldPages(course.Code, sectionText));
+        }
+
+        var (held, declinedBy) = ClaimTheBuild(course, section, asked);
+        if (held is not null) return (held, null);
+        return (null, declinedBy == WorkLease.Previewing
+            ? AssistWording.ChangesAreSavedPreviewShowsTheOldPages(course.Code, sectionText)
+            : AssistWording.ChangesAreSavedWhileTheCourseIsBuilt(course.Code, sectionText));
+    }
+
+    /// <summary><c>outside assistant worked while a preview was open</c>: which of the three, never a page.</summary>
+    private static void NoteAnOutsideAssistantMetAServedPreview(Course course, int section, string what) =>
+        ActivityTrail.Note(ActivityTrail.Event.OutsideAssistantWorkedWhileAPreviewWasOpen,
+            $"an outside assistant {what} — a preview of {course.Code} was open in Plantoir",
+            course.Code, section);
 
     /// <summary>
     /// The claim, or the KIND of lease that declined it — returned with the
     /// result rather than kept in a field, so two calls cannot read each
     /// other's answer (bundle 6a ruling 5).
     /// </summary>
-    private (WorkLease.Held? Held, string? DeclinedBy) ClaimTheBuild(Course course, int section, string asked)
+    private (WorkLease.Held? Held, string? DeclinedBy) ClaimTheBuild(Course course, int section, string asked,
+                                                                     WorkLease.Asker asker = WorkLease.Asker.ABuild)
     {
         var claim = WorkLease.Take(_folder, course.Code, WorkLease.Building);
-        if (WorkLease.InTheWay(WorkLease.Asker.ABuild, _folder, course.Code, claim.Claim) is not { } other)
+        if (WorkLease.InTheWay(asker, _folder, course.Code, claim.Claim) is not { } other)
             return (claim, null);
         claim.Dispose();
         ActivityTrail.Note(ActivityTrail.Event.BuildDeclinedCourseBusyElsewhere,

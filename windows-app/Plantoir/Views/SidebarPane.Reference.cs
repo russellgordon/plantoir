@@ -79,6 +79,9 @@ public sealed partial class SidebarPane
                         // The code a teacher reads; the folder is in the tooltip,
                         // the one place it is the fact.
                         Title = ReferenceCourse.ShownCode(course),
+                        // A fuller name for a screen reader (#426): the shown
+                        // code alone is the live course's name too.
+                        SpokenName = ReferenceCourse.SpokenRowName(ReferenceCourse.ShownCode(course), group.Key),
                         Glyph = LibraryGlyph,
                         Tooltip = course.Code,
                         IsExpanded = Workspace.IsCourseExpanded(course.Code),

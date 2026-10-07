@@ -16,9 +16,8 @@ public partial class App : Application
 
     /// <summary>
     /// The update engine (#337), or null in a development build (no feed at
-    /// all, decision 5). Constructed in a Release build, but INACTIVE — it
-    /// fetches nothing and shows no menu item — while AppUpdates.ConfiguredFeed
-    /// is empty, which it is until a release sets it.
+    /// all, decision 5). Constructed and started in every Release build since
+    /// v1.4.2, the first release to set AppUpdates.ConfiguredFeed and its key.
     /// </summary>
     public static Plantoir.Core.Assist.AppUpdater? Updater { get; private set; }
 
@@ -128,11 +127,15 @@ public partial class App : Application
         }
 
         // `app updated` (#337): the first launch of a new version, whoever
-        // installed it. No updater runs yet, so it is always "by hand".
+        // installed it. "By its own updater" when the installer left its
+        // marker for THIS version (#428 item 1); the marker is read and
+        // removed at every launch, so it can never speak for a later one.
         try
         {
             string running = Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion;
-            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: false) is { } line)
+            var runningVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0);
+            bool byItself = Plantoir.Core.Assist.AppUpdates.ConsumeUpdatedByItselfMarker(AppDataRoot.Current, runningVersion);
+            if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: byItself) is { } line)
                 Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AppUpdated, line);
             if (Settings.LastLaunchedVersion != running)
             {
@@ -186,39 +189,19 @@ public partial class App : Application
 
         string rawArgs = args.Arguments ?? "";
         string[] cmdArgs = Environment.GetCommandLineArgs();
-        string outputDir = "";
 
-        int shotIdx = Array.IndexOf(cmdArgs, "--capture-marketing-shots");
-        if (shotIdx >= 0 && shotIdx + 1 < cmdArgs.Length)
+        // The pictures on plantoir.app (#380): one scene staged in a REAL
+        // window and held open, for website/shots/app_scenes_windows.py to
+        // photograph whole and then end. Replaces --capture-marketing-shots
+        // (content rendered with no window round it) and --hero-window (now
+        // the scene called "hero"). Read from the parsed arguments only: the
+        // capture script starts the app with a plain argument list.
+        Plantoir.Core.Models.MarketingScene? scene = null;
+        try { scene = Plantoir.Core.Models.MarketingScene.Parse(cmdArgs); }
+        catch (ArgumentException problem) { MarketingShotCapturer.Log(problem.Message); Exit(); return; }
+        if (scene is not null)
         {
-            outputDir = cmdArgs[shotIdx + 1];
-        }
-        else if (rawArgs.Contains("--capture-marketing-shots"))
-        {
-            string[] parts = rawArgs.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            int idx = Array.IndexOf(parts, "--capture-marketing-shots");
-            if (idx >= 0 && idx + 1 < parts.Length) outputDir = parts[idx + 1].Trim('"');
-        }
-
-        if (!string.IsNullOrEmpty(outputDir))
-        {
-            var bootstrapWindow = new MainWindow(null, null);
-            bootstrapWindow.Activate();
-            // Optional: capture one appearance only, so the harness can run
-            // us once per OS theme and every themed brush resolves right.
-            _ = MarketingShotCapturer.RunAsync(
-                outputDir, ArgumentAfter(cmdArgs, rawArgs, "--theme") is { Length: > 0 } t ? t : null);
-            return;
-        }
-
-        // The hero composite needs a REAL window on screen, title bar and all,
-        // because the Python harness photographs it off the desktop beside
-        // Obsidian and Edge. So this mode stages the window and stops -- the
-        // harness takes the picture and kills the process.
-        string heroTheme = ArgumentAfter(cmdArgs, rawArgs, "--hero-window");
-        if (!string.IsNullOrEmpty(heroTheme))
-        {
-            _ = MarketingShotCapturer.ShowHeroWindowAsync(heroTheme);
+            _ = MarketingShotCapturer.StageAsync(scene);
             return;
         }
 

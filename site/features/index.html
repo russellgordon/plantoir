@@ -40,6 +40,7 @@
     function swap(el) {
       if (el.hasAttribute('data-win-srcset')) el.setAttribute('srcset', el.getAttribute('data-win-srcset'));
       if (el.hasAttribute('data-win-src')) el.setAttribute('src', el.getAttribute('data-win-src'));
+      if (el.hasAttribute('data-win-alt')) el.setAttribute('alt', el.getAttribute('data-win-alt'));
     }
     function scan(node) {
       if (node.nodeType !== 1) return;
@@ -116,10 +117,10 @@
 </figure>
   <figure class="shot">
     <picture>
-      <source srcset="../img/site-sch3u-chemistry-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/site-sch3u-chemistry-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/site-sch3u-chemistry-light.webp" type="image/webp">
-      <img src="../img/site-sch3u-chemistry-light.png" alt="A Grade 11 Chemistry class page with two balanced reactions set on lines of their own, states in brackets and subscripts set low, and the sulfate and ammonium ions written with their charges."
+      <source srcset="../img/site-sch3u-chemistry-dark.webp" data-win-srcset="../img/site-sch3u-chemistry-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/site-sch3u-chemistry-dark.png" data-win-srcset="../img/site-sch3u-chemistry-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/site-sch3u-chemistry-light.webp" data-win-srcset="../img/site-sch3u-chemistry-windows-light.webp" type="image/webp">
+      <img src="../img/site-sch3u-chemistry-light.png" data-win-src="../img/site-sch3u-chemistry-windows-light.png" alt="A Grade 11 Chemistry class page with two balanced reactions set on lines of their own, states in brackets and subscripts set low, and the sulfate and ammonium ions written with their charges."
            width="1392" height="972" loading="lazy" decoding="async">
     </picture>
     <figcaption>Chemistry too: formulas, charges, states and reaction arrows, set the way a textbook sets them.</figcaption>
@@ -135,10 +136,10 @@
   <p>For about 1,900 other Ontario courses, you get a starting outline that suits the subject — a drama course opens with conventions and warm-ups, a chemistry course with investigations and lab safety. Turn down the ready-made pages and you get that outline instead, with the curriculum expectations still there, so the coverage map works from the first day.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/new-course-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/new-course-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/new-course-light.webp" type="image/webp">
-      <img src="../img/new-course-light.png" alt="The New Course panel with TEJ3M entered and its suggested course names offered beneath."
+      <source srcset="../img/new-course-dark.webp" data-win-srcset="../img/new-course-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/new-course-dark.png" data-win-srcset="../img/new-course-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/new-course-light.webp" data-win-srcset="../img/new-course-windows-light.webp" type="image/webp">
+      <img src="../img/new-course-light.png" data-win-src="../img/new-course-windows-light.png" alt="The New Course panel with TEJ3M entered and its suggested course names offered beneath."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>A course code is enough to start.</figcaption>
@@ -172,20 +173,20 @@
   <p>Put each curriculum in its own folder, tick it in Course Settings, and every build draws a map for each: one for the Ministry's expectations, one for the other framework, each shaded by the pages that reach it.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/two-maps-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/two-maps-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/two-maps-light.webp" type="image/webp">
-      <img src="../img/two-maps-light.png" alt="Two curriculum coverage maps for the same ICS3U section: the Ontario expectations, and the AP Computer Science Principles learning objectives, each shaded by how many pages reach it."
+      <source srcset="../img/two-maps-dark.webp" data-win-srcset="../img/two-maps-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/two-maps-dark.png" data-win-srcset="../img/two-maps-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/two-maps-light.webp" data-win-srcset="../img/two-maps-windows-light.webp" type="image/webp">
+      <img src="../img/two-maps-light.png" data-win-src="../img/two-maps-windows-light.png" alt="Two curriculum coverage maps for the same ICS3U section: the Ontario expectations, and the AP Computer Science Principles learning objectives, each shaded by how many pages reach it."
            width="2720" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Two curricula, a map for each.</figcaption>
 </figure>
   <figure class="shot">
     <picture>
-      <source srcset="../img/curriculum-settings-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/curriculum-settings-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/curriculum-settings-light.webp" type="image/webp">
-      <img src="../img/curriculum-settings-light.png" alt="ICS3U's Course Settings with both the Curriculum folder and the College Board Curriculum folder ticked as curricula."
+      <source srcset="../img/curriculum-settings-dark.webp" data-win-srcset="../img/curriculum-settings-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/curriculum-settings-dark.png" data-win-srcset="../img/curriculum-settings-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/curriculum-settings-light.webp" data-win-srcset="../img/curriculum-settings-windows-light.webp" type="image/webp">
+      <img src="../img/curriculum-settings-light.png" data-win-src="../img/curriculum-settings-windows-light.png" alt="ICS3U's Course Settings with both the Curriculum folder and the College Board Curriculum folder ticked as curricula."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Tick a folder, and it gets a map.</figcaption>
@@ -193,10 +194,10 @@
   <p>A lesson can reach both. Its curriculum connection quotes an Ontario expectation and an AP learning objective one after the other, and each map counts it.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/both-curricula-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/both-curricula-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/both-curricula-light.webp" type="image/webp">
-      <img src="../img/both-curricula-light.png" alt="A class activity page whose curriculum connection quotes an Ontario expectation and an AP learning objective, one under the other."
+      <source srcset="../img/both-curricula-dark.webp" data-win-srcset="../img/both-curricula-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/both-curricula-dark.png" data-win-srcset="../img/both-curricula-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/both-curricula-light.webp" data-win-srcset="../img/both-curricula-windows-light.webp" type="image/webp">
+      <img src="../img/both-curricula-light.png" data-win-src="../img/both-curricula-windows-light.png" alt="A class activity page whose curriculum connection quotes an Ontario expectation and an AP learning objective, one under the other."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>One lesson, counted on both maps.</figcaption>
@@ -214,10 +215,10 @@
   <p>When a page from last year is exactly what you need, copy it into the course you're teaching. Its pictures come with it, the pages it links to can come too, and it always arrives hidden from students until you publish it.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/reference-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/reference-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/reference-light.webp" type="image/webp">
-      <img src="../img/reference-light.png" alt="The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet about to copy one of its pages into ICS4U, with "Also copy the pages this page links to" ticked."
+      <source srcset="../img/reference-dark.webp" data-win-srcset="../img/reference-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/reference-dark.png" data-win-srcset="../img/reference-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/reference-light.webp" data-win-srcset="../img/reference-windows-light.webp" type="image/webp">
+      <img src="../img/reference-light.png" data-win-src="../img/reference-windows-light.png" alt="The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet about to copy one of its pages into ICS4U, with "Also copy the pages this page links to" ticked."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Last year's course, to read and borrow from — never published.</figcaption>
@@ -252,10 +253,10 @@
   <p>Tell it how you teach first. A page called How I Teach, at the top of the course, is read at the start of every session: your units, your assessment habits, the words you use with students. Write it yourself, or ask for a draft from your own pages and correct it. It is never put on your website.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/how-i-teach-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/how-i-teach-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/how-i-teach-light.webp" type="image/webp">
-      <img src="../img/how-i-teach-light.png" alt="Obsidian open on ICS3U's How I Teach page: short notes on units, assessment and classroom routines."
+      <source srcset="../img/how-i-teach-dark.webp" data-win-srcset="../img/how-i-teach-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/how-i-teach-dark.png" data-win-srcset="../img/how-i-teach-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/how-i-teach-light.webp" data-win-srcset="../img/how-i-teach-windows-light.webp" type="image/webp">
+      <img src="../img/how-i-teach-light.png" data-win-src="../img/how-i-teach-windows-light.png" alt="Obsidian open on ICS3U's How I Teach page: short notes on units, assessment and classroom routines."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Tell Claude or Codex how you teach, once. It is never published.</figcaption>
@@ -331,8 +332,8 @@
   <p>You choose in the app and see a live sample before anything is built.</p>
   <figure class="shot shot-static">
     <picture>
-      <source srcset="../img/colour-schemes-dark.webp" data-win-srcset="../img/colour-schemes-windows.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/colour-schemes-dark.png" data-win-srcset="../img/colour-schemes-windows.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/colour-schemes-dark.webp" data-win-srcset="../img/colour-schemes-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/colour-schemes-dark.png" data-win-srcset="../img/colour-schemes-windows-dark.png" media="(prefers-color-scheme: dark)">
       <source srcset="../img/colour-schemes.webp" data-win-srcset="../img/colour-schemes-windows.webp" type="image/webp">
       <img src="../img/colour-schemes.png" data-win-src="../img/colour-schemes-windows.png" alt="Three class websites overlapping like a fanned deck of cards, each in a different colour scheme and typeface."
            width="2467" height="972" loading="lazy" decoding="async">
@@ -357,10 +358,10 @@
   <p>Not everything you run is a course. Tick "This is a club" when you add one and it starts the way a club does: an empty set of folders, a first meeting page, and a front page headed with your own words — "Most Recent Meeting", say. Meetings are numbered Week 1, Week 2, and the assistant talks about meetings, not classes.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/club-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/club-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/club-light.webp" type="image/webp">
-      <img src="../img/club-light.png" alt="The New Course or Club panel with CODING entered and "This is a club" switched on, explaining that a club's pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting."
+      <source srcset="../img/club-dark.webp" data-win-srcset="../img/club-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/club-dark.png" data-win-srcset="../img/club-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/club-light.webp" data-win-srcset="../img/club-windows-light.webp" type="image/webp">
+      <img src="../img/club-light.png" data-win-src="../img/club-windows-light.png" alt="The New Course or Club panel with CODING entered and "This is a club" switched on, explaining that a club's pages are numbered one after another, it has no curriculum, and it starts with a page for its first meeting."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Clubs start the way clubs do.</figcaption>

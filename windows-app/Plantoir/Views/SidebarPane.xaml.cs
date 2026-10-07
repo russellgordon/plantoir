@@ -42,6 +42,13 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
 
     public required string Title { get; init; }
+
+    private readonly string? _spokenName;
+    /// <summary>
+    /// The row's automation Name: <see cref="Title"/>, unless a fuller one was
+    /// given — a reference course's row says which year it is kept for (#426).
+    /// </summary>
+    public string SpokenName { get => _spokenName ?? Title; init => _spokenName = value; }
     public required string Glyph { get; init; }
     private string? _tooltip;
     /// <summary>Settable after creation: backup sizes arrive from a measurement off the UI thread (#283).</summary>
@@ -881,6 +888,13 @@ public sealed partial class SidebarPane : UserControl
         };
         return menu;
     }
+
+    /// <summary>
+    /// For the marketing pictures only (<c>--stage-scene schedule-sheet</c>):
+    /// the Schedule a Deploy sheet for a section, exactly as the menu opens it.
+    /// The scene never presses Schedule, so nothing is scheduled.
+    /// </summary>
+    public void OpenScheduleSheetForCapture(Course course, int section) => AskWhenToDeploy(course, section, null);
 
     /// <summary>
     /// Ask when to deploy, and set it — both for a brand-new schedule and

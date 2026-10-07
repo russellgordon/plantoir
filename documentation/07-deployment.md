@@ -194,6 +194,17 @@ in `deploy.ps1`, which tests for a match object rather than a Boolean. The
 general rule for PowerShell written from the mac: `-Quiet` is not a scalar when
 the input is a pipeline.
 
+What the folder leg SAYS when it has to rebuild is deploy.sh's two lines, word
+for word since v1.4.3 (#407 on the mac, #438 here): "Rebuilding it before it is
+deployed" and "Nothing was deployed, rather than deploying pages students'
+browsers would ask about", because publishing marks a page for the website and
+this step is the deploy. `deploy.ps1` prints "..." where deploy.sh prints "…"
+(every line it prints is ASCII, and the file has no byte-order mark for
+Windows PowerShell 5.1 to read one by).
+`LauncherRulesContractTests.TheRebuildLinesAreDeploySHsWordForWord` reads both
+lines from deploy.sh rather than retyping them. The other rebuild lines, and
+every line still saying "published" for a deploy, are #441 (v1.4.4).
+
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
 Whether a built site is a preview's is asked in six places, and until #136
@@ -1506,7 +1517,13 @@ delivery is theirs: their run is PowerShell under Task Scheduler with no app
 process alive, so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
-it; GitHub #212 carries the ask.
+it; GitHub #212 carries the ask. Windows' toast shipped with #324 and **posted
+nothing until #448** (2026-10-04): its toast step read the job file after the
+run, and the run's own one-shot clearing had deleted it. What the toast needs
+is now read before the run; `documentation/12-windows-app.md` → "The
+scheduled-publish toast (#324)" has the measurement and the fix. The mac's
+`announceThenLeave` posts before the job is booted out, so it never had this
+shape.
 
 ### Clicking the notification opens the section (#306)
 

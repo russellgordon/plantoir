@@ -96,7 +96,7 @@ public class ImportForReferenceUiTests
                      "the folder imported FROM was marked");
 
         // And the summary a teacher opens says what it is.
-        app.Find("sidebar-" + folder, "the imported course's row").Click();
+        app.ClickMiddleOf(app.Find("sidebar-" + folder, "the imported course's row"));
         var summary = DrivenApp.TextsUnder(app.Find("referenceSummary", "the read-only summary"));
         Assert.Contains(EndToEnd.Say(EndToEnd.ReferenceWording["neverDeployed"]!, ("course", Code)), summary);
     }

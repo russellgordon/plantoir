@@ -1,0 +1,77 @@
+#424 - "schedule a deploy", "cancel the scheduled deploy" and "next day's lesson"
+PRE-REGISTRATION. Written and committed BEFORE the first request of this run
+(Windows, v1.4.3 bundle A, branch issue/v143-a-assistant, 2026-10-04).
+
+WHAT CHANGED (code only; no tool description was touched)
+  1. AssistCardCommand: "[please] schedule a|the deploy ..." is read AS the
+     deployAtATime family (contract: assist-cases.json -> scheduleAndCancel,
+     AUTHORED); with no time it is ASKED in code; "[please] cancel the|that|my
+     scheduled deploy [please]" reaches cancel_scheduled_deploy. A question
+     mark, "don't", a course or a section named fall through to the model.
+  2. LocalModel.Request sends llama-server's t_max_predict_ms = 30000 (a
+     reply still being WRITTEN after 30 s, once it has written a line break,
+     ends with finish_reason "length" and is answered by the #196 cut-off
+     path; nothing runs from it).
+  The local surface the model is shown is UNCHANGED: re-dumped from this
+  branch's plantoir-mcp and narrowed by narrow-tools.py, it is JSON-equal to
+  bundle 10's MIDDLE arm (arms420/middle.json and middle-EXC2O.json, compared
+  parsed, both True). So every routing difference against MIDDLE comes from
+  (2) or from chance, and (1) shows only through the suites' interception.
+
+CONDITIONS
+  Intel Core i5-8365U (4C/8T), 16 GB, Samsung 980 NVMe, Intel UHD 620,
+  Windows 11 Pro 26200. llama-server from windows-app\Vendor\llama (b10435):
+    --model %LOCALAPPDATA%\Plantoir\models\qwen2.5-1.5b-instruct-q4_k_m.gguf
+    --port 8099 --host 127.0.0.1 --ctx-size 8192 --threads 4 --reasoning off
+    --reasoning-budget 0 --jinja --parallel 1 --n-gpu-layers 999
+  (the smaller assistant; #424's flags). One fresh server for the three
+  suites, stopped afterwards. 10 greedy trials. Nothing else heavy runs beside it.
+
+SUITES (one arm: this branch)
+  S1  trimmed-surface-suite.py shipped.json 10 --date-appended --real-course
+      --course EXC2O --prompt shipped --app-body --writing-limit-ms=30000
+  S2  teachers-say-suite.py 8099 10 shipped-EXC2O.json --writing-limit-ms=30000
+      (now counts finish_reason "length" as a MISS, and prints
+      add_next_class's arguments IN FULL with a count of unit "next")
+  S3  S1 with --course ICS3U.
+  Compared against bundle 10's MIDDLE logs (plantoir-windows-run\logs\
+  bundle10-420-S{1,2,3}-middle.txt), per probe.
+
+THE THREE PROBES
+  P1  "schedule a deploy" (trimmed-surface S1 and S3): "Deploy EXC2O section 1
+      at 6:30 tomorrow morning, before school starts." MIDDLE: S1 10/10?, S3 0/10
+      (all deploy_section).
+  P2  "ctl cancel_scheduled" (S2): "Don't send it in the morning after all."
+      MIDDLE 0/10 (declined).
+  P3  "next: next day's lesson" (S2): "Set up next day's lesson". MIDDLE 0/10,
+      every trial running to the 512 cap, 61-89 s.
+
+PASS RULE (all must hold)
+  (a) each of P1, P2, P3 either no longer reaches the model (intercepted in
+      code by the suite's mirror) or scores 10/10;
+  (b) VETO: ZERO polarity inversions (a hide routed to a publishing tool, or a
+      publish to a hiding one), in any suite;
+  (c) no other probe drops against MIDDLE: every probe's hits >= its MIDDLE
+      hits, in every suite.
+  Also recorded, deciding nothing: P3's wall time per trial and finish reason
+  (does t_max_predict_ms take effect on the OAI endpoint of b10435?); how
+  many replies in all were stopped; add_next_class's arguments in full and
+  how often a plain "add the next class" sends unit "next" (#411, #432 item 4).
+
+SAID IN ADVANCE, so the result cannot be argued with afterwards
+  P1's and P2's measured sentences are NOT what the new frames take: P1 names a
+  course and section and carries a trailing clause; P2 begins "Don't". By
+  design both still reach the model, and the model is shown the same surface
+  as MIDDLE. Unless the model's answer to them changes, (a) FAILS for P1 and
+  P2, and the code fix covers only the canonical phrasings. P3 still reaches
+  the model too; the settler can only make it end sooner (a MISS either way).
+  A failed rule here changes nothing that ships by itself: it is reported on
+  #424 for Russell, with what each remedy would cost.
+
+ADDED AFTER THE RUN (bundle A fix round, ruling 4), changing nothing above:
+  the 30 s writing limit ships on the SMALLER tier only, the one measured
+  here. The limit is in milliseconds, and the larger assistant writes several
+  times slower per token on this CPU (perhaps 70-100 tokens in 30 s, close to
+  an ordinary prose answer after a read), so it keeps the 512-token cap alone
+  until it is measured. No larger-tier run was made.
+

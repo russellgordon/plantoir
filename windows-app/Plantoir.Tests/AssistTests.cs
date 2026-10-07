@@ -831,12 +831,19 @@ public class AssistWorkspaceTests : IDisposable
 
             var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.Apply(plan)).Result;
 
-            Assert.Contains("Plantoir is building ICS3U right now", refusal.Message);
-            Assert.Contains("Reading and planning are fine meanwhile.", refusal.Message);
+            // An outside assistant (#436) is told the contract's sentence.
+            Assert.Equal(AssistWording.CourseIsBeingBuilt("ICS3U"), refusal.Message);
             Assert.Empty(_launcher.Runs);                 // never got as far as a build
             Assert.Contains("publish: false",
                 File.ReadAllText(Path.Combine(_folder, "courses", "ICS3U",
                     "section1", "All Classes", "Unit 2, Day 3.md")));   // and never edited
+
+            // Plantoir's own window keeps its own sentence (director's ruling).
+            var window = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
+            var inTheWindow = Assert.ThrowsAsync<AssistRefusal>(
+                () => window.Apply(window.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" }))).Result;
+            Assert.Contains("Plantoir is building ICS3U right now", inTheWindow.Message);
+            Assert.Contains("Reading and planning are fine meanwhile.", inTheWindow.Message);
         }
         finally { try { child.Kill(entireProcessTree: true); } catch { } }
     }
@@ -911,12 +918,14 @@ public class AssistWorkspaceTests : IDisposable
         // #289 (mac #156): a --build-only first ends that section's serving
         // preview, so an assistant's rebuild would take down the page the
         // teacher is reading. Another program's PREVIEW lease declines a
-        // build — never a write.
+        // build — never a write. Plantoir's OWN window keeps this rule; an
+        // outside assistant's rebuild builds nothing and says so instead
+        // (#436, OutsideAssistantWhilePreviewingTests).
         using var child = StartALongRunningChild();
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = Open();
+            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
 
             var refusal = Assert.ThrowsAsync<AssistRefusal>(() => workspace.RebuildPreview("ICS3U", 1)).Result;
 
@@ -932,14 +941,16 @@ public class AssistWorkspaceTests : IDisposable
     public void AWriteGoesAheadWhileAnotherProgramPreviewsAndOnlyItsRebuildIsDeclined()
     {
         // The write lands (Markdown never conflicts with a build); the rebuild
-        // after it is declined, and the note where the preview would have been
-        // refreshed says the course is busy.
+        // after it is declined, and — in Plantoir's OWN window, which keeps
+        // #289's rule — the note where the preview would have been refreshed
+        // says the course is busy. (An outside assistant is told its change
+        // is saved instead: OutsideAssistantWhilePreviewingTests.)
         Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: true);
         using var child = StartALongRunningChild();
         try
         {
             WriteWorkLease("ICS3U", WorkLease.Previewing, child.Id, child.ProcessName);
-            var workspace = Open();
+            var workspace = new AssistWorkspace(_folder, _launcher) { ServesTheLocalWindow = true };
             var plan = workspace.PlanPublish("ICS3U", 1, new[] { "Unit 2, Day 3" });
 
             var result = workspace.Apply(plan).Result;

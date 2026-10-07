@@ -73,12 +73,12 @@ public class CopyAPageDialogUiTests
         double scale = GetDpiForWindow(window.Properties.NativeWindowHandle.Value) / 96.0;
 
         var row = app.Find("sidebar-" + Source, $"the sidebar entry for {Source}");
-        row.RightClick();
+        app.RightClickMiddleOf(row);
         var item = Retry.WhileNull(() => app.Window.Automation.GetDesktop()
                 .FindFirstDescendant(cf => cf.ByName("Copy a Page from This Course…")),
             TimeSpan.FromSeconds(8), TimeSpan.FromMilliseconds(200)).Result;
         Assert.True(item is not null, "the course row's menu offers Copy a Page");
-        item!.Click();
+        DrivenApp.PressMenuItem(item!);
 
         var picker = app.Find("copyPagePicker", "the page picker");
         // The click and the typing below are REAL input, which goes to whatever
