@@ -134,6 +134,66 @@ final class HeadlessDeployAnswersTests: XCTestCase {
         XCTAssertTrue(wordsGiven(to: "preview").contains("--non-interactive"), wordsGiven(to: "preview"))
     }
 
+    /// GitHub #439, review finding 1: a build leg REFUSED because the section
+    /// is still being deployed reaches the windowless assistant as the
+    /// refusal, not as "could not be built". The stand-in `preview.sh` prints
+    /// the launcher's own line and exits 1, as the real guard does; the site
+    /// is stale (nothing has been built), so the build leg runs — the usual
+    /// case after a teacher edits and sets a deploy again.
+    func testAHeadlessDeployWhoseBuildIsRefusedSaysTheRefusal() async throws {
+        let laterDeploy: String = "\u{274C} ICS3U section 1 is still being deployed by a deploy that was set for later, "
+            + "so it cannot be built until that has finished."
+        let build: String = "#!/bin/bash\necho \"$*\" >> \"\(root.path)/preview-words.txt\"\n"
+            + "echo \"\(laterDeploy)\"\necho \"   Nothing was changed.\"\nexit 1\n"
+        try build.write(to: root.appendingPathComponent("preview.sh"), atomically: true, encoding: .utf8)
+        let work: AssistToolchainWork = AssistToolchainWork(workspace: workspace)
+        let result: AssistSiteWorkResult = await work.deploy(course: course, sectionNumber: 1)
+        XCTAssertFalse(result.succeeded)
+        XCTAssertTrue(wordsGiven(to: "preview").contains("--build-only"), "the build leg must have run: " + wordsGiven(to: "preview"))
+        XCTAssertEqual(wordsGiven(to: "deploy"), "", "nothing may be sent when the build was refused")
+        XCTAssertTrue(
+            result.message.hasPrefix(AssistWording.deployRefusedWhileALaterDeployWorks(course: "ICS3U", section: "1")),
+            result.message
+        )
+    }
+
+    /// The same for the other refusal (another deploy of the section), and an
+    /// ordinary broken build still says "could not be built".
+    func testAHeadlessBuildRefusedByAnotherDeployAndABrokenBuildAreToldApart() async throws {
+        let another: String = "\u{274C} ICS3U section 1 is already being deployed, so it cannot be built until that has finished."
+        let refused: String = "#!/bin/bash\necho \"\(another)\"\necho \"   Nothing was changed.\"\nexit 1\n"
+        try refused.write(to: root.appendingPathComponent("preview.sh"), atomically: true, encoding: .utf8)
+        let work: AssistToolchainWork = AssistToolchainWork(workspace: workspace)
+        let refusedResult: AssistSiteWorkResult = await work.deploy(course: course, sectionNumber: 1)
+        XCTAssertTrue(
+            refusedResult.message.hasPrefix(AssistWording.deployRefusedWhileItsSectionDeploys(course: "ICS3U", section: "1")),
+            refusedResult.message
+        )
+
+        try stubLaunchers(buildExits: 1, deployExits: 0)
+        let brokenResult: AssistSiteWorkResult = await work.deploy(course: course, sectionNumber: 1)
+        XCTAssertTrue(
+            brokenResult.message.hasPrefix(AssistWording.couldNotBuildBeforeDeploying(course: "ICS3U", section: "1")),
+            brokenResult.message
+        )
+    }
+
+    /// The window's assistant path cannot be driven without a window, so its
+    /// half is read from the source: `deployAndWait` asks the SAME shared
+    /// answer the windowless path asks, and never builds the "could not be
+    /// built" sentence itself (which is how it skipped the refusal before).
+    func testTheWindowsAssistantPathAsksTheSharedBuildAnswer() throws {
+        var sourceURL: URL?
+        for fileURL in ActivityTrailWiringTests.swiftFiles(under: ActivityTrailWiringTests.productSourceFolderURL()) {
+            if fileURL.lastPathComponent == "SectionDetailView.swift" {
+                sourceURL = fileURL
+            }
+        }
+        let source: String = try String(contentsOf: try XCTUnwrap(sourceURL), encoding: .utf8)
+        XCTAssertTrue(source.contains("MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish("))
+        XCTAssertFalse(source.contains("AssistWording.couldNotBuildBeforeDeploying("))
+    }
+
     /// The headless rebuild passes it too, and says so.
     func testAHeadlessRebuildThatMeetsAQuestionSaysSo() async throws {
         try stubLaunchers(buildExits: 3, deployExits: 0)
