@@ -6202,6 +6202,10 @@ more than the window supplies, which leaves the schema alone. That trades the ru
 the schema, never a name" property for the outcome he asked for. Until then
 both apps RUN an empty `add_next_class` call — Windows through
 `AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
+*(Settled 2026-10-07 by #440: the empty call RUNS on both apps, pinned by the
+authored scenario "an empty add_next_class from the model runs"; the schema
+stays at course and section. See "#440: `add_next_class` keeps two arguments;
+units and counts answered in code" below.)*
 
 **For Windows, MEASURED (v1.4.3 bundle A, 2026-10-04):** Windows' local model
 has been shown this exact `unit` line all along, and it does read it that way.
@@ -6224,6 +6228,11 @@ the authored scenario "a model-sent unit 'next' on add_next_class is ignored
 unless the teacher said unit". Rejected: dropping `unit`/`days` from the local
 surface (a routing change to re-measure), and keying on phrasings. The rest
 is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+*(#440, 2026-10-07, mac: the rest is decided. S2 is widened to drop the
+model's `unit` and `days` from EVERY `add_next_class` — the "unless the
+sentence says unit" exception let "Add the next class in this unit" start a
+new unit — and Windows owes taking both out of its model's view. See the
+#440 section below.)*
 
 ### #424: schedule, cancel, and a reply that runs to the cap
 
@@ -6320,7 +6329,10 @@ All three fixes are CODE; no description moved.
     card keeps its unit "next"), unless the teacher's sentence says unit|units:
     `AssistAgent.withoutAnUnaskedNewUnit`. REJECTED: stripping every undeclared
     key from model calls — principled, but it changes other tools beyond this
-    piece and would need its own cases.
+    piece and would need its own cases. *(Widened by #440, 2026-10-07: the
+    model's `unit` AND `days` are now taken out of every `add_next_class`
+    whatever the sentence says, as `AssistAgent.withoutCardOnlyArguments`; the
+    function named above is gone. Still this one tool only.)*
 - **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
   it in the morning after all.") is still declined by the model — the safe
   direction, since nothing is claimed — and the 30 s limit works only for a
@@ -7649,7 +7661,10 @@ that the mac should match Windows' ORIGINAL schema instead — declare both, and
 refuse the empty call. It was built and measured on 2026-10-04 and failed the
 pre-registered routing rule, so it is PARKED on the branch
 `issue/411-add-next-class-unit-days` and nothing changed on either app; see
-"#411: `add_next_class` with `unit` and `days`, measured and parked" above.)* "Add the next class page" is a card and
+"#411: `add_next_class` with `unit` and `days`, measured and parked" above. #440
+settled it on 2026-10-07: the schema stays at course and section, and an empty
+call runs on both apps — "#440: `add_next_class` keeps two arguments; units and
+counts answered in code".)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.
