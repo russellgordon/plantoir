@@ -1001,6 +1001,18 @@ swap unit and day, strip a `?`, read past the day number (which takes "… in
 ICS3U" and binds this window's course), and send the hide arm's day form to
 `publish_pages` each turn a contract row red.
 
+**On Windows (#432, v1.4.3 bundle A)** the arm is `AssistCardCommand.UnitAndDay`:
+the UNTRIMMED remainder after `"publish unit "` must be ASCII digits, `, day `,
+ASCII digits. Before it landed, the older regex in `AssistAgent.CardCommand`
+that bundle 5a deleted was run against every refused row: it would have taken
+FOUR of the 35 — "publish unit 4,day 3", "publish  unit 4, day 3", "publish
+unit 4, day  3" and "publish unit  4, day 3" — all publishing with no model in
+the loop, so it is not restored. `HideAndEchoContractTests` reads each row's
+`expectTool` and runs all 16 accepted rows through the agent as well (the
+model never asked, the tool bound to the window's course and section), and
+the scenario runner scripts `given.modelReply`, so "an answer the engine
+stopped part way runs nothing" runs there too.
+
 **What the frame tolerates was decided rather than left to taste**, because
 spellings are the whole question for a family like this — the same argument
 `deployAtATime` won. The comma is frame punctuation and is dropped before the
@@ -2988,8 +3000,9 @@ mistake that shipped from v1.1.0 to 2026-09-19** (issue #202, the mac half of
 a VVH2O window, published a VVH2O class and told the teacher it had. **A
 failure that reports success is the one kind a teacher cannot catch**, and it
 is worse than the lost turn the binding was invented to prevent. Windows never
-had it: each of its assistant sessions is locked to one course
-(`AssistWorkspace.Course` throws an `AssistRefusal`), and Russell decided on
+had it: each of its IN-APP assistant sessions is locked to one course
+(`AssistWorkspace.Course` throws an `AssistRefusal`; the outside doors are not,
+since #430 — `courseIsNamedInTheGreetingOnly`), and Russell decided on
 2026-09-19 that Windows' answer is the one both apps should have.
 
 **What is BOUND, and what is GUARDED.**
@@ -4036,8 +4049,9 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
   and `remember_timetable`) is REFUSED at the door of `AssistToolRunner.run`,
   before anything is backed up or written, with `wording.courseIsBeingBuilt`
   ("…so nothing was changed. Ask again once it has finished."). So are
-  `rebuild_preview` and `deploy_section`. This matches Windows'
-  `RefuseIfPlantoirIsBuilding`. `WorkLeaseFiles.whatAnOutsideChangeMeets`
+  `rebuild_preview` and `deploy_section`. Windows does the same at its
+  server's door since v1.4.3 (`OutsideChangeGate`, below — until then it
+  refused only a publish, inside the workspace). `WorkLeaseFiles.whatAnOutsideChangeMeets`
   decides it, and a `build` lease WINS over a `preview` lease whatever order
   the files are read in — reading a building preview as merely served would
   let a change and a rebuild through while a build runs.
@@ -4120,6 +4134,39 @@ rule is `workLeases.declining.outsideChanges`, its cases run by
 - **When the client goes away mid-build**, the server stops the launchers it
   started, and the sections inside the website builder, BEFORE its leases come
   down. A client that kills the server skips that; see the known limit in 09.
+- **On Windows (#436, v1.4.3 bundle A), matched case for case.** The ten
+  `outsideChanges` cases and the four `publishPlanNaming` cases run in
+  `OutsideAssistantWhilePreviewingTests` and `PublishPlanNamingContractTests`
+  (Windows had no reader for either before). Where it lives: the hold-back is
+  `Plantoir.Mcp/OutsideChangeGate.cs`, a call-tool filter in `Program.cs`
+  beside `ReferenceWriteGate` — asked before the tool is dispatched, so before
+  any backup — gated on each tool's own `ReadOnly` flag minus the contract's
+  six, so a new write tool is held back by default. `WorkLease.OutsideMeets`
+  is the pure decision (a HashSet of kinds, so `build` wins whatever the read
+  order — `ABuildWinsWhateverOrderTheLeasesAreReadIn`). Before #436 Windows'
+  writes refused only `if (plan.Publishes)`: an unpublish, a re-date or a new
+  class went ahead mid-build (`AnUnpublishIsHeldBackAtTheDoorWhileTheCourseIsBuilt`
+  pins the difference). The served-preview notes, the rebuild that builds
+  nothing and the deploy that goes ahead (`WorkLease.Asker.AnOutsideDeploy`)
+  are in `AssistWorkspace` (`ClaimTheRebuildAfterAWrite`, `RebuildPreview`,
+  `Deploy`). Three Windows-side decisions, each the easiest to undo:
+  (1) Plantoir's OWN assistant window keeps #289's rule and its words
+  (director's ruling; it is told apart by `PLANTOIR_LOCAL_WINDOW=1`, never by
+  `--course`), as the mac's in-app assistant keeps #156's;
+  (2) the Restore Section pointer (`restoreSectionPutsItBack`) is said only to
+  that window, never to an outside assistant, which has no such button;
+  (3) an outside deploy runs NO separate stop sweep before it builds — the
+  build's own `stop_preview_serving` ends the serving preview to completion
+  before anything is built, which is what the mac's outside deploy and every
+  deploy set for later rely on. A `preview.ps1 --stop` sweep from the server
+  was REJECTED: it ends the window's whole preview chain by command line, so
+  the window's output would carry no mark of the stop and read as a failure.
+  The window's "Closed for a deploy" reads `returned non-zero exit status 15.`
+  — MEASURED on this PC (Python 3.14, Windows 11 26200) by killing a
+  `check=True` child the way `stop_preview.stop_one` does: Windows has no
+  SIGKILL, so it is `os.kill(pid, SIGTERM)`, TerminateProcess with exit code
+  15 (`ScriptRunner.KilledServerMarker`, `ClosedForADeployTests`). Not
+  measured end to end through a real preview and a real deploy.
 
 None of this touches the tool surface: no description, schema or prompt byte
 moved (local 13 `46b96562…2cd96cb6`, MCP 32 `9bcc7eb7…9cef36f7`, hashed before
@@ -6156,11 +6203,87 @@ the schema, never a name" property for the outcome he asked for. Until then
 both apps RUN an empty `add_next_class` call — Windows through
 `AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
 
-**For Windows, by inference and not measured:** Windows' local model has been
-shown this exact `unit` line all along. If its router reads it the same way,
-an ordinary "add the next class" there may already start a new unit. Only a
-measurement that prints the full arguments, rather than scoring the tool's
-name, can tell; it is asked for in the comment on #432.
+**For Windows, MEASURED (v1.4.3 bundle A, 2026-10-04):** Windows' local model
+has been shown this exact `unit` line all along, and it does read it that way.
+With the full arguments printed (`teachers-say-suite.py`, smaller tier, i5-8365U
+/ UHD 620, b10435, 10 trials), all five ordinary phrasings that reached
+`add_next_class` — "Add the next class", "Add an entry for the next class",
+"Add tomorrow's class page", "Start the next class", "Make a page for our next
+class" — sent `"unit": "next", "days": 0` in 50 of 50 calls, and
+`AssistWorkspace` reads unit "next" as the first day of a NEW unit. So on
+Windows today a routed "add the next class" starts Unit N+1 and reports
+success. The fixed phrasing "add the next class page" (code, no `unit`) is
+not affected. **Settled in code (bundle A fix round 2, settler S2):**
+`AssistAgent.WithoutAnUnaskedNewUnit` drops a model-sent `unit: "next"` on
+`add_next_class` unless the teacher's own sentence says "unit"; the call then
+runs as if no unit were given (the next day of the current unit). A model-sent
+`days: 0` is kept and means nothing — `PlanAddNextClass` reads `days` only when
+it is above 0 beside a NUMBERED unit — so one class is added. The surface and
+`OptionalExtras` are unchanged, so no routing measurement was owed. Pinned by
+the authored scenario "a model-sent unit 'next' on add_next_class is ignored
+unless the teacher said unit". Rejected: dropping `unit`/`days` from the local
+surface (a routing change to re-measure), and keying on phrasings. The rest
+is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+
+### #424: schedule, cancel, and a reply that runs to the cap
+
+Windows, v1.4.3 bundle A. Found by #420's measurement on Windows (bundle 10):
+on the local surface that ships, a sentence asking for a LATER deploy reached
+`deploy_section` 10/10, a request to call off a scheduled deploy was declined
+10/10, and "Set up next day's lesson" wrote prose to the 512 cap, 61–89 s.
+All three fixes are CODE; no description moved.
+
+- **"schedule a|the deploy …"** is read as the deploy-at-a-time family
+  (`AssistCardCommand.ScheduleAsDeploy`: "for" may stand for "at"; "for
+  today|tomorrow at <time>" is the day first). Any OTHER sentence opening that
+  way — no time, "tomorrow morning", "for Monday", "at 7" — is ASKED in code
+  (`AsksWhenToSchedule`, `AssistWording.ScheduleADeployNeedsATime`, Windows'
+  sentence proposed as a key), never a deploy now and never the model. A
+  question mark, a negation, or another course or section named still falls
+  through, as in every frame here. The fix round widened the ask (ruling 1)
+  after review traced "Schedule a deploy for tomorrow at 6:30 am" past both
+  first-cut frames to the model.
+- **"[please] cancel the|that|my scheduled deploy [please]"** reaches
+  `cancel_scheduled_deploy` (the safe direction).
+- Rows: `assist-cases.json` → `scheduleAndCancel` (AUTHORED from Windows),
+  run by `ScheduleAndCancelFramesTests`; the mac is asked to implement them.
+- **The settler** is llama-server's own `t_max_predict_ms` = 30000, on the
+  SMALLER tier only (`LocalModel.WritingTimeLimitMs`): a reply still being
+  written 30 s after its first token ends as "length" and takes the #196
+  cut-off path. MEASURED: it fires only once the reply has written a line
+  break — 5 of 10 "next day's lesson" trials ended at ~30 s of writing, the
+  other 5 still ran to the 512 cap (61–82 s). REJECTED: lowering max_tokens
+  (contract-pinned; cuts tool calls everywhere), a streaming early stop (the
+  shape that would close the other half, but a new path and a threshold to
+  measure), a fixed phrasing for the one sentence. The larger tier was not
+  measured and keeps the cap alone: a limit in milliseconds is far fewer of
+  its slower tokens.
+- **The pre-registered rule FAILED, as it said it would**
+  (`schedule-and-settler-424-preregistration.txt`, `-results.txt`): the
+  measured sentences are conversational ("Deploy EXC2O section 1 at 6:30
+  tomorrow morning, before school starts." — ICS3U 0/10; "Don't send it in the
+  morning after all." — 0/10), so they still reach a model shown the same
+  surface. Zero polarity inversions; every other probe equal to MIDDLE but one
+  the app answers in code.
+- **Fix round 2, settler S1: what the model SENT is settled in code.** When
+  its answer is `deploy_section` and the teacher's own sentence carries a
+  later-time word — schedule, scheduled, later, tonight, tomorrow, morning,
+  afternoon, evening, noon, midnight, a weekday — or "at" and a clock, no
+  Deploy-now card is shown, nothing runs, the turn is wound back, the time is
+  asked for (`ScheduleADeployNeedsATime`), and the trail says "chose to deploy
+  now for a request that named a later time — no deploy card was shown…".
+  The measured ICS3U sentence is covered; a sentence with none of the words
+  behaves as before (`AssistAgent.SaysALaterTime`, `TheLaterTimeWordsAreShortAndExact`).
+  Rejected: "next" (the next section), "soon", "after" ("after all"), "today"
+  alone (a deploy today is plausibly now), and turning the call into a
+  `schedule_deploy` card (it would have to guess the moment). Pinned by the
+  authored scenario "a deploy-now answer to a request that named a later time
+  is asked about, never offered"; the mac must make it pass.
+- **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
+  it in the morning after all.") is still declined by the model — the safe
+  direction, since nothing is claimed — and the 30 s limit works only for a
+  reply that has written a line break (5 of 10). Both are Russell's: a
+  pre-registered description change, a broader code rule, or a streaming stop.
 
 ### What was MEASURED for the Codex door
 
@@ -6237,9 +6360,25 @@ Claude…", each hidden independently (`CodexLauncher.IsAvailable`,
 contract's argv exactly — which needed `plantoir-mcp.exe` to accept
 `--mcp-stdio <folder>` (an alias of `--folder`; Windows' server took only
 `--folder` until now). So a Codex session reaches the whole working folder, as
-the contract says (`courseIsNamedInTheGreetingOnly`) — where Windows' CLAUDE
-door still passes `--course` and is locked to one course, a difference the
-contract does not describe; see the questions in `ready/bundle5b.md`.
+the contract says (`courseIsNamedInTheGreetingOnly`). Windows' CLAUDE door
+passed `--course` and was locked to one course until v1.4.3; since #430 it
+passes `--mcp-stdio <folder>` too (`ClaudeCodeLauncher.ServerArguments`, its
+`mcp-<CODE>.json` still named after the course so two launches cannot race),
+names the course in its greeting only, and still writes `started Claude Code
+for <CODE>` on the trail. `CodexLauncherTests.TheOutsideDoorsPassWhatTheContractSays`
+now compares BOTH doors' server argv with `serverArguments` by substitution.
+Without `--course` the server would take no `assist` lease, which the stack
+review showed costs three protections 1.4.2 had: the conversation's backup
+(#283's `BackupDeleter` honours a held backup only for a pid with an `assist`
+lease), the guard against a second session on the same course, and the hold on
+structural work ("Available once you finish revising with Claude"). So the
+door ALSO names its course in the server's ENVIRONMENT
+(`PLANTOIR_DOOR_COURSE`, in the config's `env`; argv stays folder-only) and
+the server takes an `assist` lease on that course WITHOUT locking to it
+(`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
+as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
+and the mac is asked what it does). The Codex door names none and holds none,
+as before.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6643,8 +6782,10 @@ before changing it:
   reaches `list_courses` through a fixed phrasing over the SAME server binary,
   so the window's `McpClient` sets `PLANTOIR_LOCAL_WINDOW=1` and the server
   leaves the line out. Rejected: keying it on `--course` (both the window and
-  the Claude door pass it), and stripping it in `AssistAgent` (the window would
-  then have to know a sentence it never says).
+  the Claude door passed it then; since #430 only the window does, and it is
+  still not the test — a flag one door drops and another keeps is not an
+  identity), and stripping it in `AssistAgent` (the window would then have to
+  know a sentence it never says).
 - **A backup that cannot be made does not stop the save** — the mac's choice,
   with "with no backup, because one could not be made" on the trail. Every other
   Windows write refuses instead; this one follows the mac because the page is

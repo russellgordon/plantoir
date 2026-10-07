@@ -1,7 +1,7 @@
 """The update feeds plantoir.app serves: copied, checked, and checked live (#204).
 
 A released Plantoir asks ``https://plantoir.app/updates/macos.xml`` once a day
-whether there is a new version (and, from Windows' v1.4.0,
+whether there is a new version (and, since Windows 1.4.2,
 ``updates/windows.xml``). Each feed is SIGNED — on the mac the signature is a
 trailing comment inside the file, and NetSparkle keeps it in a separate
 ``windows.xml.signature`` — so the site must serve the exact bytes that were
@@ -20,6 +20,9 @@ signed. This module is the one place that knows that:
 - ``verify_live`` is what a deploy checks afterwards: the live feed is these
   bytes, and its newest download actually exists — the check for a feed that
   points at nothing (deployed before its release was published).
+
+The Windows feed is checked by ``website/windows_feed.py`` instead (#428);
+only ``copy_feeds`` here serves both.
 
 ``website/update_feed.py`` WRITES the mac feed at a release cut; this module
 only copies and checks. Both are documented in RELEASING.md → "The update
@@ -126,10 +129,10 @@ def problems_with(feed: Path) -> list[str]:
     """Why the MAC's feed must not be published, or an empty list.
 
     It reads Sparkle's shape — a `sparkle:shortVersionString` child and a
-    whole-number `sparkle:version` — and is run only on `macos.xml`. A
-    NetSparkle `windows.xml` may carry its version as an attribute; it needs
-    a checker of its own, written with v1.4.0, and build.py does not call this
-    on it (the slice-2 review's L6).
+    whole-number `sparkle:version` — and is run only on `macos.xml`.
+    NetSparkle's `windows.xml` has a checker of its own, `windows_feed.py`
+    (#428): its versions are not whole numbers, and its signatures are checked
+    against the key the app carries.
     """
     problems: list[str] = []
     name = feed.name

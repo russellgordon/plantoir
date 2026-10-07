@@ -353,7 +353,8 @@ baked PowerShell script, and every rule decided at its moment lives there.
 - **Leases both ways, take-then-check** (#289): another program's build,
   publish OR preview declines a build (never a write); Deploy claims before it
   stops the preview; `plantoir-mcp` stops its own launcher before leaving.
-  `workLeases.declining` (29), `.liveness` (17 of 19), `workLease.bodyCases` (7).
+  `workLeases.declining` (32 since #438; the two `copy` cases
+  marked `appliesOn: ["windows"]` run here only), `.liveness` (17 of 19), `workLease.bodyCases` (7).
 - **A scheduled task runs `Plantoir.exe --run-scheduled-deploy "<name>"`**
   (#347): the lateness window (#239), a ten-minute wait for the course (#289),
   whether it still stands, the settings as they are now, then the wrapper.

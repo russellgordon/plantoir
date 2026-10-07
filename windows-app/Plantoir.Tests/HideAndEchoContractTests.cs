@@ -28,11 +28,16 @@ public class HideAndEchoContractTests : IDisposable
 
     // ---- hideIsUnpublish --------------------------------------------------
 
+    /// <summary>
+    /// Each row names its own tool (#432): since #411 three accepted rows are
+    /// the exact "publish unit N, day M" form and expect <c>publish_pages</c>,
+    /// so the tool is read off the row rather than assumed to be unpublish.
+    /// </summary>
     [Fact]
-    public void EveryAcceptedSpellingReachesUnpublishWithThePageBuiltInCapitals()
+    public void EveryAcceptedSpellingReachesItsToolWithThePageBuiltInCapitals()
     {
         var accepted = Cases("hideIsUnpublish")["accepted"]!.AsArray();
-        Assert.True(accepted.Count >= 13, "hideIsUnpublish.accepted has lost rows");
+        Assert.True(accepted.Count >= 16, "hideIsUnpublish.accepted has lost rows");
         foreach (var row in accepted)
         {
             string input = row!["input"]!.ToString();
@@ -52,7 +57,7 @@ public class HideAndEchoContractTests : IDisposable
     public void EveryRefusedSpellingMatchesNothing()
     {
         var refused = Cases("hideIsUnpublish")["refused"]!.AsArray();
-        Assert.True(refused.Count >= 20, "hideIsUnpublish.refused has lost rows");
+        Assert.True(refused.Count >= 35, "hideIsUnpublish.refused has lost rows");
         var wrongly = refused
             .Select(row => row!["input"]!.ToString())
             .Where(input => AssistCardCommand.Matching(input) is not null)
@@ -84,6 +89,36 @@ public class HideAndEchoContractTests : IDisposable
         }
         Assert.True(wrongly.Count == 0, "answered in code by the agent, and the contract sends it to the model: " +
                                        string.Join(" | ", wrongly));
+    }
+
+    /// <summary>
+    /// The accepted rows through the AGENT too (#432): each is answered in
+    /// code — the model is never asked — and what the agent asks the tools for
+    /// is the row's own tool (or its plan twin), bound to THIS window's course
+    /// and section and carrying the row's page.
+    /// </summary>
+    [Fact]
+    public async Task EveryAcceptedSpellingIsAnsweredInCodeThroughTheAgent()
+    {
+        var wrongly = new List<string>();
+        foreach (var row in Cases("hideIsUnpublish")["accepted"]!.AsArray())
+        {
+            string input = row!["input"]!.ToString();
+            string tool = row["expectTool"]!.ToString();
+            var model = new WindowBindingContractTests.ScriptedModel();
+            var tools = new WindowBindingContractTests.RecordingTools();
+            var agent = new AssistAgent(model, tools,
+                ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray(), "ICS3U", 1);
+            await agent.Say(input, CancellationToken.None);
+            bool right = model.Asked.Count == 0 && tools.Calls.Count > 0 && tools.Calls.All(call =>
+                (call.Name == tool || call.Name == "plan_" + tool) &&
+                call.Arguments["course"]?.ToString() == "ICS3U" &&
+                call.Arguments["section"]?.ToString() == "1" &&
+                call.Arguments["pages"]?.AsArray().Single()?.ToString() == row["expectPages"]!.ToString());
+            if (!right) wrongly.Add($"{input} → asked the model {model.Asked.Count}, tools " +
+                                    string.Join(",", tools.Calls.Select(call => call.Name)));
+        }
+        Assert.True(wrongly.Count == 0, "the contract answers these in code: " + string.Join(" | ", wrongly));
     }
 
     // ---- echoedRequest ----------------------------------------------------

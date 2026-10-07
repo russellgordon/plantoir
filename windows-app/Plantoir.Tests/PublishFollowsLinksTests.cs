@@ -128,9 +128,13 @@ public sealed class PublishFollowsLinksTests : IDisposable
 
         string bare = tools.PlanPublishPages(Course, 1, pages: new[] { "index" }).Summary();
         Assert.StartsWith(AssistWording.MorePagesThanOneAreCalled(Course, "1", "index"), bare);
-        // Each named the way it can be asked for again: a landing page by its folder.
-        Assert.Contains("• " + StartOfYearWording.PageName("Concepts"), bare);
-        Assert.Contains("• " + StartOfYearWording.PageName("Labs"), bare);
+        // Each named the way it can be asked for again (publishPlanNaming,
+        // #436): pageNameInFolder, then its folder/name.
+        Assert.Contains("• " + StartOfYearWording.PageNameInFolder("Concepts", "Concepts") + " — Concepts/index", bare);
+        Assert.Contains("• " + StartOfYearWording.PageNameInFolder("Labs", "Labs") + " — Labs/index", bare);
+        // …and given back, the folder/name fits that page alone.
+        Assert.Contains("“Labs” will become visible",
+            tools.PlanPublishPages(Course, 1, pages: new[] { "Labs/index" }).Summary());
         Assert.Contains("“Labs” will become visible", tools.PlanPublishPages(Course, 1, pages: new[] { "Labs" }).Summary());
     }
 

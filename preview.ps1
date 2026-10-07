@@ -742,8 +742,9 @@ if (-not $BUILD_ONLY) {
     $listening = Get-ListeningPorts
     $HOST_PREVIEW_PORT = Find-FreePreviewPort -From $PREVIEW_PORT -Listening $listening
     if (-not $HOST_PREVIEW_PORT) {
-        # previewPorts.whenNoBlockIsFree, word for word except the machine
-        # (proposed to the contract as its Windows line), and its exit code.
+        # previewPorts.whenNoBlockIsFree.sentence, word for word with its
+        # {machine} said "PC" (specialNames.platformWording.machine, #438),
+        # and its exit code.
         Write-Host "Every address Plantoir can use for a preview is taken."
         Write-Host "Close Plantoir's windows for your other working folders, or restart this PC, then try again."
         Write-TrailLine ("{0}/{1} {2} stopped before starting {2} every address Plantoir can use for a preview was taken" -f $COURSE, $SECTION, [char]0x00B7)

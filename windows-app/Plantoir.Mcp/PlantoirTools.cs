@@ -2049,16 +2049,20 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     }
 
     /// <summary>
-    /// What a publish that stopped part way says (#165). Shaped on the mac's
-    /// inline sentence in <c>AssistToolRunner</c> ("Unit 4 was only partly
-    /// published: ...") -- the mac has no <c>AssistWording</c> key for it, so
-    /// this is Windows' own until a key is proposed (the bundle-5b handover to the mac).
-    /// Names the conversation's copy when there is one, because the undo
-    /// entry is abandoned on a throw and that copy is what puts it back.
+    /// What a publish (marking pages) that stopped part way says (#165; the
+    /// contract's words since #436, mac #412: <c>wording.publishStoppedPartWay</c>).
+    /// <c>{what}</c> is "Unit 4" when one unit was asked for, else "the pages
+    /// you named".
     /// </summary>
+    /// <remarks>
+    /// The pointer to the conversation's copy (<c>wording.restoreSectionPutsItBack</c>)
+    /// is said ONLY to Plantoir's own assistant window, which has the Restore
+    /// Section button — never to an outside assistant, which has no such
+    /// button to point at (director's ruling, as the mac does). The undo entry
+    /// is abandoned on a throw, so in the window that copy is what puts it back.
+    /// </remarks>
     private string OnlyPartlyDone(string course, int section, string[]? pages, bool publishing, Exception error)
     {
-        string verb = publishing ? "published" : "unpublished";
         string? unitWord = null;
         int? unit = null;
         if (pages is { Length: 1 })
@@ -2070,14 +2074,13 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             catch { /* the unit word is a nicety; the sentence stands without it */ }
             if (unitWord is not null) unit = PublishPlan.UnitNamed(pages[0], workspace.NamingForCourse(course));
         }
-        string what = unit is { } number ? $"{unitWord} {number}" : "The pages";
+        string what = unit is { } number ? $"{unitWord} {number}" : "the pages you named";
         string reason = error is UnauthorizedAccessException
             ? "Plantoir doesn’t have permission to change one of them."
             : error.Message;
-        string said = $"{what} {(unit is null ? "were" : "was")} only partly {verb}: {reason}";
-        if (workspace.ConversationBackupPath is not null)
-            said += $" A copy from before this conversation changed anything is saved — " +
-                    $"{AssistSectionRestore.ButtonTitle(section)} puts the section back.";
+        string said = AssistWording.PublishStoppedPartWay(what, reason);
+        if (workspace.ServesTheLocalWindow && workspace.ConversationBackupPath is not null)
+            said += " " + AssistWording.RestoreSectionPutsItBack(section.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return said;
     }
 

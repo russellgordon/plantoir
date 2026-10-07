@@ -207,11 +207,13 @@ gh release edit v<version> --draft=false -R <owner/repo>
    `plantoir.app/updates/windows.xml` for new versions (#337). The feed is
    built and signed ON THE WINDOWS PC, from the exact installer being
    uploaded, with `netsparkle-generate-appcast` and the key in
-   `%USERPROFILE%\.plantoir-release` — the command, the two signature checks
-   and what the next feed still owes (notes, earlier items) are in
-   `RELEASING.md` → "The update feed (Windows)". Confirm
-   `website/updates/windows.xml` names THIS version and this installer's
-   length before deploying; if it does not, stop — a Windows release with a
+   `%USERPROFILE%\.plantoir-release` — the command (it ADDS an item with
+   `--reparse-existing`, its plain-text notes from
+   `windows-app/release-notes/<version>.md`) and the signature checks are in
+   `RELEASING.md` → "The update feed (Windows)". `python website/build.py
+   --check` verifies both signatures, and `--deploy` refuses unless the
+   newest item is `<Version>`; confirm too that it carries this installer's
+   length; if it does not, stop — a Windows release with a
    stale feed is offered to nobody. Never print the private key, and never let
    the feed's line endings change (`.gitattributes` keeps them).
 
