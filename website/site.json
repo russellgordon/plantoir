@@ -89,9 +89,18 @@
     "index",
     "features",
     "day-to-day",
-    "publishing",
+    "deploying",
     "support"
   ],
+  "redirects": {
+    "why": "Pages that moved, so their old addresses keep working. build.py writes each move into site/_redirects as a permanent (301) redirect, old address and everything under it, and --check refuses a move whose new page is missing, whose old page still exists, or whose old address a page still links to. 'publishing' became 'deploying' in v1.4.4 (#443): DEPLOY puts a site online, PUBLISH only marks a page. Never remove a move: outside links to the old address cannot be counted.",
+    "moved": [
+      {
+        "from": "publishing",
+        "to": "deploying"
+      }
+    ]
+  },
   "demo_sites": {
     "show_links": true,
     "sites": [
