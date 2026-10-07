@@ -74,7 +74,7 @@ def fence_lines_that_fall_out(text: str) -> list:
 # backticks; a space where the mark should be is the shape refused here.
 # Read on the RAW page, not on prose with code removed: removing the
 # backticked marks makes the correct sentence look exactly like the broken one.
-HEADING_MARK_MISSING = re.compile(r"(?<!`) \(level [1-6]\)")
+HEADING_MARK_MISSING = re.compile(r"(?:Every|and)  \(level [1-6]\)")
 HEADING_MARK_MUST_BE_ACCEPTED = [
     "> Every `##` (level 2) and `###` (level 3) heading you use on this page",
     "> Every heading you use on this page automatically becomes an entry",
