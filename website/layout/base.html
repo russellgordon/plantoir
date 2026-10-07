@@ -40,6 +40,7 @@
     function swap(el) {
       if (el.hasAttribute('data-win-srcset')) el.setAttribute('srcset', el.getAttribute('data-win-srcset'));
       if (el.hasAttribute('data-win-src')) el.setAttribute('src', el.getAttribute('data-win-src'));
+      if (el.hasAttribute('data-win-alt')) el.setAttribute('alt', el.getAttribute('data-win-alt'));
     }
     function scan(node) {
       if (node.nodeType !== 1) return;

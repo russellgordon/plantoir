@@ -58,12 +58,6 @@ SMALLEST_REAL_RADIUS = 0.0155
 # little else; the rule is kept by the code that no longer draws.
 SMALLEST_REAL_WINDOWS_RADIUS = 0.004
 
-# The Windows figures retaken as whole native captures so far (#380). The
-# single-window Windows shots are still square page and content pictures;
-# when they are retaken this list goes and `include_windows=True` takes over.
-WINDOWS_FIGURES_RETAKEN = ("hero", "colour-schemes", "light-and-dark")
-
-
 def is_windows_picture(name: str) -> bool:
     """A picture taken on Windows: `<id>-windows.png`, `<id>-windows-dark.webp`."""
     stem = name.rsplit(".", 1)[0]
@@ -226,7 +220,10 @@ def window_height(pixels, image_height: int, column: int, corner_y: int, step_y:
 
 
 def images_the_pages_show(website: Path, image_dir: Path, include_windows: bool = False) -> list[Path]:
-    """Every picture the pages put in front of a Mac visitor, PNG and WebP.
+    """Every picture the pages put in front of a Mac visitor, PNG and WebP --
+    and, with `include_windows`, every one a Windows visitor is shown too (a
+    shot marked `windows: false` shows Windows visitors the Mac picture, so
+    its `-windows` files are not offered and not judged).
 
     Read from shots.json and the pages themselves, so a shot added to either is
     checked without anyone remembering to list it here. A shot still waiting
@@ -254,27 +251,16 @@ def images_the_pages_show(website: Path, image_dir: Path, include_windows: bool 
             stems.append(identifier)
             if shot.get("dark"):
                 stems.append(f"{identifier}-dark")
-            if include_windows:
+            if include_windows and shot.get("windows") is not False:
                 stems.append(f"{identifier}-windows")
+                stems.append(f"{identifier}-windows-dark")
         else:
             stems.append(f"{identifier}-light")
             stems.append(f"{identifier}-dark")
-            if include_windows:
+            if include_windows and shot.get("windows") is not False:
                 stems.append(f"{identifier}-windows-light")
                 stems.append(f"{identifier}-windows-dark")
         for stem in stems:
-            for suffix in (".png", ".webp"):
-                candidate = image_dir / f"{stem}{suffix}"
-                if candidate.exists():
-                    paths.append(candidate)
-    return paths
-
-
-def windows_figures_retaken(image_dir: Path) -> list[Path]:
-    """The Windows figures already retaken natively, PNG and WebP (#380)."""
-    paths: list[Path] = []
-    for identifier in WINDOWS_FIGURES_RETAKEN:
-        for stem in (f"{identifier}-windows", f"{identifier}-windows-light", f"{identifier}-windows-dark"):
             for suffix in (".png", ".webp"):
                 candidate = image_dir / f"{stem}{suffix}"
                 if candidate.exists():
