@@ -3082,7 +3082,7 @@ folder on this computer" — never a path (a path is machinery on a card, and a
 folder not chosen yet would be blank; #322's contract case pins "a folder").
 Two vocabularies for one list is pre-existing and deliberate; the contract
 pins both (`planOpening.cases[].sheet` and `.card`). `destination(of:)`, the
-primary-only name, was still used by `list_courses`' "publishes to:" — not
+primary-only name, was still used by `list_courses`' "publishes to:" line (it says "deploys to:" since v1.4.4, #443) — not
 scheduling, so out of this piece. It went with
 [#403](https://github.com/russellgordon/plantoir/issues/403): `list_courses`
 now says `everyDestination(of:)` too, and `destination(of:)` is deleted (a
@@ -3121,7 +3121,7 @@ a course with one destination the line is what it always was. The
 | immediate deploy's results (`deployWentOutTo`, `deployNeedsAnAnswerAt`) | yes | unchanged |
 | assistant's `deploy_section` card | names none, on purpose | unchanged |
 | scheduled-publish notification, after-Save sentence | yes, joined with ", " | unchanged; the different join is known and out of scope — do not "fix" one to match the other in passing |
-| `list_courses` "publishes to:" (MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
+| `list_courses` "deploys to:" ("publishes to:" before v1.4.4; MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
 | refusal trail line | the cause, since #396 | above |
 
 **Rejected**, so nobody proposes them again: keeping the unpublished list
