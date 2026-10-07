@@ -11,9 +11,10 @@ import XCTest
 /// `website/shots.json`; renaming one here without renaming it there leaves a
 /// placeholder on a published page.
 ///
-/// They need a demo working folder with the ENG2D, MCV4U and SCH3U courses in
-/// it, supplied as `MARKETING_WORKSPACE`. `DemoWorkspaceProvisioning` below
-/// builds one.
+/// They need a demo working folder with the demo courses in it (ENG2D, MCV4U
+/// and SCH3U today: `website/shots/marketing/folders.json` → `demo.courses`,
+/// read through `MarketingFolderSpec`), supplied as `MARKETING_WORKSPACE`.
+/// `DemoWorkspaceProvisioning` below builds one.
 class MarketingScreenshotCase: XCTestCase {
 
     // MARK: - Stored properties
@@ -37,7 +38,7 @@ class MarketingScreenshotCase: XCTestCase {
     /// there, which is why `AssistWindowPlacement` stopped using one. So this
     /// is that key, and the value is an NSRect string rather than AppKit's
     /// frame format.
-    static let assistantFrameKey: String = "AssistantWindowFrame-ENG2D-1"
+    static let assistantFrameKey: String = "AssistantWindowFrame-\(MarketingFolderSpec.shared.firstDemoCourse)-1"
     static let assistantWidth: CGFloat = 560
     static let assistantHeight: CGFloat = 760
 
@@ -471,7 +472,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     /// one of them open beside them.
     func test1Courses() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let window: XCUIElement = openCourse("ENG2D", in: application)
+        let window: XCUIElement = openCourse(MarketingFolderSpec.shared.firstDemoCourse, in: application)
         settle(2.0)
         // Since v1.4.0 "courses" is taken in the marketing folder
         // (MarketingScenes.testCourses); this demo-folder picture is kept
@@ -484,7 +485,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     func test2NewCourse() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
-        XCTAssertTrue(courseRow("ENG2D", in: application).waitForExistence(timeout: 30))
+        XCTAssertTrue(courseRow(MarketingFolderSpec.shared.firstDemoCourse, in: application).waitForExistence(timeout: 30))
 
         application.buttons["addCourseButton"].click()
         let codeField: XCUIElement = application.textFields["wizardCourseCodeField"]
@@ -512,7 +513,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     func test3Deploying() throws {
         let workspacePath: String = try demoWorkspacePath()
         let application: XCUIApplication = launchApp(workspacePath: workspacePath)
-        let window: XCUIElement = openSection(1, ofCourse: "ENG2D", in: application)
+        let window: XCUIElement = openSection(1, ofCourse: MarketingFolderSpec.shared.firstDemoCourse, in: application)
 
         let deployButton: XCUIElement = application.buttons["deployButton"]
         XCTAssertTrue(deployButton.waitForExistence(timeout: 20), "Deploy button should exist")
@@ -560,7 +561,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     /// photographed the finished site twice and called one of them progress.
     func test4Progress() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let window: XCUIElement = openSection(2, ofCourse: "ENG2D", in: application)
+        let window: XCUIElement = openSection(2, ofCourse: MarketingFolderSpec.shared.firstDemoCourse, in: application)
 
         let previewButton: XCUIElement = application.buttons["previewButton"]
         XCTAssertTrue(previewButton.waitForExistence(timeout: 20))
@@ -630,7 +631,7 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     /// The finished site, inside the app, before anyone else has seen it.
     func test5Preview() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let window: XCUIElement = openSection(1, ofCourse: "ENG2D", in: application)
+        let window: XCUIElement = openSection(1, ofCourse: MarketingFolderSpec.shared.firstDemoCourse, in: application)
 
         let previewButton: XCUIElement = application.buttons["previewButton"]
         XCTAssertTrue(previewButton.waitForExistence(timeout: 20))
@@ -650,10 +651,10 @@ final class MarketingScreenshots: MarketingScreenshotCase {
     /// The assistant, holding a plan and waiting to be told to go ahead.
     func test6Assistant() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        openSection(1, ofCourse: "ENG2D", in: application)
+        openSection(1, ofCourse: MarketingFolderSpec.shared.firstDemoCourse, in: application)
 
         let sectionRow: XCUIElement = application.descendants(matching: .any)
-            .matching(identifier: "sidebar-ENG2D-section1")
+            .matching(identifier: "sidebar-\(MarketingFolderSpec.shared.firstDemoCourse)-section1")
             .firstMatch
         sectionRow.rightClick()
 
@@ -761,11 +762,10 @@ final class DemoWorkspaceProvisioning: MarketingScreenshotCase {
             initialize.click()
         }
 
-        let wanted: [(code: String, sections: String)] = [
-            ("ENG2D", "1, 2"),
-            ("MCV4U", "1"),
-            ("SCH3U", "1"),
-        ]
+        var wanted: [(code: String, sections: String)] = []
+        for course in MarketingFolderSpec.shared.demo.courses {
+            wanted.append((code: course.code, sections: course.sectionsAsTyped))
+        }
 
         for course in wanted {
             if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
@@ -868,13 +868,16 @@ final class MarketingScenes: MarketingScreenshotCase {
 
     // MARK: - Stored properties
 
-    static let course: String = "ICS3U"
-    static let secondCourse: String = "ICS4U"
-    static let collegeBoardFolder: String = "College Board Curriculum"
-    static let referenceYearTitle: String = "2025–26"
+    // All of these are `website/shots/marketing/folders.json` (#445), which
+    // `website/shots/test_demo_folders.py` checks against the payloads: the
+    // curriculum course and the course beside it, the College Board folder,
+    // and the scenes' own pages.
+    static let course: String = MarketingFolderSpec.shared.marketing.curriculumCourse
+    static let secondCourse: String = MarketingFolderSpec.shared.secondMarketingCourse
+    static let collegeBoardFolder: String = MarketingFolderSpec.shared.marketing.collegeBoardPages.folder
     /// In ICS3U and not in ICS4U (measured on the payloads), so copying it is a
     /// plausible Grade 11 → Grade 12 borrow and the checklist has something in it.
-    static let pageToBorrow: String = "The Unplugged Algorithm"
+    static let pageToBorrow: String = MarketingFolderSpec.shared.marketing.scenes.pageToBorrow
 
     // MARK: - Functions
 
@@ -895,7 +898,8 @@ final class MarketingScenes: MarketingScreenshotCase {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
         let window: XCUIElement = application.windows.firstMatch
         XCTAssertTrue(courseRow(MarketingScenes.course, in: application).waitForExistence(timeout: 30))
-        openNewCoursePanel(typing: "TEJ3M", sections: "1, 2", in: application)
+        let offered: MarketingFolderSpec.NewCourse = MarketingFolderSpec.shared.marketing.scenes.newCourse
+        openNewCoursePanel(typing: offered.code, sections: offered.sections, in: application)
         settle(1.5)
         save(window, as: "new-course")
         application.buttons["wizardCloseButton"].click()
@@ -1134,7 +1138,8 @@ final class MarketingScenes: MarketingScreenshotCase {
         openInSite("Curriculum Coverage", in: application)
         // Search also finds "College Board Curriculum Coverage"; the Ontario
         // map is the one listing an Ontario code, and it must be THIS page.
-        XCTAssertTrue(waitForWebText("B3.1", in: webView, timeout: 10),
+        let codes: MarketingFolderSpec.BothCurricula = MarketingFolderSpec.shared.marketing.scenes.bothCurricula
+        XCTAssertTrue(waitForWebText(codes.ontario, in: webView, timeout: 10),
                       "The first map photographed should be the Ontario one")
         save(window, as: "map-ontario")
 
@@ -1142,7 +1147,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         // An EMPTY second map is the failure that reports success: the page
         // exists, every step is green, and nothing is shaded. A code the
         // correlation links must be on it.
-        XCTAssertTrue(waitForWebText("AAP-2.A", in: webView, timeout: 10),
+        XCTAssertTrue(waitForWebText(codes.collegeBoard, in: webView, timeout: 10),
                       "The College Board map should list the objectives its pages reach")
         save(window, as: "map-college-board")
 
@@ -1204,7 +1209,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         }
     }
 
-    /// Unfold Reference Courses › 2025–26, however it was left.
+    /// Unfold Reference Courses › the copy's school year, however it was left.
     func unfoldReferenceYear(in application: XCUIApplication) {
         let year: XCUIElement = application.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
@@ -1219,7 +1224,7 @@ final class MarketingScenes: MarketingScreenshotCase {
         if !referenceCourseRow(in: application).exists {
             // The year's own disclosure triangle, in the outline row that
             // holds it: a click on the year's label selects nothing and
-            // unfolds nothing (the first capture showed 2025–26 still shut).
+            // unfolds nothing (the first capture showed the year still shut).
             let yearRow: XCUIElement = application.outlineRows
                 .containing(NSPredicate(format: "identifier BEGINSWITH %@", "referenceYear-")).firstMatch
             let triangle: XCUIElement = yearRow.disclosureTriangles.firstMatch
@@ -1232,7 +1237,7 @@ final class MarketingScenes: MarketingScreenshotCase {
             settle(1.0)
         }
         XCTAssertTrue(referenceCourseRow(in: application).waitForExistence(timeout: 10),
-                      "Last year's ICS3U should be showing under 2025–26")
+                      "Last year's \(MarketingScenes.course) should be showing under its school year")
     }
 
     /// Open the sidebar's "Reference Courses" section. The header is found by
@@ -1314,7 +1319,10 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         if initialize.waitForExistence(timeout: 10) {
             initialize.click()
         }
-        let wanted: [(code: String, sections: String)] = [("ICS3U", "1, 2"), ("ICS4U", "1")]
+        var wanted: [(code: String, sections: String)] = []
+        for course in MarketingFolderSpec.shared.marketing.courses {
+            wanted.append((code: course.code, sections: course.sectionsAsTyped))
+        }
         for course in wanted {
             if courseRow(course.code, in: application).waitForExistence(timeout: 5) {
                 continue
@@ -1327,18 +1335,20 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         }
     }
 
-    /// Keep a Copy for Reference… on ICS3U, filed under 2025–26.
+    /// Keep a Copy for Reference… on ICS3U, filed under the school year
+    /// `capture.py` names (the one before this one, for a new copy).
     func testKeepACopyForReference() throws {
         let application: XCUIApplication = launchApp(workspacePath: try demoWorkspacePath())
-        let row: XCUIElement = courseRow("ICS3U", in: application)
+        let code: String = MarketingScenes.course
+        let row: XCUIElement = courseRow(code, in: application)
         if !row.waitForExistence(timeout: 30) {
             // Say what the queries see, so a row the tree shows and the
             // query misses can be told apart from a row that is not there.
-            let byIdentifier: Int = application.descendants(matching: .any).matching(identifier: "sidebar-ICS3U").count
+            let byIdentifier: Int = application.descendants(matching: .any).matching(identifier: "sidebar-\(code)").count
             let outlines: Int = application.outlines.count
             let outlineTexts: Int = application.outlines.staticTexts.count
             let windows: Int = application.windows.count
-            XCTFail("ICS3U's row was not found: \(byIdentifier) by identifier, \(outlines) outlines, "
+            XCTFail("\(code)'s row was not found: \(byIdentifier) by identifier, \(outlines) outlines, "
                     + "\(outlineTexts) texts in them, \(windows) windows")
             return
         }
@@ -1349,7 +1359,7 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         }
         row.rightClick()
         let item: XCUIElement = application.descendants(matching: .any)
-            .matching(identifier: "keepACopy-ICS3U").firstMatch
+            .matching(identifier: "keepACopy-\(code)").firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 15), "The course menu should offer Keep a Copy for Reference…")
         item.click()
         // The picker's "School year" is a text BESIDE it, not its label: the
@@ -1358,7 +1368,10 @@ final class MarketingFolderProvisioning: MarketingScreenshotCase {
         let year: XCUIElement = application.sheets.firstMatch.popUpButtons.firstMatch
         XCTAssertTrue(year.waitForExistence(timeout: 15), "The sheet should ask for the school year")
         year.click()
-        application.menuItems[MarketingScenes.referenceYearTitle].firstMatch.click()
+        let yearTitle: String = try MarketingFolderSpec.yearTitle(
+            MarketingFolderSpec.referenceSchoolYear(inWorkspace: try demoWorkspacePath())
+        )
+        application.menuItems[yearTitle].firstMatch.click()
         let keep: XCUIElement = application.buttons["keepACopyButton"]
         XCTAssertTrue(keep.isEnabled, "Keeping the copy should be allowed")
         keep.click()

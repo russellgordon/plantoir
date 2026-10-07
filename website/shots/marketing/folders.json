@@ -1,0 +1,47 @@
+{
+  "about": "The two demo working folders plantoir.app's pictures are taken in, as RULES and DATA rather than as a copy of either folder (GitHub #445). website/shots/demo_folders.py reads this file and applies it; capture.py (macOS), capture_windows.py (Windows), marketing_folder.py and mac-app/Tests/QuartzTeachersUITests/MarketingScreenshotTests.swift all read their course codes, sections and site names from here, and website/shots/test_demo_folders.py proves a clone can make both folders from the repository alone. Dates are never written down: every date follows the school year the courses are made in, the way the app's own installer dates them. Nothing private is here: no Netlify ids, no paths, no College Board text.",
+  "teacherLastName": "gordon",
+  "demo": {
+    "about": "The hero, the app windows and the three class sites (ENG2D prose, MCV4U typeset mathematics, SCH3U chemistry). Default place: ~/Desktop/Teaching.",
+    "defaultFolder": "~/Desktop/Teaching",
+    "courses": [
+      {"code": "ENG2D", "sections": [1, 2], "colourScheme": "vintage-sepia", "site": "eng2d-s1-2026-gordon", "siteTitle": "Grade 10 English"},
+      {"code": "MCV4U", "sections": [1], "colourScheme": "midnight-orchid", "site": "mcv4u-s1-2026-gordon", "siteTitle": "Grade 12 Calculus and Vectors"},
+      {"code": "SCH3U", "sections": [1], "colourScheme": "forest-moss", "site": "sch3u-s1-2026-gordon", "siteTitle": "Grade 11 Chem"}
+    ],
+    "frontPage": {
+      "about": "Every section's front page shows the LATEST class dated on or before this month and day of the school year (never a fixed date: January 15 is a Friday in 2027 and a Saturday in 2028), and every class after it is unpublished. Made through the app's own door (Plantoir --mcp-stdio on the Mac, plantoir-mcp.exe on Windows) with unpublish_pages from the next class's date onward, so the app repoints the front page itself.",
+      "latestClassOnOrBefore": "01-15"
+    },
+    "siteMarkers": "The live sites belong to the kept folder: its .netlify_sites/section1.json carry Netlify's own ids and are never committed. A folder made from this file gets stand-in markers naming the same sites, which is enough for every picture (the site shots photograph the LIVE addresses) and NOT enough to deploy to them: deploying from a stand-in marker makes a new Netlify site."
+  },
+  "marketing": {
+    "about": "The v1.4.0 scenes. Default place: ~/Plantoir Marketing (the scenes show it as ~/Desktop/Teaching while they run; capture.py puts it back).",
+    "defaultFolder": "~/Plantoir Marketing",
+    "courses": [
+      {"code": "ICS3U", "sections": [1, 2], "publishTo": "School Web Space", "collegeBoardCorrelation": "csp-correlation.json", "declaresCollegeBoardHere": false},
+      {"code": "ICS4U", "sections": [1], "publishTo": "School Web Space/ICS4U", "collegeBoardCorrelation": "csp-correlation-ics4u.json", "declaresCollegeBoardHere": true}
+    ],
+    "curriculumCourse": "ICS3U",
+    "secondSemester": {
+      "about": "This section of curriculumCourse moves by whole weeks so its first class falls in the week of this month and day, in the school year after the one its dates begin in (the start-of-year scene is the week before a second semester starts).",
+      "section": 2,
+      "startsInTheWeekOf": "02-01"
+    },
+    "referenceCopy": {
+      "about": "Keep a Copy for Reference of this course, filed under the school year BEFORE the one the folder is made in. Once a copy exists, its own reference_school_year is the year every scene reads; the clock decides only what a NEW copy is filed under.",
+      "of": "ICS3U",
+      "schoolYear": "previous"
+    },
+    "collegeBoardPages": {
+      "about": "The College Board's own words never enter this repository. A Mac makes 56 of the 66 pages from the public Course and Exam Description (college_board.py, csp-codes.json); the other ten quote drawn code and are set out by a person. Russell's are hand-copied from ~/Plantoir Marketing/.sources/College Board Curriculum. Windows has no PDF reader for them (ced_statements.swift is PDFKit), so a Windows folder has no College Board pages and the scenes that need them are taken on the Mac.",
+      "folder": "College Board Curriculum",
+      "source": "hand-copied by Russell"
+    },
+    "scenes": {
+      "newCourse": {"code": "TEJ3M", "sections": "1, 2"},
+      "pageToBorrow": "The Unplugged Algorithm",
+      "bothCurricula": {"page": "The Unplugged Algorithm", "ontario": "B3.1", "collegeBoard": "AAP-2.A"}
+    }
+  }
+}

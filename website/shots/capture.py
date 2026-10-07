@@ -49,6 +49,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -64,6 +65,7 @@ from shadow import capture_active_window, problems_with_shadow, NATIVE_MARGINS  
 from corners import corner_problems, images_the_pages_show  # noqa: E402
 from safari import SafariWindow, verify_appearance, verify_address_bar  # noqa: E402
 import scenes as scene_book  # noqa: E402
+import demo_folders  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 WEBSITE = REPO / "website"
@@ -103,15 +105,14 @@ DEFAULT_WORKSPACE = Path.home() / "Desktop" / "Teaching"
 MARKETING_FOLDER = Path.home() / "Plantoir Marketing"
 
 # The courses the marketing shots are taken from, and the Netlify site each is
-# published to. The naming scheme is per-SECTION — <code>-s<n>-2026-gordon —
+# published to: marketing/folders.json → demo.courses, the one place both
+# demo folders are described (#445), read by the Windows capture and the UI
+# tests too. The naming scheme is per-SECTION — <code>-s<n>-2026-gordon —
 # matching the sites Russell redeployed on 2026-08-19; the browser and phone
-# shots use each course's section 1. The authoritative record is the working
-# folder itself: courses/<CODE>/.netlify_sites/section<n>.json.
-DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon"},
-    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon"},
-    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon"},
-]
+# shots use each course's section 1. The authoritative record of a site's
+# Netlify id is the KEPT working folder itself:
+# courses/<CODE>/.netlify_sites/section<n>.json, never committed.
+DEMO_COURSES = demo_folders.demo_courses()
 
 # The simulator used for the phone shot, and the RocketSim helper that draws
 # the device around it. "iPhone 17 Pro" because the plain iPhone 17 simulator
@@ -129,8 +130,11 @@ REMEMBERED_FRAME_KEYS = [
     # The assistant keeps its own frame under its own key rather than an
     # autosave name — SwiftUI owns the autosave name for that window and
     # overwrites anything put there.
-    "AssistantWindowFrame-ENG2D-1",
+    # The first demo course's section 1, as MarketingScreenshotTests.swift
+    # names it (`assistantFrameKey`), both from folders.json.
+    f"AssistantWindowFrame-{DEMO_COURSES[0]['code']}-1",
 ]
+ASSISTANT_FRAME_KEY = REMEMBERED_FRAME_KEYS[-1]
 
 # Where the assistant window should sit for its portrait. Written into the
 # app's own preference before the run and put back afterwards, because a
@@ -219,8 +223,8 @@ class RememberedWindowFrames:
         that never landed shows up only as a badly proportioned screenshot half
         an hour later. Reading it back costs nothing.
         """
-        write_defaults("AssistantWindowFrame-ENG2D-1", ASSISTANT_FRAME)
-        written = read_defaults("AssistantWindowFrame-ENG2D-1")
+        write_defaults(ASSISTANT_FRAME_KEY, ASSISTANT_FRAME)
+        written = read_defaults(ASSISTANT_FRAME_KEY)
         if written != ASSISTANT_FRAME:
             print(f"   The assistant window frame did not take: wanted {ASSISTANT_FRAME}, "
                   f"got {written!r}", file=sys.stderr)
@@ -267,6 +271,15 @@ def run_ui_test(test_identifier: str, workspace: Path, label: str,
     # by hand from Xcode.
     environment["MARKETING_WORKSPACE"] = str(workspace)
     environment["TEST_RUNNER_MARKETING_WORKSPACE"] = str(workspace)
+    # The spec the tests read their course codes and sections from, and the
+    # school year a reference copy is filed under: READ from the folder's own
+    # copy once it has one, the year before this one for a folder about to
+    # be given one (#445, ruling 4).
+    environment["MARKETING_FOLDERS_SPEC"] = str(demo_folders.SPEC_FILE)
+    environment["TEST_RUNNER_MARKETING_FOLDERS_SPEC"] = str(demo_folders.SPEC_FILE)
+    reference_year = str(demo_folders.reference_school_year(workspace, date.today()))
+    environment["MARKETING_REFERENCE_YEAR"] = reference_year
+    environment["TEST_RUNNER_MARKETING_REFERENCE_YEAR"] = reference_year
 
     # Several identifiers may arrive comma-separated, so a re-shoot of three
     # wrong captures costs one run rather than three preflights and six
@@ -494,10 +507,15 @@ def ensure_launchers(workspace: Path) -> None:
 
 def provision(workspace: Path) -> None:
     """The demo folder (hero and class-site shots): launchers, the build
-    recipe, the three courses THROUGH THE APP, and the live sites' markers.
+    recipe, the three courses THROUGH THE APP, then folders.json's demo state
+    (demo_folders.py): each section's colour scheme, the teacher's last name,
+    the live sites' markers, and every front page on the latest class dated on
+    or before January 15 with every class after it unpublished — that last
+    part asked of the app's own door (`Plantoir --mcp-stdio`), so the app
+    repoints the front page itself.
 
     Idempotent: a course already there is not made again (the UI test skips
-    it), and a marker already there is not rewritten.
+    it), and every step of the state says "already there" on a second run.
     """
     announce(f"Provisioning the demo courses in {workspace}")
     workspace.mkdir(parents=True, exist_ok=True)
@@ -513,18 +531,17 @@ def provision(workspace: Path) -> None:
         run_ui_test("QuartzTeachersUITests/DemoWorkspaceProvisioning/testCreateDemoCourses",
                     workspace, "provision-demo")
     else:
-        print("   ENG2D, MCV4U and SCH3U are already there.")
+        print("   The demo courses are already there.")
 
-    for course in DEMO_COURSES:
-        marker_dir = workspace / "courses" / course["code"] / ".netlify_sites"
-        marker_dir.mkdir(parents=True, exist_ok=True)
-        marker_path = marker_dir / "section1.json"
-        if not marker_path.exists():
-            marker_path.write_text(json.dumps({
-                "id": f"demo-{course['code'].lower()}-s1",
-                "name": course["site"],
-                "url": f"https://{course['site']}.netlify.app"
-            }, indent=2), encoding="utf-8")
+    import marketing_folder
+    report = marketing_folder.Report()
+    app_binary = app_bundle_resources().parent / "MacOS" / "Plantoir"
+    state = SCRATCH / "demo-state-dir"
+    state.mkdir(parents=True, exist_ok=True)
+    left = demo_folders.apply_demo_state(workspace, demo_folders.mac_server(app_binary, workspace, state), report)
+    print(f"   {marketing_folder.summary(report)}")
+    if left:
+        raise SystemExit("The demo folder does not match marketing/folders.json:\n   - " + "\n   - ".join(left))
 
 
 def build_section(workspace: Path, code: str) -> None:
@@ -552,21 +569,16 @@ def build_section(workspace: Path, code: str) -> None:
         raise SystemExit(f"{code} did not build; nothing to publish.")
 
 
-def remember_teacher_name(workspace: Path, last_name: str = "gordon") -> None:
+def remember_teacher_name(workspace: Path) -> None:
     """Answer the one question a first publish asks about the teacher.
 
     Publishing asks for a last name once per working folder, to suggest a site
     name from it. Writing the answer straight into the profile it would save
     means the only thing left on the prompt queue is the site name — and a
     queue of answers that can slip by one is a queue that names a site after
-    the wrong prompt.
+    the wrong prompt. The name is folders.json's `teacherLastName`.
     """
-    profile = workspace / "courses" / ".internal" / "profile.json"
-    if profile.exists():
-        return
-    profile.parent.mkdir(parents=True, exist_ok=True)
-    profile.write_text(json.dumps({"teacher_last_name": last_name}, indent=2), encoding="utf-8")
-    profile.chmod(0o600)
+    demo_folders.remember_teacher_name(workspace)
 
 
 def publish_section(workspace: Path, code: str, site_name: str) -> None:
@@ -1302,8 +1314,8 @@ def provision_marketing(folder: Path) -> int:
     app; the College Board pages from the public document (fetched once into
     .sources/, hash-checked), into both courses; each course's correlation
     embeds and folder destination, ICS4U's declared second curriculum and
-    How I Teach (marketing_folder.py); and a reference copy of ICS3U for
-    2025–26, through the app. Declaring ICS3U's second curriculum is NOT
+    How I Teach (marketing_folder.py); and a reference copy of ICS3U filed
+    under the school year before this one (folders.json), through the app. Declaring ICS3U's second curriculum is NOT
     here: the curriculum-settings scene does it through Course Settings,
     because that is the picture.
     """
@@ -1355,7 +1367,8 @@ def provision_marketing(folder: Path) -> int:
     print(f"   {marketing_folder.summary(report)}")
 
     if not any(True for _ in reference_copies_of(folder, "ICS3U")):
-        print("   Keeping a copy of ICS3U for reference (2025–26), through the app…")
+        title = demo_folders.year_title(demo_folders.reference_school_year(folder, date.today()))
+        print(f"   Keeping a copy of ICS3U for reference ({title}), through the app…")
         run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testKeepACopyForReference", folder, "provision-reference")
     else:
         print("   A reference copy of ICS3U is already there.")

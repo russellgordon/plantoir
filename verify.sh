@@ -224,6 +224,17 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+# Not a toolchain test, and deliberately not in scripts/: it lives beside the
+# screenshot scripts so plantoir.app's marketing data never enters the recipe
+# or the image hash. It is here because nothing else runs it on the mac (#445).
+# It never reads the kept folders: their comparison is opt-in only.
+if python3 website/shots/test_demo_folders.py >/tmp/verify_demo_folders_test.log 2>&1; then
+  pass "plantoir.app's two demo folders can be made from the repository alone, in 2026 and 2027 (website/shots/test_demo_folders.py, #445)"
+else
+  fail "plantoir.app's two demo folders can be made from the repository alone, in 2026 and 2027 (website/shots/test_demo_folders.py, #445)"
+  cat /tmp/verify_demo_folders_test.log
+fi
+
 if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
   pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
 else
