@@ -92,10 +92,13 @@ foreach ($case in @($ports.hostBlockCases)) {
     $want = $case.expect
     Report 'hostBlockCases' $case.name (("$got") -eq ("$want")) "expected '$want', got '$got'"
 }
-# The sentence, word for word, as preview.ps1 prints it (the proposed
-# Windows line, whenNoBlockIsFree.sentenceOnWindows).
+# The sentence, word for word, as preview.ps1 prints it: the contract's
+# `sentence` with its {machine} filled with this platform's word
+# (specialNames.platformWording.machine, #438; it replaced sentenceOnWindows).
+$machine = $shared.specialNames.platformWording.machine
 $previewSource = Get-Content -LiteralPath (Join-Path $repo 'preview.ps1') -Raw -Encoding UTF8
-foreach ($line in @($ports.whenNoBlockIsFree.sentenceOnWindows)) {
+foreach ($written in @($ports.whenNoBlockIsFree.sentence)) {
+    $line = $written.Replace([string]$machine.placeholder, [string]$machine.windows)
     Report 'whenNoBlockIsFree' $line ($previewSource.Contains('Write-Host "' + $line + '"')) 'preview.ps1 does not print this line word for word'
 }
 # The websocket half of a block spoils it too.

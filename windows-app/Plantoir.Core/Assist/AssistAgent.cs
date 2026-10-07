@@ -864,6 +864,16 @@ public sealed class AssistAgent
                 _courseCode, _section);
             return new List<Line> { new("assistant", AssistWording.MorningOrEvening(question)) };
         }
+        // "schedule a deploy" with no time it can set (#424, fix round ruling 1b): never a deploy now, and
+        // never the model, which sent this shape of sentence to deploy_section
+        // 10 of 10 on this PC. Asked in code, transcript only, as above.
+        if (AssistCardCommand.AsksWhenToSchedule(text))
+        {
+            ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
+                "matched in code, not sent to the model — asked what time to schedule the deploy for; nothing was set",
+                _courseCode, _section);
+            return new List<Line> { new("assistant", AssistWording.ScheduleADeployNeedsATime) };
+        }
         if (AssistCardCommand.TimeToSayAs(text) is { } respelling)
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantMatchedAFixedPhrase,
@@ -993,10 +1003,11 @@ public sealed class AssistAgent
                                     cancellation);
         }
         // The old "publish|unpublish Unit N, Day M" shape lived here and was
-        // deleted in bundle 5a's fix round: it answered "publish unit 4, day
-        // 3" in code, where hideIsUnpublish.refused sends that sentence to the
-        // model (publishing is the direction the contract deliberately did not
-        // widen). The unpublish half is AssistCardCommand.HideOrUnpublish now.
+        // deleted in bundle 5a's fix round. It was LOOSER than the contract:
+        // measured against hideIsUnpublish.refused (#432) it took four refused
+        // spellings ("publish unit 4,day 3", doubled spaces in three places).
+        // Both verbs are AssistCardCommand's now — HideOrUnpublish, and
+        // UnitAndDay for the exact "publish unit N, day M" (#411/#432).
         if (planned.Success && !Dated(planned.Groups["title"].Value))
             return await RunCommand(text, "plan_publish_pages",
                                     PageArguments(planned.Groups["title"].Value),
@@ -1918,6 +1929,32 @@ public sealed class AssistAgent
             }
 
             string name = call["function"]?["name"]?.GetValue<string>() ?? "";
+
+            // Settler S1 (#424, fix round 2): a Deploy-now card for a teacher
+            // who named a LATER time is the measured failure (ICS3U 0/10, all
+            // deploy_section). Nothing runs and no card is shown; the time is
+            // asked for, as "schedule a deploy" with no time is.
+            if (name.Equals("deploy_section", StringComparison.OrdinalIgnoreCase) && SaysALaterTime(_typedThisTurn))
+            {
+                ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
+                    "chose to deploy now for a request that named a later time — no deploy card was shown, " +
+                    "nothing ran, and the teacher was asked what time to schedule it for",
+                    _courseCode, _section);
+                WindTheTurnBack();
+                lines.Add(new Line("assistant", AssistWording.ScheduleADeployNeedsATime));
+                return lines;
+            }
+
+            // Settler S2 (#411, fix round 2): the small router sends unit
+            // "next" for an ordinary "add the next class" (50 of 50 on this PC),
+            // which starts a NEW unit. Ignored unless the teacher's own
+            // sentence says "unit"; the call then runs as if no unit were
+            // given. `days` is left as sent: 0 (what the model sends) already
+            // means nothing — PlanAddNextClass reads days only when it is > 0
+            // beside a NUMBERED unit, so one class is added.
+            if (name.Equals("add_next_class", StringComparison.OrdinalIgnoreCase))
+                call = WithoutAnUnaskedNewUnit(call, _typedThisTurn);
+
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
                 ChoseAToolLine(name, call, asking.Elapsed, modelAnswer.CompletionTokens,
                                waited: NeedsApproval(name) || (ConfirmationMode() && PlanTwins.ContainsKey(name))),
@@ -1948,6 +1985,58 @@ public sealed class AssistAgent
         lines.Add(new Line("assistant",
             "I’ve gone round several times without finishing. Tell me what you’d like me to do next."));
         return lines;
+    }
+
+    /// <summary>
+    /// The later-time words of settler S1 (#424, fix round 2), matched as
+    /// WHOLE words in the teacher's own sentence: short and exact on purpose.
+    /// "next" is not here ("deploy the next section"), nor "soon" or "after"
+    /// ("after all"), nor "today" alone ("deploy today" is now, plausibly).
+    /// </summary>
+    internal static readonly HashSet<string> LaterTimeWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "schedule", "scheduled", "later", "tonight", "tomorrow", "morning", "afternoon", "evening",
+        "noon", "midnight",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    };
+
+    /// <summary>Whether the teacher's sentence names a later time: a word above, or "at" and a clock ("at 6:30", "at 7 pm").</summary>
+    internal static bool SaysALaterTime(string? typed)
+    {
+        if (string.IsNullOrWhiteSpace(typed)) return false;
+        string folded = typed.ToLowerInvariant();
+        foreach (System.Text.RegularExpressions.Match word in System.Text.RegularExpressions.Regex.Matches(folded, "[a-z]+"))
+            if (LaterTimeWords.Contains(word.Value)) return true;
+        return System.Text.RegularExpressions.Regex.IsMatch(folded,
+            @"\bat\s+\d{1,2}(\s*(:|\.)\s*\d{2})?\s*(am|pm|a\.m\.?|p\.m\.?)?\b");
+    }
+
+    /// <summary>
+    /// Settler S2: the model's <c>unit: "next"</c> on add_next_class taken out
+    /// unless the teacher said "unit". Everything else in the call is kept.
+    /// </summary>
+    internal static JsonObject WithoutAnUnaskedNewUnit(JsonObject call, string? typed)
+    {
+        if (typed is not null && System.Text.RegularExpressions.Regex.IsMatch(typed, @"\bunits?\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return call;
+        var function = call["function"] as JsonObject;
+        JsonObject? arguments;
+        try
+        {
+            arguments = function?["arguments"] switch
+            {
+                JsonValue text when text.TryGetValue(out string? json) => JsonNode.Parse(json) as JsonObject,
+                JsonObject given => (JsonObject)given.DeepClone(),
+                _ => null,
+            };
+        }
+        catch (System.Text.Json.JsonException) { return call; }   // a malformed call is judged elsewhere
+        if (arguments?["unit"]?.ToString() is not { } unit ||
+            !unit.Equals("next", StringComparison.OrdinalIgnoreCase)) return call;
+        arguments.Remove("unit");
+        var settled = (JsonObject)call.DeepClone();
+        settled["function"]!["arguments"] = arguments.ToJsonString();
+        return settled;
     }
 
     /// <summary>

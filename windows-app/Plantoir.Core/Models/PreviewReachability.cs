@@ -76,15 +76,20 @@ public static class PreviewReachability
     public const string AlertTitle = "Your Preview Did Not Appear";
 
     /// <summary>
-    /// The contract's sentence for a verdict, with its one platform word said
-    /// the Windows way ("your Mac" → "your PC", as <c>specialNames.platformWording</c>
-    /// does for its keys). Proposed to the mac as a platformWording entry.
+    /// <c>cases[1].sentence</c> as the contract writes it, <c>{machine}</c> and
+    /// all (<c>specialNames.platformWording.machine.usedIn</c>, #438).
+    /// </summary>
+    public const string TheSiteNeverAnsweredContract =
+        "Your website did not come up, so Plantoir stopped waiting for it.\n\n" +
+        "Nothing has been lost. Press Preview to try again — and if it happens again, restarting your {machine} usually puts it right.";
+
+    /// <summary>
+    /// The contract's sentence for a verdict, its <c>{machine}</c> said as
+    /// <see cref="MachineWord.Name"/>.
     /// </summary>
     public static string Sentence(Verdict verdict) => verdict switch
     {
-        Verdict.TheSiteNeverAnswered =>
-            "Your website did not come up, so Plantoir stopped waiting for it.\n\n" +
-            "Nothing has been lost. Press Preview to try again — and if it happens again, restarting your PC usually puts it right.",
+        Verdict.TheSiteNeverAnswered => MachineWord.Fill(TheSiteNeverAnsweredContract),
         _ =>
             "Plantoir could not get your website to appear, and could not tell why.\n\n" +
             "Nothing has been lost. Press Preview to try again — and if it happens again, choose “Report a Problem…” " +

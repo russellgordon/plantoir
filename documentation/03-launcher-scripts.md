@@ -2272,10 +2272,11 @@ and what was measured.
   `hostBlockStep` from the port asked for over ONE read of
   `Get-NetTCPConnection -State Listen`; a block is the site port and its
   websocket (+1000), because the native path binds one pair, not a published
-  block of four. None free: the two `whenNoBlockIsFree` lines with "restart this
-  PC" (proposed as `sentenceOnWindows`, not reworded locally; since 2026-10-03
-  the contract says `restart this {machine}` for both apps and
-  `sentenceOnWindows` is superseded, #410/#418), exit 1, and the
+  block of four. None free: the two `whenNoBlockIsFree.sentence` lines, their
+  `{machine}` said "PC" (`specialNames.platformWording.machine`, #410/#418/#438;
+  the Windows-only copy `sentenceOnWindows` that came first was deleted when
+  the fill landed, and `test_launcher_rules.ps1` fills the contract's
+  `sentence` before comparing with what `preview.ps1` prints), exit 1, and the
   launcher trail line written by `Write-TrailLine` — the same file, stamp and
   named mutex (`Local\PlantoirActivityTrail`) as the app's writer. Exercised:
   40 loopback listeners held, exit 1 in 2.0 s.

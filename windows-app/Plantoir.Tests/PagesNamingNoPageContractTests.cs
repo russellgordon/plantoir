@@ -99,9 +99,13 @@ public class PagesNamingNoPageContractTests : IDisposable
         }
         else if (expect["refusal"] is not null)
         {
-            // This platform's own open-ended refusal: nothing written, not a
-            // plan, and not the no-page line.
+            // The open-ended refusal: nothing written, not a plan, and not the
+            // no-page line — in the contract's words since #436
+            // (wording.openEndedPublishRefused, {day} the date asked from).
             Assert.DoesNotContain("named no page it could find", trail);
+            if (expect["refusal"]!.ToString() == "openEndedPublish")
+                Assert.Equal(wording["openEndedPublishRefused"]!.ToString().Replace("{day}", onOrAfter),
+                             result.Summary());
         }
     }
 

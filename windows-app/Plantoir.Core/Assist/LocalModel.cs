@@ -501,14 +501,57 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// → "Every request caps how much the model may write", whose <c>cap</c>
     /// a test reads.
     /// </summary>
-    internal static JsonObject Request(JsonArray messages, JsonArray tools) => new()
+    internal static JsonObject Request(JsonArray messages, JsonArray tools,
+                                       AssistModelTier tier = AssistModelTier.Small)
     {
-        ["model"] = "local",
-        ["temperature"] = 0,
-        ["max_tokens"] = 512,
-        ["messages"] = messages.DeepClone(),
-        ["tools"] = tools.DeepClone(),
-    };
+        var body = new JsonObject
+        {
+            ["model"] = "local",
+            ["temperature"] = 0,
+            ["max_tokens"] = 512,
+        };
+        // The writing limit on the SMALLER tier only, where it was measured
+        // (#424 fix round, ruling 4): see WritingTimeLimitMs.
+        if (tier == AssistModelTier.Small) body["t_max_predict_ms"] = WritingTimeLimitMs;
+        body["messages"] = messages.DeepClone();
+        body["tools"] = tools.DeepClone();
+        return body;
+    }
+
+    /// <summary>
+    /// How long the engine may go on WRITING one reply, in milliseconds — the
+    /// settler for a turn that runs to the cap (#424 item 2). llama-server's
+    /// own <c>t_max_predict_ms</c>: timed from the first token written (never
+    /// the prompt), and it ends a reply only once a line break has been
+    /// written, as a reply stopped at the cap — finish_reason "length" — so
+    /// the existing cut-off path (#196, <see cref="AssistWording.AnswerWasCutOff"/>)
+    /// answers it and nothing the reply began is run.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why.</b> Measured on this PC (bundle 10, i5-8365U, UHD 620,
+    /// Qwen2.5-1.5B, ~7.6 tokens/s): "Set up next day's lesson" wrote prose to
+    /// the 512-token cap 10 trials of 10, 61–89 s each, before the teacher was
+    /// told anything. A routed reply is ~44 tokens (a few seconds here); 30 s
+    /// is ~230 tokens on this hardware — five times a routed reply — and on
+    /// Metal or a discrete GPU the 512-token cap arrives first, so it changes
+    /// nothing there.</para>
+    /// <para><b>Rejected:</b> lowering <c>max_tokens</c> (pinned by
+    /// <c>modelTiers.requirements</c>, and it cuts a long tool call on fast
+    /// and slow machines alike); stopping a STREAMED reply once it is long
+    /// prose with no tool call (the right shape, but a new streaming path and
+    /// a threshold in tokens to re-measure, for one probe); a fixed phrasing
+    /// for "set up next day's lesson" (answers one sentence, not the failure).
+    /// The cost, said plainly: on hardware this slow a genuinely long second
+    /// answer (over ~230 tokens) is now ended as cut off rather than waited
+    /// for — the safe direction, since nothing runs from a cut-off reply.</para>
+    /// <para><b>The smaller assistant only</b> (bundle A fix round, ruling 4).
+    /// The limit is in milliseconds, not tokens, and the larger assistant
+    /// writes several times slower per token on this CPU, so the same 30 s
+    /// would be perhaps 70–100 tokens there — close to an ordinary prose
+    /// answer after a read. It was measured on the smaller tier only, so the
+    /// larger tier keeps the 512-token cap alone until it is measured.</para>
+    /// </remarks>
+    internal const int WritingTimeLimitMs = 30_000;
 
     /// <summary>
     /// The engine's response body, read into the message AND the reason it
@@ -535,7 +578,7 @@ public sealed class LocalModel : IChatModel, IDisposable
     /// </summary>
     public async Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation)
     {
-        var request = Request(messages, tools);
+        var request = Request(messages, tools, Tier);
 
         using var content = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
         try

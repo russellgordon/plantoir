@@ -59,7 +59,7 @@ public class ReferenceCourseUiTests
         EndToEnd.Say(EndToEnd.ReferenceWording["neverDeployed"]!, ("course", "ICS3U"));
 
     private static void Click(DrivenApp app, string automationId, string describedAs) =>
-        app.Find(automationId, describedAs).Click();
+        app.ClickMiddleOf(app.Find(automationId, describedAs));
 
     [UiFact]
     public void AReferenceCourseHasNoDeployButtonAndNoRepairButton()
@@ -170,7 +170,7 @@ public class ReferenceCourseUiTests
     {
         using var app = new DrivenApp(WriteCourses);
         var row = app.Find("sidebar-" + Folder, "the reference course's row");
-        row.RightClick();
+        app.RightClickMiddleOf(row);
         var item = Retry.WhileNull(
             () => app.Window.Automation.GetDesktop().FindFirstDescendant(cf => cf.ByName("Open in Obsidian").And(cf.ByControlType(ControlType.MenuItem))),
             TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
@@ -184,12 +184,12 @@ public class ReferenceCourseUiTests
             Keyboard.Press(FlaUI.Core.WindowsAPI.VirtualKeyShort.ESCAPE);
             return;   // no Obsidian on this machine: the note is reached only through it
         }
-        item.Click();
+        DrivenApp.PressMenuItem(item);
         var note = app.FindOrNull("referenceCalmNote", TimeSpan.FromSeconds(5))
                    ?? Retry.WhileNull(() => desktop.FindFirstDescendant(cf => cf.ByName("About this course’s pages")),
                        TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
         Assert.NotNull(note);
         var cancel = desktop.FindFirstDescendant(cf => cf.ByName("Cancel").And(cf.ByControlType(ControlType.Button)));
-        cancel?.Click();
+        cancel?.AsButton().Invoke();
     }
 }

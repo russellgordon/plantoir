@@ -182,7 +182,68 @@ public static class WorkLease
         /// not cost the morning's publish.
         /// </summary>
         AScheduledPublish,
+
+        /// <summary>
+        /// An OUTSIDE assistant's deploy (#436, mac #433's
+        /// <c>Asker.anOutsideDeploy</c>): goes ahead while a preview is only
+        /// being served — Russell: "if the teacher asks Claude or Codex to
+        /// deploy, it should be allowed to go ahead, even if a preview is
+        /// running" — and is declined by a build, a publish or a copy. A
+        /// preview still BUILDING holds a build lease beside its preview one,
+        /// so it declines this too.
+        /// </summary>
+        AnOutsideDeploy,
     }
+
+    /// <summary>What an outside assistant meets on a course (<c>workLeases.declining.outsideChanges</c>).</summary>
+    public enum OutsideMeeting
+    {
+        /// <summary>Nothing that matters: no lease, or only assist/import ones.</summary>
+        Nothing,
+        /// <summary>A preview that has finished building and is only being SERVED: holds nothing back.</summary>
+        AServedPreview,
+        /// <summary>A site of the course is being BUILT (a build or publish lease): holds everything back.</summary>
+        ABuild,
+    }
+
+    /// <summary>
+    /// What an outside assistant meets, from the KINDS other programs hold on
+    /// the course. PURE, and order-free on purpose: a preview still building
+    /// holds <c>build</c> beside <c>preview</c>, and <c>build</c> must win
+    /// whatever order the lease files were read in — otherwise a change is let
+    /// through mid-build (the trap #433 names).
+    /// </summary>
+    public static OutsideMeeting OutsideMeets(IEnumerable<string> kinds)
+    {
+        var held = kinds.ToHashSet(StringComparer.Ordinal);
+        if (held.Contains(Building) || held.Contains(Publishing)) return OutsideMeeting.ABuild;
+        return held.Contains(Previewing) ? OutsideMeeting.AServedPreview : OutsideMeeting.Nothing;
+    }
+
+    /// <summary>
+    /// A window's preview work lease, given up the moment a preview that had
+    /// been SERVING ends (bundle A fix round, ruling 2): otherwise the lease
+    /// outlived the preview — after another program's deploy closed it, an
+    /// outside assistant went on being told a preview was open ("still shows
+    /// the pages as they were", "deploying closed it") about one that was not.
+    /// Returns what the caller should keep: null once released. Said on the
+    /// trail when the end was a closing for a deploy.
+    /// </summary>
+    public static Held? LetGoWhenAServingPreviewEnds(Held? previewWork, bool isRunning, bool hasBeenServing,
+                                                     bool closedForADeploy, string course, int section)
+    {
+        if (previewWork is null || isRunning || !hasBeenServing) return previewWork;
+        previewWork.Dispose();
+        if (closedForADeploy)
+            Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.PreviewClosedForADeploy,
+                "the window let go of the closed preview's hold on the course, so nothing is told a preview is still open",
+                course, section);
+        return null;
+    }
+
+    /// <summary>The same, read off disk for this working folder (other live programs only).</summary>
+    public static OutsideMeeting WhatAnOutsideChangeMeets(string workspacePath, string courseCode) =>
+        OutsideMeets(HeldBy(workspacePath, courseCode));
 
     /// <summary>One lease file as a reader sees it.</summary>
     /// <param name="Moment">Line 3, or null when there is none.</param>
@@ -204,7 +265,7 @@ public static class WorkLease
     /// </param>
     public static Other? FirstInTheWay(Asker asker, string courseCode, int myPid, Claim? claim, IEnumerable<Other> others)
     {
-        string[] blocking = asker == Asker.AScheduledPublish
+        string[] blocking = asker is Asker.AScheduledPublish or Asker.AnOutsideDeploy
             ? [Building, Publishing, Copying]
             : [Building, Publishing, Previewing, Copying];
 
@@ -415,5 +476,14 @@ public static class WorkLease
 
     public static string DeclinedForTheAssistant(string course, string kind) =>
         kind == Copying ? AssistWording.CourseIsBeingCopied(course) : AssistWording.CourseIsBusy(course);
+
+    /// <summary>
+    /// What an OUTSIDE assistant is told when its rebuild or deploy is held
+    /// back (#436): <see cref="AssistWording.CourseIsBeingBuilt"/>, or the
+    /// copy sentence when the course is being zipped. Never
+    /// <see cref="AssistWording.CourseIsBusy"/>, which keeps its other uses.
+    /// </summary>
+    public static string HeldBackForAnOutsideAssistant(string course, string kind) =>
+        kind == Copying ? AssistWording.CourseIsBeingCopied(course) : AssistWording.CourseIsBeingBuilt(course);
 
 }

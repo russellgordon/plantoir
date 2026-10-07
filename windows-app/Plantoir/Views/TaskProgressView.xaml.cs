@@ -206,6 +206,9 @@ public sealed partial class TaskProgressView : UserControl
                 // An ending the teacher asked for is not a fault.
                 if (_runner.WasCancelled) Outcome("Cancelled", Glyphs.Cancel, Caution(), $"{_title} was cancelled.");
                 else if (_runner.WasStoppedByUser) Outcome("Stopped", Glyphs.Stop, Secondary(), null);
+                // Another program's deploy ended a serving preview (#436): the
+                // teacher asked for that deploy, so it is not a fault.
+                else if (_runner.WasClosedForADeploy) Outcome(ScriptRunner.ClosedForADeployOutcome, Glyphs.Stop, Secondary(), null);
                 else if (exitCode == 0) Outcome("Done", Glyphs.CheckMark, Success(), null);
                 else Outcome("Something went wrong", Glyphs.Cancel, Critical(), _runner.FailureExplanation);
 
@@ -382,7 +385,7 @@ public sealed partial class TaskProgressView : UserControl
     private void AutoExpandOnUnexplainedFailure()
     {
         if (_runner is null || _runner.LastExitCode is not { } exitCode) return;
-        if (exitCode != 0 && !_runner.WasCancelled && !_runner.WasStoppedByUser
+        if (exitCode != 0 && !_runner.WasCancelled && !_runner.WasStoppedByUser && !_runner.WasClosedForADeploy
             && _runner.FailureExplanation is null && !_detailsOpen)
             ToggleDetails(open: true);
     }
