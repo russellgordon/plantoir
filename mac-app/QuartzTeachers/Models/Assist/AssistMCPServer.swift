@@ -43,6 +43,20 @@ enum AssistMCPServer {
     /// by code the app and the server share can say which of the two wrote it.
     static var isServing: Bool = false
 
+    /// The environment variable the Claude door names its course in (#458):
+    /// `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}` in the session's
+    /// `mcp-<CODE>.json`, beside `args`. Windows' `AssistWorkspace
+    /// .DoorCourseVariable`, by the same name.
+    ///
+    /// **It HOLDS the course and never narrows to it.** The server is still
+    /// handed the working folder alone (`outsideAgents.serverArguments`), so
+    /// every course stays reachable (#430); the course named here is the one
+    /// this process takes an `assist` lease on, which keeps the session's
+    /// backup (#283), refuses a second session, and holds rename, Add
+    /// Section and restore in the app while the conversation is open. The
+    /// Codex door names none and holds none, on both platforms.
+    nonisolated static let doorCourseVariable: String = "PLANTOIR_DOOR_COURSE"
+
     // MARK: - Functions
 
     /// The working folder given on the command line, when the flag is present.
@@ -64,6 +78,62 @@ enum AssistMCPServer {
         return URL(fileURLWithPath: RealHome.expandingTilde(in: path))
     }
 
+    /// The course a door's session should hold an `assist` lease on, or nil
+    /// (#458; Windows' `CourseToHoldForTheConversation`).
+    ///
+    /// The value is trimmed; nothing, or blank, is nil. Otherwise it must be
+    /// one of this folder's courses, matched without regard to case, and the
+    /// answer is that course's code AS THE FOLDER SPELLS IT. A course the
+    /// folder does not have is nil — never a refusal and never a lock: the
+    /// session simply holds nothing, as a Codex session does.
+    nonisolated static func courseToHoldForTheConversation(
+        _ doorCourse: String?,
+        among courseCodes: [String]
+    ) -> String? {
+        guard let doorCourse else {
+            return nil
+        }
+        let asked: String = doorCourse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if asked.isEmpty {
+            return nil
+        }
+        for code in courseCodes {
+            if code.lowercased() == asked.lowercased() {
+                return code
+            }
+        }
+        return nil
+    }
+
+    /// Takes the conversation's `assist` lease on the course the door named,
+    /// when there is one this folder has (#458), and says so on the trail.
+    static func holdTheDoorsCourse(
+        in workspace: WorkspaceModel,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        guard let folderPath = workspace.workspaceURL?.path else {
+            return
+        }
+        var courseCodes: [String] = []
+        for course in workspace.courses {
+            courseCodes.append(course.code)
+        }
+        guard let held = courseToHoldForTheConversation(
+            environment[doorCourseVariable], among: courseCodes
+        ) else {
+            return
+        }
+        WorkLeaseRegistry.holdForTheConversation(folderPath: folderPath, courseCode: held)
+        if WorkLeaseRegistry.holdsACourseForTheConversation {
+            ActivityTrail.note(.outsideSessionHeldACourse, AssistMCPServer.holdingTrailLine(courseCode: held))
+        }
+    }
+
+    /// The trail line for a session that holds its course (#458).
+    nonisolated static func holdingTrailLine(courseCode: String) -> String {
+        return "a Claude session started from Plantoir is holding \(courseCode) while it is open"
+    }
+
     /// Read requests from stdin, write replies to stdout, until stdin closes.
     ///
     /// Never returns — MCP servers live until their client goes away, and the
@@ -73,6 +143,7 @@ enum AssistMCPServer {
         let workspace: WorkspaceModel = WorkspaceModel()
         workspace.adoptRestoredPath(workingFolder.path)
         let runner: AssistToolRunner = AssistToolRunner(workspace: workspace, surface: .mcp)
+        holdTheDoorsCourse(in: workspace)
 
         DispatchQueue.global(qos: .userInitiated).async {
             while let line = readLine(strippingNewline: true) {
@@ -164,6 +235,10 @@ enum AssistMCPServer {
             )
         }
 
+        // Windows' order (Program.cs): the runs stop, then the held-backup
+        // records go, then the leases. A record outliving its lease would be
+        // ignored anyway; going first means no reader ever has to.
+        WorkLeaseRegistry.forgetRecordedBackups()
         WorkLeaseRegistry.releaseEverything()
     }
 

@@ -13,14 +13,17 @@ import Foundation
 ///   and nothing is left behind when the session ends.
 /// * **Nothing lands in the teacher's folder.** The config sits in the app's
 ///   own data directory, not in the vault Obsidian is watching.
-/// * **The course is named in the opening message, and nowhere else.** This
-///   used to claim the session was "locked to the course … passed to the
-///   server rather than asked for in a prompt", and that was never true:
-///   `--mcp-stdio` takes the WORKING FOLDER, so every course in it is
-///   reachable, and the only thing that points the session at one course is
-///   the greeting. Corrected 2026-09-19, when a second door made the
-///   difference matter: a reader who believed the old sentence would have
-///   given Codex a narrowing that neither door has.
+/// * **The course points the session in the opening message, and is HELD
+///   through the server's environment — it never narrows it.** `--mcp-stdio`
+///   takes the WORKING FOLDER, so every course in it is reachable, and the
+///   only thing that points the session at one course is the greeting. Since
+///   #458 the configuration also names the course in the server's `env`
+///   (`AssistMCPServer.doorCourseVariable`), so the server holds an `assist`
+///   lease on it — the session's backup is kept, a second session is
+///   refused, and rename, Add Section and restore wait — exactly as Windows'
+///   Claude door has since #430. (Until 2026-09-19 this comment claimed the
+///   session was "locked to the course", which was never true; it still is
+///   not. The Codex door names no course and holds none, on both platforms.)
 ///
 /// The menu item only appears when this returns true from
 /// `isAvailable` — a teacher without Claude Code should not be offered a
@@ -287,6 +290,12 @@ nonisolated enum ClaudeCodeLauncher {
                     "args": [
                         "--mcp-stdio",
                         workspacePath
+                    ],
+                    // The course this door was opened from, for the server to
+                    // HOLD (#458, as Windows since #430): an `assist` lease,
+                    // never a narrowing — `args` stays the folder alone.
+                    "env": [
+                        AssistMCPServer.doorCourseVariable: courseCode
                     ]
                 ]
             ]

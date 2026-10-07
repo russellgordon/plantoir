@@ -254,6 +254,24 @@ enum AssistContract {
             ),
             "deployClosedAnOpenPreview": AssistWording.deployClosedAnOpenPreview(course: course, section: section),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
+            // A Claude session opened from Plantoir holding its course (#458).
+            // Two keys for each counted sentence, one rendering per branch.
+            "availableOnceYouFinishRevisingWithClaude": AssistWording.availableOnceYouFinishRevisingWithClaude,
+            "courseIsAlreadyBeingRevised": AssistWording.courseIsAlreadyBeingRevised(course: course),
+            "finishTheClaudeSessionFirst": AssistWording.finishTheClaudeSessionFirst,
+            "claudeIsRevisingTheCourseRename": AssistWording.claudeIsRevisingTheCourse(course: course, then: "rename"),
+            "claudeIsRevisingTheCourseRestore": AssistWording.claudeIsRevisingTheCourse(course: course, then: "restore"),
+            "claudeIsRevisingTheCourseAddSection": AssistWording.claudeIsRevisingTheCourse(
+                course: course, then: "add the section"
+            ),
+            "backupKeptForAClaudeSession": AssistWording.backupsKeptForAClaudeSession(course: course, count: 1),
+            "backupsKeptForAClaudeSession": AssistWording.backupsKeptForAClaudeSession(course: course, count: 2),
+            "finishTheClaudeSessionToDeleteItsBackup": AssistWording.finishTheClaudeSessionToDeleteItsBackup(
+                course: course, count: 1
+            ),
+            "finishTheClaudeSessionToDeleteItsBackups": AssistWording.finishTheClaudeSessionToDeleteItsBackup(
+                course: course, count: 2
+            ),
             "courseIsBeingBuiltElsewhere": AssistWording.courseIsBeingBuiltElsewhere(course: course),
             "sectionIsBeingDeployed": AssistWording.sectionIsBeingDeployed(course: course, section: section),
             "previewIsRebuilding": AssistWording.previewIsRebuilding(course: course, section: section),
