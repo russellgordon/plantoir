@@ -342,7 +342,7 @@ Added for v1.4.0, macOS only (a Windows visitor sees the mac picture until
 
 | ID | Subject | Scene(s) |
 |---|---|---|
-| `schedule` | Schedule Deploy sheet with the "published on its own" notification over it | `schedule-sheet`, `notification-banner` |
+| `schedule` | Schedule Deploy sheet with the "deployed on its own" notification over it | `schedule-sheet`, `notification-banner` |
 | `reference` | Reference Courses in the sidebar, and Copy a Page into ICS4U | `reference` |
 | `start-of-year` | Get Ready for the Start of the Year's plan | `start-of-year` |
 | `two-maps` | The Ontario and College Board coverage maps side by side | `two-maps` |

@@ -257,6 +257,55 @@ class RedirectTests(unittest.TestCase):
             self.assertTrue((output / "deploying").exists())
 
 
+class DeployWordTests(unittest.TestCase):
+    """DEPLOY puts a site online; PUBLISH only marks a page (#443). Every
+    "publish" the site shows must be one of the page-marking sentences build.py
+    names; the rest say deploy. The site's half of scripts/test_deploy_words.py,
+    turned round: an allowlist rather than a list of old phrases, because the
+    site is small enough to name every sentence that may say publish."""
+
+    def test_the_sites_own_words_say_deploy_for_a_deploy(self):
+        found: list[str] = []
+        for page in build.load_pages():
+            name = page["slug"] + ".html"
+            found += build.deploy_word_problems(name, page["body"])
+            for key in ("title", "description", "nav_label"):
+                found += build.deploy_word_problems(f"{name} {key}", page[key], readable=False)
+        for layout in sorted((build.WEBSITE / "layout").glob("*.html")):
+            found += build.deploy_word_problems(layout.name, layout.read_text(encoding="utf-8"))
+        shots = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))["shots"]
+        for shot in shots:
+            for key, text in build.shot_texts(shot):
+                found += build.deploy_word_problems(f"shots.json {shot['id']} {key}", text, readable=False)
+        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
+        for key, text in build.site_json_texts(site):
+            found += build.deploy_word_problems(f"site.json {key}", text, readable=False)
+        self.assertEqual(found, [], "the site says publish for a deploy (#443)")
+
+    def test_a_deploy_in_the_old_word_is_refused(self):
+        self.assertTrue(build.deploy_word_problems("x", "<p>A failed publish changes nothing.</p>"))
+        self.assertTrue(build.deploy_word_problems("x", "Publish on a schedule, and hear how it went.", readable=False))
+        self.assertTrue(build.deploy_word_problems("x", "<h2>Publishing</h2>"))
+        self.assertTrue(build.deploy_word_problems("x", "It is never published.", readable=False))
+
+    def test_marking_a_page_is_allowed_and_code_is_not_read(self):
+        self.assertEqual(build.deploy_word_problems("x", "<li>Publish or hold back a class.</li>"), [])
+        self.assertEqual(build.deploy_word_problems("x", "<p>A line reading <code>publishForSection1: true</code>.</p>"), [])
+        # The allowed sentence still counts when the page wraps it over two lines.
+        self.assertEqual(build.deploy_word_problems("x", "<p>until you publish it\n  and deploy.</p>"), [])
+
+    def test_a_shot_waiting_for_its_retake_is_read_by_its_new_words(self):
+        shot = {"id": "s", "alt": "saying it published on its own.", "retake": {"alt": "saying it deployed on its own."},
+                "parts": {"banner": {"expectText": ["deployed on its own"]}}}
+        keys = [key for key, _ in build.shot_texts(shot)]
+        self.assertEqual(keys, ["retake alt", "banner expectText"])
+        shot["parts"]["banner"]["expectText"] = ["published on its own"]
+        found = []
+        for key, text in build.shot_texts(shot):
+            found += build.deploy_word_problems(key, text, readable=False)
+        self.assertEqual(len(found), 1)
+
+
 class ReleaseReadinessTests(unittest.TestCase):
 
     def test_pages_ahead_of_the_release_are_not_deployed(self):

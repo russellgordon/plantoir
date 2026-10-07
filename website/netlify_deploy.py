@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Publish the built site/ folder to plantoir.app on Netlify.
+"""Deploy the built site/ folder to plantoir.app on Netlify.
 
 Run through ``python3 website/build.py --deploy``, which builds first; this
-module can also be run directly to publish whatever ``site/`` already holds::
+module can also be run directly to deploy whatever ``site/`` already holds::
 
     python3 website/netlify_deploy.py
 

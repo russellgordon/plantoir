@@ -113,7 +113,7 @@
       <summary>The first build is taking forever. Is it stuck?</summary>
       <div class="answer">
         <p>Almost certainly not.</p>
-        <p>The first time you build a site, the app assembles the machinery that does the building. That's a few minutes on a normal connection — some downloading, some building — and longer on a school network. It happens once — every build after that starts in seconds.</p>
+        <p>The first time you build a site, Plantoir gets your computer ready to build websites. That takes a few minutes on a normal connection, and longer on a school network. It happens once — every build after that starts in seconds.</p>
         <p>The progress view names the step it has reached. As long as that wording keeps changing, work is happening.</p>
       </div>
     </details>
@@ -122,7 +122,7 @@
       <summary>Does this need an administrator password?</summary>
       <div class="answer">
         <p>No. Everything it needs is installed under your own user account, so a school computer you don't have administrator rights on is fine.</p>
-        <p>One thing worth asking about ahead of time: a school network that filters downloads may block what the app fetches on its first run. Easy workaround – do the initial set up of Plantoir and each course you wish to use at home.</p>
+        <p>One thing worth asking about ahead of time: a school network that filters downloads may block what the app fetches on its first run. An easy way round it: do the first setup of Plantoir, and of each course you want to use, at home.</p>
       </div>
     </details>
 
@@ -139,16 +139,16 @@
       <div class="answer">
         <p>Every page carries an instruction saying which classes may see it, and a page you haven't published to a section is left out on purpose.</p>
         <p>Ask the assistant what students would see in that section, or open the page and check the settings at the top of it.</p>
-        <p>If the page should be visible and still isn't, rebuild the preview. The site shows your last build, not the current state of the folder.</p>
+        <p>If the page should be visible and still isn't, press Preview again. The site shows your last build, not the current state of the folder.</p>
       </div>
     </details>
 
     <details>
-      <summary>Publishing failed.</summary>
+      <summary>Deploying failed.</summary>
       <div class="answer">
-        <p>Publishing needs a working connection and, the first time, permission to reach your hosting account. The message in the section's window says which of those went wrong.</p>
+        <p>Deploying needs a working connection and, the first time, permission to reach your hosting account. The message in the section's window says which of those went wrong.</p>
         <p>If you entered the account details incorrectly, you can clear them and be asked again.</p>
-        <p>A failed publish changes nothing for your students. The site that's already live stays live.</p>
+        <p>A failed deploy changes nothing for your students. The site that's already live stays live.</p>
       </div>
     </details>
 
@@ -156,7 +156,7 @@
       <summary>Can I keep last year's course?</summary>
       <div class="answer">
         <p>Yes. Right-click the course and choose <strong>Keep a Copy for Reference…</strong> before you change it for the new year, or bring in a whole working folder from last year with <strong>File ▸ Import Courses for Reference…</strong>. Either way the copy sits under Reference Courses in the sidebar, filed by school year.</p>
-        <p>Its pages are locked, and it is never published — you can read it, preview it and copy pages out of it, and that is all.</p>
+        <p>Its pages are locked, and it is never deployed — you can read it, preview it and copy pages out of it, and that is all.</p>
         <p>If your working folder is in iCloud Drive and you use it on two Macs, update Plantoir on both Macs before you keep a course for reference.</p>
       </div>
     </details>
@@ -164,7 +164,7 @@
     <details id="page-could-not-be-read">
       <summary>Plantoir says a page could not be read, and it's missing from the site.</summary>
       <div class="answer">
-        <p>The settings block at the top of that page is written in a way the site builder can't read. Rather than guess, the build keeps the page away from students and names it, so nothing is published by mistake.</p>
+        <p>The settings block at the top of that page is written in a way the website builder can't read. Rather than guess, the build leaves the page out and names it, so nothing reaches students by mistake.</p>
         <p>Open the page, fix the settings at the top, and build again. The page comes back.</p>
       </div>
     </details>
@@ -174,7 +174,7 @@
       <div class="answer">
         <p>Yes. Say you teach AP Computer Science Principles alongside the Ontario course. Make a folder for it in your course — “College Board Curriculum”, for instance — and tick it under <strong>Curriculum folders</strong> in Course Settings.</p>
         <p>Then fill it with one page per expectation, each named by its code alone: <code>1.A</code>, <code>CRD-1.A</code> and so on. Plantoir doesn't come with these pages, because the framework's wording is yours to bring. <strong>Revise with Claude…</strong> can draft them for you from the framework you have.</p>
-        <p>The next time you preview or publish, the course has a second coverage map beside the first, linked from Key Links. Your first map keeps its name.</p>
+        <p>The next time you preview or deploy, the course has a second coverage map beside the first, linked from Key Links. Your first map keeps its name.</p>
       </div>
     </details>
 
@@ -197,7 +197,7 @@
   <p>Choose <strong>Report a Problem…</strong> from the Help menu. The app asks what to include, saves a file, and then shows you where it put it, so you can read it before it goes anywhere.</p>
   <div class="note">
     <h3>What's in it</h3>
-    <p>A record of what the app did and when — courses opened, previews built, sites published, and any errors along the way. That sequence is usually enough to find a fault without asking you to reproduce it.</p>
+    <p>A record of what the app did and when — courses opened, previews built, sites deployed, and any errors along the way. That sequence is usually enough to find a fault without asking you to reproduce it.</p>
     <h3>What's never in it</h3>
     <p>Anything you wrote on a page. No student names, no assessment, no lesson content — the record notes that a page was published, never what it says. Passwords and account tokens are stripped as the record is written, so what's on disk is already safe to hand over.</p>
     <h3>What you're asked first</h3>
@@ -212,11 +212,11 @@
   <h2>What you need</h2>
   <div class="note">
     <h3>Mac</h3>
-    <p>macOS 15 or later, with Apple silicon. A few gigabytes of free disk space for the site builder, plus whatever your courses need.</p>
+    <p>macOS 15 or later, with Apple silicon. A few gigabytes of free disk space for the website builder, plus whatever your courses need.</p>
     <h3>Windows</h3>
-    <p>Windows 10 or 11 (64-bit). A few gigabytes of free disk space for the site builder, plus whatever your courses need.</p>
+    <p>Windows 10 or 11 (64-bit). A few gigabytes of free disk space for the website builder, plus whatever your courses need.</p>
     <h3>Internet</h3>
-    <p>Needed on the first run, and whenever you publish. Writing, building and previewing all work offline. Plantoir also checks once a day for a new version when it can &mdash; see <a href="#updates">Updates</a>.</p>
+    <p>Needed on the first run, and whenever you deploy. Writing, building and previewing all work offline. Plantoir also checks once a day for a new version when it can &mdash; see <a href="#updates">Updates</a>.</p>
     <h3>Hosting</h3>
     <p>A free hosting account, or a folder on a school web server. The app handles both, and switching later doesn't mean rewriting anything.</p>
   </div>
@@ -226,7 +226,7 @@
 
 <section>
   <h2 id="updates">Updates</h2>
-  <p>Plantoir checks plantoir.app once a day for a new version. When there is one, it shows you what changed &mdash; including anything you need to do first &mdash; and asks before installing anything. It never installs while it is publishing, building a preview, or running a scheduled publish: it waits, and finishes once that is done. You can also check any time with Check for Updates&hellip; &mdash; in the Plantoir menu on a Mac, in the File menu on Windows.</p>
+  <p>Plantoir checks plantoir.app once a day for a new version. When there is one, it shows you what changed &mdash; including anything you need to do first &mdash; and asks before installing anything. It never installs while it is deploying, building a preview, or running a scheduled deploy: it waits, and finishes once that is done. You can also check any time with Check for Updates&hellip; &mdash; in the Plantoir menu on a Mac, in the File menu on Windows.</p>
   <div class="note">
     <h3>On a school-managed Mac</h3>
     <p>If your account can&rsquo;t install apps, Plantoir asks for an administrator&rsquo;s name and password when you choose to install a new version. Your IT department can do it for you, or install new versions themselves.</p>
@@ -243,10 +243,10 @@
 <section>
   <h2>Privacy</h2>
   <p>Your course notes stay on the computer you wrote them on. The app has no accounts and collects no analytics. The one thing it sends on its own is its daily check for a new version, which asks plantoir.app what the newest version is and says at most which version of Plantoir is asking &mdash; nothing about you or your courses. <a href="#updates">Updates</a> says how IT can turn it off on a Mac.</p>
-  <p>A site becomes public when you publish a section. Not before.</p>
+  <p>A site becomes public when you deploy a section. Not before.</p>
   <p>The assistant runs on your computer as part of the app. What you type to it isn't sent to a service and isn't used to train anything. You can leave it off entirely, and nothing is downloaded for it unless you ask.</p>
-  <p>Revise with Claude… and Revise with Codex… are different: they open a program you installed and signed in to yourself, and what it reads from your course goes to that company under your own account. Plantoir never sends anything there on its own. A course's How I Teach page is read by those sessions and never published.</p>
-  <p>Publishing does involve a hosting provider, of course. The account details for it are handed to your computer's own password store rather than left sitting in your course folder.</p>
+  <p>Revise with Claude… and Revise with Codex… are different: they open a program you installed and signed in to yourself, and what it reads from your course goes to that company under your own account. Plantoir never sends anything there on its own. A course's How I Teach page is read by those sessions and never put on your website.</p>
+  <p>Deploying does involve a hosting provider, of course. The account details for it are handed to your computer's own password store rather than left sitting in your course folder.</p>
 </section>
 
 </main>
