@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Plantoir.Core.Assist;
@@ -377,6 +378,7 @@ public sealed partial class SectionDetailView : UserControl
 
         bool running = _previewRunner.IsRunning;
         PreviewLabel.Text = running ? "Stop Preview" : "Preview";
+        AutomationProperties.SetName(PreviewButton, PreviewLabel.Text);
         PreviewIcon.Glyph = running ? Glyphs.Stop : Glyphs.Play;
         ToolTipService.SetToolTip(PreviewButton,
             running ? "Stop previewing this section"

@@ -1016,9 +1016,19 @@ carries `AutomationProperties.Name` in the words its tooltip already shows: the
 sidebar's Add and Remove, the section toolbar's back, forward, reload, Obsidian
 and Open in Browser, Course Settings' Obsidian, and a list row's rename
 (`FormBuilders`; the row's ⓘ and the lists' + and − were already named).
-Preview and Deploy show text beside their icon and are left to be named by it
-(not yet measured: the UiFact below is what will say, and it fails by
-AutomationId if either comes back empty). A reference
+Preview and Deploy show text beside their icon and were left to be named by
+it — which was WRONG, measured on the v1.4.3 cut (2026-10-07), the first time
+the UiFact below ran: a Button whose content is a `StackPanel` (icon plus
+`TextBlock`) is not named from that text, so both came back empty. They now
+carry their visible words as `AutomationProperties.Name` — "Deploy", and
+Preview's set in `SectionDetailView.RefreshChrome` from the same line that
+sets its label, so it reads "Stop Preview" while one runs. The same run found
+every `ToggleSwitch` in Course Settings and the wizard with NO Name at all
+(their On/Off content is empty and the label is a separate `TextBlock`), so a
+switch was announced "toggle switch, off" with no word of which setting it
+was: `FormBuilders.LabeledRow` now gives its control the label as Name (unless
+one is already set) and as `LabeledBy`, which names every switch, combo box
+and text box built through it. A reference
 course's row SHOWS its code, which is the live course's code too, so its Name is
 fuller — `ReferenceCourse.SpokenRowName`, "ICS3U, kept for reference, 2025–26"
 (or without the year when none is set) — through `SidebarRow.SpokenName`, which
@@ -1029,8 +1039,21 @@ the sidebar, a course's settings and a section; the reference row's Name) and by
 `ReferenceCourseTests.AReferenceRowIsSpokenWithItsYear`. Rejected (reasoned, not
 measured): a HelpText on the reference row instead of a fuller Name (the Name is
 what is announced first, so the two ICS3U rows would still start identically); naming
-Preview/Deploy explicitly (their label changes to Stop and to "Available in a
-moment", and a static Name would go stale).
+Preview/Deploy explicitly because their label changes (to Stop, and to
+"Available in a moment") and a static Name would go stale — reversed on the
+v1.4.3 cut: only Preview's LABEL changes, and its Name is set beside it; "Available
+in a moment" is a tooltip, and Deploy's label is always "Deploy".
+
+**Two harness traps from the same cut (2026-10-07, this PC).** FlaUI's
+`element.Name` asks UI Automation NOT to fill in a default, so an element that
+nothing names reports the property unsupported and `.Name` THROWS
+(`PropertyNotSupportedException`) — the empty-name UiFact crashed on the very
+switch it exists to report. A check for "is this named?" reads
+`Properties.Name.ValueOrDefault`. And a Ctrl-click sent back to back —
+`Keyboard.Press(CONTROL)` then the click — arrived as a PLAIN click in both
+runs that reached it, so All Backups' second choice replaced the first ("Delete
+1 Backup…"); with 150 ms either side of the click it is a Ctrl-click. Not a
+product fault: a teacher's finger holds Ctrl far longer than that.
 
 Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
 29–32 s; its first preview served 52–61 s after Preview was pressed;
@@ -2630,8 +2653,9 @@ not a detail to leave in the code.
 ## Dates are written in the Gregorian calendar, by one helper (#144)
 
 Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
-from a cloud session on Linux (see "Working from a cloud session" in
-`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+from a cloud session on Linux (see `windows-app/PROGRESS.md` → "Work done
+from a cloud (Linux) session — 2026-09-27" for what such a session can and
+cannot build).
 The mac needs nothing from this and owes nothing back; it is written up here
 because the REASON is what a future reader of the C# needs, and the reason
 cannot be read off the code.
