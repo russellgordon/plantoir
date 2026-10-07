@@ -149,6 +149,10 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         if (MakeRoom(tidied) is { } room) return room;
         if (numberedPageWord is not null && MakeRoomNumbered(tidied, numberedPageWord) is { } numbered) return numbered;
         if (DeployAtATime(tidied) is { } scheduled) return scheduled;
+        // #424: "schedule a deploy at …" read as the family above; "cancel the
+        // scheduled deploy" by a frame of its own.
+        if (ScheduleAsDeploy(tidied) is { } asDeploy && DeployAtATime(asDeploy) is { } scheduledToo) return scheduledToo;
+        if (CancelTheScheduledDeploy(tidied) is { } cancelled) return cancelled;
         if (LinksCard(message) is { } links) return links;
         return DuplicateClass(tidied, message);
     }
@@ -322,6 +326,7 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
             ("publish unit ", "publish_pages"),
             ("publish all the classes in unit ", "publish_pages"), ("publish everything in unit ", "publish_pages"),
         };
+        if (UnitAndDay(tidied) is { } oneClass) return oneClass;
         foreach (var (prefix, tool) in prefixes)
         {
             if (tidied.StartsWith(prefix, StringComparison.Ordinal))
@@ -339,6 +344,51 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         }
         return null;
     }
+
+    /// <summary>
+    /// <c>publish unit &lt;n&gt;, day &lt;m&gt;</c> → <c>publish_pages</c>, in the
+    /// EXACT form only (#432, the mac's #411; decided by Russell 2026-10-03:
+    /// a sentence that needs no model should not be sent to one).
+    /// </summary>
+    /// <remarks>
+    /// <para>The literal opening "publish unit ", then the UNTRIMMED remainder
+    /// must be digits, ", day ", digits — nothing before, nothing after, single
+    /// spaces, the comma where a class page's own title has it. The shared
+    /// tidier has already taken a trailing "." or "!" and folded the case; it
+    /// takes no "?" and no "please", and neither does this. Every looser
+    /// spelling is a refused row in <c>hideIsUnpublish</c> and reaches the
+    /// model, because publishing is the direction students see and #215's
+    /// widening stays rejected for it.</para>
+    ///
+    /// <para>This replaces nothing that still exists: the older
+    /// <c>AssistAgent.CardCommand</c> regex (deleted in bundle 5a) was LOOSER —
+    /// it took "publish unit 4,day 3", "publish  unit 4, day 3", "publish
+    /// unit 4, day  3" and "publish unit  4, day 3", four rows the contract
+    /// refuses — and is deliberately not restored.</para>
+    ///
+    /// <para>The safety half is the hide frame's: a card binds THIS window's
+    /// course and section, and the exact form leaves no room to name another,
+    /// so "publish unit 4, day 3 in ICS3U" falls through to the model.</para>
+    /// </remarks>
+    private static AssistCardCommand? UnitAndDay(string tidied)
+    {
+        const string opening = "publish unit ";
+        if (!tidied.StartsWith(opening, StringComparison.Ordinal)) return null;
+        string rest = tidied[opening.Length..];
+
+        const string between = ", day ";
+        int comma = rest.IndexOf(between, StringComparison.Ordinal);
+        if (comma <= 0) return null;
+        string unit = rest[..comma];
+        string day = rest[(comma + between.Length)..];
+        if (!AllAsciiDigits(unit) || !AllAsciiDigits(day)) return null;
+
+        return new AssistCardCommand("publish_pages",
+            new Dictionary<string, string> { ["pages"] = $"Unit {unit}, Day {day}" });
+    }
+
+    private static bool AllAsciiDigits(string text) =>
+        text.Length > 0 && text.All(c => c is >= '0' and <= '9');
 
     private static AssistCardCommand? MoreDays(string tidied)
     {

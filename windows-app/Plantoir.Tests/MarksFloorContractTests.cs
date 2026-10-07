@@ -56,16 +56,12 @@ public class MarksFloorContractTests : IDisposable
         if (c["graded"] is JsonArray graded) values["graded_folders"] = new JArray(Strings(graded));
         var config = CourseConfiguration.FromDictionary(values);
 
-        // "Every per-section case has at least two per-section folders, none of
-        // them the class folder" (floor.outcomes). With no class_folder recorded
-        // THIS app guesses the first per-section folder — Handouts in F13/F14 —
-        // and protects it as the class folder, where the mac protects only the
-        // literal "All Classes" or a recorded name. The fixture says which folder
-        // is the class folder (none of these), so the guess is taken out here;
-        // the difference is recorded in documentation/04 rather than changed in
-        // a piece about the marks floor.
-        var context = CourseSettingsProtection.For(config, CourseSettingsProtection.Walk(config, course))
-            with { ResolvedClassFolder = null };
+        // Through the real resolution, nothing taken out (#431, #438): with no
+        // class_folder recorded only the literal "All Classes" is the class
+        // folder, so F13/F14's "Handouts" reaches the marks floor as it does on
+        // the mac. This used to null ResolvedClassFolder to get round this
+        // app's own first-per-section-folder guess.
+        var context = CourseSettingsProtection.For(config, CourseSettingsProtection.Walk(config, course));
         var gesture = c["gesture"]!;
         ItemProtection protection = gesture["untick"] is JsonNode untick
             ? ItemProtectionRule.For(untick.ToString(), ItemList.GradedFolders, context)

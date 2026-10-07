@@ -233,7 +233,13 @@ public sealed partial class SectionDetailView : UserControl
         {
             RefreshChrome();
             if (args.PropertyName == nameof(_previewRunner.IsRunning) && !_previewRunner.IsRunning)
+            {
                 _ = RefreshPublishedMarker();
+                // A preview that had been serving and has ended holds the
+                // course no longer (fix round ruling 2): WorkLease.LetGoWhenAServingPreviewEnds.
+                _previewWork = WorkLease.LetGoWhenAServingPreviewEnds(_previewWork, _previewRunner.IsRunning,
+                    _previewRunner.HasBeenServing, _previewRunner.WasClosedForADeploy, _course.Code, _sectionNumber);
+            }
             // A new build asks the question again, so a problem it still finds
             // is told again — "show it once" means once per BUILD, not once
             // for the life of this view.
@@ -750,7 +756,8 @@ public sealed partial class SectionDetailView : UserControl
     private async Task OfferTodaysClassAsync(string folder)
     {
         var askedOn = DateOnly.FromDateTime(DateTime.Now);
-        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
+        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
+            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         TodaysClassOnTheFrontPage.Offering? offer;
         try { offer = workspace.TodaysClassOffer(_course.Code, _sectionNumber, askedOn); }
         catch (Exception ex) { App.LogDiagnostic($"Today's class: {ex.Message}"); return; }
@@ -1138,6 +1145,7 @@ public sealed partial class SectionDetailView : UserControl
             _lastLoadedUrl = null;
             _isWaitingForServer = true;
             _previewRunner.Milestones = TaskMilestones.Preview;
+            ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
@@ -1361,6 +1369,7 @@ public sealed partial class SectionDetailView : UserControl
             _lastLoadedUrl = null;
             _isWaitingForServer = true;
             _previewRunner.Milestones = TaskMilestones.Preview;
+            ShowAnotherProgramsDeployAsAClosing(workspacePath);
             _previewRunner.Run("preview.ps1",
                 new[] { _course.Code, _sectionNumber.ToString(), "--port", _lease.Port.ToString() },
                 workspacePath);
@@ -1439,6 +1448,9 @@ public sealed partial class SectionDetailView : UserControl
                                 // stays on screen for the teacher to read.
                                 _isWaitingForServer = false;
                                 ReleaseBuildClaim();
+                                // Serving from here: a later end may be another
+                                // program's deploy closing it (#436).
+                                _previewRunner.HasBeenServing = true;
                                 _previewUrl = announced;
                                 LoadIfNeeded(announced);
                                 RefreshChrome();
@@ -1603,6 +1615,20 @@ public sealed partial class SectionDetailView : UserControl
         _isWaitingForServer = false;
         ReleaseLease();
         RefreshChrome();
+    }
+
+    /// <summary>
+    /// A deploy another program runs — an outside assistant's deploy_section,
+    /// or one set for later — ends this preview when it builds the section
+    /// (build_site.stop_preview_serving). The teacher asked for that deploy,
+    /// so the end is shown as "Closed for a deploy", not as a failure (#436,
+    /// mac #433's stack review). Asked of the leases at the moment the run
+    /// ends; ScriptRunner.EndIsAClosingForADeploy holds the other conditions.
+    /// </summary>
+    private void ShowAnotherProgramsDeployAsAClosing(string workspacePath)
+    {
+        string course = _course.Code;
+        _previewRunner.EndedForAnotherProgramsBuild = () => WorkLease.IsHeld(workspacePath, course, WorkLease.Building);
     }
 
     /// <summary>

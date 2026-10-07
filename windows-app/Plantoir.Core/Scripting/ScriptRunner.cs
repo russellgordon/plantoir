@@ -46,6 +46,63 @@ public sealed class ScriptRunner : INotifyPropertyChanged
     public bool WasCancelled { get; private set; }
     public bool WasStoppedByUser { get; private set; }
 
+    // ---- "Closed for a deploy" (#436, mac #433's stack review) ------------
+
+    /// <summary>
+    /// A preview that another program's deploy ended — an outside assistant's
+    /// deploy_section, or a deploy set for later — rather than one that failed.
+    /// Decided once, as the run ends, BEFORE <see cref="LastExitCode"/> is set,
+    /// so a view never shows the end as a failure first.
+    /// </summary>
+    public bool WasClosedForADeploy { get; private set; }
+
+    /// <summary>
+    /// Set by the section's view the moment its preview answers — the site is
+    /// SERVING. A preview that ends before this is a failed build, whatever
+    /// else is happening on the computer. Reset by <see cref="Run"/>.
+    /// </summary>
+    public bool HasBeenServing { get; set; }
+
+    /// <summary>
+    /// Asked once as the run ends: does another program hold a build lease on
+    /// this course right now? Set by the section's view; null means never.
+    /// </summary>
+    public Func<bool>? EndedForAnotherProgramsBuild { get; set; }
+
+    /// <summary>The badge a closed-for-a-deploy preview shows instead of a failure (the mac's words).</summary>
+    public const string ClosedForADeployOutcome = "Closed for a deploy";
+
+    /// <summary>
+    /// What <c>build_site.stop_preview_serving</c> leaves in a serving preview's
+    /// output on THIS platform: Python's own CalledProcessError sentence for the
+    /// node server it ended. Windows has no SIGKILL, so the stop is
+    /// <c>os.kill(pid, SIGTERM)</c> — TerminateProcess with exit code 15 — and
+    /// the server's <c>check=True</c> parent prints "returned non-zero exit
+    /// status 15." MEASURED on this PC (Python 3.14, Windows 11 26200) with the
+    /// same kill the stop uses; the mac's marker is "died with
+    /// &lt;Signals.SIGKILL: 9&gt;". Read, not added — the launchers are unchanged.
+    /// </summary>
+    public const string KilledServerMarker = "returned non-zero exit status 15.";
+
+    /// <summary>
+    /// Whether a preview's end is "Closed for a deploy" rather than a failure.
+    /// ALL of: it ended non-zero and not by the teacher; it had been SERVING;
+    /// its output shows the server ended the way the stop ends it; and another
+    /// program holds a build lease on the course. PURE.
+    /// </summary>
+    /// <remarks>
+    /// The residual, as the mac records it: a lease names the course, not the
+    /// section, so a coinciding deploy of ANOTHER section could mask this
+    /// section's own serving failure of exactly that shape. Accepted; the
+    /// output stays one click away.
+    /// </remarks>
+    public static bool EndIsAClosingForADeploy(int exitCode, bool wasStoppedByUser, bool wasCancelled,
+                                               bool hasBeenServing, string output, bool anotherProgramIsBuilding) =>
+        exitCode != 0 && !wasStoppedByUser && !wasCancelled && hasBeenServing &&
+        output.Contains(KilledServerMarker, StringComparison.Ordinal) && anotherProgramIsBuilding;
+
+    private IReadOnlyList<string> _runArguments = Array.Empty<string>();
+
     /// <summary>
     /// True for the span between one script on this runner exiting and the
     /// NEXT one being launched on it — set only by
@@ -108,6 +165,9 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         LaunchProblem = null;
         WasCancelled = false;
         WasStoppedByUser = false;
+        WasClosedForADeploy = false;
+        HasBeenServing = false;
+        _runArguments = arguments.ToArray();
         IsBetweenPhases = false;
         StepDetail = "";
         if (!keepTranscript) { _announcedPreviewAddress = null; _unfinishedPreviewLine = ""; }
@@ -433,6 +493,25 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         if (IsAwaitingInput) { IsAwaitingInput = false; Notify(nameof(IsAwaitingInput)); }
         FlushBufferedOutput();
         FlushUnfinishedPreviewLine();
+        // Asked BEFORE LastExitCode is set, which is what the views watch, so
+        // they never see a preview another program's deploy ended as a failure.
+        bool anotherIsBuilding = false;
+        if (EndedForAnotherProgramsBuild is { } check && exitCode != 0 && HasBeenServing)
+        {
+            try { anotherIsBuilding = check(); } catch { anotherIsBuilding = false; }
+        }
+        if (EndIsAClosingForADeploy(exitCode, WasStoppedByUser, WasCancelled, HasBeenServing,
+                                    Transcript.DisplayText, anotherIsBuilding))
+        {
+            WasClosedForADeploy = true;
+            string course = _runArguments.Count >= 1 ? _runArguments[0] : "";
+            int section = _runArguments.Count >= 2 && int.TryParse(_runArguments[1], out int number) ? number : 0;
+            const string line = "the preview closed — another program on this computer was building the course for a deploy";
+            if (course.Length > 0 && section > 0)
+                ActivityTrail.Note(ActivityTrail.Event.PreviewClosedForADeploy, line, course, section);
+            else
+                ActivityTrail.Note(ActivityTrail.Event.PreviewClosedForADeploy, line);
+        }
         LastExitCode = exitCode;
         IsRunning = false;
         _process?.Dispose();
@@ -451,6 +530,7 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         string outcome = exitCode == 0 ? "succeeded"
             : WasStoppedByUser ? "stopped by the teacher"
             : WasCancelled ? "backed out at a question"
+            : WasClosedForADeploy ? "closed for a deploy"
             : $"failed (exit code {exitCode})";
         string duration = "";
         if (StartedAt is { } startedAt)

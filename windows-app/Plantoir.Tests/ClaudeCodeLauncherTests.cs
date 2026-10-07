@@ -59,10 +59,13 @@ public class ClaudeCodeLauncherTests
 
             var args = plantoir["args"]?.AsArray();
             Assert.NotNull(args);
-            Assert.Contains(args, a => a?.ToString() == "--folder");
-            Assert.Contains(args, a => a?.ToString() == tempWorkspace);
-            Assert.Contains(args, a => a?.ToString() == "--course");
-            Assert.Contains(args, a => a?.ToString() == courseCode);
+            // The folder only (#430, outsideAgents.serverArguments): the
+            // course is named in the greeting, never handed to the server.
+            Assert.Equal(new[] { "--mcp-stdio", tempWorkspace }, args!.Select(a => a?.ToString()));
+            Assert.DoesNotContain(args, a => a?.ToString() == "--course");
+            // …and named in the server's ENVIRONMENT, to be held, not locked (fix round ruling 3).
+            Assert.Equal(courseCode, plantoir["env"]?[AssistWorkspace.DoorCourseVariable]?.ToString());
+            Assert.EndsWith($"mcp-{courseCode}.json", configPath);
         }
         finally
         {
