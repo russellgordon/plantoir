@@ -157,6 +157,12 @@ Style rules, in order of importance:
   Many commits produce NO line — that is correct behaviour.
 - Merge related commits into one line (three commits fixing the same
   sidebar bug are one bullet).
+- **Keep the app's two words apart** (#443, v1.4.4): DEPLOY is putting a
+  site online — Netlify, Cloudflare or a folder; PUBLISH is only marking a
+  page so that the next deploy includes it, and nothing leaves the
+  computer. "Deploy a section to more than one place at once", never
+  "Publish a section to…". (This skill's own "publish a release" is about
+  GitHub releases, a third sense, and stays.)
 - Cover BOTH platforms when the release carries both assets; label
   platform-specific items "(Windows)" / "(macOS)" only when they truly
   apply to one side.
