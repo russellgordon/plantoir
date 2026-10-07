@@ -95,7 +95,7 @@ final class ScheduleAndCancelFramesTests: XCTestCase {
     /// shape, so it is not answered as if it were this window's course).
     func testANegationOrAnUnknownCodeAfterTheOpeningGoesToTheModel() {
         let toTheModel: [String] = [
-            "schedule a deploy, but not tomorrow",
+            "schedule a deploy but not tomorrow",
             "schedule a deploy tomorrow, no",
             "schedule a deploy and don’t send it yet",
             "schedule a deploy for zzz9q tomorrow",
