@@ -2957,8 +2957,11 @@ mac writes.
   working folder names a pid that means nothing here. #245's liveness limit;
   a Windows lease has no line 4 (except its import lease, since parity bundle
   6b, #415), so a match rests on the name alone.
-- `CourseActivity.busyDescription` (menus, Add Section…) stays in-process on
+- `CourseActivity.busyDescription` (the build gate) stays in-process on
   purpose — declining at the press is the guarantee, not the menu's grey.
+  Since #458 the menu's Rename and Add Section ask `structuralHoldReason`
+  instead, whose assist half is read from the activity folder into the
+  window's snapshot, so a door's lease from another process greys them too.
 
 **A copy lease is Windows' alone (#413, 2026-10-03).** Windows' plantoir-mcp
 holds a `copy` lease while it zips a course for an assistant backup, and its
