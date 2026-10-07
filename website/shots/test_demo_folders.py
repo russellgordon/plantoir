@@ -373,6 +373,55 @@ class OneHome(unittest.TestCase):
         self.assertIsNone(re.search(r"SECOND_SEMESTER_STARTS\s*=\s*date\(", source))
 
 
+# ---------- The door's own behaviour, with a stand-in server ----------
+
+class TheDoor(unittest.TestCase):
+    """ask_the_app stops a server that goes quiet, says what it said on
+    stderr, and sends every section's requests through ONE process."""
+
+    def server(self, body: str) -> list[str]:
+        script = Path(self.temporary.name) / "server.py"
+        script.write_text(body, encoding="utf-8")
+        return [sys.executable, str(script)]
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_a_quiet_server_is_stopped_and_its_stderr_is_shown(self):
+        quiet = self.server("import sys, time\nsys.stderr.write('building the site\\n'); sys.stderr.flush()\n"
+                            "time.sleep(60)\n")
+        started = datetime.now()
+        with self.assertRaises(demo_folders.DoorRefused) as raised:
+            demo_folders.ask_the_app(quiet, [("unpublish_pages", {})], timeout_seconds=2)
+        self.assertLess((datetime.now() - started).total_seconds(), 30)
+        self.assertIn("building the site", str(raised.exception))
+
+    def test_every_request_goes_through_one_process_with_the_extra_arguments(self):
+        log = Path(self.temporary.name) / "calls.jsonl"
+        echo = self.server(
+            "import json, os, sys\n"
+            f"log = open({str(log)!r}, 'a')\n"
+            "for line in sys.stdin:\n"
+            "    message = json.loads(line)\n"
+            "    if 'id' not in message: continue\n"
+            "    log.write(json.dumps({'pid': os.getpid(), 'message': message}) + '\\n'); log.flush()\n"
+            "    print(json.dumps({'jsonrpc': '2.0', 'id': message['id'], 'result': {'content': [{'type': 'text', 'text': 'ok'}]}}), flush=True)\n")
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = make_demo_folder(Path(temporary), AtSeptember2026.CLOCK)
+            demo_folders.apply_demo_state(folder, echo, marketing_folder.Report(), SPEC, extra_arguments={"preview": False})
+        calls = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+        processes = {call["pid"] for call in calls}
+        tools = [call["message"] for call in calls if call["message"].get("method") == "tools/call"]
+        self.assertEqual(len(processes), 1, "one server for every section, so each course is backed up once")
+        sections = sum(len(course["sections"]) for course in demo_folders.demo_courses(SPEC))
+        self.assertEqual(len(tools), sections)
+        for call in tools:
+            self.assertIs(call["params"]["arguments"]["preview"], False)
+
+
 # ---------- The kept folders, opt-in ----------
 
 @unittest.skipUnless(os.environ.get("PLANTOIR_DEMO_FOLDERS_COMPARE") == "1",

@@ -284,7 +284,10 @@ def provision_demo(folder: Path, plantoir_exe: Path) -> int:
     the teacher's last name and the sites' stand-in markers, and asks the
     app's own door to put every front page on the latest class dated on or
     before January 15 with every class after it unpublished. The same
-    demo_folders.py the Mac runs; only the door differs.
+    demo_folders.py the Mac runs; only the door differs. Each request says
+    `preview: false`, so no site is rebuilt; the app still backs each course
+    up once into courses/_backups, and plantoir-mcp.exe takes no --state-dir,
+    so the calls land on the REAL activity trail.
     """
     import marketing_folder
     mcp_exe = plantoir_exe.parent / "plantoir-mcp.exe"
@@ -292,7 +295,8 @@ def provision_demo(folder: Path, plantoir_exe: Path) -> int:
         print(f"   plantoir-mcp.exe is not beside {plantoir_exe}; publish.ps1 puts it there.", file=sys.stderr)
         return 1
     report = marketing_folder.Report()
-    left = demo_folders.apply_demo_state(folder, demo_folders.windows_server(mcp_exe, folder), report)
+    left = demo_folders.apply_demo_state(folder, demo_folders.windows_server(mcp_exe, folder), report,
+                                         extra_arguments=demo_folders.WINDOWS_ARGUMENTS)
     print(f"   {marketing_folder.summary(report)}")
     for line in left:
         print(f"   still to do: {line}", file=sys.stderr)
