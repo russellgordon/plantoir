@@ -184,7 +184,7 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
     /// Both assistant sentences are in the generated wording, under the keys
     /// the contract's cases name, and say nothing about the machinery.
     func testTheAssistantSentencesAreInTheWording() throws {
-        let wording: [String: Any] = AssistContract.wording()
+        let wording: [String: Any] = try XCTUnwrap(AssistContract.wording()["wording"] as? [String: Any])
         for key in ["deployRefusedWhileALaterDeployWorks", "deployRefusedWhileItsSectionDeploys"] {
             let sentence: String = try XCTUnwrap(wording[key] as? String, key)
             for word in ["script", "launcher", "container", "Docker", "toolchain", "publish"] {
