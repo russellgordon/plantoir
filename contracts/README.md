@@ -253,8 +253,9 @@ back on its own.
 **While no Windows release is being cut, an entry may name an open issue on
 the milestone "Windows: parity with mac v1.4.0" itself.** Those entries are
 that milestone's burn-down list: the milestone cannot close, and no Windows
-release can be cut, while any of them remains (2026-09-25; see
-[`WINDOWS-PARITY.md`](../WINDOWS-PARITY.md) → section 8).
+release can be cut, while any of them remains (2026-09-25; the rule was
+section 8 of `WINDOWS-PARITY.md`, deleted 2026-10-04 with the milestone's
+Windows side closed — it is in git history).
 
 The ledger lives on Windows because that is the side that currently owes
 something; there is no mac equivalent and none is needed until the mac is the
