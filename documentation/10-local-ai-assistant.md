@@ -6173,8 +6173,8 @@ terminal.
 declare `unit` and `days`, as Windows' does, so that an EMPTY model call is
 refused (`answerLeftOutWhatItWasFor`) on both apps by the schema-reading rule
 in `AssistToolCall.needsMoreThanTheWindowSupplies`. That moves the local tool
-surface, so it was built on a side branch (`issue/411-add-next-class-unit-days`:
-the two properties in Windows' words, the twin likewise, and an
+surface, so it was built on a side branch, kept as the record
+(`issue/411-add-next-class-unit-days`: the two properties in Windows' words, the twin likewise, and an
 `app-rules.json` → `modelTiers.requirements` case for the empty call) and
 measured on BOTH tiers before it could land. The pass rule was written down
 before anything ran: zero polarity inversions, and no probe that was 10/10
@@ -6293,15 +6293,22 @@ Both tiers, 10 greedy trials, M4 Pro, b10435 Metal, the app's flags. The
 design (AFTER, surface byte-equal to BEFORE): every probe identical BEFORE and
 AFTER in both suites (smaller 210/290 trimmed, 210/250 teachers-say; larger
 290/290, 240/250), zero inversions, unit "next" never; every one of the 22
-pointed sentences reached `add_next_class` with only course and section, or
+pointed sentences then on record (three decided rows were added after the
+measurement) reached `add_next_class` with only course and section, or
 was declined ("Start a new unit?" on both tiers, "Start a new module" on the
 smaller), never another write tool; every control 10/10. **A' was not
 adopted**: on the smaller tier "HIDE - the inversion case", "typos" and the
 "delete" decline each fell 10 → 0, and on BOTH tiers every plain "add the
-next class" phrasing came back with `unit` and `days` filled in (unit 2, days
-1 — or unit 0 on the larger), the smaller sending `newUnit: true` for "Add
+next class" phrasing in the teachers-say suite came back with `unit` and
+`days` filled in — unit 2 and days 1 on all 60 calls on each tier, the
+larger with `newUnit: false`, the smaller sending `newUnit: true` for "Add
 the next class" 10 of 10 — the #411 harm again, with numbers in place of the
-word "next". Zero inversions on every arm, which was necessary and not enough.
+word "next". (The unit-and-count probes, a separate suite, saw the larger
+send `unit: 0` for "Add the next class", "…for period 2" and "…to Module 4".
+Their "28 of 37 fail" against A' follows by construction from a rule that
+bans the keys A' declares, so it is not the evidence; the two findings
+above are.) Zero inversions on every arm, which was necessary and not
+enough.
 
 **Pinned.** `contracts/assist-cases.json` → `nextClassUnits` (accepted,
 notThis, pointed, runs — the runs rows are the deterministic sweep of every
@@ -6317,8 +6324,10 @@ Unit, a Module and a numbered course); the mirror in
 the sentence says "unit" — measured on its own tier; widen S2; port the
 frames and S3, reading the plain next page with `plan_add_next_class` over
 MCP (course and section only; a refusal for dates means S3 does nothing).
-The parked branch `issue/411-add-next-class-unit-days` is deleted at the
-merge; this section is the record of it.
+The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
+record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
+`7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
+a rename. It is not merged and is not to be merged.
 
 ### #424: schedule, cancel, and a reply that runs to the cap
 
@@ -7746,7 +7755,7 @@ there is no difference left to know. *(#411: Russell decided on 2026-10-03
 that the mac should match Windows' ORIGINAL schema instead — declare both, and
 refuse the empty call. It was built and measured on 2026-10-04 and failed the
 pre-registered routing rule, so it is PARKED on the branch
-`issue/411-add-next-class-unit-days` and nothing changed on either app; see
+`issue/411-add-next-class-unit-days` (kept as the record) and nothing changed on either app; see
 "#411: `add_next_class` with `unit` and `days`, measured and parked" above. #440
 settled it on 2026-10-07: the schema stays at course and section, and an empty
 call runs on both apps — "#440: `add_next_class` keeps two arguments; units and
