@@ -38,7 +38,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 from test_deploy_sh_questions import HAS_BASH, REPOSITORY_ROOT
-from test_preview_while_deploying import BASH, TABLE_END, TABLE_START, PretendMac, function_named
+from test_preview_while_deploying import (BASH, FAKE_PS_FOR_THE_REAL_LAUNCHER, TABLE_END, TABLE_START, PretendMac,
+                                          function_named)
 
 GUARD_START = "# >>> DEPLOY WHILE ITS SECTION DEPLOYS GUARD >>>"
 GUARD_END = "# <<< DEPLOY WHILE ITS SECTION DEPLOYS GUARD <<<"
@@ -227,6 +228,65 @@ class TheCallSites(unittest.TestCase):
                 for word in ("workspace", "container", "script", "Docker", "docker", "publish"):
                     self.assertNotIn(word, line)
 
+
+
+# Mac only, for TheRealPreviewUpToItsGuard's reason: the pretend ps walks the
+# REAL process table with /bin/ps -o to list this run and its ancestors.
+@unittest.skipUnless(HAS_BASH and sys.platform == "darwin" and Path("/bin/ps").exists(),
+                     "needs a Mac: the pretend ps walks the real table with /bin/ps -o")
+class TheRealLaunchersUpToTheirGuard(unittest.TestCase):
+    """The cases above paste the reader and the guard in themselves, and the
+    call sites are otherwise checked as TEXT, so a call made under the wrong
+    condition (a build-only run that never asks, say) would stay green (#439
+    implementation review, finding 9). This runs deploy.sh and preview.sh
+    --build-only THEMSELVES, from their first line to just after the guard's
+    call, and stops there: no docker or colima on PATH, a scratch HOME, and
+    pretend ps and lsof. The cut is made at the call LINE, not at its whole
+    if-block, so a changed condition is caught by what the launcher does."""
+
+    LEFTOVER = ("/bin/bash /Users/t/Library/Application Support/Plantoir/scheduled/"
+                "ca.russellgordon.Plantoir.deploy.ICS4U.section2.{hereID}.sh")
+
+    def run_the_real_prefix(self, launcher: str, call_line: str, arguments: list, working: bool):
+        text = launcher_text(launcher)
+        self.assertEqual(text.count(call_line), 1, call_line)
+        end_of_block = text.index("fi\n", text.index(call_line)) + len("fi\n")
+        prefix = text[:end_of_block] + "echo REACHED\nexit 0\n"
+        with tempfile.TemporaryDirectory() as folder:
+            mac = PretendMac(Path(folder))
+            (mac.bin / "ps").write_text(FAKE_PS_FOR_THE_REAL_LAUNCHER, encoding="utf-8")
+            (mac.here / launcher).write_text(prefix, encoding="utf-8")
+            (mac.here / "courses" / "ICS4U" / "section2").mkdir(parents=True)
+            (mac.here / "courses" / "ICS4U" / "course_config.json").write_text("{}\n", encoding="utf-8")
+            rows = [[801, 1, self.LEFTOVER]] if working else []
+            mac.lay_out({"processes": rows})
+            environment = {"HOME": str(mac.home), "FAKE": str(mac.fake), "PATH": f"{mac.bin}:/usr/bin:/bin"}
+            result = subprocess.run([BASH, "./" + launcher] + arguments, cwd=mac.here, env=environment,
+                                    capture_output=True, text=True, timeout=60)
+            calls_file = mac.fake / "calls"
+            calls = calls_file.read_text(encoding="utf-8") if calls_file.exists() else ""
+            self.assertIn("ps -Ao pid=,ppid=,args=", calls,
+                          f"the real {launcher} never read the process table: " + result.stdout + result.stderr)
+            return result
+
+    def check(self, launcher: str, call_line: str, arguments: list, leg: str):
+        refused = self.run_the_real_prefix(launcher, call_line, arguments, working=True)
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertNotIn("REACHED", refused.stdout)
+        for line in expected_lines("later", leg, "ICS4U", "2"):
+            self.assertIn(line, refused.stdout.splitlines())
+        self.assertNotIn("command not found", refused.stderr)
+        allowed = self.run_the_real_prefix(launcher, call_line, arguments, working=False)
+        self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
+        self.assertIn("REACHED", allowed.stdout)
+
+    def test_the_real_deploy_sh_refuses_while_a_leftover_run_works(self):
+        self.check("deploy.sh", 'refuse_while_this_section_deploys "$COURSE_CODE" "$SECTION_NUM" deploy\n',
+                   ["ICS4U", "2"], "deploy")
+
+    def test_the_real_preview_sh_build_only_refuses_while_a_leftover_run_works(self):
+        self.check("preview.sh", 'refuse_while_this_section_deploys "$COURSE" "$SECTION" build\n',
+                   ["ICS4U", "2", "--build-only", "--image", "x"], "build")
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
