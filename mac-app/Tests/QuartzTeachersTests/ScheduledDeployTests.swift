@@ -811,6 +811,9 @@ final class ScheduledDeployTests: XCTestCase {
         }
         XCTAssertTrue(written.contains("could not set a scheduled deploy"), written)
         XCTAssertFalse(written.contains("set this section's deploy again"), written)
+        // …but the earlier deploy the boot-out left working is still said
+        // (#439 fixes review, finding 2).
+        XCTAssertTrue(written.contains("earlier deploy was still working, and will finish on its own"), written)
     }
 
     func testCancellingRemovesTheAgent() throws {
