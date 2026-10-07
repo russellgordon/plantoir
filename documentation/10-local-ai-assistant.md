@@ -6234,6 +6234,92 @@ sentence says unit" exception let "Add the next class in this unit" start a
 new unit — and Windows owes taking both out of its model's view. See the
 #440 section below.)*
 
+### #440: `add_next_class` keeps two arguments; units and counts answered in code
+
+**The defect, measured on the mac (2026-10-07, M4 Pro, b10435, the smaller
+assistant, the shipped 13-tool surface).** Ten sentences about units and
+counts — "Add the next class in a new unit", "The next class begins Unit 3",
+"Make the next class the first day of a new unit", "Add three days to Unit 2",
+"Add another day to Unit 4", "Add the next two classes" and four more —
+reached `add_next_class` 50 times in 50 with only `{course, section}`. Each
+added ONE page in the CURRENT unit and reported success ("Unit 4" was also read
+as section 4; the window binding takes that back). Less harm than starting a
+unit by mistake, the same shape: silent, and success reported.
+
+**What was decided, and why (rulings on the #440 plan, 2026-10-07).**
+- **The local tool keeps `{course, section}`; nothing the model is shown
+  moves** (13 tools, `LOCAL_DIGEST` unmoved). #411 measured declaring
+  Windows' `unit`/`days` and both models read the NEXT in "add the next class"
+  as "start a new unit" (6 of 6, 5 of 6).
+- **Fixed frames answer the sentences in code** (`AssistCardCommand`): "add
+  the next class in a new unit" and "start a new unit with the next class"
+  beside the shipped "start a new unit"; "add <count> [more] days|classes to
+  unit <n>" and "add a|one|another [more] day|class to unit <n>" beside the
+  shipped "add <count> more days to unit <n>", the count agreeing with the
+  noun. Term-blind (only "unit"), exact, nothing else tolerated.
+- **Settler S3** (`AssistNextClassUnits`, in `think()` after the course gate,
+  MODEL calls only): the teacher's own sentence is read for (a) a new unit,
+  (c) a count above one right before a page noun, after an adding verb or
+  "next", (b) a unit — or, when a unit is named, a day — that is not where the
+  plain next page goes (read-only, `AssistToolRunner.nextClassReading`, the
+  same planner the tool calls). Any of them: nothing runs, no card, the turn
+  is wound back, the trail says which (`nextClassPointedLine`), and the
+  teacher gets `wording.nextClassNeedsItsOwnPhrasing` naming sentences the
+  window accepts in THAT course (Module: the "unit" sentences, said to be
+  read as Module; numbered: "Add the next meeting page", once per page — a
+  numbered course refuses both unit frames). No dates on file: S3 does nothing
+  and the dates are asked for. **It points; it never converts**: "don't start a
+  new unit" must not become one.
+- **The model's `unit` and `days` are dropped from every `add_next_class`**
+  (S2 widened). S2's "unless the sentence says unit" let "Add the next class in
+  this unit" start a unit.
+- **An empty `add_next_class` RUNS on both apps** (option E), pinned by a
+  scenario rather than an app-rules row (only a scenario runs the call through
+  the agent).
+- The mac's MCP `add_next_class` does not gain `unit`/`days`: `add_classes`
+  covers several days and a new unit there.
+
+**Rejected.** A — declare `unit`/`days`, steer in code: the #411 arm, failed.
+**A'** — Russell's `newUnit` boolean and integer `unit`/`days`: measured
+today as a third arm, both tiers, pre-registered (adopt only if it matched
+the design on every count with no inversions); it did not — see the numbers
+below. B — a separate local tool (14 tools; "the next class" vs "a new unit"
+is the near-synonym pair a small router confuses). E — refusing the empty
+call.
+
+**Measured.** `research/ai-assist/next-class-unit-440-preregistration.txt`
+(committed before the first request) and `…-results.txt` / `…-raw.txt`.
+Both tiers, 10 greedy trials, M4 Pro, b10435 Metal, the app's flags. The
+design (AFTER, surface byte-equal to BEFORE): every probe identical BEFORE and
+AFTER in both suites (smaller 210/290 trimmed, 210/250 teachers-say; larger
+290/290, 240/250), zero inversions, unit "next" never; every one of the 22
+pointed sentences reached `add_next_class` with only course and section, or
+was declined ("Start a new unit?" on both tiers, "Start a new module" on the
+smaller), never another write tool; every control 10/10. **A' was not
+adopted**: on the smaller tier "HIDE - the inversion case", "typos" and the
+"delete" decline each fell 10 → 0, and on BOTH tiers every plain "add the
+next class" phrasing came back with `unit` and `days` filled in (unit 2, days
+1 — or unit 0 on the larger), the smaller sending `newUnit: true` for "Add
+the next class" 10 of 10 — the #411 harm again, with numbers in place of the
+word "next". Zero inversions on every arm, which was necessary and not enough.
+
+**Pinned.** `contracts/assist-cases.json` → `nextClassUnits` (accepted,
+notThis, pointed, runs — the runs rows are the deterministic sweep of every
+add_next_class sentence on record that reaches the model — and
+pointerSentences) and seven scenarios; `NextClassUnitsTests` (`reachesModel`
+pinned both ways; every quoted sentence typed back as a card and RUN in a
+Unit, a Module and a numbered course); the mirror in
+`trimmed-surface-suite.py`.
+
+**Windows owes** (issue drafted from the mac; #440 stays open for it): hide
+`unit`/`days` from its model via `CardOnlyArguments` — its router is shown
+`unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever
+the sentence says "unit" — measured on its own tier; widen S2; port the
+frames and S3, reading the plain next page with `plan_add_next_class` over
+MCP (course and section only; a refusal for dates means S3 does nothing).
+The parked branch `issue/411-add-next-class-unit-days` is deleted at the
+merge; this section is the record of it.
+
 ### #424: schedule, cancel, and a reply that runs to the cap
 
 Windows, v1.4.3 bundle A. Found by #420's measurement on Windows (bundle 10):
