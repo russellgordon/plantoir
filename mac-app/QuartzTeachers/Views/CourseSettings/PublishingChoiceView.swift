@@ -7,7 +7,7 @@ import SwiftUI
 ///
 /// One is always the PRIMARY (the picker at the top); a teacher may also
 /// switch on any of the other known types as ADDITIONAL destinations, for
-/// redundancy against one host having a bad day. Deploying publishes to
+/// redundancy against one host having a bad day. Deploying sends your website to
 /// every configured destination in one action — this view only decides
 /// which destinations are configured, not how deploying uses them.
 struct PublishingChoiceView: View {
