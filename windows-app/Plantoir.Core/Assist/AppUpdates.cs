@@ -158,6 +158,31 @@ public static class AppUpdates
         return dir.StartsWith(root, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ---- The notes in the offer (appUpdates.notes) ----------------------------
+
+    /// <summary>
+    /// What the offer shows (#428 item 2, <c>appUpdates.notes.cumulative</c>):
+    /// the notes of EVERY release newer than the running one, newest first, so
+    /// a teacher who skipped 1.4.3 still reads its warning when 1.4.4 is
+    /// offered. The feed keeps one item per release, each carrying only its own
+    /// notes (the generator's <c>--reparse-existing</c> keeps the earlier items
+    /// and <c>--change-log-path</c> fills only the new one), so the gathering is
+    /// done here. With one release to offer, its notes alone; with several,
+    /// each under its version. A release with no notes adds nothing.
+    /// Rejected: writing cumulative notes into each new item at the cut — it
+    /// repeats every old note in every item, and depends on whoever cuts
+    /// remembering to.
+    /// </summary>
+    public static string NotesFor(IEnumerable<(string? Version, string? Notes)> newerReleases)
+    {
+        var withNotes = newerReleases
+            .Where(release => !string.IsNullOrWhiteSpace(release.Notes))
+            .ToList();
+        var all = newerReleases.ToList();
+        if (all.Count <= 1) return withNotes.FirstOrDefault().Notes?.Trim() ?? "";
+        return string.Join("\n\n", withNotes.Select(release => $"{release.Version}\n{release.Notes!.Trim()}"));
+    }
+
     // ---- "app updated" (activityTrail) ----------------------------------------
 
     /// <summary>
@@ -170,6 +195,48 @@ public static class AppUpdates
             ? null
             : $"updated from {lastLaunched} to {running}, " +
               (byItsOwnUpdater ? "by its own updater" : "by hand (a new copy installed some other way)");
+
+    /// <summary>
+    /// The file installer.iss leaves in the state folder (<c>{localappdata}\Plantoir</c>)
+    /// when an install run with <c>/PLANTOIRUPDATE=1</c> FINISHES (#428 item 1).
+    /// It holds the version that install put in place, and nothing else.
+    ///
+    /// <para>Why a file and not an argument: the at-quit install does not reopen
+    /// Plantoir at all, so the next launch is the teacher's own, from the Start
+    /// menu, and carries no argument; a file is the one thing both paths share.
+    /// Rejected: the running app recording "about to install X" in Settings
+    /// before it quits — that is written BEFORE the install, so a failed or
+    /// refused install would leave it saying the updater did it, and it helps
+    /// only from the version that writes it onward.</para>
+    ///
+    /// <para>Why a failed or refused install cannot make a later hand install
+    /// read as the updater's: (1) the installer writes it at <c>ssPostInstall</c>,
+    /// after every file is in place, so a refusal (<c>InitializeSetup</c>) or a
+    /// failed copy writes nothing; (2) EVERY install, hand-run or not, deletes
+    /// it at <c>ssInstall</c> before copying, so it describes only the LAST
+    /// install to finish; (3) the app believes it only when its version is the
+    /// version now running, and deletes it at every launch, believed or not.</para>
+    /// </summary>
+    public const string UpdatedByItselfMarker = "installed-by-its-own-updater.txt";
+
+    /// <summary>
+    /// Reads AND removes the marker. True only when it names <paramref name="running"/>
+    /// (compared as Major.Minor.Build: the installer writes "1.4.3", the
+    /// assembly says 1.4.3.0). Best-effort: a marker that cannot be read is "no".
+    /// </summary>
+    public static bool ConsumeUpdatedByItselfMarker(string stateFolder, Version running)
+    {
+        string path = Path.Combine(stateFolder, UpdatedByItselfMarker);
+        if (!File.Exists(path)) return false;
+        string written;
+        try { written = File.ReadAllText(path).Trim(); }
+        catch (Exception) { written = ""; }
+        try { File.Delete(path); } catch (Exception) { }
+        return Version.TryParse(written, out var installed)
+            && installed.Major == running.Major
+            && installed.Minor == running.Minor
+            && Math.Max(installed.Build, 0) == Math.Max(running.Build, 0);
+    }
 }
 
 /// <summary>
@@ -184,11 +251,14 @@ public static class UpdateWording
     public const string HeldTitle = "Plantoir will finish updating once it is done {work}.";
     public const string ScheduledWork = "publishing Section {section} of {course} on its schedule";
     public const string ScheduledWorkUnnamed = "publishing on its schedule";
-    /// <summary>The contract's words, which name a Mac.</summary>
-    public const string ElsewhereWorkContract = "waiting for {course} to finish building somewhere else on this Mac";
-    /// <summary>What Windows says until the contract carries a {machine} placeholder (proposed to the mac): windowsWording.elsewhereWorkOnWindows.</summary>
-    public const string ElsewhereWorkOnWindows = "waiting for {course} to finish building somewhere else on this PC";
-    public static string ElsewhereWork(string course) => ElsewhereWorkOnWindows.Replace("{course}", course);
+    /// <summary>
+    /// The contract's words, <c>{machine}</c> and all (#438): said with
+    /// <see cref="Plantoir.Core.Models.MachineWord"/>'s "PC", which replaced the
+    /// Windows-only copy <c>windowsWording.elsewhereWorkOnWindows</c>.
+    /// </summary>
+    public const string ElsewhereWorkContract = "waiting for {course} to finish building somewhere else on this {machine}";
+    public static string ElsewhereWork(string course) =>
+        Plantoir.Core.Models.MachineWord.Fill(ElsewhereWorkContract).Replace("{course}", course);
     public const string HeldExplanation =
         "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.";
     public const string HeldExplanationOnceInstalling =

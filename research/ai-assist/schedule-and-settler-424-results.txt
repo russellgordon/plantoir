@@ -1,0 +1,73 @@
+#424 - "schedule a deploy", "cancel the scheduled deploy" and "next day's lesson"
+RESULTS, against schedule-and-settler-424-preregistration.txt (committed
+9a1a6f1e at 09:00:55 EDT, before the first request at 09:01:20).
+
+Run 2026-10-04 09:01-10:40 EDT on the conditions registered: Intel Core
+i5-8365U, 16 GB, Samsung 980 NVMe, Intel UHD 620, Windows 11 Pro 26200;
+llama-server b10435, the smaller assistant (qwen2.5-1.5b-instruct q4_k_m),
+--ctx-size 8192 --threads 4 --reasoning off --reasoning-budget 0 --jinja
+--parallel 1 --n-gpu-layers 999; one server for all three suites, stopped
+after. Generation ~5.7-8.5 tokens/s. DEVIATION: another program's python
+(pid 14504, started 08:58, not this run's) was using CPU throughout; it
+affects wall times only, not greedy choices.
+
+WHICH NUMBERS PREDATE THE FIX ROUND. Every model number below was taken on
+commit 9a1a6f1e, BEFORE the bundle A fix round. The fix round changed:
+ - ruling 1 (the schedule frame takes the day first; any other sentence
+   opening "schedule a|the deploy" is ASKED in code): nothing the model is
+   shown, so no request was re-run; the suite's interception guard was
+   re-run with --intercept-only after the change (10:5x): still 8 of 29
+   probes intercepted, the same 8 - none of the 29 opens "schedule a deploy".
+ - ruling 4 (the 30 s writing limit on the SMALLER tier only): this run was
+   the smaller tier, so its numbers stand; the larger tier was not measured
+   and keeps the 512-token cap alone.
+
+RESULTS (10 greedy trials per probe; per-probe against bundle 10's MIDDLE logs)
+  S1 trimmed-surface, EXC2O   250/290 all, MIDDLE 260. One probe differs:
+       "card: undo" 10 -> 0 (declined) - a sentence the app answers in code
+       ("undo that" is a fixed phrasing) and never sends to the model.
+       Polarity inversions 0. Turns ended on 'length' 0.
+  S2 teachers-say, EXC2O      210/250 (TEST 90/100, CONTROL 120/150), MIDDLE
+       210; no probe differs. 10 replies stopped (finish_reason length), all
+       "next day's lesson".
+  S3 trimmed-surface, ICS3U   220/290, MIDDLE 220; no probe differs.
+       Polarity inversions 0. 'length' 0.
+
+THE THREE PROBES
+  P1 "schedule a deploy" (Deploy <course> section 1 at 6:30 tomorrow morning,
+     before school starts.): S1 10/10 schedule_deploy (as in MIDDLE); S3 0/10,
+     10x deploy_section (as in MIDDLE). Reaches the model in both: it opens
+     "Deploy", names a course and section, and carries a trailing clause.
+  P2 "ctl cancel_scheduled" (Don't send it in the morning after all.): 0/10,
+     declined, as in MIDDLE. Reaches the model (begins "Don't").
+  P3 "next: next day's lesson": 0/10, every trial stopped. The writing
+     limit WAS honoured on the OAI endpoint, but only when a line break had
+     been written: 5 trials ended at 30.0-31.1 s of writing (171-259 tokens;
+     30.3-33.1 s wall); 5 ran to the 512 cap (60.7-81.9 s of writing, 60.8-82.2
+     s wall) - in those the reply had no line break by 30 s, which is
+     llama-server's own condition for the limit. Before (MIDDLE): 10 of 10 to
+     the cap, 61-89 s.
+
+PASS RULE
+  (a) FAILS: P1 (S3) and P2 still reach the model and score 0/10; P3 is a
+      MISS in every trial (as registered: "a MISS either way").
+  (b) PASSES: zero polarity inversions in all three suites.
+  (c) FAILS on paper by one probe: S1 "card: undo" 10 -> 0, a sentence the
+      app never routes (answered in code). Every other probe equals MIDDLE.
+  So the pre-registered rule FAILS, as the pre-registration predicted for P1
+  and P2. What the code DOES do is unmeasured by these suites, because none of
+  their probes is a canonical "schedule a deploy at ..." or "cancel the
+  scheduled deploy" sentence: those are answered in code (ScheduleAndCancel-
+  FramesTests). For Russell on #424: P1 and P2 need either a description
+  change (candidate b, its own pre-registered measurement) or a code rule
+  broad enough to take conversational sentences, which these frames
+  deliberately are not.
+
+#411 / #432 item 4 - add_next_class's arguments, printed in full (S2)
+  A plain "Add the next class" sent unit "next" (with days 0) in 10 of 10
+  trials, and so did "Add an entry for the next class", "Add tomorrow's class
+  page", "Start the next class" and "Make a page for our next class": 50 of 50.
+  On Windows' surface, which declares `unit` and `days` on add_next_class, the
+  small router starts a NEW UNIT whenever a teacher asks for the next class.
+  Raw: scratchpad m424\S2.txt (bundle A); summary in plantoir-windows-run\
+  drafts\cc\411-measure.md.

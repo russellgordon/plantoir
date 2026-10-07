@@ -173,6 +173,36 @@ public class ClassPageTermTests
         Assert.True(ItemProtectionRule.For("All Classes", ItemList.PerSectionFolders, context).IsBlocked);
     }
 
+    /// <summary>
+    /// #431 (Russell, 2026-10-03: Windows matches the mac). A course that
+    /// recorded no class_folder protects only the literal "All Classes" from
+    /// removal: never the first per-section folder, and never one that merely
+    /// mentions "class". Through <see cref="CourseSettingsProtection"/>, which
+    /// is what Course Settings asks. The naming rule (where a new class page is
+    /// written) keeps its guess; this is only what is PROTECTED.
+    /// </summary>
+    [Theory]
+    [InlineData(null, "Handouts", false)]          // the first folder, no "class": the old guess protected it
+    [InlineData(null, "Class Pages", false)]       // mentions "class": the old guess protected it too
+    [InlineData(null, "All Classes", true)]        // the literal, always
+    [InlineData("Handouts", "Handouts", true)]     // a recorded name, whatever it says
+    [InlineData("  handouts ", "Handouts", true)]  // trimmed, compared without case
+    public void OnlyARecordedNameOrAllClassesIsProtectedAsTheClassFolder(string? recorded, string folder, bool blocked)
+    {
+        var values = new Newtonsoft.Json.Linq.JObject
+        {
+            ["course_code"] = "TEST",
+            ["section_numbers"] = new Newtonsoft.Json.Linq.JArray(1),
+            ["per_section_folders"] = new Newtonsoft.Json.Linq.JArray("Handouts", "Class Pages", "All Classes", "Worksheets"),
+            ["graded_folders"] = new Newtonsoft.Json.Linq.JArray(),
+        };
+        if (recorded is not null) values["class_folder"] = recorded;
+        var config = CourseConfiguration.FromDictionary(values);
+        var protection = ItemProtectionRule.For(folder, ItemList.PerSectionFolders,
+            CourseSettingsProtection.For(config, new List<WalkedFolder>(), (string?)null));
+        Assert.Equal(blocked, protection.IsBlocked && protection.Reason == SpecialNames.ClassFolderBlocked);
+    }
+
     [Fact]
     public void ARecordedKeyWithStrayWhitespaceStillNamesTheFolder()
     {

@@ -20,11 +20,19 @@ public class WorkLeaseContractTests
     public void EveryDecliningCaseIsDecidedAsTheContractSays()
     {
         var cases = ContractLoader.LoadJson("shared-rules.json")["workLeases"]!["declining"]!["cases"]!.AsArray();
-        Assert.True(cases.Count >= 29, $"only {cases.Count} declining cases were read");
+        // 32 since #413/#438: two copy cases are appliesOn ["windows"] (the mac
+        // reads no copy lease and says so in onTheMac), and a third holds on
+        // both. A case for another platform only is skipped by appliesOn, never
+        // by name.
+        Assert.True(cases.Count >= 32, $"only {cases.Count} declining cases were read");
+        Assert.True(cases.Count(c => c!["appliesOn"] is JsonArray a && a.Any(p => p!.ToString() == "windows")) >= 2,
+            "the windows-only copy cases are gone");
 
         var wrong = new List<string>();
+        int ran = 0;
         foreach (var c in cases.Where(c => AppliesHere(c!)))
         {
+            ran++;
             var asker = c!["asker"]!.ToString() switch
             {
                 "aBuild" => WorkLease.Asker.ABuild,
@@ -48,6 +56,7 @@ public class WorkLeaseContractTests
                 wrong.Add($"\"{c["name"]}\": expected {c["expect"]}, decided {decided}");
         }
         Assert.True(wrong.Count == 0, string.Join("\n", wrong));
+        Assert.True(ran >= 32, $"only {ran} declining cases ran here");
     }
 
     [Fact]

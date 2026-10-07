@@ -20,6 +20,29 @@ public sealed partial class AssistWorkspace
     public const string LocalWindowVariable = "PLANTOIR_LOCAL_WINDOW";
 
     /// <summary>
+    /// The course an outside door was opened FROM, set by the Claude door in
+    /// its configuration's <c>env</c> (bundle A fix round, ruling 3). The
+    /// server takes an <c>assist</c> lease on it WITHOUT locking to it: the
+    /// door still reaches every course in the folder (#430, argv stays
+    /// folder-only), and the course it was opened from keeps the protections
+    /// 1.4.2 had — its conversation backup (#283), the second-session guard,
+    /// and the hold on structural work. Never a lock, never read as one.
+    /// </summary>
+    public const string DoorCourseVariable = "PLANTOIR_DOOR_COURSE";
+
+    /// <summary>
+    /// The course this server should hold an <c>assist</c> lease on: the one
+    /// it is locked to, else the door's course when that course exists here.
+    /// </summary>
+    public string? CourseToHoldForTheConversation(string? doorCourse)
+    {
+        if (LockedCourse is { } locked) return locked;
+        if (string.IsNullOrWhiteSpace(doorCourse)) return null;
+        try { return Course(doorCourse.Trim()).Code; }
+        catch (AssistRefusal) { return null; }
+    }
+
+    /// <summary>
     /// Whether this server answers Plantoir's own assistant window rather than
     /// an outside door. Only list_courses asks: the window's answer never
     /// carries the How I Teach line (<c>howITeachPage.listCoursesLine</c>).
