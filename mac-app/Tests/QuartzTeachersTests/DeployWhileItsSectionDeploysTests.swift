@@ -343,6 +343,10 @@ final class DeployWhileItsSectionDeploysTests: XCTestCase {
         let course: Range<String.Index> = try XCTUnwrap(body.range(of: "waitForTheCourse("))
         XCTAssertLessThan(lateness.lowerBound, earlier.lowerBound)
         XCTAssertLessThan(earlier.lowerBound, course.lowerBound)
+        // Asked whether or not the plist names a section (review finding 8):
+        // nothing between the lateness check and the wait makes it depend on one.
+        let beforeTheWait: String = String(body[lateness.upperBound..<earlier.lowerBound])
+        XCTAssertFalse(beforeTheWait.contains("if let section"), beforeTheWait)
         let branch: String = String(body[earlier.lowerBound..<course.lowerBound])
         XCTAssertTrue(branch.contains("kind: .earlierDeployStillWorking"))
         XCTAssertTrue(branch.contains(".scheduledDeployWaitedForItsEarlierDeploy"))
