@@ -843,8 +843,8 @@ with authoring guidance, heading/TOC examples, curriculum link reminders,
 and preview shortcuts. Copy its table-of-contents sentence from an existing
 template rather than retyping it: it names the marks in backticks — Every
 `##` (level 2) and `###` (level 3) heading — and typed through a shell, the
-backticks run as a command and the marks vanish. That is how 307 template
-pages said "Every  (level 2) and  (level 3) heading" for seven weeks (#444);
+backticks run as a command and the marks vanish, which is the likeliest
+way 307 template pages came to say "Every  (level 2) and  (level 3) heading" for seven weeks (#444);
 `lint_payload.py` now refuses a "(level N)" with no mark before it.
 
 **Key Links is the course's orientation panel, not an index of its
