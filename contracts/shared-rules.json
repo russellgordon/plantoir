@@ -21085,7 +21085,7 @@
       "quit": "quittingWhileWorkIsUnderWay counts only this app's own work, so another program's assist lease never makes quitting ask - and the app's quit removes only its own leases, never a session's.",
       "update": "appUpdates.mayNotInstallWhile.doesNotCount: 'a lease of any other kind (assist, import)'."
     },
-    "reviseCasesNote": "item is claude, codex or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item.",
+    "reviseCasesNote": "item is claude, codex or local; revisedElsewhere is whether ANOTHER live program holds an assist lease on the course; active is the in-app assistant window's course and section, or null. expect is the assist-wording.json key said under the item, closeTheAssistantFirst (the in-app sentence naming the open window: 'Close the assistant for {course} Section {section} first'), or null when the item may be used. The course asked about is ICS3U, section 1 for the local item. A case with appliesOn mac describes the mac's in-app window, which takes no lease and is one at a time; onWindows says what Windows does instead.",
     "reviseCases": [
       {
         "name": "nothing open: every item may be used",
@@ -21116,7 +21116,7 @@
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "the in-app assistant is open on this course: the Claude door names that window",
+        "name": "the in-app assistant is open on this course: the Claude door names that window", "appliesOn": ["mac"], "onWindows": "Windows' assistant window runs its own server, which takes the assist lease on its course, so on Windows the doors on that course grey with availableOnceYouFinishRevisingWithClaude instead (CanReviseNow). Whether Windows says the window's own cause is its decision, in the windows issue from #458.",
         "item": "claude",
         "revisedElsewhere": false,
         "active": {
@@ -21126,7 +21126,7 @@
         "expect": "closeTheAssistantFirst"
       },
       {
-        "name": "the in-app assistant is open on this course: the Codex door names that window",
+        "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door with availableOnceYouFinishRevisingWithClaude.",
         "item": "codex",
         "revisedElsewhere": false,
         "active": {
@@ -21146,7 +21146,7 @@
         "expect": null
       },
       {
-        "name": "the in-app assistant open on this very section: the local item brings it forward",
+        "name": "the in-app assistant open on this very section: the local item brings it forward", "appliesOn": ["mac"], "onWindows": "Windows' window holds the assist lease through its own server process, which the app reads as another program, so the local item on the course the window is open on is greyed there (CanReviseNow) rather than bringing the window forward.",
         "item": "local",
         "revisedElsewhere": false,
         "active": {
@@ -21156,7 +21156,7 @@
         "expect": null
       },
       {
-        "name": "the in-app assistant open elsewhere: the local item names that window (one at a time)",
+        "name": "the in-app assistant open elsewhere: the local item names that window (one at a time)", "appliesOn": ["mac"], "onWindows": "The mac allows one in-app assistant window at a time (AssistActivity); Windows has no such rule - the local item on another course is not greyed there, because nothing holds that course.",
         "item": "local",
         "revisedElsewhere": false,
         "active": {

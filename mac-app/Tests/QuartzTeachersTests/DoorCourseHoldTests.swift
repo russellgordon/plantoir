@@ -405,6 +405,12 @@ final class DoorCourseHoldTests: XCTestCase {
         let folder: String = "/folder"
         for item in cases {
             let name: String = item["name"] as? String ?? "?"
+            if let platforms = item["appliesOn"] as? [String] {
+                XCTAssertNotNil(item["onWindows"] as? String, "\(name): a case Windows skips says what it does instead")
+                if !platforms.contains("mac") {
+                    continue
+                }
+            }
             let which: CourseActivity.ReviseItem
             switch item["item"] as? String {
             case "claude":
