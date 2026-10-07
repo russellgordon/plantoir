@@ -3778,8 +3778,53 @@ while running, marshalled to the UI thread) and reads
 `AppInstance.GetActivatedEventArgs()` for a click that started Plantoir.
 Approximations, said plainly: an inactive app has no key window, so "front to
 back" is newest window first; "the section is still in the folder" is
-`courses\<CODE>\section<n>` existing. The announcing cases (`notification.announcing`)
-are still #212's. Unproven on a real click.
+`courses\<CODE>\section<n>` existing. Unproven on a real click.
+
+**Until #448 (2026-10-04) it never posted at all.** `Program.Main` ran
+`ScheduledRun.Execute` and THEN the toast step, which read the job file —
+and a run that deploys, or stands down, ends with `ClearIfStillMine` →
+`TaskScheduling.Cancel`, which deletes the task AND its job file. The toast
+step found no job and returned without a word, so no toast and no trail line,
+on every scheduled run since #324. Measured on two real runs (the installed
+1.4.2 and a Debug build; i5-8365U, UHD 620, Windows 11 Pro 26200): record
+`succeeded`, folder written, task gone, nothing in Notification Center, no
+`scheduled publish notification` line. The unit tests had all passed, because
+none of them ran the clearing before the toast.
+
+The fix: `ScheduledRunAnnouncement.RunAndAnnounce` reads the job BEFORE
+`Execute`, then hands course, section and folder to `Announce`, which reads
+the section's record, posts its sentence through an `IPoster`
+(`ScheduledPublishNotifier.SystemToasts` in the app; a stand-in in tests) and
+writes the contract's `trailSays` line — told, turned off
+(`AppNotificationManager.Default.Setting` disabled for the app, the user or by
+policy), or could not be sent (a post that throws or returns id 0). Which
+endings announce: `Deployed` (the wrapper's record: succeeded, did not finish,
+needed an answer) and `StoodDown`. `NoLongerStands` announces nothing — the
+teacher cancelled or set it again, this run wrote no record, and the record
+lying there is an older run's news — and nor does a record older than the run
+(less two seconds), so a wrapper that wrote nothing never replays last week's
+notice. A deploy set again while the run worked keeps the new task (the
+"not mine any more" path) and still announces THIS run's record: what the
+toast names was read before the run, so it never depends on which job file is
+there afterwards. `ScheduledRunAnnouncementTests` plays
+`notification.announcing` (the `allowed`/`notAllowed` rows, every kind) and
+drives real runs through `FakeScheduler`, asserting the job file is gone
+before it asserts the post; putting the old order back (reading the job after
+`Execute`) turns them red. **Proved for real, 2026-10-04 11:49** (same PC):
+a real Task Scheduler run of the fixed x64 Debug build (task action
+`Plantoir.exe --run-scheduled-deploy "<task name>" --token …`, set through
+the branch's own `plantoir-mcp.exe` with `PLANTOIR_APP_PATH` pointing at
+that build) wrote its record, cleared its task, and posted: an entry with tag
+`ICS4U-section1.<folder id>`, group `scheduled`, under the app identity whose
+display name is "Plantoir" (`HKCU\Software\Classes\AppUserModelId\{GUID}`),
+was in the notification database Notification Center reads
+(`%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db`), carrying
+the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
+a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
+is posted (moving the clearing out of `Execute`) — the clearing is what makes
+the task one-shot and is guarded by the job's token; a second caller in charge
+of it is a deploy that can recur. Still owed from #212: withdrawing the toast
+when the band is dismissed (`onShow`'s dismiss case).
 
 ### Accelerators under a dialog (#191)
 
