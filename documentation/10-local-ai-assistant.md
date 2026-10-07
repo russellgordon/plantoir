@@ -6318,6 +6318,16 @@ pinned both ways; every quoted sentence typed back as a card and RUN in a
 Unit, a Module and a numbered course); the mirror in
 `trimmed-surface-suite.py`.
 
+**Known limit, left open (review N-impl F3, pre-existing).** In a numbered
+course S3 reads only the word "unit", so "Add the page for Week 12" when the
+next page is Week 10 runs and makes Week 10, reported as success — the shape
+ruling 4 closed for Unit/Day, which a sparse numbering (CODING's Week 2, then
+Week 8) makes real. Not fixed with #440; a decision for a later piece.
+Three false refusals ARE decided rows (`pointed`, review F2): "…before the
+next unit test", "…not the next unit", and "next week" in a course whose
+unit word is Week — each points where the plain call was asked for, which
+costs one sentence and writes nothing.
+
 **Windows owes** (issue drafted from the mac; #440 stays open for it): hide
 `unit`/`days` from its model via `CardOnlyArguments` — its router is shown
 `unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever

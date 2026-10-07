@@ -1783,7 +1783,8 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// Term-blind, like every frame in this file: only the word "unit".
     /// Anything else — a question mark, a "please", a course or section
     /// named, a negation — falls through to the model, where settler S3
-    /// (`AssistAgent.nextClassNeedsItsOwnPhrasing`) stops it.
+    /// (`AssistNextClassUnits.kind`) stops it and says
+    /// `AssistWording.nextClassNeedsItsOwnPhrasing`.
     private static func daysToAUnit(_ tidied: String) -> AssistCardCommand? {
         let spelled: [String: Int] = [
             "a": 1, "another": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
