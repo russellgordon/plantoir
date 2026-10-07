@@ -385,8 +385,12 @@ pages' words (hand-copied by Russell) and those Netlify ids.
 `python3 website/shots/test_demo_folders.py` (in `verify.sh`) proves a clone
 can make both; `PLANTOIR_DEMO_FOLDERS_COMPARE=1` adds a read-only check that
 the kept folders still match every rule, and `PLANTOIR_DEMO_FOLDERS_APP=<binary>`
-runs the front pages through a built app. A course code, section or site name
-changes in `folders.json` and nowhere else: the UI tests read it too.
+runs the front pages through a built app. The course codes, sections and site
+names are written in `folders.json` and read by the scripts and the UI tests
+alike; the one exception is each class-site SHOT, whose address names the page
+it photographs on one course's site (`capture_windows.py`'s
+`site_address("MCV4U") + "/concepts/derivative-rules"`, the shots in
+`shots.json`) — a shot about a different course is a different shot.
 
 The three courses are ENG2D, MCV4U and SCH3U on purpose: between them the
 class sites show prose, typeset mathematics and chemistry notation, which is

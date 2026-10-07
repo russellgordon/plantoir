@@ -115,6 +115,8 @@ MARKETING_FOLDER = Path.home() / "Plantoir Marketing"
 # Netlify id is the KEPT working folder itself:
 # courses/<CODE>/.netlify_sites/section<n>.json, never committed.
 DEMO_COURSES = demo_folders.demo_courses()
+# The course the app windows, the assistant and the progress shot are taken in.
+FIRST_DEMO_COURSE = DEMO_COURSES[0]["code"]
 
 # The simulator used for the phone shot, and the RocketSim helper that draws
 # the device around it. "iPhone 17 Pro" because the plain iPhone 17 simulator
@@ -768,7 +770,7 @@ def capture_app(workspace: Path, only: str | None = None) -> None:
             # reason: a warm section 2 rebuild still holds the progress
             # view up for several seconds, and the 20 Hz poll in the test
             # needs only one of them.)
-            clear_built_site(workspace, "ENG2D", 2)
+            clear_built_site(workspace, FIRST_DEMO_COURSE, 2)
             suffix = "dark" if dark else "light"
             print(f"   {suffix} appearance")
             with Appearance(dark=dark):
@@ -823,9 +825,9 @@ def capture_parts(suffix: str) -> None:
 def capture_obsidian(workspace: Path, suffix: str) -> None:
     """Capture Obsidian showing the ENG2D course note."""
     PARTS.mkdir(parents=True, exist_ok=True)
-    note_path = workspace / "courses" / "ENG2D" / "section2" / "index.md"
+    note_path = workspace / "courses" / FIRST_DEMO_COURSE / "section2" / "index.md"
     if not note_path.exists():
-        note_path = workspace / "ENG2D" / "section2" / "index.md"
+        note_path = workspace / FIRST_DEMO_COURSE / "section2" / "index.md"
 
     run(["open", f"obsidian://open?path={note_path}"], capture_output=True)
     time.sleep(2.5)
@@ -1146,7 +1148,7 @@ def capture_phone(dark: bool) -> None:
          "--dataNetwork", "wifi", "--wifiBars", "3", "--cellularBars", "4"],
         capture_output=True)
 
-    url = site_address("ENG2D") + "/"
+    url = site_address(FIRST_DEMO_COURSE) + "/"
     # The site remembers a light/dark choice in Mobile Safari's own storage,
     # which outranks the simulator's appearance: the committed "light" phone
     # shot had been dark all along (median luminance 18, measured
@@ -1369,7 +1371,7 @@ def provision_marketing(folder: Path) -> int:
     report = marketing_folder.apply_file_steps(folder, extraction.pages)
     print(f"   {marketing_folder.summary(report)}")
 
-    if not any(True for _ in reference_copies_of(folder, "ICS3U")):
+    if not any(True for _ in reference_copies_of(folder, demo_folders.load_spec()["marketing"]["referenceCopy"]["of"])):
         title = demo_folders.year_title(demo_folders.reference_school_year(folder, date.today()))
         print(f"   Keeping a copy of ICS3U for reference ({title}), through the app…")
         run_ui_test(f"{scene_book.PROVISIONING_CLASS}/testKeepACopyForReference", folder, "provision-reference")
@@ -1549,7 +1551,7 @@ class MarketingFolderShownAsTeaching:
         if not (self.marketing / ".plantoir-marketing-folder").exists():
             raise SystemExit(f"{self.marketing} is not the marketing folder (no .plantoir-marketing-folder).")
         if SHOWN_FOLDER.exists():
-            if (SHOWN_FOLDER / ".plantoir-marketing-folder").exists() or not (SHOWN_FOLDER / "courses" / "ENG2D").is_dir():
+            if (SHOWN_FOLDER / ".plantoir-marketing-folder").exists() or not (SHOWN_FOLDER / "courses" / FIRST_DEMO_COURSE).is_dir():
                 raise SystemExit(f"{SHOWN_FOLDER} is not the demo folder this harness keeps there; "
                                  "refusing to move it.")
             SHOWN_FOLDER.rename(DEMO_SET_ASIDE)
@@ -1683,7 +1685,7 @@ def run_scenes_in(folder: Path, chosen: list) -> int:
         for scene in chosen:
             if scene.kind == "notification":
                 scene_book.cancel_leftover_schedule(app_binary, folder)
-                record = scene_book.scheduled_record(folder, "ICS3U", 1)
+                record = scene_book.scheduled_record(folder, demo_folders.load_spec()["marketing"]["curriculumCourse"], 1)
                 if record.exists():
                     record.unlink()
                 print("   Cleared the scheduled run's record for this folder. The delivered notification stays "
