@@ -18189,8 +18189,8 @@
     "partialCopy": {
       "setUp": "A full --to-folder whose section folder already holds a folder of stale pages that cannot be removed (its permissions forbid it), so the copy's --delete fails part way while every new page still lands.",
       "expectExit": 1,
-      "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Published"],
-      "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
+      "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Deployed", "✅ Published"],
+      "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. Both success words are listed: \"✅ Deployed\" is what the line says since v1.4.4 (#443), and \"✅ Published\" is kept so a line that goes back to the old word is caught too; with only the old word listed, the check passed whatever the launcher printed. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
     }
   },
   "reopeningTheLastWorkingFolder": {
