@@ -522,7 +522,7 @@
       {
         "event": "scheduled deploy set again while its deploy worked",
         "carries": "the course and the section",
-        "why": "GitHub #439 and #409. Setting a section's deploy again ends its run's app first (#237's 'never briefly two agents'), and the deploy that app had started carries on by itself and finishes without the app's after-work: the section is not marked deployed (it stays 'Edited'), the run writes no trail line of its own and sends no notification. Its script still writes the section's outcome record. This line is the only place that says a deploy went on after the re-set. Written after the boot-out, and only when the run's script is still running, so a run that was only waiting for the course (and had started nothing) does not write it.",
+        "why": "GitHub #439 and #409. Setting a section's deploy again ends its run's app first (#237's 'never briefly two agents'), and the deploy that app had started carries on by itself and finishes without the app's after-work: the section is not marked deployed (it stays 'Edited'), the run writes no trail line of its own and sends no notification. Its script still writes the section's outcome record. This line is the only place that says a deploy went on after the re-set. Asked right after the boot-out, and only when the run's script is still running, so a run that was only waiting for the course (and had started nothing) does not write it; written once macOS has accepted the new job, so a re-set that fails says only 'could not set a scheduled deploy'.",
         "appliesOn": [
           "mac"
         ],
