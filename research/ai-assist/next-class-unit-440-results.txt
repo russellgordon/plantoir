@@ -48,6 +48,13 @@ M1 - REGRESSION (trimmed-surface 29 probes; teachers-say 25 probes)
              added to Unit 2 whatever unit the teacher is in).
 
 M2 - next-class-unit-probes.py (22 pointed + 15 runs rows that reach the model)
+  NOTE (final sweep H4, 2026-10-07): three pointed rows were added by review
+    N-impl F2 AFTER this run - "Add the next class, review day before the
+    next unit test", "Add the next class in the current unit, not the next
+    unit" and "Add the next class for next week" - decided false refusals,
+    not measured. "22 pointed" here and "60 nextClassUnits rows" above
+    describe the run; the contract now holds 25 pointed rows and the guard
+    agrees with 63. No measured number below changed.
   AFTER, smaller: 37 of 37 sentences pass. Every pointed sentence reaches
     add_next_class 10/10 with only course and section, except "Start a new
     unit?" and "Start a new module", DECLINED 10/10 (no write, no S3 needed:
