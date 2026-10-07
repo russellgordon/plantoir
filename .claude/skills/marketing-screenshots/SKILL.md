@@ -372,6 +372,18 @@ on or before January 15, every class after it unpublished — asked of the
 app's own `--mcp-stdio` door, never written by the script. Every step says
 "made" or "already there".
 
+What a door call COSTS, said plainly: on the Mac each change zips the course
+into `courses/_backups` (once per course, since every section goes through one
+server) and rebuilds that section's site headless (`preview.sh --build-only`,
+into the real builds folder, starting the website builder if it is not
+running) — four builds for the four demo sections on a first run, and the
+Mac's tools have no switch to skip it. `capture.py` runs the door with
+`--state-dir` on a temporary folder, so nothing reaches the real activity
+trail. On Windows the same tools take `preview: false`, which
+`capture_windows.py` passes, so nothing is built; `plantoir-mcp.exe` takes no
+`--state-dir`, so its calls DO land on the real trail. A second run, with the
+front pages already right, makes no call at all.
+
 **`--publish` from a folder made this way does NOT reach the live sites.** The
 live sites' Netlify ids are only in the KEPT demo folder's `.netlify_sites/`
 (never committed); a fresh folder gets stand-in markers that name the sites
