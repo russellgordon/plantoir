@@ -63,14 +63,18 @@ M2 - next-class-unit-probes.py (22 pointed + 15 runs rows that reach the model)
   A', larger: 28 of 37 fail (unit/days on every call; "Add the next class"
     and "Add the next class for period 2" send unit 0; "Add the next class to
     Module 4" sends unit 0).
-  NOTE (review N-impl F6, 2026-10-07): "28 of 37" against A' follows from
-    rule (e) BY CONSTRUCTION - (e) bans a unit/days key and A' declares
-    them - so it is not evidence against A' on its own. The evidence that
-    decided it is independent of (e): the smaller tier's "HIDE - the
-    inversion case", "typos" and "ctl decline: delete" falling 10 -> 0 (M1,
-    rule g), and both tiers filling unit/days on every plain "add the next
-    class" phrasing in teachers-say (M1b, rule j), the smaller asking for a
-    NEW unit 10 of 10 on "Add the next class".
+  NOTE (review N-impl F6, 2026-10-07; reworded by review N-fixes G3):
+    "28 of 37" against A' is scored against rule (e), and (e) is a rule
+    for the AFTER arm - it bans SENDING a unit/days key, which A' declares
+    (declaring a key does not force the model to send it) - so it is not
+    evidence against A' on its own. A' is judged by (g)-(j), and it fails
+    (g), (i) and (j): the smaller tier's "HIDE - the inversion case",
+    "typos" and "ctl decline: delete" falling 10 -> 0 (M1, rule g); "Start
+    a new unit?" and "Start a new module" moving from declined to
+    add_next_class on the smaller tier (M2, rule i); and both tiers filling
+    unit/days on every plain "add the next class" phrasing in teachers-say
+    (M1b, rule j), the smaller asking for a NEW unit 10 of 10 on "Add the
+    next class".
 
 THE DETERMINISTIC SWEEP (ruling 5, F7). Every add_next_class sentence on
 record that reaches the model - teachers-say-suite.py's six (= the tool's
