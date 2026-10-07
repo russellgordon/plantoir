@@ -1751,19 +1751,25 @@ enum ScheduledDeploy {
         // deploy it started may still be going, under this run's own script
         // name. Wait for it, up to thirty minutes, before anything else: the
         // launchers would refuse this run's legs while it works.
-        if let section {
-            switch waitForTheEarlierDeploy(script: script) {
-            case .goAhead(let waited, let didWait):
-                if didWait {
-                    ActivityTrail.note(
-                        .scheduledDeployWaitedForItsEarlierDeploy,
-                        "a scheduled deploy waited \(Int(waited.rounded())) seconds for this section's "
-                        + "earlier deploy to finish, then went ahead",
-                        course: section.courseCode,
-                        section: section.sectionNumber
-                    )
-                }
-            case .standDown(let waited):
+        //
+        // Asked whether or not the plist names a section: the wait needs only
+        // the script, and a pre-v1.2.0 run that skipped it would go straight
+        // to legs the launchers refuse (#439 review, finding 8). Only the
+        // trail line needs the section; `standDown` takes a nil section
+        // already (it then writes no outcome record, as for lateness).
+        switch waitForTheEarlierDeploy(script: script) {
+        case .goAhead(let waited, let didWait):
+            if didWait, let section {
+                ActivityTrail.note(
+                    .scheduledDeployWaitedForItsEarlierDeploy,
+                    "a scheduled deploy waited \(Int(waited.rounded())) seconds for this section's "
+                    + "earlier deploy to finish, then went ahead",
+                    course: section.courseCode,
+                    section: section.sectionNumber
+                )
+            }
+        case .standDown(let waited):
+            if let section {
                 ActivityTrail.note(
                     .scheduledDeployWaitedForItsEarlierDeploy,
                     "a scheduled deploy waited \(Int(waited.rounded())) seconds for this section's "
@@ -1771,8 +1777,8 @@ enum ScheduledDeploy {
                     course: section.courseCode,
                     section: section.sectionNumber
                 )
-                standDown(script: script, section: section, now: Date(), kind: .earlierDeployStillWorking)
             }
+            standDown(script: script, section: section, now: Date(), kind: .earlierDeployStillWorking)
         }
 
         // IS ANOTHER PROGRAM BUILDING THIS COURSE? (#156) An assistant working
