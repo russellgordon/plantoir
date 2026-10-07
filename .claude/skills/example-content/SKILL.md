@@ -1075,7 +1075,8 @@ than hand-written:
   linter checks every article by that rule. The class website is "your
   class website", never "the published page / website / site": DEPLOY
   puts a site online and PUBLISH only marks a page (#443), and the linter
-  refuses the phrase — a sentence about MARKING a page ("publish: true",
+  refuses the phrase (in the skeletons, and in the Example Course
+  `support/example_course/` when run with no family named) — a sentence about MARKING a page ("publish: true",
   "the newest published page") is right and passes. It tests its own rules against
   `MUST_BE_ACCEPTED` / `MUST_BE_REFUSED` before every run and exits 2 if
   one misbehaves — add a shape there when widening a check.

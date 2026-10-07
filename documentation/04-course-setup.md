@@ -337,7 +337,10 @@ The skeletons are GENERATED from eleven shapes plus a family table by
 Course pages say "your class website" for the site students see, never
 "the published page / website / site" (#443, decided by Russell
 2026-10-04): DEPLOY puts a site online, PUBLISH only marks a page so a
-deploy includes it. `lint_skeletons.py` refuses the phrase in a skeleton.
+deploy includes it. `lint_skeletons.py` refuses the phrase in a skeleton,
+and — run with no family named — in the Example Course
+(`support/example_course/EXC2O`), which carries the same template sentences
+and which the first pass of this change missed because nothing read it.
 The payloads were reworded by hand and have no such rule, because several
 are about students' OWN published work (a newsroom's "published page", a
 journal's "published version") and a blunt pattern would refuse those.

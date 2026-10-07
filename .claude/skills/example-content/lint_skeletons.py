@@ -8,7 +8,9 @@ are deliberately blunt: every link resolves, every page is titled, every
 sentinel is where the installer expects it, no template token — %PERCENT% or
 {brace} — survived into the output, the subject never lands in front of a
 noun it does not fit ("a this course course", #328), and the class website is
-never called "the published website" (#443).
+never called "the published website" (#443). That last rule also reads the
+Example Course (`support/example_course/`, EXC2O), whose template pages carry
+the same sentences and which no other linter reads.
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -26,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts"))
 import markdown_code  # noqa: E402
 SKELETONS = ROOT / "support" / "skeletons"
+EXAMPLE_COURSE = ROOT / "support" / "example_course"
 
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
@@ -358,6 +361,27 @@ def check(family: str) -> list:
     return problems
 
 
+def example_course_problems() -> list:
+    """The #443 phrase rule over the Example Course (EXC2O).
+
+    Only that ONE rule: EXC2O is hand-written course content, not a skeleton,
+    so the skeleton-shape checks (sentinels, manifests, every link) do not
+    apply to it. It copies the skeleton template sentences, though, and was
+    missed once because nothing read it (review of #443, 2026-10-07).
+    """
+    problems = []
+    for page in sorted(EXAMPLE_COURSE.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        published = SITE_CALLED_PUBLISHED.search(text)
+        if published:
+            where = page.relative_to(EXAMPLE_COURSE)
+            problems.append(
+                f'{where}: the class website called "published" (#443 — say '
+                f'"your class website"): {published.group(0)!r}'
+            )
+    return problems
+
+
 def main():
     broken = check_the_checks()
     if broken:
@@ -376,7 +400,17 @@ def main():
                 print(f"   {line}")
             if len(problems) > 12:
                 print(f"   … and {len(problems) - 12} more")
-    print(f"\n{len(families)} skeletons checked; "
+    if not sys.argv[1:]:
+        problems = example_course_problems()
+        total += len(problems)
+        if problems:
+            print(f"\nexample_course: {len(problems)} problem(s)")
+            for line in problems[:12]:
+                print(f"   {line}")
+    checked = f"{len(families)} skeletons"
+    if not sys.argv[1:]:
+        checked += " and the Example Course"
+    print(f"\n{checked} checked; "
           + ("clean" if not total else f"{total} problem(s)"))
     return 1 if total else 0
 
