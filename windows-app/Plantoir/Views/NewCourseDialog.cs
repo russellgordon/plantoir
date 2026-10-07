@@ -274,6 +274,7 @@ public sealed class NewCourseDialog : ContentDialog
         AutomationProperties.SetAutomationId(_sectionsBox, "newCourseSectionsBox");
         AutomationProperties.SetAutomationId(_codeWarning, "newCourseCodeWarning");
         AutomationProperties.SetAutomationId(_validationText, "newCourseValidation");
+        AutomationProperties.SetAutomationId(_suggestionsRow, "newCourseSuggestions");
 
         // Pin the whole dialog to a fixed width so the form and the progress
         // view share the same size and the "Step x of y" label can't be
@@ -305,6 +306,9 @@ public sealed class NewCourseDialog : ContentDialog
         Opened += (_, _) => _ = StartCreation();
     }
 
+    /// <summary>Whether the panel is making a club — read by the marketing scenes to refuse a wrong picture.</summary>
+    public bool IsMakingAClub => IsClub;
+
     /// <summary>
     /// Fill the panel in for a marketing capture, as though a teacher had
     /// typed it.
@@ -317,11 +321,14 @@ public sealed class NewCourseDialog : ContentDialog
     /// knows perfectly well. Nothing is wrong for a teacher, whose typing goes
     /// into a loaded control; this hook simply cannot rely on that.
     /// </summary>
-    public void StageForCapture(string code, string? sections = null)
+    public void StageForCapture(string code, string? sections = null, bool club = false)
     {
         _codeBox.Text = code;
         AutoFillCourseName();
         RefreshClubRow();
+        // "This is a club" ticked as a teacher ticks it, when the code alone
+        // did not (CODING does on its own; the scene asks either way).
+        if (club && !IsClub) _clubBox.IsChecked = true;
         RefreshGradeWarning();
         RefreshCodeValidation();
         RefreshStartingContent();
@@ -1042,7 +1049,11 @@ public sealed class NewCourseDialog : ContentDialog
         DeclaredPayloadFolder: ExampleContentCatalog.CurriculumFolder(ExampleContentRoot, NormalizedCode),
         GradedFolders: CurrentGradedFolders(),
         PerSectionFolders: _perSectionFolders,
-        ResolvedClassFolder: ClassFolderRule.Name(null, _perSectionFolders));
+        // The literal "All Classes" is always protected; besides it, only a
+        // club's folder by the name its row gives (#267/#274), as the mac's
+        // wizard does. Never the guess (#431): it protected the FIRST folder of
+        // a list with no "class" in it, and missed "All Meetings" entirely.
+        ResolvedClassFolder: IsClub ? ClassFolderRule.ProtectedName(_classFolderBox.Text) : null);
 
     /// <summary>
     /// Which province's curriculum the switch offers, so the blocked sentence

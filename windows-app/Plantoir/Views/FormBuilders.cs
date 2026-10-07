@@ -70,11 +70,27 @@ public static class FormBuilders
         HorizontalAlignment = HorizontalAlignment.Stretch,
     };
 
+    /// <summary>
+    /// A label above its control, and the label is the control's accessible
+    /// name too. Without it a switch built with empty On/Off content (every
+    /// ToggleSwitch here) had NO name at all, so a screen reader said only
+    /// "toggle switch, off" and the teacher could not tell which setting it
+    /// was — found by the #426 empty-name UiFact on the v1.4.3 cut. An
+    /// explicitly set name wins; LabeledBy keeps the label and the control
+    /// tied together for assistive technology as well.
+    /// </summary>
     public static StackPanel LabeledRow(string label, FrameworkElement control)
     {
         var panel = new StackPanel { Spacing = 4, Margin = new Thickness(0, 6, 0, 0) };
-        panel.Children.Add(new TextBlock { Text = label, FontSize = 13 });
+        var text = new TextBlock { Text = label, FontSize = 13 };
+        panel.Children.Add(text);
         panel.Children.Add(control);
+        if (control is Control)
+        {
+            AutomationProperties.SetLabeledBy(control, text);
+            if (string.IsNullOrWhiteSpace(AutomationProperties.GetName(control)))
+                AutomationProperties.SetName(control, label);
+        }
         return panel;
     }
 
@@ -244,6 +260,8 @@ public static class FormBuilders
                     };
                     ToolTipService.SetToolTip(rename, $"Rename {display}…");
                     AutomationProperties.SetAutomationId(rename, "rename:" + display);
+                    // Icon-only, so a screen reader needs the tooltip's words (#426).
+                    AutomationProperties.SetName(rename, $"Rename {display}…");
                     string toRename = item;
                     rename.Click += (_, _) => onRenameRequested(toRename);
                     trailing.Children.Add(rename);

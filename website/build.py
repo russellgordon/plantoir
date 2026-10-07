@@ -41,7 +41,9 @@ import re
 import shutil
 
 import update_feeds
+import windows_feed
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -265,6 +267,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
 
     joined = "\n".join(sources)
     win_src_attr = f' data-win-src="{up}img/{win_prefix}light.png"' if has_windows else ""
+    # `windowsAlt` in shots.json: the alt text for the Windows picture, where
+    # the shared one names something only the Mac picture shows (schedule's
+    # macOS notification). base.html swaps it exactly as it swaps the image,
+    # so a Mac visitor's words never change.
+    if has_windows and shot.get("windowsAlt"):
+        win_src_attr += f' data-win-alt="{shot["windowsAlt"]}"'
 
     return (
         f'<figure class="{classes_html}">\n'
@@ -303,7 +311,8 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     taken in Dark Mode (`<id>-dark.png`/`.webp`) for a page in dark mode,
     with `<id>.png` kept as the light one so its name never changes
     (`colour-schemes`, Russell 2026-10-04: "It needs a dark mode version").
-    A Windows visitor still gets `<id>-windows.png` in either scheme."""
+    A Windows visitor gets `<id>-windows.png`, and `<id>-windows-dark.png`
+    for a page in dark mode whenever it exists (#380)."""
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
@@ -331,18 +340,32 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
 
     webp_source = ""
     win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
-    if shot.get("dark"):
-        dark_png = IMAGE_DIR / f"{identifier}-dark.png"
-        dark_webp = IMAGE_DIR / f"{identifier}-dark.webp"
-        if not dark_png.exists() or not dark_webp.exists():
-            problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
-                            f"or .webp is missing (capture.py --colour-figures)")
+    # A Dark Mode version of a static figure (colour-schemes, Russell
+    # 2026-10-04). The mac's is `<id>-dark.png`, offered when shots.json says
+    # `"dark": true` (the mac's website branch adds that, with its picture);
+    # Windows' is `<id>-windows-dark.png`, offered to a Windows visitor in dark
+    # mode whenever it exists. `<id>.png` and `<id>-windows.png` stay the light
+    # ones, so neither name ever changes. Until the mac's dark picture lands,
+    # a dark page's Mac visitor is given the light figure, as before.
+    mac_dark = shot.get("dark") and (IMAGE_DIR / f"{identifier}-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-dark.webp").exists()
+    if shot.get("dark") and not mac_dark:
+        problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
+                        f"or .webp is missing (capture.py --colour-figures)")
+    win_dark = has_windows and (IMAGE_DIR / f"{identifier}-windows-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-windows-dark.webp").exists()
+    if mac_dark or win_dark:
+        dark_stem = f"{identifier}-dark" if mac_dark else identifier
+        if win_dark:
+            win_dark_webp = f' data-win-srcset="{up}img/{identifier}-windows-dark.webp"'
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows-dark.png"'
         else:
-            win_png_attr = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
-            dark_query = ' media="(prefers-color-scheme: dark)"'
-            webp_source += (f'      <source srcset="{up}img/{identifier}-dark.webp"{win_webp_attr} '
-                            f'type="image/webp"{dark_query}>\n')
-            webp_source += f'      <source srcset="{up}img/{identifier}-dark.png"{win_png_attr}{dark_query}>\n'
+            win_dark_webp = win_webp_attr
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
+        dark_query = ' media="(prefers-color-scheme: dark)"'
+        webp_source += (f'      <source srcset="{up}img/{dark_stem}.webp"{win_dark_webp} '
+                        f'type="image/webp"{dark_query}>\n')
+        webp_source += f'      <source srcset="{up}img/{dark_stem}.png"{win_dark_png}{dark_query}>\n'
     if webp.exists():
         webp_source += f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
 
@@ -785,13 +808,17 @@ def build(check_only: bool) -> int:
     # The update feeds (#204): checked in both modes, copied byte for byte —
     # never parsed and rewritten, which would break their signatures.
     feed_source = WEBSITE / "updates"
-    # Only the MAC's feed is checked: the checker reads Sparkle's shape, and
-    # NetSparkle's windows.xml (in the site since Windows 1.4.2) still needs a
-    # checker of its own (the slice-2 review's L6; #428). Copied either way.
+    # Each feed by its own checker: the mac's reads Sparkle's shape, and
+    # NetSparkle's windows.xml (in the site since Windows 1.4.2) has one of its
+    # own since #428 — real version order, and both of its signatures checked
+    # against the key the app carries.
     mac_feed = feed_source / "macos.xml"
     if mac_feed.is_file():
         for problem in update_feeds.problems_with(mac_feed):
             problems.append(problem)
+    windows_feed_file = feed_source / "windows.xml"
+    if windows_feed_file.is_file():
+        problems.extend(windows_feed.problems_with(windows_feed_file))
     if not check_only:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
 
@@ -926,6 +953,49 @@ def feed_version_refusal(feed: Path, project_yml: Path) -> str | None:
     return None
 
 
+def committed_feed_bytes_refusal(repo: Path = REPO, updates: Path | None = None, git_show=None) -> str | None:
+    """Why the feeds must not be deployed from this working copy, or None (#428 item 7).
+
+    Every ``website/updates/*.xml`` and ``*.signature`` must be byte for byte
+    what ``git show HEAD:<path>`` gives. On 2026-10-03, after ``git checkout
+    main`` on the Windows PC, ``macos.xml`` was CR LF again (SHA-256
+    ``63026ebf…`` against the committed and live ``ecb57d48…``) even with the
+    ``-text`` attribute merged: git does not rewrite a file whose content did
+    not change between the two branches. The deploy's live check compares the
+    live feed with ``site/``, which is copied from this working copy, so it
+    would have passed the wrong bytes — and a wrong byte breaks the signature,
+    silently, for every installed copy. Caught by hand that day; refused here
+    on every machine since. A feed that is new and not yet committed is
+    refused too: commit it first, so what goes live is what is in history.
+    The fix it names is the one that worked: delete the file and check it out
+    again.
+    """
+    updates = updates or (repo / "website" / "updates")
+    if not updates.is_dir():
+        return None
+    if git_show is None:
+        def git_show(relative: str) -> bytes | None:
+            result = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{relative}"],
+                                    capture_output=True)
+            return result.stdout if result.returncode == 0 else None
+    differing: list[str] = []
+    for file in sorted(updates.iterdir()):
+        if not file.is_file() or not (file.suffix == ".xml" or file.name.endswith(".signature")):
+            continue
+        relative = file.relative_to(repo).as_posix()
+        committed = git_show(relative)
+        if committed is None:
+            differing.append(f"{relative} (not committed)")
+        elif committed != file.read_bytes():
+            differing.append(relative)
+    if differing:
+        listed = "\n  ".join(differing)
+        return ("Not deploying: these update-feed files are not byte for byte what is committed, and a "
+                "changed byte breaks their signature (line endings are the usual cause):\n  " + listed +
+                "\nDelete each one and run `git checkout -- <path>`, or commit it if it is a new feed.")
+    return None
+
+
 def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR) -> str | None:
     """Why the pictures must not go live, or None (#375).
 
@@ -937,10 +1007,8 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     question (`shots/corners.py`, about 6 s, Pillow only) and refuses on any
     failing picture, whoever made it.
 
-    Of the `-windows-` pictures, the same scope as the test: the three
-    figures Windows has retaken as whole native captures — hero,
-    colour-schemes and light-and-dark (#380) — are judged; the square
-    single-window shots are still Windows' to retake and are not.
+    Every `-windows-` picture a Windows visitor is shown is judged too, the
+    same scope as the test: since #380 each is a whole native capture.
     """
     sys.path.insert(0, str(website / "shots"))
     try:
@@ -948,10 +1016,9 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     except ImportError as error:
         return (f"Not deploying: the corner check needs Pillow ({error}). "
                 f"Install it (python3 -m pip install pillow) and deploy again.")
-    pictures = corners.images_the_pages_show(website, image_dir)
+    pictures = corners.images_the_pages_show(website, image_dir, include_windows=True)
     if not pictures:
         return f"Not deploying: no pictures found in {image_dir} to check."
-    pictures = pictures + corners.windows_figures_retaken(image_dir)
     problems: list[str] = []
     for picture in pictures:
         problems.extend(corners.corner_problems(picture))
@@ -1020,7 +1087,15 @@ def main() -> int:
         if refusal:
             print(refusal, file=sys.stderr)
             return 1
+        refusal = committed_feed_bytes_refusal()
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
         refusal = feed_version_refusal(WEBSITE / "updates" / "macos.xml", REPO / "mac-app" / "project.yml")
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return 1
+        refusal = windows_feed.version_refusal(WEBSITE / "updates" / "windows.xml")
         if refusal:
             print(refusal, file=sys.stderr)
             return 1

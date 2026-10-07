@@ -432,4 +432,32 @@ public sealed class CopyAPageDialog
         var ui = new CopyAPageDialog(source, courses, workspacePath);
         await show(ui._dialog);
     }
+
+    /// <summary>
+    /// For the marketing pictures only (<c>--stage-scene reference</c>): the
+    /// sheet with its three questions answered the way a teacher answers them
+    /// — the page whose title is <paramref name="pageTitle"/> chosen, the
+    /// destination <paramref name="destinationCode"/> picked, "Also copy the
+    /// pages this page links to" left ticked — and Copy NOT pressed. Returns
+    /// null when the sheet cannot be put in that state (no such page, no such
+    /// destination), so the scene refuses rather than photographing the wrong
+    /// sheet. The dialog is shown by the caller and never closes itself.
+    /// </summary>
+    public static ContentDialog? StagedForCapture(Course source, IEnumerable<Course> courses, string workspacePath,
+                                                  string pageTitle, string destinationCode)
+    {
+        var ui = new CopyAPageDialog(source, courses, workspacePath);
+        string? page = ui._offered.FirstOrDefault(p =>
+            Path.GetFileNameWithoutExtension(p).Equals(pageTitle, StringComparison.OrdinalIgnoreCase));
+        int destination = ui._destinations.FindIndex(c =>
+            ReferenceCourse.ShownCode(c).Equals(destinationCode, StringComparison.OrdinalIgnoreCase));
+        if (page is null || destination < 0) return null;
+        ui._destination.SelectedIndex = destination;
+        ui._chosenPage = page;
+        ui._picker.Text = Shown(page);
+        ui.PreferTheSourceFolder();
+        ui._alsoLinked.IsChecked = true;
+        ui.RefreshAsk();
+        return ui._dialog;
+    }
 }

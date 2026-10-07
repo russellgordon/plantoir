@@ -365,6 +365,24 @@ public static class ActivityTrail
         /// </summary>
         BuildDeclinedCourseBusyElsewhere,
         /// <summary>
+        /// An outside assistant (Claude or Codex, through plantoir-mcp) made a
+        /// change, asked for a rebuild, or deployed while a preview of the
+        /// course was only being SERVED (#436, mac #433). The change and the
+        /// rebuild left the open preview exactly as it was; the deploy went
+        /// ahead and may have closed that section's preview. Carries the
+        /// course, the section and which of the three — never a page.
+        /// </summary>
+        OutsideAssistantWorkedWhileAPreviewWasOpen,
+        /// <summary>
+        /// The window read a serving preview's end as closed by another
+        /// program's deploy — an outside assistant's deploy_section or a
+        /// deploy set for later — rather than as a failure (#436, mac #433's
+        /// stack review): it had been serving, its output shows the server
+        /// ended the way build_site.stop_preview_serving ends it, and another
+        /// program held a build lease on the course. Course and section only.
+        /// </summary>
+        PreviewClosedForADeploy,
+        /// <summary>
         /// A publish set for later found the course being built or published
         /// elsewhere and waited for it (#289). Carries how long, for whom, and
         /// whether it then went ahead or stood down — a publish that went out
@@ -601,6 +619,8 @@ public static class ActivityTrail
         Event.ScheduledPublishDidNotFinish => "scheduled publish did not finish",
         Event.ScheduledPublishFinished => "scheduled publish finished",
         Event.BuildDeclinedCourseBusyElsewhere => "build declined, course busy elsewhere",
+        Event.OutsideAssistantWorkedWhileAPreviewWasOpen => "outside assistant worked while a preview was open",
+        Event.PreviewClosedForADeploy => "preview closed for a deploy",
         Event.ScheduledPublishWaitedForTheCourse => "scheduled publish waited for the course",
         Event.ScheduledDeployTurnedOff => "scheduled deploy turned off",
         Event.ScheduledDeployReplaced => "scheduled deploy replaced",

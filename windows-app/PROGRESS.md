@@ -1,5 +1,26 @@
 # Plantoir for Windows — Progress
 
+## 2026-10-07 — the 1.4.3 release branch
+
+Branch `issue/windows-1.4.3-release`. The Windows version is 1.4.3 (`<Version>` in `Plantoir.csproj`, `AppVersion` in `installer.iss`), and `PlantoirSetup.exe` joins the EXISTING v1.4.3 release, which the mac cut on 2026-10-04 with its DMG — no new tag. It is the first version the Windows updater installs (1.4.2 offers it). `website/updates/windows.xml` gains a 1.4.3 item (built with `--reparse-existing --change-log-path`, notes in `windows-app/release-notes/1.4.3.md`) and the Windows download card is unpinned. `WINDOWS-DIRECTOR-PROMPT.md` is deleted.
+
+What landed on `dev` since 1.4.2, one line each (GUI rows 712–721 have the detail):
+
+- **Bundle A, the assistant** (#432, #430, #436, #424, #411; rows 716–719): "Publish Unit 4, Day 3" in its exact form, "schedule a deploy at 6:30 am" and "cancel that scheduled deploy" are answered in code without the model; "schedule a deploy" with no time asks for one; a reply the smaller assistant is still writing after 30 seconds ends as cut off (measured: it ends 5 of 10 such replies — the other 5 had no line break — so a reply can still run to about 80 s); the Claude door works on every course in the folder; an outside assistant is held back only while a site is being BUILT, and a preview a deploy closed says "Closed for a deploy". #424 stays open for the conversational "don't send it in the morning after all".
+- **Bundle B, rules and wording** (#438, #431, #426; rows 712–714): the computer is named by the contract's own `{machine}` sentences; a folder deploy that rebuilds says "deployed"; only "All Classes" or the recorded class folder is protected from removal; a screen reader names every icon-only button and tells a reference course from the live one.
+- **Bundle C1, the updater and the feed** (#428 items 1 and 2; row 715): the update offer carries the notes of every newer release; the trail says when Plantoir updated itself; the feed ADDS an item per release, checked by `website/windows_feed.py` in every `build.py` run.
+- **#448** (row 720): a scheduled deploy tells the teacher how it went, in a notification, every time.
+- **The pictures** (#380, #370, #442, #428 item 6; row 721): every Windows picture on plantoir.app is a real window, photographed whole, staged by `--stage-scene`.
+
+**Moved to v1.4.4 by Russell on 2026-10-07:** the dark title bar fix and the dark pictures.
+
+Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), at `dev` `581c2f634`:
+
+- `dotnet test`: Failed 0, Passed 2338, Skipped 0, Total 2338 (6 m 19 s).
+- UI suite (`run-ui-tests.ps1`): first run Failed 2, Passed 51, Total 53 (23 m 18 s); both failures reproduced alone and were real — a `ToggleSwitch` and the icon-plus-text Preview and Deploy buttons had no accessible name (app fix, GUI row below), and the two-backups test sent its Ctrl-click too fast for the app (test fix). Second run Failed 0, Passed 53, Skipped 0, Total 53 (22 m 35 s). The installer was re-signed after that fix, so the shipped bytes carry it.
+- `verify-deploy.ps1`: 37 passed, 0 failed, 0 skipped.
+- `NamedGapLedger`: empty.
+
 ## 2026-10-03 — the 1.4.2 release branch
 
 Branch `issue/windows-1.4.2-release`. The Windows version is 1.4.2 and its installer joins the v1.4.2 release; #424 moved to milestone v1.4.3. The updater (#337) is switched on: the feed and the public key are set, and `website/updates/windows.xml` is signed and committed. Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200): `dotnet test` Failed 0, Passed 2243, Skipped 0, Total 2243; the UI suite 44 of 44 (20 m 35 s); `verify-deploy.ps1` 37 passed, 0 failed, 0 skipped; `NamedGapLedger` empty. The installer paths `/PLANTOIRUPDATE`, `/RELAUNCH`, `/NOCLOSEAPPLICATIONS` and `/RETURNTO` were run for the first time (documentation/11 has the table). The UI suite's first run was 41 of 44: at 200% display scale the Copy a Page picker gave its clickable point at twice its real coordinates, so three tests clicked the window behind and typed there — a harness fault, fixed in `DrivenApp.ClickMiddleOf` (documentation/12 → "Driving the real interface"). #380: the hero and the two colour figures are whole native window captures (`website/shots/windowshot`). #370: the six availability flags are true and the Windows card is unpinned. Still open on #380: the single-window Windows shots; on #370: Windows scenes for the v1.4.0 pictures.
@@ -353,7 +374,8 @@ baked PowerShell script, and every rule decided at its moment lives there.
 - **Leases both ways, take-then-check** (#289): another program's build,
   publish OR preview declines a build (never a write); Deploy claims before it
   stops the preview; `plantoir-mcp` stops its own launcher before leaving.
-  `workLeases.declining` (29), `.liveness` (17 of 19), `workLease.bodyCases` (7).
+  `workLeases.declining` (32 since #438; the two `copy` cases
+  marked `appliesOn: ["windows"]` run here only), `.liveness` (17 of 19), `workLease.bodyCases` (7).
 - **A scheduled task runs `Plantoir.exe --run-scheduled-deploy "<name>"`**
   (#347): the lateness window (#239), a ten-minute wait for the course (#289),
   whether it still stands, the settings as they are now, then the wrapper.
@@ -566,9 +588,7 @@ wrong in a `mac` issue.
 
 The first piece of this port built off the Windows PC: [#144](https://github.com/russellgordon/plantoir/issues/144),
 in a Claude Code cloud session (Ubuntu 24.04, no Windows App SDK). What that
-kind of session can do, measured on the day and written for the next one in
-[`WINDOWS-DIRECTOR-PROMPT.md`](../WINDOWS-DIRECTOR-PROMPT.md) → "Working from a
-cloud session":
+kind of session can do, measured on the day and written for the next one:
 
 - `Plantoir.Core`, `Plantoir.Mcp`, `PtyDriver` and `Plantoir.Tests` build and
   run on Linux with the .NET 10 SDK (Microsoft's apt repository no longer

@@ -12,8 +12,8 @@ namespace Plantoir.UiTests;
 /// sidebar's Backups group. The backups are written by the fixture as tiny
 /// zips with names the readers parse; nothing of the teacher's is touched.
 ///
-/// <para>UNPROVEN as of 2026-10-01: written while the desktop was locked, so
-/// it has compiled but never run (bundle 8).</para>
+/// <para>Written while the desktop was locked (bundle 8); first run on
+/// bundle 11's unlocked runs, and fixed again on the v1.4.3 cut.</para>
 /// </summary>
 [Collection("drives the real app")]
 public class AllBackupsUiTests
@@ -38,14 +38,11 @@ public class AllBackupsUiTests
     public void TwoBackupsAreDeletedTogetherAndLeaveTheList()
     {
         using var app = new DrivenApp(WriteCoursesAndBackups);
-        var desktop = app.Window.Automation.GetDesktop();
 
-        app.Find("backupsGroup", "the Backups group").RightClick();
-        var open = Retry.WhileNull(
-            () => desktop.FindFirstDescendant(cf => cf.ByName("All Backups…").And(cf.ByControlType(ControlType.MenuItem))),
-            TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
-        Assert.NotNull(open);
-        open!.Click();
+        // The harness's own row-menu helper, not a whole-desktop query of
+        // its own: that query is the one that times out (bundle 11 run 5),
+        // and it failed this test at "All Backups…" on the v1.4.3 cut.
+        app.PressRowMenuItem("backupsGroup", "All Backups…");
 
         // Nothing chosen yet: the button is greyed and offers no count — never
         // "Delete 0 Backups…" (bundle 11, ruling U9).
@@ -57,15 +54,29 @@ public class AllBackupsUiTests
 
         var first = app.Find("allBackups-" + Names[0], "the first backup's line");
         var second = app.Find("allBackups-" + Names[1], "the second backup's line");
-        first.Click();
-        Keyboard.Pressing(VirtualKeyShort.CONTROL);
-        second.Click();
-        Keyboard.Release(VirtualKeyShort.CONTROL);
+        app.ClickMiddleOf(first);
+        // Ctrl is given time to land before the click and after it. Pressed
+        // and clicked back to back, the click arrived as a PLAIN one and
+        // replaced the first choice (v1.4.3 cut, 2026-10-07: only the second
+        // row selected, the button "Delete 1 Backup…", in both runs that got
+        // that far); with the pauses it was a Ctrl-click in every run since. WinUI 3 takes the pointer in
+        // through its own input-site window, so the key and the click are not
+        // guaranteed to be read in the order they were sent.
+        Keyboard.Press(VirtualKeyShort.CONTROL);
+        try
+        {
+            Thread.Sleep(150);
+            app.ClickMiddleOf(second);
+            Thread.Sleep(150);
+        }
+        finally { Keyboard.Release(VirtualKeyShort.CONTROL); }
 
+        // Read in the dialog itself, not a whole-desktop query by name.
         var button = Retry.WhileNull(
-            () => desktop.FindFirstDescendant(cf => cf.ByName("Delete 2 Backups…").And(cf.ByControlType(ControlType.Button))),
+            () => app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton")) is { Name: "Delete 2 Backups…" } b ? b : null,
             TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
-        Assert.NotNull(button);
+        Assert.True(button is not null, "two backups were not chosen together; the dialog's button reads \"" +
+            (app.OpenDialog()?.FindFirstDescendant(cf => cf.ByAutomationId("PrimaryButton"))?.Properties.Name.ValueOrDefault ?? "(no dialog)") + "\"");
         button!.AsButton().Invoke();
 
         // The CONFIRMATION's own button, found inside the dialog titled for it

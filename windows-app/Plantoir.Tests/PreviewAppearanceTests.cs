@@ -22,6 +22,8 @@ namespace Plantoir.Tests;
 public class PreviewAppearanceTests
 {
     private static JsonNode PreviewPorts => ContractLoader.LoadJson("app-rules.json")["previewPorts"]!;
+    private static JsonNode Machine =>
+        ContractLoader.LoadJson("shared-rules.json")["specialNames"]!["platformWording"]!["machine"]!;
 
     private static JsonNode Golden => JsonNode.Parse(File.ReadAllText(Path.Combine(
         ContractLoader.RepositoryRoot, "mac-app", "Tests", "Goldens", "235-preview-first-build.json")))!;
@@ -137,16 +139,16 @@ public class PreviewAppearanceTests
     }
 
     /// <summary>
-    /// The sentences are the contract's, with its one platform word said the
-    /// Windows way (the specialNames.platformWording convention) — proposed to
-    /// the mac rather than reworded silently.
+    /// The sentences are the contract's, its <c>{machine}</c> filled with
+    /// <c>specialNames.platformWording.machine.windows</c> (#438), rather than
+    /// the "your Mac" → "your PC" substitution this test used to make.
     /// </summary>
     [Fact]
     public void TheSentencesAreTheContractsSaidOnThisPc()
     {
         var cases = PreviewPorts["whenThePreviewNeverAppears"]!["cases"]!.AsArray();
         string SentenceFor(string verdict) => cases.First(c => c!["verdict"]!.ToString() == verdict)!["sentence"]!.ToString()
-            .Replace("your Mac", "your PC");
+            .Replace(Machine["placeholder"]!.ToString(), Machine["windows"]!.ToString());
         Assert.Equal(SentenceFor("theSiteNeverAnswered"), PreviewReachability.Sentence(PreviewReachability.Verdict.TheSiteNeverAnswered));
         Assert.Equal(SentenceFor("plantoirCouldNotTell"), PreviewReachability.Sentence(PreviewReachability.Verdict.PlantoirCouldNotTell));
         foreach (var verdict in Enum.GetValues<PreviewReachability.Verdict>())
