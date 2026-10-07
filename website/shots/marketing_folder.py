@@ -53,38 +53,46 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+import sys  # noqa: E402
+sys.path.insert(0, str(HERE))
+import demo_folders  # noqa: E402
+
 DEFAULT_FOLDER = Path.home() / "Plantoir Marketing"
 CORRELATION_FILE = HERE / "csp-correlation.json"
 ICS4U_CORRELATION_FILE = HERE / "csp-correlation-ics4u.json"
 HOW_I_TEACH_SOURCE = HERE / "marketing" / "How I Teach.md"
 HOW_I_TEACH_NAME = "How I Teach.md"
 
-# The courses the folder holds, with the sections the app is asked to make.
+# The courses the folder holds, with the sections the app is asked to make,
+# and the AP CSP half of each: read from marketing/folders.json, the one place
+# both demo folders are described (#445), so this file, capture.py, the
+# Windows capture and the UI tests cannot disagree about them.
 # ICS4U is there so Copy a Page has somewhere to copy TO (ruling Q4).
-COURSES: list[dict] = [
-    {"code": "ICS3U", "sections": "1, 2"},
-    {"code": "ICS4U", "sections": "1"},
-]
-CURRICULUM_COURSE = "ICS3U"
-COLLEGE_BOARD_FOLDER = "College Board Curriculum"
-# The courses that answer to AP CSP as well as Ontario, each with its own
-# correlation (data, never code). `declare`: whether this set-up writes the
-# second curriculum into `curriculum_folders`. ICS3U's is ticked through
-# Course Settings by the curriculum-settings scene, because that tick is the
-# picture; no scene photographs ICS4U's, so the file step writes it.
-# `publish_to`: the folder, inside the kept folder, the course publishes to.
-# EVERY course here publishes to a folder and never to a public site, because
-# its pages print the College Board's words, which were cleared for Russell's
-# own folder and not for the web (ruling Q2). ICS4U gets a folder of its own:
-# a folder destination writes `<folder>/section<N>` with `rsync --delete`
-# (deploy.sh), so two courses sharing one folder would overwrite each other's
-# section 1.
-CSP_COURSES: list[dict] = [
-    {"code": "ICS3U", "correlation": CORRELATION_FILE, "declare": False,
-     "publish_to": "School Web Space"},
-    {"code": "ICS4U", "correlation": ICS4U_CORRELATION_FILE, "declare": True,
-     "publish_to": "School Web Space/ICS4U"},
-]
+#
+# `correlation`: the course's correlation (data, never code). `declare`:
+# whether this set-up writes the second curriculum into `curriculum_folders`.
+# ICS3U's is ticked through Course Settings by the curriculum-settings scene,
+# because that tick is the picture; no scene photographs ICS4U's, so the file
+# step writes it. `publish_to`: the folder, inside the kept folder, the course
+# publishes to. EVERY course here publishes to a folder and never to a public
+# site, because its pages print the College Board's words, which were cleared
+# for Russell's own folder and not for the web (ruling Q2). ICS4U gets a
+# folder of its own: a folder destination writes `<folder>/section<N>` with
+# `rsync --delete` (deploy.sh), so two courses sharing one folder would
+# overwrite each other's section 1.
+def _courses_from_spec() -> tuple[list[dict], list[dict]]:
+    courses: list[dict] = []
+    csp: list[dict] = []
+    for course in demo_folders.marketing_courses():
+        courses.append({"code": course["code"], "sections": demo_folders.sections_as_typed(course["sections"])})
+        csp.append({"code": course["code"], "correlation": HERE / course["collegeBoardCorrelation"],
+                    "declare": course["declaresCollegeBoardHere"], "publish_to": course["publishTo"]})
+    return courses, csp
+
+
+COURSES, CSP_COURSES = _courses_from_spec()
+CURRICULUM_COURSE = demo_folders.load_spec()["marketing"]["curriculumCourse"]
+COLLEGE_BOARD_FOLDER = demo_folders.load_spec()["marketing"]["collegeBoardPages"]["folder"]
 # Where the scheduled-publish scene publishes: ICS3U's folder, inside the kept
 # folder. `deploy_target` spells a folder destination "local_folder"
 # (contracts/file-formats.json -> courseConfigKeys).
@@ -374,14 +382,19 @@ def add_how_i_teach(course_dir: Path, report: Report, source: Path = HOW_I_TEACH
 
 
 # The start-of-year scene is "the week before school starts" for section 2,
-# so section 2 is a SECOND-SEMESTER section: its classes begin on this day.
-# Measured 2026-09-27: the payload's classes run from 2026-09-08, so on the
-# day of the capture 13 of them were "dated before today" and the sheet led
-# with an orange warning about students losing classes already taught — a
-# true sentence about the wrong story. Section 1 keeps the payload's dates:
-# the maps, the preview and the scheduled publish are all section 1.
-SECOND_SEMESTER_SECTION = 2
-SECOND_SEMESTER_STARTS = date(2027, 2, 1)
+# so section 2 is a SECOND-SEMESTER section: its classes begin in the week of
+# folders.json → marketing.secondSemester.startsInTheWeekOf (1 February), in
+# the school year after the one the section's dates begin in. Measured
+# 2026-09-27: the payload's classes run from 2026-09-08, so on the day of the
+# capture 13 of them were "dated before today" and the sheet led with an
+# orange warning about students losing classes already taught — a true
+# sentence about the wrong story. Section 1 keeps the payload's dates: the
+# maps, the preview and the scheduled publish are all section 1.
+#
+# Computed, never a fixed date (#445): this was `date(2027, 2, 1)`, and a
+# folder made after August 2027 would have had a section 2 already past it,
+# so nothing moved and the scene told the wrong story again.
+SECOND_SEMESTER_SECTION = demo_folders.load_spec()["marketing"]["secondSemester"]["section"]
 DATE_LINE = re.compile(r"^(?P<key>created|createdSection\d+): (?P<day>\d{4}-\d{2}-\d{2})(?P<rest>T.*)?$")
 
 
@@ -400,9 +413,11 @@ def section_dates(course_dir: Path, section: int) -> list[tuple[Path, str]]:
 
 def move_section_to_second_semester(course_dir: Path, report: Report,
                                     section: int = SECOND_SEMESTER_SECTION,
-                                    starts: date = SECOND_SEMESTER_STARTS) -> None:
+                                    starts: date | None = None) -> None:
     """Shift every date `section` carries by whole weeks, so its first class
-    falls in the week of `starts` and every class keeps its weekday.
+    falls in the week of `starts` and every class keeps its weekday. Without
+    `starts`, the day folders.json names in the school year the section's
+    earliest date belongs to (`demo_folders.second_semester_starts`).
 
     Idempotent: nothing moves once the earliest date is on or after the start
     of that week. Only the date lines change; the rest of each page is left
@@ -416,10 +431,12 @@ def move_section_to_second_semester(course_dir: Path, report: Report,
             if match and match.group("key") == key:
                 day = date.fromisoformat(match.group("day"))
                 earliest = day if earliest is None or day < earliest else earliest
-    week_start = starts - timedelta(days=starts.weekday())
     if earliest is None:
         report.skip(f"{course_dir.name} section {section} — no dated pages to move")
         return
+    if starts is None:
+        starts = demo_folders.second_semester_starts(earliest)
+    week_start = starts - timedelta(days=starts.weekday())
     if earliest >= week_start:
         report.note("already there", f"{course_dir.name} section {section} starts {earliest.isoformat()}")
         return

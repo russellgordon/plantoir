@@ -16,6 +16,11 @@ What it does:
    light-and-dark-windows) using the Edge captures.
 5. Scales and optimizes all captured PNGs and generates WebP companions.
 6. Rebuilds the marketing site (website/build.py).
+
+``--provision-demo <folder>`` instead gives a demo working folder the state
+``marketing/folders.json`` describes, through ``plantoir-mcp.exe``
+(``demo_folders.py``, shared with the Mac). Every run first checks that spec
+against the ready-made courses (``test_demo_folders.py``).
 """
 
 from __future__ import annotations
@@ -46,15 +51,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from images import prepare, WIDEST_PHONE_PIXELS, WIDEST_WINDOW_PIXELS  # noqa: E402
 from composite import fan, side_by_side  # noqa: E402
 
-# Per-section naming, matching the sites redeployed on 2026-08-19 — see the
-# note beside the same table in capture.py.
-# `title` is how a page window of the site is FOUND to be photographed: the
-# start of the home page's own <title>, which is the window's title.
-DEMO_COURSES = [
-    {"code": "ENG2D", "site": "eng2d-s1-2026-gordon", "title": "Grade 10 English"},
-    {"code": "MCV4U", "site": "mcv4u-s1-2026-gordon", "title": "Grade 12 Calculus and Vectors"},
-    {"code": "SCH3U", "site": "sch3u-s1-2026-gordon", "title": "Grade 11 Chem"},
-]
+# The demo courses and their sites: marketing/folders.json → demo.courses, the
+# one place both demo folders are described (#445), read by capture.py and the
+# mac's UI tests too. Per-section naming, matching the sites redeployed on
+# 2026-08-19. `title` is how a page window of the site is FOUND to be
+# photographed: the start of the home page's own <title>, which is the
+# window's title (folders.json's `siteTitle`).
+import demo_folders  # noqa: E402
+
+
+def _demo_courses() -> list:
+    courses = []
+    for course in demo_folders.demo_courses():
+        courses.append({"code": course["code"], "site": course["site"], "title": course["siteTitle"],
+                        "sections": course["sections"], "colourScheme": course["colourScheme"]})
+    return courses
+
+
+DEMO_COURSES = _demo_courses()
 
 
 def announce(message: str) -> None:
@@ -252,9 +266,51 @@ def windows_shot_ids() -> list:
     return ids
 
 
+def check_the_folders_spec() -> None:
+    """Run the shared check that a clone can make both demo folders
+    (test_demo_folders.py). No `dotnet test` runs website/shots tests, so on
+    Windows this is where it is gated; a red run stops the capture."""
+    announce("Checking marketing/folders.json against the ready-made courses")
+    subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "test_demo_folders.py")],
+                   cwd=REPO, check=True)
+
+
+def provision_demo(folder: Path, plantoir_exe: Path) -> int:
+    """Give a demo folder folders.json's state, through plantoir-mcp.exe.
+
+    The courses themselves are made by the app's own new-course panel first
+    (ENG2D sections 1 and 2, MCV4U 1, SCH3U 1 — folders.json → demo.courses),
+    exactly as on the Mac; this step then sets each section's colour scheme,
+    the teacher's last name and the sites' stand-in markers, and asks the
+    app's own door to put every front page on the latest class dated on or
+    before January 15 with every class after it unpublished. The same
+    demo_folders.py the Mac runs; only the door differs.
+    """
+    import marketing_folder
+    mcp_exe = plantoir_exe.parent / "plantoir-mcp.exe"
+    if not mcp_exe.exists():
+        print(f"   plantoir-mcp.exe is not beside {plantoir_exe}; publish.ps1 puts it there.", file=sys.stderr)
+        return 1
+    report = marketing_folder.Report()
+    left = demo_folders.apply_demo_state(folder, demo_folders.windows_server(mcp_exe, folder), report)
+    print(f"   {marketing_folder.summary(report)}")
+    for line in left:
+        print(f"   still to do: {line}", file=sys.stderr)
+    return 1 if left else 0
+
+
 def main() -> int:
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    check_the_folders_spec()
     plantoir_exe = find_or_build_plantoir_exe()
+
+    # Give a demo folder folders.json's state: `--provision-demo <folder>`.
+    if "--provision-demo" in sys.argv:
+        index = sys.argv.index("--provision-demo")
+        if index + 1 >= len(sys.argv):
+            print("--provision-demo needs the demo working folder after it.", file=sys.stderr)
+            return 2
+        return provision_demo(Path(sys.argv[index + 1]).expanduser(), plantoir_exe)
 
     # Only the three figures made of whole window captures (#380): the hero
     # and the two colour figures. Takes the desktop for a few minutes.
