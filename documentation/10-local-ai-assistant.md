@@ -6336,12 +6336,17 @@ next unit test", "…not the next unit", and "next week" in a course whose
 unit word is Week — each points where the plain call was asked for, which
 costs one sentence and writes nothing.
 
-**Windows owes** (issue drafted from the mac; #440 stays open for it): hide
+**Windows owes** (the hand-back is a comment on #440, the one issue; it stays open for Windows to close): hide
 `unit`/`days` from its model via `CardOnlyArguments` — its router is shown
 `unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever
 the sentence says "unit" — measured on its own tier; widen S2; port the
 frames and S3, reading the plain next page with `plan_add_next_class` over
 MCP (course and section only; a refusal for dates means S3 does nothing).
+That read must not offer the dates sheet, or any other interface, as a side
+effect: the mac reads `NextClassPlanner.plan` directly rather than the
+runner's plan path, which offers the sheet, so a twin that reads through
+`plan_add_next_class` could offer it twice; read the planner, or suppress
+the offer for S3's probe.
 The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
 record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
 `7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
