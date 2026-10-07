@@ -6495,7 +6495,17 @@ Terminate) — in all four the server was gone within six seconds and its lease
 was still on disk. SIGHUP and SIGTERM sent by hand do the same. Quitting
 Plantoir itself while a session is open leaves the session's lease, its
 held-backup record and its server exactly as they were (measured: app gone,
-server alive, both files present) — the app's quit removes only its own.
+server alive, both files present) — the app's quit removes only its own. So the clean
+release (`stopOwnWorkBeforeLeaving`: runs stopped, then
+`forgetRecordedBackups()`, then `releaseEverything()` — Windows' order) is the
+exception, and no "let go" trail line is written: it would almost never appear,
+and its absence would read as a session still open. The stale lease and record
+hold nothing, because every reader skips a dead owner by pid, name and start
+time; one lease and at most one record per course accumulate per session, and
+nothing sweeps them (`doorCourseHold.knownLimits`). **Rejected**: a SIGTERM
+handler (it cannot await the runs it would stop, and the readers already ignore
+the dead), and exporting the course in the `.command` script (implicit, and it
+would reach the server only through the shell's environment).
 
 **The acceptance run (#458 ruling 6)**, the same day: a scratch Debug build
 launched with `--state-dir` on a temp working folder holding EXC2O, and a real
@@ -6511,17 +6521,7 @@ section's menu greyed all three Revise items with one line; Delete Backup on
 the session's zip answered "Finish the Claude session working on EXC2O first.
 It made this backup, so it was kept."; and Restore on another backup of EXC2O,
 confirmed, answered "A Claude session is working on EXC2O right now. Finish that
-session, then restore." So the clean
-release (`stopOwnWorkBeforeLeaving`: runs stopped, then
-`forgetRecordedBackups()`, then `releaseEverything()` — Windows' order) is the
-exception, and no "let go" trail line is written: it would almost never appear,
-and its absence would read as a session still open. The stale lease and record
-hold nothing, because every reader skips a dead owner by pid, name and start
-time; one lease and at most one record per course accumulate per session, and
-nothing sweeps them (`doorCourseHold.knownLimits`). **Rejected**: a SIGTERM
-handler (it cannot await the runs it would stop, and the readers already ignore
-the dead), and exporting the course in the `.command` script (implicit, and it
-would reach the server only through the shell's environment).
+session, then restore."
 
 **The asymmetry both platforms share.** The Codex door names no course and
 holds nothing — on Windows since #430 and on the mac by ruling 3 of #458, so a
