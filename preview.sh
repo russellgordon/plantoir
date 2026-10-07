@@ -663,7 +663,7 @@ say_this_folder_cannot_be_reached() {
 #            script a shell was handed before any word starting with "-" —
 #            and 0 when the line merely names it (a `claude -p` prompt, a
 #            `bash -c` wrapper whose own child is the launcher). For a
-#            publish set for later, 1 when its SCRIPT is the program the same
+#            deploy set for later, 1 when its SCRIPT is the program the same
 #            way — the wrapper the run started, `/bin/bash …/<label>.sh`,
 #            which outlives a run ended by a re-set (#439) — and 0 for the
 #            app's own `Plantoir --run-scheduled-deploy <script> …` line, an
