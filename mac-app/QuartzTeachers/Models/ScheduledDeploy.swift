@@ -1409,9 +1409,10 @@ enum ScheduledDeploy {
         // would leave it alive. (The wrapper it started outlives it — a
         // `Process` child has a process group of its own — and finishes the
         // old deploy. It cannot remove the new deploy — its only plist line
-        // is its first and it boots nothing out — but it is NOT harmless: the
-        // ended run's leases read as stale while it works, so a second deploy
-        // of the section can overlap it. See doc 07.) Pinned by
+        // is its first and it boots nothing out. The ended run's leases read
+        // as stale while it works, so since #439 the launchers refuse a second
+        // deploy of the section while its script runs, and the newly set run
+        // waits for it (`waitForTheEarlierDeploy`). See doc 07.) Pinned by
         // `testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`;
         // measured in documentation/07-deployment.md → "Set again while the
         // run works (#409)".
