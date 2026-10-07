@@ -189,6 +189,26 @@ nonisolated enum AssistWording {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
     }
 
+    /// A deploy from the in-app assistant or an outside assistant's
+    /// `deploy_section` was refused by the launchers because the section was
+    /// still being deployed by a deploy that was set for later — its run
+    /// still working, including one ended by setting the section again
+    /// (GitHub #439). Said instead of "did not finish", which would send the
+    /// teacher looking for a fault. Names what is deploying, because after a
+    /// re-set the app shows only the new time. `shared-rules.json` →
+    /// `deployWhileItsSectionDeploys.sentences.assistant`.
+    static func deployRefusedWhileALaterDeployWorks(course: String, section: String) -> String {
+        return "\(course) Section \(section) is still being deployed by a deploy that was set for later, "
+             + "so it was not deployed again. Try again once that deploy has finished."
+    }
+
+    /// The same refusal when what was in the way is another deploy of the
+    /// section — one typed in Terminal, say (GitHub #439).
+    static func deployRefusedWhileItsSectionDeploys(course: String, section: String) -> String {
+        return "\(course) Section \(section) is already being deployed, so it was not deployed again. "
+             + "Try again once that deploy has finished."
+    }
+
     /// A deploy from a caller with no window (an assistant in another app,
     /// or the in-app assistant with no section window open) stopped at a
     /// question — a site name, a surname, a token — rather than waiting for
