@@ -1473,6 +1473,7 @@ enum ScheduledDeploy {
                 alreadySet, plists: plistURLs(of: existing), runner: runner,
                 when: when, course: course, sectionNumber: sectionNumber
             )
+            noteTheEarlierDeployGoesOn(anEarlierDeployWasLeftWorking, course: course, sectionNumber: sectionNumber)
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
         }
 
@@ -1484,6 +1485,7 @@ enum ScheduledDeploy {
                 course: course.code,
                 section: sectionNumber
             )
+            noteTheEarlierDeployGoesOn(anEarlierDeployWasLeftWorking, course: course, sectionNumber: sectionNumber)
             // A job under ANOTHER name — one set before #237 — still has its
             // plist, because nothing is deleted until the new job is accepted.
             // Hand it back rather than lose it. A job under THIS label was
@@ -1552,6 +1554,23 @@ enum ScheduledDeploy {
             )
         }
         return nil
+    }
+
+    /// A re-set that FAILED has still ended a working run's app (the boot-out
+    /// comes first), and the deploy that app started still goes out (#439).
+    /// "Set again" would be untrue here, so this says only what is: under
+    /// the could-not-be-set event, beside the line that says the new one
+    /// was not set (#439 fixes review, finding 2).
+    private static func noteTheEarlierDeployGoesOn(_ wasLeftWorking: Bool, course: Course, sectionNumber: Int) {
+        if !wasLeftWorking {
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployCouldNotBeSet,
+            "this section's earlier deploy was still working, and will finish on its own",
+            course: course.code,
+            section: sectionNumber
+        )
     }
 
     /// The earliest moment still ahead among some jobs, or nil — the same
