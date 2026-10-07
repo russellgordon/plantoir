@@ -196,6 +196,13 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
   side), by placing them, never by cutting or redrawing them.
   How to run it and what it leaves behind: `website/README.md`, "Regenerating
   every image".
+- **Both working folders are described in the repository** (#445):
+  `website/shots/marketing/folders.json` holds their courses, sections,
+  colours, site names and demo state as rules that follow the school year;
+  `demo_folders.py` applies them (the front pages through the app's own
+  `--mcp-stdio` door), and `test_demo_folders.py`, run by `verify.sh`, proves a
+  clone can make both at two clock years. The UI tests read their course codes
+  and sections from the same file (`MarketingFolderSpec.swift`).
 - **Class Sites**: Photographed in Safari on a real macOS display so native font
   rasterization, scrollbars, and window chrome are preserved. The two colour
   figures are the exception: their parts are the course home pages in a plain
@@ -225,7 +232,12 @@ Under the hood:
 1. **Autonomous Invocation**: Executes `Plantoir.exe --capture-marketing-shots <output-dir>`.
 2. **Demo Provisioning**: `MarketingShotCapturer.cs` (`windows-app/Plantoir/Services/MarketingShotCapturer.cs`)
    creates an isolated demo workspace in `Path.Combine(Path.GetTempPath(), "PlantoirMarketingWorkspace")`
-   populated with `ENG2D`, `MCV4U`, and `SCH3U` from `support/example_content/`.
+   populated with `ENG2D`, `MCV4U`, and `SCH3U` from `support/example_content/` — by copying each
+   payload's `shared/` into a `shared/` subfolder with fixed dates (2026-10-14 for every class,
+   2026-09-08 for every other page) and colour keys of its own, so it is not yet the mac's folder.
+   Making those courses through the app's installer and from `website/shots/marketing/folders.json`
+   (whose demo state `capture_windows.py --provision-demo <folder>` already applies through
+   `plantoir-mcp.exe`) is the `windows` issue for #445.
 3. **Staged Rendering**: For each appearance (`ElementTheme.Light` and `ElementTheme.Dark`),
    the capturer configures and renders the exact visual states:
    - `courses`: Main window with multi-course sidebar and Section 1 detail.

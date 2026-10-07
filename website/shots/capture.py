@@ -20,8 +20,10 @@ What it does, in order:
 1. **Provisions a demo working folder** (``~/Desktop/Teaching`` by default,
    ``--provision-demo``) by driving the app's own new-course panel for ENG2D,
    MCV4U and SCH3U -- three subjects chosen so the class sites between them
-   show prose, typeset mathematics and chemistry. Skipped when the courses are
-   already there. (Until v1.4.0 this step only wrote launchers and site
+   show prose, typeset mathematics and chemistry -- then gives it the state
+   ``marketing/folders.json`` describes (``demo_folders.py``, #445). The
+   courses are skipped when already there; every state step says "already
+   there" on a second run. (Until v1.4.0 this step only wrote launchers and site
    markers and never ran the course-making test, although this docstring said
    it did; it runs it now.)
 2. **Builds and publishes** each of those sections, so the address bar in a
@@ -1315,7 +1317,8 @@ def provision_marketing(folder: Path) -> int:
     .sources/, hash-checked), into both courses; each course's correlation
     embeds and folder destination, ICS4U's declared second curriculum and
     How I Teach (marketing_folder.py); and a reference copy of ICS3U filed
-    under the school year before this one (folders.json), through the app. Declaring ICS3U's second curriculum is NOT
+    under the school year before this one (folders.json), through the app.
+    Declaring ICS3U's second curriculum is NOT
     here: the curriculum-settings scene does it through Course Settings,
     because that is the picture.
     """
