@@ -168,8 +168,21 @@ on or before January 15** of the school year with every class after it
 unpublished. That last part is asked of the app's own door (`Plantoir
 --state-dir … --mcp-stdio <folder>`, `unpublish_pages` from the next class's
 date on), so the app repoints the front page itself and no third copy of that
-rule exists. "On or before", never "on": 2028-01-15 is a Saturday. Before
-v1.4.0 the same step, then called `--provision`, only wrote launchers and
+rule exists. "On or before", never "on": 2028-01-15 is a Saturday.
+
+What a door call COSTS, said plainly: on the Mac each change zips the course
+into `courses/_backups` (once per course, since every section goes through one
+server) and rebuilds that section's site headless (`preview.sh --build-only`,
+into the real builds folder, starting the website builder if it is not
+running) — four builds for the four demo sections on a first run, and the
+Mac's tools have no switch to skip it. `capture.py` runs the door with
+`--state-dir` on a temporary folder, so nothing reaches the real activity
+trail. On Windows the same tools take `preview: false`, which
+`capture_windows.py` passes, so nothing is built; `plantoir-mcp.exe` takes no
+`--state-dir`, so its calls DO land on the real trail. A second run, with the
+front pages already right, makes no call at all.
+
+Before v1.4.0 the same step, then called `--provision`, only wrote launchers and
 markers and never ran that test, although its docstring said it did — so the
 demo folder could not actually be made from nothing.
 
