@@ -1516,11 +1516,20 @@ class MarketingFolderShownAsTeaching:
         dark one after it). Kept at the shown path, the config changes once,
         the next deploy records it, and every later run is clean. Outside a
         run the marketing folder is only provisioned, never deployed from.
+
+        The paths are searched for as they are written INSIDE a JSON string
+        (#461): a Windows path's backslashes are doubled there, so the raw
+        path never matched and nothing was rewritten. The Windows twin
+        (app_scenes_windows.ShownAsTeaching.rewrite) does the same. A mac
+        path with no backslash or quote reads the same either way, and
+        ensure_ascii=False keeps a non-ASCII name in the raw form it had.
         """
+        escaped_old = json.dumps(old, ensure_ascii=False)[1:-1]
+        escaped_new = json.dumps(new, ensure_ascii=False)[1:-1]
         for config in self.configs(root):
             text = config.read_text(encoding="utf-8")
-            if old in text:
-                config.write_text(text.replace(old, new), encoding="utf-8")
+            if escaped_old in text:
+                config.write_text(text.replace(escaped_old, escaped_new), encoding="utf-8")
 
     def __enter__(self) -> Path:
         if self.marketing == SHOWN_FOLDER:
