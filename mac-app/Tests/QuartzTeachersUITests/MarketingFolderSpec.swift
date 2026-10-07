@@ -21,8 +21,13 @@ struct MarketingFolderSpec: Decodable {
     let marketing: MarketingFolder
 
     struct Course: Decodable {
+
+        // MARK: - Stored properties
+
         let code: String
         let sections: [Int]
+
+        // MARK: - Computed properties
 
         /// The sections the way a teacher types them into the new-course panel.
         var sectionsAsTyped: String {
@@ -35,10 +40,16 @@ struct MarketingFolderSpec: Decodable {
     }
 
     struct DemoFolder: Decodable {
+
+        // MARK: - Stored properties
+
         let courses: [Course]
     }
 
     struct MarketingFolder: Decodable {
+
+        // MARK: - Stored properties
+
         let courses: [Course]
         let curriculumCourse: String
         let collegeBoardPages: CollegeBoardPages
@@ -46,21 +57,33 @@ struct MarketingFolderSpec: Decodable {
     }
 
     struct CollegeBoardPages: Decodable {
+
+        // MARK: - Stored properties
+
         let folder: String
     }
 
     struct Scenes: Decodable {
+
+        // MARK: - Stored properties
+
         let newCourse: NewCourse
         let pageToBorrow: String
         let bothCurricula: BothCurricula
     }
 
     struct NewCourse: Decodable {
+
+        // MARK: - Stored properties
+
         let code: String
         let sections: String
     }
 
     struct BothCurricula: Decodable {
+
+        // MARK: - Stored properties
+
         let page: String
         let ontario: String
         let collegeBoard: String
@@ -156,6 +179,8 @@ struct MarketingFolderSpec: Decodable {
 /// What is missing when a scene needs a school year and has none.
 enum MarketingFolderSpecProblem: Error, CustomStringConvertible {
     case noReferenceYear(String)
+
+    // MARK: - Computed properties
 
     var description: String {
         switch self {
