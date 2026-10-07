@@ -213,6 +213,50 @@ class FragmentTests(unittest.TestCase):
         self.assertEqual(build.broken_fragment_problems(rendered), [])
 
 
+class RedirectTests(unittest.TestCase):
+    """A page that moved keeps its old address (#443: /publishing/ became
+    /deploying/), and nothing on the site still points at the old one."""
+
+    SITE = {"nav": ["index", "deploying"], "redirects": {"moved": [{"from": "publishing", "to": "deploying"}]}}
+
+    def test_the_old_address_and_everything_under_it_redirect_permanently(self):
+        text = build.redirects_text(self.SITE)
+        self.assertIn("/publishing    /deploying/    301!", text)
+        self.assertIn("/publishing/*    /deploying/:splat    301!", text)
+
+    def test_the_real_site_moves_publishing_to_deploying(self):
+        site = json.loads((build.WEBSITE / "site.json").read_text(encoding="utf-8"))
+        self.assertIn({"from": "publishing", "to": "deploying"}, build.moved_pages(site))
+        self.assertIn("deploying", site["nav"])
+        self.assertNotIn("publishing", site["nav"])
+        self.assertFalse((build.WEBSITE / "pages" / "publishing.html").exists())
+        self.assertTrue((build.WEBSITE / "pages" / "deploying.html").exists())
+
+    def test_a_clean_move_has_no_problems(self):
+        rendered = {"features": '<a href="../deploying/#on-a-schedule">how</a>'}
+        self.assertEqual(build.redirect_problems(self.SITE, ["index", "deploying"], rendered), [])
+
+    def test_a_link_to_the_old_address_is_a_problem(self):
+        rendered = {"features": '<a href="../publishing/#on-a-schedule">how</a>'}
+        problems = build.redirect_problems(self.SITE, ["index", "deploying"], rendered)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("features.html links to publishing/", problems[0])
+
+    def test_a_missing_new_page_or_a_lingering_old_one_is_a_problem(self):
+        self.assertEqual(len(build.redirect_problems(self.SITE, ["index"], {})), 1)
+        self.assertEqual(len(build.redirect_problems(self.SITE, ["index", "deploying", "publishing"], {})), 1)
+
+    def test_the_old_pages_built_copy_is_removed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            (output / "publishing").mkdir()
+            (output / "publishing" / "index.html").write_text("old", encoding="utf-8")
+            (output / "deploying").mkdir()
+            build.remove_moved_output(self.SITE, output)
+            self.assertFalse((output / "publishing").exists())
+            self.assertTrue((output / "deploying").exists())
+
+
 class ReleaseReadinessTests(unittest.TestCase):
 
     def test_pages_ahead_of_the_release_are_not_deployed(self):

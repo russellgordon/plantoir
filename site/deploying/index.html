@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Publishing — Plantoir</title>
+<title>Deploying — Plantoir</title>
 <meta name="description" content="Where a class site can go, how to choose, and how to set up each destination — Netlify, Cloudflare Pages, or a folder on your own web space.">
-<link rel="canonical" href="https://plantoir.app/publishing">
+<link rel="canonical" href="https://plantoir.app/deploying">
 
 <!-- Social preview. Update the URLs if the domain changes. -->
 <meta property="og:site_name" content="Plantoir">
-<meta property="og:title" content="Publishing — Plantoir">
+<meta property="og:title" content="Deploying — Plantoir">
 <meta property="og:description" content="Where a class site can go, how to choose, and how to set up each destination — Netlify, Cloudflare Pages, or a folder on your own web space.">
-<meta property="og:url" content="https://plantoir.app/publishing">
+<meta property="og:url" content="https://plantoir.app/deploying">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://plantoir.app/social-card.png">
 <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
 <meta property="og:image:alt" content="The Plantoir seedling icon beside the words Plantoir, on a cream background.">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Publishing — Plantoir">
+<meta name="twitter:title" content="Deploying — Plantoir">
 <meta name="twitter:description" content="Where a class site can go, how to choose, and how to set up each destination — Netlify, Cloudflare Pages, or a folder on your own web space.">
 <meta name="twitter:image" content="https://plantoir.app/social-card.png">
 
@@ -77,7 +77,7 @@
       <a href="../">Home</a>
       <a href="../features/">Features</a>
       <a href="../day-to-day/">Day to day</a>
-      <a href="../publishing/" aria-current="page">Publishing</a>
+      <a href="../deploying/" aria-current="page">Deploying</a>
       <a href="../support/">Support</a>
   </nav>
 </div>
@@ -85,7 +85,7 @@
 <main id="main">
 
 <div class="page-head">
-  <h1>Publishing</h1>
+  <h1>Deploying</h1>
   <p class="standfirst">A built section can go to three different places. This page covers the choice properly — the in-app picker only has room for a caption.</p>
 </div>
 
@@ -93,34 +93,34 @@
 
 <section>
   <h2>The three destinations</h2>
-  <p>Whichever you choose, what gets published is the same site — the exact pages you previewed. Only where it ends up differs, and you can change your mind later without rewriting anything.</p>
+  <p>Whichever you choose, what gets deployed is the same site — the exact pages you previewed. Only where it ends up differs, and you can change your mind later without rewriting anything.</p>
 
   <div class="note">
     <h3>Netlify — the default</h3>
     <p>A free hosting account, one site per section, at an address like <code>ics3u-s1-2025-gordon.netlify.app</code>. The address is suggested once and stays fixed after that, so a link handed out in September still works in June.</p>
-    <p>This is the right choice for most teachers starting out — the app does the account creation for you the first time you publish. The one thing worth knowing: Netlify's free-tier API can get rate-limited if a whole staff room publishes at once, say at a workshop. It resolves itself in a few minutes; nothing is lost.</p>
+    <p>This is the right choice for most teachers starting out — the app does the account creation for you the first time you deploy. The one thing worth knowing: Netlify's free accounts can turn requests away for a few minutes if a whole staff room deploys at once, say at a workshop. It resolves itself in a few minutes; nothing is lost.</p>
   </div>
 
   <div class="note">
     <h3>Cloudflare Pages — for unmetered bandwidth, or a free address per section</h3>
-    <p>Also free, also one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Worth choosing if a class page carries a lot of images or embedded documents and you'd rather not think about bandwidth limits — Cloudflare's free plan doesn't meter static traffic.</p>
+    <p>Also free, also one project per section, at an address like <code>ics3u-s1-2025-gordon.pages.dev</code>. Worth choosing if a class page carries a lot of images or embedded documents and you'd rather not think about bandwidth limits — Cloudflare's free plan doesn't limit how much your students download.</p>
     <p>Setup asks for two things instead of one — see below.</p>
   </div>
 
   <div class="note">
     <h3>A folder on this computer — for a board or university web space</h3>
-    <p>No hosting account at all. The app copies the built site into a folder you choose, one <code>sectionN</code> subfolder per class, and only changed files are copied on later publishes — a page you remove locally is removed there too. You upload that folder to wherever your board or university already gives you space — over SFTP, a network share, whatever you normally use.</p>
-    <p>Because nothing is uploaded by the app itself, there's a page opened straight from that folder won't look quite right locally — the site expects to be served over the web, not read off disk. Once it's on your host, it looks the same as the other two.</p>
+    <p>No hosting account at all. The app copies the built site into a folder you choose, one <code>sectionN</code> subfolder per class, and only changed files are copied on later deploys — a page you remove locally is removed there too. You upload that folder to wherever your board or university already gives you space — over SFTP, a network share, whatever you normally use.</p>
+    <p>A page opened straight from that folder won't look quite right on this computer — the site expects to be served over the web, not read off disk. Once it's on your host, it looks the same as the other two.</p>
   </div>
 
-  <p>A section can also publish to more than one of these at once, for redundancy — set that up once and every publish after it goes to both.</p>
+  <p>A section can also deploy to more than one of these at once, for redundancy — set that up once and every deploy after it goes to each of them.</p>
 </section>
 
 <hr class="rule">
 
 <section>
   <h2>Setting up Netlify</h2>
-  <p>Nothing to set up ahead of time. Publish a section for the first time and the app asks for your last name (used once, to build the site's address) and walks you through connecting a Netlify account. After that, every publish for that section reuses the same site.</p>
+  <p>Nothing to set up ahead of time. Deploy a section for the first time and the app asks for your last name (used once, to build the site's address) and walks you through connecting a Netlify account. After that, every deploy for that section reuses the same site.</p>
 </section>
 
 <hr class="rule">
@@ -131,17 +131,17 @@
   <div class="note">
     <h3>An API token</h3>
     <p>Create one in the Cloudflare dashboard with exactly one permission: <strong>Account → Cloudflare Pages → Edit</strong>. Nothing broader is needed, and nothing broader is asked for.</p>
-    <h3>An account ID</h3>
-    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app asks for your Cloudflare Account ID once, up front, rather than mid-publish. It's on the same dashboard page as the token.</p>
+    <h3>An Account ID</h3>
+    <p>A token scoped this narrowly can't look up its own account — that's a Cloudflare limitation, not an app one — so the app asks for your Cloudflare Account ID once, up front, rather than mid-deploy. It's on the same dashboard page as the token.</p>
   </div>
-  <p>Enter both once and every Cloudflare course you publish afterward reuses them.</p>
+  <p>Enter both once and every Cloudflare course you deploy afterward reuses them.</p>
 </section>
 
 <hr class="rule">
 
 <section>
   <h2>Setting up a folder</h2>
-  <p>Choose the destination folder once in the section's publishing settings. No account, no token — the app just needs to know where to copy files.</p>
+  <p>Choose the destination folder once under Deploying in Course Settings. No account, no token — the app just needs to know where to copy files.</p>
 </section>
 
 <hr class="rule">
@@ -157,8 +157,8 @@
 
 <section id="on-a-schedule">
   <h2>On a schedule</h2>
-  <p>Choose Schedule Deploy… on a section, pick a time, and the section publishes itself then — the same site you would publish by hand, to the same places.</p>
-  <p>Your computer has to be awake for it, or wake up soon after. If it was asleep, the publish runs when it wakes — unless too long has passed, which you set per course ("How late a scheduled deploy may still run"). Past that, it leaves the site as it was and tells you.</p>
+  <p>Choose Schedule Deploy… on a section, pick a time, and the section deploys itself then — the same site you would deploy by hand, to the same places.</p>
+  <p>Your computer has to be awake for it, or wake up soon after. If it was asleep, the deploy runs when it wakes — unless too long has passed, which you set per course ("How late a scheduled deploy may still run"). Past that, it leaves the site as it was and tells you.</p>
   <p>Either way you hear about it: a note on the section, and a notification that opens the section when you click it.</p>
   
 </section>
@@ -167,7 +167,7 @@
 
 <section>
   <h2>Some real class sites</h2>
-  <p>Built from ready-made course material and published exactly the way described above.</p>
+  <p>Built from ready-made course material and deployed exactly the way described above.</p>
   <ul class="links">
     <li><span class="label">ENG2D</span> <a href="https://eng2d-s1-2026-gordon.netlify.app">English, Grade 10</a></li>
     <li><span class="label">MCV4U</span> <a href="https://mcv4u-s1-2026-gordon.netlify.app">Calculus and Vectors, Grade 12</a></li>
@@ -182,7 +182,7 @@
     <a href="../">Home</a>
     <a href="../features/">Features</a>
     <a href="../day-to-day/">Day to day</a>
-    <a href="../publishing/">Publishing</a>
+    <a href="../deploying/">Deploying</a>
     <a href="../support/">Support</a>
   </nav>
   Icon from <a href="https://phosphoricons.com">Phosphor Icons</a> (MIT).<br>

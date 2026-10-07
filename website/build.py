@@ -10,9 +10,9 @@ Usage::
     python3 website/build.py             # write site/
     python3 website/build.py --check     # report problems, write nothing
     python3 website/build.py --serve     # preview locally; rebuild on refresh
-    python3 website/build.py --deploy    # build, then publish to plantoir.app
+    python3 website/build.py --deploy    # build, then deploy to plantoir.app
 
-Publishing is deliberately a separate, explicit flag: the Netlify site is not
+Deploying is deliberately a separate, explicit flag: the Netlify site is not
 connected to GitHub, so plantoir.app changes ONLY when --deploy (or
 website/netlify_deploy.py directly) is run. Build, look at site/ locally,
 deploy when it is right.
@@ -623,6 +623,64 @@ def broken_fragment_problems(rendered: dict[str, str]) -> list[str]:
     return problems
 
 
+# ---------- Pages that moved ----------
+
+# A page that moves keeps its old address working: site.json's "redirects"
+# names each move, build.py writes them into site/_redirects (Netlify reads
+# that file from the deployed folder, as it reads _headers), and the old
+# address answers 301 with the new one. A browser carries the #fragment over
+# a redirect itself, so /publishing/#on-a-schedule lands on
+# /deploying/#on-a-schedule. The rules are FORCED (301!) so that a stale copy
+# of the old page left anywhere can never shadow them.
+REDIRECTS_FILE = "_redirects"
+
+
+def moved_pages(site: dict) -> list[dict]:
+    return list(site.get("redirects", {}).get("moved", []))
+
+
+def redirects_text(site: dict) -> str:
+    lines: list[str] = [
+        "# Written by website/build.py from site.json \"redirects\". Do not edit by hand.",
+    ]
+    for move in moved_pages(site):
+        old = move["from"]
+        new = move["to"]
+        lines.append(f"/{old}    /{new}/    301!")
+        lines.append(f"/{old}/*    /{new}/:splat    301!")
+    return "\n".join(lines) + "\n"
+
+
+def redirect_problems(site: dict, slugs: list[str], rendered: dict[str, str]) -> list[str]:
+    """A move whose new page does not exist, whose old address is still a
+    page, or whose old address a page still links to (it would work, by way
+    of a redirect, and the link should say where the page is now)."""
+    problems: list[str] = []
+    for move in moved_pages(site):
+        old = move["from"]
+        new = move["to"]
+        if new not in slugs:
+            problems.append(f"site.json redirects /{old}/ to /{new}/, which is not a page")
+        if old in slugs:
+            problems.append(f"site.json redirects /{old}/ away, but pages/{old}.html still exists")
+        if old in site.get("nav", []):
+            problems.append(f"site.json's nav still lists {old!r}, which moved to {new!r}")
+        link = re.compile(r'href="(?:\./|\.\./)?' + re.escape(old) + r'/')
+        for slug, html in rendered.items():
+            if link.search(html):
+                problems.append(f"{slug}.html links to {old}/, which moved to {new}/")
+    return problems
+
+
+def remove_moved_output(site: dict, output: Path) -> None:
+    """The old page's built copy, left from before the move: removed so the
+    folder that is deployed holds only what the sources say."""
+    for move in moved_pages(site):
+        stale = output / move["from"]
+        if stale.is_dir() and stale.parent == output:
+            shutil.rmtree(stale)
+
+
 def version_tuple(text: str) -> tuple:
     parts: list[int] = []
     for piece in str(text).split("."):
@@ -681,6 +739,13 @@ def new_in_is_current(site: dict) -> bool:
     listed = str(site.get("new_in", {}).get("version", ""))
     major_minor = ".".join(version.split(".")[:2])
     return listed == major_minor
+
+
+def site_slugs(pages: list[dict]) -> list[str]:
+    slugs: list[str] = []
+    for page in pages:
+        slugs.append(page["slug"])
+    return slugs
 
 
 def substitute(template: str, values: dict) -> str:
@@ -802,8 +867,11 @@ def build(check_only: bool) -> int:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
 
     problems.extend(broken_fragment_problems(rendered))
+    problems.extend(redirect_problems(site, site_slugs(pages), rendered))
 
     if not check_only:
+        remove_moved_output(site, OUTPUT)
+        (OUTPUT / REDIRECTS_FILE).write_text(redirects_text(site), encoding="utf-8")
         assets = OUTPUT / "assets"
         assets.mkdir(parents=True, exist_ok=True)
         for asset in sorted((WEBSITE / "assets").iterdir()):
@@ -862,6 +930,15 @@ def serve(port: int) -> int:
             nonlocal built_from
             # Rebuild only ahead of page loads, not for every image the page
             # then pulls in — one check per refresh, not thirty.
+            # A moved page's old address answers as plantoir.app does.
+            for move in moved_pages(read_json(WEBSITE / "site.json")):
+                old_prefix = "/" + move["from"]
+                if self.path == old_prefix or self.path.startswith(old_prefix + "/"):
+                    rest = self.path[len(old_prefix):].lstrip("/")
+                    self.send_response(301)
+                    self.send_header("Location", "/" + move["to"] + "/" + rest)
+                    self.end_headers()
+                    return
             wants_page = self.path.endswith("/") or self.path.endswith(".html")
             if wants_page:
                 current = newest_source_time()
