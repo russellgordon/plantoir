@@ -45,10 +45,11 @@ final class NextClassUnitsTests: XCTestCase {
         for row in rows {
             let input: String = try XCTUnwrap(row["input"] as? String)
             XCTAssertNotNil(row["why"] as? String, "\(input) is accepted for no stated reason")
-            let command: AssistCardCommand = try XCTUnwrap(
-                AssistCardCommand.matching(input),
-                "\"\(input)\" is in the contract as answered in code and matches nothing"
-            )
+            // Not XCTUnwrap: every row that fails is reported, not the first.
+            guard let command = AssistCardCommand.matching(input) else {
+                XCTFail("\"\(input)\" is in the contract as answered in code and matches nothing")
+                continue
+            }
             XCTAssertEqual(command.toolName, row["expectTool"] as? String, input)
             XCTAssertEqual(command.arguments, row["expectArguments"] as? [String: String], input)
         }
