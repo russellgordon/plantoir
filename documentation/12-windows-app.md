@@ -4001,7 +4001,7 @@ product question, not a capture one). Fixed on 2026-10-07 — see the next
 section; `Dress` now re-syncs the caption after it sets a scene's theme, so
 pictures taken after that carry a dark bar in the dark scenes.
 
-## The title bar follows dark and light mode (Windows v1.4.3 order, 2026-10-07)
+## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
 
 Russell's order: "The title bar should be in dark mode when the computer is in
 dark mode." Neither window extends its content into the title bar, so the
