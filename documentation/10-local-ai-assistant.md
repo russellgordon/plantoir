@@ -4230,7 +4230,11 @@ Claude builds or deploys a section, a preview in that folder waits and the
 status line says "Waiting for Revise with Claude to finish deploying MPM2D
 section 2… (59s)"; while it only edits pages, or sits idle, nothing waits. The
 app's own lease check already agreed: `WorkLeaseRegistry.reconcile` derives
-leases from running work, so an idle MCP server holds none.
+leases from running work, so an idle MCP server holds no `build`, `preview` or
+`publish` lease. (Since #458 a server opened by the Claude door does hold an
+`assist` lease on that door's course for the whole session — which declines no
+build and holds back no change; it greys the Revise items and structural work
+only. See "On the mac (#458)".)
 
 **Tested.** `HeadlessDeployAnswersTests` runs the real `AssistToolchainWork`
 against stand-in launchers that write down their words and exit 3 (MF-6), and
@@ -6150,7 +6154,10 @@ passed to the server rather than asked for in a prompt" — and it was never
 true; it was corrected with this work, because a reader who believed it would
 have given Codex a narrowing that neither door has. The assistant Plantoir
 carries itself *is* bound (`contracts/assist-cases.json` → `windowBinding`);
-an outside door is not.
+an outside door is not. **Since #458 the Claude door also names its course to
+the server, in its environment (`PLANTOIR_DOOR_COURSE`) — to HOLD it, never to
+narrow it**: the server takes an `assist` lease on it, and every course stays
+reachable. See "On the mac (#458)".
 
 **The search list does nearly all of the work, and it is the first thing
 somebody will simplify away.** An app launched from the Dock inherits launchd's
@@ -6377,8 +6384,9 @@ door ALSO names its course in the server's ENVIRONMENT
 the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
-and the mac is asked what it does). The Codex door names none and holds none,
-as before.
+and the mac is asked what it does — answered by #458, below). The Codex door
+names none and holds none, as before — on BOTH platforms since #458: only the
+Claude door names a course to its server.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6411,6 +6419,101 @@ codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
 `%APPDATA%\npm` has no `codex.cmd`). Plantoir never installs it, and neither did
 this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
 Windows machine that has Codex, with its hardware, before trusting it there.
+
+### On the mac (#458, 2026-10-07): the Claude door holds its course, as Windows'
+
+Russell decided on #458 that the mac MATCHES Windows. The Claude door's
+`mcp-<CODE>.json` now carries `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}` beside
+`args` (`ClaudeCodeLauncher.writeConfig`; the name is written once, as
+`AssistMCPServer.doorCourseVariable`, and pinned against
+`app-rules.json` → `outsideAgents.doorCourseVariable` and each door's
+`serverEnvironment`). The argv stays `--mcp-stdio <folder>`: #430's trap was a
+course in the argv being read as a lock, and nothing keys on it.
+
+**The server.** `AssistMCPServer.serve` reads the variable after it has opened
+the folder and resolves it with `courseToHoldForTheConversation(_:among:)` —
+Windows' `CourseToHoldForTheConversation`: trimmed, blank is nothing, matched
+without regard to case and answered as the folder spells it, a course the
+folder does not have is nothing (never a refusal, never a lock).
+`WorkLeaseRegistry.holdForTheConversation` keeps the `assist` lease in what
+`reconcile()` WANTS — necessary, not tidy: `reconcile` removes every written
+lease that is not wanted, so a hold written beside it would vanish at the first
+reconcile after the session's own preview or deploy ended. It survives the
+`isLeaving` window too, and `releaseEverything()` clears it. The trail gets
+`outside session held a course` ("a Claude session started from Plantoir is
+holding ICS3U while it is open").
+
+**The three protections**, each read from another live process's files, never
+this process's own (`heldElsewhere` skips its own pid and dead owners):
+
+- **The session's backup is kept** (#283). The runner's two places that make a
+  conversation's way back now go through one `rememberConversationBackup`, which
+  — in the server only (`AssistMCPServer.isServing`) — writes
+  `<COURSE>.held-backup.<pid>` beside the lease, one line, the zip's path
+  (`file-formats.json` → `heldBackupRecord`, Windows' format). The app's delete
+  keeps a record's backup only while that pid holds a live `assist` lease
+  (`WorkLeaseFiles.backupsHeldByOtherSessions`), and tells it apart from the
+  in-app window's own held backup: the confirmation, the alert afterwards, the
+  single Delete Backup and the trail's kept clause each say which (#458 ruling 7).
+- **A second session is refused.** All three Revise items grey on a held course
+  with "Available once you finish revising with Claude" once under them — the
+  sentence Windows' `BusyReason` has said since #430, word for word. The two
+  doors also grey while the in-app window is open on that course, with the
+  sentence that names the window (`AssistActivity.closeTheAssistantFirst`), not
+  the session's: two causes, two sentences (`CourseActivity
+  .reviseUnavailableReason`, `doorCourseHold.reviseCases`). Each click re-reads
+  the disk (`WorkspaceModel.reviseRefusal`) and refuses with "{CODE} is already
+  being revised", because a session can start between the menu opening and the
+  click.
+- **Structural work waits.** `CourseActivity.structuralHoldReason` is
+  `busyDescription`, then the hold. It is a SEPARATE question because
+  `busyDescription` is also the one a BUILD asks (`AssistSiteWork`), and an
+  `assist` lease never declines a build. Switched to it: the menu's Rename Course
+  and Add Section…, `renameIsUnavailableReason`, `rename()`, both checks in
+  `restoreBackup`, and a new click-time check on Add Section…. **Not held, as on
+  Windows** (ruling 2): removing a course or a section (`ScheduledDeployCleanup`
+  keeps `courseIsBusy`), and the unit-word rename. Keep a Copy for Reference
+  only reads the course and is not held either.
+
+**Staleness.** Another process's file changes nothing the app observes, and
+SwiftUI has no "menu is opening" hook (Windows reads at its menu's Opening). The
+window keeps a snapshot, `WorkspaceModel.coursesRevisedElsewhere`, refreshed when
+the folder is shown, on `NSApplication.didBecomeActiveNotification` (a session
+is opened and closed in Terminal, so coming back to Plantoir is when it changes)
+and at every click. **Rejected**: a folder watcher on `courses/.internal/activity`
+(more than Windows has, and a timing test on a serial suite, for a case the
+activation refresh covers), and reading the disk while a menu draws.
+
+**How a session ENDS — measured, and why there is no "let go" line.** Scratch
+Debug build, Claude Code 2.1.292, macOS 26 on Apple silicon, a temp working
+folder: the `EXC2O.assist.<pid>.lease` appeared within seconds of the session
+starting, its pid the server's (so Claude Code passes `env` through), and was
+removed when the server's input was closed under it. But each way a teacher
+ends a real session KILLED the server instead: `/exit`, Control-C twice,
+Command-W on the Terminal window (Terminate) and quitting Terminal (Command-Q,
+Terminate) — in all four the server was gone within six seconds and its lease
+was still on disk. SIGHUP and SIGTERM sent by hand do the same. So the clean
+release (`stopOwnWorkBeforeLeaving`: runs stopped, then
+`forgetRecordedBackups()`, then `releaseEverything()` — Windows' order) is the
+exception, and no "let go" trail line is written: it would almost never appear,
+and its absence would read as a session still open. The stale lease and record
+hold nothing, because every reader skips a dead owner by pid, name and start
+time; one lease and at most one record per course accumulate per session, and
+nothing sweeps them (`doorCourseHold.knownLimits`). **Rejected**: a SIGTERM
+handler (it cannot await the runs it would stop, and the readers already ignore
+the dead), and exporting the course in the `.command` script (implicit, and it
+would reach the server only through the shell's environment).
+
+**The asymmetry both platforms share.** The Codex door names no course and
+holds nothing — on Windows since #430 and on the mac by ruling 3 of #458, so a
+Codex session keeps none of the three protections. Russell's comment on #458
+said "both doors"; the director matched Windows instead, and that is a question
+put back to him (the undo is one more `-c` override,
+`mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"`, which Codex 0.155.1
+was measured to accept with `codex mcp get --json`).
+
+**The in-app window does not hold structural work on the mac**, and never did;
+on Windows its own server takes the lease, so it does there. Not changed here.
 
 ### The two timeouts, and why they are passed rather than trusted
 
