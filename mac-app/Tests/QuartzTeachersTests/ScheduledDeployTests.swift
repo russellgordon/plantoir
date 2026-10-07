@@ -777,6 +777,42 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertEqual(after.components(separatedBy: "that deploy will finish on its own").count, before)
     }
 
+    /// A re-set macOS refuses says only that it could not be set — never that
+    /// the section was set again (#439 review, finding 11): the line waits
+    /// for the new job to be accepted.
+    func testARefusedReSetNeverSaysItWasSetAgain() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let trailFolder: URL = workspaceURL.deletingLastPathComponent().appendingPathComponent("trail-refused")
+        try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        let launchControl: FakeLaunchControl = FakeLaunchControl()
+        launchControl.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        ScheduledDeploy.earlierDeployIsWorkingOverride = { (script: String) -> Bool in
+            return true
+        }
+        addTeardownBlock {
+            MainActor.assumeIsolated {
+                ActivityTrail.store = previousTrail
+                ScheduledDeploy.earlierDeployIsWorkingOverride = nil
+            }
+        }
+
+        let problem: String? = ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: launchControl
+        )
+
+        XCTAssertNotNil(problem)
+        var written: String = ""
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: trailFolder.path)) ?? [] {
+            written += (try? String(contentsOf: trailFolder.appendingPathComponent(name), encoding: .utf8)) ?? ""
+        }
+        XCTAssertTrue(written.contains("could not set a scheduled deploy"), written)
+        XCTAssertFalse(written.contains("set this section's deploy again"), written)
+    }
+
     func testCancellingRemovesTheAgent() throws {
         try prepare()
         let course: Course = try makeCourse()
