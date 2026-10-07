@@ -2924,11 +2924,46 @@ the app that was ended: the section is not marked deployed (it stays
 " — Edited", the harmless direction), the run writes no trail line of its own,
 and no notification is sent. Its script still writes the outcome record. So
 `scheduleDeploy` writes "scheduled deploy set again while its deploy worked"
-after its boot-out, when the label's script is still running — the one line
-that says a deploy went on after the re-set. A leftover run that hangs refuses
+when the label's script outlived its boot-out — the one line that says a
+deploy went on after the re-set. It is ASKED right after the boot-out (so the
+new run can never be mistaken for the leftover) and WRITTEN only once macOS has
+accepted the new job, so a re-set that fails says only "could not set a
+scheduled deploy" (#439 review, finding 11). A leftover run that hangs refuses
 that section until it ends, and nothing in the app ends it (cancelling or
 setting again boots out a job that is already gone); logging out or restarting
-the Mac does — `deployWhileItsSectionDeploys.knownLimits`.
+the Mac does.
+
+**Three more limits, recorded rather than built** (the #439 implementation
+review; all in `deployWhileItsSectionDeploys.knownLimits`):
+
+- **Turning the deploy off, or renaming the course, while its run works makes
+  the same leftover**, and the deploy still goes out. `cancelScheduledDeploy`
+  boots the label out blind (a working run's plist is already gone), which
+  ends the app exactly as a re-set does. The guard keeps it from overlapping
+  anything, but no trail line says a deploy the teacher turned off still went
+  out: the re-set line is written by `scheduleDeploy` only. Not built because
+  it is not one line: every caller of `cancelScheduledDeploy` (the sidebar,
+  three assistant paths, `CourseRenamer`) would need its own event and wording,
+  and actually STOPPING the script needs the process-group kill that #409
+  rejected.
+- **`newerRecordWins` holds only for a leftover whose script carries the
+  look** — one written by 1.4.4 or later. The look lives in the leftover's own
+  script, written at the PREVIOUS set, so a deploy set under 1.4.3 and set
+  again after updating leaves a leftover that can still replace
+  `earlierDeployStillWorking` with "succeeded". Transitional; it ends with the
+  last deploy set before the update.
+- **A dismissed stand-down notice lets the old deploy's result arrive as if it
+  were the new one.** Dismissing `earlierDeployStillWorking` removes the record,
+  so the leftover's "succeeded" then lands and the section reads as deployed
+  on its own — true of the OLD deploy's content. Left: the record says what
+  last went out, and the notice the teacher dismissed had said the new deploy
+  never ran.
+
+The newly set run's wait is asked even for a plist that names no section (a
+pre-v1.2.0 job): it needs only the script, and only its trail line needs the
+section (#439 review, finding 8). The launchers' reader accepts any of `sh`,
+`bash`, `zsh`, `dash` or `ksh` handed the script while the app looks for `bash`
+only; the app always starts `/bin/bash`, so the two agree on every real run.
 
 **Rejected:** letting the run survive a re-set and comparing moments at the
 end as Windows does, because the boot-out-first order is what keeps "never
