@@ -57,7 +57,7 @@
       {
         "carries": "the course code and WHICH check held Save back: deploy folder, cloudflare account id, or additional destination — never the path or the ID. Written once per visit to the course, on the change into the held-back state, not per keystroke.",
         "event": "settings save held back",
-        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the publishing folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
+        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the deploy folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
       },
       {
         "carries": "the course code and the section",
