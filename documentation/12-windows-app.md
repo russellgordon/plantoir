@@ -3995,6 +3995,51 @@ the app set up a folder of that name; each argument now carries its own
 quotes. The app must be started through ShellExecute, never with redirected
 stdio (the leak `DrivenApp.cs` measured, which hangs course creation).
 WinUI's system title bar does NOT follow dark mode on its own: in a dark
-picture the content is dark and the title bar light, which is how the app
-looks to a teacher today, so the pictures show it (a product question, not a
-capture one).
+picture taken on 2026-10-04 the content is dark and the title bar light,
+which is how the app looked to a teacher then, so the pictures show it (a
+product question, not a capture one). Fixed on 2026-10-07 — see the next
+section; `Dress` now re-syncs the caption after it sets a scene's theme, so
+pictures taken after that carry a dark bar in the dark scenes.
+
+## The title bar follows dark and light mode (Windows v1.4.3 order, 2026-10-07)
+
+Russell's order: "The title bar should be in dark mode when the computer is in
+dark mode." Neither window extends its content into the title bar, so the
+caption is drawn by the system — and the system draws it LIGHT unless the
+window says otherwise, whatever Windows' colour mode is. In dark mode the
+content went dark under a near-white strip.
+
+**What was done.** `Services/WindowTheme.cs` is the one place: `Apply(window)`
+sets `AppWindow.TitleBar.PreferredTheme` (Windows App SDK 1.7+; the app
+resolves 1.8) to `Dark` or `Light` from the root element's `ActualTheme`
+(`RequestedTheme` first when it is set, the application's theme when the
+root has not resolved one yet), and re-applies it on the root's
+`ActualThemeChanged` and `Loaded`, with `UISettings.ColorValuesChanged`
+(marshalled to the window's dispatcher, unhooked on `Closed`) as a backstop for
+the live switch. `MainWindow` and `AssistWindow` — the only two `Window`
+subclasses; a section opens inside the main window, not in one of its own —
+call it right after `InitializeComponent`, and `MarketingShotCapturer.Dress`
+calls `WindowTheme.Sync` after setting a scene's theme. `WindowThemeSourceTests`
+fails for any `Window` subclass under `windows-app/Plantoir` that does not call
+`WindowTheme.Apply(this)`, so a window added later cannot keep the white bar.
+
+**Measured** on this PC (Windows 11 Pro 26200, x64 Debug, `--state-dir`), by
+`PrintWindow` captures of the live windows and a pixel read at the caption's
+centre: dark mode, main window caption (31, 32, 34) over content (26, 35, 34);
+the assistant window (30, 33, 34). Switching Settings to light with the app
+open turned the caption to (239, 244, 247) within four seconds, no restart,
+and back again. The caption is drawn on the same Mica as the content, so it
+reads as one surface rather than a stripe in both modes.
+
+**Rejected.** Hand-set `AppWindow.TitleBar` colours (the twelve
+`Background`/`Button*`/`Inactive*` slots): both windows sit on a Mica backdrop
+tinted by the wallpaper, so any fixed colour reads as a band against it, and
+twelve slots are twelve chances to look unlike Windows' own hover, pressed and
+inactive states. `PreferredTheme = UseDefaultAppMode`: it follows the SYSTEM,
+not the content, and the marketing capture themes the content directly, so a
+dark scene taken on a light PC would get a light bar. `DwmSetWindowAttribute`
+with `DWMWA_USE_IMMERSIVE_DARK_MODE`: the same result through P/Invoke, where
+the Windows App SDK property already exists. `ExtendsContentIntoTitleBar` with
+a custom bar: a redesign of both windows' chrome for a colour fix, and nothing
+in the app uses it today. The mac inherits nothing: its title bars already
+follow the system.

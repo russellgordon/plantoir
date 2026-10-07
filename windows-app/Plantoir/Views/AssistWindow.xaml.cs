@@ -58,6 +58,7 @@ public sealed partial class AssistWindow : Window
     {
         InitializeComponent();
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
+        WindowTheme.Apply(this);   // the title bar follows dark/light mode
         _folder = workspacePath;
         _course = course;
         _section = section;
