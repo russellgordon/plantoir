@@ -14,7 +14,8 @@ the app publishing them, and the finished site -- with Edge standing in for
 Safari:
 
 1. Obsidian, showing a class note in the demo ENG2D vault.
-2. Plantoir, staged mid-deploy (``Plantoir.exe --hero-window <theme>``).
+2. Plantoir, staged mid-deploy (the "hero" scene of
+   ``Plantoir.exe --stage-scene``).
 3. Microsoft Edge, showing the published class site.
 
 What it borrows and puts back: the Windows app colour mode, Obsidian's list of

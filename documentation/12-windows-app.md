@@ -2979,12 +2979,12 @@ asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
 today's sites stays green the moment somebody adds a sixth, which is the whole
-failure it exists to prevent. It also pins the four write sites and the single
+failure it exists to prevent. It also pins the three write sites and the single
 registration write, since deleting a capture would otherwise leave every stop a
-silent no-op wearing the shape of the fix working. (Four, not three: the
-marketing-shot harness `StagePreviewForCapture` sets `_previewUrl`, which makes
-`hadPreview` true, and a staged view must not answer the teardown's question
-differently from a real one.)
+silent no-op wearing the shape of the fix working. (There were four until the
+marketing-shot harness's `StagePreviewForCapture`, which set `_previewUrl` and
+so made `hadPreview` true, went with the old `--capture-marketing-shots` mode
+when the pictures moved to `--stage-scene` (#380); the test expects three.)
 
 **That scan is LEXICAL, and one exception is named rather than tidied away.**
 Every teardown path ends in `RefreshChrome()`, which is defined outside the

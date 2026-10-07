@@ -883,6 +883,13 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
+    /// For the marketing pictures only (<c>--stage-scene schedule-sheet</c>):
+    /// the Schedule a Deploy sheet for a section, exactly as the menu opens it.
+    /// The scene never presses Schedule, so nothing is scheduled.
+    /// </summary>
+    public void OpenScheduleSheetForCapture(Course course, int section) => AskWhenToDeploy(course, section, null);
+
+    /// <summary>
     /// Ask when to deploy, and set it — both for a brand-new schedule and
     /// for changing an existing one, since <see cref="TaskScheduling.Schedule"/>
     /// already replaces by name (there is at most one per section by
@@ -899,13 +906,6 @@ public sealed partial class SidebarPane : UserControl
     /// at that moment is stated in the dialog rather than discovered at
     /// 6:31, either way.
     /// </summary>
-    /// <summary>
-    /// For the marketing pictures only (<c>--stage-scene schedule-sheet</c>):
-    /// the Schedule a Deploy sheet for a section, exactly as the menu opens it.
-    /// The scene never presses Schedule, so nothing is scheduled.
-    /// </summary>
-    public void OpenScheduleSheetForCapture(Course course, int section) => AskWhenToDeploy(course, section, null);
-
     private async void AskWhenToDeploy(Course windowCourse, int number, DateTime? existing)
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
