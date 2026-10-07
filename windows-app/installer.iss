@@ -102,16 +102,36 @@ begin
   Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
 end;
 
+// The `app updated` trail line (#428 item 1): Plantoir writes "by its own
+// updater" only when this file names the version now running, and removes it at
+// every launch (AppUpdates.ConsumeUpdatedByItselfMarker). EVERY install deletes
+// it before copying, and only an update that FINISHES writes it (ssPostInstall),
+// so a refused or failed update can never make a later hand install read as
+// the updater's. In the state folder, where the app looks, never under {app}.
+// ssPostInstall runs before the [Run] entry that reopens Plantoir, so the
+// relaunched copy finds it; were that order ever reversed, the line would say
+// "by hand" and the next launch would discard the marker with no line at all.
+function UpdatedByItselfMarker: String;
+begin
+  Result := ExpandConstant('{localappdata}\Plantoir\installed-by-its-own-updater.txt');
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
 begin
   if CurStep = ssInstall then
   begin
+    DeleteFile(UpdatedByItselfMarker);
     if not IsUpdate then
     begin
       Exec('taskkill.exe', '/F /IM plantoir-mcp.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec('taskkill.exe', '/F /IM llama-server.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
+  end;
+  if (CurStep = ssPostInstall) and IsUpdate then
+  begin
+    ForceDirectories(ExpandConstant('{localappdata}\Plantoir'));
+    SaveStringToFile(UpdatedByItselfMarker, '{#AppVersion}', False);
   end;
 end;

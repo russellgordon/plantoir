@@ -19,8 +19,10 @@ public class SectionAdderContractTests
         var cases = list["cases"]!.AsArray();
         string created = list["created"]!.ToString();
         int section = list["section"]!.GetValue<int>();
-        Assert.True(cases.Count >= 8,
-            $"course-management.json carries {cases.Count} adding-keys cases; 8 were there on 2026-09-25.");
+        // 9 since #408/#437: the ninth is the quoted per-section keys this
+        // side proposed (AQuotedPerSectionKeyIsGivenItsPairToo), now in the contract.
+        Assert.True(cases.Count >= 9,
+            $"course-management.json carries {cases.Count} adding-keys cases; 9 were there on 2026-10-03.");
 
         var failures = new List<string>();
         foreach (var testCase in cases)

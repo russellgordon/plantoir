@@ -200,13 +200,12 @@ internal static class EndToEnd
             var top = app.Window.FindFirstDescendant(cf => cf.ByName(menu).And(cf.ByControlType(ControlType.MenuItem)))
                       ?? throw new Xunit.Sdk.XunitException($"the menu bar has no {menu} menu");
             if (top.Patterns.ExpandCollapse.IsSupported) top.Patterns.ExpandCollapse.Pattern.Expand();
-            else top.Click();
+            else app.ClickMiddleOf(top);
             var item = Retry.WhileNull(
                 () => app.Desktop.FindFirstDescendant(cf => cf.ByAutomationId(itemAutomationId)),
                 TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
             if (item is null) continue;
-            if (item.Patterns.Invoke.IsSupported) item.Patterns.Invoke.Pattern.Invoke();
-            else item.Click();
+            DrivenApp.PressMenuItem(item);
             return;
         }
         throw new Xunit.Sdk.XunitException($"the {menu} menu never offered {itemAutomationId}");

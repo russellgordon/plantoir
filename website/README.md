@@ -43,18 +43,25 @@ day for a new version; `updates/windows.xml` is the Windows app's, since its v1.
 Each is **signed**, so the site must serve the exact bytes that were signed:
 `build.py` copies `updates/*.xml` (and any `*.xml.signature`, NetSparkle's
 detached form) into `site/updates/` byte for byte, never parsing and rewriting
-them, and checks the mac's in both modes (`update_feeds.problems_with`: well
-formed, signed, every download the platform's own asset under its own
-version's release, never the other platform's) — the MAC's feed only: the
-checker reads Sparkle's shape, and NetSparkle's `windows.xml` still has no
-checker of its own at build time (its two signatures are verified with the
-generator at the cut, `RELEASING.md` → "The update feed (Windows)"). `--deploy` refuses when the mac
-feed's newest version is not `MARKETING_VERSION`, and afterwards — like
-`--verify-deploy` — fetches each live feed, compares its SHA-256 with `site/`,
-and follows its newest download to a 200 of the right length: the check for a
-feed deployed before its release was published. For the Windows feed it also
-checks `windows.xml.signature` is live as built, and counts a missing one as a
-failure.
+them, and checks each in both modes: the mac's with `update_feeds.problems_with`
+(well formed, signed, every download the platform's own asset under its own
+version's release, never the other platform's), and since #428 the Windows
+one with `windows_feed.problems_with` (newest item by real version order and
+written first, every item's download signed and under its own release, and
+`windows.xml.signature` VERIFIED against the feed's bytes with
+`AppUpdates.PublicKey` — pure-stdlib Ed25519, so it runs with plain `python`
+on either machine). `--deploy` refuses when any `updates/*.xml` or
+`*.signature` is not byte for byte `git show HEAD:<path>`, when the mac
+feed's newest version is not `MARKETING_VERSION`, and when the Windows feed's
+is not `<Version>` in `Plantoir.csproj`; afterwards — like `--verify-deploy`
+— it fetches each live feed, compares it with `site/`, and follows its newest
+download to a 200 of the right length: the check for a feed deployed before
+its release was published. For the Windows feed it also verifies the live
+`windows.xml.signature` against the live feed and, on Windows (or anywhere
+with `PLANTOIR_VERIFY_WINDOWS_INSTALLER=1`), reads the newest installer
+(about 240 MB) to verify its signature; from the mac it compares the length
+and says so. `website/test_windows_feed.py`
+covers all of that with a throwaway key.
 
 `updates/macos-notes.html` is the cumulative release notes the feed is built
 from, and is NOT served. Both files are written only by

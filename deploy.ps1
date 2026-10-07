@@ -544,10 +544,13 @@ if ($TO_FOLDER) {
   $publishedIndex = Join-Path $PUBLIC_DIR_HOST "index.html"
   if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
     # Plain words (#296, rule 1): this used to say "bakes in a live-reload
-    # script". The mac's deploy.sh carries the old sentence at its own
-    # line and is asked to take this wording (bundle 1 mac issue).
+    # script". deploy.sh took this wording (#407) and changed "for
+    # publishing" to "before it is deployed", because publishing marks a page
+    # for the website and this step is the deploy; taken back here word for
+    # word (#438). Three dots rather than deploy.sh's ellipsis character:
+    # every line this file prints is ASCII.
     Write-Host "This site was built by a preview, which adds live updating"
-    Write-Host "  that students' browsers would ask about. Rebuilding it for publishing..."
+    Write-Host "  that students' browsers would ask about. Rebuilding it before it is deployed..."
     # Forward the flag. Without it this rebuild is a SECOND way a scheduled
     # publish can meet a question nobody is there to answer: preview.ps1 asks
     # about a course code ending in a zero, and about a section the
@@ -592,7 +595,8 @@ if ($TO_FOLDER) {
     }
     if (Test-CarriesLiveReload $PUBLIC_DIR_HOST) {
       Write-Host "The rebuilt site still carries the preview's live updating."
-      Write-Host "  Nothing was published, rather than publishing pages students'"
+      # "Nothing was deployed", as deploy.sh says it (#407, #438).
+      Write-Host "  Nothing was deployed, rather than deploying pages students'"
       Write-Host "  browsers would ask about."
       exit 1
     }
