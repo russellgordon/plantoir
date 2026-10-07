@@ -159,10 +159,19 @@ python3 website/shots/capture.py --provision-demo   # first time only: the three
 ```
 
 `--provision-demo` makes ENG2D, MCV4U and SCH3U through the app's own
-new-course panel (the `DemoWorkspaceProvisioning` UI test) and writes the live
-sites' markers. Before v1.4.0 the same step, then called `--provision`, only
-wrote launchers and markers and never ran that test, although its docstring
-said it did — so the demo folder could not actually be made from nothing.
+new-course panel (the `DemoWorkspaceProvisioning` UI test), then gives the
+folder the state `shots/marketing/folders.json` describes (`shots/demo_folders.py`,
+#445): each section's colour scheme (vintage-sepia, midnight-orchid,
+forest-moss — the panel writes quartz-standard), the teacher's last name, the
+live sites' markers, and every section's front page on the **latest class dated
+on or before January 15** of the school year with every class after it
+unpublished. That last part is asked of the app's own door (`Plantoir
+--state-dir … --mcp-stdio <folder>`, `unpublish_pages` from the next class's
+date on), so the app repoints the front page itself and no third copy of that
+rule exists. "On or before", never "on": 2028-01-15 is a Saturday. Before
+v1.4.0 the same step, then called `--provision`, only wrote launchers and
+markers and never ran that test, although its docstring said it did — so the
+demo folder could not actually be made from nothing.
 
 ### Capturing on Windows
 
@@ -170,11 +179,26 @@ said it did — so the demo folder could not actually be made from nothing.
 python website/shots/capture_windows.py
 ```
 
-It autonomously launches `Plantoir.exe --capture-marketing-shots site/img`,
+It first runs `shots/test_demo_folders.py` (no `dotnet test` discovers
+website/shots tests, so this is where Windows gates them) and stops if it is
+red. Then it autonomously launches `Plantoir.exe --capture-marketing-shots site/img`,
 provisions demo courses in `%TEMP%`, stages each view (`courses`, `new-course`,
 `progress`, `preview`, `assistant`) across both `ElementTheme.Light` and
 `ElementTheme.Dark`, captures 2x HiDPI `RenderTargetBitmap`s, generates WebP
-companions, and rebuilds the site.
+companions, and rebuilds the site. Its demo courses and sites come from
+`shots/marketing/folders.json`, the same file the mac reads.
+
+`python website/shots/capture_windows.py --provision-demo <folder>` gives a
+demo folder whose courses the app's new-course panel has made the same state
+the mac's `--provision-demo` gives it, through `plantoir-mcp.exe` and the same
+`demo_folders.py`. **What is still Windows' to do** (the `windows` issue for
+#445): `MarketingShotCapturer.cs` makes its own demo courses by copying each
+payload's `shared/` into a `shared/` SUBFOLDER, with every class dated
+2026-10-14 and every other page 2026-09-08 and colour keys of its own, so its
+courses match the mac's in neither layout, names, dates nor colours; it should
+make them through the app's own installer and read `folders.json`. The
+College Board pages cannot be made on Windows at all (the document is read
+with PDFKit, `ced_statements.swift`), so the scenes that show them are the mac's.
 
 ### Only macOS's own window capture, kept whole
 
@@ -297,6 +321,37 @@ and copies launchers from THAT checkout's Debug build, found by the
 `Plantoir-*` folder sorted last, which on a Mac with several clones was
 another clone's two-day-old bundle). The run asks for Safari and UI-automation permission in its first
 minute; answer both and walk away.
+
+**Both folders from a clone (#445).** Nothing in either kept folder is needed
+to make it again: `shots/marketing/folders.json` describes both as rules and
+data — the courses and sections, the demo colours, front pages and site names,
+the marketing courses' destinations, which section is second-semester and in
+the week of which day, and which school year a new reference copy is filed
+under — and `shots/test_demo_folders.py` (run by `verify.sh`) lays every course
+out from its ready-made content with the real installer, at a September 2026
+clock and a September 2027 one, and checks what each scene needs. It checks
+NEEDS, not byte-identity: the folders follow today's payloads, so a picture
+taken in a folder made today differs from one taken in the kept folder (made
+from the 2026-08-17 payloads for the demo folder) wherever the payload has
+changed since, and is retaken at the next reshoot. Not in the repository, and
+said so in folders.json: the College Board pages' words (hand-copied by
+Russell from `~/Plantoir Marketing/.sources/College Board Curriculum`; a fresh
+mac makes 56 of the 66 from the public document and drafts the other ten),
+the live sites' Netlify ids (the kept demo folder's `.netlify_sites/`; a folder
+made from `folders.json` gets stand-in markers, enough for every picture and
+NOT enough to deploy to the live sites — deploying from one makes a new site),
+and `~/Plantoir Marketing/courses/Archive.zip`, Russell's own snapshot of the
+three marketing courses, which carries College Board text. The kept ICS3U-2025
+keeps its section 2 in September (it was copied before the second-semester
+step existed); no scene shows it. Two dates are never written down: the
+second semester is computed from the section's own dates, and the reference
+year is READ from the folder's copy (`reference_school_year`) — `capture.py`
+passes it to the UI tests as `MARKETING_REFERENCE_YEAR`, and only a folder
+without a copy yet takes the year before the clock's. To check that the kept
+folders still match every rule (read-only; never in `verify.sh`):
+`PLANTOIR_DEMO_FOLDERS_COMPARE=1 python3 website/shots/test_demo_folders.py`,
+and add `PLANTOIR_DEMO_FOLDERS_APP=<…/Plantoir.app/Contents/MacOS/Plantoir>` to
+run the front pages through the app's door in a temporary copy.
 
 **The marketing folder** (`website/shots/marketing_folder.py`) is made once and
 kept. `--provision` makes ICS3U and ICS4U through the app when they are
@@ -548,8 +603,9 @@ Windows uses, and check the *count of captured images*, never the exit code.
 
 The published demo sites now follow a per-SECTION scheme —
 `<code>-s<n>-2026-gordon.netlify.app`, e.g. `eng2d-s1-2026-gordon` — and
-ENG2D has a section 2 site of its own. `capture.py`, `capture_windows.py`
-and `website/site.json` carry the new names, but
+ENG2D has a section 2 site of its own. `shots/marketing/folders.json` (read
+by `capture.py` and `capture_windows.py` since #445) and `website/site.json`
+carry the new names, but
 `windows-app/Plantoir/Services/MarketingShotCapturer.cs` still writes the
 OLD per-course names (`{code}-gordon-2026-27`) into its fixture configs'
 `deploy_site_name`, in two places. Left for the Windows side to update
@@ -567,7 +623,9 @@ SCH3U, created through the app's own new-course panel rather than by writing
 folders directly — so the pictures show what a teacher's folder actually looks
 like, not what a script thinks it should. The three codes were chosen so that
 between them the class sites show prose, typeset mathematics, and chemistry
-notation, which is most of what anyone doubts a Markdown site can do.
+notation, which is most of what anyone doubts a Markdown site can do. Since
+#445 the three, their sections, colours and sites are written in one place,
+`shots/marketing/folders.json`, which the UI tests read as well.
 
 Rejected: hand-made screenshots (they go stale silently, which is how a
 marketing site ends up showing an interface that no longer exists), and a
