@@ -59,8 +59,14 @@ public class SidebarNamesUiTests
             var buttons = app.Window.FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
                 .Where(b => !inThePage.Any(page => page.Equals(b))).ToList();
             Assert.NotEmpty(buttons);
-            var unnamed = buttons.Where(b => string.IsNullOrWhiteSpace(b.Name))
-                .Select(b => string.IsNullOrEmpty(b.AutomationId) ? b.ClassName : b.AutomationId).ToList();
+            // ValueOrDefault, never .Name: FlaUI asks UI Automation NOT to
+            // fill in a default, so an element nothing names at all reports
+            // the Name property as unsupported and .Name THROWS — the very
+            // defect this test hunts crashed it instead of being reported
+            // (a Course Settings switch, v1.4.3 cut, 2026-10-07).
+            var unnamed = buttons.Where(b => string.IsNullOrWhiteSpace(b.Properties.Name.ValueOrDefault))
+                .Select(b => b.Properties.AutomationId.ValueOrDefault is { Length: > 0 } id ? id
+                           : $"{b.Properties.ClassName.ValueOrDefault} at {b.Properties.BoundingRectangle.ValueOrDefault}").ToList();
             Assert.True(unnamed.Count == 0, $"{screen}: buttons announced with no name: " + string.Join(", ", unnamed));
         }
 
