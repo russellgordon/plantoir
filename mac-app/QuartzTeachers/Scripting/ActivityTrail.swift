@@ -77,6 +77,12 @@ nonisolated enum ActivityTrail {
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
         case assistantOpened = "assistant opened"
+        /// A Claude session opened from Plantoir's door is holding the course
+        /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
+        /// it takes its `assist` lease. Carries the course only. It answers
+        /// "why is Rename greyed?" — `assistant opened` says a door was
+        /// opened, never which course its server went on to hold.
+        case outsideSessionHeldACourse = "outside session held a course"
         case assistantReady = "assistant ready"
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"

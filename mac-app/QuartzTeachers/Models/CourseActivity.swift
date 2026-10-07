@@ -297,6 +297,109 @@ enum CourseActivity {
         return nil
     }
 
+    // MARK: - A Claude session holding the course (#458)
+
+    /// Which Revise item is asking (`reviseUnavailableReason`).
+    enum ReviseItem: Equatable {
+        case claude
+        case codex
+        case localAssistant
+    }
+
+    /// True while ANOTHER live program holds an `assist` lease on this course
+    /// — on the mac, a Claude session opened from Plantoir, through its
+    /// `Plantoir --mcp-stdio` (#458); on a folder Windows also opens,
+    /// `plantoir-mcp`. Read from disk, because that program has a memory of
+    /// its own. This process's own lease never counts (`heldElsewhere`), and
+    /// neither does one whose owner has gone.
+    static func isRevisedElsewhere(folderPath: String, courseCode: String) -> Bool {
+        let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
+            .appendingPathComponent("courses", isDirectory: true)
+        let holdings: [WorkLeaseFiles.Holding] = WorkLeaseFiles.heldElsewhere(
+            courseCode: courseCode, coursesDirectory: coursesDirectory
+        )
+        for holding in holdings where holding.kind.lowercased() == WorkLeaseFiles.assistKind {
+            return true
+        }
+        return false
+    }
+
+    /// The short line naming what stands in the way of STRUCTURAL work on a
+    /// course — Rename Course, Add Section…, restoring a backup — or nil when
+    /// it is free: `busyDescription`, and then a Claude session open on the
+    /// course elsewhere (#458; Windows' `BusyReason`, which includes it).
+    ///
+    /// **Separate from `busyDescription` on purpose.** That one is also the
+    /// question a BUILD asks (`AssistSiteWork`), and an `assist` lease never
+    /// declines a build (`workLeases.declining`) — a teacher previewing while
+    /// Claude revises is the intended way to use both. Removing a course or a
+    /// section, and the unit-word rename, are NOT held either: Windows holds
+    /// neither (#458's ruling 2), so they stay on `busyDescription`.
+    ///
+    /// `revisedElsewhere` is the answer already read, for a menu drawn from
+    /// a window's snapshot (`WorkspaceModel.coursesRevisedElsewhere`); nil
+    /// reads the disk now, which is what every click-time check does.
+    static func structuralHoldReason(
+        folderPath: String,
+        courseCode: String,
+        revisedElsewhere: Bool? = nil
+    ) -> String? {
+        if let busy = busyDescription(folderPath: folderPath, courseCode: courseCode) {
+            return busy
+        }
+        let held: Bool = revisedElsewhere ?? isRevisedElsewhere(folderPath: folderPath, courseCode: courseCode)
+        if held {
+            return AssistWording.availableOnceYouFinishRevisingWithClaude
+        }
+        return nil
+    }
+
+    /// Why a Revise item cannot be used on this course right now, in the
+    /// words that go under it — or nil when it can (#458).
+    ///
+    /// Two causes, each said as itself (ruling 7):
+    /// - a Claude session open on the course elsewhere greys ALL THREE items
+    ///   (Windows' `CanReviseNow`): a second session on one course would
+    ///   have two conversations writing the same pages;
+    /// - the in-app assistant open on this course greys the two DOORS, with
+    ///   the sentence that names the window to close — the same symmetry
+    ///   Windows gets from its window taking the lease too. The local item
+    ///   keeps its own one-window rule (`AssistActivity.reasonItIsUnavailable`).
+    static func reviseUnavailableReason(
+        item: ReviseItem,
+        folderPath: String,
+        courseCode: String,
+        sectionNumber: Int?,
+        revisedElsewhere: Bool,
+        active: AssistActivity.Session?
+    ) -> String? {
+        if revisedElsewhere {
+            return AssistWording.availableOnceYouFinishRevisingWithClaude
+        }
+        guard let active else {
+            return nil
+        }
+        switch item {
+        case .claude, .codex:
+            if active.courseCode.lowercased() == courseCode.lowercased()
+                && FolderIdentity.isSameFolder(active.folderPath, folderPath) {
+                return AssistActivity.closeTheAssistantFirst(active)
+            }
+            return nil
+        case .localAssistant:
+            guard let sectionNumber else {
+                return nil
+            }
+            let asked: AssistActivity.Session = AssistActivity.Session(
+                folderPath: folderPath, courseCode: courseCode, sectionNumber: sectionNumber
+            )
+            if asked == active {
+                return nil
+            }
+            return AssistActivity.closeTheAssistantFirst(active)
+        }
+    }
+
     /// Starts from nothing — for tests.
     static func reset() {
         store.activePublishes = []

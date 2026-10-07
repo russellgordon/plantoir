@@ -41,6 +41,9 @@ struct SidebarView: View {
     /// The course "Add Section…" was chosen on, while its sheet is up.
     @State var addSectionCourse: Course?
 
+    /// Why "Add Section…" refused at the click (#458), shown as an alert.
+    @State var addSectionRefusal: String?
+
     /// The course a "Keep a Copy for Reference…" sheet is open for.
     @State var keepACopyCourse: Course?
 
@@ -89,6 +92,11 @@ struct SidebarView: View {
     /// because the alert TITLE names the assistant, and a teacher who has both
     /// installed should be told which of them did not open.
     @State var codexProblem: String?
+
+    /// Why a Revise item refused at the click (#458) — a Claude session open
+    /// on the course elsewhere, or the in-app assistant open on it — shown
+    /// as an alert.
+    @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
 
     // MARK: - Body
 
@@ -152,6 +160,7 @@ struct SidebarView: View {
                                         reviseWithClaudeItem(course: course)
                                         reviseWithCodexItem(course: course)
                                         reviseWithAIItem(course: course, sectionNumber: sectionNumber)
+                                        reviseNotes(course: course, sectionNumber: sectionNumber)
                                         Divider()
                                         openInObsidianItem(
                                             revealing: course.sectionDirectoryURL(forSection: sectionNumber),
@@ -211,6 +220,10 @@ struct SidebarView: View {
                             // closure left the menu showing the state
                             // from whenever the row last drew.
                             let busyReason: String? = busyReason(for: course)
+                            // Rename and Add Section… wait for a Claude
+                            // session open on the course as well (#458);
+                            // Keep a Copy only reads it, so it does not.
+                            let structuralReason: String? = structuralHoldReason(for: course)
                             CourseRowLabel(
                                 course: course,
                                 isBeingRenamed: renamingCourseCode == course.code,
@@ -221,6 +234,7 @@ struct SidebarView: View {
                                 .contextMenu {
                                     reviseWithClaudeItem(course: course)
                                     reviseWithCodexItem(course: course)
+                                    reviseNotes(course: course, sectionNumber: nil)
                                     if course.isKeptForReference {
                                         openInObsidianItem(forReferenceCourse: course)
                                     } else {
@@ -259,7 +273,7 @@ struct SidebarView: View {
                                         Button("Rename Course", systemImage: "pencil") {
                                             workspace.renamingCourseCode = course.code
                                         }
-                                        .disabled(busyReason != nil)
+                                        .disabled(structuralReason != nil)
                                         .accessibilityIdentifier("renameCourse-\(course.code)")
                                         Divider()
                                         // Adding a section re-runs the course
@@ -267,11 +281,23 @@ struct SidebarView: View {
                                         // folders — never while a preview or
                                         // publish could be reading them.
                                         Button("Add Section…", systemImage: "doc.badge.plus") {
+                                            // Asked again at the click (#458):
+                                            // a session can start between the
+                                            // menu opening and this.
+                                            if let refusal = workspace.structuralRefusal(
+                                                courseCode: course.code,
+                                                act: "add the section",
+                                                whenBusy: "\(course.code) is previewing or deploying right now. "
+                                                    + "Stop that first, then add the section."
+                                            ) {
+                                                addSectionRefusal = refusal
+                                                return
+                                            }
                                             addSectionCourse = course
                                         }
-                                        .disabled(busyReason != nil)
-                                        if let busyReason {
-                                            Text(busyReason)
+                                        .disabled(structuralReason != nil)
+                                        if let structuralReason {
+                                            Text(structuralReason)
                                         }
                                         Divider()
                                     }
@@ -575,7 +601,10 @@ struct SidebarView: View {
         } message: {
             Text(removalProblem ?? "")
         }
-        .modifier(OutsideAgentAlerts(claudeProblem: $claudeProblem, codexProblem: $codexProblem))
+        .modifier(OutsideAgentAlerts(
+            claudeProblem: $claudeProblem, codexProblem: $codexProblem, reviseRefusal: $reviseRefusal
+        ))
+        .modifier(OutsideSessionHolds(workspace: workspace, addSectionRefusal: $addSectionRefusal))
         .sheet(item: $keepACopyCourse) { course in
             KeepACopyForReferenceSheet(course: course) { folderName in
                 workspace.reloadCourses()
@@ -1228,6 +1257,73 @@ struct SidebarView: View {
         return CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code)
     }
 
+    /// Why structural work on the course — Rename Course, Add Section… —
+    /// must wait: `busyReason`, or a Claude session open on the course in
+    /// another program (#458), read from the window's snapshot.
+    func structuralHoldReason(for course: Course) -> String? {
+        guard let workspaceURL = workspace.workspaceURL else {
+            return nil
+        }
+        return CourseActivity.structuralHoldReason(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            revisedElsewhere: workspace.isRevisedElsewhere(course.code)
+        )
+    }
+
+    /// Why one Revise item cannot be used on this course right now, or nil
+    /// (#458) — from the window's snapshot of other programs' sessions and
+    /// the in-app assistant's claim, both observable.
+    func reviseReason(_ item: CourseActivity.ReviseItem, course: Course, sectionNumber: Int?) -> String? {
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        return CourseActivity.reviseUnavailableReason(
+            item: item,
+            folderPath: folder.path,
+            courseCode: course.code,
+            sectionNumber: sectionNumber,
+            revisedElsewhere: workspace.isRevisedElsewhere(course.code),
+            active: AssistActivity.active
+        )
+    }
+
+    /// The line (or lines) under the Revise items saying why they are greyed
+    /// — each distinct reason ONCE, for the items actually drawn, so a Claude
+    /// session greying all three is one line rather than three (#458).
+    @ViewBuilder
+    func reviseNotes(course: Course, sectionNumber: Int?) -> some View {
+        let notes: [String] = reviseNoteLines(course: course, sectionNumber: sectionNumber)
+        ForEach(notes, id: \.self) { note in
+            Text(note)
+        }
+    }
+
+    /// The distinct reasons behind `reviseNotes`, in the items' order.
+    func reviseNoteLines(course: Course, sectionNumber: Int?) -> [String] {
+        var lines: [String] = []
+        if course.isKeptForReference {
+            return lines
+        }
+        var asked: [CourseActivity.ReviseItem] = []
+        if ClaudeCodeLauncher.isAvailable {
+            asked.append(.claude)
+        }
+        if CodexLauncher.isAvailable {
+            asked.append(.codex)
+        }
+        if sectionNumber != nil && AssistHardwareBudget.current().canRunAssistant {
+            asked.append(.localAssistant)
+        }
+        for item in asked {
+            if let reason = reviseReason(item, course: course, sectionNumber: sectionNumber),
+               !lines.contains(reason) {
+                lines.append(reason)
+            }
+        }
+        return lines
+    }
+
     /// The open/closed state of one course's disclosure triangle, living
     /// on the window's model so restoration can bring it back.
     /// The "Reference Courses" group: courses kept to be read, never
@@ -1421,11 +1517,16 @@ struct SidebarView: View {
             Button(ClaudeCodeLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithClaude(course: course, folder: folder)
             }
+            .disabled(reviseReason(.claude, course: course, sectionNumber: nil) != nil)
             .accessibilityIdentifier("reviseWithClaude-\(course.code)")
         }
     }
 
     func reviseWithClaude(course: Course, folder: URL) {
+        if let refusal = workspace.reviseRefusal(item: .claude, courseCode: course.code, sectionNumber: nil) {
+            reviseRefusal = refusal
+            return
+        }
         if ClaudeCodeLauncher.open(
             workspacePath: folder.path,
             courseCode: course.code,
@@ -1457,11 +1558,16 @@ struct SidebarView: View {
             Button(CodexLauncher.menuItemTitle, systemImage: "sparkles") {
                 reviseWithCodex(course: course, folder: folder)
             }
+            .disabled(reviseReason(.codex, course: course, sectionNumber: nil) != nil)
             .accessibilityIdentifier("reviseWithCodex-\(course.code)")
         }
     }
 
     func reviseWithCodex(course: Course, folder: URL) {
+        if let refusal = workspace.reviseRefusal(item: .codex, courseCode: course.code, sectionNumber: nil) {
+            reviseRefusal = refusal
+            return
+        }
         if CodexLauncher.open(
             workspacePath: folder.path,
             courseCode: course.code,
@@ -1501,12 +1607,19 @@ struct SidebarView: View {
             // Reading it in the closure would show the answer from whenever
             // the row last drew, which is the staleness bug the course
             // activity registry already taught us.
-            let blocked: String? = AssistActivity.reasonItIsUnavailable(
-                folderPath: folder.path,
-                courseCode: course.code,
-                sectionNumber: sectionNumber
-            )
+            //
+            // Since #458 a Claude session open on the course elsewhere greys
+            // it too; the line saying why is drawn once under all three
+            // Revise items (`reviseNotes`), so the same reason is not said
+            // three times.
+            let blocked: String? = reviseReason(.localAssistant, course: course, sectionNumber: sectionNumber)
             Button("Revise with Local AI Assistant…", systemImage: "sparkles") {
+                if let refusal = workspace.reviseRefusal(
+                    item: .localAssistant, courseCode: course.code, sectionNumber: sectionNumber
+                ) {
+                    reviseRefusal = refusal
+                    return
+                }
                 openWindow(value: AssistWindowRequest(
                     courseCode: course.code,
                     sectionNumber: sectionNumber,
@@ -1515,12 +1628,6 @@ struct SidebarView: View {
             }
             .disabled(blocked != nil)
             .accessibilityIdentifier("reviseWithAI-\(course.code)-section\(sectionNumber)")
-            // Dimmed alone says "no"; the line under it says what to do
-            // about it — the same shape "Add Section…" uses when a course is
-            // busy.
-            if let blocked {
-                Text(blocked)
-            }
         }
     }
 
@@ -2022,6 +2129,8 @@ private struct OutsideAgentAlerts: ViewModifier {
 
     @Binding var codexProblem: String?
 
+    @Binding var reviseRefusal: WorkspaceModel.ReviseRefusal?
+
     // MARK: - Functions
 
     func body(content: Content) -> some View {
@@ -2040,6 +2149,23 @@ private struct OutsideAgentAlerts: ViewModifier {
             } message: {
                 Text(codexProblem ?? "")
             }
+            .alert(
+                reviseRefusal?.title ?? "",
+                isPresented: Binding(
+                    get: { reviseRefusal != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            reviseRefusal = nil
+                        }
+                    }
+                )
+            ) {
+                Button("OK") {
+                    reviseRefusal = nil
+                }
+            } message: {
+                Text(reviseRefusal?.message ?? "")
+            }
     }
 
     /// An alert wants a `Bool`; what the sidebar holds is the sentence itself,
@@ -2053,5 +2179,49 @@ private struct OutsideAgentAlerts: ViewModifier {
                 }
             }
         )
+    }
+}
+
+/// What the sidebar does about a Claude session holding a course from another
+/// program (#458): keeps the window's snapshot of held courses fresh, and
+/// says why "Add Section…" refused at the click. A modifier of its own so
+/// the sidebar's body stays small enough to type-check.
+private struct OutsideSessionHolds: ViewModifier {
+
+    // MARK: - Stored properties
+
+    let workspace: WorkspaceModel
+
+    @Binding var addSectionRefusal: String?
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Could not add a section", isPresented: Binding(
+                get: { addSectionRefusal != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        addSectionRefusal = nil
+                    }
+                }
+            )) {
+                Button("OK") {
+                    addSectionRefusal = nil
+                }
+            } message: {
+                Text(addSectionRefusal ?? "")
+            }
+            // Which courses a Claude session elsewhere is holding: read when
+            // the folder is shown, and again whenever Plantoir becomes the
+            // active app — a session is opened and closed in Terminal, so
+            // coming back is when the answer changes. Every click that acts
+            // on it reads the disk itself.
+            .task(id: workspace.workspaceURL) {
+                workspace.refreshCoursesRevisedElsewhere()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                workspace.refreshCoursesRevisedElsewhere()
+            }
     }
 }
