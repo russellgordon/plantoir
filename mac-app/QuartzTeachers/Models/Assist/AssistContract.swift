@@ -147,15 +147,16 @@ enum AssistContract {
             // later time (#449): adopted from Windows byte for byte.
             "scheduleADeployNeedsATime": AssistWording.scheduleADeployNeedsATime,
             // Settler S3's answer (#440), in the three course shapes the
-            // contract's nextClassUnits.pointerSentences rows name.
+            // contract's nextClassUnits.pointerSentences rows name — each
+            // row's `plainNext` ("Unit 2, Day 6") gives the latest unit, 2.
             "nextClassNeedsItsOwnPhrasing": AssistWording.nextClassNeedsItsOwnPhrasing(
-                unitWord: "Unit", isNumbered: false, noun: .class
+                unitWord: "Unit", isNumbered: false, noun: .class, latestUnit: 2
             ),
             "nextClassNeedsItsOwnPhrasingInAModuleCourse": AssistWording.nextClassNeedsItsOwnPhrasing(
-                unitWord: "Module", isNumbered: false, noun: .class
+                unitWord: "Module", isNumbered: false, noun: .class, latestUnit: 2
             ),
             "nextClassNeedsItsOwnPhrasingInANumberedCourse": AssistWording.nextClassNeedsItsOwnPhrasing(
-                unitWord: "Week", isNumbered: true, noun: .meeting
+                unitWord: "Week", isNumbered: true, noun: .meeting, latestUnit: 9
             ),
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,

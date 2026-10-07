@@ -144,7 +144,10 @@ final class NextClassUnitsTests: XCTestCase {
             let given: [String: Any] = try XCTUnwrap(row["given"] as? [String: Any], key)
             let reading: AssistNextClassReading = try XCTUnwrap(try NextClassUnitsTests.reading(from: given))
             let sentence: String = AssistWording.nextClassNeedsItsOwnPhrasing(
-                unitWord: reading.unitWord, isNumbered: reading.isNumbered, noun: reading.noun
+                unitWord: reading.unitWord,
+                isNumbered: reading.isNumbered,
+                noun: reading.noun,
+                latestUnit: reading.plainNextUnit
             )
             XCTAssertEqual(wording[key], sentence, "\(key) is stale in assist-wording.json")
             let quoted: [String] = NextClassUnitsTests.quotedSentences(in: sentence)
@@ -185,7 +188,9 @@ final class NextClassUnitsTests: XCTestCase {
         XCTAssertEqual(agent.messages.count, messagesBefore, "the turn was not wound back")
         XCTAssertEqual(
             agent.entries.last?.text,
-            AssistWording.nextClassNeedsItsOwnPhrasing(unitWord: "Unit", isNumbered: false, noun: .class)
+            AssistWording.nextClassNeedsItsOwnPhrasing(
+                unitWord: "Unit", isNumbered: false, noun: .class, latestUnit: 1
+            )
         )
         XCTAssertEqual(try NextClassUnitsTests.classPages(in: made.course), pagesBefore)
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
@@ -222,8 +227,11 @@ final class NextClassUnitsTests: XCTestCase {
             try made.course.configuration.write(
                 to: made.course.directoryURL.appendingPathComponent("course_config.json")
             )
+            // The course's latest unit is the one the row's reading names,
+            // so the quoted days sentence is typed back where it was said.
             try AssistFixture.write(
-                page: reading.unitWord + " 1, Day 1", publish: "false", body: "one", in: made.course
+                page: reading.unitWord + " \(reading.plainNextUnit), Day 1", publish: "false", body: "one",
+                in: made.course
             )
             try NextClassUnitsTests.rememberDates(in: made.course)
         }
@@ -232,6 +240,30 @@ final class NextClassUnitsTests: XCTestCase {
         _ = await AssistFixture.run(card.toolName, with: card.arguments, on: made.runner)
         let after: [String] = try NextClassUnitsTests.classPages(in: made.course)
         XCTAssertGreaterThan(after.count, before.count, "“\(typedBack)” added nothing in this course")
+        if reading.isNumbered {
+            return
+        }
+        // Review N-impl F4: the days sentence adds to the LATEST unit, and
+        // "Start a new unit" opens the one after it — never a unit further on.
+        var expectedUnit: Int = reading.plainNextUnit
+        if card.arguments["days"] == nil {
+            expectedUnit = reading.plainNextUnit + 1
+        }
+        for name in after where !before.contains(name) {
+            let numbers: [Int] = NextClassUnitsTests.numbers(in: name)
+            XCTAssertEqual(numbers.first, expectedUnit, "“\(typedBack)” made \(name)")
+        }
+    }
+
+    /// The numbers in a page name, in order: "Unit 2, Day 7.md" is 2 then 7.
+    private static func numbers(in name: String) -> [Int] {
+        var found: [Int] = []
+        for word in AssistNextClassUnits.words(of: name) {
+            if let number = Int(word) {
+                found.append(number)
+            }
+        }
+        return found
     }
 
     private func prepare(withDates: Bool = true) throws -> AssistFixture.Made {

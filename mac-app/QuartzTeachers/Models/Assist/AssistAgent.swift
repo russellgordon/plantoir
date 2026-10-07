@@ -968,7 +968,10 @@ final class AssistAgent {
         entries.append(Entry(
             speaker: .assistant,
             text: AssistWording.nextClassNeedsItsOwnPhrasing(
-                unitWord: reading.unitWord, isNumbered: reading.isNumbered, noun: reading.noun
+                unitWord: reading.unitWord,
+                isNumbered: reading.isNumbered,
+                noun: reading.noun,
+                latestUnit: reading.plainNextUnit
             )
         ))
         activity = .idle

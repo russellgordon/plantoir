@@ -2731,7 +2731,7 @@
       },
       {
         "input" : "Add three days to Module 2",
-        "why" : "Term-blind: only the word 'unit' is matched. On the model's path S3 points it at 'Add five more days to Unit 4'."
+        "why" : "Term-blind: only the word 'unit' is matched. On the model's path S3 points it at 'Add five more days to Unit <n>', <n> being the course's latest unit."
       },
       {
         "input" : "Add a few days to Unit 4",
@@ -3002,6 +3002,42 @@
         "kind" : "c",
         "reachesModel" : true,
         "why" : "A numbered course: the pointer says to add one at a time."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class, review day before the next unit test",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is one more sentence ('Add the next class page', a card). 'next unit' is read side by side and S3 does not look past it for test, quiz or review; teaching it to would be reading meaning, and a miss the other way starts a new unit and reports success. Not measured: this row is decided, not observed."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class in the current unit, not the next unit",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is one more sentence ('Add the next class page', a card). S3 reads no negation (as in 'Don't start a new unit, just add the next class'). Not measured: decided, not observed."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Week 2, Day 3",
+          "unitWord" : "Week"
+        },
+        "input" : "Add the next class for next week",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is one more sentence ('Add the next class page', a card). The course's unit word is free text: in a course whose units are called Week, 'next week' is 'next' + its unit word, so it is a new unit to S3. Not measured: decided, not observed."
       }
     ],
     "pointerSentences" : [
@@ -3012,7 +3048,7 @@
           "plainNext" : "Unit 2, Day 6",
           "unitWord" : "Unit"
         },
-        "why" : "Every sentence it quotes, typed back, matches a card that plans in this course (ruling 1).",
+        "why" : "Every sentence it quotes, typed back, matches a card that plans in this course (ruling 1). The days sentence names the latest unit, the one plainNext is in (2 here), so typed back it adds to that unit and never skips one (review N-impl F4).",
         "wording" : "nextClassNeedsItsOwnPhrasing"
       },
       {
@@ -4320,12 +4356,12 @@
             "Make the next class the first day of a new unit"
           ],
           "visibleClasses" : [
-            "Unit 1, Day 1"
+            "Unit 2, Day 5"
           ]
         },
         "name" : "a new unit asked through the model is pointed at the phrasing and nothing is written",
         "when" : "say",
-        "why" : "AUTHORED on the mac with #440 (settler S3, kind a). Measured 2026-10-07 (M4 Pro, b10435, the smaller assistant): this sentence reached add_next_class 5 of 5 with only a course and a section, which adds Unit 1, Day 2 and reports success. S3 reads the teacher's own sentence ('new unit'), runs nothing, shows no card ('say' fails on a card), winds the turn back and answers with the sentence naming 'Start a new unit' (a card). The engine is asked once."
+        "why" : "AUTHORED on the mac with #440 (settler S3, kind a). Measured 2026-10-07 (M4 Pro, b10435, the smaller assistant): this sentence reached add_next_class 5 of 5 with only a course and a section, which adds Unit 2, Day 6 and reports success. The course's latest unit is 2, so the pointer is the generated key word for word (its days sentence names Unit 2, review N-impl F4). S3 reads the teacher's own sentence ('new unit'), runs nothing, shows no card ('say' fails on a card), winds the turn back and answers with the sentence naming 'Start a new unit' (a card). The engine is asked once."
       },
       {
         "expectModelRequests" : 1,
@@ -4350,12 +4386,12 @@
             "Add the next class to Unit 3"
           ],
           "visibleClasses" : [
-            "Unit 1, Day 1"
+            "Unit 2, Day 5"
           ]
         },
         "name" : "a unit other than the next page's, asked through the model, is pointed",
         "when" : "say",
-        "why" : "AUTHORED on the mac with #440 (settler S3, kind b). The plain next page is Unit 1, Day 2; the sentence names Unit 3, so running would add a page in a unit the teacher did not name and report success. Pointed, nothing written."
+        "why" : "AUTHORED on the mac with #440 (settler S3, kind b). The plain next page is Unit 2, Day 6 (the latest unit is 2, as in the generated pointer); the sentence names Unit 3, so running would add a page in a unit the teacher did not name and report success. Pointed, nothing written."
       },
       {
         "expectModelRequests" : 1,

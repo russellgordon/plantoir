@@ -144,14 +144,23 @@ nonisolated enum AssistWording {
     /// **Every sentence it quotes is one the window accepts, in that very
     /// course** (ruling 1 of the #440 review, pinned by `NextClassUnitsTests`
     /// for a Unit, a Module and a numbered course): "Start a new unit" and
-    /// "Add five more days to Unit 4" are answered in code, term-blind, and
-    /// plan the course's own word ("Module 4, Day 1"); a numbered course has
+    /// "Add five more days to Unit 2" are answered in code, term-blind, and
+    /// plan the course's own word ("Module 2, Day 7"). The days sentence
+    /// names `latestUnit` — the unit the plain next page goes in — rather
+    /// than a fixed example: typed back, "Add five more days to Unit 4" in a
+    /// course whose latest unit is 2 would start Unit 4 at Day 1 and skip
+    /// Unit 3 (review N-impl F4). A numbered course has
     /// no units, so it is told the one thing it can do — "Add the next
     /// meeting page" — once per page. Quoting the course's own word ("Start a
     /// new module") was REJECTED: the frames read only "unit", so that
     /// sentence would go to the model and be stopped here again, round and
     /// round (review finding F2).
-    static func nextClassNeedsItsOwnPhrasing(unitWord: String, isNumbered: Bool, noun: ClassNoun) -> String {
+    static func nextClassNeedsItsOwnPhrasing(
+        unitWord: String,
+        isNumbered: Bool,
+        noun: ClassNoun,
+        latestUnit: Int
+    ) -> String {
         if isNumbered {
             return "Nothing was added. This course numbers its pages one after another and has no units, "
                 + "so I add one \(noun.singular) at a time: say “Add the next \(noun.singular) page” once for "
@@ -161,12 +170,12 @@ nonisolated enum AssistWording {
         let opening: String = "Nothing was added. I add one \(noun.singular) at a time, after the last one in "
             + "your latest \(word)."
         if word == "unit" {
-            return opening + " To start a new unit, say “Start a new unit”. To add several days to a unit, "
-                + "say “Add five more days to Unit 4”."
+            return opening + " To start a new unit, say “Start a new unit”. To add several days to Unit "
+                + "\(latestUnit), say “Add five more days to Unit \(latestUnit)”."
         }
-        return opening + " To start a new \(word), say “Start a new unit”. To add several days to a \(word), "
-            + "say “Add five more days to Unit 4” with its number, since I read the word unit as "
-            + "\(unitWord) here."
+        return opening + " To start a new \(word), say “Start a new unit”. To add several days to "
+            + "\(unitWord) \(latestUnit), say “Add five more days to Unit \(latestUnit)”, since I read the "
+            + "word unit as \(unitWord) here."
     }
 
     /// The answer to a deploy time written a way the app can read but does
