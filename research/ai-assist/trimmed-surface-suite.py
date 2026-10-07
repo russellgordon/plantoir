@@ -427,10 +427,14 @@ CASES = PROMISED + [
 #
 # Most of these are answered in code — the interception guard marks which, and
 # it is the guard rather than this list that decides, so a shape moved into or
-# out of AssistCardCommand changes the answer here by itself. The four that
-# reach the model are the ones this list is evidence about; `re_date_classes`
-# and the rest are not even ON the local surface, so a model could not choose
-# them if it were asked.
+# out of AssistCardCommand changes the answer here by itself. Since #449
+# (2026-10-07) the mac app answers EVERY card on its shelf in code — the last,
+# "Cancel scheduled deploy", moved then, and AssistPromptShelfTests'
+# goes-to-the-model list is empty — so a card the guard lets through here is
+# a gap in this mirror, not routing evidence. (This said "the four that reach
+# the model" until then; the count had already fallen as #411 and #432 moved
+# cards into code.) `re_date_classes` and the rest are not even ON the local
+# surface, so a model could not choose them if it were asked.
 MAC_SHELF = [
     (("plan_publish_pages", "publish_pages"), "Publish Unit 2, Day 3",
      "shelf: publish by name", False),
