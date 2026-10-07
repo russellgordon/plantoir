@@ -6267,7 +6267,12 @@ unit by mistake, the same shape: silent, and success reported.
   teacher gets `wording.nextClassNeedsItsOwnPhrasing` naming sentences the
   window accepts in THAT course (Module: the "unit" sentences, said to be
   read as Module; numbered: "Add the next meeting page", once per page — a
-  numbered course refuses both unit frames). No dates on file: S3 does nothing
+  numbered course refuses both unit frames). The days sentence names the
+  course's LATEST EXISTING unit — the unit the plain next page lands in
+  (`NextClassPlanner.nextUnitAndDay`) — never a fixed example. Rejected: a
+  fixed "Unit 4", because typed back in a course whose latest unit is 2 it
+  starts Unit 4 at Day 1 and skips Unit 3 — a unit number that may not
+  exist in the course (review N-impl F4). No dates on file: S3 does nothing
   and the dates are asked for. **It points; it never converts**: "don't start a
   new unit" must not become one.
 - **The model's `unit` and `days` are dropped from every `add_next_class`**
@@ -6305,9 +6310,12 @@ larger with `newUnit: false`, the smaller sending `newUnit: true` for "Add
 the next class" 10 of 10 — the #411 harm again, with numbers in place of the
 word "next". (The unit-and-count probes, a separate suite, saw the larger
 send `unit: 0` for "Add the next class", "…for period 2" and "…to Module 4".
-Their "28 of 37 fail" against A' follows by construction from a rule that
-bans the keys A' declares, so it is not the evidence; the two findings
-above are.) Zero inversions on every arm, which was necessary and not
+Their "28 of 37 fail" is scored against rule (e), which is a rule for the
+AFTER arm — it bans SENDING a unit/days key, and declaring a key does not
+force the model to send it — so it is not the evidence. A' is judged by rules (g)–(j), and it fails
+(g), (i) and (j): the two findings above, and (i) because "Start a new
+unit?" and "Start a new module" move from declined to `add_next_class` on
+the smaller tier.) Zero inversions on every arm, which was necessary and not
 enough.
 
 **Pinned.** `contracts/assist-cases.json` → `nextClassUnits` (accepted,
