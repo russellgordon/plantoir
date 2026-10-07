@@ -549,7 +549,7 @@ def build_section(workspace: Path, code: str) -> None:
     )
     if result.returncode != 0 or not built.exists():
         print("\n".join(result.stdout.splitlines()[-30:]), file=sys.stderr)
-        raise SystemExit(f"{code} did not build; nothing to publish.")
+        raise SystemExit(f"{code} did not build; nothing to deploy.")
 
 
 def remember_teacher_name(workspace: Path, last_name: str = "gordon") -> None:
@@ -570,7 +570,7 @@ def remember_teacher_name(workspace: Path, last_name: str = "gordon") -> None:
 
 
 def publish_section(workspace: Path, code: str, site_name: str) -> None:
-    print(f"   Publishing {code} to {site_name}.netlify.app…")
+    print(f"   Deploying {code} to {site_name}.netlify.app…")
     answers = f"{site_name}\n\n\n\n"
     result = subprocess.run(
         ["./deploy.sh", code, "1"],
@@ -581,11 +581,11 @@ def publish_section(workspace: Path, code: str, site_name: str) -> None:
     )
     print("\n".join(result.stdout.splitlines()[-15:]))
     if result.returncode != 0:
-        raise SystemExit(f"Publishing {code} failed.")
+        raise SystemExit(f"Deploying {code} failed.")
 
 
 def publish_demo_sites(workspace: Path) -> None:
-    announce("Building and publishing the demo class sites")
+    announce("Building and deploying the demo class sites")
     mirror_toolchain(workspace)
     remember_teacher_name(workspace)
     for course in DEMO_COURSES:

@@ -1,9 +1,9 @@
 # plantoir.app
 
 The marketing site. Sources live here; **finished pages are written into
-`site/`**, which is what gets published. Nothing in this folder is served.
+`site/`**, which is what gets deployed. Nothing in this folder is served.
 
-Publishing is explicit: the Netlify site is NOT connected to GitHub, so
+Deploying is explicit: the Netlify site is NOT connected to GitHub, so
 pushing this repository deploys nothing. Build, preview `site/` locally,
 and deploy when it is right (delta upload — an unchanged site sends nothing;
 token from the `containerized-quartz-netlify` Keychain item or
@@ -13,7 +13,7 @@ token from the `containerized-quartz-netlify` Keychain item or
 python3 website/build.py                 # write site/
 python3 website/build.py --check         # report problems, write nothing
 python3 website/build.py --serve         # preview locally; edits rebuild on refresh
-python3 website/build.py --deploy        # build, then publish to plantoir.app
+python3 website/build.py --deploy        # build, then deploy to plantoir.app
 python3 website/build.py --verify-deploy # fetch plantoir.app, confirm it matches site.json
 ```
 
@@ -25,7 +25,7 @@ the same instant. This is advisory, not a build failure: a network blip
 fetching the check is never treated as evidence the deploy itself failed, only
 a genuine, persistent version mismatch is (`website/netlify_deploy.py`,
 `verify_live()`). Run `--verify-deploy` on its own to check a past deploy
-without publishing anything new.
+without deploying anything new.
 
 plantoir.app is itself a free-tier Netlify project, so `--deploy` also writes
 `site/_headers` — a Content-Security-Policy that keeps Netlify's own
@@ -144,10 +144,10 @@ There are two working folders, and each picture is taken in one of them:
   (`MarketingFolderShownAsTeaching`; a move, because the app resolves a link to
   its real path). A scene picture that shows "Plantoir Marketing" is refused.
 - **`~/Desktop/Teaching`** — the demo folder: ENG2D, MCV4U and SCH3U, whose
-  sections are published as the live example sites. The hero, the class-site
+  sections are deployed as the live example sites. The hero, the class-site
   shots, search, the phone and the colour figures come from here, because a
   visitor can follow those to a real site. ICS3U and ICS4U are never
-  published to a public site: an embedded curriculum page puts its text on
+  deployed to a public site: an embedded curriculum page puts its text on
   the page, and
   the College Board's words were cleared for Russell's own folder, not for
   the web (ruling Q2).
@@ -248,12 +248,12 @@ Written down because each cost an afternoon:
   `UITEST_WORKSPACE` the app reads scheduled records from a temporary folder,
   so the notification scene schedules through `--mcp-stdio` instead, outside
   the isolation. A record written into the temporary folder would photograph a
-  publish that never happened.
+  deploy that never happened.
 - **An embedded curriculum page publishes its text.** A class site shows the
   full wording of every expectation a lesson embeds, even with the curriculum
   folder hidden from the sidebar — which is why ICS3U and ICS4U, whose
   College Board pages are the College Board's words, are photographed in the
-  in-app preview and never published to a public site: each publishes to a
+  in-app preview and never deployed to a public site: each deploys to a
   folder inside the kept folder.
 - **The class site inside the app's preview renders dark even in a light
   capture.** Quartz reads `(prefers-color-scheme: light)` and treats anything
@@ -332,8 +332,8 @@ missing, then, in the folder only — never the shipped payload:
 - ICS4U's second curriculum DECLARED (`curriculum_folders` gains
   `College Board Curriculum` after `Curriculum`, what ticking the box writes);
 - a folder destination for each of the two courses, so nothing they
-  publish — the scheduled publish included — reaches a public site, since
-  their pages print the College Board's words (ruling Q2): ICS3U publishes to
+  deploy — the scheduled deploy included — reaches a public site, since
+  their pages print the College Board's words (ruling Q2): ICS3U deploys to
   `School Web Space`, ICS4U to `School Web Space/ICS4U` (a folder destination
   writes `<folder>/section<N>` with `rsync --delete`, so one shared folder
   would let each course overwrite the other's section 1). The new-course
@@ -358,7 +358,7 @@ picture. No scene photographs ICS4U's, so for ICS4U the set-up writes it.
 
 **The scenes** are listed in `website/shots/scenes.py` with what each sets up.
 Most are `MarketingScenes` UI tests; the notification banner is a REAL
-scheduled publish asked for through `Plantoir --mcp-stdio` (a UI-tested app
+scheduled deploy asked for through `Plantoir --mcp-stdio` (a UI-tested app
 reads scheduled records from a temporary folder, so it could never see a real
 run's), photographed the moment the banner appears after the run's record says
 it succeeded.

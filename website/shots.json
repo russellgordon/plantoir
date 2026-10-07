@@ -193,7 +193,7 @@
         ],
         "arrange": "banner-over-window-top-right"
       },
-      "alt": "The Schedule Deploy sheet for ICS3U Section 1 set for a morning time, with a macOS notification above it saying the section published on its own.",
+      "alt": "The Schedule Deploy sheet for ICS3U Section 1 set for a morning time, with a macOS notification above it saying the section deployed on its own.",
       "caption": "Set it on Sunday. Hear how it went on Monday.",
       "parts": {
         "schedule-sheet": {
@@ -208,7 +208,7 @@
           "scene": "notification-banner",
           "expectText": [
             "ICS3U Section 1",
-            "published on its own"
+            "deployed on its own"
           ]
         }
       }
@@ -222,12 +222,13 @@
         "test": "testReferenceAndCopyAPage"
       },
       "alt": "The Plantoir sidebar with last year's ICS3U under Reference Courses, 2025–26, and a sheet about to copy one of its pages into ICS4U, with \"Also copy the pages this page links to\" ticked.",
-      "caption": "Last year's course, to read and borrow from — never published.",
+      "caption": "Last year's course, to read and borrow from — never deployed.",
       "expectText": [
         "Reference Courses",
         "2025",
         "The Unplugged Algorithm",
-        "ICS4U"
+        "ICS4U",
+        "and deploy"
       ]
     },
     {
@@ -317,7 +318,7 @@
         "note": "ICS3U/How I Teach.md"
       },
       "alt": "Obsidian open on ICS3U's How I Teach page: short notes on units, assessment and classroom routines.",
-      "caption": "Tell Claude or Codex how you teach, once. It is never published.",
+      "caption": "Tell Claude or Codex how you teach, once. It is never on your website.",
       "expectText": [
         "How I Teach"
       ]
