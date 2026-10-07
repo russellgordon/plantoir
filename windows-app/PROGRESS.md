@@ -17,9 +17,9 @@ What landed on `dev` since 1.4.2, one line each (GUI rows 712–721 have the det
 Gates on this project's Windows PC (Intel i5-8365U, 16 GB, Windows 11 Pro build 26200), at `dev` `581c2f634`:
 
 - `dotnet test`: Failed 0, Passed 2338, Skipped 0, Total 2338 (6 m 19 s).
-- UI suite (`run-ui-tests.ps1`): TBD_AT_CUT — pending, run at the cut.
-- `verify-deploy.ps1`: TBD_AT_CUT — pending, run at the cut.
-- `NamedGapLedger`: TBD_AT_CUT — pending, read at the cut.
+- UI suite (`run-ui-tests.ps1`): first run Failed 2, Passed 51, Total 53 (23 m 18 s); both failures reproduced alone and were real — a `ToggleSwitch` and the icon-plus-text Preview and Deploy buttons had no accessible name (app fix, GUI row below), and the two-backups test sent its Ctrl-click too fast for the app (test fix). Second run Failed 0, Passed 53, Skipped 0, Total 53 (22 m 35 s). The installer was re-signed after that fix, so the shipped bytes carry it.
+- `verify-deploy.ps1`: 37 passed, 0 failed, 0 skipped.
+- `NamedGapLedger`: empty.
 
 ## 2026-10-03 — the 1.4.2 release branch
 

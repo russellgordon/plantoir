@@ -27,10 +27,10 @@ Course Settings no longer protects a folder from removal just because Plantoir g
 Class dates remembered with an impossible year are asked for again instead of being believed.
 
 From this version on, when Plantoir offers an update it shows what is new in every version since yours.</description>
-      <pubDate>Wed, 07 Oct 2026 17:05:16 -04:00</pubDate>
+      <pubDate>Wed, 07 Oct 2026 18:23:35 -04:00</pubDate>
       <sparkle:version>1.4.3</sparkle:version>
       <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.3/PlantoirSetup.exe" sparkle:version="1.4.3" sparkle:shortVersionString="1.4.3" length="237407256" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="EoL91WsSsXtqAANnTSfHOws2or6eM4ugXgu12/N0NGvfGLY7uHs5+/v/Mx1gGafQd3u5XGxl3vp/G77vm9rfCA==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.3/PlantoirSetup.exe" sparkle:version="1.4.3" sparkle:shortVersionString="1.4.3" length="237396952" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="2a1daOj8JuEh37kYHFTD2wPFGbptxGVwX+kccf0lCgnRdqmIM01feHdQN0StInTdPPcit9QLVWc5NS4u5OreCA==" />
     </item>
     <item>
       <title>Plantoir 1.4.2</title>
