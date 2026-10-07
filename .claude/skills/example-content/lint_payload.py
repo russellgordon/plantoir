@@ -88,7 +88,7 @@ HEADING_MARK_MUST_BE_REFUSED = [
 
 
 def heading_marks_missing(text: str) -> list:
-    """The 1-based line numbers where a "(level N)" has no heading mark before it."""
+    """The 1-based line numbers carrying the sentence's markless form ("Every  (level N)" / "and  (level N)")."""
     lines = []
     for number, line in enumerate(text.split("\n"), start=1):
         if HEADING_MARK_MISSING.search(line):
@@ -112,7 +112,7 @@ def heading_mark_problem(rel: str, text: str) -> list:
     problems = []
     for number in heading_marks_missing(text):
         problems.append(
-            f"{rel}:{number}: a heading level is named with no mark before it "
+            f"{rel}:{number}: the heading sentence names a level with no mark before it "
             f"(\"Every  (level 2)\") — write Every `##` (level 2) and `###` (level 3) (#444)"
         )
     return problems

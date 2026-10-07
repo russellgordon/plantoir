@@ -845,7 +845,7 @@ template rather than retyping it: it names the marks in backticks — Every
 `##` (level 2) and `###` (level 3) heading — and typed through a shell, the
 backticks run as a command and the marks vanish, which is the likeliest
 way 307 template pages came to say "Every  (level 2) and  (level 3) heading" for seven weeks (#444);
-`lint_payload.py` now refuses a "(level N)" with no mark before it.
+`lint_payload.py` now refuses that sentence's markless form — "Every  (level N)" or "and  (level N)", a double space where the backticked mark should be — and nothing else that names a level.
 
 **Key Links is the course's orientation panel, not an index of its
 content.** It holds the things that set the tone and answer a newcomer's
