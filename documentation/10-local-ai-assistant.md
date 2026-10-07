@@ -6523,6 +6523,14 @@ It made this backup, so it was kept."; and Restore on another backup of EXC2O,
 confirmed, answered "A Claude session is working on EXC2O right now. Finish that
 session, then restore."
 
+**Known platform difference: when Restore asks.** On the mac a restore is
+checked AFTER the teacher confirms "Restore {CODE} from this backup?"
+(`WorkspaceModel.restoreBackup`, the order busy had before #458); Windows
+checks `BusyReason` before its confirmation. With a Claude session that can
+stay open for an hour, the mac's refusal after a confirmation is the likelier
+case now. Left as it is (review of #458, finding 8); greying Restore while the
+course is held is the change if Russell wants one.
+
 **The asymmetry both platforms share.** The Codex door names no course and
 holds nothing — on Windows since #430 and on the mac by ruling 3 of #458, so a
 Codex session keeps none of the three protections. Russell's comment on #458
