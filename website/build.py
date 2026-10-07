@@ -36,6 +36,7 @@ warning, so the site can be built before the captures are taken.
 from __future__ import annotations
 
 import argparse
+import http.server
 import json
 import re
 import shutil
@@ -745,11 +746,53 @@ def redirect_problems(site: dict, slugs: list[str], rendered: dict[str, str]) ->
             problems.append(f"site.json redirects /{old}/ away, but pages/{old}.html still exists")
         if old in site.get("nav", []):
             problems.append(f"site.json's nav still lists {old!r}, which moved to {new!r}")
-        link = re.compile(r'href="(?:\./|\.\./)?' + re.escape(old) + r'/')
+        # Relative ("../publishing/"), root-relative ("/publishing/") and
+        # absolute ("https://plantoir.app/publishing/") links all count.
+        link = re.compile(r'href="(?:https?://plantoir\.app)?/?(?:\./|\.\./)*' + re.escape(old) + r'/')
         for slug, html in rendered.items():
             if link.search(html):
                 problems.append(f"{slug}.html links to {old}/, which moved to {new}/")
     return problems
+
+
+def moved_location(site: dict, path: str) -> str | None:
+    """Where --serve sends a request for a moved page's old address — the
+    same place plantoir.app's _redirects sends it — or None if it did not move."""
+    for move in moved_pages(site):
+        old_prefix = "/" + move["from"]
+        if path == old_prefix or path.startswith(old_prefix + "/"):
+            rest = path[len(old_prefix):].lstrip("/")
+            return "/" + move["to"] + "/" + rest
+    return None
+
+
+class MovedPagesHandler(http.server.SimpleHTTPRequestHandler):
+    """Serves site/ and answers a moved page's old address with the 301
+    plantoir.app gives — to HEAD as well as GET, as Netlify does, so a
+    `curl -I` against the preview tells the truth about the live site."""
+
+    def answered_as_moved(self) -> bool:
+        location = moved_location(read_json(WEBSITE / "site.json"), self.path)
+        if location is None:
+            return False
+        self.send_response(301)
+        self.send_header("Location", location)
+        self.end_headers()
+        return True
+
+    def before_serving(self) -> None:
+        """A hook for --serve's rebuild-on-refresh; nothing by default."""
+
+    def do_GET(self) -> None:
+        if self.answered_as_moved():
+            return
+        self.before_serving()
+        super().do_GET()
+
+    def do_HEAD(self) -> None:
+        if self.answered_as_moved():
+            return
+        super().do_HEAD()
 
 
 def remove_moved_output(site: dict, output: Path) -> None:
@@ -1010,25 +1053,17 @@ def serve(port: int) -> int:
     browser, see it. Stop with Ctrl+C.
     """
     import functools
-    import http.server
     import socketserver
 
     built_from = newest_source_time()
 
-    class PreviewHandler(http.server.SimpleHTTPRequestHandler):
-        def do_GET(self) -> None:
+    class PreviewHandler(MovedPagesHandler):
+        # A moved page's old address answers as plantoir.app does
+        # (MovedPagesHandler, for GET and HEAD alike).
+        def before_serving(self) -> None:
             nonlocal built_from
             # Rebuild only ahead of page loads, not for every image the page
             # then pulls in — one check per refresh, not thirty.
-            # A moved page's old address answers as plantoir.app does.
-            for move in moved_pages(read_json(WEBSITE / "site.json")):
-                old_prefix = "/" + move["from"]
-                if self.path == old_prefix or self.path.startswith(old_prefix + "/"):
-                    rest = self.path[len(old_prefix):].lstrip("/")
-                    self.send_response(301)
-                    self.send_header("Location", "/" + move["to"] + "/" + rest)
-                    self.end_headers()
-                    return
             wants_page = self.path.endswith("/") or self.path.endswith(".html")
             if wants_page:
                 current = newest_source_time()
@@ -1036,7 +1071,6 @@ def serve(port: int) -> int:
                     print("✏️  Sources changed — rebuilding…", flush=True)
                     build(check_only=False)
                     built_from = current
-            super().do_GET()
 
         def end_headers(self) -> None:
             # Without this the browser caches assets heuristically and an

@@ -171,7 +171,7 @@ shown, and on any failing retaken Windows figure.
 The macOS capture harness is driven by Python and Xcode UI tests:
 
 ```bash
-python3 website/shots/capture.py            # captures app + published sites
+python3 website/shots/capture.py            # captures app + deployed sites
 python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
 python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing

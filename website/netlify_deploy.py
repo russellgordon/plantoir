@@ -129,7 +129,7 @@ def build_manifest() -> tuple[dict[str, str], dict[str, Path]]:
             continue  # .DS_Store and friends never ship
         if file.parent == SITE_DIR and file.suffix == ".zip":
             # A zip at the site root is a leftover from the manual deploy era
-            # (zip site/, drag into Netlify), not a page. Never publish one.
+            # (zip site/, drag into Netlify), not a page. Never deploy one.
             print(f"   Skipping {file.name} — a zip at the site root is not part of the site.")
             continue
         digest = hashlib.sha1(file.read_bytes()).hexdigest()
@@ -171,7 +171,7 @@ def verify_live() -> str:
     Compares against site.json's own "version" field, not the git release
     tag: the tag carries a "v" prefix ("v1.1.0") the page text never does,
     so comparing against the tag would misfire on every release. This is
-    checking "did Netlify actually publish what we just told it to", not
+    checking "did Netlify actually deploy what we just told it to", not
     "does the live site match the tag" — keep it that way if this is ever
     touched again.
 
@@ -284,7 +284,7 @@ def deploy() -> int:
     print(f"🌍 Deploying site/ to plantoir.app (from branch '{branch or 'unknown'}')…")
 
     # Netlify can add its own advertisement badge to free-plan sites, same as
-    # any class site published by scripts/deploy.py. Must run before the
+    # any class site deployed by scripts/deploy.py. Must run before the
     # manifest below, so the _headers file it writes is part of what gets
     # uploaded.
     protected_scripts = write_netlify_headers_file(SITE_DIR)
@@ -345,7 +345,7 @@ if __name__ == "__main__":
     # deploy below on a plausible typo, which is the one outcome a
     # read-only check can never be allowed to risk.
     if "--verify-deploy" in sys.argv:
-        # Standalone check, no deploy: "did the last publish actually reach
+        # Standalone check, no deploy: "did the last deploy actually reach
         # plantoir.app", runnable independently and after the fact.
         outcome = verify_live()
         feeds = verify_feeds_live()

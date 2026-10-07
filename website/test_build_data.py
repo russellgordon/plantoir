@@ -242,6 +242,47 @@ class RedirectTests(unittest.TestCase):
         self.assertEqual(len(problems), 1)
         self.assertIn("features.html links to publishing/", problems[0])
 
+    def test_a_root_relative_or_absolute_link_to_the_old_address_is_a_problem(self):
+        for href in ("/publishing/", "/publishing/#on-a-schedule", "https://plantoir.app/publishing/"):
+            rendered = {"features": f'<a href="{href}">how</a>'}
+            problems = build.redirect_problems(self.SITE, ["index", "deploying"], rendered)
+            self.assertEqual(len(problems), 1, href)
+
+    def test_a_link_that_only_ends_in_the_old_name_is_not_a_problem(self):
+        rendered = {"features": '<a href="https://example.com/publishing/">elsewhere</a>'}
+        self.assertEqual(build.redirect_problems(self.SITE, ["index", "deploying"], rendered), [])
+
+    def test_serve_answers_head_and_get_for_the_old_address_with_the_same_301(self):
+        import functools
+        import http.client
+        import socketserver
+        import threading
+
+        class QuietHandler(build.MovedPagesHandler):
+            def log_message(self, format, *arguments):
+                pass
+
+        with tempfile.TemporaryDirectory() as temporary:
+            handler = functools.partial(QuietHandler, directory=temporary)
+            with socketserver.ThreadingTCPServer(("127.0.0.1", 0), handler) as server:
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    port = server.server_address[1]
+                    for method in ("GET", "HEAD"):
+                        for path, expected in (("/publishing", "/deploying/"),
+                                               ("/publishing/", "/deploying/"),
+                                               ("/publishing/index.html", "/deploying/index.html")):
+                            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                            connection.request(method, path)
+                            response = connection.getresponse()
+                            response.read()
+                            connection.close()
+                            self.assertEqual(response.status, 301, f"{method} {path}")
+                            self.assertEqual(response.getheader("Location"), expected, f"{method} {path}")
+                finally:
+                    server.shutdown()
+
     def test_a_missing_new_page_or_a_lingering_old_one_is_a_problem(self):
         self.assertEqual(len(build.redirect_problems(self.SITE, ["index"], {})), 1)
         self.assertEqual(len(build.redirect_problems(self.SITE, ["index", "deploying", "publishing"], {})), 1)

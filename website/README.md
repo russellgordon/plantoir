@@ -249,7 +249,7 @@ Written down because each cost an afternoon:
   so the notification scene schedules through `--mcp-stdio` instead, outside
   the isolation. A record written into the temporary folder would photograph a
   deploy that never happened.
-- **An embedded curriculum page publishes its text.** A class site shows the
+- **An embedded curriculum page puts its text on the deployed site.** A class site shows the
   full wording of every expectation a lesson embeds, even with the curriculum
   folder hidden from the sidebar — which is why ICS3U and ICS4U, whose
   College Board pages are the College Board's words, are photographed in the
@@ -427,8 +427,10 @@ whose section does not exist.
   writes each as two forced 301s into `site/_redirects` (the address, and
   everything under it; a browser carries the `#fragment` across), removes the
   old page's built copy, and answers the old address the same way under
-  `--serve`. `--check` refuses a move whose new page is missing, whose old page
-  is still in `pages/` or the nav, or whose old address a page still links to.
+  `--serve`, to HEAD as well as GET. `--check` refuses a move whose new page is
+  missing, whose old page is still in `pages/` or the nav, or whose old address
+  a page still links to — relative, root-relative (`/publishing/`) or absolute
+  (`https://plantoir.app/publishing/`).
   Never remove a move: links to the old address from outside cannot be counted.
 - **Availability.** `{{availability:<key>}}` prints "On the Mac. The Windows
   version gets this in a later release." under a section while `site.json →
@@ -567,7 +569,7 @@ Windows uses, and check the *count of captured images*, never the exit code.
 
 ### The demo sites were renamed on 2026-08-19
 
-The published demo sites now follow a per-SECTION scheme —
+The deployed demo sites now follow a per-SECTION scheme —
 `<code>-s<n>-2026-gordon.netlify.app`, e.g. `eng2d-s1-2026-gordon` — and
 ENG2D has a section 2 site of its own. `capture.py`, `capture_windows.py`
 and `website/site.json` carry the new names, but

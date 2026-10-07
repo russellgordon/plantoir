@@ -42,7 +42,7 @@
         "scene": "new-course",
         "workspace": "marketing"
       },
-      "alt": "The New Course panel with TEJ3M entered and its suggested course names offered beneath.",
+      "alt": "The New Course or Club panel with TEJ3M entered and its suggested course names offered beneath.",
       "caption": "A course code is enough to start.",
       "windows": false,
       "expectText": [
