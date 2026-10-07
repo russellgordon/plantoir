@@ -6422,8 +6422,8 @@ and the mac is asked what it does). The Codex door names none and holds none,
 as before. **The mac's answer (#449, 2026-10-07): its `--mcp-stdio` server
 holds NOTHING for the door's course, and never did.** Both mac doors write a
 folder-only argv and no `env` (`ClaudeCodeLauncher.swift`, `CodexLauncher.swift`);
-`AssistMCPServer.serve` takes no lease; the mac writes build, preview and
-publish leases only (`WorkLeaseFiles`); a held backup is in-process only
+`AssistMCPServer.serve` takes no lease; the mac writes `build`, `preview` and
+`publish` leases only (`WorkLeaseFiles`); a held backup is in-process only
 (`AssistActivity.heldBackups`, read by `WorkspaceModel.heldBackupPaths`), so an
 MCP session's conversation backup is not held; and `AssistActivity` guards the
 built-in assistant only. So the mac has all three gaps Windows closed, and has
