@@ -584,7 +584,7 @@ def intercepted(message, window_course=None, window_section=None):
     # #424 (Windows, v1.4.3 bundle A; contracts/assist-cases.json ->
     # scheduleAndCancel, AUTHORED): "schedule a|the deploy ..." is read as the
     # family above, "for" standing for "at" right after the opening (or after
-    # a day word); with no time at all it is ASKED in code; and three exact
+    # a day word); with no time at all it is ASKED in code; and four exact
     # "cancel ... scheduled deploy" sentences reach cancel_scheduled_deploy.
     # A question mark is never stripped for these.
     if not tidied.endswith("?"):
@@ -611,7 +611,10 @@ def intercepted(message, window_course=None, window_section=None):
                        for w in opened.group(3).split()):
                 return ASKED_IN_CODE
         bare = re.sub(r"^please |( please)$", "", tidied)
-        if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy"):
+        # The mac's #449 review added the prompt shelf's own card, "Cancel
+        # scheduled deploy", with no determiner (an ACCEPTED row since then).
+        if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy",
+                    "cancel scheduled deploy"):
             return "cancel_scheduled_deploy"
     if deploy_time_asked_about(tidied):
         # Not a tool: the app answers "deploy at 6:30" with a question of its
