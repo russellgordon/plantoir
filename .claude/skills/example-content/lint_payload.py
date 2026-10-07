@@ -1,9 +1,13 @@
 """Lint an example-content payload before shipping it.
 
 Usage:  python3 .claude/skills/example-content/lint_payload.py ADA1O
+        python3 .claude/skills/example-content/lint_payload.py --example-course
 
 Checks every rule the installer and the site build depend on. Exit code 0
-means clean; 1 means problems were printed.
+means clean; 1 means problems were printed; 2 means the linter's own
+self-check failed. `--example-course` reads the Example Course
+(`support/example_course/`, EXC2O), which is not a payload and has no
+manifest, for the one rule that applies to it: the heading marks below.
 """
 
 import json
@@ -60,6 +64,71 @@ def fence_lines_that_fall_out(text: str) -> list:
                     fallen.append(index + 1)
             index += 1
     return fallen
+
+# The template pages (`_DUPLICATE ME.md`) tell a teacher that "Every `##`
+# (level 2) and `###` (level 3) heading" becomes an entry in the page's table
+# of contents. In 307 files the marks themselves were missing — "Every  (level
+# 2) and  (level 3) heading" — from the day the template was added
+# (db7e693f1, 2026-08-17), and every payload copied from another inherited it
+# (#444). A level named in brackets must follow the mark it names, in
+# backticks; a space where the mark should be is the shape refused here.
+# Read on the RAW page, not on prose with code removed: removing the
+# backticked marks makes the correct sentence look exactly like the broken one.
+HEADING_MARK_MISSING = re.compile(r"(?<!`) \(level [1-6]\)")
+HEADING_MARK_MUST_BE_ACCEPTED = [
+    "> Every `##` (level 2) and `###` (level 3) heading you use on this page",
+    "> Every heading you use on this page automatically becomes an entry",
+]
+HEADING_MARK_MUST_BE_REFUSED = [
+    "> Every  (level 2) and  (level 3) heading you use on this page",
+    "> Every `##` (level 2) and  (level 3) heading you use on this page",
+]
+
+
+def heading_marks_missing(text: str) -> list:
+    """The 1-based line numbers where a "(level N)" has no heading mark before it."""
+    lines = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if HEADING_MARK_MISSING.search(line):
+            lines.append(number)
+    return lines
+
+
+def check_the_checks() -> list:
+    """The heading-mark rule against the shapes it must accept and refuse."""
+    failures = []
+    for sentence in HEADING_MARK_MUST_BE_ACCEPTED:
+        if heading_marks_missing(sentence):
+            failures.append(f"refused a sentence it must accept: {sentence!r}")
+    for sentence in HEADING_MARK_MUST_BE_REFUSED:
+        if not heading_marks_missing(sentence):
+            failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    return failures
+
+
+def heading_mark_problem(rel: str, text: str) -> list:
+    problems = []
+    for number in heading_marks_missing(text):
+        problems.append(
+            f"{rel}:{number}: a heading level is named with no mark before it "
+            f"(\"Every  (level 2)\") — write Every `##` (level 2) and `###` (level 3) (#444)"
+        )
+    return problems
+
+
+def lint_example_course() -> int:
+    """The heading-mark rule over the Example Course, which is not a payload."""
+    root = REPO_ROOT / "support" / "example_course"
+    pages = sorted(root.rglob("*.md"))
+    problems = []
+    for page in pages:
+        rel = str(page.relative_to(root))
+        problems.extend(heading_mark_problem(rel, page.read_text(encoding="utf-8")))
+    print(f"{len(pages)} Example Course pages checked")
+    for problem in problems:
+        print(f"PROBLEM  {problem}")
+    print("clean" if not problems else f"{len(problems)} problem(s)")
+    return 1 if problems else 0
 
 # An Ontario credit is 110 hours of scheduled time. A semestered day school
 # runs 75-minute periods, so a full credit is about 86 periods plus a
@@ -171,6 +240,8 @@ def lint(course_code: str) -> int:
         text = page.read_text(encoding="utf-8")
         rel = str(page.relative_to(root))
         is_curriculum = curriculum_folder and rel.startswith(f"shared/{curriculum_folder}/")
+
+        problems.extend(heading_mark_problem(rel, text))
 
         # A filename Windows cannot create is a course Windows teachers
         # cannot have. Git for Windows refuses to check such a path out at
@@ -708,4 +779,12 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(__doc__)
         sys.exit(2)
+    broken = check_the_checks()
+    if broken:
+        print("the linter's own rules misbehave (a broken LINTER, not a broken page):")
+        for line in broken:
+            print(f"   {line}")
+        sys.exit(2)
+    if sys.argv[1] == "--example-course":
+        sys.exit(lint_example_course())
     sys.exit(lint(sys.argv[1]))

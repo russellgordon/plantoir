@@ -840,7 +840,12 @@ page name on the built site. Every shared content folder (and `Tutorials`)
 also carries a `_DUPLICATE ME.md` template (`title: _DUPLICATE ME`,
 `publish: false`, `created: __CREATED__`) floating to the top in Obsidian
 with authoring guidance, heading/TOC examples, curriculum link reminders,
-and preview shortcuts.
+and preview shortcuts. Copy its table-of-contents sentence from an existing
+template rather than retyping it: it names the marks in backticks — Every
+`##` (level 2) and `###` (level 3) heading — and typed through a shell, the
+backticks run as a command and the marks vanish. That is how 307 template
+pages said "Every  (level 2) and  (level 3) heading" for seven weeks (#444);
+`lint_payload.py` now refuses a "(level N)" with no mark before it.
 
 **Key Links is the course's orientation panel, not an index of its
 content.** It holds the things that set the tone and answer a newcomer's
@@ -964,6 +969,11 @@ the linter.
    from boilerplate, and boilerplate is the failure mode this block has —
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
+
+   If you touched the Example Course (`support/example_course/`, EXC2O),
+   also run `lint_payload.py --example-course`: it has no manifest, so it
+   gets only the heading-mark rule (#444), the one a copied template
+   sentence can break.
 
    **Two things the linter reads the way the site does (#313).** A link
    written inside code — a fence of either character, a fence inside a
