@@ -411,11 +411,13 @@ missing, then, in the folder only — never the shipped payload:
   destination, or Netlify once a site is recorded, is left alone;
 - `How I Teach.md` for ICS3U (our own words, `shots/marketing/`);
 - ICS3U section 2 moved to a second semester (its dates shifted by whole
-  weeks so its first class is in the week of 2027-02-01; section 1 keeps the
+  weeks so its first class is in the week of 1 February of the school year
+  the clock is in, worked out by `demo_folders.py`; section 1 keeps the
   payload's dates), so the start-of-year scene is the week before school
   rather than a semester already under way with 13 classes "dated before
   today";
-- a reference copy of ICS3U for 2025–26, through the app.
+- a reference copy of ICS3U for the previous school year (its year is read
+  back from the copy itself, never computed), through the app.
 
 Every step says "made" or "already there", a second run changes nothing, a file
 you changed is "left as you changed it", and a folder holding any course but
