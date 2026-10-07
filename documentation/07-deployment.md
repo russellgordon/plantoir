@@ -2902,7 +2902,7 @@ three parts:**
   happens. Still working after thirty, it stands down and records
   `earlierDeployStillWorking`, a ninth kind with its own sentence and the
   attention badge. It writes "scheduled deploy waited for its earlier deploy"
-  either way. Without the wait the new run's first leg would be refused and it
+  whenever it waited, whether it then went ahead or stood down. Without the wait the new run's first leg would be refused and it
   would be recorded as `buildDidNotFinish` — the wrong cause — and the two
   runs' legs could refuse each other between legs, sending the old deploy to
   one host and not the other (the #439 plan review, finding 1). Its own loop,
