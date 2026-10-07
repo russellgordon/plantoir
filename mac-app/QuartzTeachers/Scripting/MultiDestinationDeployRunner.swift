@@ -469,6 +469,53 @@ class MultiDestinationDeployRunner {
         return result
     }
 
+    /// What an assistant says when the shared BUILD step did not finish, or
+    /// nil when it finished or was not needed. Both assistant paths — the
+    /// windowless one (`AssistSiteWork`) and the one with a section window
+    /// (`SectionDetailView.deployAndWait`) — ask this before `result(...)`,
+    /// because nothing was sent anywhere and "did not finish" would name the
+    /// upload.
+    ///
+    /// A build refused because the section was still being deployed (#439)
+    /// is said as ITSELF, not as "could not be built": a refused
+    /// `preview.sh --build-only` exits 1 like a broken build, and a stale
+    /// site — the usual state after a teacher edits and sets a deploy again —
+    /// always takes this path, so checking for the refusal only in
+    /// `result(...)` let the assistants name the wrong cause (#439 review,
+    /// finding 1).
+    static func answerWhenTheBuildDidNotFinish(course: String, section: String, firstLeg: Leg?) -> AssistSiteWorkResult? {
+        guard let firstLeg, firstLeg.buildFailed else {
+            return nil
+        }
+        if let refusal = firstLeg.refusedWhileItsSectionDeploys {
+            return MultiDestinationDeployRunner.refusalAnswer(course: course, section: section, refusal: refusal)
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.couldNotBuildBeforeDeploying(course: course, section: section)
+        )
+    }
+
+    /// The sentence for a deploy refused because its section was still being
+    /// deployed (#439): which one depends on whether a deploy set for later
+    /// is the one working.
+    static func refusalAnswer(
+        course: String,
+        section: String,
+        refusal: FailureExplainer.SectionDeployRefusal
+    ) -> AssistSiteWorkResult {
+        if refusal.byALaterDeploy {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployRefusedWhileALaterDeployWorks(course: course, section: section)
+            )
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.deployRefusedWhileItsSectionDeploys(course: course, section: section)
+        )
+    }
+
     /// The final `AssistSiteWorkResult` for a finished run — the single
     /// place that decides which sentence a teacher hears, whether that is
     /// the unchanged single-destination wording (`destinationCount <= 1`,
@@ -512,16 +559,7 @@ class MultiDestinationDeployRunner {
         // as itself, for one destination or several, since nothing was
         // changed anywhere.
         if let refusal = outcome.refusedWhileItsSectionDeploys {
-            if refusal.byALaterDeploy {
-                return AssistSiteWorkResult(
-                    succeeded: false,
-                    message: AssistWording.deployRefusedWhileALaterDeployWorks(course: course, section: section)
-                )
-            }
-            return AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.deployRefusedWhileItsSectionDeploys(course: course, section: section)
-            )
+            return MultiDestinationDeployRunner.refusalAnswer(course: course, section: section, refusal: refusal)
         }
         if destinationCount <= 1 {
             if outcome.anySucceeded {
