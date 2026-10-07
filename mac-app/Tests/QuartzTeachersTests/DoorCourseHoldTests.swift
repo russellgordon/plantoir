@@ -570,6 +570,31 @@ final class DoorCourseHoldTests: XCTestCase {
         XCTAssertTrue(result.didRemove, "\(String(describing: result.problem))")
     }
 
+    /// Removing a SECTION is not held either (ruling 2). MUST FAIL if the
+    /// hold widens to section removal.
+    func testSectionRemovalIsNotHeld() async throws {
+        let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
+        try writeOthersLeases(["assist"], course: "MPM2D", in: made.root)
+        let mpm2d: Course = try course("MPM2D", in: made.workspace)
+        let result: ScheduledDeployCleanup.RemovalResult = await ScheduledDeployCleanup.removeSection(
+            2,
+            from: mpm2d,
+            coursesDirectoryURL: made.root.appendingPathComponent("courses"),
+            runner: SilentLaunchControl()
+        )
+        XCTAssertTrue(result.didRemove, "\(String(describing: result.problem))")
+    }
+
+    /// The unit-word rename is not held (ruling 2; Windows does not hold its
+    /// own). MUST FAIL if its check widens to the Claude session's hold.
+    func testTheUnitWordRenameIsNotHeld() throws {
+        let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
+        try writeOthersLeases(["assist"], in: made.root)
+        XCTAssertNotNil(CourseActivity.structuralHoldReason(folderPath: made.root.path, courseCode: "ICS3U"),
+                        "The hold is there to be ignored.")
+        XCTAssertNil(UnitWordRenameSheet.busyProblem(courseCode: "ICS3U", workingFolderPath: made.root.path))
+    }
+
     // MARK: - The words
 
     /// None of the new sentences names the machinery (CLAUDE.md rule 1), and

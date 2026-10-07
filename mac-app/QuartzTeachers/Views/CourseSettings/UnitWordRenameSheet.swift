@@ -197,13 +197,24 @@ struct UnitWordRenameSheet: View {
         }.value
     }
 
+    /// Why the rename cannot start now, or nil. `courseIsBusy` — this
+    /// process's previews, deploys and copies — and deliberately NOT a Claude
+    /// session holding the course elsewhere (#458 ruling 2: Windows does not
+    /// hold its unit-word rename, so the mac does not either).
+    static func busyProblem(courseCode: String, workingFolderPath: String) -> String? {
+        if CourseActivity.courseIsBusy(folderPath: workingFolderPath, courseCode: courseCode) {
+            return UnitWordRenameWording.problemBusy(courseCode: courseCode)
+        }
+        return nil
+    }
+
     func performRename() async {
         if problem != nil || survey == nil || isRenaming {
             return
         }
         failure = nil
-        if CourseActivity.courseIsBusy(folderPath: workingFolderPath, courseCode: course.code) {
-            failure = UnitWordRenameWording.problemBusy(courseCode: course.code)
+        if let busy = UnitWordRenameSheet.busyProblem(courseCode: course.code, workingFolderPath: workingFolderPath) {
+            failure = busy
             return
         }
         isRenaming = true
