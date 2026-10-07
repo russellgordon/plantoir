@@ -178,10 +178,18 @@ final class HeadlessDeployAnswersTests: XCTestCase {
         )
     }
 
-    /// The window's assistant path cannot be driven without a window, so its
-    /// half is read from the source: `deployAndWait` asks the SAME shared
-    /// answer the windowless path asks, and never builds the "could not be
-    /// built" sentence itself (which is how it skipped the refusal before).
+    /// The window's assistant path, read from the source: `deployAndWait` asks
+    /// the SAME shared answer the windowless path asks, and never builds the
+    /// "could not be built" sentence itself (which is how it skipped the
+    /// refusal before).
+    ///
+    /// This pins PRESENCE, not order or behaviour. `deployAndWait` lives on a
+    /// SwiftUI view and needs a section window, its preview controller and a
+    /// running workspace, none of which a unit test can stand up; so an
+    /// earlier `buildFailed` branch added above the call, the answer computed
+    /// but not returned, or the sentence spelt another way would all stay
+    /// green here. The behaviour itself is proved on the windowless path above,
+    /// which calls the same function.
     func testTheWindowsAssistantPathAsksTheSharedBuildAnswer() throws {
         var sourceURL: URL?
         for fileURL in ActivityTrailWiringTests.swiftFiles(under: ActivityTrailWiringTests.productSourceFolderURL()) {
