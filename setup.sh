@@ -398,8 +398,12 @@ say_this_folder_cannot_be_reached() {
 #     (a_deploy_is_running_for, in the PREVIEW WHILE DEPLOYING GUARD);
 #   - the look before a website builder is set up again (#378): has the
 #     program that started this work gone? (the_owners_of_the_work, in the
-#     PREVIEW PORT BLOCK).
-# Both now ask the_launchers_running, below, and each keeps its own POLICY —
+#     PREVIEW PORT BLOCK);
+#   - deploy.sh's guard and preview.sh's build-leg guard (#439): is this
+#     section still being deployed by a scheduled script or another deploy.sh?
+#     (refuse_while_this_section_deploys, in the DEPLOY WHILE ITS SECTION
+#     DEPLOYS GUARD).
+# All three ask the_launchers_running, below, and each keeps its own POLICY —
 # what counts, and which way to fail — because the two fail-safes point
 # opposite ways on purpose (see each caller). What they share is how the
 # table is READ: how a launcher, its course and section and its flags are

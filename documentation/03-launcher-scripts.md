@@ -1954,6 +1954,81 @@ course typed with two spaces…" red; and moving the block into the PREVIEW
 PORT BLOCK turns `TheRealPreviewUpToItsGuard` red (the real `preview.sh`
 printed `REACHED` with the deploy running).
 
+#### A section being deployed cannot be deployed again (#439)
+
+Decided by Russell on 2026-10-04 (issue
+[#439](https://github.com/russellgordon/plantoir/issues/439)): a deploy of a
+section refuses, before anything is changed, while that same section is still
+being deployed in this working folder. The rule, its 23 `launcherCases`, its
+sentences and its limits are `contracts/shared-rules.json` →
+`deployWhileItsSectionDeploys`; the run's side is in
+[07](07-deployment.md) → "Set again while the run works (#409)".
+
+**What it closes.** Setting a section's deploy again while its run works ends
+that run's app (the boot-out #237 relies on), and the script the app started
+carries on by itself — a "leftover run". Its leases name the app that was
+ended, so they read as stale, and nothing else refused: the window's Deploy,
+an assistant's deploy, a deploy typed in Terminal, or the newly set run could
+build and upload the section on top of it.
+
+**Where.** `refuse_while_this_section_deploys`, between the `DEPLOY WHILE ITS
+SECTION DEPLOYS GUARD` markers, identical in `deploy.sh` and `preview.sh`
+(`scripts/test_deploy_while_its_section_deploys.py` holds the copies equal).
+`deploy.sh` asks on every run that deploys (not `--reset-token`, `--logout` or
+`--help`); `preview.sh` asks on a `--build-only` run only — a deploy's build
+leg — and never on a serving run, which is #381's guard above. Both ask after
+the arguments are checked and before anything changes, and both exit 1.
+
+**What counts**, read from the live process table through the one reader
+(`the_launchers_running`), never from a remembered process id or a lease:
+
+- **a deploy set for later of C/S whose script is the PROGRAM**: the reader
+  prints `program=1` for a `scheduled` record when the label's script is the
+  first word, or the script a shell was handed, and `0` for the app's own
+  `--run-scheduled-deploy` line. The script lives under
+  `~/Library/Application Support/Plantoir/scheduled/`, and `ps` splits that
+  path at its space, so the label is found in a word after the shell's, not
+  only in word 2 — the case "under Application Support (a path with a space)"
+  pins the damaging direction. The app's line alone does NOT count: that run
+  is still waiting for the course (#156's ten minutes), possibly for the very
+  window whose deploy would then be refused half-way. A label naming another
+  folder's id is that folder's; a label from before #237 names none and counts.
+- **`deploy.sh C S` for this section in this folder** (the "Terminal pair",
+  director's ruling 9), counted as #381 counts it for previews: the program,
+  its working directory asked of `lsof`, still counted when `lsof` cannot say,
+  not counted when it only clears a token or prints its help.
+- **Never this run itself or its ancestors.** A scheduled run's own legs are
+  its script's children, and a folder deploy reruns `preview.sh --build-only`
+  under its own `deploy.sh`; the reader's `mine` walk leaves both out. A
+  second script of the SAME label that is not an ancestor — the newly set
+  run's leg while the leftover works — does count.
+
+**The table cannot be read: let it through.** Not for #381's reason (the
+leases do NOT cover a leftover run — that is the fault): failing closed would
+refuse every deploy, and every scheduled run's own legs, for as long as `ps`
+fails.
+
+**What a teacher reads.** "❌ {course} section {section} is still being
+deployed by a deploy that was set for later, so it cannot be deployed again
+until that has finished." (or "…already being deployed…" for the Terminal
+pair; "…cannot be built…" from the build leg), then "Nothing was changed."
+It names WHAT is deploying because after a re-set the app shows only the new
+time. The window lifts that line into its failure explanation
+(`FailureExplainer.sectionDeployRefusal`); the in-app and outside assistants
+say `deployRefusedWhileALaterDeployWorks` or
+`deployRefusedWhileItsSectionDeploys` instead of "did not finish" when every
+leg that ran was refused this way. The launcher writes its own trail line,
+under "build declined, course busy elsewhere".
+
+**Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
+script's process id (misses Terminal, leaves a gap, touches a shared format);
+refusing or deferring a re-set while the run works; letting the run survive a
+re-set as Windows' does, which reopens #237's "never briefly two agents";
+counting the app's line. **Known limits**: a leftover run that hangs refuses
+that section until it ends, and nothing in the app ends it — logging out or
+restarting the Mac does; and a scheduled run does not wait for a deploy typed
+in Terminal (its legs are refused and it is recorded as stopped).
+
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 
 Between finding the address and announcing it, `preview.sh`

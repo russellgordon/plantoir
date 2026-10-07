@@ -2860,40 +2860,86 @@ app (`--run-scheduled-deploy`), so that boot-out ends the run there and then: a
 set made during the wait ends it before `jobStillStands`, a set made during the
 deploy ends it before `bootOutAgent`, and an ended run removes nothing. The
 wrapper it started is a `Process` child in a process group of its own, so it
-SURVIVES and finishes the old deploy as an orphan. It cannot remove the new
-deploy — its only plist line has already run and it boots nothing out — but it
-is NOT harmless (see "What this costs" below). `jobStillStands` and
-`leaveQuietly` stay as the second line of defence they were written as.
+SURVIVES and finishes the old deploy as an orphan — a "leftover run". It
+cannot remove the new deploy — its only plist line has already run and it
+boots nothing out. Until #439 it was NOT harmless (below). `jobStillStands`
+and `leaveQuietly` stay as the second line of defence they were written as.
 
 Measured on an Apple M4 Pro, macOS 26.6, with a throwaway agent shaped like the
 run (a Swift binary waiting on a `Process` running `sleep`): `launchctl bootout`
 returned exit 0 in 0.02 s; the job read as unloaded and the binary was gone at
 once; the child was still running six seconds later, in its own process group
 (PGID = its own pid). A bash script whose child shares its process group lost
-both at once.
+both at once. Measured again for #439 on 2026-10-04, with stand-in launchers
+under a path holding a space: after SIGKILL of a pretend run, its script and
+both legs kept running, and `deploy.sh`'s own process-table reader saw them.
 
-**What this costs, and was left:** the old run's own after-work (recording that
-the section was deployed, the trail line for a stopped run, the notification) does not
-happen, and its leases name a process that is gone, so they read as stale while
-the orphaned wrapper is still deploying. **That last part can make two deploys of
-one section overlap.** A lease whose owner is gone is ignored
-(`shared-rules.json` → `workLeases.liveness`), so the window's Deploy, an
-outside assistant's `deploy_section`, or the newly set run firing soon all go
-ahead while the orphan is still building and uploading. `deploy.sh` has no
-same-section guard of its own (`a_deploy_is_running_for` is only named in a
-comment there), and `preview.sh`'s #381 guard is asked on a SERVING run only, so
-a deploy's `--build-only` leg is not refused either. The result is two builds
-and uploads of one section at once, which is the fault #156's leases exist to
-prevent. Nothing on `dev` is worse than before #409 was checked. A guard is a
-decision for Russell, #439: a deploy refuses while that
-section's scheduled wrapper is still working. Rejected for now: letting the run
-survive a re-set and comparing moments at the end as Windows does, because the
-boot-out-first order is what keeps "never briefly two agents" true (#237) and
-changing it reopens that. Pinned by
-`ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`
-(the boot-out is asked with no plist on disk, and before the new one exists).
-No contract case: the guard is in the order of two `launchctl` calls on the
-mac and in Task Scheduler on Windows, which no shared case can express.
+**What it used to cost: two deploys of one section at once.** The leftover's
+leases name a process that is gone, so they read as stale
+(`shared-rules.json` → `workLeases.liveness`), `deploy.sh` had no same-section
+guard and `preview.sh`'s #381 guard is asked on a serving run only — so the
+window's Deploy, an outside assistant's `deploy_section`, or the newly set run
+firing could build and upload the section on top of it.
+
+**Fixed by #439 (decided by Russell 2026-10-04, on the mac 2026-10-07), in
+three parts:**
+
+- **The launchers refuse.** `deploy.sh`, and `preview.sh` on a `--build-only`
+  run, refuse before anything is changed while the section's scheduled script
+  is still running in this folder, or another `deploy.sh` of it is — see
+  [03](03-launcher-scripts.md) → "A section being deployed cannot be deployed
+  again (#439)" and `shared-rules.json` → `deployWhileItsSectionDeploys`.
+- **The newly set run waits for its leftover run** before it starts its own
+  script (`ScheduledDeploy.waitForTheEarlierDeploy`, contract
+  `deployWhileItsSectionDeploys.theNewRunWaits`): after the lateness check and
+  before #156's wait for the course, it looks every fifteen seconds for another
+  `/bin/bash <its own script>` in the kernel's process list (the same label is
+  the same section in the same folder; arguments read whole, so "Application
+  Support" is one of them). Up to THIRTY minutes, three times the course wait,
+  because what is waited for is the same section's deploy, which normally
+  ends, and a large course deploying to two places can take longer than ten;
+  standing down after ten would all but promise the deploy just set never
+  happens. Still working after thirty, it stands down and records
+  `earlierDeployStillWorking`, a ninth kind with its own sentence and the
+  attention badge. It writes "scheduled deploy waited for its earlier deploy"
+  either way. Without the wait the new run's first leg would be refused and it
+  would be recorded as `buildDidNotFinish` — the wrong cause — and the two
+  runs' legs could refuse each other between legs, sending the old deploy to
+  one host and not the other (the #439 plan review, finding 1). Its own loop,
+  not a holder in `waitForTheCourse`, because that wait reads leases and the
+  leftover's are the stale ones. No deadlock: the leftover waits on nothing.
+- **A leftover never replaces a newer record.** Both runs write the SAME
+  per-folder outcome record, so the leftover finishing after a stand-down used
+  to replace `earlierDeployStillWorking` with its own `succeeded`, and the
+  section read as deployed while the new deploy never ran. The wrapper's
+  completion lines now move a record into place only when none is there
+  (`recordCompletionLines`): a run clears its record first and writes at most
+  one, so a record standing at that moment is a newer run's
+  (`scheduledPublishStopped.newerRecordWins`, measured under bash with a
+  spaced path). A record landing in the microseconds between the look and
+  the move is still replaced.
+
+**What is still lost, and was left.** The leftover's own after-work belongs to
+the app that was ended: the section is not marked deployed (it stays
+" — Edited", the harmless direction), the run writes no trail line of its own,
+and no notification is sent. Its script still writes the outcome record. So
+`scheduleDeploy` writes "scheduled deploy set again while its deploy worked"
+after its boot-out, when the label's script is still running — the one line
+that says a deploy went on after the re-set. A leftover run that hangs refuses
+that section until it ends, and nothing in the app ends it (cancelling or
+setting again boots out a job that is already gone); logging out or restarting
+the Mac does — `deployWhileItsSectionDeploys.knownLimits`.
+
+**Rejected:** letting the run survive a re-set and comparing moments at the
+end as Windows does, because the boot-out-first order is what keeps "never
+briefly two agents" true (#237) and changing it reopens that — not reopened by
+#439. Refusing or deferring a re-set while the run works: it blocks a teacher
+changing a schedule during a long deploy and leaves the overlap untouched.
+Pinned by `ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`
+(the boot-out order), `testSettingASectionAgainWhileItsDeployWorksSaysSoOnTheTrail`,
+and `DeployWhileItsSectionDeploysTests`. The boot-out order itself has no
+contract case — it is two `launchctl` calls on the mac and Task Scheduler on
+Windows — but the guard and the wait do.
 
 ### The window's acts read the saved settings too (#335)
 
