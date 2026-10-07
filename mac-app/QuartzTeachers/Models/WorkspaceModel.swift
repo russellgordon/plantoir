@@ -1872,6 +1872,9 @@ class WorkspaceModel {
 
     /// An alert a Revise item answers a click with when it may not open.
     struct ReviseRefusal: Equatable {
+
+        // MARK: - Stored properties
+
         let title: String
         let message: String
     }

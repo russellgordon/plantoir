@@ -21012,7 +21012,7 @@
     "whichDoors": {
       "claude": true,
       "codex": false,
-      "why": "Matches Windows, where the Codex door names no course and holds none (Program.cs; documentation/10). The Codex door's argv is unchanged on both platforms, so a Codex session holds nothing: its backups are ordinary backups, and nothing is greyed while it is open. Ruled 2026-10-07 for #458 (ruling 3); Russell's comment on #458 said 'both doors', and that difference is put to him in the piece's ready note rather than decided here."
+      "why": "Matches Windows, where the Codex door names no course and holds none (Program.cs; documentation/10). The Codex door's argv is unchanged on both platforms, so a Codex session holds nothing: its backups are ordinary backups, and nothing is greyed while it is open. Ruled 2026-10-07 for #458 (ruling 3); Russell's comment on #458 said 'both doors', and that difference is put to him in GitHub #458 and documentation/10 ('The asymmetry both platforms share') rather than decided here."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a Codex session does.",
