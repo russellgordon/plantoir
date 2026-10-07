@@ -392,13 +392,40 @@ class DoorRefused(Exception):
     """The app answered a tool call with an error."""
 
 
-def ask_the_app(server: list[str], requests: list[tuple[str, dict]], timeout_seconds: int = 300) -> list[str]:
+def ask_the_app(server: list[str], requests: list[tuple[str, dict]], timeout_seconds: int = 900) -> list[str]:
     """Send tool calls to the app's own MCP server, one process for all of
     them, and return each answer's text. Newline-delimited JSON-RPC over
-    stdio, the way an outside assistant talks to it."""
+    stdio, the way an outside assistant talks to it.
+
+    The timeout is real: the server's output is read on a thread of its own,
+    so a server that goes quiet — stuck in the site build a change starts —
+    is stopped after `timeout_seconds` per answer rather than waited on for
+    ever, and what it wrote to stderr is in the error."""
+    import queue
+    import threading
+
     process = subprocess.Popen(server, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
-    assert process.stdin is not None and process.stdout is not None
+                               stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+    lines: "queue.Queue[str | None]" = queue.Queue()
+    errors: list[str] = []
+
+    def read_stdout() -> None:
+        for line in process.stdout:
+            lines.put(line)
+        lines.put(None)
+
+    def read_stderr() -> None:
+        for line in process.stderr:
+            errors.append(line)
+
+    readers = [threading.Thread(target=read_stdout, daemon=True), threading.Thread(target=read_stderr, daemon=True)]
+    for reader in readers:
+        reader.start()
+
+    def what_it_said() -> str:
+        said = "".join(errors[-20:]).strip()
+        return f"\nIts last words on stderr:\n{said}" if said else ""
 
     def send(message: dict) -> None:
         process.stdin.write(json.dumps(message) + "\n")
@@ -406,17 +433,24 @@ def ask_the_app(server: list[str], requests: list[tuple[str, dict]], timeout_sec
 
     def answer(identifier: int) -> dict:
         deadline = time.time() + timeout_seconds
-        while time.time() < deadline:
-            line = process.stdout.readline()
-            if not line:
-                break
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                process.kill()
+                raise DoorRefused(f"the app's MCP server gave no answer to request {identifier} in "
+                                  f"{timeout_seconds} seconds and was stopped{what_it_said()}")
+            try:
+                line = lines.get(timeout=remaining)
+            except queue.Empty:
+                continue
+            if line is None:
+                raise DoorRefused(f"the app's MCP server ended before answering request {identifier}{what_it_said()}")
             try:
                 message = json.loads(line)
             except ValueError:
                 continue
             if message.get("id") == identifier:
                 return message
-        raise DoorRefused(f"the app's MCP server did not answer request {identifier}")
 
     answers: list[str] = []
     try:
@@ -440,14 +474,21 @@ def ask_the_app(server: list[str], requests: list[tuple[str, dict]], timeout_sec
             answers.append(text)
             identifier += 1
     finally:
-        # Close stdin and wait: a stray server holds files open.
-        process.stdin.close()
+        # Close stdin and wait: a stray server holds files open, and a server
+        # still finishing a build it started is let finish (#156) up to a limit.
         try:
-            process.wait(timeout=60)
+            process.stdin.close()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+        for reader in readers:
+            reader.join(timeout=5)
         process.stdout.close()
+        process.stderr.close()
     return answers
 
 
@@ -462,17 +503,36 @@ def mac_server(app_binary: Path, folder: Path, state_dir: Path | None = None) ->
 
 
 def windows_server(mcp_exe: Path, folder: Path) -> list[str]:
-    """Windows' door: plantoir-mcp.exe beside Plantoir.exe."""
+    """Windows' door: plantoir-mcp.exe beside Plantoir.exe. It takes no
+    `--state-dir` (its trail and leases are the real ones), so it is run only
+    against a demo folder; pass WINDOWS_ARGUMENTS with every request."""
     return [str(mcp_exe), "--mcp-stdio", str(folder)]
 
 
-def apply_front_pages(folder: Path, server: list[str] | None, report=None, spec: dict | None = None) -> list[str]:
-    """Every demo section's front page, through the app. Returns what could
-    not be done; a section already right is "already there" and costs no
-    call at all."""
+# What a door call costs, and the one part of it a caller can switch off.
+# On the Mac every change through `unpublish_pages` / `publish_class_on`
+# (1) zips the course into courses/_backups once per server process, and
+# (2) rebuilds the section's site headless (`preview.sh --build-only`), into
+# the real builds folder, starting the website builder if it is not running —
+# the Mac's tools have NO switch for it (AssistToolSurface.swift: "There is no
+# `preview` flag"). Windows' tools take `preview: false`, which skips the
+# rebuild; the backup is still made. So: one server process for every section
+# (one backup per course), and on Windows every request says preview=false.
+WINDOWS_ARGUMENTS: dict = {"preview": False}
+
+
+def apply_front_pages(folder: Path, server: list[str] | None, report=None, spec: dict | None = None,
+                      extra_arguments: dict | None = None) -> list[str]:
+    """Every demo section's front page, through the app, in ONE server
+    process (so the course is backed up once, not once per section). Returns
+    what could not be done; a section already right is "already there" and
+    costs no call at all. `extra_arguments` go with every request
+    (WINDOWS_ARGUMENTS on Windows)."""
     if spec is None:
         spec = load_spec()
     left: list[str] = []
+    wanted: list[tuple[Path, int, FrontPagePlan, str]] = []
+    requests: list[tuple[str, dict]] = []
     for course in demo_courses(spec):
         course_dir = folder / "courses" / course["code"]
         if read_config(course_dir) is None:
@@ -484,28 +544,37 @@ def apply_front_pages(folder: Path, server: list[str] | None, report=None, spec:
                 note(report, "already there", label)
                 continue
             plan = front_page_plan(course_dir, section, spec)
-            requests = door_requests(plan)
+            asked = door_requests(plan)
             if server is None:
-                left.append(f"{label} — needs the app ({len(requests)} request(s))")
+                left.append(f"{label} — needs the app ({len(asked)} request(s))")
                 continue
-            ask_the_app(server, requests)
-            still = front_page_problems(course_dir, section, spec)
-            if still:
-                left.extend(still)
-            else:
-                note(report, "made", f"{label} shows {plan.shown.title if plan.shown else '?'}")
+            for tool, arguments in asked:
+                merged = dict(arguments)
+                merged.update(extra_arguments or {})
+                requests.append((tool, merged))
+            wanted.append((course_dir, section, plan, label))
+    if server is not None and requests:
+        ask_the_app(server, requests)
+    for course_dir, section, plan, label in wanted:
+        still = front_page_problems(course_dir, section, spec)
+        if still:
+            left.extend(still)
+        else:
+            note(report, "made", f"{label} shows {plan.shown.title if plan.shown else '?'}")
     return left
 
 
-def apply_demo_state(folder: Path, server: list[str] | None, report=None, spec: dict | None = None) -> list[str]:
+def apply_demo_state(folder: Path, server: list[str] | None, report=None, spec: dict | None = None,
+                     extra_arguments: dict | None = None) -> list[str]:
     """Everything folders.json asks of a demo folder after the app has made
-    its courses. Returns what is still left (empty when the folder matches)."""
+    its courses. Returns what is still left (empty when the folder matches).
+    See WINDOWS_ARGUMENTS for what the front pages cost."""
     if spec is None:
         spec = load_spec()
     apply_colours(folder, report, spec)
     remember_teacher_name(folder, report, spec)
     write_site_markers(folder, report, spec)
-    return apply_front_pages(folder, server, report, spec)
+    return apply_front_pages(folder, server, report, spec, extra_arguments)
 
 
 # ---------- Finding the kept folders, for the opt-in comparison ----------
@@ -587,13 +656,15 @@ if __name__ == "__main__":
     arguments = parser.parse_args()
     target = Path(arguments.folder).expanduser()
     door: list[str] | None = None
+    extra: dict | None = None
     if arguments.app:
         if os.name == "nt":
             door = windows_server(Path(arguments.app), target)
+            extra = WINDOWS_ARGUMENTS
         else:
             door = mac_server(Path(arguments.app), target,
                               Path(arguments.state_dir) if arguments.state_dir else None)
-    remaining = apply_demo_state(target, door)
+    remaining = apply_demo_state(target, door, extra_arguments=extra)
     for line in remaining:
         print(f"   still to do: {line}")
     raise SystemExit(1 if remaining else 0)
