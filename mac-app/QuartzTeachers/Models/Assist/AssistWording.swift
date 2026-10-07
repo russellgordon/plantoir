@@ -136,6 +136,39 @@ nonisolated enum AssistWording {
         "What time should this section deploy? Say it with the time, for example “deploy tomorrow at "
         + "6:30 am”, and I’ll set it up for you to agree to."
 
+    /// Settler S3's answer (#440): the model chose a plain add_next_class for
+    /// a sentence asking for a new unit, a unit or day other than the next
+    /// one, or several pages. Nothing is added, and the teacher is given the
+    /// sentences that DO it.
+    ///
+    /// **Every sentence it quotes is one the window accepts, in that very
+    /// course** (ruling 1 of the #440 review, pinned by `NextClassUnitsTests`
+    /// for a Unit, a Module and a numbered course): "Start a new unit" and
+    /// "Add five more days to Unit 4" are answered in code, term-blind, and
+    /// plan the course's own word ("Module 4, Day 1"); a numbered course has
+    /// no units, so it is told the one thing it can do — "Add the next
+    /// meeting page" — once per page. Quoting the course's own word ("Start a
+    /// new module") was REJECTED: the frames read only "unit", so that
+    /// sentence would go to the model and be stopped here again, round and
+    /// round (review finding F2).
+    static func nextClassNeedsItsOwnPhrasing(unitWord: String, isNumbered: Bool, noun: ClassNoun) -> String {
+        if isNumbered {
+            return "Nothing was added. This course numbers its pages one after another and has no units, "
+                + "so I add one \(noun.singular) at a time: say “Add the next \(noun.singular) page” once for "
+                + "each one you want."
+        }
+        let word: String = unitWord.lowercased()
+        let opening: String = "Nothing was added. I add one \(noun.singular) at a time, after the last one in "
+            + "your latest \(word)."
+        if word == "unit" {
+            return opening + " To start a new unit, say “Start a new unit”. To add several days to a unit, "
+                + "say “Add five more days to Unit 4”."
+        }
+        return opening + " To start a new \(word), say “Start a new unit”. To add several days to a \(word), "
+            + "say “Add five more days to Unit 4” with its number, since I read the word unit as "
+            + "\(unitWord) here."
+    }
+
     /// The answer to a deploy time written a way the app can read but does
     /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
     /// Answered in code; nothing is scheduled and nothing is sent to the
