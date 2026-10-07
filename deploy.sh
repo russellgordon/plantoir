@@ -753,13 +753,11 @@ if [[ -f "$_course_config" ]]; then
   # launcher, deploy.ps1, the shared Python and the app) must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   #
-  # "Nothing was published." is OLD, and stays only because it is pinned. A
-  # site is DEPLOYED and a page is PUBLISHED (Russell, 2026-09-20; every line
-  # is to use each word only in its own sense, 2026-10-03), but this sentence
-  # is asserted by two shared Python tests, a contract case and Windows' own
-  # tests, so it moves in one change with Windows rather than here alone —
-  # contracts/shared-rules.json -> whyTheLaunchersStillSayPublished names
-  # every such line.
+  # "Nothing was deployed." — a site is DEPLOYED and a page is PUBLISHED
+  # (Russell, 2026-09-20; every line uses each word only in its own sense,
+  # 2026-10-03, #443). The sentence is asserted by two shared Python tests and
+  # a contract case, so Windows' deploy.ps1 is red on it until it matches
+  # (#441) — contracts/shared-rules.json -> whyTheLaunchersStillSayPublished.
   _reference_code="$COURSE_CODE"
   # A marker that is THERE with a value that is neither true nor false — `1`,
   # `"true"`, a key written with \u escapes. Somebody plainly meant it, and
