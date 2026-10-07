@@ -6492,7 +6492,26 @@ removed when the server's input was closed under it. But each way a teacher
 ends a real session KILLED the server instead: `/exit`, Control-C twice,
 Command-W on the Terminal window (Terminate) and quitting Terminal (Command-Q,
 Terminate) — in all four the server was gone within six seconds and its lease
-was still on disk. SIGHUP and SIGTERM sent by hand do the same. So the clean
+was still on disk. SIGHUP and SIGTERM sent by hand do the same. Quitting
+Plantoir itself while a session is open leaves the session's lease, its
+held-backup record and its server exactly as they were (measured: app gone,
+server alive, both files present) — the app's quit removes only its own.
+
+**The acceptance run (#458 ruling 6)**, the same day: a scratch Debug build
+launched with `--state-dir` on a temp working folder holding EXC2O, and a real
+Claude session opened through a door configuration written exactly as
+`writeConfig` writes it — with one deliberate difference, `--state-dir` added to
+the server's args, because a server started by the app's own menu item takes no
+state folder and would have written to the real trail. Asked to publish a page,
+the session made its backup and wrote `EXC2O.held-backup.<pid>` naming it. In
+the app: the course menu showed Revise with Claude and Codex greyed with
+"Available once you finish revising with Claude" once under them, and Rename
+Course and Add Section… greyed with the same line (Edit → Rename Course too); a
+section's menu greyed all three Revise items with one line; Delete Backup on
+the session's zip answered "Finish the Claude session working on EXC2O first.
+It made this backup, so it was kept."; and Restore on another backup of EXC2O,
+confirmed, answered "A Claude session is working on EXC2O right now. Finish that
+session, then restore." So the clean
 release (`stopOwnWorkBeforeLeaving`: runs stopped, then
 `forgetRecordedBackups()`, then `releaseEverything()` — Windows' order) is the
 exception, and no "let go" trail line is written: it would almost never appear,
