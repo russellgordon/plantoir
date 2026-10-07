@@ -13,7 +13,8 @@
       },
       "alt": "Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right.",
       "caption": "From your notes in Obsidian, through Plantoir, to a live class website.",
-      "windows": true
+      "windows": true,
+      "windowsAlt": "Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Edge on the right."
     },
     {
       "id": "courses",
