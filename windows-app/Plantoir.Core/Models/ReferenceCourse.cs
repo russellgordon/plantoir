@@ -183,6 +183,19 @@ public static class ReferenceCourse
     public static string KeepACopyMenuItem => Wording["keepACopyMenuItem"];
     public static string SetSchoolYearMenuItem => Wording["setSchoolYearMenuItem"];
 
+    /// <summary>
+    /// What a screen reader says for a reference course's sidebar row: "ICS3U,
+    /// kept for reference, 2025–26", or "ICS3U, kept for reference" with no
+    /// year (#426). The row SHOWS only the code, which is faithful but leaves
+    /// the reference ICS3U and the live ICS3U announced identically. Windows'
+    /// own (no contract key): the mac's VoiceOver reads SwiftUI rows by their
+    /// labels, and #426 records no mac obligation.
+    /// </summary>
+    public static string SpokenRowName(string shownCode, int? schoolYear) =>
+        schoolYear is int year
+            ? $"{shownCode}, kept for reference, {SchoolYear.Label(year)}"
+            : $"{shownCode}, kept for reference";
+
     /// <summary><c>referenceCourses.importing.wording.noSchoolYear</c> — how a year that is not set reads in a sentence.</summary>
     public const string NoSchoolYear = "no school year";
 

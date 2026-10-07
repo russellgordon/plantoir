@@ -28,7 +28,8 @@ public static class StartOfYearDialog
                                                  Func<ContentDialog, Task<ContentDialogResult?>> show,
                                                  Func<bool> folderMovedMeanwhile)
     {
-        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
+        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
+            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
         var proposal = workspace.PlanStartOfYear(course.Code, section);
         if (proposal.Plan.First is null || proposal.Plan.NothingToDo)
         {
@@ -93,7 +94,8 @@ public static class StartOfYearDialog
     {
         if (StartOfYearSessionUndo.For(folder, course.Code, section) is not { } entry) return null;
         string backupName = Path.GetFileName(entry.BackupPath);
-        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory());
+        var workspace = new AssistWorkspace(folder, new NoLauncher(), undo: new UndoHistory())
+            { ServesTheLocalWindow = true };   // in-process: Plantoir's own, never an outside assistant (fix round ruling 7)
 
         // A scheduled deploy since the act ends it — the schedule read again
         // now, as the sheet opens — and so does the next change to the

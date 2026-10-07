@@ -40,12 +40,12 @@ public class AllBackupsUiTests
         using var app = new DrivenApp(WriteCoursesAndBackups);
         var desktop = app.Window.Automation.GetDesktop();
 
-        app.Find("backupsGroup", "the Backups group").RightClick();
+        app.RightClickMiddleOf(app.Find("backupsGroup", "the Backups group"));
         var open = Retry.WhileNull(
             () => desktop.FindFirstDescendant(cf => cf.ByName("All Backups…").And(cf.ByControlType(ControlType.MenuItem))),
             TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(200)).Result;
         Assert.NotNull(open);
-        open!.Click();
+        DrivenApp.PressMenuItem(open!);
 
         // Nothing chosen yet: the button is greyed and offers no count — never
         // "Delete 0 Backups…" (bundle 11, ruling U9).
@@ -57,10 +57,10 @@ public class AllBackupsUiTests
 
         var first = app.Find("allBackups-" + Names[0], "the first backup's line");
         var second = app.Find("allBackups-" + Names[1], "the second backup's line");
-        first.Click();
-        Keyboard.Pressing(VirtualKeyShort.CONTROL);
-        second.Click();
-        Keyboard.Release(VirtualKeyShort.CONTROL);
+        app.ClickMiddleOf(first);
+        Keyboard.Press(VirtualKeyShort.CONTROL);
+        try { app.ClickMiddleOf(second); }
+        finally { Keyboard.Release(VirtualKeyShort.CONTROL); }
 
         var button = Retry.WhileNull(
             () => desktop.FindFirstDescendant(cf => cf.ByName("Delete 2 Backups…").And(cf.ByControlType(ControlType.Button))),

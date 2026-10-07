@@ -41,23 +41,40 @@ public class PublishStoppedPartWayTests : IDisposable
     private string Page(string title) =>
         Path.Combine(_folder, "courses", "ICS3U", "section1", "All Classes", title + ".md");
 
+    /// <summary>
+    /// The contract's sentence (#436, mac #412: <c>wording.publishStoppedPartWay</c>),
+    /// "{what}" being the unit asked for or "the pages you named". The pointer
+    /// to Restore Section (<c>wording.restoreSectionPutsItBack</c>) is said
+    /// ONLY in Plantoir's own window, which has that button — never to an
+    /// outside assistant (director's ruling, as on the mac).
+    /// </summary>
     [Theory]
-    [InlineData("Unit 1", "Unit 1 was only partly published")]
-    [InlineData("Unit 1, Day 2", "The pages were only partly published")]
-    public async Task APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamed(string asked, string expected)
+    [InlineData("Unit 1", "Unit 1", false)]
+    [InlineData("Unit 1, Day 2", "the pages you named", false)]
+    [InlineData("Unit 1", "Unit 1", true)]
+    [InlineData("Unit 1, Day 2", "the pages you named", true)]
+    public async Task APageThatCannotBeWrittenIsAnsweredAndTheCopyIsNamedOnlyInTheWindow(
+        string asked, string what, bool inTheWindow)
     {
-        var tools = new PlantoirTools(new AssistWorkspace(_folder, new FakeLauncher()));
+        var workspace = new AssistWorkspace(_folder, new FakeLauncher()) { ServesTheLocalWindow = inTheWindow };
+        var tools = new PlantoirTools(workspace);
         var progress = new Progress<ProgressNotificationValue>(_ => { });
 
-        // Another program holds the page: reading or writing it fails.
-        using (new FileStream(Page("Unit 1, Day 2"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        // The page can be read and planned, and not written: the failure comes
+        // AFTER the copy is taken, which is when the pointer has a copy to name.
+        File.SetAttributes(Page("Unit 1, Day 2"), FileAttributes.ReadOnly);
+        try
         {
             var answer = await tools.PublishPages("ICS3U", 1, progress, default,
                                                   new[] { asked }, preview: false);
             string said = answer.Summary();
-            Assert.Contains(expected, said);
-            if (said.Contains("A copy from before", StringComparison.Ordinal))
-                Assert.Contains("Restore Section 1", said);
+            Assert.StartsWith(AssistWording.PublishStoppedPartWay(what, ""), said);
+            Assert.NotNull(workspace.ConversationBackupPath);
+            if (inTheWindow)
+                Assert.EndsWith(AssistWording.RestoreSectionPutsItBack("1"), said);
+            else
+                Assert.DoesNotContain("Restore Section", said);
         }
+        finally { File.SetAttributes(Page("Unit 1, Day 2"), FileAttributes.Normal); }
     }
 }

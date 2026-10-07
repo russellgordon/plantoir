@@ -23,6 +23,17 @@ One place for what changed on the preview and publish path in bundle 4, so a
 reader of the code finds the reasons. Hardware for every number: Intel Core
 i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
 
+- **"Closed for a deploy" (#436, v1.4.3).** A serving preview that another
+  program's deploy ended reads "Closed for a deploy", not "Something went
+  wrong" (`ScriptRunner.EndIsAClosingForADeploy`; the stop's mark here is
+  `returned non-zero exit status 15.`, measured — TerminateProcess(15), since
+  Windows has no SIGKILL). It asks the leases of OTHER processes only, so a
+  deploy of the same course from another window of the SAME Plantoir (one
+  process, its own build lease excluded) still ends the preview as "Something
+  went wrong". That is deliberate, the safe direction — an end is never hidden
+  — not a bug. Once a serving preview ends, the window also gives up its
+  `preview` work lease (`WorkLease.LetGoWhenAServingPreviewEnds`), so an
+  outside assistant is no longer told a preview is open.
 - **The address (#278).** `ScriptRunner.CapturePreviewAddress` reads COMPLETE
   lines only: the unfinished tail waits for the next piece, colour codes come out
   per line, the carry is flushed when the run ends, and nothing is read back off
@@ -39,10 +50,10 @@ i5-8365U, 16 GB, Samsung 980 SSD, Windows 11 Pro 25H2 build 26200.
   explains it — accepted rather than adding a third stop path), then the alert.
   Only a connection REFUSED by this PC is `theSiteNeverAnswered`; a timeout or
   anything else is `plantoirCouldNotTell`. There is no builder to ask, so no
-  first verdict. Sentences say "your PC" for "your Mac" (proposed to the mac;
-  since 2026-10-03 the contract writes `theSiteNeverAnswered`'s sentence with
-  `{machine}`, filled from `specialNames.platformWording.machine`, #410/#418, so
-  the substitution becomes a fill driven by `machine.usedIn`).
+  first verdict. `theSiteNeverAnswered`'s sentence is the contract's with its
+  `{machine}` filled "PC" (`specialNames.platformWording.machine`, #410/#418;
+  since v1.4.3 a fill driven by `machine.usedIn` in `MachineWordContractTests`,
+  #438, where it used to be a "your Mac" → "your PC" substitution).
 - **A typed publish folder (#304, review L1).** `deploy.ps1`'s
   `Resolve-PublishFolder` takes a plain relative name from the working folder
   (deploy.sh's rule), a fully qualified or UNC path as is, and REFUSES a
@@ -866,14 +877,34 @@ pixels at every scale. Rejected: FlaUI's `Window.SetForeground()` and
 `Focus()` (measured: the terminal stayed in front); minimising the terminal
 from the runner (the click still went to the doubled point).
 
-**Only the two Copy a Page pickers were changed.** About twenty other
-`Click()` and `RightClick()` calls remain (the helpers in `DrivenApp.cs`,
-`AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`, `EndToEnd.cs` and
-others), none with `BringToFront`. They passed in the 44 of 44 run on the same
-200% session, so the doubled point is not general — it was measured on the
-picker (an AutoSuggestBox inside a dialog) and nowhere else — but nothing
-proves the others cannot meet it. Moving them to `ClickMiddleOf` is owed
-(#428).
+**Since #428 item 4 (2026-10-04) no real click in the suite asks for a
+clickable point.** At first only the two Copy a Page pickers were changed;
+the twenty-odd other `Click()` / `RightClick()` calls (the helpers in
+`DrivenApp.cs`, `AllBackupsUiTests`, `AcceleratorUnderDialogUiTests`,
+`EndToEnd.cs`, `ReferenceCourseUiTests`, `LinksChecklistUiTests`,
+`PanelHeightUnderSqueezeUiTests`, `ImportForReferenceUiTests`,
+`CopyAPageDialogUiTests`) had passed 44 of 44 on the same 200% session, but
+nothing proved they could not meet the doubled point. Now: a row, the menu
+bar or anything else in the window → `ClickMiddleOf` / `RightClickMiddleOf`;
+an item of a menu that is already OPEN → `DrivenApp.PressMenuItem` (its
+Invoke pattern, else a click in the middle of its box WITHOUT `BringToFront`,
+which could dismiss the menu that is already in front); a dialog's button →
+`AsButton().Invoke()`. Every one of those real clicks goes through
+`DrivenApp.MiddleOf`, which REFUSES (`ClickWouldMissException`) an element
+that is off screen, has an empty box (whose middle is 0,0), or — for
+anything in the main window — whose middle lies outside the window's box:
+the old `element.Click()` threw `NoClickablePointException` in those cases,
+and FlaUI clamps neither a row scrolled out of view nor an empty box, so
+without the refusal the click would land on the taskbar, the desktop or
+another app (the stack review's finding; `ClickRefusalRuleTests`, plain
+facts). An open menu's item may lie outside the window, so only the first
+two refusals apply to it. `PressRowMenuItem` again skips and retries when
+the clickable-point wait runs out. The Ctrl+click in `AllBackupsUiTests` releases Ctrl
+in a `finally`, so a failed click cannot leave the key down for the next
+test. `grep -n "\.Click()\|\.RightClick()" Plantoir.UiTests/*.cs` should
+find only the comment in `DrivenApp.cs` that explains why. Built, NOT run
+through the window when this was written (the UI suite needs the whole
+machine; the director schedules it).
 
 ### A test that runs a launcher (bundle 11, 2026-10-01)
 
@@ -899,10 +930,19 @@ runs `preview.ps1 CODE N --stop` for every section the test declared with
 `WillServe` (the launcher's own sweep, by the directories the build and serve
 work in); ends any process whose command line still names the run's
 temporary folder or that builds folder (a deploy's launcher, its python);
-deletes that builds folder; and unlocks the working folder's courses so a
-reference course the app locked can be deleted with it. (Before bundle 11 the
+deletes that builds folder; and deletes the run folder with
+`DrivenApp.DeleteRunFolder`, which lifts the reference lock first so a
+reference course the app locked can go with it. (Before bundle 11 the
 reference tests' temporary folders outlived their runs for exactly that
-reason.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
+reason, and two still did after the 44-of-44 run of 2026-10-03 — `rmdir`
+"Access is denied" on `courses\ICS3U-…\section1\index.md`, removed by hand
+with `icacls /reset /T`. Since #428 item 5 the unlock covers the WHOLE run
+folder rather than only `workspace\courses` — the import test keeps last
+year's working folder in a scratch folder beside it — Dispose waits for the
+app's pid to be gone first, and the unlock is asked again between delete
+attempts. The two days' leftover was never reproduced, so which of those it
+was is not known; `RunFolderTeardownTests`, two plain facts, pin the
+behaviour without a desktop.) Rejected: redirecting `LOCALAPPDATA` for the app's children so the
 launchers would build under the state folder — it would have stopped the
 tests exercising the real path the ruling asked for, and node and npm resolve
 caches from the same variable.
@@ -969,6 +1009,29 @@ report — a `Progress<T>` made inside `Task.Run` reports on a pool thread
 folder and then Netlify again in Course Settings left Revert on
 (`CourseConfiguration.DeployTarget` now restores the saved spelling); and
 every sidebar row's accessible name was "Plantoir.Views.SidebarRow".
+
+**What a screen reader hears for an icon-only button (#426, v1.4.3).** The same
+runs measured the sidebar's Add and Remove with an EMPTY automation Name, so
+Narrator said only "button". Every icon-only button in the main window now
+carries `AutomationProperties.Name` in the words its tooltip already shows: the
+sidebar's Add and Remove, the section toolbar's back, forward, reload, Obsidian
+and Open in Browser, Course Settings' Obsidian, and a list row's rename
+(`FormBuilders`; the row's ⓘ and the lists' + and − were already named).
+Preview and Deploy show text beside their icon and are left to be named by it
+(not yet measured: the UiFact below is what will say, and it fails by
+AutomationId if either comes back empty). A reference
+course's row SHOWS its code, which is the live course's code too, so its Name is
+fuller — `ReferenceCourse.SpokenRowName`, "ICS3U, kept for reference, 2025–26"
+(or without the year when none is set) — through `SidebarRow.SpokenName`, which
+is the Title for every other row. Windows' own: VoiceOver reads SwiftUI buttons
+by their labels, so the mac owes nothing. Pinned by two UiFacts in
+`SidebarNamesUiTests` (no Button in the main window with an empty Name, asked on
+the sidebar, a course's settings and a section; the reference row's Name) and by
+`ReferenceCourseTests.AReferenceRowIsSpokenWithItsYear`. Rejected (reasoned, not
+measured): a HelpText on the reference row instead of a fuller Name (the Name is
+what is announced first, so the two ICS3U rows would still start identically); naming
+Preview/Deploy explicitly (their label changes to Stop and to "Available in a
+moment", and a static Name would go stale).
 
 Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
 29–32 s; its first preview served 52–61 s after Preview was pressed;
@@ -1616,10 +1679,11 @@ the same day.)
   install while this app is publishing or building a preview, or a scheduled
   publish of this install is running — Task Scheduler's run is the counterpart
   of the mac's launchd one; never refuse a quit), and the eight trail events it
-  added to `activityTrail.mustRecord`. NetSparkle gathers the notes of every
-  newer release itself, so a skipped release's warning is not lost the way it
-  would be on the mac without the cumulative notes; each Windows item carries
-  only its own. The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
+  added to `activityTrail.mustRecord`. The app gathers the notes of every newer
+  feed item itself (`AppUpdates.NotesFor`, #428: NetSparkle hands it the newer
+  items but, with no UI of its own here, shows none), so a skipped release's
+  warning is not lost; each Windows item carries only its own. (This said
+  NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
   `site/appcast-windows.xml`, and before that one shared appcast.)
 - **Stable code signing** (entry from the signing fix): sign dev builds
@@ -3100,14 +3164,33 @@ Settings was open would then ask about the wrong thing. Rejected: a walk per
 row (the mac measured 53 ms per walk on a 400-folder course, ten-plus rows per
 drawing).
 
-One difference the runner absorbs rather than hides: with no `class_folder`
-recorded, Windows protects the first per-section folder as the class folder
-(`ClassFolderRule.Name`'s guess), where the mac protects only the literal "All
-Classes" or a recorded name. `floor`'s per-section fixtures say none of their
-folders is the class folder, so `MarksFloorContractTests` sets the resolved
-class folder to null for those cases. Whether the two apps should agree on
-which folder an unrecorded course protects is a separate question and was not
-taken here.
+**Which folder is protected as the class folder (#431, Russell 2026-10-03:
+Windows matches the mac).** With no `class_folder` recorded, only the literal
+"All Classes" is protected from removal; with one recorded, that name as well
+(`ClassFolderRule.ProtectedName`, the mac's
+`ClassFolder.isTheAllClassesFolder(_:configured:)`). Until v1.4.3 Windows
+protected `ClassFolderRule.Name`'s GUESS — the first folder whose name says
+"class", else the first per-section folder — so the same course file answered
+`classFolderBlocked` for "Handouts" here and reached the marks floor on the mac,
+and `MarksFloorContractTests` nulled the resolved class folder for F13/F14 to
+get round it. Both are gone; the floor cases run through the real resolution.
+The New Course wizard matches the mac's too: the literal, plus a club's folder
+by the name its row gives (the guess never found "All Meetings").
+
+What did NOT change, on purpose: the guess still decides WHERE a new class page
+is written (`class-planning.json → classFolder.naming`, shared with the mac and
+`build_site.py`), and what the wizard RECORDS as `class_folder`. Writing needs
+an answer for every course; protecting needs certainty, and a guess is not.
+Measured before the change (#431's own ask): of the 39 example payloads and 50
+skeleton families, NONE records a class folder and none has a first
+per-section folder other than "All Classes" (every skeleton lists exactly
+`["All Classes"]`), so no course made from them changes. The courses that do
+are ones with no `class_folder` key — made before the key existed, or
+hand-edited — whose per-section list's guess is not "All Classes": such a
+course can now remove that folder, as it always could on a Mac. Rejected:
+keeping the guess and asking the mac to adopt it (a first-folder guess would
+protect "Handouts" for no reason the teacher can see, and the mac never shipped
+it).
 
 ### Reopening the last working folder: a path, not a bookmark
 

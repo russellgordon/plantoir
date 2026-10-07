@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace Plantoir.Tests;
@@ -51,5 +52,30 @@ public class LauncherRulesContractTests
         // A runner that skipped everything would also say "0 failed".
         Assert.Matches(@"(\d{2,}) passed", output);
         Assert.Equal(0, process.ExitCode);
+    }
+
+    /// <summary>
+    /// #438 (the mac's #407): the two lines a deploy prints when it has to
+    /// rebuild a preview's site say what deploy.sh says, word for word — "before
+    /// it is deployed" and "Nothing was deployed", because publishing marks a
+    /// page for the website and this step is the deploy. Read from deploy.sh
+    /// rather than retyped. Only the ellipsis character may differ (deploy.ps1
+    /// prints ASCII only, so it says "..."). The other rebuild lines and every
+    /// "published" line in deploy.ps1 are #441, not this.
+    /// </summary>
+    [Theory]
+    [InlineData("Rebuilding it before it is deployed")]
+    [InlineData("Nothing was deployed, rather than deploying pages")]
+    public void TheRebuildLinesAreDeploySHsWordForWord(string anchor)
+    {
+        string Echoed(string file, string prefix) =>
+            File.ReadAllLines(Path.Combine(ContractLoader.RepositoryRoot, file))
+                .Select(line => line.Trim())
+                .Where(line => line.StartsWith(prefix, StringComparison.Ordinal) && line.Contains(anchor, StringComparison.Ordinal))
+                .Select(line => line[(line.IndexOf('"') + 1)..line.LastIndexOf('"')].Trim().Replace("…", "..."))
+                .Single();
+        string shLine = Echoed("deploy.sh", "echo ");
+        string psLine = Echoed("deploy.ps1", "Write-Host ");
+        Assert.Equal(shLine, psLine);
     }
 }
