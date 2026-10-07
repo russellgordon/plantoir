@@ -1421,20 +1421,16 @@ enum ScheduledDeploy {
             runner.bootOut(label: agent.label)
         }
         // A run that was WORKING has just been ended, and the deploy its app
-        // started carries on by itself (#439): say so, since nothing else
-        // will — that run's app writes no line of its own now, sends no
-        // notification and does not mark the section deployed. Asked AFTER
-        // the boot-out, so only a script that outlived it counts; a run that
-        // was still waiting for the course had started none.
-        if anEarlierDeployIsWorking(script: ScheduledDeploy.scriptURL(label: label).path) {
-            ActivityTrail.note(
-                .scheduledDeploySetAgainWhileItsDeployWorked,
-                "set this section's deploy again while its earlier deploy was still working — "
-                + "that deploy will finish on its own",
-                course: course.code,
-                section: sectionNumber
-            )
-        }
+        // started carries on by itself (#439): said on the trail once the new
+        // job is ACCEPTED (below), since nothing else will — that run's app
+        // writes no line of its own now, sends no notification and does not
+        // mark the section deployed. Asked HERE, right after the boot-out, so
+        // only a script that outlived it counts (a run that was still waiting
+        // for the course had started none), and before the new job exists,
+        // so the new run can never be mistaken for it.
+        let anEarlierDeployWasLeftWorking: Bool = anEarlierDeployIsWorking(
+            script: ScheduledDeploy.scriptURL(label: label).path
+        )
 
         do {
             // The script the app will run, written beside nothing else and
@@ -1531,6 +1527,18 @@ enum ScheduledDeploy {
         for agent in existing where agent.label != label {
             try? FileManager.default.removeItem(at: agent.plistURL)
             try? FileManager.default.removeItem(at: ScheduledDeploy.scriptURL(label: agent.label))
+        }
+        // Written only now the new job is in, so a re-set macOS refused
+        // ("could not set a scheduled deploy…") never also says it was set
+        // again (#439 review, finding 11).
+        if anEarlierDeployWasLeftWorking {
+            ActivityTrail.note(
+                .scheduledDeploySetAgainWhileItsDeployWorked,
+                "set this section's deploy again while its earlier deploy was still working — "
+                + "that deploy will finish on its own",
+                course: course.code,
+                section: sectionNumber
+            )
         }
         if let replacing {
             // "It went on Saturday; I set it for Friday" is otherwise a report
