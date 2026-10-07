@@ -121,6 +121,21 @@ nonisolated enum AssistWording {
             + "Say “\(sayMorning)” or “\(sayEvening)”."
     }
 
+    /// The answer to "schedule a deploy" with no time the app can set, and
+    /// to a deploy-now answer from the model for a sentence that named a
+    /// later time (#449, from Windows' #424). Asked in code; nothing is
+    /// scheduled, nothing runs, and the question is never sent to the model.
+    ///
+    /// **Windows' sentence byte for byte**, curly quotes and apostrophe
+    /// included: it was written there first and Windows' wording comparison
+    /// reads this generated key. The example it names, "deploy tomorrow at
+    /// 6:30 am", is one the deploy-at-a-time family accepts, so typing it
+    /// puts the scheduled deploy's card up on the very next turn —
+    /// `ScheduleAndCancelFramesTests` pins that.
+    static let scheduleADeployNeedsATime: String =
+        "What time should this section deploy? Say it with the time, for example “deploy tomorrow at "
+        + "6:30 am”, and I’ll set it up for you to agree to."
+
     /// The answer to a deploy time written a way the app can read but does
     /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
     /// Answered in code; nothing is scheduled and nothing is sent to the
