@@ -6346,8 +6346,10 @@ an application was NOT measured — the dress rehearsal (`RELEASING.md`, V3) che
    700 processes; a copy started by launchd is found and classified the same as
    one from a shell (plan and review). The scan also names the folder an
    assistant working from another app has open, so step 2 can read its leases.
-   An assistant that holds no lease is not under way — it can stay connected
-   for days.
+   An assistant that holds no build or publish lease is not under way — it can
+   stay connected for days. (Since #458 a Claude session's server always holds
+   an `assist` lease on its door's course; `UpdateGate.leaseKindsThatHold` is
+   build and publish only, so that lease never holds an update.)
 
 **The scheduled job's own file is NOT a signal**, and this is why the leases
 and the scan are needed at all: the run's wrapper deletes its plist in its
