@@ -16,6 +16,7 @@ import Foundation
 /// | `build` | any preview of the course is being built, or any section of it is publishing |
 /// | `publish` | any section of the course is publishing |
 /// | `preview` | any section of the course has a preview up |
+/// | `assist` | `Plantoir --mcp-stdio` only: the course the Claude door named, for the whole conversation (#458) |
 ///
 /// One file per folder, course and kind: two sections of one course
 /// previewing keep ONE `preview` lease, ending one keeps it, ending both
@@ -90,6 +91,11 @@ enum WorkLeaseRegistry {
     /// Removed at exit by `forgetRecordedBackups()`, BEFORE the leases go.
     private(set) static var recordedBackups: [URL] = []
 
+    /// For tests only: when not nil, the name of every lease and record this
+    /// process removes is appended, in order — the one way to see that a
+    /// leaving server forgets its records BEFORE its leases go (#458).
+    static var removalsSeenByTests: [String]?
+
     /// The trail line for a preview the window declined because this copy of
     /// the app is deploying that same section (#381) — the contract's
     /// `activityTrail.mustRecord` → "build declined, course busy elsewhere" →
@@ -149,6 +155,7 @@ enum WorkLeaseRegistry {
     static func releaseEverything() {
         for (_, lease) in written {
             WorkLeaseFiles.remove(at: lease.url)
+            removalsSeenByTests?.append(lease.url.lastPathComponent)
         }
         written = [:]
         heldForTheConversation = nil
@@ -209,6 +216,7 @@ enum WorkLeaseRegistry {
     static func forgetRecordedBackups() {
         for record in recordedBackups {
             try? FileManager.default.removeItem(at: record)
+            removalsSeenByTests?.append(record.lastPathComponent)
         }
         recordedBackups = []
     }
