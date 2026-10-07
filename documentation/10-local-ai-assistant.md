@@ -6246,7 +6246,7 @@ All three fixes are CODE; no description moved.
 - **"[please] cancel the|that|my scheduled deploy [please]"** reaches
   `cancel_scheduled_deploy` (the safe direction).
 - Rows: `assist-cases.json` → `scheduleAndCancel` (AUTHORED from Windows),
-  run by `ScheduleAndCancelFramesTests`; the mac is asked to implement them.
+  run by `ScheduleAndCancelFramesTests` on both apps since #449 (below).
 - **The settler** is llama-server's own `t_max_predict_ms` = 30000, on the
   SMALLER tier only (`LocalModel.WritingTimeLimitMs`): a reply still being
   written 30 s after its first token ends as "length" and takes the #196
@@ -6278,7 +6278,48 @@ All three fixes are CODE; no description moved.
   alone (a deploy today is plausibly now), and turning the call into a
   `schedule_deploy` card (it would have to guess the moment). Pinned by the
   authored scenario "a deploy-now answer to a request that named a later time
-  is asked about, never offered"; the mac must make it pass.
+  is asked about, never offered"; the mac makes it pass since #449 (below).
+- **On the mac (#449, 2026-10-07).** The same frames, ported function for
+  function into `AssistCardCommand.swift`: `scheduleAsDeploy`,
+  `asksWhenToSchedule` and `cancelTheScheduledDeploy`, with `matching`,
+  `morningOrEvening` and `timeToSayAs` reading the rewrite exactly as Windows'
+  do; the ask sits between the morning-or-evening and say-it-as questions in
+  `AssistAgent.say`, as on Windows. `AssistWording.scheduleADeployNeedsATime`
+  is Windows' sentence byte for byte, generated into `assist-wording.json`, and
+  the S1 scenario names it rather than quoting it. Things a reader should know:
+  - **Both apps refuse a trailing "?" BEFORE the rewrite**, because both
+    apps' deploy frame drops a "?" itself (Windows' `DeployFrame`, the mac's
+    `deployFrame`): rewritten first, "schedule a deploy at 6:30 am?" would be
+    accepted. Not a mac trap; the mac test checks every refused row against
+    all four readers so neither app can lose it quietly.
+  - **The prompt shelf's cancel card is answered in code now.** Both shelves
+    say "Cancel scheduled deploy", with no "the|that|my", so the card was still
+    going to the model (the accepted row's `why` called "Cancel that scheduled
+    deploy" the shelf's sentence; it never was). The mac added an ACCEPTED row
+    for the bare sentence and accepts it; Windows owes the same one-word
+    widening. The shelves were not reworded.
+  - **Not in `cardPhrasings.parsed`, on purpose.** That generated catalogue
+    lists card families with an example and a `notThis`; these two are frames
+    over sentences whose specification is the authored `scheduleAndCancel` key,
+    so listing them twice would be a second copy to keep in step.
+  - **Settler S1 is decided BEFORE the turn is recorded** on the mac. The mac
+    writes the model's chose-a-tool line (`recordTurn`) before its gates, and
+    that line says "waited for the button" for any readable approval tool; S1
+    is decided first so that line says no such thing on a turn that puts no
+    button up, and S1's own line (Windows' words,
+    `AssistAgent.choseADeployNowForALaterTimeLine`) follows it. Windows writes
+    S1's line INSTEAD of its chose-a-tool line; the difference is in how the two
+    apps already wrote that line, not in what they record.
+  - **Settler S2 was NOT already true on the mac**, as the case expected. The
+    mac's local `add_next_class` declares no `unit`, but nothing strips an
+    undeclared key from a model call and `nextClassPlan` reads `unit` from any
+    call, so a model-sent unit "next" started Unit 2 here too (measured: with
+    the settler off the scenario's plan says "Unit 2"). The mac drops it in
+    `AssistAgent.think()`, for the model's calls only (the "Start a new unit…"
+    card keeps its unit "next"), unless the teacher's sentence says unit|units:
+    `AssistAgent.withoutAnUnaskedNewUnit`. REJECTED: stripping every undeclared
+    key from model calls — principled, but it changes other tools beyond this
+    piece and would need its own cases.
 - **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
   it in the morning after all.") is still declined by the model — the safe
   direction, since nothing is claimed — and the 30 s limit works only for a
@@ -6378,7 +6419,17 @@ the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
 and the mac is asked what it does). The Codex door names none and holds none,
-as before.
+as before. **The mac's answer (#449, 2026-10-07): its `--mcp-stdio` server
+holds NOTHING for the door's course, and never did.** Both mac doors write a
+folder-only argv and no `env` (`ClaudeCodeLauncher.swift`, `CodexLauncher.swift`);
+`AssistMCPServer.serve` takes no lease; the mac writes build, preview and
+publish leases only (`WorkLeaseFiles`); a held backup is in-process only
+(`AssistActivity.heldBackups`, read by `WorkspaceModel.heldBackupPaths`), so an
+MCP session's conversation backup is not held; and `AssistActivity` guards the
+built-in assistant only. So the mac has all three gaps Windows closed, and has
+had them since the doors existed — 1.4.3 lost it nothing. Whether to match is
+[#458](https://github.com/russellgordon/plantoir/issues/458), a `decision` for
+Russell, not part of #449.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -7069,8 +7120,8 @@ family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
 3", and three `nearMisses` that a runner walks both without a course and in a
 club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
-on it is matched in code except "Cancel scheduled deploy", which was already
-measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
+on it is matched in code — "Cancel scheduled deploy" too since #449, which
+until then went to the model, where it had been measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
 it — a title-bearing publish or hide goes to the model, and no routing
 measurement has been made in a club course.
 

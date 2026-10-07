@@ -89,6 +89,24 @@ final class ScheduleAndCancelFramesTests: XCTestCase {
         }
     }
 
+    /// The three things that fall through AFTER the opening, which no
+    /// contract row exercises on its own: a negation later in the sentence,
+    /// and a course code this Mac has never heard of (recognised by its
+    /// shape, so it is not answered as if it were this window's course).
+    func testANegationOrAnUnknownCodeAfterTheOpeningGoesToTheModel() {
+        let toTheModel: [String] = [
+            "schedule a deploy, but not tomorrow",
+            "schedule a deploy tomorrow, no",
+            "schedule a deploy and don’t send it yet",
+            "schedule a deploy for zzz9q tomorrow",
+            "schedule the deploy for both courses",
+        ]
+        for sentence in toTheModel {
+            XCTAssertNil(AssistCardCommand.matching(sentence), sentence)
+            XCTAssertFalse(AssistCardCommand.asksWhenToSchedule(sentence), sentence)
+        }
+    }
+
     /// The example the question names is a sentence the family accepts, so a
     /// teacher who types it gets the scheduled deploy's card on the next turn.
     func testTheExampleTheQuestionNamesIsAccepted() throws {
