@@ -2630,8 +2630,9 @@ not a detail to leave in the code.
 ## Dates are written in the Gregorian calendar, by one helper (#144)
 
 Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
-from a cloud session on Linux (see "Working from a cloud session" in
-`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+from a cloud session on Linux (see `windows-app/PROGRESS.md` → "Work done
+from a cloud (Linux) session — 2026-09-27" for what such a session can and
+cannot build).
 The mac needs nothing from this and owes nothing back; it is written up here
 because the REASON is what a future reader of the C# needs, and the reason
 cannot be read off the code.
