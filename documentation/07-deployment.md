@@ -2927,8 +2927,11 @@ and no notification is sent. Its script still writes the outcome record. So
 when the label's script outlived its boot-out — the one line that says a
 deploy went on after the re-set. It is ASKED right after the boot-out (so the
 new run can never be mistaken for the leftover) and WRITTEN only once macOS has
-accepted the new job, so a re-set that fails says only "could not set a
-scheduled deploy" (#439 review, finding 11). A leftover run that hangs refuses
+accepted the new job, so a re-set that fails never says it was set again
+(#439 review, finding 11). The failed re-set has still ended the working run's
+app, so it says instead, under "scheduled deploy could not be set", that the
+earlier deploy was still working and will finish on its own — in both failure
+branches (the write, and macOS refusing the job). A leftover run that hangs refuses
 that section until it ends, and nothing in the app ends it (cancelling or
 setting again boots out a job that is already gone); logging out or restarting
 the Mac does.
@@ -2936,16 +2939,17 @@ the Mac does.
 **Three more limits, recorded rather than built** (the #439 implementation
 review; all in `deployWhileItsSectionDeploys.knownLimits`):
 
-- **Turning the deploy off, or renaming the course, while its run works makes
-  the same leftover**, and the deploy still goes out. `cancelScheduledDeploy`
-  boots the label out blind (a working run's plist is already gone), which
-  ends the app exactly as a re-set does. The guard keeps it from overlapping
-  anything, but no trail line says a deploy the teacher turned off still went
-  out: the re-set line is written by `scheduleDeploy` only. Not built because
-  it is not one line: every caller of `cancelScheduledDeploy` (the sidebar,
-  three assistant paths, `CourseRenamer`) would need its own event and wording,
-  and actually STOPPING the script needs the process-group kill that #409
-  rejected.
+- **One narrow race turns a deploy off yet lets it go out**: the sidebar's
+  Cancel Deploy dialog opened before the deploy's time and confirmed after its
+  run has started. The run has removed its own plist, so
+  `cancelScheduledDeploy` boots the label out blind, which ends the app
+  exactly as a re-set does, and the deploy its script started still goes out
+  — the guard keeps it from overlapping anything, but no trail line says so.
+  Every other cancel (a rename through `CourseRenamer`, the assistants'
+  cancels, the cleanup) acts only on a plist found on disk, so it never
+  reaches a working run; the implementation review's claim that renames and
+  the assistants did was checked and was wrong. Recorded rather than built:
+  it needs the dialog's moment to pass while it is open.
 - **`newerRecordWins` holds only for a leftover whose script carries the
   look** — one written by 1.4.4 or later. The look lives in the leftover's own
   script, written at the PREVIOUS set, so a deploy set under 1.4.3 and set
