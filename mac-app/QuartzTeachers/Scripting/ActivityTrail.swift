@@ -77,6 +77,12 @@ nonisolated enum ActivityTrail {
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
         case assistantOpened = "assistant opened"
+        /// A Claude or Codex session opened from Plantoir's door is holding the course
+        /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
+        /// it takes its `assist` lease. Carries the course only. It answers
+        /// "why is Rename greyed?" — `assistant opened` says a door was
+        /// opened, never which course its server went on to hold.
+        case outsideSessionHeldACourse = "outside session held a course"
         case assistantReady = "assistant ready"
         case assistantWouldNotStart = "assistant would not start"
         case assistantEngineSaid = "assistant engine said"
@@ -860,6 +866,25 @@ nonisolated enum ActivityTrail {
         /// minutes late, or not at all, looks from outside exactly like one
         /// that misfired.
         case scheduledPublishWaitedForTheCourse = "scheduled publish waited for the course"
+        /// A newly set deploy found a run of the SAME section still working
+        /// (GitHub #439): setting the section again had ended that run's app,
+        /// and its script carried on as a leftover. The new run waits for it —
+        /// every fifteen seconds, up to thirty minutes — before it starts its
+        /// own, because two deploys of one section at once is the fault the
+        /// launchers' guard refuses. Carries the course, the section, how long
+        /// it waited, and whether it then went ahead or stood down (the
+        /// stand-down also leaves the section's `earlierDeployStillWorking`
+        /// record). Recorded because a deploy that went out half an hour late,
+        /// or not at all, looks from outside exactly like one that misfired.
+        case scheduledDeployWaitedForItsEarlierDeploy = "scheduled deploy waited for its earlier deploy"
+        /// A section's deploy set for later was set again while that
+        /// section's run was still working (GitHub #439, #409). Setting it
+        /// again ends the run's app, but the deploy it had started goes on and
+        /// finishes on its own — without the app's after-work: the section is
+        /// not marked deployed, the run writes no trail line of its own and
+        /// sends no notification. This line is the only place that says the
+        /// earlier deploy is still going. Carries the course and section.
+        case scheduledDeploySetAgainWhileItsDeployWorked = "scheduled deploy set again while its deploy worked"
         /// A launcher had to remake a working folder's workspace and found
         /// something running in it (GitHub #94). Carries where the run was
         /// for — course and section, or the word "setup" — and which of

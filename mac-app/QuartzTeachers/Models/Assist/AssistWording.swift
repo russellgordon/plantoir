@@ -136,6 +136,48 @@ nonisolated enum AssistWording {
         "What time should this section deploy? Say it with the time, for example “deploy tomorrow at "
         + "6:30 am”, and I’ll set it up for you to agree to."
 
+    /// Settler S3's answer (#440): the model chose a plain add_next_class for
+    /// a sentence asking for a new unit, a unit or day other than the next
+    /// one, or several pages. Nothing is added, and the teacher is given the
+    /// sentences that DO it.
+    ///
+    /// **Every sentence it quotes is one the window accepts, in that very
+    /// course** (ruling 1 of the #440 review, pinned by `NextClassUnitsTests`
+    /// for a Unit, a Module and a numbered course): "Start a new unit" and
+    /// "Add five more days to Unit 2" are answered in code, term-blind, and
+    /// plan the course's own word ("Module 2, Day 7"). The days sentence
+    /// names `latestUnit` — the unit the plain next page goes in — rather
+    /// than a fixed example: typed back, "Add five more days to Unit 4" in a
+    /// course whose latest unit is 2 would start Unit 4 at Day 1 and skip
+    /// Unit 3 (review N-impl F4). A numbered course has
+    /// no units, so it is told the one thing it can do — "Add the next
+    /// meeting page" — once per page. Quoting the course's own word ("Start a
+    /// new module") was REJECTED: the frames read only "unit", so that
+    /// sentence would go to the model and be stopped here again, round and
+    /// round (review finding F2).
+    static func nextClassNeedsItsOwnPhrasing(
+        unitWord: String,
+        isNumbered: Bool,
+        noun: ClassNoun,
+        latestUnit: Int
+    ) -> String {
+        if isNumbered {
+            return "Nothing was added. This course numbers its pages one after another and has no units, "
+                + "so I add one \(noun.singular) at a time: say “Add the next \(noun.singular) page” once for "
+                + "each one you want."
+        }
+        let word: String = unitWord.lowercased()
+        let opening: String = "Nothing was added. I add one \(noun.singular) at a time, after the last one in "
+            + "your latest \(word)."
+        if word == "unit" {
+            return opening + " To start a new unit, say “Start a new unit”. To add several days to Unit "
+                + "\(latestUnit), say “Add five more days to Unit \(latestUnit)”."
+        }
+        return opening + " To start a new \(word), say “Start a new unit”. To add several days to "
+            + "\(unitWord) \(latestUnit), say “Add five more days to Unit \(latestUnit)”, since I read the "
+            + "word unit as \(unitWord) here."
+    }
+
     /// The answer to a deploy time written a way the app can read but does
     /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
     /// Answered in code; nothing is scheduled and nothing is sent to the
@@ -202,6 +244,26 @@ nonisolated enum AssistWording {
 
     static func deployDidNotFinish(course: String, section: String) -> String {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
+    }
+
+    /// A deploy from the in-app assistant or an outside assistant's
+    /// `deploy_section` was refused by the launchers because the section was
+    /// still being deployed by a deploy that was set for later — its run
+    /// still working, including one ended by setting the section again
+    /// (GitHub #439). Said instead of "did not finish", which would send the
+    /// teacher looking for a fault. Names what is deploying, because after a
+    /// re-set the app shows only the new time. `shared-rules.json` →
+    /// `deployWhileItsSectionDeploys.sentences.assistant`.
+    static func deployRefusedWhileALaterDeployWorks(course: String, section: String) -> String {
+        return "\(course) Section \(section) is still being deployed by a deploy that was set for later, "
+             + "so it was not deployed again. Try again once that deploy has finished."
+    }
+
+    /// The same refusal when what was in the way is another deploy of the
+    /// section — one typed in Terminal, say (GitHub #439).
+    static func deployRefusedWhileItsSectionDeploys(course: String, section: String) -> String {
+        return "\(course) Section \(section) is already being deployed, so it was not deployed again. "
+             + "Try again once that deploy has finished."
     }
 
     /// A deploy from a caller with no window (an assistant in another app,
@@ -1775,4 +1837,59 @@ nonisolated enum AssistWording {
 
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."
+
+    // MARK: - A Claude or Codex session holding its course (#458)
+
+    /// Under the greyed items while a Claude or Codex session opened from
+    /// Plantoir is open on this course: the three Revise items, Rename Course
+    /// and Add Section…. Menu-length, in the shape of
+    /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
+    /// with "or Codex" added, so one sentence greys the same items on both
+    /// platforms once Windows' Codex door holds its course too.
+    ///
+    /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
+    /// BOTH doors name their course to the server, which holds it. The
+    /// server cannot tell which door started it, so one sentence names both;
+    /// Windows said "with Claude" while only its Claude door held a course.
+    static let availableOnceYouFinishRevisingWithClaude: String =
+        "Available once you finish revising with Claude or Codex"
+
+    /// The title of the alert a Revise item gives when it is clicked while a
+    /// Claude or Codex session is open on the course — the click-time
+    /// re-check behind the greyed menu, since a session can start between the
+    /// menu opening and the click. Windows' title for its own second-session refusal.
+    static func courseIsAlreadyBeingRevised(course: String) -> String {
+        return "\(course) is already being revised"
+    }
+
+    /// The message under `courseIsAlreadyBeingRevised`.
+    static let finishTheClaudeSessionFirst: String =
+        "A Claude or Codex session is working on this course already. Finish that session, then start again here."
+
+    /// What Rename Course, Restore and Add Section say when they are asked
+    /// for while a Claude or Codex session is open on the course — the
+    /// click-time check behind the greyed menu item. `then` is the act, in a teacher's
+    /// words: "rename", "restore", "add the section".
+    static func claudeIsRevisingTheCourse(course: String, then act: String) -> String {
+        return "A Claude or Codex session is working on \(course) right now. Finish that session, then \(act)."
+    }
+
+    /// The delete-several confirmation's sentence for backups a Claude or
+    /// Codex session still open on a course made — and which are therefore kept.
+    /// `count` is how many of the chosen backups that session holds.
+    static func backupsKeptForAClaudeSession(course: String, count: Int) -> String {
+        if count == 1 {
+            return "One of these is kept: a Claude or Codex session still open on \(course) made it."
+        }
+        return "\(count) of these are kept: a Claude or Codex session still open on \(course) made them."
+    }
+
+    /// What a delete that kept a Claude or Codex session's backup tells the teacher
+    /// afterwards, and what the single "Delete Backup…" says at once.
+    static func finishTheClaudeSessionToDeleteItsBackup(course: String, count: Int) -> String {
+        if count == 1 {
+            return "Finish the Claude or Codex session working on \(course) first. It made this backup, so it was kept."
+        }
+        return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
+    }
 }

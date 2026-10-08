@@ -271,36 +271,35 @@ final class ScheduleAndCancelFramesTests: XCTestCase {
         }
     }
 
-    // MARK: - Settler S2: a model-sent unit "next"
+    // MARK: - Settler S2, as widened by #440: unit and days from the model
 
-    /// The model's unit "next" is dropped unless the teacher said "unit";
-    /// everything else in the call is kept.
-    func testAModelSentNextUnitIsDroppedUnlessTheTeacherSaidUnit() {
+    /// The model's `unit` and `days` are dropped from add_next_class whatever
+    /// the sentence said (#440, ruling 2 — S2 kept "next" whenever the
+    /// teacher said "unit"); everything else in the call is kept.
+    func testAModelSentUnitAndDaysAreAlwaysDropped() {
         let call: AssistToolCall = AssistToolCall(
             id: "1", type: "function",
             function: AssistToolCall.Function(
                 name: "add_next_class", arguments: #"{"course":"ICS3U","section":1,"unit":"Next","days":0}"#
             )
         )
-        let settled: [String: Any] = AssistAgent.withoutAnUnaskedNewUnit(call, typed: "Add the next class")
-            .argumentValues
+        let settled: [String: Any] = AssistAgent.withoutCardOnlyArguments(call).argumentValues
         XCTAssertNil(settled["unit"])
-        XCTAssertEqual(settled["days"] as? Int, 0)
+        XCTAssertNil(settled["days"])
         XCTAssertEqual(settled["course"] as? String, "ICS3U")
-
-        let asked: [String: Any] = AssistAgent.withoutAnUnaskedNewUnit(call, typed: "Start the next Unit")
-            .argumentValues
-        XCTAssertEqual(asked["unit"] as? String, "Next")
+        XCTAssertEqual(settled["section"] as? Int, 1)
 
         let numbered: AssistToolCall = AssistToolCall(
             id: "2", type: "function",
-            function: AssistToolCall.Function(name: "add_next_class", arguments: #"{"unit":"3"}"#)
+            function: AssistToolCall.Function(name: "add_next_class", arguments: #"{"unit":"3","days":2}"#)
         )
-        XCTAssertEqual(
-            AssistAgent.withoutAnUnaskedNewUnit(numbered, typed: "Add the next class").argumentValues["unit"]
-                as? String,
-            "3"
+        XCTAssertTrue(AssistAgent.withoutCardOnlyArguments(numbered).argumentValues.isEmpty)
+
+        let plain: AssistToolCall = AssistToolCall(
+            id: "3", type: "function",
+            function: AssistToolCall.Function(name: "add_next_class", arguments: #"{"course":"ICS3U"}"#)
         )
+        XCTAssertEqual(AssistAgent.withoutCardOnlyArguments(plain), plain, "nothing to take out: the call as sent")
     }
 
     // MARK: - Helpers

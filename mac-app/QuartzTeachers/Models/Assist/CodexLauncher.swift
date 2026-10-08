@@ -156,7 +156,16 @@ nonisolated enum CodexLauncher {
     /// The `-c` overrides that describe Plantoir's MCP server to Codex for
     /// this one invocation, before shell escaping.
     ///
-    /// Four separate dotted overrides rather than one inline table
+    /// The fifth names the course this door was opened from in the server's
+    /// environment (`AssistMCPServer.doorCourseVariable`), exactly as the
+    /// Claude door's `env` does (#458, Russell 2026-10-07: both doors). The
+    /// server HOLDS that course with an `assist` lease and never narrows to
+    /// it, so the session's backup is kept, a second session is refused, and
+    /// Rename Course, Add Section and restore wait while it is open. Codex
+    /// 0.155.1 reads `mcp_servers.<name>.env.<VAR>` from the command line
+    /// (measured with `codex mcp get --json`).
+    ///
+    /// Five separate dotted overrides rather than one inline table
     /// (`mcp_servers.plantoir={command=…,args=[…]}`): dotted keys merge into a
     /// teacher's configuration one key at a time and are the form the published
     /// documentation shows, so a reader can check them against it. The inline
@@ -166,7 +175,7 @@ nonisolated enum CodexLauncher {
     /// Nothing is persisted by any of this: the overrides live for the length
     /// of the session, and `~/.codex/config.toml` is neither read from nor
     /// written to by Plantoir.
-    static func configurationOverrides(workspacePath: String, serverPath: String) -> [String] {
+    static func configurationOverrides(workspacePath: String, serverPath: String, courseCode: String) -> [String] {
         var overrides: [String] = []
         overrides.append("mcp_servers.plantoir.command=\"\(escapeForTOMLString(serverPath))\"")
         overrides.append(
@@ -174,6 +183,9 @@ nonisolated enum CodexLauncher {
         )
         overrides.append("mcp_servers.plantoir.startup_timeout_sec=\(startupTimeoutSeconds)")
         overrides.append("mcp_servers.plantoir.tool_timeout_sec=\(toolTimeoutSeconds)")
+        overrides.append(
+            "mcp_servers.plantoir.env.\(AssistMCPServer.doorCourseVariable)=\"\(escapeForTOMLString(courseCode))\""
+        )
         return overrides
     }
 
@@ -195,7 +207,11 @@ nonisolated enum CodexLauncher {
         let appSupportDirectory: URL = try ClaudeCodeLauncher.supportDirectory()
 
         var commandLine: String = ClaudeCodeLauncher.escapeForShell(codexPath)
-        for override in configurationOverrides(workspacePath: workspacePath, serverPath: serverPath) {
+        for override in configurationOverrides(
+            workspacePath: workspacePath,
+            serverPath: serverPath,
+            courseCode: courseCode
+        ) {
             commandLine.append(" -c ")
             commandLine.append(ClaudeCodeLauncher.escapeForShell(override))
         }

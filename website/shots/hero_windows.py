@@ -48,16 +48,16 @@ from composite import diagonal_hero, FIGURE_WIDTH  # noqa: E402
 from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
 
 WORKSPACE = Path.home() / "Teaching"
-VAULT = WORKSPACE / "courses" / "ENG2D"
+# Read from the one table both capture scripts share (folders.json, #445).
+from capture_windows import DEMO_COURSES  # noqa: E402
+
+VAULT = WORKSPACE / "courses" / DEMO_COURSES[0]["code"]
 # The card shows SECTION 1, because everything else in the picture does:
 # Plantoir is deploying ENG2D-S1 and Edge is on the section 1 site.
 SECTION = 1
 # Which class note, though, is not ours to decide -- see most_recent_class().
 FALLBACK_CLASS = "Unit 4, Day 22"
-# Read from the one table both capture scripts share, so a renamed demo
-# site never leaves this harness photographing a dead address.
-from capture_windows import DEMO_COURSES  # noqa: E402
-
+# A renamed demo site never leaves this harness photographing a dead address.
 SITE_URL = f"https://{DEMO_COURSES[0]['site']}.netlify.app/"
 
 OBSIDIAN_EXE = Path(r"C:\Program Files\Obsidian\Obsidian.exe")

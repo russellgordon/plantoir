@@ -28,10 +28,14 @@ final class CodexLauncherTests: XCTestCase {
 
     // MARK: - What the door hands to Codex
 
-    func testTheOverridesNameTheServerAndTheFolder() {
+    /// The fifth override names the course to the server's environment, for
+    /// it to HOLD (#458, Russell 2026-10-07: both doors) — the Claude door's
+    /// `env` in Codex's form. MUST FAIL if the override is dropped.
+    func testTheOverridesNameTheServerTheFolderAndTheCourse() {
         let overrides: [String] = CodexLauncher.configurationOverrides(
             workspacePath: plainFolder,
-            serverPath: plainServer
+            serverPath: plainServer,
+            courseCode: "ICS3U"
         )
         XCTAssertEqual(
             overrides,
@@ -40,6 +44,7 @@ final class CodexLauncherTests: XCTestCase {
                 "mcp_servers.plantoir.args=[\"--mcp-stdio\",\"/Users/teacher/Teaching\"]",
                 "mcp_servers.plantoir.startup_timeout_sec=60",
                 "mcp_servers.plantoir.tool_timeout_sec=1800",
+                "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"ICS3U\"",
             ]
         )
     }
@@ -51,7 +56,8 @@ final class CodexLauncherTests: XCTestCase {
     func testBothTimeoutsArePassed() {
         let overrides: [String] = CodexLauncher.configurationOverrides(
             workspacePath: plainFolder,
-            serverPath: plainServer
+            serverPath: plainServer,
+            courseCode: "ICS3U"
         )
         var sawStartup: Bool = false
         var sawTool: Bool = false
@@ -295,7 +301,9 @@ final class CodexLauncherTests: XCTestCase {
 
         let scriptPath: String = try CodexLauncher.writeLauncherScript(
             workspacePath: awkwardFolder,
-            courseCode: "ICS3U_ROUNDTRIP_TEST",
+            // A code that CAN occur and is awkward for a shell: a space, and
+            // dashes at both ends (`course-management.json` → `courseCode`).
+            courseCode: "-AP CALC-",
             codexPath: stubPath.path,
             serverPath: "/Applications/Plan \"toir\".app/Contents/MacOS/Plantoir",
             prompt: ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science")
@@ -321,13 +329,18 @@ final class CodexLauncherTests: XCTestCase {
             arrived.removeLast()
         }
 
-        XCTAssertEqual(arrived.count, 9, "Nine arguments: four -c pairs and the greeting.\n\(arrived)")
+        XCTAssertEqual(arrived.count, 11, "Eleven arguments: five -c pairs and the greeting.\n\(arrived)")
+        guard arrived.count == 11 else {
+            return
+        }
         XCTAssertEqual(arrived[0], "-c")
         XCTAssertEqual(arrived[1], "mcp_servers.plantoir.command=\"/Applications/Plan \\\"toir\\\".app/Contents/MacOS/Plantoir\"")
         XCTAssertEqual(arrived[2], "-c")
         XCTAssertEqual(arrived[4], "-c")
         XCTAssertEqual(arrived[6], "-c")
-        XCTAssertEqual(arrived[8], ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science"))
+        XCTAssertEqual(arrived[8], "-c")
+        XCTAssertEqual(arrived[9], "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"-AP CALC-\"")
+        XCTAssertEqual(arrived[10], ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science"))
 
         // And the value Codex would parse really is an ARRAY of two strings,
         // not the raw string its parser falls back to.
