@@ -75,14 +75,14 @@ public static class MachineWork
         if (snapshot.Leases.FirstOrDefault() is { Lease: not null } held)
             return $"Plantoir is {Verb(held.Lease.Kind)} {held.Lease.Course} (pid {held.Lease.Pid}).";
         if (snapshot.AssistantServers.Count > 0)
-            return $"An outside assistant's Plantoir server is running (pid {string.Join(", ", snapshot.AssistantServers)}); it may be publishing.";
+            return $"An outside assistant's Plantoir server is running (pid {string.Join(", ", snapshot.AssistantServers)}); it may be publishing or deploying.";
         return null;
     }
 
     private static string Verb(string kind) => kind switch
     {
         WorkLease.Building => "building",
-        WorkLease.Publishing => "publishing",
+        WorkLease.Publishing => "deploying",
         WorkLease.Previewing => "previewing",
         WorkLease.Assisting => "working with an assistant on",
         WorkLease.Copying => "copying",

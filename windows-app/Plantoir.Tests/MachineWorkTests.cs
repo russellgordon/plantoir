@@ -35,7 +35,7 @@ public class MachineWorkTests : IDisposable
         var snapshot = new MachineWork.Snapshot(
             new[] { (_folder, new WorkLease.Other("ICS3U", WorkLease.Publishing, 4242, null, Alive: true)) },
             Array.Empty<int>());
-        Assert.Equal("Plantoir is publishing ICS3U (pid 4242).", MachineWork.WhyBusy(snapshot));
+        Assert.Equal("Plantoir is deploying ICS3U (pid 4242).", MachineWork.WhyBusy(snapshot));
     }
 
     [Fact]

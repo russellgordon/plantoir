@@ -34,8 +34,8 @@ public static class LinksChecklistWording
     public const string PublishButton = @"Publish {count} {pages}";
     public const string PublishNothingTicked = @"Publish";
     public const string NotNow = @"Not Now";
-    public const string DeployUnderWay = @"{course} is being published just now. Try again when that has finished.";
-    public const string NeedsAPreviewFirst = @"Pages in {course} have changed since Section {section} was last previewed or published. Preview it again, and this list will be up to date.";
+    public const string DeployUnderWay = @"{course} is being deployed just now. Try again when that has finished.";
+    public const string NeedsAPreviewFirst = @"Pages in {course} have changed since Section {section} was last previewed or deployed. Preview it again, and this list will be up to date.";
     public const string NothingLeftToPublish = @"Those pages have all been published or removed since the website was made.";
     public const string PageChangedSince = @"{name} changed since it was checked, so it was left as it is.";
     public const string Published = @"{count} {pages} will be on the website the next time you deploy.";
