@@ -286,6 +286,23 @@ final class AssistAgent {
             return
         }
 
+        // "Schedule a deploy" with no time it can set (#449, from Windows'
+        // #424): never a deploy now, and never the model, which sent this
+        // shape of sentence to deploy_section 10 of 10 on Windows. Asked in
+        // code, transcript only, nothing set — the same shape as the
+        // morning-or-evening question above, and in the same place in the
+        // order as on Windows.
+        if AssistCardCommand.asksWhenToSchedule(trimmed) {
+            entries.append(Entry(speaker: .assistant, text: AssistWording.scheduleADeployNeedsATime))
+            ActivityTrail.note(
+                .assistantMatchedAFixedPhrase,
+                AssistAgent.askedWhenToScheduleLine,
+                course: courseCode,
+                section: sectionNumber
+            )
+            return
+        }
+
         // "Deploy at 6.30 pm", "deploy at 6:30 tonight" — a time the app can
         // read but does not set, answered with the one sentence to type
         // instead (issue #277). The same shape as the question above, for the
@@ -394,7 +411,14 @@ final class AssistAgent {
             // the model wrote is the evidence that it ran away, and a turn
             // thrown away is exactly the turn somebody reading a problem
             // report needs to see.
-            recordTurn(reply: answer, askedAt: askedAt)
+            // Settler S1 (#449, Windows' #424): a deploy-NOW answer to a
+            // sentence that named a later time. Decided HERE, before the turn
+            // is recorded, so the trail's chose-a-tool line never says it
+            // waited for the button on a turn that puts no button up.
+            let asksForATimeInstead: Bool = AssistAgent.isADeployNowForALaterTime(
+                reply, typed: sentenceThisTurnBeganWith
+            )
+            recordTurn(reply: answer, askedAt: askedAt, asksForATimeInstead: asksForATimeInstead)
 
             // ABOVE the tool-call branch, because a reply the engine stopped
             // part way is not an instruction and is not something to read out
@@ -496,11 +520,39 @@ final class AssistAgent {
                     sayTheRequestNamedAnotherCourse(other, tool: first.function.name)
                     return
                 }
+
+                // Settler S1 (#449, from Windows' #424, fix round 2). Measured
+                // on Windows (Intel UHD 620, the small assistant): "Deploy
+                // ICS3U section 1 at 6:30 tomorrow morning, before school
+                // starts." reached deploy_section 10 of 10 — a Deploy-NOW
+                // card for a teacher who asked for a later deploy. No card,
+                // nothing run, the turn wound back, and the time asked for
+                // with the sentence "schedule a deploy" with no time gets.
+                // NOT converted into a schedule_deploy card: that would guess
+                // the moment, which is what the deploy-at-a-time family
+                // exists to refuse.
+                if asksForATimeInstead {
+                    askWhatTimeToScheduleTheDeployFor()
+                    return
+                }
+
+                // Settler S2 (#449, from Windows' #411/#440): the small
+                // router may send unit "next" on add_next_class — 50 of 50 on
+                // Windows — and the mac's runner reads `unit` from ANY call,
+                // so it would start a NEW unit for a teacher who wanted the
+                // next day of the one they are in. Dropped unless the
+                // teacher's own sentence says "unit". The MODEL's calls only:
+                // the "Start a new unit…" card reaches `run(settledCall:)`
+                // without passing through here, and keeps its unit "next".
+                var call: AssistToolCall = first
+                if first.function.name == "add_next_class" {
+                    call = AssistAgent.withoutAnUnaskedNewUnit(first, typed: sentenceThisTurnBeganWith)
+                }
                 messages.append(reply)
                 // One tool at a time, on purpose: a model that batches has
                 // decided an order, and the order is exactly the reasoning
                 // we are trying not to leave with it.
-                await run(call: first)
+                await run(call: call)
                 return
             }
 
@@ -809,6 +861,105 @@ final class AssistAgent {
         }
     }
 
+    /// Settler S1's answer (#449): the turn wound back, nothing run, no card,
+    /// and the teacher asked what time to schedule the deploy for — in the
+    /// transcript only, so the model never sees the question.
+    private func askWhatTimeToScheduleTheDeployFor() {
+        windTheTurnBack()
+        ActivityTrail.note(
+            .assistantChoseATool,
+            AssistAgent.choseADeployNowForALaterTimeLine,
+            course: courseCode,
+            section: sectionNumber
+        )
+        entries.append(Entry(speaker: .assistant, text: AssistWording.scheduleADeployNeedsATime))
+        activity = .idle
+    }
+
+    /// Whether the model's reply is an immediate deploy for a sentence that
+    /// named a later time — settler S1 (#449).
+    nonisolated static func isADeployNowForALaterTime(_ reply: AssistMessage, typed: String) -> Bool {
+        guard let first = reply.toolCalls?.first else {
+            return false
+        }
+        guard first.function.name == "deploy_section" else {
+            return false
+        }
+        return AssistAgent.saysALaterTime(typed)
+    }
+
+    /// The later-time words of settler S1, matched as WHOLE words in the
+    /// teacher's own sentence: Windows' list exactly (`AssistAgent.LaterTimeWords`).
+    ///
+    /// Short and exact on purpose. "next" is not here ("deploy the next
+    /// section"), nor "soon" or "after" ("after all"), nor "today" alone
+    /// ("deploy today" is now, plausibly).
+    nonisolated static let laterTimeWords: Set<String> = [
+        "schedule", "scheduled", "later", "tonight", "tomorrow", "morning", "afternoon", "evening",
+        "noon", "midnight",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    ]
+
+    /// Whether the teacher's sentence names a later time: a word above, or
+    /// "at" followed by a clock ("at 6:30", "at 7 pm", "at 7").
+    ///
+    /// Words are runs of the letters a to z, so "tomorrow's" counts as
+    /// "tomorrow" — as Windows' `[a-z]+` reads it.
+    nonisolated static func saysALaterTime(_ typed: String) -> Bool {
+        let folded: String = typed.lowercased()
+        var word: String = ""
+        for character in folded {
+            if character >= "a" && character <= "z" {
+                word.append(character)
+                continue
+            }
+            if laterTimeWords.contains(word) {
+                return true
+            }
+            word = ""
+        }
+        if laterTimeWords.contains(word) {
+            return true
+        }
+        return AssistAgent.saysAtAClock(folded)
+    }
+
+    /// "at", then spaces, then one or two digits that a further digit does
+    /// not follow — Windows' `\bat\s+\d{1,2}` with the rest of its pattern
+    /// optional. ("at 6:30", "at 7 pm" and "at 7" all start that way, and
+    /// the optional minutes and meridiem cannot make a match fail.)
+    nonisolated static func saysAtAClock(_ folded: String) -> Bool {
+        let pattern: String = #"\bat\s+\d{1,2}(\s*(:|\.)\s*\d{2})?\s*(am|pm|a\.m\.?|p\.m\.?)?\b"#
+        return folded.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    /// Settler S2 (#449): the model's `unit: "next"` on add_next_class taken
+    /// out unless the teacher said "unit" or "units". Everything else in the
+    /// call is kept as sent — `days` included, which the mac's local
+    /// add_next_class does not read on this path anyway.
+    static func withoutAnUnaskedNewUnit(_ call: AssistToolCall, typed: String) -> AssistToolCall {
+        let saidUnit: Bool = typed.range(
+            of: #"\bunits?\b"#, options: [.regularExpression, .caseInsensitive]
+        ) != nil
+        if saidUnit {
+            return call
+        }
+        var arguments: [String: Any] = call.argumentValues
+        guard let unit = arguments["unit"] as? String, unit.lowercased() == "next" else {
+            return call
+        }
+        arguments["unit"] = nil
+        guard let data = try? JSONSerialization.data(withJSONObject: arguments),
+              let rewritten = String(data: data, encoding: .utf8) else {
+            return call
+        }
+        return AssistToolCall(
+            id: call.id,
+            type: call.type,
+            function: AssistToolCall.Function(name: call.function.name, arguments: rewritten)
+        )
+    }
+
     /// The course the model named, when the tool declares one and the code is
     /// not this window's.
     ///
@@ -972,7 +1123,7 @@ final class AssistAgent {
         )
     }
 
-    private func recordTurn(reply: AssistReply, askedAt: Date) {
+    private func recordTurn(reply: AssistReply, askedAt: Date, asksForATimeInstead: Bool) {
         var toolName: String?
         var argumentNames: [String] = []
         var stoppedAtGate: Bool = false
@@ -984,8 +1135,11 @@ final class AssistAgent {
             // reaches the card, and the trail used to say it had.
             let definition: AssistToolDefinition? = tools.definition(named: call.function.name)
             let needsApproval: Bool = definition?.needsApproval ?? false
+            // Nor when settler S1 will wind the turn back and ask for a time
+            // instead (#449): no card goes up on that turn either.
             stoppedAtGate = needsApproval
                 && !reply.wasCutOff
+                && !asksForATimeInstead
                 && AssistAgent.argumentsAreReadable(of: call, for: definition)
         }
         let record: AssistTurnRecord = AssistTurnRecord(
@@ -1176,6 +1330,25 @@ final class AssistAgent {
     static let askedToSayTheTimeAsLine: String =
         "matched in code, not sent to the model — asked for the time in a spelling it can set; "
         + "nothing was set"
+
+    /// The trail's line for "schedule a deploy" with no time it can set,
+    /// answered with `AssistWording.scheduleADeployNeedsATime` (#449).
+    /// Windows' words, so a trail read on either platform says the same
+    /// thing. No clock and nothing the teacher wrote, for the reason
+    /// `askedMorningOrEveningLine` gives.
+    static let askedWhenToScheduleLine: String =
+        "matched in code, not sent to the model — asked what time to schedule the deploy for; "
+        + "nothing was set"
+
+    /// The trail's line for settler S1 (#449): the model chose an immediate
+    /// deploy for a sentence that named a later time, and the app asked for
+    /// the time instead. Windows' words. It follows the turn's own
+    /// chose-a-tool line (which, for this turn, does NOT say it waited for
+    /// the button), so the trail says both what the model chose and what the
+    /// app did with it.
+    static let choseADeployNowForALaterTimeLine: String =
+        "chose to deploy now for a request that named a later time — no deploy card was shown, "
+        + "nothing ran, and the teacher was asked what time to schedule it for"
 
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.
