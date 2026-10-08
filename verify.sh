@@ -224,6 +224,33 @@ else
   cat /tmp/verify_site_health_test.log
 fi
 
+# Not toolchain tests, and deliberately not in scripts/: they live beside the
+# screenshot scripts so plantoir.app's marketing data never enters the recipe
+# or the image hash. They are here because nothing else runs them on the mac
+# (#445). Neither reads the kept folders: HOME is an empty temporary folder
+# for both, so test_marketing_folder.py's College Board extraction (which
+# looks in ~/Plantoir Marketing/.sources) skips rather than reading Russell's.
+# The default run of test_demo_folders.py checks the courses, colours, markers
+# and every scene's files at two clock years, and the REQUESTS that would set
+# each front page; the front pages themselves are set and checked only by the
+# opt-in run with PLANTOIR_DEMO_FOLDERS_APP (website/README.md).
+DEMO_HOME=$(mktemp -d)
+if env -u PLANTOIR_CED_PDF -u PLANTOIR_DEMO_FOLDERS_APP -u PLANTOIR_DEMO_FOLDERS_COMPARE HOME="$DEMO_HOME" \
+     python3 website/shots/test_demo_folders.py >/tmp/verify_demo_folders_test.log 2>&1; then
+  pass "plantoir.app's demo folders: every course, colour, site marker and scene's files can be made from the repository alone in 2026 and 2027, and each front page is asked of the app correctly (website/shots/test_demo_folders.py, #445; the front pages themselves only with PLANTOIR_DEMO_FOLDERS_APP)"
+else
+  fail "plantoir.app's demo folders: every course, colour, site marker and scene's files can be made from the repository alone in 2026 and 2027, and each front page is asked of the app correctly (website/shots/test_demo_folders.py, #445; the front pages themselves only with PLANTOIR_DEMO_FOLDERS_APP)"
+  cat /tmp/verify_demo_folders_test.log
+fi
+if env -u PLANTOIR_CED_PDF HOME="$DEMO_HOME" \
+     python3 website/shots/test_marketing_folder.py >/tmp/verify_marketing_folder_test.log 2>&1; then
+  pass "the marketing folder's file steps: idempotent, never over a changed file, the second semester in the week of 1 February (website/shots/test_marketing_folder.py)"
+else
+  fail "the marketing folder's file steps: idempotent, never over a changed file, the second semester in the week of 1 February (website/shots/test_marketing_folder.py)"
+  cat /tmp/verify_marketing_folder_test.log
+fi
+rm -rf "$DEMO_HOME"
+
 if (cd scripts && python3 test_getting_ready_turn.py) >/tmp/verify_getting_ready_turn_test.log 2>&1; then
   pass "Launchers: one at a time gets the website builder ready, and setup.sh --prepare-builder does only that (scripts/test_getting_ready_turn.py, bundle B)"
 else
@@ -369,6 +396,16 @@ else
   cat /tmp/verify_tool_digest_test.log
 fi
 
+# DEPLOY puts a site online; PUBLISH only marks a page (#443, v1.4.4). The
+# sentences that said publish for a deploy were moved; this keeps them moved,
+# in the mac app's Swift, the launchers and the shared Python. Reads files only.
+if (cd scripts && python3 test_deploy_words.py) >/tmp/verify_deploy_words_test.log 2>&1; then
+  pass "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
+else
+  fail "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
+  cat /tmp/verify_deploy_words_test.log
+fi
+
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it
@@ -396,6 +433,13 @@ if (cd scripts && python3 test_preview_while_deploying.py) >/tmp/verify_preview_
 else
   fail "preview.sh: a section being deployed cannot be previewed, whoever deploys it, and a build or an unreadable process table does not refuse (scripts/test_preview_while_deploying.py, #381)"
   cat /tmp/verify_preview_while_deploying_test.log
+fi
+
+if (cd scripts && python3 test_deploy_while_its_section_deploys.py) >/tmp/verify_deploy_while_its_section_deploys_test.log 2>&1; then
+  pass "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
+else
+  fail "deploy.sh and preview.sh --build-only: a section still being deployed (a deploy set for later, even one whose run was ended, or deploy.sh) is not deployed again (scripts/test_deploy_while_its_section_deploys.py, #439)"
+  cat /tmp/verify_deploy_while_its_section_deploys_test.log
 fi
 
 if (cd scripts && python3 test_colour_scheme_names.py) >/tmp/verify_colour_scheme_names_test.log 2>&1; then

@@ -581,10 +581,10 @@
     "whyNoBrowserOpens" : "The launchers used to run `open` (macOS) or `Start-Process` (Windows) on the token page the moment they asked, so a browser tab appeared unasked while the teacher was looking at the app. Reported as disconcerting: an application that takes over the screen reads as something going wrong, not as help. The address is now offered as a link in the dialog and printed in the launcher's own output, and the teacher decides when to follow it. Neither app may open a page on the teacher's behalf here."
   },
   "credentialRequests" : {
-    "note" : "What a teacher reads when a first publish stops to ask for a Netlify or Cloudflare credential. The launcher's own prompt is one line — \"Paste Netlify token:\" — which names something most teachers have never heard of and does not say where to get one, so both apps answer it with a dialog: what the credential is for, the steps that produce one, and the page to make it on as a LINK. The link is never opened for them; see credentialPrompts.whyNoBrowserOpens.",
+    "note" : "What a teacher reads when a first deploy stops to ask for a Netlify or Cloudflare credential. The launcher's own prompt is one line — \"Paste Netlify token:\" — which names something most teachers have never heard of and does not say where to get one, so both apps answer it with a dialog: what the credential is for, the steps that produce one, and the page to make it on as a LINK. The link is never opened for them; see credentialPrompts.whyNoBrowserOpens.",
     "requests" : [
       {
-        "explanation" : "Netlify hosts this section's website for free, and it needs to know that the publishing is coming from you. It does that with an access token — a long code that acts like a password made just for this app. Creating one takes about a minute, and you will not be asked again: it is saved securely on this computer.",
+        "explanation" : "Netlify hosts this section's website for free, and it needs to know that the deploys are coming from you. It does that with an access token — a long code that acts like a password made just for this app. Creating one takes about a minute, and you will not be asked again: it is saved securely on this computer.",
         "fieldLabel" : "Netlify token",
         "isSecret" : true,
         "linkAddress" : "https://app.netlify.com/user/applications#personal-access-tokens",
@@ -594,14 +594,14 @@
           "Open the Netlify page linked below, and sign in if you are asked to.",
           "Choose “New access token”.",
           "Describe it as something you will recognise later, such as “Class websites”.",
-          "Change the expiry — it starts at 7 days. A token that expires stops your publishing working, with nothing on screen to say why, so set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered.",
+          "Change the expiry — it starts at 7 days. A token that expires stops your deploys working, with nothing on screen to say why, so set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered.",
           "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
           "Paste it below."
         ],
         "title" : "Connect to Netlify"
       },
       {
-        "explanation" : "Cloudflare hosts this section's website for free, and it needs to know that the publishing is coming from you. It does that with an API token — a long code that acts like a password made just for this app. Creating one takes about two minutes, and you will not be asked again: it is saved securely on this computer.",
+        "explanation" : "Cloudflare hosts this section's website for free, and it needs to know that the deploys are coming from you. It does that with an API token — a long code that acts like a password made just for this app. Creating one takes about two minutes, and you will not be asked again: it is saved securely on this computer.",
         "fieldLabel" : "Cloudflare token",
         "isSecret" : true,
         "linkAddress" : "https://dash.cloudflare.com/profile/api-tokens",
@@ -612,15 +612,15 @@
           "Choose “Create Token”, then “Create Custom Token”.",
           "Name it something you will recognise later, such as “Class websites”.",
           "Give it one permission, chosen from the three dropdowns: Account, then Cloudflare Pages, then Edit.",
-          "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot publish anything, and what you get back if you skip this does not mention accounts at all.",
-          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your publishing working, with nothing on screen to say why.",
+          "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot deploy anything, and what you get back if you skip this does not mention accounts at all.",
+          "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. An expired token stops your deploys working, with nothing on screen to say why.",
           "Choose “Continue to summary”, then “Create Token”.",
           "Copy the long code Cloudflare shows you — it is only shown once — and paste it below."
         ],
         "title" : "Connect to Cloudflare"
       },
       {
-        "explanation" : "The token you just made is allowed to publish, but not to look up which Cloudflare account it belongs to — so the account's ID is needed as well. This is the only time you will be asked for it.",
+        "explanation" : "The token you just made is allowed to deploy, but not to look up which Cloudflare account it belongs to — so the account's ID is needed as well. This is the only time you will be asked for it.",
         "fieldLabel" : "Account ID",
         "isSecret" : false,
         "linkAddress" : "https://dash.cloudflare.com",
@@ -635,7 +635,7 @@
         "title" : "One more thing from Cloudflare"
       },
       {
-        "explanation" : "Cloudflare gives every account a 32-character ID, and it says which account your class websites are published into. It identifies you rather than a class, so you enter it once here and every course published to Cloudflare uses it.",
+        "explanation" : "Cloudflare gives every account a 32-character ID, and it says which account your class websites are deployed into. It identifies you rather than a class, so you enter it once here and every course deployed to Cloudflare uses it.",
         "fieldLabel" : "Account ID",
         "isSecret" : false,
         "linkAddress" : "https://dash.cloudflare.com",
@@ -663,7 +663,7 @@
         "title" : "Teacher Surname"
       },
       {
-        "explanation" : "Every website published to Netlify (*.netlify.app) or Cloudflare Pages (*.pages.dev) needs a unique web address. On Netlify, this name is shared globally with all users across the world.",
+        "explanation" : "Every website deployed to Netlify (*.netlify.app) or Cloudflare Pages (*.pages.dev) needs a unique web address. On Netlify, this name is shared globally with all users across the world.",
         "fieldLabel" : "Website address",
         "isSecret" : false,
         "linkAddress" : "",
@@ -840,13 +840,13 @@
   "failureExplanations" : {
     "cases" : [
       {
-        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings say something other than true or false. Nothing was published.",
-        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings say something other than true or false. Nothing was published.",
-        "why" : "The launcher's OTHER reference refusal, and it matters for the same population as the one below: the app reads a course with an odd marker value as ORDINARY, so a teacher can set it to deploy on its own - and at half six the launcher refuses, the app is closed, and without this case the app shows the generic 'did not finish' while the real reason sits in a log nobody opens. Two lines, joined, because the launcher prints them as two. It still says PUBLISHED rather than deployed only because this case, two shared tests and Windows pin it, so it moves in one change with Windows (Russell's words rule of 2026-10-03); see shared-rules.json -> referenceCourses.wording.whyTheLaunchersStillSayPublished."
+        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings say something other than true or false. Nothing was deployed.",
+        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings say something other than true or false. Nothing was deployed.",
+        "why" : "The launcher's OTHER reference refusal, and it matters for the same population as the one below: the app reads a course with an odd marker value as ORDINARY, so a teacher can set it to deploy on its own - and at half six the launcher refuses, the app is closed, and without this case the app shows the generic 'did not finish' while the real reason sits in a log nobody opens. Two lines, joined, because the launcher prints them as two. It said 'Nothing was published.' until v1.4.4 (#443), when it moved to DEPLOYED with every other launcher line that meant a deploy - Russell's words rule of 2026-10-03; deploy.ps1 and Windows' ReferenceRefusalTests move with it under #441."
       },
       {
-        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read. Nothing was published.",
-        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings file could not be read. Nothing was published.",
+        "expect" : "Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read. Nothing was deployed.",
+        "output" : "❌ Plantoir cannot tell whether ICS3U-2025 is kept for reference —\n   its settings file could not be read. Nothing was deployed.",
         "why" : "The same sentence with its other reason. The launchers fail CLOSED on a settings file that is there and will not open, and the teacher reads WHICH of the two it was."
       },
       {
@@ -855,8 +855,8 @@
         "why" : "The launcher's refusal, lifted out of the log and into the sentence the teacher reads. It matters most for a deploy set to happen on its own: that one runs with the app closed, and without this the app shows the generic 'did not finish' while the real reason sits in a file nobody opens. NO NEW EXIT CODE was added for it - deploy.sh states its own invariant, that exit 3 means 'a question nobody was there to answer' and nothing else, and every other exit is 0 or 1 - so this is matched on OUTPUT, which is how every other launcher failure already becomes a sentence. The line is LIFTED rather than rewritten: the launcher's output already is a sentence a teacher can act on, and a second explanation of one rule is how one rule comes to be said two ways."
       },
       {
-        "expect" : "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try publishing again; if the same thing happens, one of your pages may not open or the folder may not be taking new files.",
-        "output" : "📦 Publishing ICS4U section 1 to a folder…\n❌ Not every page could be copied into the publishing folder, so it is not up to date.\n   Folder: /Users/teacher/Sites/ics4u/section1\n   (copy error 23)\nrsync(19876): error: ./stale/x.html: unlinkat: Permission denied\nrsync(19876): error: ./stale: unlinkat: Directory not empty",
+        "expect" : "Plantoir could not copy every page into your deploy folder, so it is not up to date. Try deploying again; if the same thing happens, one of your pages may not open or the folder may not be taking new files.",
+        "output" : "📦 Deploying ICS4U section 1 to a folder…\n❌ Not every page could be copied into the deploy folder, so it is not up to date.\n   Folder: /Users/teacher/Sites/ics4u/section1\n   (copy error 23)\nrsync(19876): error: ./stale/x.html: unlinkat: Permission denied\nrsync(19876): error: ./stale: unlinkat: Directory not empty",
         "why" : "GitHub issue #227. deploy.sh used to throw the copy's exit status away and say Published over an empty or stale folder; it now fails, INCLUDING when the copy finished only in part (exit 23), because the page left behind may be one the teacher took down. Its line carries the copy's error number, which means nothing to a teacher, so it is matched on the launcher's own words and replaced. The output is the one measured from the real launcher with a stale folder --delete could not remove; scripts/test_deploy_folder_target.py checks that the launcher's cross line is still carried by exactly one case here, so rewording it cannot silently drop this sentence."
       },
       {
@@ -895,28 +895,28 @@
         "output" : "Built site not found at /courses/ICS3U/.merged_output/section1/public"
       },
       {
-        "expect" : "This section has no front page, so there is no website to publish. Put the front page back, then publish again.",
-        "output" : "❌ Nothing to publish for ICS3U Section 1: it has no front page, so no website was produced.",
+        "expect" : "This section has no front page, so there is no website to deploy. Put the front page back, then deploy again.",
+        "output" : "❌ Nothing to deploy for ICS3U Section 1: it has no front page, so no website was produced.",
         "why" : "A section with no index.md builds without error and produces no root index.html, so nothing publishable exists. The build used to print \"Static build complete\" anyway and the deploy then said \"Built site not found — build first\", sending a teacher to do the thing they had just done. The build now says why and fails, so the reason reaches the teacher from the step that knows it."
       },
       {
-        "expect" : "This section has no front page, so there is no website to publish. Put the front page back, then publish again.",
-        "output" : "❌ Nothing to publish for ICS3U Section 1: it has no front page, so no website was produced.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
+        "expect" : "This section has no front page, so there is no website to deploy. Put the front page back, then deploy again.",
+        "output" : "❌ Nothing to deploy for ICS3U Section 1: it has no front page, so no website was produced.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
         "why" : "Order, pinned. A publish runs the build and then the deploy on ONE transcript, so a missing front page puts both lines in the output. The specific reason must win: \"hasn't been built yet\" is the wrong thing to say to somebody who has just watched it build."
       },
       {
-        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings near line 3, then publish again.",
-        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to deploy. Open the front page in Obsidian, fix its settings near line 3, then deploy again.",
+        "output" : "❌ Nothing to deploy for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
         "why" : "#246. A front page whose settings the build cannot read is HIDDEN, like every such page, so the section produces no website - but the page is THERE, so the missing front page's \"Put the front page back\" would send a teacher to restore a page they can see, and its repair would find the page and say it was already put right. The build says which it was in its own words, and the line the reader stopped near travels with it. The output is exactly what build_site._nothing_to_publish prints; scripts/test_unreadable_page_settings.py holds the two together."
       },
       {
-        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings, then publish again.",
-        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read, so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to deploy. Open the front page in Obsidian, fix its settings, then deploy again.",
+        "output" : "❌ Nothing to deploy for ICS3U Section 1: the settings at the top of its front page could not be read, so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.",
         "why" : "The same, when the reader cannot say which line - a date that cannot be, a key that is a number, a date or yes/no. No line number is invented."
       },
       {
-        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to publish. Open the front page in Obsidian, fix its settings near line 3, then publish again.",
-        "output" : "❌ Nothing to publish for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
+        "expect" : "The settings at the top of this section's front page could not be read, so there is no website to deploy. Open the front page in Obsidian, fix its settings near line 3, then deploy again.",
+        "output" : "❌ Nothing to deploy for ICS3U Section 1: the settings at the top of its front page could not be read (near line 3), so the website was left without one.\n   Open the front page in Obsidian, fix those lines, then build again.\nBuilt site not found at /courses/ICS3U/.merged_output/section1/public",
         "why" : "Order, pinned, as for the missing front page: the deploy's line follows the build's on one transcript, and the build's reason must win."
       },
       {
@@ -2689,6 +2689,10 @@
         "key" : "claude",
         "macHandsOverWith" : "launch-{course}.command",
         "menuItem" : "Revise with Claude…",
+        "serverEnvironment" : {
+          "PLANTOIR_DOOR_COURSE" : "{course}"
+        },
+        "serverEnvironmentWhy" : "Written as \"env\" beside \"args\" in mcp-{course}.json, so the server holds an assist lease on the course the door was opened from (shared-rules.json -> doorCourseHold). Windows since #430, the mac since #458. The argv stays the folder alone (serverArguments).",
         "trailLine" : "started Claude Code for {course}",
         "writesForTheConnection" : [
           "mcp-{course}.json"
@@ -2705,9 +2709,11 @@
           "mcp_servers.plantoir.startup_timeout_sec=60",
           "-c",
           "mcp_servers.plantoir.tool_timeout_sec=1800",
+          "-c",
+          "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"{course}\"",
           "{greeting}"
         ],
-        "argumentsNote" : "Four dotted -c overrides and the greeting as a positional first message. No sandbox flag and no approval flag: Codex asks the teacher itself before any tool that changes a page, and passing a flag would quietly widen permissions they set for themselves. Dotted keys rather than one inline table because they merge into a teacher's configuration one key at a time and match the published documentation.",
+        "argumentsNote" : "Five dotted -c overrides (the fifth names the course to the server's environment, serverEnvironment) and the greeting as a positional first message. No sandbox flag and no approval flag: Codex asks the teacher itself before any tool that changes a page, and passing a flag would quietly widen permissions they set for themselves. Dotted keys rather than one inline table because they merge into a teacher's configuration one key at a time and match the published documentation.",
         "couldNotStart" : "Plantoir couldn’t start a Codex session for {course}. If Codex was updated or moved recently, restarting Plantoir may be enough.",
         "didNotOpenTitle" : "Codex didn’t open",
         "executable" : "codex",
@@ -2718,6 +2724,10 @@
         "macHandsOverWith" : "launch-{course}-codex.command",
         "menuItem" : "Revise with Codex…",
         "scriptNameCarriesTheAgentWhy" : "The second door's script is named after the agent as well as the course. The script is read by the terminal AFTER Plantoir has handed it over, so two doors sharing one name would let a second launch seconds later reach the first window with the wrong command line - which is the same race the per-course naming already exists to stop.",
+        "serverEnvironment" : {
+          "PLANTOIR_DOOR_COURSE" : "{course}"
+        },
+        "serverEnvironmentWhy" : "Passed as a fifth override, -c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"{course}\" (escaped for TOML, then for the shell, like every value), so the server holds an assist lease on the course the door was opened from, exactly as the Claude door's env does (shared-rules.json -> doorCourseHold.whichDoors). The mac since #458 (Russell, 2026-10-07: both doors); Windows' Codex door does not yet, and owes it. Codex 0.155.1 reads the form: measured with codex mcp get --json.",
         "timeoutsAreOverriddenWhy" : "Codex's own defaults are version-dependent - 30s startup and 300s per tool in its current source, 10s and 60s in its published reference - and both tool figures are too short, because a publish is awaited and a first one builds the image and uploads, which takes minutes. 60s and 1800s are passed rather than trusted.",
         "trailLine" : "started Codex for {course}",
         "valuesAreEscapedTwice" : "Each value sits inside a TOML basic string inside a shell-single-quoted argument, so it is escaped for TOML first (backslash, double quote and control characters) and for the shell second. Getting the inner layer wrong fails QUIETLY: an unparseable value is not rejected, it is treated as a raw string, so args stops being a list and the door greets the teacher and then cannot start its server.",
@@ -2727,7 +2737,9 @@
         "writesNothingElse" : "No configuration file exists for this door: the server is described in the arguments. Nothing is written into the teacher's working folder, and nothing is added to or read from their own Codex configuration."
       }
     ],
-    "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. The only thing that points a session at one course is the greeting. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
+    "courseIsNamedInTheGreetingOnly" : "The server is given the WORKING FOLDER, never a course, so every course in the folder is reachable from either door. What points a session at one course is the greeting. Both doors ALSO name their course to the server, in its environment (doorCourseVariable) - to HOLD it, never to narrow: the server takes an assist lease on it (shared-rules.json -> doorCourseHold), and every course stays reachable. This is a real difference from the assistant Plantoir carries itself, whose window is bound to one section and refuses any other course (assist-cases.json -> windowBinding), and it is stated here because a reader who assumed otherwise would give a door a narrowing it does not have.",
+    "doorCourseVariable" : "PLANTOIR_DOOR_COURSE",
+    "doorCourseVariableWhy" : "The one name both platforms read: both doors write it into their server's environment (each agent's serverEnvironment: the Claude door in its configuration's env, the Codex door as a -c override), and the server - Plantoir --mcp-stdio on the mac since #458, plantoir-mcp on Windows since #430 - holds an assist lease on that course when the folder has it. An environment variable rather than an argument because the argv is the folder alone (serverArguments) and #430's trap was a course in the argv being read as a lock.",
     "greetingCarriesNoDoubleQuotes" : "The greeting is passed as one shell argument, so double quotes are replaced with apostrophes before it goes anywhere near a command line.",
     "greetingHowITeachSentence" : "Then read my How I Teach page for this course, and keep to it in anything you write for me.",
     "greetingHowITeachSentenceWhy" : "GitHub #209. The sentence is the same whether or not a page exists (the read tool's answer handles a missing one, and offers a draft), so it is one string both platforms pin and neither has to look at the disk when the menu item is clicked. It names no tool, because the teacher sees the greeting in their terminal as their own words. It is the LOAD-BEARING channel for the page: measured for the Codex door (documentation/10, 'What was MEASURED for the Codex door'), a tool whose description says 'call first' was deferred, while the greeting was acted on at once. Comes straight after the sentence about listing the sections. See shared-rules.json -> howITeachPage.",

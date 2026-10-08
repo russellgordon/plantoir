@@ -762,7 +762,7 @@ normally do (SFTP, a network share, a sync client), and no third-party
 account is involved at all.
 
 Because the copy is host-side, this path prints `PUBLISHED_FOLDER=<path>`
-rather than a live URL, and the apps show a "copied to its publishing folder"
+rather than a live URL, and the apps show a "deployed to a folder"
 panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
@@ -815,11 +815,11 @@ folder whose own name has a colon is fine: the result still starts with `/`.
 **And it reads rsync's own exit status.** It used to pipe rsync into
 `grep -c … || true`, which threw the status away. Now any non-zero status —
 including **23 and 24, a copy that finished only in part** — exits 1 with a
-cross line and no `PUBLISHED_FOLDER=`, so the app's "copied to its publishing
+cross line and no `PUBLISHED_FOLDER=`, so the app's "deployed to a
 folder" panel never appears. A partial copy is a failure on purpose (director's
 ruling): measured with a stale folder `--delete` could not remove, the new pages
 landed, the page the teacher had taken down stayed, and the launcher said
-`Published: 2`. The cross line is matched by the app and replaced with
+`Published: 2` (the line has said `Deployed:` since v1.4.4, #443). The cross line is matched by the app and replaced with
 `FailureExplainer.folderCopyDidNotFinish` (`app-rules.json` →
 `failureExplanations`), because "copy error 23" means nothing to a teacher.
 
@@ -2866,40 +2866,125 @@ app (`--run-scheduled-deploy`), so that boot-out ends the run there and then: a
 set made during the wait ends it before `jobStillStands`, a set made during the
 deploy ends it before `bootOutAgent`, and an ended run removes nothing. The
 wrapper it started is a `Process` child in a process group of its own, so it
-SURVIVES and finishes the old deploy as an orphan. It cannot remove the new
-deploy — its only plist line has already run and it boots nothing out — but it
-is NOT harmless (see "What this costs" below). `jobStillStands` and
-`leaveQuietly` stay as the second line of defence they were written as.
+SURVIVES and finishes the old deploy as an orphan — a "leftover run". It
+cannot remove the new deploy — its only plist line has already run and it
+boots nothing out. Until #439 it was NOT harmless (below). `jobStillStands`
+and `leaveQuietly` stay as the second line of defence they were written as.
 
 Measured on an Apple M4 Pro, macOS 26.6, with a throwaway agent shaped like the
 run (a Swift binary waiting on a `Process` running `sleep`): `launchctl bootout`
 returned exit 0 in 0.02 s; the job read as unloaded and the binary was gone at
 once; the child was still running six seconds later, in its own process group
 (PGID = its own pid). A bash script whose child shares its process group lost
-both at once.
+both at once. Measured again for #439 on 2026-10-04, with stand-in launchers
+under a path holding a space: after SIGKILL of a pretend run, its script and
+both legs kept running, and `deploy.sh`'s own process-table reader saw them.
 
-**What this costs, and was left:** the old run's own after-work (recording that
-the section was deployed, the trail line for a stopped run, the notification) does not
-happen, and its leases name a process that is gone, so they read as stale while
-the orphaned wrapper is still deploying. **That last part can make two deploys of
-one section overlap.** A lease whose owner is gone is ignored
-(`shared-rules.json` → `workLeases.liveness`), so the window's Deploy, an
-outside assistant's `deploy_section`, or the newly set run firing soon all go
-ahead while the orphan is still building and uploading. `deploy.sh` has no
-same-section guard of its own (`a_deploy_is_running_for` is only named in a
-comment there), and `preview.sh`'s #381 guard is asked on a SERVING run only, so
-a deploy's `--build-only` leg is not refused either. The result is two builds
-and uploads of one section at once, which is the fault #156's leases exist to
-prevent. Nothing on `dev` is worse than before #409 was checked. A guard is a
-decision for Russell, #439: a deploy refuses while that
-section's scheduled wrapper is still working. Rejected for now: letting the run
-survive a re-set and comparing moments at the end as Windows does, because the
-boot-out-first order is what keeps "never briefly two agents" true (#237) and
-changing it reopens that. Pinned by
-`ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`
-(the boot-out is asked with no plist on disk, and before the new one exists).
-No contract case: the guard is in the order of two `launchctl` calls on the
-mac and in Task Scheduler on Windows, which no shared case can express.
+**What it used to cost: two deploys of one section at once.** The leftover's
+leases name a process that is gone, so they read as stale
+(`shared-rules.json` → `workLeases.liveness`), `deploy.sh` had no same-section
+guard and `preview.sh`'s #381 guard is asked on a serving run only — so the
+window's Deploy, an outside assistant's `deploy_section`, or the newly set run
+firing could build and upload the section on top of it.
+
+**Fixed by #439 (decided by Russell 2026-10-04, on the mac 2026-10-07), in
+three parts:**
+
+- **The launchers refuse.** `deploy.sh`, and `preview.sh` on a `--build-only`
+  run, refuse before anything is changed while the section's scheduled script
+  is still running in this folder, or another `deploy.sh` of it is — see
+  [03](03-launcher-scripts.md) → "A section being deployed cannot be deployed
+  again (#439)" and `shared-rules.json` → `deployWhileItsSectionDeploys`.
+- **The newly set run waits for its leftover run** before it starts its own
+  script (`ScheduledDeploy.waitForTheEarlierDeploy`, contract
+  `deployWhileItsSectionDeploys.theNewRunWaits`): after the lateness check and
+  before #156's wait for the course, it looks every fifteen seconds for another
+  `/bin/bash <its own script>` in the kernel's process list (the same label is
+  the same section in the same folder; arguments read whole, so "Application
+  Support" is one of them). Up to THIRTY minutes, three times the course wait,
+  because what is waited for is the same section's deploy, which normally
+  ends, and a large course deploying to two places can take longer than ten;
+  standing down after ten would all but promise the deploy just set never
+  happens. Still working after thirty, it stands down and records
+  `earlierDeployStillWorking`, a ninth kind with its own sentence and the
+  attention badge. It writes "scheduled deploy waited for its earlier deploy"
+  whenever it waited, whether it then went ahead or stood down. Without the wait the new run's first leg would be refused and it
+  would be recorded as `buildDidNotFinish` — the wrong cause — and the two
+  runs' legs could refuse each other between legs, sending the old deploy to
+  one host and not the other (the #439 plan review, finding 1). Its own loop,
+  not a holder in `waitForTheCourse`, because that wait reads leases and the
+  leftover's are the stale ones. No deadlock: the leftover waits on nothing.
+- **A leftover never replaces a newer record.** Both runs write the SAME
+  per-folder outcome record, so the leftover finishing after a stand-down used
+  to replace `earlierDeployStillWorking` with its own `succeeded`, and the
+  section read as deployed while the new deploy never ran. The wrapper's
+  completion lines now move a record into place only when none is there
+  (`recordCompletionLines`): a run clears its record first and writes at most
+  one, so a record standing at that moment is a newer run's
+  (`scheduledPublishStopped.newerRecordWins`, measured under bash with a
+  spaced path). A record landing in the microseconds between the look and
+  the move is still replaced.
+
+**What is still lost, and was left.** The leftover's own after-work belongs to
+the app that was ended: the section is not marked deployed (it stays
+" — Edited", the harmless direction), the run writes no trail line of its own,
+and no notification is sent. Its script still writes the outcome record. So
+`scheduleDeploy` writes "scheduled deploy set again while its deploy worked"
+when the label's script outlived its boot-out — the one line that says a
+deploy went on after the re-set. It is ASKED right after the boot-out (so the
+new run can never be mistaken for the leftover) and WRITTEN only once macOS has
+accepted the new job, so a re-set that fails never says it was set again
+(#439 review, finding 11). The failed re-set has still ended the working run's
+app, so it says instead, under "scheduled deploy could not be set", that the
+earlier deploy was still working and will finish on its own — in both failure
+branches (the write, and macOS refusing the job). A leftover run that hangs refuses
+that section until it ends, and nothing in the app ends it (cancelling or
+setting again boots out a job that is already gone); logging out or restarting
+the Mac does.
+
+**Three more limits, recorded rather than built** (the #439 implementation
+review; all in `deployWhileItsSectionDeploys.knownLimits`):
+
+- **One narrow race turns a deploy off yet lets it go out**: the sidebar's
+  Cancel Deploy dialog opened before the deploy's time and confirmed after its
+  run has started. The run has removed its own plist, so
+  `cancelScheduledDeploy` boots the label out blind, which ends the app
+  exactly as a re-set does, and the deploy its script started still goes out
+  — the guard keeps it from overlapping anything, but no trail line says so.
+  Every other cancel (a rename through `CourseRenamer`, the assistants'
+  cancels, the cleanup) acts only on a plist found on disk, so it never
+  reaches a working run; the implementation review's claim that renames and
+  the assistants did was checked and was wrong. Recorded rather than built:
+  it needs the dialog's moment to pass while it is open.
+- **`newerRecordWins` holds only for a leftover whose script carries the
+  look** — one written by 1.4.4 or later. The look lives in the leftover's own
+  script, written at the PREVIOUS set, so a deploy set under 1.4.3 and set
+  again after updating leaves a leftover that can still replace
+  `earlierDeployStillWorking` with "succeeded". Transitional; it ends with the
+  last deploy set before the update.
+- **A dismissed stand-down notice lets the old deploy's result arrive as if it
+  were the new one.** Dismissing `earlierDeployStillWorking` removes the record,
+  so the leftover's "succeeded" then lands and the section reads as deployed
+  on its own — true of the OLD deploy's content. Left: the record says what
+  last went out, and the notice the teacher dismissed had said the new deploy
+  never ran.
+
+The newly set run's wait is asked even for a plist that names no section (a
+pre-v1.2.0 job): it needs only the script, and only its trail line needs the
+section (#439 review, finding 8). The launchers' reader accepts any of `sh`,
+`bash`, `zsh`, `dash` or `ksh` handed the script while the app looks for `bash`
+only; the app always starts `/bin/bash`, so the two agree on every real run.
+
+**Rejected:** letting the run survive a re-set and comparing moments at the
+end as Windows does, because the boot-out-first order is what keeps "never
+briefly two agents" true (#237) and changing it reopens that — not reopened by
+#439. Refusing or deferring a re-set while the run works: it blocks a teacher
+changing a schedule during a long deploy and leaves the overlap untouched.
+Pinned by `ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`
+(the boot-out order), `testSettingASectionAgainWhileItsDeployWorksSaysSoOnTheTrail`,
+and `DeployWhileItsSectionDeploysTests`. The boot-out order itself has no
+contract case — it is two `launchctl` calls on the mac and Task Scheduler on
+Windows — but the guard and the wait do.
 
 ### The window's acts read the saved settings too (#335)
 
@@ -3088,7 +3173,7 @@ folder on this computer" — never a path (a path is machinery on a card, and a
 folder not chosen yet would be blank; #322's contract case pins "a folder").
 Two vocabularies for one list is pre-existing and deliberate; the contract
 pins both (`planOpening.cases[].sheet` and `.card`). `destination(of:)`, the
-primary-only name, was still used by `list_courses`' "publishes to:" — not
+primary-only name, was still used by `list_courses`' "publishes to:" line (it says "deploys to:" since v1.4.4, #443) — not
 scheduling, so out of this piece. It went with
 [#403](https://github.com/russellgordon/plantoir/issues/403): `list_courses`
 now says `everyDestination(of:)` too, and `destination(of:)` is deleted (a
@@ -3127,7 +3212,7 @@ a course with one destination the line is what it always was. The
 | immediate deploy's results (`deployWentOutTo`, `deployNeedsAnAnswerAt`) | yes | unchanged |
 | assistant's `deploy_section` card | names none, on purpose | unchanged |
 | scheduled-publish notification, after-Save sentence | yes, joined with ", " | unchanged; the different join is known and out of scope — do not "fix" one to match the other in passing |
-| `list_courses` "publishes to:" (MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
+| `list_courses` "deploys to:" ("publishes to:" before v1.4.4; MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
 | refusal trail line | the cause, since #396 | above |
 
 **Rejected**, so nobody proposes them again: keeping the unpublished list
@@ -3356,3 +3441,85 @@ mac has no share modes; nothing to mirror.
 click opens that section (`ScheduledPublishToast`; trail `scheduled publish
 notification`). It is unproven on a real click (the desktop was locked), and
 nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.
+
+## Deploy and publish: the two words (v1.4.4, #443)
+
+**The rule (Russell, 2026-10-03; decisions on the inventory 2026-10-04):
+DEPLOY is what puts a site online — Netlify, Cloudflare Pages or a folder.
+PUBLISH is only marking a page so a deploy includes it; nothing leaves the
+computer.** Every sentence a teacher reads uses each word in its own sense.
+Until v1.4.4 the two were mixed: Course Settings said "Also publish to, for
+redundancy" under a header that said Deploying, the scheduled deploy's
+notification said "…published on its own to…", and the launchers said
+"Nothing was published." after refusing a deploy.
+
+**What changed on the mac, the launchers and the shared Python** (the
+sentences themselves are in the contracts and the code, not repeated here):
+Course Settings ("Also deploy to, for redundancy"; the caption now starts
+"Deploying sends your website to every destination…" because a plain swap
+read "Deploying deploys"); the coverage-map switch is **"Include the
+curriculum coverage map"**, the wizard's existing label, so one setting has
+one name (both refusals in `SpecialNames` quote it); every scheduled-deploy
+sentence and the success notification ("…deployed on its own to <place>.
+Your website has the new pages." — "your website" rather than "your
+students", because for a FOLDER destination the students see the pages only
+once the school's host serves that folder); the quit, update-held, rename,
+settings-saved, links-checklist, site-health and rollover sentences; the
+credential sheets ("the deploys are coming from you", "stops your deploys
+working"); every `deploy.sh`, `deploy.py` and `build_site.py` line that meant
+a deploy. Copy a Page keeps "publish" (it IS the right word) and adds the
+deploy it was silently claiming: "…until you publish them and deploy."
+Obsidian's own add-ons "can put these pages online" — neither of Plantoir's
+words, for somebody else's tool.
+
+**What deliberately did NOT change**, because something parses it or a key
+is frozen: the `PUBLISHED_FOLDER=` marker, the work-lease kind `publish`,
+frontmatter `publish:` / `publishForSectionN`, tool names (`publish_pages`,
+`explain_publishing`…), contract KEYS (`scheduledPublishStopped`,
+`rolloverTurnedOffTheScheduledPublish`, `settingsSavedWhilePublishing`…),
+`ActivityTrail.Event` raw values ("scheduled publish finished" and the rest —
+never written into a line), Swift type and file names, and the 13 tools the
+local model is shown.
+
+**Three couplings that must move together**, and did, in one commit each:
+- `deploy.sh`'s "Not every page could be copied into the deploy folder"
+  line, `FailureExplainer.folderCopyDidNotFinishExplanation`'s matcher and
+  `app-rules.json` → `failureExplanations.cases` (decision 1). Rewording the
+  launcher alone gives the teacher the raw line back;
+  `scripts/test_deploy_folder_target.py` fails if the cross line has no case.
+- The build's "❌ Nothing to deploy for <course> Section <n>: …" lines and
+  their `failureExplanations` output fixtures (the app matches the reason
+  half, "no front page, so no website was produced", which did not change).
+- `ScheduledDeploy`'s run line keeps the words "set to deploy to": the
+  contract's `theDestination` cases read `notesTheChange` by that phrase.
+
+**The trail: lines changed, keys did not.** A trail that spans the upgrade
+says "scheduled publish" before v1.4.4 and "scheduled deploy" after, so a
+search looks for both (`activityTrail.note` says so). Rejected: leaving the
+lines alone so searches stay whole — rule 5 says a changed behaviour changes
+its line, and a teacher reads these lines in a problem report. Rejected:
+renaming the keys too — they are pinned between both apps' code and the
+contract, and no teacher ever reads one.
+
+**What outside assistants read** (decision 5): `list_courses` says
+"  deploys to: " and four descriptions only MCP clients see (`list_courses`,
+`re_date_classes`, `make_room_for_classes`, `plan_scheduled_deploy`'s
+`classes`) say deploy. The local 13-tool digest is unchanged
+(`46b96562…2cd96cb6`); the MCP digest moved `85bc3f80…05aa7639f` →
+`a7c0823d…ad04e1733`. Measured before shipping, as `toolDescriptions.rule`
+asks, as a PROXY because the real readers (Claude Code, Codex) cannot be run
+as a controlled suite: the smaller assistant on the whole 37-tool MCP surface,
+11 probes × 10 trials, 70/110 before and 70/110 after, identical probe for
+probe, 0 inversions (M4 Pro, b10435;
+`research/ai-assist/outside-assistant-descriptions-443-results.txt`).
+
+**The guard.** `scripts/test_deploy_words.py` scans the mac app's string
+literals, the three `.sh` launchers and the shared Python for 36 exact
+phrases that each meant a deploy and said publish. Exact on purpose: a guard
+on the bare word fails on "Publish Unit 2, Day 3", which is right. It cannot
+see a NEW wrong wording, comments, or Windows' half.
+
+**Windows** inherits the shared Python and `deploy.sh`'s words free; it owes
+`deploy.ps1`'s twins, `FailureExplainer.cs`'s matcher, `CredentialRequests.cs`,
+its views and `AssistWording.cs`, and is red on the moved contract cases until
+it does — that is the request, under #441.

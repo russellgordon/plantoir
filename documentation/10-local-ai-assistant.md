@@ -3760,7 +3760,7 @@ links to stays put, and the result says which and why — a server that does not
 keep such a page must fix the behaviour first or the sentence lies to the
 router and to Claude Code.
 
-**Hashes.** (After merging #209, `toolSchemas.mcp` is n=35 `777bf545…2fdcc54` — #209's own change, identical on `dev`; `local` is unchanged.) The piece moved no byte the mac's model reads, and says so with the
+**Hashes.** (After merging #209, `toolSchemas.mcp` is n=35 `777bf545…2fdcc54` — #209's own change, identical on `dev`; `local` is unchanged.) (Since #443, v1.4.4: four MCP-only descriptions say deploy for a deploy — `list_courses`, `re_date_classes`, `make_room_for_classes` and `plan_scheduled_deploy`'s `classes` — and `toolSchemas.mcp` n=37 moved `85bc3f80…05aa7639f` → `a7c0823d…ad04e1733`, measured before shipping as a proxy (`research/ai-assist/outside-assistant-descriptions-443-results.txt`: 70/110 both arms, identical); `local` n=13 is unchanged. `documentation/07-deployment.md` → "Deploy and publish: the two words".) The piece moved no byte the mac's model reads, and says so with the
 form quoted above, before and after regenerating the contracts:
 `toolSchemas.local` n=13 `46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6`,
 `toolSchemas.mcp` n=32 `9bcc7eb7911d06009a70edef1db5721af4a52072726a31d0798662049cef36f7`
@@ -4230,7 +4230,11 @@ Claude builds or deploys a section, a preview in that folder waits and the
 status line says "Waiting for Revise with Claude to finish deploying MPM2D
 section 2… (59s)"; while it only edits pages, or sits idle, nothing waits. The
 app's own lease check already agreed: `WorkLeaseRegistry.reconcile` derives
-leases from running work, so an idle MCP server holds none.
+leases from running work, so an idle MCP server holds no `build`, `preview` or
+`publish` lease. (Since #458 a server opened by either door does hold an
+`assist` lease on that door's course for the whole session — which declines no
+build and holds back no change; it greys the Revise items and structural work
+only. See "On the mac (#458)".)
 
 **Tested.** `HeadlessDeployAnswersTests` runs the real `AssistToolchainWork`
 against stand-in launchers that write down their words and exit 3 (MF-6), and
@@ -6107,7 +6111,7 @@ connected and an opening message already sent. Nothing is typed by them.
 | | Revise with Claude… | Revise with Codex… |
 |---|---|---|
 | Tool looked for | `claude` | `codex` |
-| Server handed over as | a configuration file, `--mcp-config` | inline configuration, four `-c` overrides |
+| Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) |
 | Written for the connection | `mcp-<CODE>.json` | **nothing** |
 | Script the mac hands to a terminal | `launch-<CODE>.command` | `launch-<CODE>-codex.command` |
 | A teacher's own MCP servers | not loaded (`--strict-mcp-config`) | **loaded beside Plantoir's** |
@@ -6150,7 +6154,10 @@ passed to the server rather than asked for in a prompt" — and it was never
 true; it was corrected with this work, because a reader who believed it would
 have given Codex a narrowing that neither door has. The assistant Plantoir
 carries itself *is* bound (`contracts/assist-cases.json` → `windowBinding`);
-an outside door is not.
+an outside door is not. **Since #458 both doors also name their course to
+the server, in its environment (`PLANTOIR_DOOR_COURSE`) — to HOLD it, never to
+narrow it**: the server takes an `assist` lease on it, and every course stays
+reachable. See "On the mac (#458)".
 
 **The search list does nearly all of the work, and it is the first thing
 somebody will simplify away.** An app launched from the Dock inherits launchd's
@@ -6173,8 +6180,8 @@ terminal.
 declare `unit` and `days`, as Windows' does, so that an EMPTY model call is
 refused (`answerLeftOutWhatItWasFor`) on both apps by the schema-reading rule
 in `AssistToolCall.needsMoreThanTheWindowSupplies`. That moves the local tool
-surface, so it was built on a side branch (`issue/411-add-next-class-unit-days`:
-the two properties in Windows' words, the twin likewise, and an
+surface, so it was built on a side branch, kept as the record
+(`issue/411-add-next-class-unit-days`: the two properties in Windows' words, the twin likewise, and an
 `app-rules.json` → `modelTiers.requirements` case for the empty call) and
 measured on BOTH tiers before it could land. The pass rule was written down
 before anything ran: zero polarity inversions, and no probe that was 10/10
@@ -6202,6 +6209,10 @@ more than the window supplies, which leaves the schema alone. That trades the ru
 the schema, never a name" property for the outcome he asked for. Until then
 both apps RUN an empty `add_next_class` call — Windows through
 `AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
+*(Settled 2026-10-07 by #440: the empty call RUNS on both apps, pinned by the
+authored scenario "an empty add_next_class from the model runs"; the schema
+stays at course and section. See "#440: `add_next_class` keeps two arguments;
+units and counts answered in code" below.)*
 
 **For Windows, MEASURED (v1.4.3 bundle A, 2026-10-04):** Windows' local model
 has been shown this exact `unit` line all along, and it does read it that way.
@@ -6224,6 +6235,129 @@ the authored scenario "a model-sent unit 'next' on add_next_class is ignored
 unless the teacher said unit". Rejected: dropping `unit`/`days` from the local
 surface (a routing change to re-measure), and keying on phrasings. The rest
 is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+*(#440, 2026-10-07, mac: the rest is decided. S2 is widened to drop the
+model's `unit` and `days` from EVERY `add_next_class` — the "unless the
+sentence says unit" exception let "Add the next class in this unit" start a
+new unit — and Windows owes taking both out of its model's view. See the
+#440 section below.)*
+
+### #440: `add_next_class` keeps two arguments; units and counts answered in code
+
+**The defect, measured on the mac (2026-10-07, M4 Pro, b10435, the smaller
+assistant, the shipped 13-tool surface).** Ten sentences about units and
+counts — "Add the next class in a new unit", "The next class begins Unit 3",
+"Make the next class the first day of a new unit", "Add three days to Unit 2",
+"Add another day to Unit 4", "Add the next two classes" and four more —
+reached `add_next_class` 50 times in 50 with only `{course, section}`. Each
+added ONE page in the CURRENT unit and reported success ("Unit 4" was also read
+as section 4; the window binding takes that back). Less harm than starting a
+unit by mistake, the same shape: silent, and success reported.
+
+**What was decided, and why (rulings on the #440 plan, 2026-10-07).**
+- **The local tool keeps `{course, section}`; nothing the model is shown
+  moves** (13 tools, `LOCAL_DIGEST` unmoved). #411 measured declaring
+  Windows' `unit`/`days` and both models read the NEXT in "add the next class"
+  as "start a new unit" (6 of 6, 5 of 6).
+- **Fixed frames answer the sentences in code** (`AssistCardCommand`): "add
+  the next class in a new unit" and "start a new unit with the next class"
+  beside the shipped "start a new unit"; "add <count> [more] days|classes to
+  unit <n>" and "add a|one|another [more] day|class to unit <n>" beside the
+  shipped "add <count> more days to unit <n>", the count agreeing with the
+  noun. Term-blind (only "unit"), exact, nothing else tolerated.
+- **Settler S3** (`AssistNextClassUnits`, in `think()` after the course gate,
+  MODEL calls only): the teacher's own sentence is read for (a) a new unit,
+  (c) a count above one right before a page noun, after an adding verb or
+  "next", (b) a unit — or, when a unit is named, a day — that is not where the
+  plain next page goes (read-only, `AssistToolRunner.nextClassReading`, the
+  same planner the tool calls). Any of them: nothing runs, no card, the turn
+  is wound back, the trail says which (`nextClassPointedLine`), and the
+  teacher gets `wording.nextClassNeedsItsOwnPhrasing` naming sentences the
+  window accepts in THAT course (Module: the "unit" sentences, said to be
+  read as Module; numbered: "Add the next meeting page", once per page — a
+  numbered course refuses both unit frames). The days sentence names the
+  course's LATEST EXISTING unit — the unit the plain next page lands in
+  (`NextClassPlanner.nextUnitAndDay`) — never a fixed example. Rejected: a
+  fixed "Unit 4", because typed back in a course whose latest unit is 2 it
+  starts Unit 4 at Day 1 and skips Unit 3 — a unit number that may not
+  exist in the course (review N-impl F4). No dates on file: S3 does nothing
+  and the dates are asked for. **It points; it never converts**: "don't start a
+  new unit" must not become one.
+- **The model's `unit` and `days` are dropped from every `add_next_class`**
+  (S2 widened). S2's "unless the sentence says unit" let "Add the next class in
+  this unit" start a unit.
+- **An empty `add_next_class` RUNS on both apps** (option E), pinned by a
+  scenario rather than an app-rules row (only a scenario runs the call through
+  the agent).
+- The mac's MCP `add_next_class` does not gain `unit`/`days`: `add_classes`
+  covers several days and a new unit there.
+
+**Rejected.** A — declare `unit`/`days`, steer in code: the #411 arm, failed.
+**A'** — Russell's `newUnit` boolean and integer `unit`/`days`: measured
+today as a third arm, both tiers, pre-registered (adopt only if it matched
+the design on every count with no inversions); it did not — see the numbers
+below. B — a separate local tool (14 tools; "the next class" vs "a new unit"
+is the near-synonym pair a small router confuses). E — refusing the empty
+call.
+
+**Measured.** `research/ai-assist/next-class-unit-440-preregistration.txt`
+(committed before the first request) and `…-results.txt` / `…-raw.txt`.
+Both tiers, 10 greedy trials, M4 Pro, b10435 Metal, the app's flags. The
+design (AFTER, surface byte-equal to BEFORE): every probe identical BEFORE and
+AFTER in both suites (smaller 210/290 trimmed, 210/250 teachers-say; larger
+290/290, 240/250), zero inversions, unit "next" never; every one of the 22
+pointed sentences then on record (three decided rows were added after the
+measurement) reached `add_next_class` with only course and section, or
+was declined ("Start a new unit?" on both tiers, "Start a new module" on the
+smaller), never another write tool; every control 10/10. **A' was not
+adopted**: on the smaller tier "HIDE - the inversion case", "typos" and the
+"delete" decline each fell 10 → 0, and on BOTH tiers every plain "add the
+next class" phrasing in the teachers-say suite came back with `unit` and
+`days` filled in — unit 2 and days 1 on all 60 calls on each tier, the
+larger with `newUnit: false`, the smaller sending `newUnit: true` for "Add
+the next class" 10 of 10 — the #411 harm again, with numbers in place of the
+word "next". (The unit-and-count probes, a separate suite, saw the larger
+send `unit: 0` for "Add the next class", "…for period 2" and "…to Module 4".
+Their "28 of 37 fail" is scored against rule (e), which is a rule for the
+AFTER arm — it bans SENDING a unit/days key, and declaring a key does not
+force the model to send it — so it is not the evidence. A' is judged by rules (g)–(j), and it fails
+(g), (i) and (j): the two findings above, and (i) because "Start a new
+unit?" and "Start a new module" move from declined to `add_next_class` on
+the smaller tier.) Zero inversions on every arm, which was necessary and not
+enough.
+
+**Pinned.** `contracts/assist-cases.json` → `nextClassUnits` (accepted,
+notThis, pointed, runs — the runs rows are the deterministic sweep of every
+add_next_class sentence on record that reaches the model — and
+pointerSentences) and seven scenarios; `NextClassUnitsTests` (`reachesModel`
+pinned both ways; every quoted sentence typed back as a card and RUN in a
+Unit, a Module and a numbered course); the mirror in
+`trimmed-surface-suite.py`.
+
+**Known limit, left open (review N-impl F3, pre-existing).** In a numbered
+course S3 reads only the word "unit", so "Add the page for Week 12" when the
+next page is Week 10 runs and makes Week 10, reported as success — the shape
+ruling 4 closed for Unit/Day, which a sparse numbering (CODING's Week 2, then
+Week 8) makes real. Not fixed with #440; a decision for a later piece.
+Three false refusals ARE decided rows (`pointed`, review F2): "…before the
+next unit test", "…not the next unit", and "next week" in a course whose
+unit word is Week — each points where the plain call was asked for, which
+costs one sentence and writes nothing.
+
+**Windows owes** (the hand-back is a comment on #440, the one issue; it stays open for Windows to close): hide
+`unit`/`days` from its model via `CardOnlyArguments` — its router is shown
+`unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever
+the sentence says "unit" — measured on its own tier; widen S2; port the
+frames and S3, reading the plain next page with `plan_add_next_class` over
+MCP (course and section only; a refusal for dates means S3 does nothing).
+That read must not offer the dates sheet, or any other interface, as a side
+effect: the mac reads `NextClassPlanner.plan` directly rather than the
+runner's plan path, which offers the sheet, so a twin that reads through
+`plan_add_next_class` could offer it twice; read the planner, or suppress
+the offer for S3's probe.
+The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
+record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
+`7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
+a rename. It is not merged and is not to be merged.
 
 ### #424: schedule, cancel, and a reply that runs to the cap
 
@@ -6238,15 +6372,16 @@ All three fixes are CODE; no description moved.
   today|tomorrow at <time>" is the day first). Any OTHER sentence opening that
   way — no time, "tomorrow morning", "for Monday", "at 7" — is ASKED in code
   (`AsksWhenToSchedule`, `AssistWording.ScheduleADeployNeedsATime`, Windows'
-  sentence proposed as a key), never a deploy now and never the model. A
+  sentence, generated by the mac as `wording.scheduleADeployNeedsATime` since
+  #449), never a deploy now and never the model. A
   question mark, a negation, or another course or section named still falls
   through, as in every frame here. The fix round widened the ask (ruling 1)
   after review traced "Schedule a deploy for tomorrow at 6:30 am" past both
   first-cut frames to the model.
-- **"[please] cancel the|that|my scheduled deploy [please]"** reaches
+- **"[please] cancel the|that|my scheduled deploy [please]"**, and since #449 the shelf's bare "Cancel scheduled deploy" (below), reaches
   `cancel_scheduled_deploy` (the safe direction).
 - Rows: `assist-cases.json` → `scheduleAndCancel` (AUTHORED from Windows),
-  run by `ScheduleAndCancelFramesTests`; the mac is asked to implement them.
+  run by `ScheduleAndCancelFramesTests` on both apps since #449 (below).
 - **The settler** is llama-server's own `t_max_predict_ms` = 30000, on the
   SMALLER tier only (`LocalModel.WritingTimeLimitMs`): a reply still being
   written 30 s after its first token ends as "length" and takes the #196
@@ -6278,7 +6413,51 @@ All three fixes are CODE; no description moved.
   alone (a deploy today is plausibly now), and turning the call into a
   `schedule_deploy` card (it would have to guess the moment). Pinned by the
   authored scenario "a deploy-now answer to a request that named a later time
-  is asked about, never offered"; the mac must make it pass.
+  is asked about, never offered"; the mac makes it pass since #449 (below).
+- **On the mac (#449, 2026-10-07).** The same frames, ported function for
+  function into `AssistCardCommand.swift`: `scheduleAsDeploy`,
+  `asksWhenToSchedule` and `cancelTheScheduledDeploy`, with `matching`,
+  `morningOrEvening` and `timeToSayAs` reading the rewrite exactly as Windows'
+  do; the ask sits between the morning-or-evening and say-it-as questions in
+  `AssistAgent.say`, as on Windows. `AssistWording.scheduleADeployNeedsATime`
+  is Windows' sentence byte for byte, generated into `assist-wording.json`, and
+  the S1 scenario names it rather than quoting it. Things a reader should know:
+  - **Both apps refuse a trailing "?" BEFORE the rewrite**, because both
+    apps' deploy frame drops a "?" itself (Windows' `DeployFrame`, the mac's
+    `deployFrame`): rewritten first, "schedule a deploy at 6:30 am?" would be
+    accepted. Not a mac trap; the mac test checks every refused row against
+    all four readers so neither app can lose it quietly.
+  - **The prompt shelf's cancel card is answered in code now.** Both shelves
+    say "Cancel scheduled deploy", with no "the|that|my", so the card was still
+    going to the model (the accepted row's `why` called "Cancel that scheduled
+    deploy" the shelf's sentence; it never was). The mac added an ACCEPTED row
+    for the bare sentence and accepts it; Windows owes the same one-word
+    widening. The shelves were not reworded.
+  - **Not in `cardPhrasings.parsed`, on purpose.** That generated catalogue
+    lists card families with an example and a `notThis`; these two are frames
+    over sentences whose specification is the authored `scheduleAndCancel` key,
+    so listing them twice would be a second copy to keep in step.
+  - **Settler S1 is decided BEFORE the turn is recorded** on the mac. The mac
+    writes the model's chose-a-tool line (`recordTurn`) before its gates, and
+    that line says "waited for the button" for any readable approval tool; S1
+    is decided first so that line says no such thing on a turn that puts no
+    button up, and S1's own line (Windows' words,
+    `AssistAgent.choseADeployNowForALaterTimeLine`) follows it. Windows writes
+    S1's line INSTEAD of its chose-a-tool line; the difference is in how the two
+    apps already wrote that line, not in what they record.
+  - **Settler S2 was NOT already true on the mac**, as the case expected. The
+    mac's local `add_next_class` declares no `unit`, but nothing strips an
+    undeclared key from a model call and `nextClassPlan` reads `unit` from any
+    call, so a model-sent unit "next" started Unit 2 here too (measured: with
+    the settler off the scenario's plan says "Unit 2"). The mac drops it in
+    `AssistAgent.think()`, for the model's calls only (the "Start a new unit…"
+    card keeps its unit "next"), unless the teacher's sentence says unit|units:
+    `AssistAgent.withoutAnUnaskedNewUnit`. REJECTED: stripping every undeclared
+    key from model calls — principled, but it changes other tools beyond this
+    piece and would need its own cases. *(Widened by #440, 2026-10-07: the
+    model's `unit` AND `days` are now taken out of every `add_next_class`
+    whatever the sentence says, as `AssistAgent.withoutCardOnlyArguments`; the
+    function named above is gone. Still this one tool only.)*
 - **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
   it in the morning after all.") is still declined by the model — the safe
   direction, since nothing is claimed — and the 30 s limit works only for a
@@ -6377,8 +6556,10 @@ door ALSO names its course in the server's ENVIRONMENT
 the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
-and the mac is asked what it does). The Codex door names none and holds none,
-as before.
+and the mac is asked what it does — answered by #458, below). Windows' Codex
+door names none and holds none, as before. Russell decided on #458 that BOTH
+doors hold their course, so the mac's Codex door names it too and Windows'
+owes the same (below).
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6411,6 +6592,142 @@ codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
 `%APPDATA%\npm` has no `codex.cmd`). Plantoir never installs it, and neither did
 this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
 Windows machine that has Codex, with its hardware, before trusting it there.
+
+### On the mac (#458, 2026-10-07): both doors hold their course, as Windows' Claude door does
+
+Russell decided on #458 that the mac MATCHES Windows, and that BOTH doors,
+Claude and Codex, name their course to the server, which holds it. The Claude
+door's `mcp-<CODE>.json` now carries `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}`
+beside `args` (`ClaudeCodeLauncher.writeConfig`); the Codex door passes a fifth
+override, `-c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"`, escaped
+for TOML and then the shell like the other four
+(`CodexLauncher.configurationOverrides`). The name is written once, as
+`AssistMCPServer.doorCourseVariable`, and pinned against
+`app-rules.json` → `outsideAgents.doorCourseVariable` and each door's
+`serverEnvironment`. The argv stays `--mcp-stdio <folder>`: #430's trap was a
+course in the argv being read as a lock, and nothing keys on it.
+
+**The server.** `AssistMCPServer.serve` reads the variable after it has opened
+the folder and resolves it with `courseToHoldForTheConversation(_:among:)` —
+Windows' `CourseToHoldForTheConversation`: trimmed, blank is nothing, matched
+without regard to case and answered as the folder spells it, a course the
+folder does not have is nothing (never a refusal, never a lock).
+`WorkLeaseRegistry.holdForTheConversation` keeps the `assist` lease in what
+`reconcile()` WANTS — necessary, not tidy: `reconcile` removes every written
+lease that is not wanted, so a hold written beside it would vanish at the first
+reconcile after the session's own preview or deploy ended. It survives the
+`isLeaving` window too, and `releaseEverything()` clears it. The trail gets
+`outside session held a course` ("a Claude or Codex session started from
+Plantoir is holding ICS3U while it is open").
+
+**The three protections**, each read from another live process's files, never
+this process's own (`heldElsewhere` skips its own pid and dead owners):
+
+- **The session's backup is kept** (#283). The runner's two places that make a
+  conversation's way back now go through one `rememberConversationBackup`, which
+  — in the server only (`AssistMCPServer.isServing`) — writes
+  `<COURSE>.held-backup.<pid>` beside the lease, one line, the zip's path
+  (`file-formats.json` → `heldBackupRecord`, Windows' format). The app's delete
+  keeps a record's backup only while that pid holds a live `assist` lease
+  (`WorkLeaseFiles.backupsHeldByOtherSessions`), and tells it apart from the
+  in-app window's own held backup: the confirmation, the alert afterwards, the
+  single Delete Backup and the trail's kept clause each say which (#458 ruling 7).
+- **A second session is refused.** All three Revise items grey on a held course
+  with "Available once you finish revising with Claude or Codex" once under
+  them — the sentence Windows' `BusyReason` has said since #430, with "or
+  Codex" added because the server cannot tell which door started it. The two
+  doors also grey while the in-app window is open on that course, with the
+  sentence that names the window (`AssistActivity.closeTheAssistantFirst`), not
+  the session's: two causes, two sentences (`CourseActivity
+  .reviseUnavailableReason`, `doorCourseHold.reviseCases`). Each click re-reads
+  the disk (`WorkspaceModel.reviseRefusal`) and refuses with "{CODE} is already
+  being revised", because a session can start between the menu opening and the
+  click.
+- **Structural work waits.** `CourseActivity.structuralHoldReason` is
+  `busyDescription`, then the hold. It is a SEPARATE question because
+  `busyDescription` is also the one a BUILD asks (`AssistSiteWork`), and an
+  `assist` lease never declines a build. Switched to it: the menu's Rename Course
+  and Add Section…, `renameIsUnavailableReason`, `rename()`, both checks in
+  `restoreBackup`, and a new click-time check on Add Section…. **Not held, as on
+  Windows** (ruling 2): removing a course or a section (`ScheduledDeployCleanup`
+  keeps `courseIsBusy`), and the unit-word rename. Keep a Copy for Reference
+  only reads the course and is not held either.
+
+**Staleness.** Another process's file changes nothing the app observes, and
+SwiftUI has no "menu is opening" hook (Windows reads at its menu's Opening). The
+window keeps a snapshot, `WorkspaceModel.coursesRevisedElsewhere`, refreshed when
+the folder is shown, on `NSApplication.didBecomeActiveNotification` (a session
+is opened and closed in Terminal, so coming back to Plantoir is when it changes)
+and at every click. **Rejected**: a folder watcher on `courses/.internal/activity`
+(more than Windows has, and a timing test on a serial suite, for a case the
+activation refresh covers), and reading the disk while a menu draws.
+
+**How a session ENDS — measured, and why there is no "let go" line.** Scratch
+Debug build, Claude Code 2.1.292, macOS 26 on Apple silicon, a temp working
+folder: the `EXC2O.assist.<pid>.lease` appeared within seconds of the session
+starting, its pid the server's (so Claude Code passes `env` through), and was
+removed when the server's input was closed under it. But each way a teacher
+ends a real session KILLED the server instead: `/exit`, Control-C twice,
+Command-W on the Terminal window (Terminate) and quitting Terminal (Command-Q,
+Terminate) — in all four the server was gone within six seconds and its lease
+was still on disk. SIGHUP and SIGTERM sent by hand do the same. Quitting
+Plantoir itself while a session is open leaves the session's lease, its
+held-backup record and its server exactly as they were (measured: app gone,
+server alive, both files present) — the app's quit removes only its own. So the clean
+release (`stopOwnWorkBeforeLeaving`: runs stopped, then
+`forgetRecordedBackups()`, then `releaseEverything()` — Windows' order) is the
+exception, and no "let go" trail line is written: it would almost never appear,
+and its absence would read as a session still open. The stale lease and record
+hold nothing, because every reader skips a dead owner by pid, name and start
+time; one lease and at most one record per course accumulate per session, and
+nothing sweeps them (`doorCourseHold.knownLimits`). **Rejected**: a SIGTERM
+handler (it cannot await the runs it would stop, and the readers already ignore
+the dead), and exporting the course in the `.command` script (implicit, and it
+would reach the server only through the shell's environment).
+
+**The acceptance run (#458 ruling 6)**, the same day: a scratch Debug build
+launched with `--state-dir` on a temp working folder holding EXC2O, and a real
+Claude session opened through a door configuration written exactly as
+`writeConfig` writes it — with one deliberate difference, `--state-dir` added to
+the server's args, because a server started by the app's own menu item takes no
+state folder and would have written to the real trail. Asked to publish a page,
+the session made its backup and wrote `EXC2O.held-backup.<pid>` naming it. In
+the app: the course menu showed Revise with Claude and Codex greyed with
+"Available once you finish revising with Claude" once under them, and Rename
+Course and Add Section… greyed with the same line (Edit → Rename Course too); a
+section's menu greyed all three Revise items with one line; Delete Backup on
+the session's zip answered "Finish the Claude session working on EXC2O first.
+It made this backup, so it was kept."; and Restore on another backup of EXC2O,
+confirmed, answered "A Claude session is working on EXC2O right now. Finish that
+session, then restore." (Those are the words as they stood that afternoon; every
+one of these sentences now says "Claude or Codex", and the Codex door was not
+put through an acceptance run of its own — `codex mcp get --json` shows Codex
+0.155.1 reads the override into the server's `env`, and the server side is the
+same code.)
+
+**Known platform difference: when Restore asks.** On the mac a restore is
+checked AFTER the teacher confirms "Restore {CODE} from this backup?"
+(`WorkspaceModel.restoreBackup`, the order busy had before #458); Windows
+checks `BusyReason` before its confirmation. With a Claude session that can
+stay open for an hour, the mac's refusal after a confirmation is the likelier
+case now. Left as it is (review of #458, finding 8); greying Restore while the
+course is held is the change if Russell wants one.
+
+**Both doors, by Russell's decision — and what Windows owes.** The director's
+ruling 3 for #458 first kept the Codex door holding nothing, to match Windows.
+Russell's comment on #458 (2026-10-07) won: BOTH doors hold, because a Codex
+session that held nothing would lose all three protections — its backup could
+be deleted under it, a second session could open on the course, and the course
+could be renamed under it — while looking to the teacher exactly like a Claude
+one. Windows' Codex door still names no course (it passes four overrides), so
+Windows owes the fifth, and the words "or Codex" in the sentences above
+(`doorCourseHold.whichDoors`). How a Codex session ENDS was not measured; a
+leftover lease holds nothing either way. **Rejected**: naming the door in a
+second variable so each sentence could say "Claude" or "Codex" — the lease
+would have to carry it, a format change on both platforms for one word.
+
+**The in-app window does not hold structural work on the mac**, and never did;
+on Windows its own server takes the lease, so it does there. Not changed here.
 
 ### The two timeouts, and why they are passed rather than trusted
 
@@ -7069,8 +7386,8 @@ family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
 3", and three `nearMisses` that a runner walks both without a course and in a
 club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
-on it is matched in code except "Cancel scheduled deploy", which was already
-measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
+on it is matched in code — "Cancel scheduled deploy" too since #449, which
+until then went to the model, where it had been measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
 it — a title-bearing publish or hide goes to the model, and no routing
 measurement has been made in a club course.
 
@@ -7596,8 +7913,11 @@ there is no difference left to know. *(#411: Russell decided on 2026-10-03
 that the mac should match Windows' ORIGINAL schema instead — declare both, and
 refuse the empty call. It was built and measured on 2026-10-04 and failed the
 pre-registered routing rule, so it is PARKED on the branch
-`issue/411-add-next-class-unit-days` and nothing changed on either app; see
-"#411: `add_next_class` with `unit` and `days`, measured and parked" above.)* "Add the next class page" is a card and
+`issue/411-add-next-class-unit-days` (kept as the record) and nothing changed on either app; see
+"#411: `add_next_class` with `unit` and `days`, measured and parked" above. #440
+settled it on 2026-10-07: the schema stays at course and section, and an empty
+call runs on both apps — "#440: `add_next_class` keeps two arguments; units and
+counts answered in code".)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.

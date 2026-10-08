@@ -27,7 +27,7 @@ Write an introduction or opening summary for this page here. Introduce the core 
 Explain the key idea, activity, demonstration, or investigation here.
 
 > [!note] Table of contents
-> Every  (level 2) and  (level 3) heading you use on this page automatically becomes an entry in the **Navigate this page** table of contents on the right side of the published page.
+> Every `##` (level 2) and `###` (level 3) heading you use on this page automatically becomes an entry in the **Navigate this page** table of contents on the right side of the page on your class website.
 
 ### Supporting Details
 

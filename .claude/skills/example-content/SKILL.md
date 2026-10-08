@@ -840,7 +840,12 @@ page name on the built site. Every shared content folder (and `Tutorials`)
 also carries a `_DUPLICATE ME.md` template (`title: _DUPLICATE ME`,
 `publish: false`, `created: __CREATED__`) floating to the top in Obsidian
 with authoring guidance, heading/TOC examples, curriculum link reminders,
-and preview shortcuts.
+and preview shortcuts. Copy its table-of-contents sentence from an existing
+template rather than retyping it: it names the marks in backticks — Every
+`##` (level 2) and `###` (level 3) heading — and typed through a shell, the
+backticks run as a command and the marks vanish, which is the likeliest
+way 307 template pages came to say "Every  (level 2) and  (level 3) heading" for seven weeks (#444);
+`lint_payload.py` now refuses that sentence's markless form on every payload page, and `lint_skeletons.py` (no family named) on the Example Course — "Every  (level N)" or "and  (level N)", a double space where the backticked mark should be — and nothing else that names a level.
 
 **Key Links is the course's orientation panel, not an index of its
 content.** It holds the things that set the tone and answer a newcomer's
@@ -965,6 +970,12 @@ the linter.
    which only shows up when you compare two of them. Check the days named
    are days that task actually runs on.
 
+   If you touched the Example Course (`support/example_course/`, EXC2O),
+   also run `lint_skeletons.py` with no family named: EXC2O has no
+   manifest, so it gets only the two rules a copied template sentence can
+   break — the class website never called "published" (#443) and the
+   heading marks (#444).
+
    **Two things the linter reads the way the site does (#313).** A link
    written inside code — a fence of either character, a fence inside a
    callout, an inline span — is an example of the syntax, not a link: it
@@ -1072,7 +1083,12 @@ than hand-written:
   article ("an English course", "this course" — never "a this course
   course"), and the linter refuses the misfit. "a"/"an" follows the
   first SOUND (`article_for`: "a unit", "a European", "an hour"), and the
-  linter checks every article by that rule. It tests its own rules against
+  linter checks every article by that rule. The class website is "your
+  class website", never "the published page / website / site": DEPLOY
+  puts a site online and PUBLISH only marks a page (#443), and the linter
+  refuses the phrase (in the skeletons, and in the Example Course
+  `support/example_course/` when run with no family named) — a sentence about MARKING a page ("publish: true",
+  "the newest published page") is right and passes. It tests its own rules against
   `MUST_BE_ACCEPTED` / `MUST_BE_REFUSED` before every run and exits 2 if
   one misbehaves — add a shape there when widening a check.
 - The sidebar is a RULE, not a list: the `Curriculum` folder is never

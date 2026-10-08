@@ -68,7 +68,7 @@ SCENES: list[Scene] = [
         name="courses", produces=["courses"], kind="ui-test", test="testCourses",
         identifiers=["courseNameField", "referenceYear-"],
         what_it_sets_up="ICS3U selected (its settings form), ICS4U beside it, and last year's ICS3U "
-                        "unfolded under Reference Courses, 2025–26.",
+                        "unfolded under Reference Courses, under the school year the copy is filed in.",
     ),
     Scene(
         name="new-course", produces=["new-course"], kind="ui-test", test="testNewCourse",
@@ -93,7 +93,7 @@ SCENES: list[Scene] = [
         name="reference", produces=["reference"], kind="ui-test", test="testReferenceAndCopyAPage",
         identifiers=["referenceYear-", "copyAPage-", "copyPageDestinationCourse", "copyPageChecklist",
                      "copyPageRefusal"],
-        what_it_sets_up="Reference Courses › 2025–26 unfolded; Copy a Page from the reference ICS3U, "
+        what_it_sets_up="Reference Courses › the copy's school year unfolded; Copy a Page from the reference ICS3U, "
                         "\"The Unplugged Algorithm\" into ICS4U with its linked pages coming too, before Copy is pressed; cancelled.",
     ),
     Scene(

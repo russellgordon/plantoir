@@ -3,16 +3,16 @@
 
 The finished site is written to ``site/`` at the top of the repository, which
 is what Netlify deploys. Nothing here is served: page sources, the layout and
-the screenshot harness stay outside the published folder.
+the screenshot harness stay outside the deployed folder.
 
 Usage::
 
     python3 website/build.py             # write site/
     python3 website/build.py --check     # report problems, write nothing
     python3 website/build.py --serve     # preview locally; rebuild on refresh
-    python3 website/build.py --deploy    # build, then publish to plantoir.app
+    python3 website/build.py --deploy    # build, then deploy to plantoir.app
 
-Publishing is deliberately a separate, explicit flag: the Netlify site is not
+Deploying is deliberately a separate, explicit flag: the Netlify site is not
 connected to GitHub, so plantoir.app changes ONLY when --deploy (or
 website/netlify_deploy.py directly) is run. Build, look at site/ locally,
 deploy when it is right.
@@ -36,6 +36,7 @@ warning, so the site can be built before the captures are taken.
 from __future__ import annotations
 
 import argparse
+import http.server
 import json
 import re
 import shutil
@@ -220,7 +221,7 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
             # A shot written into the pages before the app it photographs has
             # been released (website/README.md, "Regenerating every image").
             # It renders as NOTHING rather than a "pending" box, so the site
-            # stays publishable meanwhile; `awaiting_capture_notes` lists it
+            # stays deployable meanwhile; `awaiting_capture_notes` lists it
             # on every build, and the capture removes the flag.
             return ""
         problems.append(f"screenshot '{identifier}' has not been captured yet")
@@ -401,7 +402,7 @@ def expand_shots(body: str, shots: dict, problems: list[str], page_name: str, up
 def demo_links_html(site: dict) -> str:
     """The list of live example class sites, or nothing when they are off.
 
-    The sites are built and published by ``website/shots/capture.py`` when the
+    The sites are built and deployed by ``website/shots/capture.py`` when the
     screenshots are taken, and their addresses are recorded in site.json. Set
     ``show_links`` to false there and the block disappears from the page --
     which is what to do if the example sites are ever taken down.
@@ -464,7 +465,7 @@ COUNT_NOUNS = re.compile(r"^(course|courses|code|codes)$", re.IGNORECASE)
 # The app enforces it for its own sentences; the site is the same product to
 # a teacher, so it is enforced here too. "token" is deliberately NOT on the
 # list: Cloudflare asks the teacher for an "API token" by that name, and the
-# publishing page has to call it what the dashboard calls it.
+# Deploying page has to call it what the dashboard calls it.
 MACHINERY = re.compile(
     r"\b(toolchain|scripts?|docker|colima|containers?|launchd|launchagents?|mcp|"
     r"models?|sparkle|appcast|feeds?)\b",
@@ -551,6 +552,86 @@ def machinery_problems(name: str, body: str, first_line: int = 1) -> list[str]:
             "does: plain words (CLAUDE.md rule 1)."
         )
     return problems
+
+
+# DEPLOY puts a site online; PUBLISH only marks a page so that it is included
+# in a deploy (#443, v1.4.4). The site teaches the app's words, so every
+# "publish" a visitor can read must be one of the page-marking sentences
+# below; anything else is a deploy in the wrong word. The opposite of the
+# MACHINERY list on purpose: a list of forbidden phrases catches only the
+# sentences somebody thought of, and the site is small enough to name every
+# sentence that is allowed. A NEW sentence that marks a page goes here, with
+# its page; one that puts a site online says deploy.
+PUBLISH_MEANS_MARKING_A_PAGE: list[str] = [
+    # day-to-day.html, Start of the Year: mirrors startOfYear.wording.undoAvailable.
+    "publish any of its pages or put one into draft",
+    # day-to-day.html and features.html: what a teacher asks the assistant.
+    "Publish or hold back a class.",
+    "Publish Thursday's class for section 2.",
+    "Which pages are published right now?",
+    "Yesterday's class published.",
+    # features.html, Copy a Page: mirrors referenceCourses copiesStartHidden.
+    "until you publish it and deploy.",
+    # support.html: a page's own setting, and the problem report's record of it.
+    "a page you haven't published to a section",
+    "the record notes that a page was published",
+]
+
+PUBLISH_WORD = re.compile(r"\w*publish\w*", re.IGNORECASE)
+
+
+def deploy_word_problems(name: str, text: str, readable: bool = True) -> list[str]:
+    """A "publish" on the site that is not one of the page-marking sentences."""
+    if readable:
+        text = readable_text(text)
+    for entity, character in (("&mdash;", "—"), ("&hellip;", "…"), ("&rsquo;", "’"), ("&amp;", "&")):
+        text = text.replace(entity, character)
+    text = re.sub(r"\s+", " ", text)
+    for phrase in PUBLISH_MEANS_MARKING_A_PAGE:
+        text = text.replace(phrase, " " * len(phrase))
+    problems: list[str] = []
+    for match in PUBLISH_WORD.finditer(text):
+        start = max(0, match.start() - 50)
+        context = text[start:match.end() + 30].strip()
+        problems.append(
+            f"{name} says {match.group(0)!r} (\"…{context}…\"). DEPLOY puts a site online and PUBLISH only "
+            "marks a page (#443): say deploy, or add a sentence that really marks a page to "
+            "PUBLISH_MEANS_MARKING_A_PAGE in build.py."
+        )
+    return problems
+
+
+def shot_texts(shot: dict) -> list[tuple[str, str]]:
+    """Every word a shot carries that a visitor or a capture reads: alt and
+    caption (and a pending retake's), and the expectText a picture must show.
+    A shot's current alt is skipped while a retake carries a new one: it
+    describes the picture on disk, and is replaced with it."""
+    texts: list[tuple[str, str]] = []
+    retake = shot.get("retake") or {}
+    for key in ("alt", "caption"):
+        if shot.get(key) and key not in retake:
+            texts.append((key, shot[key]))
+        if retake.get(key):
+            texts.append((f"retake {key}", retake[key]))
+    for word in shot.get("expectText", []) + retake.get("expectText", []):
+        texts.append(("expectText", word))
+    for part_name, part in shot.get("parts", {}).items():
+        for word in part.get("expectText", []):
+            texts.append((f"{part_name} expectText", word))
+    return texts
+
+
+def site_json_texts(site: dict) -> list[tuple[str, str]]:
+    """The words site.json puts on a page."""
+    texts: list[tuple[str, str]] = [("headline", site.get("headline", "")), ("tagline", site.get("tagline", ""))]
+    for index, item in enumerate(site.get("new_in", {}).get("items", [])):
+        texts.append((f"new_in item {index + 1}", item["text"]))
+    for entry in site.get("downloads", []):
+        texts.append((f"downloads {entry.get('platform', '')}", entry.get("meta", "")))
+    texts.append(("availability note", site.get("availability", {}).get("note", "")))
+    for entry in site.get("demo_sites", {}).get("sites", []):
+        texts.append((f"demo site {entry.get('code', '')}", entry.get("label", "")))
+    return texts
 
 
 # ---------- Blocks drawn from site.json ----------
@@ -644,6 +725,106 @@ def broken_fragment_problems(rendered: dict[str, str]) -> list[str]:
     return problems
 
 
+# ---------- Pages that moved ----------
+
+# A page that moves keeps its old address working: site.json's "redirects"
+# names each move, build.py writes them into site/_redirects (Netlify reads
+# that file from the deployed folder, as it reads _headers), and the old
+# address answers 301 with the new one. A browser carries the #fragment over
+# a redirect itself, so /publishing/#on-a-schedule lands on
+# /deploying/#on-a-schedule. The rules are FORCED (301!) so that a stale copy
+# of the old page left anywhere can never shadow them.
+REDIRECTS_FILE = "_redirects"
+
+
+def moved_pages(site: dict) -> list[dict]:
+    return list(site.get("redirects", {}).get("moved", []))
+
+
+def redirects_text(site: dict) -> str:
+    lines: list[str] = [
+        "# Written by website/build.py from site.json \"redirects\". Do not edit by hand.",
+    ]
+    for move in moved_pages(site):
+        old = move["from"]
+        new = move["to"]
+        lines.append(f"/{old}    /{new}/    301!")
+        lines.append(f"/{old}/*    /{new}/:splat    301!")
+    return "\n".join(lines) + "\n"
+
+
+def redirect_problems(site: dict, slugs: list[str], rendered: dict[str, str]) -> list[str]:
+    """A move whose new page does not exist, whose old address is still a
+    page, or whose old address a page still links to (it would work, by way
+    of a redirect, and the link should say where the page is now)."""
+    problems: list[str] = []
+    for move in moved_pages(site):
+        old = move["from"]
+        new = move["to"]
+        if new not in slugs:
+            problems.append(f"site.json redirects /{old}/ to /{new}/, which is not a page")
+        if old in slugs:
+            problems.append(f"site.json redirects /{old}/ away, but pages/{old}.html still exists")
+        if old in site.get("nav", []):
+            problems.append(f"site.json's nav still lists {old!r}, which moved to {new!r}")
+        # Relative ("../publishing/"), root-relative ("/publishing/") and
+        # absolute ("https://plantoir.app/publishing/") links all count.
+        link = re.compile(r'href="(?:https?://plantoir\.app)?/?(?:\./|\.\./)*' + re.escape(old) + r'/')
+        for slug, html in rendered.items():
+            if link.search(html):
+                problems.append(f"{slug}.html links to {old}/, which moved to {new}/")
+    return problems
+
+
+def moved_location(site: dict, path: str) -> str | None:
+    """Where --serve sends a request for a moved page's old address — the
+    same place plantoir.app's _redirects sends it — or None if it did not move."""
+    for move in moved_pages(site):
+        old_prefix = "/" + move["from"]
+        if path == old_prefix or path.startswith(old_prefix + "/"):
+            rest = path[len(old_prefix):].lstrip("/")
+            return "/" + move["to"] + "/" + rest
+    return None
+
+
+class MovedPagesHandler(http.server.SimpleHTTPRequestHandler):
+    """Serves site/ and answers a moved page's old address with the 301
+    plantoir.app gives — to HEAD as well as GET, as Netlify does, so a
+    `curl -I` against the preview tells the truth about the live site."""
+
+    def answered_as_moved(self) -> bool:
+        location = moved_location(read_json(WEBSITE / "site.json"), self.path)
+        if location is None:
+            return False
+        self.send_response(301)
+        self.send_header("Location", location)
+        self.end_headers()
+        return True
+
+    def before_serving(self) -> None:
+        """A hook for --serve's rebuild-on-refresh; nothing by default."""
+
+    def do_GET(self) -> None:
+        if self.answered_as_moved():
+            return
+        self.before_serving()
+        super().do_GET()
+
+    def do_HEAD(self) -> None:
+        if self.answered_as_moved():
+            return
+        super().do_HEAD()
+
+
+def remove_moved_output(site: dict, output: Path) -> None:
+    """The old page's built copy, left from before the move: removed so the
+    folder that is deployed holds only what the sources say."""
+    for move in moved_pages(site):
+        stale = output / move["from"]
+        if stale.is_dir() and stale.parent == output:
+            shutil.rmtree(stale)
+
+
 def version_tuple(text: str) -> tuple:
     parts: list[int] = []
     for piece in str(text).split("."):
@@ -667,7 +848,7 @@ def release_readiness_refusal(site: dict, shots: dict) -> str | None:
     features whose download does not exist yet — deploy after the cut), or a
     shot the pages name is still `awaiting_capture` with no image (the section
     would go out without its picture). `--check` lets both through, so the
-    site can be built and reviewed before the release; publishing does not.
+    site can be built and reviewed before the release; deploying does not.
     """
     listed = str(site.get("new_in", {}).get("version", ""))
     current = ".".join(str(site.get("version", "")).split(".")[:2])
@@ -702,6 +883,13 @@ def new_in_is_current(site: dict) -> bool:
     listed = str(site.get("new_in", {}).get("version", ""))
     major_minor = ".".join(version.split(".")[:2])
     return listed == major_minor
+
+
+def site_slugs(pages: list[dict]) -> list[str]:
+    slugs: list[str] = []
+    for page in pages:
+        slugs.append(page["slug"])
+    return slugs
 
 
 def substitute(template: str, values: dict) -> str:
@@ -755,6 +943,11 @@ def build(check_only: bool) -> int:
     for index, item in enumerate(site.get("new_in", {}).get("items", [])):
         problems.extend(typed_count_problems(f"site.json new_in item {index + 1}", item["text"]))
         problems.extend(machinery_problems(f"site.json new_in item {index + 1}", item["text"]))
+    for shot in shot_list:
+        for key, text in shot_texts(shot):
+            problems.extend(deploy_word_problems(f"shots.json {shot['id']} {key}", text, readable=False))
+    for key, text in site_json_texts(site):
+        problems.extend(deploy_word_problems(f"site.json {key}", text, readable=False))
 
     written: list[Path] = []
     rendered: dict[str, str] = {}
@@ -798,6 +991,11 @@ def build(check_only: bool) -> int:
         if leftover:
             problems.append(f"{page['slug']}.html left placeholders unfilled: {', '.join(sorted(set(leftover)))}")
 
+        # Read as BUILT, so the layout, the navigation and every block
+        # build.py writes are read too, not only the page's own source; the
+        # description goes into meta tags, which reading the text skips.
+        problems.extend(deploy_word_problems(f"{page_name} (as built)", html))
+        problems.extend(deploy_word_problems(f"{page_name} description", page["description"], readable=False))
         rendered[page["slug"]] = html
         destination = output_path(page["slug"])
         if not check_only:
@@ -823,8 +1021,11 @@ def build(check_only: bool) -> int:
         update_feeds.copy_feeds(feed_source, OUTPUT / "updates")
 
     problems.extend(broken_fragment_problems(rendered))
+    problems.extend(redirect_problems(site, site_slugs(pages), rendered))
 
     if not check_only:
+        remove_moved_output(site, OUTPUT)
+        (OUTPUT / REDIRECTS_FILE).write_text(redirects_text(site), encoding="utf-8")
         assets = OUTPUT / "assets"
         assets.mkdir(parents=True, exist_ok=True)
         for asset in sorted((WEBSITE / "assets").iterdir()):
@@ -873,13 +1074,14 @@ def serve(port: int) -> int:
     browser, see it. Stop with Ctrl+C.
     """
     import functools
-    import http.server
     import socketserver
 
     built_from = newest_source_time()
 
-    class PreviewHandler(http.server.SimpleHTTPRequestHandler):
-        def do_GET(self) -> None:
+    class PreviewHandler(MovedPagesHandler):
+        # A moved page's old address answers as plantoir.app does
+        # (MovedPagesHandler, for GET and HEAD alike).
+        def before_serving(self) -> None:
             nonlocal built_from
             # Rebuild only ahead of page loads, not for every image the page
             # then pulls in — one check per refresh, not thirty.
@@ -890,7 +1092,6 @@ def serve(port: int) -> int:
                     print("✏️  Sources changed — rebuilding…", flush=True)
                     build(check_only=False)
                     built_from = current
-            super().do_GET()
 
         def end_headers(self) -> None:
             # Without this the browser caches assets heuristically and an
@@ -1040,7 +1241,7 @@ def main() -> int:
     parser.add_argument(
         "--deploy",
         action="store_true",
-        help="after a clean build, publish site/ to plantoir.app on Netlify",
+        help="after a clean build, deploy site/ to plantoir.app on Netlify",
     )
     parser.add_argument(
         "--serve",
@@ -1071,9 +1272,9 @@ def main() -> int:
             outcome = feeds
         return {"match": 0, "mismatch": 2, "unknown": 1}[outcome]
     if arguments.check and (arguments.deploy or arguments.serve):
-        parser.error("--check writes nothing, so there is nothing to publish or preview")
+        parser.error("--check writes nothing, so there is nothing to deploy or preview")
     if arguments.deploy and arguments.serve:
-        parser.error("--serve is for looking before you publish; run --deploy after")
+        parser.error("--serve is for looking before you deploy; run --deploy after")
     result = build(check_only=arguments.check)
     if arguments.serve:
         if result != 0:

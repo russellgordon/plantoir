@@ -121,6 +121,63 @@ nonisolated enum AssistWording {
             + "Say “\(sayMorning)” or “\(sayEvening)”."
     }
 
+    /// The answer to "schedule a deploy" with no time the app can set, and
+    /// to a deploy-now answer from the model for a sentence that named a
+    /// later time (#449, from Windows' #424). Asked in code; nothing is
+    /// scheduled, nothing runs, and the question is never sent to the model.
+    ///
+    /// **Windows' sentence byte for byte**, curly quotes and apostrophe
+    /// included: it was written there first and Windows' wording comparison
+    /// reads this generated key. The example it names, "deploy tomorrow at
+    /// 6:30 am", is one the deploy-at-a-time family accepts, so typing it
+    /// puts the scheduled deploy's card up on the very next turn —
+    /// `ScheduleAndCancelFramesTests` pins that.
+    static let scheduleADeployNeedsATime: String =
+        "What time should this section deploy? Say it with the time, for example “deploy tomorrow at "
+        + "6:30 am”, and I’ll set it up for you to agree to."
+
+    /// Settler S3's answer (#440): the model chose a plain add_next_class for
+    /// a sentence asking for a new unit, a unit or day other than the next
+    /// one, or several pages. Nothing is added, and the teacher is given the
+    /// sentences that DO it.
+    ///
+    /// **Every sentence it quotes is one the window accepts, in that very
+    /// course** (ruling 1 of the #440 review, pinned by `NextClassUnitsTests`
+    /// for a Unit, a Module and a numbered course): "Start a new unit" and
+    /// "Add five more days to Unit 2" are answered in code, term-blind, and
+    /// plan the course's own word ("Module 2, Day 7"). The days sentence
+    /// names `latestUnit` — the unit the plain next page goes in — rather
+    /// than a fixed example: typed back, "Add five more days to Unit 4" in a
+    /// course whose latest unit is 2 would start Unit 4 at Day 1 and skip
+    /// Unit 3 (review N-impl F4). A numbered course has
+    /// no units, so it is told the one thing it can do — "Add the next
+    /// meeting page" — once per page. Quoting the course's own word ("Start a
+    /// new module") was REJECTED: the frames read only "unit", so that
+    /// sentence would go to the model and be stopped here again, round and
+    /// round (review finding F2).
+    static func nextClassNeedsItsOwnPhrasing(
+        unitWord: String,
+        isNumbered: Bool,
+        noun: ClassNoun,
+        latestUnit: Int
+    ) -> String {
+        if isNumbered {
+            return "Nothing was added. This course numbers its pages one after another and has no units, "
+                + "so I add one \(noun.singular) at a time: say “Add the next \(noun.singular) page” once for "
+                + "each one you want."
+        }
+        let word: String = unitWord.lowercased()
+        let opening: String = "Nothing was added. I add one \(noun.singular) at a time, after the last one in "
+            + "your latest \(word)."
+        if word == "unit" {
+            return opening + " To start a new unit, say “Start a new unit”. To add several days to Unit "
+                + "\(latestUnit), say “Add five more days to Unit \(latestUnit)”."
+        }
+        return opening + " To start a new \(word), say “Start a new unit”. To add several days to "
+            + "\(unitWord) \(latestUnit), say “Add five more days to Unit \(latestUnit)”, since I read the "
+            + "word unit as \(unitWord) here."
+    }
+
     /// The answer to a deploy time written a way the app can read but does
     /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
     /// Answered in code; nothing is scheduled and nothing is sent to the
@@ -187,6 +244,26 @@ nonisolated enum AssistWording {
 
     static func deployDidNotFinish(course: String, section: String) -> String {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
+    }
+
+    /// A deploy from the in-app assistant or an outside assistant's
+    /// `deploy_section` was refused by the launchers because the section was
+    /// still being deployed by a deploy that was set for later — its run
+    /// still working, including one ended by setting the section again
+    /// (GitHub #439). Said instead of "did not finish", which would send the
+    /// teacher looking for a fault. Names what is deploying, because after a
+    /// re-set the app shows only the new time. `shared-rules.json` →
+    /// `deployWhileItsSectionDeploys.sentences.assistant`.
+    static func deployRefusedWhileALaterDeployWorks(course: String, section: String) -> String {
+        return "\(course) Section \(section) is still being deployed by a deploy that was set for later, "
+             + "so it was not deployed again. Try again once that deploy has finished."
+    }
+
+    /// The same refusal when what was in the way is another deploy of the
+    /// section — one typed in Terminal, say (GitHub #439).
+    static func deployRefusedWhileItsSectionDeploys(course: String, section: String) -> String {
+        return "\(course) Section \(section) is already being deployed, so it was not deployed again. "
+             + "Try again once that deploy has finished."
     }
 
     /// A deploy from a caller with no window (an assistant in another app,
@@ -375,7 +452,7 @@ nonisolated enum AssistWording {
     /// `courseIsBusy` instead — it is the one talking to the program that is
     /// busy, so "busy in Plantoir" is the true sentence there.
     static func courseIsBeingBuiltElsewhere(course: String) -> String {
-        return "\(course) is being previewed or published somewhere else on this computer right now — "
+        return "\(course) is being previewed or deployed somewhere else on this computer right now — "
              + "by an assistant working from another app, another copy of Plantoir, or a deploy set "
              + "for later. Both would build the same pages in the same place, so doing it here as "
              + "well would spoil both. Try again once that has finished."
@@ -525,7 +602,7 @@ nonisolated enum AssistWording {
     /// same thing in the same shape, so a shared sentence stays shared.
     static func rolloverStartedANewWebsite(keptAs: String) -> String {
         return rolloverIsOnANewWebsite + " Last year's details are "
-             + "kept at \(keptAs), so you can go back to it. The next time you publish this "
+             + "kept at \(keptAs), so you can go back to it. The next time you deploy this "
              + "section, Plantoir will ask what to call the new website."
     }
 
@@ -539,15 +616,15 @@ nonisolated enum AssistWording {
     static let rolloverIsOnANewWebsite: String =
         "This section is no longer tied to last year's website." 
 
-    /// Confirming a new website for a section that had never been published.
+    /// Confirming a new website for a section that had never been deployed.
     static let rolloverHadNoWebsiteYet: String =
-        "This section had not been published anywhere yet, so there was no website to move away "
-        + "from. The first time you publish it, Plantoir will ask what to call it."
+        "This section had not been deployed anywhere yet, so there was no website to move away "
+        + "from. The first time you deploy it, Plantoir will ask what to call it."
 
     /// Confirming the same website.
     static let rolloverKeptTheSameWebsite: String =
-        "This section still publishes to the same website as last year, so every link anybody "
-        + "saved keeps working. Nothing goes out until you publish."
+        "This section still deploys to the same website as last year, so every link anybody "
+        + "saved keeps working. Nothing goes out until you deploy."
 
     /// What a teacher is told when the question was never answered.
     ///
@@ -559,7 +636,7 @@ nonisolated enum AssistWording {
     /// that it was NOT is what stops this feature quietly recreating the
     /// defect it was built to fix.
     static let rolloverWebsiteNotDecided: String =
-        "I have not changed which website this section publishes to — publishing it will still "
+        "I have not changed which website this section deploys to — deploying it will still "
         + "go to last year's website. Ask me to roll it over again if you would like to choose."
 
     /// A destination that could not be released, so the section is still
@@ -568,38 +645,38 @@ nonisolated enum AssistWording {
     /// **Its own sentence because the alternative said the opposite.** A
     /// marker that exists and cannot be moved used to produce the same empty
     /// result as one that was never there, so a teacher was told "this section
-    /// had not been published anywhere yet" about a section that is still
-    /// publishing over last year's site. That is a lie about the one fact this
+    /// had not been published anywhere yet" (as it then said) about a section that is still
+    /// deploying over last year's site. That is a lie about the one fact this
     /// whole feature turns on.
     static func rolloverCouldNotStartANewWebsite(stillPinned: String) -> String {
-        return "I could not move this section off \(stillPinned), so publishing it will still "
+        return "I could not move this section off \(stillPinned), so deploying it will still "
              + "replace last year's website there. Try again, or check whether that file is "
              + "locked or open somewhere else."
     }
 
-    /// Added when releasing a website turned off a publish that was set to
+    /// Added when releasing a website turned off a deploy that was set to
     /// happen on its own.
     ///
-    /// A section cut loose has nowhere agreed to publish TO, and the scheduled
+    /// A section cut loose has nowhere agreed to deploy TO, and the scheduled
     /// run has no one to ask, so it would silently create a website nobody
     /// named while the address students actually read stopped updating. The
     /// same shape as renaming a course, which turns the schedule off and says
     /// so for the same reason.
     static let rolloverTurnedOffTheScheduledPublish: String =
-        "This section was set to publish on its own. Starting a new website turned that off — "
-        + "set it again from the section's menu once you have published the new website for the "
+        "This section was set to deploy on its own. Starting a new website turned that off — "
+        + "set it again from the section's menu once you have deployed the new website for the "
         + "first time."
 
-    /// When turning that scheduled publish off did NOT work.
+    /// When turning that scheduled deploy off did NOT work.
     ///
     /// The dangerous state, and so the one that must not be described by the
-    /// sentence above. A publish still set to run has nobody to ask what the
+    /// sentence above. A deploy still set to run has nobody to ask what the
     /// new website should be called, so it would go ahead and make one — the
     /// exact outcome turning it off exists to prevent. Renaming a course says
     /// the same thing for the same reason.
     static let rolloverCouldNotTurnOffTheScheduledPublish: String =
-        "This section was also set to publish on its own, and Plantoir could not turn that off. "
-        + "It may still try to publish, and it has no way to ask what the new website should be "
+        "This section was also set to deploy on its own, and Plantoir could not turn that off. "
+        + "It may still try to deploy, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
     // MARK: - Getting a section ready for the start of the year (#96)
@@ -1756,8 +1833,63 @@ nonisolated enum AssistWording {
     /// `otherClassesMoved`. Named rather than typed inline, so that reply
     /// carries no copy of the undo caveat of its own (#185).
     static let lookTheSectionOverBeforePublishing: String =
-        "Look the section over in Plantoir before you publish."
+        "Look the section over in Plantoir before you deploy."
 
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."
+
+    // MARK: - A Claude or Codex session holding its course (#458)
+
+    /// Under the greyed items while a Claude or Codex session opened from
+    /// Plantoir is open on this course: the three Revise items, Rename Course
+    /// and Add Section…. Menu-length, in the shape of
+    /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
+    /// with "or Codex" added, so one sentence greys the same items on both
+    /// platforms once Windows' Codex door holds its course too.
+    ///
+    /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
+    /// BOTH doors name their course to the server, which holds it. The
+    /// server cannot tell which door started it, so one sentence names both;
+    /// Windows said "with Claude" while only its Claude door held a course.
+    static let availableOnceYouFinishRevisingWithClaude: String =
+        "Available once you finish revising with Claude or Codex"
+
+    /// The title of the alert a Revise item gives when it is clicked while a
+    /// Claude or Codex session is open on the course — the click-time
+    /// re-check behind the greyed menu, since a session can start between the
+    /// menu opening and the click. Windows' title for its own second-session refusal.
+    static func courseIsAlreadyBeingRevised(course: String) -> String {
+        return "\(course) is already being revised"
+    }
+
+    /// The message under `courseIsAlreadyBeingRevised`.
+    static let finishTheClaudeSessionFirst: String =
+        "A Claude or Codex session is working on this course already. Finish that session, then start again here."
+
+    /// What Rename Course, Restore and Add Section say when they are asked
+    /// for while a Claude or Codex session is open on the course — the
+    /// click-time check behind the greyed menu item. `then` is the act, in a teacher's
+    /// words: "rename", "restore", "add the section".
+    static func claudeIsRevisingTheCourse(course: String, then act: String) -> String {
+        return "A Claude or Codex session is working on \(course) right now. Finish that session, then \(act)."
+    }
+
+    /// The delete-several confirmation's sentence for backups a Claude or
+    /// Codex session still open on a course made — and which are therefore kept.
+    /// `count` is how many of the chosen backups that session holds.
+    static func backupsKeptForAClaudeSession(course: String, count: Int) -> String {
+        if count == 1 {
+            return "One of these is kept: a Claude or Codex session still open on \(course) made it."
+        }
+        return "\(count) of these are kept: a Claude or Codex session still open on \(course) made them."
+    }
+
+    /// What a delete that kept a Claude or Codex session's backup tells the teacher
+    /// afterwards, and what the single "Delete Backup…" says at once.
+    static func finishTheClaudeSessionToDeleteItsBackup(course: String, count: Int) -> String {
+        if count == 1 {
+            return "Finish the Claude or Codex session working on \(course) first. It made this backup, so it was kept."
+        }
+        return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
+    }
 }
