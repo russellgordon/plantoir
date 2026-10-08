@@ -1450,6 +1450,9 @@ public sealed class NewCourseDialog : ContentDialog
         if (SectionNumbersProblem(_sectionsBox.Text) is { } problem) { ShowValidation(problem); return; }
         if (_window.Workspace.WorkspacePath is not { } workspacePath)
         { ShowValidation("No working folder is selected."); return; }
+        // Asked BEFORE the progress view replaces the form (#473): a refusal
+        // shown under a progress bar reads like a creation that started.
+        if (ToolchainReadiness.Refusal(workspacePath) is { } notReady) { ShowValidation(notReady); return; }
 
         string name = _nameBox.Text.Trim();
         if (name.Length == 0) name = WizardWording.Panel(IsClub).DefaultSiteName;
@@ -1469,8 +1472,15 @@ public sealed class NewCourseDialog : ContentDialog
     {
         if (_window.Workspace.WorkspacePath is not { } workspacePath)
         { ShowValidation("Choose a working folder first."); return; }
+        if (ToolchainReadiness.Refusal(workspacePath) is { } notReady) { ShowValidation(notReady); return; }   // #473
         BeginProgress("Adding the example course");
         await _creator.InstallExampleCourse(workspacePath);
+        if (_creator.PreparationProblem is { } preparationProblem)
+        {
+            FinishProgress();   // Close, with nothing created and no course selected
+            ShowValidation(preparationProblem);
+            return;
+        }
         CreatedCourseCode = _creator.InstalledExampleCode;
         CreatedIsExample = CreatedCourseCode is not null;
         FinishProgress();

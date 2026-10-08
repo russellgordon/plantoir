@@ -446,7 +446,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when,
-        [Description("The class pages this deploy is meant to carry, separated by commas. Checked for whether they are published yet.")]
+        [Description("The class pages this deploy is meant to carry, separated by semicolons. Checked for whether they are published yet.")]
         string classes = "")
         => Guarded(() =>
         {
@@ -458,10 +458,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // the card said tomorrow. Issue #144's family, read end.
             if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
-            return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
-                classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            return Proposing(workspace.PlanScheduledDeploy(course, section, moment, ClassTitles(classes))
                 .Describe());
         });
+
+    /// <summary>
+    /// A list of class page titles, split the way the mac's
+    /// <c>AssistToolRunner.names</c> splits one: on semicolons and line breaks,
+    /// NEVER on commas.
+    /// </summary>
+    /// <remarks>
+    /// Nearly every class page in these courses is called "Unit 2, Day 3", so
+    /// a comma-separated list cuts each title in half and checks four pages
+    /// that do not exist instead of the two that do (issue #469). This side
+    /// advertised and split on commas until 2026-10-08; the contract and the
+    /// mac had said semicolons all along.
+    /// </remarks>
+    internal static string[] ClassTitles(string classes)
+        => (classes ?? "").Split([';', '\n', '\r'],
+                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     [McpServerTool(Name = "schedule_deploy", Title = "Deploy at a set time",
                    Destructive = false, Idempotent = true)]
@@ -836,7 +851,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult PlanRememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
+        [Description("Every day this class meets, as YYYY-MM-DD, separated by semicolons — for example \"2026-09-08; 2026-09-10; 2026-09-14\". Give the dates themselves; this tool does not open timetable files or work dates out from a pattern.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
         => Guarded(() =>
@@ -1024,7 +1039,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult RememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
+        [Description("Every day this class meets, as YYYY-MM-DD, separated by semicolons — for example \"2026-09-08; 2026-09-10; 2026-09-14\". Give the dates themselves; this tool does not open timetable files or work dates out from a pattern.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
         => GuardedResult(() =>

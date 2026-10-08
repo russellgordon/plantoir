@@ -374,7 +374,8 @@ public class AssistSurfaceContractTests
     /// incompatibility and nothing should assert one from it.</para>
     ///
     /// <para><b>This list is now EXERCISED, and was not when it was written.</b>
-    /// All five entries below belong to MCP-only tools, and
+    /// All five entries below belong to MCP-only tools (three of them said
+    /// commas until issue #469 moved them to semicolons on 2026-10-08), and
     /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> used
     /// to stop at an earlier assertion and never reach them: it had been red
     /// on <c>dev</c> since before this was written, behind THREE stacked
@@ -390,10 +391,14 @@ public class AssistSurfaceContractTests
     /// </remarks>
     private static readonly Dictionary<string, string> SeparatorHere = new(StringComparer.Ordinal)
     {
-        // "separated by commas", and Split(',') in the runner.
-        ["remember_timetable.dates"] = ",",
-        ["plan_remember_timetable.dates"] = ",",
-        ["plan_scheduled_deploy.classes"] = ",",
+        // "separated by semicolons" since #469 (2026-10-08). The classes
+        // runner splits on ';' and line breaks only (PlantoirTools.ClassTitles);
+        // the dates runners stay forgiving and also take commas and spaces.
+        ["remember_timetable.dates"] = ";",
+        ["plan_remember_timetable.dates"] = ";",
+        ["plan_scheduled_deploy.classes"] = ";",
+        // "separated by commas", and Split(',') in the runner — as the
+        // contract says too: an expectation code holds no comma.
         ["add_curriculum_mentions.codes"] = ",",
         ["plan_curriculum_mentions.codes"] = ",",
     };
@@ -407,30 +412,37 @@ public class AssistSurfaceContractTests
     /// separator difference is a routing difference nobody chose, and a
     /// resolved one left listed makes this a record of what once differed.</para>
     ///
-    /// <para><b>Why the two that differ, differ.</b> The mac advertises
-    /// semicolons for anything that can carry a page or class TITLE, because
-    /// "Unit 2, Day 3" is the name nearly every class page in these courses
-    /// has and a comma-separated list would cut it in half. That reasoning
-    /// applies to <c>plan_scheduled_deploy.classes</c> here too and this side
-    /// says commas — worth revisiting, and NOT a fix to make silently, since
-    /// changing what a schema advertises is a routing change and the routing
-    /// suites are hand-run. <c>dates</c> are YYYY-MM-DD and can hold no comma,
-    /// so that one is cosmetic.</para>
+    /// <para><b>Empty since 2026-10-08, and meant to stay that way.</b> Three
+    /// differences were agreed here until then — <c>plan_scheduled_deploy.classes</c>
+    /// and the two <c>dates</c> — with this side advertising commas where the
+    /// mac advertises semicolons. The mac uses semicolons for anything that
+    /// can carry a page or class TITLE, because "Unit 2, Day 3" is the name
+    /// nearly every class page in these courses has and a comma-separated list
+    /// cuts it in half; that reasoning applied to <c>classes</c> here too, and
+    /// an outside assistant passing "Unit 2, Day 3; Unit 2, Day 4" had four
+    /// titles checked, none of which exists. Issue #469 closed all three:
+    /// the descriptions now carry the contract's text and the classes runner
+    /// splits on semicolons and line breaks. The departure had been recorded
+    /// as "NOT a fix to make silently, since changing what a schema advertises
+    /// is a routing change"; it was safe to make because all three are
+    /// MCP-only tools that <c>AssistAgent.ForTheLocalModel</c> never shows the
+    /// on-device model, so no local routing run is owed. The dates were
+    /// cosmetic (YYYY-MM-DD holds no comma) and their runners still accept
+    /// commas and spaces, so a client that learned the old wording is not
+    /// broken. <c>classes</c> stays a STRING rather than becoming a JSON array:
+    /// an array would be a type departure from the contract, which is a bigger
+    /// difference than the one being closed.</para>
     /// </remarks>
     private static void AssertOnlyTheSeparatorDifferencesWeHaveAgreed(
         List<string> found, HashSet<string> onThisSurface)
     {
-        // Scoped to the surface, exactly as the type departures are. All
-        // three of these are MCP-only tools, so on the LOCAL surface they
-        // produce no entries at all — and an unscoped list would then fail
-        // saying three differences had been resolved, which is the same
-        // mistake in the same shape as the third outcome #83 first left out.
-        var agreed = new[]
-        {
-            "remember_timetable.dates (there ;, here ,)",
-            "plan_remember_timetable.dates (there ;, here ,)",
-            "plan_scheduled_deploy.classes (there ;, here ,)",
-        }.Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
+        // Scoped to the surface, exactly as the type departures are: an entry
+        // added here for an MCP-only tool produces nothing on the LOCAL
+        // surface, and an unscoped list would then fail saying the difference
+        // had been resolved, which is the same mistake in the same shape as
+        // the third outcome #83 first left out. Empty since #469 (see above).
+        var agreed = Array.Empty<string>()
+            .Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
 
         var unexpected = found.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
         Assert.True(unexpected.Count == 0,
@@ -443,6 +455,55 @@ public class AssistSurfaceContractTests
             "These are recorded as separator differences and the two surfaces now advertise the " +
             "same character: " + string.Join("; ", resolved) + ". Delete them, so this keeps " +
             "meaning \"everything that differs\" rather than \"everything that once did\".");
+    }
+
+    /// <summary>
+    /// Every list-shaped parameter in <see cref="SeparatorHere"/> is described
+    /// to the model in the contract's own words, byte for byte.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SeparatorHere"/> is hand-kept, so on its own it cannot see
+    /// the server drift: <c>PlantoirTools</c> could go back to "separated by
+    /// commas" and that table would still say ";" (issue #469 review). The
+    /// separator a model is told lives in the parameter's
+    /// <c>[Description]</c>, so this holds THAT to
+    /// <c>assist-cases.json → toolSchemas.mcp</c>. Since the contract's text
+    /// names the separator, equality also proves the table's entry is true.
+    /// </remarks>
+    [Fact]
+    public void EveryListShapedParameterIsDescribedInTheContractsWords()
+    {
+        var served = ServedTools();
+        var contract = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var tool in ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["mcp"]!.AsArray())
+        {
+            var function = tool!["function"]!;
+            foreach (var (parameter, schema) in function["parameters"]!["properties"]!.AsObject())
+                if (schema?["description"] is { } description)
+                    contract[$"{function["name"]}.{parameter}"] = description.ToString();
+        }
+
+        var differing = new List<string>();
+        foreach (var (key, separator) in SeparatorHere)
+        {
+            string tool = key[..key.IndexOf('.')];
+            string parameter = key[(key.IndexOf('.') + 1)..];
+            Assert.True(served.TryGetValue(tool, out var method), $"{key}: this server serves no {tool}.");
+            var declared = method!.GetParameters().SingleOrDefault(p => p.Name == parameter);
+            Assert.True(declared is not null, $"{key}: {tool} here takes no {parameter}.");
+            Assert.True(contract.TryGetValue(key, out string? theirs), $"{key}: toolSchemas.mcp does not describe it.");
+
+            string? mine = declared!.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description;
+            if (mine != theirs) differing.Add($"{key}: here \"{mine}\", contract \"{theirs}\"");
+            string word = separator == ";" ? "separated by semicolons" : "separated by commas";
+            Assert.True(mine?.Contains(word, StringComparison.Ordinal) == true,
+                $"{key}: SeparatorHere says \"{separator}\" and the description does not say \"{word}\".");
+        }
+
+        Assert.True(differing.Count == 0,
+            "These list-shaped parameters are described differently from the contract, so the model is told " +
+            "a different separator here or different words around it: " + string.Join("; ", differing) +
+            ". Copy the contract's text whole (#469).");
     }
 
     // ---- What each client is shown ---------------------------------------

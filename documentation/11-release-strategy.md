@@ -306,7 +306,10 @@ proving 1.4.3 on the installed 1.4.2 (i5-8365U, Windows 11 Pro 26200): the
 first launch after an update copies its bundled tools into the working folder
 inside `OpenWindow`, about two minutes on that PC, before any window exists.
 The daily check, started in `OnLaunched` with its first look at one minute,
-found 1.4.3, had no window to show it in, and wrote `1.4.3: not now`. The day
+found 1.4.3, had no window to show it in, and wrote `1.4.3: not now`. (Since
+#473 that copy runs in the background after the window appears —
+`documentation/12-windows-app.md` → "Getting a folder ready after an update
+(#473)" — but the ordering below stays.) The day
 was already stamped, so the teacher was offered nothing until the next day.
 Now (`appUpdates.anOfferNobodySawIsNotAnAnswer`):
 
