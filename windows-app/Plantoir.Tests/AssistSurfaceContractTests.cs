@@ -457,6 +457,55 @@ public class AssistSurfaceContractTests
             "meaning \"everything that differs\" rather than \"everything that once did\".");
     }
 
+    /// <summary>
+    /// Every list-shaped parameter in <see cref="SeparatorHere"/> is described
+    /// to the model in the contract's own words, byte for byte.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="SeparatorHere"/> is hand-kept, so on its own it cannot see
+    /// the server drift: <c>PlantoirTools</c> could go back to "separated by
+    /// commas" and that table would still say ";" (issue #469 review). The
+    /// separator a model is told lives in the parameter's
+    /// <c>[Description]</c>, so this holds THAT to
+    /// <c>assist-cases.json → toolSchemas.mcp</c>. Since the contract's text
+    /// names the separator, equality also proves the table's entry is true.
+    /// </remarks>
+    [Fact]
+    public void EveryListShapedParameterIsDescribedInTheContractsWords()
+    {
+        var served = ServedTools();
+        var contract = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var tool in ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["mcp"]!.AsArray())
+        {
+            var function = tool!["function"]!;
+            foreach (var (parameter, schema) in function["parameters"]!["properties"]!.AsObject())
+                if (schema?["description"] is { } description)
+                    contract[$"{function["name"]}.{parameter}"] = description.ToString();
+        }
+
+        var differing = new List<string>();
+        foreach (var (key, separator) in SeparatorHere)
+        {
+            string tool = key[..key.IndexOf('.')];
+            string parameter = key[(key.IndexOf('.') + 1)..];
+            Assert.True(served.TryGetValue(tool, out var method), $"{key}: this server serves no {tool}.");
+            var declared = method!.GetParameters().SingleOrDefault(p => p.Name == parameter);
+            Assert.True(declared is not null, $"{key}: {tool} here takes no {parameter}.");
+            Assert.True(contract.TryGetValue(key, out string? theirs), $"{key}: toolSchemas.mcp does not describe it.");
+
+            string? mine = declared!.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>()?.Description;
+            if (mine != theirs) differing.Add($"{key}: here \"{mine}\", contract \"{theirs}\"");
+            string word = separator == ";" ? "separated by semicolons" : "separated by commas";
+            Assert.True(mine?.Contains(word, StringComparison.Ordinal) == true,
+                $"{key}: SeparatorHere says \"{separator}\" and the description does not say \"{word}\".");
+        }
+
+        Assert.True(differing.Count == 0,
+            "These list-shaped parameters are described differently from the contract, so the model is told " +
+            "a different separator here or different words around it: " + string.Join("; ", differing) +
+            ". Copy the contract's text whole (#469).");
+    }
+
     // ---- What each client is shown ---------------------------------------
 
     /// <summary>
