@@ -170,13 +170,15 @@ public sealed partial record AssistCardCommand
 
     /// <summary>
     /// <c>[please] cancel the|that|my scheduled deploy [please]</c> →
-    /// <c>cancel_scheduled_deploy</c> (#424). Measured on this PC (bundle 10):
-    /// "Don't send it in the morning after all" went from 10/10 to 0/10 —
-    /// declined, so a deploy the teacher wanted stopped still went out. The
-    /// canonical sentence (the shelf's own, "Cancel that scheduled deploy") is
-    /// answered in code; anything else — a question mark, "don't", another
-    /// course or section — reaches the model as before. Cancelling is the
-    /// SAFE direction: it stops a deploy and starts nothing.
+    /// <c>cancel_scheduled_deploy</c> (#424), and — since #466 (the mac's
+    /// #449) — the prompt shelf's own card, "Cancel scheduled deploy", with no
+    /// determiner. Measured on this PC (bundle 10): "Don't send it in the
+    /// morning after all" was declined 10 of 10, so a deploy the teacher
+    /// wanted stopped still went out. The canonical sentence is answered in
+    /// code; anything else — a question mark, "don't", a course or section
+    /// named, or "cancel the deploy" (which may mean a deploy running now) —
+    /// reaches the model as before. Cancelling is the SAFE direction: it stops
+    /// a deploy and starts nothing.
     /// </summary>
     private static AssistCardCommand? CancelTheScheduledDeploy(string tidied)
     {
@@ -184,7 +186,7 @@ public sealed partial record AssistCardCommand
         if (words.Count > 0 && words[0] == "please") words.RemoveAt(0);
         if (words.Count > 0 && words[^1] == "please") words.RemoveAt(words.Count - 1);
         return string.Join(' ', words) is "cancel the scheduled deploy" or "cancel that scheduled deploy"
-                                          or "cancel my scheduled deploy"
+                                          or "cancel my scheduled deploy" or "cancel scheduled deploy"
             ? new AssistCardCommand("cancel_scheduled_deploy", new Dictionary<string, string>())
             : null;
     }
