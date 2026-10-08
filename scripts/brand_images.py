@@ -75,14 +75,14 @@ TILE_TOP = (0xF9, 0xF5, 0xE5)
 TILE_BOTTOM = (0xD7, 0xC6, 0xA2)
 
 WORDMARK = "Plantoir"
-TAGLINE_CARD = ["Turns Markdown notes into a fast,", "searchable class website you own."]
+TAGLINE_CARD = ["Turns Markdown notes into a fast,", "searchable class website."]
 DOMAIN = "plantoir.app"
 
 # Banner tagline. Each line is a list of (text, emphasised?) runs; emphasised
 # runs are set in --green semibold so the three verbs carry the line.
 TAGLINE_BANNER = [
     [("Plan", True), (" the plot. ", False), ("Plant", True), (" your notes.", False)],
-    [("Grow", True), (" a class website you own.", False)],
+    [("Grow", True), (" a class website.", False)],
 ]
 
 SUPERSAMPLE = 4  # the path is filled at 1-bit, so we oversample for smooth edges
