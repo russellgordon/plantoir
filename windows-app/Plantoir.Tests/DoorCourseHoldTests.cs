@@ -113,14 +113,25 @@ public sealed class DoorCourseHoldTests : IDisposable
         var wording = ContractLoader.LoadJson("assist-wording.json")["wording"]!;
         var cases = Contract()["reviseCases"]!.AsArray();
         Assert.Equal(9, cases.Count);
-        int ran = 0;
+        int ran = 0, windowNotes = 0;
         foreach (var c in cases)
         {
             string name = c!["name"]!.ToString();
             if (c["appliesOn"] is { } only)
             {
                 Assert.Equal(new[] { "mac" }, only.AsArray().Select(p => p!.ToString()));
-                Assert.False(string.IsNullOrWhiteSpace(c["onWindows"]?.ToString()), $"{name} says nothing of Windows");
+                string note = c["onWindows"]?.ToString() ?? "";
+                Assert.False(string.IsNullOrWhiteSpace(note), $"{name} says nothing of Windows");
+                // A case about the window open on THIS course (ICS3U) must say
+                // what Windows says there since #468 — the window's own words —
+                // not leave it to Windows or name the Claude-or-Codex sentence.
+                if (c["active"]?["course"]?.ToString() == "ICS3U")
+                {
+                    Assert.Contains("WindowHoldWording.AvailableOnceTheAssistantCloses", note);
+                    Assert.Contains(WindowHoldWording.AvailableOnceTheAssistantCloses("{course}", 1).Replace("Section 1", "Section {section}"), note);
+                    Assert.DoesNotContain("its decision", note);
+                    windowNotes++;
+                }
                 continue;
             }
             var item = c["item"]!.ToString() switch
@@ -135,6 +146,7 @@ public sealed class DoorCourseHoldTests : IDisposable
             ran++;
         }
         Assert.Equal(5, ran);
+        Assert.Equal(3, windowNotes);
     }
 
     /// <summary>
