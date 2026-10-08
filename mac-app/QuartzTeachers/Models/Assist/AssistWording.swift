@@ -499,6 +499,11 @@ nonisolated enum AssistWording {
              + "here. Build it once from its window in Plantoir, where the question can be answered."
     }
 
+    /// Kept for the contract and for Windows, which still says it in one
+    /// place: nothing on the mac says it since #471 — the two keys below
+    /// replaced it on the only path that said it, which has no window.
+    /// Deleting it would shrink `assist-wording.json` and redden Windows'
+    /// `ContractTests`.
     static func previewDidNotBuild(course: String, section: String) -> String {
         return "The preview for \(course) Section \(section) did not finish building. "
              + AssistWording.whereTheOutputIs
