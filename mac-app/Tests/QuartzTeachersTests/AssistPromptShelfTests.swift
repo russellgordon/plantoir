@@ -117,9 +117,13 @@ final class AssistPromptShelfTests: XCTestCase {
         // so its exact form is answered in code — with none of the hide arm's
         // tolerance, because publishing is the direction that reaches
         // students (`hideIsUnpublish.refused`).
-        let goesToTheModel: Set<String> = [
-            "Cancel scheduled deploy",
-        ]
+        //
+        // "Cancel scheduled deploy" left it on 2026-10-07 (#449): the cancel
+        // frame accepts the shelf's own sentence, with no determiner, so the
+        // card is answered in code and the list is empty. It stays, empty,
+        // so a new card that should go to the model is still a decision
+        // somebody writes down here.
+        let goesToTheModel: Set<String> = []
 
         var seen: Set<String> = []
         for (_, phrasings) in AssistPromptShelfView.groups {
