@@ -352,7 +352,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
             string destination = kind switch
             {
                 ScheduledPublishOutcome.Kind.BuildNeededAnAnswer or ScheduledPublishOutcome.Kind.BuildDidNotFinish
-                    or ScheduledPublishOutcome.Kind.TooLateToRun or ScheduledPublishOutcome.Kind.CourseWasBusy => "",
+                    or ScheduledPublishOutcome.Kind.TooLateToRun or ScheduledPublishOutcome.Kind.CourseWasBusy
+                    or ScheduledPublishOutcome.Kind.EarlierDeployStillWorking => "",
                 ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow => "its settings could not be read when the time came",
                 _ => "Netlify",
             };
@@ -455,7 +456,8 @@ public class ScheduledPublishOutcomeTests : IDisposable
         // The stand-downs write the event a removal writes (scheduledPublishStopped.trail).
         foreach (var stoodDown in new[] { ScheduledPublishOutcome.Kind.TooLateToRun,
                                           ScheduledPublishOutcome.Kind.CourseWasBusy,
-                                          ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow })
+                                          ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow,
+                                          ScheduledPublishOutcome.Kind.EarlierDeployStillWorking })
             Assert.Equal("scheduled deploy turned off",
                 ActivityTrail.KeyFor(ScheduledPublishOutcome.EventFor(stoodDown)));
     }
@@ -472,6 +474,7 @@ public class ScheduledPublishOutcomeTests : IDisposable
     [InlineData(ScheduledPublishOutcome.Kind.TooLateToRun)]
     [InlineData(ScheduledPublishOutcome.Kind.CourseWasBusy)]
     [InlineData(ScheduledPublishOutcome.Kind.CouldNotRunAsSetNow)]
+    [InlineData(ScheduledPublishOutcome.Kind.EarlierDeployStillWorking)]
     public void NoSentenceNamesTheMachinery(ScheduledPublishOutcome.Kind kind)
     {
         string said = ScheduledPublishOutcome.Sentence(

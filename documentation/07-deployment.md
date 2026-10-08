@@ -3028,6 +3028,42 @@ and `DeployWhileItsSectionDeploysTests`. The boot-out order itself has no
 contract case — it is two `launchctl` calls on the mac and Task Scheduler on
 Windows — but the guard and the wait do.
 
+**Windows (#467, 2026-10-08).** These are the facts the mac must KNOW. None of
+them needs anything done on the mac.
+
+- **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
+  build leg run all 23 `launcherCases` (see [03](03-launcher-scripts.md) →
+  "A section still being deployed is not deployed again").
+- **Windows has the mac's split.** The task runs
+  `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
+  course and then runs its wrapper as `powershell.exe -File`. A task set since
+  #309 names its folder. So the four cases once marked `appliesOn: ["mac"]`
+  hold there as written and lost the mark. That edit was made to the
+  contract's authored half; no mac test reads the field.
+- **The thirty-minute wait has no Windows counterpart, and none is built.** A
+  re-set leaves the running instance alone (`ClearIfStillMine`), so no
+  leftover run exists. Its leases stay live for the whole run, because its
+  `Plantoir.exe` holds them across the wrapper.
+- **What Task Scheduler does with the new moment was MEASURED, and it is
+  worse than "the new run waits".** The test machine was RUSSELL_WINDOWS, an
+  Intel i5-8365U running Windows 11 Pro build 26200, on 2026-10-08. A
+  throwaway task was registered exactly as `TaskScheduling.TaskXml` registers
+  one: `IgnoreNew`, `InteractiveToken`, `LeastPrivilege`, `PT72H`, set from
+  XML with `schtasks /Create /F`. Its action was a 120-second sleeper.
+  - It fired at 00:29:29. The sleeper's first line landed 16 s later.
+  - At 00:29:53, with that instance still running, the task was set again for
+    00:30:18.
+  - `/Create /F` did NOT end the running instance, which finished its full
+    120 s at 00:31:46.
+  - The new moment fired: Last Run Time moved to 00:30:18. But Last Result
+    was `-2147020576` (`0x800710E0`, the request refused), and the new run
+    NEVER STARTED. Once the first instance ended, the task read Ready with no
+    next run.
+  - So on Windows, a section set again for a moment that arrives while its
+    earlier run still works is silently not deployed, and no outcome record
+    is written. That is a separate fault and is not fixed under #467; it is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
+
 ### The window's acts read the saved settings too (#335)
 
 **What was wrong, read from the code.** Course Settings keeps its edits in the

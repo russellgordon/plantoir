@@ -17,7 +17,8 @@ and that the look trusts no remembered process id.
 
 **Windows.** Skipped where there is no bash that can run a program, the same
 rule as the launcher tests beside it: Windows' preview is preview.ps1, which
-owes the same guard (the contract's appliesOnWhy).
+carries the same guard since #386 and runs every launcherCase through
+windows-app/test_launcher_rules.ps1 (LauncherRulesContractTests).
 
 Pure stdlib. Run with:
 

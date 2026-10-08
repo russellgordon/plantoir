@@ -1453,7 +1453,47 @@ What replaces the old container concepts:
   previewed (#381)"); and never a remembered process id. Built in bundle 4
   (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
   window's `CourseActivity.IsPublishingSection` — see "Preview and publish
-  mechanics that match the mac (bundle 4)" above.
+  mechanics that match the mac (bundle 4)" above. #467 (2026-10-08) found two
+  bugs that guard had from its first day. Its scheduled half never matched a
+  wrapper set since #309, because the name had no folder id. And a course with
+  a space never matched, because callers quote it. Both are fixed in the
+  shared block below; see 03 → "A section being deployed".
+- **A deploy refuses while that section is still being deployed (#467 / mac
+  #439).**
+  - **The launcher.** `deploy.ps1`, and `preview.ps1 --build-only`, refuse
+    before anything changes while the section's scheduled wrapper is running
+    in this folder, or another `deploy.ps1` of it is. The block holding this
+    is identical in both launchers, with #386's reader moved into it (03 →
+    "A section still being deployed is not deployed again").
+  - **The app.** The window lifts the launcher's line
+    (`FailureExplainer.SectionDeployRefusalOf`). The window's Deploy asks
+    `MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish` before
+    `Result`. So a refused build leg says `DeployRefusedWhileALaterDeployWorks`
+    or `DeployRefusedWhileItsSectionDeploys`, and an ordinary broken build
+    now says `CouldNotBuildBeforeDeploying` instead of "did not finish" (mac
+    parity: that key existed and was never called). `AssistWorkspace` (in
+    `plantoir-mcp`) says the refusal for a refused build leg or for
+    all-legs-refused, and keeps its own "The build failed…" message for an
+    ordinary failure, because `CouldNotBuildBeforeDeploying` points at a
+    window that process does not have.
+  - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
+    read and shown, never written.
+  - **What is NOT built: the mac's thirty-minute wait.** A re-set leaves the
+    working run alone (`ClearIfStillMine`), so there is no leftover run.
+  - **The residual.** A run ended mid-deploy by something other than a re-set
+    — Task Manager, or the task's `PT72H` limit — leaves its wrapper
+    `powershell.exe` working, with leases that now read as stale. The guard
+    then refuses other deploys of that section, which is correct. But a later
+    run of the section does not wait: its leases look free, its build leg is
+    refused, and it is recorded as `buildDidNotFinish`. Rare enough to record
+    rather than build.
+  - **Measured: a re-set whose moment arrives while the earlier run still
+    works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
+    "Set again while the run works (#409)", and the fix is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
+  - **Known limits.** A deploy run inside another process (typed at a prompt,
+    or `-Command`) is not seen, and neither is an elevated one; the
+    self-relaunch that would see the first was rejected (03).
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
   8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
