@@ -446,8 +446,10 @@ struct SectionDetailView: View {
                 // Nor while a copy of the course is being zipped (#351): a
                 // restore or removal is waiting on that zip to replace the
                 // folder a preview would be serving from.
-                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code)))
-                .help(previewRunner.isRunning ? "Stop previewing this section" : "Preview this section's website")
+                // Nor while the folder's tools are still being copied, or
+                // that copy failed (#476): the help says why, no dialog.
+                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady))
+                .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
                 // "Deploy", NOT "Publish" — a page is published (the
@@ -474,8 +476,8 @@ struct SectionDetailView: View {
                 // sequence against the first's.
                 // Nor while a copy of the course is being zipped (#351): a
                 // removal waiting on that zip deletes what this would publish.
-                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code))
-                .help("Deploy this section's website")
+                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+                .help(workspace.folderReadinessReason ?? "Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
                 }
 

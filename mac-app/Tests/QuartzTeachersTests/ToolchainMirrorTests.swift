@@ -152,9 +152,11 @@ final class ToolchainMirrorTests: XCTestCase {
 
     /// MUST FAIL before #476: the folder was marked fresh BEFORE the copy,
     /// so a copy that failed left it marked for the rest of the run and no
-    /// later reload tried again. Now the mark follows a copy with nothing
-    /// failed, and the next pass retries until it gets one.
-    func testAFolderWhoseCopyFailedIsNotMarkedFreshUntilACopySucceeds() throws {
+    /// later reload tried again. Now the one record (`ToolchainReadiness`)
+    /// says FAILED, the routine reloads skip it, and File ▸ Reload Courses
+    /// or a newly pointed window forgets the failure so the next pass tries
+    /// again — and only a copy with nothing failed is remembered as ready.
+    func testAFolderWhoseCopyFailedIsNotReadyUntilACopySucceeds() throws {
         let workspace: URL = root.appendingPathComponent("workspace")
         try write("#!/bin/bash\n", to: workspace.appendingPathComponent("preview.sh"))
         let toolchain: URL = workspace.appendingPathComponent(".toolchain")
@@ -162,30 +164,33 @@ final class ToolchainMirrorTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: toolchain.path)
         addTeardownBlock {
             try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: toolchain.path)
-            WorkspaceModel.foldersWithFreshToolchain.remove(workspace.path)
-            WorkspaceModel.foldersWhoseToolchainCopyFailed.remove(workspace.path)
+            ToolchainReadiness.shared.forgetEverything(about: workspace)
         }
-        WorkspaceModel.foldersWithFreshToolchain.remove(workspace.path)
-        WorkspaceModel.foldersWhoseToolchainCopyFailed.remove(workspace.path)
+        ToolchainReadiness.shared.forgetEverything(about: workspace)
 
-        WorkspaceModel.mirrorToolchain(into: workspace)
-        XCTAssertFalse(
-            WorkspaceModel.foldersWithFreshToolchain.contains(workspace.path),
+        ToolchainReadiness.shared.ensure(workspace, synchronously: true)
+        XCTAssertEqual(
+            ToolchainReadiness.shared.state(of: workspace),
+            .failed(message: ToolchainReadinessWording.couldNotGetReady),
             "MUST FAIL before #476: a copy that failed must not be remembered as done"
         )
-        XCTAssertTrue(WorkspaceModel.foldersWhoseToolchainCopyFailed.contains(workspace.path), "it is remembered as failed")
+        XCTAssertEqual(ToolchainReadiness.shared.reasonToWait(workspace), ToolchainReadinessWording.couldNotGetReady)
         XCTAssertFalse(
             WorkspaceModel.shouldMirrorToolchain(into: workspace),
             "a routine reload does not retry — that would bring back the pause on every rename"
         )
-        WorkspaceModel.forgetFailedToolchainCopy(of: workspace)
+        ToolchainReadiness.shared.forgetFailure(workspace)
         XCTAssertTrue(WorkspaceModel.shouldMirrorToolchain(into: workspace), "File ▸ Reload Courses, or a newly pointed window, retries")
 
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: toolchain.path)
-        WorkspaceModel.mirrorToolchain(into: workspace)
-        XCTAssertTrue(WorkspaceModel.foldersWithFreshToolchain.contains(workspace.path), "a clean copy is remembered")
-        XCTAssertFalse(WorkspaceModel.foldersWhoseToolchainCopyFailed.contains(workspace.path))
+        ToolchainReadiness.shared.ensure(workspace, synchronously: true)
+        XCTAssertEqual(ToolchainReadiness.shared.state(of: workspace), .ready, "a clean copy is remembered")
+        XCTAssertNil(ToolchainReadiness.shared.reasonToWait(workspace))
+        XCTAssertFalse(WorkspaceModel.shouldMirrorToolchain(into: workspace), "and not copied again this run")
         XCTAssertTrue(FileManager.default.fileExists(atPath: toolchain.appendingPathComponent("Dockerfile").path))
+        // A ready folder whose Dockerfile has gone is copied again.
+        try FileManager.default.removeItem(at: toolchain.appendingPathComponent("Dockerfile"))
+        XCTAssertTrue(WorkspaceModel.shouldMirrorToolchain(into: workspace))
     }
 
     // MARK: - Paths reached through a symlink

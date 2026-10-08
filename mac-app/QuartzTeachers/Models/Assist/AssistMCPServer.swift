@@ -147,6 +147,22 @@ enum AssistMCPServer {
         let runner: AssistToolRunner = AssistToolRunner(workspace: workspace, surface: .mcp)
         holdTheDoorsCourse(in: workspace)
 
+        // The folder's tools may still be being copied by the `reloadCourses`
+        // above (#476, off the main actor); the first request is read only
+        // once that copy has finished, so a preview or deploy the client
+        // sends straight away is never refused for a copy this process
+        // itself started. (Another PROCESS copying at the same time is not
+        // seen — `ToolchainReadiness`'s header says why that is accepted.)
+        Task { @MainActor in
+            await ToolchainReadiness.shared.waitUntilReady(workingFolder)
+            AssistMCPServer.readRequests(workspace: workspace, runner: runner)
+        }
+        dispatchMain()
+    }
+
+    /// Reads requests from stdin until the client goes away, answering each
+    /// on the main actor.
+    private static func readRequests(workspace: WorkspaceModel, runner: AssistToolRunner) {
         DispatchQueue.global(qos: .userInitiated).async {
             while let line = readLine(strippingNewline: true) {
                 if line.isEmpty {
@@ -169,8 +185,6 @@ enum AssistMCPServer {
                 exit(0)
             }
         }
-
-        dispatchMain()
     }
 
     /// The client has gone: stop what THIS process started, and only then

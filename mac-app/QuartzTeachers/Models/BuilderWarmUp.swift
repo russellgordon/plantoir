@@ -292,7 +292,12 @@ final class BuilderWarmUp {
             return LauncherOutcome(status: -1, output: "", why: "no launcher in the app")
         }
         _ = WorkspaceModel.syncFile(from: launcher, to: place.appendingPathComponent("setup.sh"))
-        _ = WorkspaceModel.copyToolchainFiles(into: place)
+        // A recipe that could not be copied whole would be hashed and built
+        // under the wrong tag (#476): say so and build nothing.
+        let recipe: WorkspaceModel.MirrorOutcome = WorkspaceModel.copyToolchainFiles(into: place)
+        if recipe.failed > 0 {
+            return LauncherOutcome(status: -1, output: "", why: "could not copy its recipe (\(recipe.failed) file(s))")
+        }
 
         let logName: String = flag == launcherFlag ? "last-run.log" : "recipe-tag.log"
         let logURL: URL = place.appendingPathComponent(logName)
