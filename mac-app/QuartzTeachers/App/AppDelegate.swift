@@ -125,24 +125,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
-            // A new version ready to install (#204). The installer installs
-            // on ANY quit once it is prepared, and quitting is never refused
-            // — so with work still under way the update is SET ASIDE here,
-            // and the quit waits only for the installer to be told
-            // (`appUpdates.atQuit`). Asked after the question above, whose
-            // "keep working" must leave the update exactly as it was.
-            let updateAtQuit: UpdateGate.QuitAction = AppUpdates.shared.decideAtQuit()
-
-            AppDelegate.letEverythingGo()
-
-            if updateAtQuit == .setAside {
-                AppUpdates.shared.setAsideForQuit {
-                    NSApp.reply(toApplicationShouldTerminate: true)
+            // A copy of a folder's tools still running (#476) is waited
+            // for, never cut short: the copy used to hold the main thread,
+            // so a quit could not land in the middle of it; off the main
+            // actor, ⌘Q right after an update would leave `.toolchain/`
+            // half old and half new for a scheduled run or a command-line
+            // launcher to build from. Bounded by the copy itself (seconds
+            // on this Mac; a minute on a slow one), and the window stays up
+            // with its banner saying what is happening.
+            if ToolchainReadiness.shared.anyCopyIsRunning {
+                Task { @MainActor in
+                    await ToolchainReadiness.shared.waitForAllCopies()
+                    if AppDelegate.finishTerminating() == .terminateNow {
+                        NSApp.reply(toApplicationShouldTerminate: true)
+                    }
                 }
                 return .terminateLater
             }
-            return .terminateNow
+            return AppDelegate.finishTerminating()
         }
+    }
+
+    /// Everything a quit decides once nothing is holding it back: the
+    /// update at quit, then letting everything go. Answers `.terminateLater`
+    /// only when a set-aside update will reply for itself.
+    @MainActor
+    private static func finishTerminating() -> NSApplication.TerminateReply {
+        // A new version ready to install (#204). The installer installs
+        // on ANY quit once it is prepared, and quitting is never refused
+        // — so with work still under way the update is SET ASIDE here,
+        // and the quit waits only for the installer to be told
+        // (`appUpdates.atQuit`). Asked after the question above, whose
+        // "keep working" must leave the update exactly as it was.
+        let updateAtQuit: UpdateGate.QuitAction = AppUpdates.shared.decideAtQuit()
+
+        AppDelegate.letEverythingGo()
+
+        if updateAtQuit == .setAside {
+            AppUpdates.shared.setAsideForQuit {
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+        return .terminateNow
     }
 
     /// Everything a quit does once it is going ahead: write down the open

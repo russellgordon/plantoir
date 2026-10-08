@@ -21,9 +21,9 @@ class WorkspaceModel {
     /// The key holding the most recently chosen folder.
     static let storedPathKey: String = "workspacePath"
 
-    /// Working folders whose `.toolchain` has already been brought up to date
-    /// in this run of the app. See `refreshToolchain` for why once is enough.
-    static var foldersWithFreshToolchain: Set<String> = []
+    // Where each working folder's `.toolchain` stands — being copied,
+    // ready, failed — is `ToolchainReadiness.shared` (#476), one record per
+    // folder; until then it was a process-wide set of "fresh" paths here.
 
     /// True when the hosted test suite is running. Tests drive the real
     /// window, and must not leave the teacher pointed at a fixture folder
@@ -801,6 +801,8 @@ class WorkspaceModel {
     /// done to it: not adopted, not remembered, nothing written into it, and
     /// the folder this window had stays exactly as it was.
     func chooseWorkspace(at url: URL) {
+        // A window newly pointed at the folder retries a copy that failed (#476).
+        ToolchainReadiness.shared.forgetFailure(url)
         if let refusal = WorkingFolderReach.refusal(forFolder: url) {
             refuseChosenFolder(refusal)
             return
@@ -1206,53 +1208,71 @@ class WorkspaceModel {
         WorkspaceModel.mirrorToolchain(into: workspaceURL)
     }
 
-    /// The mirror itself, as a static so it can run on a background thread
-    /// without touching a model another thread owns. It reads only the app's
-    /// own bundle and the folder, plus the shared once-per-run set above.
+    /// Starts the mirror if the folder needs it — OFF the main actor since
+    /// #476 (`ToolchainReadiness.ensure`), so the window appears while the
+    /// copy runs and Preview, Deploy and New Course wait for it with a
+    /// banner saying why.
     static func mirrorToolchain(into workspaceURL: URL) {
-        if !shouldMirrorToolchain(into: workspaceURL) {
-            return
-        }
-        noteToolchainMirrored(into: workspaceURL)
-        let changed: Int = copyToolchainFiles(into: workspaceURL)
-        if changed > 0 {
-            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(changed) file(s)")
-        }
+        ToolchainReadiness.shared.ensure(workspaceURL)
     }
 
-    /// Whether the mirror has anything to do — the once-per-folder-per-run
-    /// question, which reads the shared set and so stays on the main actor.
+    /// Whether the mirror has anything to do.
+    ///
+    /// Once per folder per run of the app, and that is not a shortcut: the
+    /// SOURCE is the app's own bundle, which cannot change while the app
+    /// is running, so a second mirror of the same folder cannot find
+    /// anything the first one missed — unless the destination is actually
+    /// missing its files on disk. It used to run inside every
+    /// `reloadCourses()` — which is after every rename, backup, restore and
+    /// archive — and cost 0.37 s each time even with nothing to do. That is
+    /// what a teacher felt as a pause between pressing Return on a renamed
+    /// course and the field going away. (Before the mirror was made cheap it
+    /// was 3.8 s.) A copy still running, and a copy that failed (retried
+    /// only from File ▸ Reload Courses or a newly pointed window, #476), are
+    /// not started again either.
     static func shouldMirrorToolchain(into workspaceURL: URL) -> Bool {
         let fileManager: FileManager = FileManager.default
         // Only a folder that is already a workspace gets a toolchain.
         if !fileManager.fileExists(atPath: workspaceURL.appendingPathComponent("preview.sh").path) {
             return false
         }
-
-        let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
-        let dockerfileURL: URL = toolchainURL.appendingPathComponent("Dockerfile")
-
-        // Once per folder per run of the app, and that is not a shortcut: the
-        // SOURCE is the app's own bundle, which cannot change while the app
-        // is running, so a second mirror of the same folder cannot find
-        // anything the first one missed — unless the destination is actually
-        // missing its files on disk.
-        //
-        // It used to run inside every `reloadCourses()` — which is after
-        // every rename, backup, restore and archive — and cost 0.37 s each
-        // time even with nothing to do. That is what a teacher felt as a
-        // pause between pressing Return on a renamed course and the field
-        // going away. (Before the mirror was made cheap it was 3.8 s.)
-        if WorkspaceModel.foldersWithFreshToolchain.contains(workspaceURL.path) &&
-           fileManager.fileExists(atPath: dockerfileURL.path) {
+        let dockerfileURL: URL = workspaceURL.appendingPathComponent(".toolchain").appendingPathComponent("Dockerfile")
+        switch ToolchainReadiness.shared.state(of: workspaceURL) {
+        case .copying, .failed:
             return false
+        case .ready:
+            return !fileManager.fileExists(atPath: dockerfileURL.path)
+        case .notStarted:
+            return true
         }
-        return true
     }
 
-    /// Records that this folder's mirror is up to date for this run.
-    static func noteToolchainMirrored(into workspaceURL: URL) {
-        WorkspaceModel.foldersWithFreshToolchain.insert(workspaceURL.path)
+    /// What a mirror pass did: how many files it wrote or removed, how
+    /// many it could not, and the first that failed. The second number is
+    /// why this is not an `Int` (#476): a count of successes cannot say
+    /// whether the folder is now up to date, and the state that skips the
+    /// next pass depends on it.
+    nonisolated struct MirrorOutcome: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        var changed: Int = 0
+        var failed: Int = 0
+
+        /// The first file that could not be copied or removed, from the
+        /// working folder down, with its error — what a problem report
+        /// needs and a count cannot give.
+        var firstFailure: String? = nil
+
+        // MARK: - Functions
+
+        nonisolated static func += (left: inout MirrorOutcome, right: MirrorOutcome) {
+            left.changed += right.changed
+            left.failed += right.failed
+            if left.firstFailure == nil {
+                left.firstFailure = right.firstFailure
+            }
+        }
     }
 
     /// The copying itself — the expensive half, and the only half that has
@@ -1262,9 +1282,20 @@ class WorkspaceModel {
     /// change while the app runs, and writes into one folder. It touches no
     /// model state and no shared set, so there is nothing here for a
     /// background thread to race against. Answers how many files it wrote.
-    nonisolated static func copyToolchainFiles(into workspaceURL: URL) -> Int {
+    nonisolated static func copyToolchainFiles(
+        into workspaceURL: URL, firstChange: (@Sendable () -> Void)? = nil
+    ) -> MirrorOutcome {
         let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
-        var changed: Int = 0
+        var changed: MirrorOutcome = MirrorOutcome()
+        var announced: Bool = false
+        // Says once, the moment a file is actually written or removed — the
+        // banner's cue (#476); a pass that changes nothing never says it.
+        func noteProgress() {
+            if !announced && changed.changed + changed.failed > 0 {
+                announced = true
+                firstChange?()
+            }
+        }
         var rootFiles: [String] = ["Dockerfile"]
         rootFiles += ["setup.sh", "preview.sh", "deploy.sh"]
         rootFiles += ["setup.bat", "preview.bat", "deploy.bat"]
@@ -1272,20 +1303,24 @@ class WorkspaceModel {
         for name in rootFiles {
             if let sourceURL = Bundle.main.url(forResource: name, withExtension: nil) {
                 changed += WorkspaceModel.syncFile(from: sourceURL, to: toolchainURL.appendingPathComponent(name))
+                noteProgress()
             }
         }
         // Whole folders, mirrored (extraneous files removed — they would
         // change the hash and force rebuilds for nothing).
         for folderName in ["patches", "scripts", "support", "contracts"] {
             if let sourceURL = Bundle.main.url(forResource: folderName, withExtension: nil) {
-                changed += WorkspaceModel.syncDirectory(from: sourceURL, to: toolchainURL.appendingPathComponent(folderName))
+                changed += WorkspaceModel.syncDirectory(
+                    from: sourceURL, to: toolchainURL.appendingPathComponent(folderName),
+                    firstChange: announced ? nil : { announced = true; firstChange?() }
+                )
             }
         }
         return changed
     }
 
     /// Copies one file when the destination differs or is missing.
-    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
 
         // The cheap question first: same size, same modification date.
@@ -1296,11 +1331,13 @@ class WorkspaceModel {
         // reloaded, which is after every rename, backup, restore and archive.
         // Two stat calls answer the same question for almost all of them.
         if WorkspaceModel.filesLookIdentical(sourceURL, destinationURL) {
-            return 0
+            return MirrorOutcome()
         }
 
         guard let sourceData = try? Data(contentsOf: sourceURL) else {
-            return 0
+            // A bundle file that cannot be read is a failure too (#476): the
+            // folder is not up to date, whatever else was written.
+            return MirrorOutcome(changed: 0, failed: 1, firstFailure: "\(sourceURL.lastPathComponent): could not be read from the app")
         }
         if let existing = try? Data(contentsOf: destinationURL), existing == sourceData {
             // Same bytes, different stamp — which is every file in the bundle
@@ -1308,7 +1345,7 @@ class WorkspaceModel {
             // cheap check can answer next time instead of re-reading 61 MB
             // for the rest of the session.
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return 0
+            return MirrorOutcome()
         }
         do {
             try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1317,9 +1354,14 @@ class WorkspaceModel {
                 try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
             }
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return 1
+            return MirrorOutcome(changed: 1, failed: 0)
         } catch {
-            return 0
+            // Counted, not swallowed (#476): `mirrorToolchain` marks the
+            // folder fresh only when this is zero.
+            return MirrorOutcome(
+                changed: 0, failed: 1,
+                firstFailure: "\(destinationURL.lastPathComponent): \(error.localizedDescription)"
+            )
         }
     }
 
@@ -1387,9 +1429,12 @@ class WorkspaceModel {
         return nil
     }
 
-    nonisolated static func syncDirectory(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncDirectory(
+        from sourceURL: URL, to destinationURL: URL, firstChange: (() -> Void)? = nil
+    ) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
-        var changed: Int = 0
+        var changed: MirrorOutcome = MirrorOutcome()
+        var announced: Bool = false
 
         // A SET, not an array. This was an array, and the removal pass below
         // asked it `contains` once per destination file — 11,354 files each
@@ -1405,6 +1450,10 @@ class WorkspaceModel {
                     }
                     sourceFiles.insert(relative)
                     changed += WorkspaceModel.syncFile(from: fileURL, to: destinationURL.appendingPathComponent(relative))
+                    if !announced && changed.changed + changed.failed > 0 {
+                        announced = true
+                        firstChange?()
+                    }
                 }
             }
         }
@@ -1425,8 +1474,21 @@ class WorkspaceModel {
                 }
             }
             for fileURL in toRemove {
-                try? fileManager.removeItem(at: fileURL)
-                changed += 1
+                if !announced {
+                    announced = true
+                    firstChange?()
+                }
+                do {
+                    try fileManager.removeItem(at: fileURL)
+                    changed.changed += 1
+                } catch {
+                    // A stray file that will not go changes the recipe's
+                    // hash, so the folder is not up to date (#476).
+                    changed.failed += 1
+                    if changed.firstFailure == nil {
+                        changed.firstFailure = "\(fileURL.lastPathComponent): \(error.localizedDescription)"
+                    }
+                }
             }
         }
         return changed
@@ -1550,6 +1612,34 @@ class WorkspaceModel {
             // read before rather than reporting every course gone.
             return
         }
+    }
+
+    /// Whether this window's folder is still getting ready (#476): its tools
+    /// being copied, or a copy that failed and has not been retried. Read
+    /// straight off `ToolchainReadiness.shared` so every window and section
+    /// window watching it updates together.
+    var folderIsGettingReady: Bool {
+        guard let workspaceURL else {
+            return false
+        }
+        return ToolchainReadiness.shared.isGettingReady(workspaceURL)
+    }
+
+    /// The sentence a greyed Preview, Deploy or New Course shows as help.
+    var folderReadinessReason: String? {
+        guard let workspaceURL else {
+            return nil
+        }
+        return ToolchainReadiness.shared.reasonToWait(workspaceURL)
+    }
+
+    /// File ▸ Reload Courses: the one routine reload that retries a
+    /// toolchain copy that failed (#476), because the teacher asked.
+    func reloadCoursesFromTheMenu() {
+        if let workspaceURL {
+            ToolchainReadiness.shared.forgetFailure(workspaceURL)
+        }
+        reloadCourses()
     }
 
     /// Scans `<workspace>/courses/` for course folders containing a
@@ -2808,13 +2898,21 @@ class WorkspaceModel {
         // the tests, chiefly, which assert what lands on disk and would
         // otherwise have to await a background thread to find out.
         //
-        // The tracker is cleared first because a folder being set up has no
-        // toolchain yet, whatever an earlier folder of the same path in this
-        // run of the app may have had — the defect row 279 fixed.
-        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
-        let problem: String? = WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
+        // The registry's entry is cleared first because a folder being set
+        // up has no toolchain yet, whatever an earlier folder of the same
+        // path in this run of the app may have had — the defect row 279
+        // fixed.
+        ToolchainReadiness.shared.forgetEverything(about: workspaceURL)
+        var problem: String? = WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
         if problem == nil {
-            WorkspaceModel.noteToolchainMirrored(into: workspaceURL)
+            // The recipe, through the one registry (#476), on this thread.
+            // Only a copy that FAILED is the folder's problem; a copy already
+            // running for the folder (unlikely: a folder being set up had no
+            // preview.sh a moment ago) is left to finish on its own.
+            ToolchainReadiness.shared.ensure(workspaceURL, synchronously: true)
+            if case .failed(let message) = ToolchainReadiness.shared.state(of: workspaceURL) {
+                problem = message
+            }
         }
         finishInitializing(at: workspaceURL, problem: problem)
     }
@@ -2839,14 +2937,22 @@ class WorkspaceModel {
         }
         isInitializingWorkspace = true
         let startedAt: Date = Date()
-        // Both touches of the shared tracker happen HERE, on the main actor,
+        // Both touches of the registry happen HERE, on the main actor,
         // never inside the detached work — see `setUpFolderOnDisk`.
-        WorkspaceModel.foldersWithFreshToolchain.remove(workspaceURL.path)
-        let problem: String? = await Task.detached(priority: .userInitiated) {
+        ToolchainReadiness.shared.forgetEverything(about: workspaceURL)
+        var problem: String? = await Task.detached(priority: .userInitiated) {
             return WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
         }.value
         if problem == nil {
-            WorkspaceModel.noteToolchainMirrored(into: workspaceURL)
+            // The recipe, through the one registry (#476): the same copy a
+            // stale folder gets, with the banner and the greyed buttons
+            // while it runs, and never two copies into one folder at once.
+            if let copy = ToolchainReadiness.shared.ensure(workspaceURL, synchronously: false) {
+                await copy.value
+            }
+            if case .failed(let message) = ToolchainReadiness.shared.state(of: workspaceURL) {
+                problem = message
+            }
         }
         AppLog.interface.info(
             "set up \(LogRedactor.redacting(workspaceURL.path), privacy: .public) in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)), privacy: .public)s"
@@ -2891,9 +2997,10 @@ class WorkspaceModel {
             return "Could not create the courses folder: \(error.localizedDescription)"
         }
 
-        // The build recipe itself — the expensive part, and the reason this
-        // runs off the main thread.
-        _ = WorkspaceModel.copyToolchainFiles(into: workspaceURL)
+        // The build recipe is NOT copied here since #476: the callers hand it
+        // to `ToolchainReadiness.ensure`, the one copy a folder ever gets,
+        // so a reload during set-up cannot start a second copy into the
+        // same `.toolchain`.
         return nil
     }
 

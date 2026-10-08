@@ -49,7 +49,8 @@ turn out NOT to be quite the same target.
   that bezel at its own intrinsic height regardless of the frame it is
   given, so the field still measured 26 and merely overflowed its box
   (tried 2026-08-23). Getting 24 means drawing the bezel yourself; the
-  wizard's three fields now share a `WizardFieldChrome` modifier built to
+  wizard's three fields now share a `WizardFieldChrome` modifier (replaced
+  by the real `.roundedBorder` bezel in #456, 2026-10-08) built to
   the figures in the table above.
 - **A `.plain` `TextField`'s glyphs ride low inside its own intrinsic box**,
   so giving it `.frame(height:)` centres the BOX and still leaves the text

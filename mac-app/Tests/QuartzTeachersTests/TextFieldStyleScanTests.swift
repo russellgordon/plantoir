@@ -28,17 +28,12 @@ final class TextFieldStyleScanTests: XCTestCase {
         "taskAnswerField": "TaskProgressView: inside an .alert, where AppKit draws the field and SwiftUI's styles are ignored.",
     ]
 
-    /// The chromes that draw a border of their own, and why they exist.
-    static let chromes: [String: String] = [
-        "WizardFieldChrome(": "The wizard's 24pt fields line up with the course-code picker; .roundedBorder is 26pt (Russell, 2026-08-23; documentation/12-windows-app.md → Metrics).",
-        "SearchablePickerChrome(": "The searchable picker's field, 24pt for the same reason.",
-    ]
-
     /// The only files allowed to write `.textFieldStyle(`, and how many times.
+    /// (Two drawn chromes, `WizardFieldChrome` and `SearchablePickerChrome`,
+    /// were allowed here at 24pt until #456 made every field the real
+    /// `.roundedBorder` bezel; nothing draws its own bezel now.)
     static let styleChoosers: [String: Int] = [
         "BorderedTextField.swift": 1,
-        "CourseCodePickerView.swift": 1,
-        "SearchablePicker.swift": 1,
         "SidebarView.swift": 1,
         "AssistWindowView.swift": 1,
     ]
@@ -65,14 +60,8 @@ final class TextFieldStyleScanTests: XCTestCase {
                 problems.append(field.location + " chooses its own style; the one nearest the field wins, so it is not bordered")
                 continue
             }
-            var bordered: Bool = field.chain.contains(".borderedTextField()")
-            for chrome in TextFieldStyleScanTests.chromes.keys {
-                if field.chain.contains(".modifier(" + chrome) {
-                    bordered = true
-                }
-            }
-            if !bordered {
-                problems.append(field.location + " has no .borderedTextField() and no bordered chrome")
+            if !field.chain.contains(".borderedTextField()") {
+                problems.append(field.location + " has no .borderedTextField()")
             }
         }
         XCTAssertEqual(problems, [], "Every text field wears .borderedTextField() (#374)")
@@ -92,14 +81,8 @@ final class TextFieldStyleScanTests: XCTestCase {
             if code.contains(".roundedBorder") {
                 roundedBorderFiles.append(file.lastPathComponent)
             }
-            // A chrome's own style must sit inside the chrome's definition.
-            for chrome in ["WizardFieldChrome", "SearchablePickerChrome"] {
-                if let definition = code.range(of: "struct " + chrome), let style = code.range(of: ".textFieldStyle(") {
-                    XCTAssertGreaterThan(style.lowerBound, definition.lowerBound, file.lastPathComponent + ": a style before " + chrome + "'s definition")
-                }
-            }
         }
-        XCTAssertEqual(counts, TextFieldStyleScanTests.styleChoosers, "Only the shared modifier, the two chromes and the listed exceptions choose a text field style")
+        XCTAssertEqual(counts, TextFieldStyleScanTests.styleChoosers, "Only the shared modifier and the listed exceptions choose a text field style")
         XCTAssertEqual(roundedBorderFiles, ["BorderedTextField.swift"], ".roundedBorder is written in one place")
     }
 

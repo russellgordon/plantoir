@@ -139,54 +139,32 @@ struct SearchablePickerField: View {
             .onKeyPress(.return) {
                 return onCommitHighlight() ? .handled : .ignored
             }
-            .modifier(SearchablePickerChrome(
-                isFocused: hasFocus,
-                backgroundIdentifier: "\(fieldIdentifier)-background"
-            ))
-            // **The whole bezel takes a click, not just the text.**
-            //
-            // A `.plain` `TextField` hit-tests its TEXT, and an EMPTY one is
-            // a caret's width of it at the leading edge — so clicking the
-            // field did nothing at all. Measured by driving the real app:
-            // `AXFocused` stayed false after a click in the middle of a
-            // 361pt-wide field, and the teacher had no way back into it once
-            // focus had gone. It never showed in the course-code field this
-            // was ported from, because that screen gives the field focus as
-            // it opens and nobody ever has to click it.
-            //
-            // Placed BEFORE the chevron's `.overlay` so the button, which
-            // sits above, still gets its own clicks.
-            .contentShape(Rectangle())
-            .onTapGesture {
-                hasFocus = true
-            }
+            // The ONE bezel every field wears (#374), since #456 — the
+            // 24pt drawn imitation is gone. A real bordered `NSTextField`
+            // takes a click anywhere in its bezel (AppKit's own hit-testing,
+            // the same as Course name's field), so the tap workaround the
+            // drawn one needed — a `.plain` field hit-tests only its text,
+            // and an EMPTY one a caret's width of it — goes with it; kept, it
+            // would have risked swallowing the mouse-down that places the
+            // caret (#456's plan review).
+            .borderedTextField()
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity)
             // The cue a Mac user already knows: a trailing chevron reads as
             // "there is a menu behind this field", the way a combo box always
             // shows one. It is a second way in, not a different control.
+            // A real AppKit button (`RevealChevronButton`): the real bezel's
+            // `NSTextField` takes a click meant for a SwiftUI overlay (#456).
             .overlay(alignment: .trailing) {
-                Button {
+                RevealChevronButton(
+                    accessibilityIdentifier: "\(fieldIdentifier)-reveal",
+                    accessibilityLabel: "Browse the whole list"
+                ) {
+                    isFocused = true
                     hasFocus = true
                     onRevealRequested()
-                } label: {
-                    RoundedRectangle(cornerRadius: CourseCodePickerView.revealButtonCornerRadius)
-                        .fill(CourseCodePickerView.revealButtonFillColor)
-                        .overlay(
-                            Image(systemName: "chevron.down")
-                                .font(.system(
-                                    size: CourseCodePickerView.revealButtonGlyphSize,
-                                    weight: .semibold
-                                ))
-                                .foregroundStyle(.primary)
-                        )
-                        .frame(
-                            width: CourseCodePickerView.revealButtonWidth,
-                            height: CourseCodePickerView.revealButtonHeight
-                        )
                 }
-                .buttonStyle(.plain)
                 .padding(.trailing, CourseCodePickerView.revealButtonTrailingInset)
-                .accessibilityIdentifier("\(fieldIdentifier)-reveal")
-                .accessibilityLabel("Browse the whole list")
             }
             .onChange(of: hasFocus) {
                 isFocused = hasFocus
@@ -214,68 +192,6 @@ struct SearchablePickerField: View {
     }
 }
 
-// MARK: - The field's chrome
-
-/// It exists because `.textFieldStyle(.roundedBorder)` renders 26pt tall while
-/// every AppKit control it stands in for is 24.
-///
-/// `.frame(height: 24)` does NOT achieve that, which is worth knowing before
-/// anybody tries it again: SwiftUI draws the `.roundedBorder` bezel at its own
-/// intrinsic height whatever frame it is given, so the field measures 26
-/// anyway and merely overflows its box. The only way to 24 is to stop asking
-/// SwiftUI for a bezel and draw one.
-///
-/// The cost, stated plainly: this is an imitation of a real AppKit bezel. It
-/// is measured against the real thing rather than eyeballed, and the
-/// alternative — an `NSViewRepresentable` around a real `NSTextField` — buys
-/// genuine chrome at the price of hand-managing first responder and binding
-/// updates.
-struct SearchablePickerChrome: ViewModifier {
-
-    // MARK: - Stored properties
-
-    /// A `ViewModifier` cannot own focus for the view it decorates, so the
-    /// ring has to be told rather than discovered.
-    let isFocused: Bool
-
-    /// Identifies the background SHAPE to a UI test.
-    ///
-    /// It has to be the shape rather than the `TextField`, and that is not a
-    /// preference: an `NSTextField` reports its accessibility frame as the
-    /// underlying CONTROL's bounds — its roughly 18pt text box — wherever in
-    /// the modifier chain the identifier is bound. So the field's own
-    /// identifier can never report the 24pt bezel a test needs in order to
-    /// check that this control ends where the controls around it end.
-    var backgroundIdentifier: String? = nil
-
-    // MARK: - Functions
-
-    func body(content: Content) -> some View {
-        content
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.leading)
-            .padding(.leading, CourseCodePickerView.textLeadingInset)
-            .padding(.trailing, CourseCodePickerView.textTrailingInset)
-            .padding(.bottom, CourseCodePickerView.textBaselineNudge)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: CourseCodePickerView.fieldHeight,
-                maxHeight: CourseCodePickerView.fieldHeight
-            )
-            .background(
-                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
-                    .fill(Color(nsColor: .textBackgroundColor))
-                    .accessibilityIdentifier(backgroundIdentifier ?? "")
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
-                    .strokeBorder(
-                        isFocused ? Color.accentColor : Color(nsColor: .separatorColor),
-                        lineWidth: isFocused ? 2 : 1
-                    )
-            )
-    }
-}
 
 // MARK: - The floating list
 
