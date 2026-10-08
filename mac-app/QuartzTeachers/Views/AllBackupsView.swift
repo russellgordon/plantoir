@@ -69,7 +69,7 @@ struct AllBackupsView: View {
                     // Disabled when nothing selected can go — including a
                     // selection of held backups only (the delete would keep
                     // them all, so there is nothing to confirm).
-                    // Held includes a Claude session's backup elsewhere
+                    // Held includes a Claude or Codex session's backup elsewhere
                     // (#458), read when the pane draws: one listing of the
                     // activity folder, and the confirmation reads it again.
                     .disabled(WorkspaceModel.deletableCount(

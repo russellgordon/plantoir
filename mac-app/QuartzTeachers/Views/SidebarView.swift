@@ -93,7 +93,7 @@ struct SidebarView: View {
     /// installed should be told which of them did not open.
     @State var codexProblem: String?
 
-    /// Why a Revise item refused at the click (#458) — a Claude session open
+    /// Why a Revise item refused at the click (#458) — a Claude or Codex session open
     /// on the course elsewhere, or the in-app assistant open on it — shown
     /// as an alert.
     @State var reviseRefusal: WorkspaceModel.ReviseRefusal?
@@ -220,8 +220,8 @@ struct SidebarView: View {
                             // closure left the menu showing the state
                             // from whenever the row last drew.
                             let busyReason: String? = busyReason(for: course)
-                            // Rename and Add Section… wait for a Claude
-                            // session open on the course as well (#458);
+                            // Rename and Add Section… wait for a Claude or
+                            // Codex session open on the course as well (#458);
                             // Keep a Copy only reads it, so it does not.
                             let structuralReason: String? = structuralHoldReason(for: course)
                             CourseRowLabel(
@@ -1258,7 +1258,7 @@ struct SidebarView: View {
     }
 
     /// Why structural work on the course — Rename Course, Add Section… —
-    /// must wait: `busyReason`, or a Claude session open on the course in
+    /// must wait: `busyReason`, or a Claude or Codex session open on the course in
     /// another program (#458), read from the window's snapshot.
     func structuralHoldReason(for course: Course) -> String? {
         guard let workspaceURL = workspace.workspaceURL else {
@@ -1289,8 +1289,8 @@ struct SidebarView: View {
     }
 
     /// The line (or lines) under the Revise items saying why they are greyed
-    /// — each distinct reason ONCE, for the items actually drawn, so a Claude
-    /// session greying all three is one line rather than three (#458).
+    /// — each distinct reason ONCE, for the items actually drawn, so a Claude or
+    /// Codex session greying all three is one line rather than three (#458).
     @ViewBuilder
     func reviseNotes(course: Course, sectionNumber: Int?) -> some View {
         let notes: [String] = reviseNoteLines(course: course, sectionNumber: sectionNumber)
@@ -1608,7 +1608,7 @@ struct SidebarView: View {
             // the row last drew, which is the staleness bug the course
             // activity registry already taught us.
             //
-            // Since #458 a Claude session open on the course elsewhere greys
+            // Since #458 a Claude or Codex session open on the course elsewhere greys
             // it too; the line saying why is drawn once under all three
             // Revise items (`reviseNotes`), so the same reason is not said
             // three times.
@@ -2182,7 +2182,7 @@ private struct OutsideAgentAlerts: ViewModifier {
     }
 }
 
-/// What the sidebar does about a Claude session holding a course from another
+/// What the sidebar does about a Claude or Codex session holding a course from another
 /// program (#458): keeps the window's snapshot of held courses fresh, and
 /// says why "Add Section…" refused at the click. A modifier of its own so
 /// the sidebar's body stays small enough to type-check.
@@ -2212,7 +2212,7 @@ private struct OutsideSessionHolds: ViewModifier {
             } message: {
                 Text(addSectionRefusal ?? "")
             }
-            // Which courses a Claude session elsewhere is holding: read when
+            // Which courses a Claude or Codex session elsewhere is holding: read when
             // the folder is shown, and again whenever Plantoir becomes the
             // active app — a session is opened and closed in Terminal, so
             // coming back is when the answer changes. Every click that acts
