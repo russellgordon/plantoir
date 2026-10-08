@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -240,6 +242,43 @@ public static partial class AssistWording
     /// </summary>
     public const string ScheduleADeployNeedsATime =
         "What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to.";
+
+    // ---- Settler S3's pointer (#440, mac AssistWording.nextClassNeedsItsOwnPhrasing) ----
+
+    /// <summary>
+    /// Settler S3's answer in a course whose unit word is "Unit": nothing was
+    /// added, and the two sentences that do it — both answered in code. The
+    /// days sentence names the course's LATEST unit (the plain next page's),
+    /// never a fixed number: "Unit 4" typed back in a Unit 2 course would start
+    /// Unit 4 at Day 1 and skip Unit 3. The contract holds the INSTANCE for a
+    /// latest unit of 2 (assist-wording.json); <see cref="AssistNextClassUnits.Pointer"/>
+    /// picks among the three forms.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasing(ClassNoun noun, int latestUnit) =>
+        $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest unit. " +
+        $"To start a new unit, say “Start a new unit”. To add several days to Unit {latestUnit}, " +
+        $"say “Add five more days to Unit {latestUnit}”.";
+
+    /// <summary>
+    /// S3's answer in a course with its own unit word ("Module"): the quoted
+    /// sentences still say "unit", because the cards read the word unit as the
+    /// course's own word — and the sentence says so.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasingInAModuleCourse(string unitWord, ClassNoun noun, int latestUnit)
+    {
+        string word = unitWord.ToLowerInvariant();
+        return $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest {word}. " +
+               $"To start a new {word}, say “Start a new unit”. To add several days to {unitWord} {latestUnit}, " +
+               $"say “Add five more days to Unit {latestUnit}”, since I read the word unit as {unitWord} here.";
+    }
+
+    /// <summary>S3's answer in a numbered course (#274), which has no units: one page at a time.</summary>
+    public static string NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun noun) =>
+        $"Nothing was added. This course numbers its pages one after another and has no units, so I add one " +
+        $"{Singular(noun)} at a time: say “Add the next {Singular(noun)} page” once for each one you want.";
+
+    /// <summary>"class" or "meeting", as the mac's <c>ClassNoun.singular</c>.</summary>
+    private static string Singular(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
 
     // ---- A publish that stops part way (#436 item 2, mac #412) ------------
 

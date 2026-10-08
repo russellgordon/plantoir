@@ -143,7 +143,8 @@ public sealed class AssistAgent
     /// as <c>tool.argument</c>.
     ///
     /// <para><b>Why a tool can have an argument its own model may not see.</b>
-    /// <c>duplicate</c> exists because Plantoir's window sends the card's
+    /// <c>duplicate</c> (and, since #440, add_next_class's <c>unit</c> and
+    /// <c>days</c>) exists because Plantoir's window sends the card's
     /// arguments to this server over JSON-RPC and the binder DROPS a key the
     /// method does not declare — so "duplicate Unit 3, Day 2 as my next class"
     /// silently made a blank page until the parameter was added (issue #149).
@@ -168,6 +169,18 @@ public sealed class AssistAgent
     {
         "add_next_class.duplicate",
         "plan_add_next_class.duplicate",
+        // #440: the router was shown `unit` and `days` until v1.4.4 and sent
+        // unit "next" (START A NEW UNIT) on 50 of 50 plain "add the next
+        // class" calls (v1.4.3 bundle A, i5-8365U / UHD 620). The server
+        // keeps declaring both, because the binder drops an undeclared key
+        // and the cards ("Start a new unit", "Add three days to Unit 2") fill
+        // them; the model now sees only course and section, as on the mac.
+        // plan_add_next_class is not a local tool, so its pair is here for
+        // symmetry with the mirror rather than to hide anything today.
+        "add_next_class.unit",
+        "add_next_class.days",
+        "plan_add_next_class.unit",
+        "plan_add_next_class.days",
         // "What does <page> link to?" (#305 / mac #167): filled in code by
         // the links phrasing; the mac keeps answer: "links" out of every
         // schema, and this is that, on a server whose binder needs it declared.
@@ -1595,6 +1608,14 @@ public sealed class AssistAgent
     /// call the mac runs — an unchosen difference. Named rather than inferred
     /// from "optional", because <c>publish_pages</c>' <c>pages</c> is optional
     /// too and an empty publish must still be refused.
+    ///
+    /// <para><b>Inert for the local model since #440</b>, which took
+    /// <c>unit</c> and <c>days</c> out of its view (<see cref="CardOnlyArguments"/>):
+    /// the narrowed schema no longer declares them, so an empty call runs
+    /// without this set. Kept rather than dropped because it still decides a
+    /// schema that DOES show them (a hand-built one in a test, or a surface
+    /// narrowed some other way), and because the contract's scenario "an
+    /// empty add_next_class from the model runs" names it as Windows' route.</para>
     /// </summary>
     internal static readonly HashSet<string> OptionalExtras = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -1945,15 +1966,43 @@ public sealed class AssistAgent
                 return lines;
             }
 
-            // Settler S2 (#411, fix round 2): the small router sends unit
-            // "next" for an ordinary "add the next class" (50 of 50 on this PC),
-            // which starts a NEW unit. Ignored unless the teacher's own
-            // sentence says "unit"; the call then runs as if no unit were
-            // given. `days` is left as sent: 0 (what the model sends) already
-            // means nothing — PlanAddNextClass reads days only when it is > 0
-            // beside a NUMBERED unit, so one class is added.
             if (name.Equals("add_next_class", StringComparison.OrdinalIgnoreCase))
-                call = WithoutAnUnaskedNewUnit(call, _typedThisTurn);
+            {
+                // Settler S3 (#440): a sentence asking for a new unit, a unit
+                // or day other than the next one, or several pages, answered
+                // with a plain add_next_class — measured 50 of 50 on the mac's
+                // smaller assistant, each adding ONE page in the current unit
+                // and reporting success. Stopped, the turn wound back, and the
+                // teacher given the sentences that do it (answered in code).
+                // The reading comes from the server's own plan_add_next_class
+                // (course and section only), never a second planner here; with
+                // no remembered dates there is none, and the call runs so the
+                // tool can ask for them (ruling 7). Its line TAKES THE PLACE of
+                // the chose-a-tool line below, which has not been written yet —
+                // Windows' S1 convention, which the contract's `why` names.
+                if (await NextClassReadingAsync(cancellation) is { } reading &&
+                    AssistNextClassUnits.KindOf(_typedThisTurn, reading) is { } kind)
+                {
+                    ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool, NextClassPointedLine(kind),
+                                       _courseCode, _section);
+                    WindTheTurnBack();
+                    lines.Add(new Line("assistant", AssistNextClassUnits.Pointer(reading)));
+                    return lines;
+                }
+
+                // Settler S2 (#411), widened by #440 (ruling 2): the model's
+                // `unit` and `days` are taken out of EVERY add_next_class it
+                // sends. The local schema declares neither since #440, but the
+                // server reads both from any call, and this router sent unit
+                // "next" (START A NEW UNIT) on 50 of 50 plain "add the next
+                // class" calls (v1.4.3 bundle A, UHD 620). S2 used to keep
+                // "next" whenever the sentence said "unit", so "Add the next
+                // class in this unit" could still start one; nothing the model
+                // sends can now. The MODEL's calls only: cards reach RunTool /
+                // ShowPlan without passing here and keep theirs, and an MCP
+                // client never enters Run().
+                call = WithoutCardOnlyArguments(call);
+            }
 
             ActivityTrail.Note(ActivityTrail.Event.AssistantChoseATool,
                 ChoseAToolLine(name, call, asking.Elapsed, modelAnswer.CompletionTokens,
@@ -1988,6 +2037,63 @@ public sealed class AssistAgent
     }
 
     /// <summary>
+    /// Where a plain "add the next class" would land, for settler S3 (#440):
+    /// the server's <c>plan_add_next_class</c> with course and section ONLY,
+    /// read from <see cref="AssistToolAnswer.NextClass"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>A probe, and nothing else.</b> No progress callback, so the
+    /// window shows no "working" line; no conversation-backup hand-off; not
+    /// added to the model's messages; never rendered — and the dates sheet is
+    /// offered only for a RENDERED line carrying
+    /// <see cref="AssistWording.MayIAskForYourDates"/>, so a refusal here
+    /// offers nothing and the real call asks once. plan_add_next_class is
+    /// read-only, so no backup is taken and no outside-change gate writes.</para>
+    ///
+    /// <para><b>Every failure is null</b> (review M1): an in-process tool
+    /// server can throw where McpClient turns failures into text, and a probe
+    /// that threw would turn an ordinary add_next_class into an engine error.
+    /// Cancellation is the one thing passed through.</para>
+    /// </remarks>
+    private async Task<AssistNextClassReading?> NextClassReadingAsync(CancellationToken cancellation)
+    {
+        try
+        {
+            var answer = await _tools.CallTool("plan_add_next_class",
+                new JsonObject { ["course"] = _courseCode, ["section"] = _section },
+                progress: null, cancellation);
+            return answer.NextClass;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The trail's line for settler S3 (#440), written in place of the turn's
+    /// chose-a-tool line: which of the three things the sentence asked for,
+    /// and that nothing was added. Never the sentence — "assistant asked"
+    /// carries it — and never a page title. Word for word the mac's
+    /// <c>AssistAgent.nextClassPointedLine</c>.
+    /// </summary>
+    internal static string NextClassPointedLine(AssistNextClassUnits.Kind kind)
+    {
+        string asked = kind switch
+        {
+            AssistNextClassUnits.Kind.NewUnit => "asked for a new unit",
+            AssistNextClassUnits.Kind.AnotherUnitOrDay => "named a unit or day other than the next one",
+            _ => "asked for more than one page",
+        };
+        return "chose to add the next class for a request that " + asked +
+               " — nothing was added, and the teacher was shown the sentences that do it";
+    }
+
+    /// <summary>
     /// The later-time words of settler S1 (#424, fix round 2), matched as
     /// WHOLE words in the teacher's own sentence: short and exact on purpose.
     /// "next" is not here ("deploy the next section"), nor "soon" or "after"
@@ -2012,13 +2118,18 @@ public sealed class AssistAgent
     }
 
     /// <summary>
-    /// Settler S2: the model's <c>unit: "next"</c> on add_next_class taken out
-    /// unless the teacher said "unit". Everything else in the call is kept.
+    /// The keys add_next_class reads that only a CARD may set (#440, ruling
+    /// 2) — the mac's <c>AssistAgent.cardOnlyNextClassArguments</c>.
     /// </summary>
-    internal static JsonObject WithoutAnUnaskedNewUnit(JsonObject call, string? typed)
+    internal static readonly string[] CardOnlyNextClassArguments = { "unit", "days" };
+
+    /// <summary>
+    /// Settler S2 (#411) as widened by #440: the model's <c>unit</c> and
+    /// <c>days</c> taken out of an add_next_class call, whatever the sentence
+    /// said. Everything else in the call is kept as sent.
+    /// </summary>
+    internal static JsonObject WithoutCardOnlyArguments(JsonObject call)
     {
-        if (typed is not null && System.Text.RegularExpressions.Regex.IsMatch(typed, @"\bunits?\b",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return call;
         var function = call["function"] as JsonObject;
         JsonObject? arguments;
         try
@@ -2031,9 +2142,11 @@ public sealed class AssistAgent
             };
         }
         catch (System.Text.Json.JsonException) { return call; }   // a malformed call is judged elsewhere
-        if (arguments?["unit"]?.ToString() is not { } unit ||
-            !unit.Equals("next", StringComparison.OrdinalIgnoreCase)) return call;
-        arguments.Remove("unit");
+        if (arguments is null) return call;
+        bool removed = false;
+        foreach (string key in CardOnlyNextClassArguments)
+            removed |= arguments.Remove(key);
+        if (!removed) return call;
         var settled = (JsonObject)call.DeepClone();
         settled["function"]!["arguments"] = arguments.ToJsonString();
         return settled;
