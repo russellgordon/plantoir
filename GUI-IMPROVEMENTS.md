@@ -1,4 +1,7 @@
-# GUI Improvement Log
+# GUI Improvement Log — closed to new entries 2026-10-08
+
+*(The paragraph and list below describe the log while it was open, 2026-08-09
+to 2026-10-08; the closing notice further down says what replaced it.)*
 
 A running log of improvement instructions for the graphical interfaces to
 this toolchain. Two purposes:
@@ -18,6 +21,35 @@ rows are correct about their own day. What is true NOW lives in
 assistant says, `assist-cases.json` for what must happen. Write tests against
 those; read this for why things are the way they are. See "Where the truth
 lives" in [`CLAUDE.md`](CLAUDE.md).
+
+**CLOSED TO NEW ENTRIES as of 2026-10-08 (Russell, GitHub #480).** Rows 1
+to 748 stay exactly as they are, frozen, append-only history the way
+[`TODO.md`](TODO.md) has been since 2026-09-08; nothing is deleted or
+rewritten, because rows are cited by number from issues, documentation and
+commits, and a dead citation is worse than a frozen file. No row is added for
+any piece of work after this date, on either platform.
+
+Why: since work moved to GitHub issues (2026-09-08) and the reasoning to
+[`documentation/`](documentation/README.md), a row restated the issue's
+closing comment and the owning documentation section and carried nothing a
+reader could not get from those two — while every piece paid for one, and the
+row numbering conflicted on every merge that landed two pieces (rows 747 and
+748 conflicted on 2026-10-08). Keeping it for "teacher-visible" changes only
+was rejected: that threshold is the judgement call that produced empty cells
+and skipped rows.
+
+Where what a row carried goes now:
+
+- **Which model did which review** (this file's row 480 was the example in
+  `CLAUDE.md` rule 11): the **closing comment on the issue**, which is already
+  the record of what landed (`CLAUDE.md` rules 3 and 4).
+- **A dated, cross-platform list of what changed in a release**: the closed
+  issues, filtered by milestone. The milestone is the release.
+- **The "Notes for Windows port" column**: the `windows` or `mac` issue the
+  change opens for the other platform, which rules 3 and 4 already require.
+
+*(What follows is the header as it stood while the log was live, kept so the
+rows read in their own terms.)*
 
 **The Windows column is required.** An entry is not finished until "Notes
 for Windows port" says something a Windows implementer can use: what to do
