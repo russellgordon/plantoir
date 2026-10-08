@@ -51,6 +51,16 @@ public class ScheduledRunAnnouncementTests : IDisposable
             OnShow[tag] = sentence;
             return true;
         }
+
+        public bool WithdrawThrows { get; set; }
+        public List<string> Withdrawn { get; } = new();
+
+        public void Withdraw(string tag)
+        {
+            if (WithdrawThrows) throw new InvalidOperationException("Notification Center did not answer");
+            Withdrawn.Add(tag);
+            OnShow.Remove(tag);
+        }
     }
 
     private string[] TrailLines() => File.Exists(_trail) ? File.ReadAllLines(_trail) : [];
@@ -295,6 +305,119 @@ public class ScheduledRunAnnouncementTests : IDisposable
         Assert.Equal(ScheduledRun.Ending.Deployed, ending);
         Assert.EndsWith($" · ICS3U/1 · {ScheduledRunAnnouncement.CouldNotBeSentLine}", Assert.Single(NotificationLines()));
         Assert.Contains(said, line => line.Contains("the notification platform is not there"));
+    }
+
+    // ---- What stays on show: notification.onShow (#464) ---------------------
+
+    /// <summary>
+    /// Every <c>notification.onShow</c> case, played through the real post
+    /// (<see cref="ScheduledRunAnnouncement.Announce"/>, after writing a record of
+    /// the step's kind) and the real dismissal
+    /// (<see cref="ScheduledRunAnnouncement.TeacherDismissed"/>), against a
+    /// stand-in that keeps what is on show by tag. Until #464 Windows ran none of
+    /// them, and the dismiss case could not have passed: nothing withdrew.
+    /// </summary>
+    [Fact]
+    public void TheContractsOnShowCases()
+    {
+        var kinds = Enum.GetValues<ScheduledPublishOutcome.Kind>().ToDictionary(ScheduledPublishOutcome.ContractKey);
+        var cases = ContractLoader.LoadJson("shared-rules.json")["scheduledPublishStopped"]!["notification"]!["onShow"]!["cases"]!.AsArray();
+        Assert.NotEmpty(cases);
+        int played = 0;
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            string folder = Path.Combine(_root, $"onshow-{played++}");
+            Directory.CreateDirectory(folder);
+            var toasts = new FakeToasts();
+            // Which section and kind each tag on show stands for.
+            var meaning = new Dictionary<string, (string Course, int Section, string Kind)>();
+
+            foreach (var step in c["steps"]!.AsArray())
+            {
+                if (step!["post"] is JsonObject post)
+                {
+                    var target = new ScheduledPublishToast.Target(post["course"]!.ToString(), post["section"]!.GetValue<int>(), folder);
+                    string kind = post["kind"]!.ToString();
+                    Assert.True(kinds.ContainsKey(kind), $"{name}: kind {kind} has no Windows record");
+                    ScheduledPublishOutcome.Record(Outcomes, target.CourseCode, target.Section, kinds[kind], "Netlify", folder);
+                    Assert.Equal(ScheduledRunAnnouncement.Said.Told, ScheduledRunAnnouncement.Announce(target, toasts, Outcomes));
+                    meaning[ScheduledRunAnnouncement.TagFor(target)] = (target.CourseCode, target.Section, kind);
+                }
+                else if (step["dismiss"] is JsonObject dismiss)
+                {
+                    var target = new ScheduledPublishToast.Target(dismiss["course"]!.ToString(), dismiss["section"]!.GetValue<int>(), folder);
+                    ScheduledRunAnnouncement.TeacherDismissed(target, toasts, Outcomes);
+                    Assert.Null(ScheduledPublishOutcome.ReadFrom(Outcomes, target.CourseCode, target.Section, folder));
+                }
+                else throw new InvalidOperationException($"{name}: a step that is neither post nor dismiss");
+            }
+
+            var expected = c["stillShown"]!.AsArray()
+                .Select(s => $"{s!["course"]}/{s["section"]}/{s["kind"]}").OrderBy(x => x).ToList();
+            var shown = toasts.OnShow.Keys.Select(tag => meaning[tag])
+                .Select(m => $"{m.Course}/{m.Section}/{m.Kind}").OrderBy(x => x).ToList();
+            Assert.True(expected.SequenceEqual(shown), $"{name}: on show [{string.Join(", ", shown)}], expected [{string.Join(", ", expected)}]");
+            // What is on show carries the sentence of the kind it stands for.
+            foreach (var (tag, sentence) in toasts.OnShow)
+            {
+                var m = meaning[tag];
+                var record = ScheduledPublishOutcome.ReadFrom(Outcomes, m.Course, m.Section, folder)!;
+                Assert.Equal(ScheduledPublishOutcome.Sentence(m.Course, m.Section, record), sentence);
+            }
+        }
+        Assert.Equal(cases.Count, played);
+    }
+
+    [Fact]
+    public void ADismissalWhoseWithdrawalFailsStillClearsTheRecordAndSaysWhy()
+    {
+        string folder = Path.Combine(_root, "withdraw-fails");
+        Directory.CreateDirectory(folder);
+        var target = new ScheduledPublishToast.Target("ICS4U", 1, folder);
+        ScheduledPublishOutcome.Record(Outcomes, "ICS4U", 1, ScheduledPublishOutcome.Kind.DidNotFinish, "Netlify", folder);
+        var said = new List<string>();
+        var linesBefore = TrailLines().Length;
+
+        ScheduledRunAnnouncement.TeacherDismissed(target, new FakeToasts { WithdrawThrows = true }, Outcomes, said.Add);
+
+        Assert.Null(ScheduledPublishOutcome.ReadFrom(Outcomes, "ICS4U", 1, folder));
+        Assert.Contains(said, line => line.Contains("Notification Center did not answer"));
+        Assert.Equal(linesBefore, TrailLines().Length);   // the withdrawal writes no trail line, as on the mac
+    }
+
+    [Fact]
+    public void TheWithdrawalNamesTheTagThePostUsed()
+    {
+        string folder = Path.Combine(_root, "same-tag");
+        Directory.CreateDirectory(folder);
+        var target = new ScheduledPublishToast.Target("ICS4U", 1, folder);
+        ScheduledPublishOutcome.Record(Outcomes, "ICS4U", 1, ScheduledPublishOutcome.Kind.Succeeded, "Netlify", folder);
+        var toasts = new FakeToasts();
+        ScheduledRunAnnouncement.Announce(target, toasts, Outcomes);
+        ScheduledRunAnnouncement.TeacherDismissed(target, toasts, Outcomes);
+        Assert.Equal(Assert.Single(toasts.Posts).Tag, Assert.Single(toasts.Withdrawn));
+    }
+
+    /// <summary>
+    /// The band's Dismiss goes through <see cref="ScheduledRunAnnouncement.TeacherDismissed"/>,
+    /// and the system's poster removes by the same group it posts under. Source-read,
+    /// because the test project cannot reference the WinUI app: a later edit that
+    /// put the bare record deletion back would leave the toast up and pass every
+    /// other test.
+    /// </summary>
+    [Fact]
+    public void TheBandsDismissWithdrawsTheNotification()
+    {
+        string app = Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir");
+        string view = File.ReadAllText(Path.Combine(app, "Views", "SectionDetailView.xaml.cs"));
+        Assert.Contains("ScheduledRunAnnouncement.TeacherDismissed(", view);
+        Assert.DoesNotContain("ScheduledPublishOutcome.Dismiss(", view);
+        string notifier = File.ReadAllText(Path.Combine(app, "Services", "ScheduledPublishNotifier.cs"));
+        Assert.Contains("Group = ScheduledRunAnnouncement.ToastGroup,", notifier);
+        Assert.Contains("RemoveByTagAndGroupAsync(tag, ScheduledRunAnnouncement.ToastGroup)", notifier);
+        // One registration per process, shared by the app and the poster.
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(notifier, @"AppNotificationManager\.Default\.Register\(\)").Count);
     }
 
     [Fact]
