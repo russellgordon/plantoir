@@ -48,6 +48,13 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         /// </summary>
         public bool BuildFailed { get; internal set; }
 
+        /// <summary>
+        /// Set when this leg's build or deploy was refused because the same
+        /// section was still being deployed (#467 / mac #439): read from the
+        /// leg's own output, since a refused launcher exits 1 like a broken one.
+        /// </summary>
+        public FailureExplainer.SectionDeployRefusal? RefusedWhileItsSectionDeploys { get; internal set; }
+
         public Leg(CourseConfiguration.DeployDestination destination, SynchronizationContext? uiContext)
         {
             Destination = destination;
@@ -75,7 +82,16 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// <summary>True once anything at all has been shown for this run, across any leg.</summary>
     public bool HasAnyOutput => Legs.Any(leg => leg.Runner.Transcript.Lines.Count > 0);
 
-    public readonly record struct Outcome(bool AnySucceeded, IReadOnlyList<CourseConfiguration.DeployDestination> FailedDestinations)
+    /// <param name="Refusal">
+    /// Set only when EVERY leg that ran was refused because the section was
+    /// still being deployed (#467 / mac #439) - a refusal comes before
+    /// anything is changed, so a run with any success, or any other failure,
+    /// is told the ordinary way.
+    /// </param>
+    public readonly record struct Outcome(
+        bool AnySucceeded,
+        IReadOnlyList<CourseConfiguration.DeployDestination> FailedDestinations,
+        FailureExplainer.SectionDeployRefusal? Refusal = null)
     {
         public bool AllSucceeded => AnySucceeded && FailedDestinations.Count == 0;
     }
@@ -90,13 +106,21 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         get
         {
             var failed = new List<CourseConfiguration.DeployDestination>();
+            var refusals = new List<FailureExplainer.SectionDeployRefusal>();
             bool anySucceeded = false;
+            bool anyFailedOtherwise = false;
             foreach (var leg in Legs.Where(leg => leg.IsFinished))
             {
+                if (!leg.Succeeded)
+                {
+                    if (leg.RefusedWhileItsSectionDeploys is { } refusal) refusals.Add(refusal);
+                    else anyFailedOtherwise = true;
+                }
                 if (leg.Succeeded) anySucceeded = true;
                 else if (!leg.BuildFailed) failed.Add(leg.Destination);
             }
-            return new Outcome(anySucceeded, failed);
+            var every = !anySucceeded && !anyFailedOtherwise && refusals.Count > 0 ? refusals[0] : null;
+            return new Outcome(anySucceeded, failed, every);
         }
     }
 
@@ -277,6 +301,7 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                         runner.IsBetweenPhases = false;
                         leg.IsFinished = true;
                         leg.BuildFailed = true;
+                        leg.RefusedWhileItsSectionDeploys = FailureExplainer.SectionDeployRefusalOf(runner.Transcript.RecentText(8000));
                         break;
                     }
                     // Still true here on the success path — cleared by the
@@ -297,6 +322,8 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
                 bool deployed = await runner.WaitUntilFinished();
                 leg.IsFinished = true;
                 leg.Succeeded = deployed;
+                if (!deployed)
+                    leg.RefusedWhileItsSectionDeploys = FailureExplainer.SectionDeployRefusalOf(runner.Transcript.RecentText(8000));
                 if (runner.WasCancelled || runner.WasStoppedByUser)
                 {
                     WasCancelled = WasCancelled || runner.WasCancelled;
@@ -380,6 +407,10 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
     /// </summary>
     public static AssistResult Result(string course, string section, int destinationCount, Outcome outcome)
     {
+        // Refused because the section was still being deployed (#467 / mac
+        // #439): said as itself, for one destination or several, since
+        // nothing was changed anywhere.
+        if (outcome.Refusal is { } refusal) return RefusalAnswer(course, section, refusal);
         if (destinationCount <= 1)
         {
             return outcome.AnySucceeded
@@ -400,6 +431,34 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
         return new AssistResult(
             false, AssistWording.DeployToMultipleDestinationsDidNotFinish(course, section), null);
     }
+
+    /// <summary>
+    /// The window's answer when the run's shared BUILD did not finish, or null
+    /// when it did (the mac's <c>answerWhenTheBuildDidNotFinish</c>). Asked
+    /// BEFORE <see cref="Result"/>: nothing was sent anywhere, so "did not
+    /// finish" would name the upload. A build refused because the section was
+    /// still being deployed is said as ITSELF - a refused
+    /// <c>preview.ps1 --build-only</c> exits 1 like a broken build, and a stale
+    /// site always takes this path (the mac's #439 review, finding 1).
+    /// </summary>
+    public static AssistResult? AnswerWhenTheBuildDidNotFinish(string course, string section, Leg? firstLeg)
+    {
+        if (firstLeg is not { BuildFailed: true }) return null;
+        if (firstLeg.RefusedWhileItsSectionDeploys is { } refusal) return RefusalAnswer(course, section, refusal);
+        return new AssistResult(false, AssistWording.CouldNotBuildBeforeDeploying(course, section), null);
+    }
+
+    /// <summary>
+    /// The sentence for a deploy refused because its section was still being
+    /// deployed (#467 / mac #439): which one depends on whether a deploy set
+    /// for later is the one working.
+    /// </summary>
+    public static AssistResult RefusalAnswer(string course, string section, FailureExplainer.SectionDeployRefusal refusal) =>
+        new(false,
+            refusal.ByALaterDeploy
+                ? AssistWording.DeployRefusedWhileALaterDeployWorks(course, section)
+                : AssistWording.DeployRefusedWhileItsSectionDeploys(course, section),
+            null);
 
     private void Notify([CallerMemberName] string? property = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
