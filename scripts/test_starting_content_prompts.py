@@ -509,11 +509,20 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     site online, PUBLISH only marks a page. Checked by installing against
     origin/dev b2726e6b and diffing: eight files (seven `_DUPLICATE ME.md`
     and `Tutorials/Scavenger Hunt.md`), those four sentences, nothing else.
+
+    Moved ON PURPOSE again: #444 (2026-10-07) put the heading marks back in
+    the template sentence "Every `##` (level 2) and `###` (level 3) heading",
+    which had said "Every  (level 2) and  (level 3) heading" since the
+    template was added. Checked by installing against origin/dev 4b177c68
+    and diffing: the seven `_DUPLICATE ME.md` files, that one line in each,
+    nothing else. The value here is the one taken after #443's wording was
+    merged in (2026-10-07): the two changes touch the same line, so the
+    hash carries both.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "1710fc1abb3a53089177524cbf6871811c8d8e7d89fde2fc457e3147f63aeacd"
+    PAYLOAD_CONTENT_HASH = "6c9018927bc1277e83f1fdd87d181bfc6d736f70d1892b85171d652a73466247"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")
