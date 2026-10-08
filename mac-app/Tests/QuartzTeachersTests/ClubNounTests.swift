@@ -202,9 +202,9 @@ final class ClubNounTests: XCTestCase {
         XCTAssertEqual(AssistCardCommand.matching(quoted)?.toolName, "read_remembered_timetable")
     }
 
-    /// Every card on a club's shelf is answered in code, apart from the one
-    /// deploy card already measured on the model — so the club shelf
-    /// promises nothing no routing measurement has seen.
+    /// Every card on a club's shelf is answered in code — the cancel card too
+    /// since #449 — so the club shelf promises nothing no routing measurement
+    /// has seen.
     func testEveryCardOnAClubsShelfIsMatchedInCode() {
         let naming: ClassPageNaming = ClassPageNaming(word: "Week", scheme: .numbered)
         for noun in [ClassNoun.meeting, ClassNoun.class] {
@@ -212,9 +212,6 @@ final class ClubNounTests: XCTestCase {
             for (_, phrasings) in AssistPromptShelfView.groups(naming: naming, noun: noun) {
                 for phrasing in phrasings {
                     seen += 1
-                    if phrasing == "Cancel scheduled deploy" {
-                        continue
-                    }
                     XCTAssertNotNil(
                         AssistCardCommand.matching(phrasing, numberedPageWord: naming.word),
                         "“\(phrasing)” goes to the model"
