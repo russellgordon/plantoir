@@ -69,8 +69,12 @@ struct AllBackupsView: View {
                     // Disabled when nothing selected can go — including a
                     // selection of held backups only (the delete would keep
                     // them all, so there is nothing to confirm).
+                    // Held includes a Claude or Codex session's backup elsewhere
+                    // (#458), read when the pane draws: one listing of the
+                    // activity folder, and the confirmation reads it again.
                     .disabled(WorkspaceModel.deletableCount(
-                        of: selectedItems, heldPaths: WorkspaceModel.heldBackupPaths()
+                        of: selectedItems,
+                        heldPaths: WorkspaceModel.everyHeldBackupPath(inWorkingFolder: workspace.workspaceURL)
                     ) == 0)
                     .accessibilityIdentifier("deleteSelectedBackupsButton")
                 }
@@ -200,7 +204,10 @@ struct AllBackupsView: View {
             for: items,
             sizes: workspace.backupSizes,
             heldPaths: WorkspaceModel.heldBackupPaths(),
-            active: AssistActivity.active
+            active: AssistActivity.active,
+            heldByOtherSessions: WorkspaceModel.backupPathsHeldByOtherSessions(
+                inWorkingFolder: workspace.workspaceURL
+            )
         )
     }
 

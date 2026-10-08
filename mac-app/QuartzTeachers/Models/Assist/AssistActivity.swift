@@ -21,7 +21,11 @@ import Observation
 ///
 /// **This governs the built-in assistant only.** Claude Code driving the same
 /// tools over MCP is unaffected — that is a different client with no engine
-/// of its own, so nothing about it multiplies memory.
+/// of its own, so nothing about it multiplies memory. What a Claude or Codex session
+/// DOES hold, since #458, is its course: its server's `assist` lease, which
+/// the app reads from disk (`CourseActivity.isRevisedElsewhere`) — and while
+/// THIS window is open on a course, the two doors on that course are greyed
+/// with `closeTheAssistantFirst` (`CourseActivity.reviseUnavailableReason`).
 @MainActor
 enum AssistActivity {
 
