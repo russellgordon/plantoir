@@ -362,11 +362,11 @@ final class RolloverWebsiteTests: XCTestCase {
 
         XCTAssertTrue(
             said.contains(AssistWording.rolloverTurnedOffTheScheduledPublish),
-            "A teacher must be told their scheduled publish was turned off: \(said)"
+            "A teacher must be told their scheduled deploy was turned off: \(said)"
         )
         XCTAssertFalse(
             FileManager.default.fileExists(atPath: plistURL.path),
-            "The scheduled publish must actually be gone, not just described as gone."
+            "The scheduled deploy must actually be gone, not just described as gone."
         )
     }
 
@@ -438,7 +438,11 @@ final class RolloverWebsiteTests: XCTestCase {
         ).write(to: plistURL)
     }
 
-    /// A section with no scheduled publish is told nothing about one.
+    /// A section with no scheduled deploy is told nothing about one.
+    ///
+    /// Named by the constants rather than by a phrase typed here: a typed
+    /// phrase goes on passing, vacuously, the day the product's words change
+    /// (#443 found the old "set to publish on its own" doing exactly that).
     @MainActor
     func testWithNoScheduledPublishNothingIsSaidAboutOne() async throws {
         let (root, course, runner) = try makeSectionNeedingReDating(withMarker: true)
@@ -447,7 +451,8 @@ final class RolloverWebsiteTests: XCTestCase {
         let said: String = await reDate(
             runner, course: course, arguments: ["rollover": "yes", "website": "new"]
         )
-        XCTAssertFalse(said.contains("set to publish on its own"), said)
+        XCTAssertFalse(said.contains(AssistWording.rolloverTurnedOffTheScheduledPublish), said)
+        XCTAssertFalse(said.contains(AssistWording.rolloverCouldNotTurnOffTheScheduledPublish), said)
     }
 
     /// Answering the question is the SECOND turn, and by then the pages are
