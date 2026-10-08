@@ -97,13 +97,16 @@ def publish_folders(folder: Path) -> list[Path]:
     return found
 
 
-def make_publish_folders(folder: Path) -> list[Path]:
+def make_publish_folders(folder: Path, made: list[Path] | None = None) -> list[Path]:
     """Make the folder destinations of `folder`'s courses — only those
     INSIDE `folder`, so a config still naming some other place (say a
     Desktop path left by a run that died) never gets folders made there.
     Returns the top-level folders under `folder` that did not exist before,
-    so a caller that made them for a while can take them away again."""
-    made: list[Path] = []
+    so a caller that made them for a while can take them away again. Pass
+    `made` to have them recorded AS they are made, so a failure part-way
+    still leaves the caller knowing what to take away."""
+    if made is None:
+        made = []
     for destination in publish_folders(folder):
         try:
             top = folder / destination.relative_to(folder).parts[0]
@@ -133,7 +136,13 @@ class ShownAsTeaching:
     @staticmethod
     def rewrite(courses: Path, old: Path, new: Path) -> None:
         for config in courses.glob("*/course_config.json"):
-            text = config.read_text(encoding="utf-8")
+            try:
+                text = config.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as problem:
+                # One unreadable config must not stop the others, nor the
+                # courses being put back: it is named and left as it is.
+                print(f"   {config.parent.name}'s course_config.json could not be read ({problem}); left as it is")
+                continue
             escaped_old, escaped_new = json.dumps(str(old))[1:-1], json.dumps(str(new))[1:-1]
             if escaped_old in text:
                 try:
@@ -159,7 +168,7 @@ class ShownAsTeaching:
             # (`Websites` for the kept folder, `School Web Space` for one made
             # from folders.json): made for the scenes, and only what was not
             # there already is taken away again on the way out.
-            self.made_here = make_publish_folders(SHOWN)
+            make_publish_folders(SHOWN, self.made_here)
         except BaseException:
             # The courses are already here: a failure past this point must
             # put them back, or they are stranded on the Desktop with their
@@ -171,12 +180,16 @@ class ShownAsTeaching:
         return SHOWN
 
     def __exit__(self, *_) -> bool:
-        for top in self.made_here:
-            shutil.rmtree(top, ignore_errors=True)
-        self.rewrite(SHOWN / "courses", SHOWN, self.folder)
-        (SHOWN / "courses").rename(self.folder / "courses")
-        if COURSES_SET_ASIDE.exists():
-            COURSES_SET_ASIDE.rename(SHOWN / "courses")
+        try:
+            for top in self.made_here:
+                shutil.rmtree(top, ignore_errors=True)
+            self.rewrite(SHOWN / "courses", SHOWN, self.folder)
+        finally:
+            # The courses go back whatever happened above: courses left on
+            # the Desktop are the one outcome this class exists to prevent.
+            (SHOWN / "courses").rename(self.folder / "courses")
+            if COURSES_SET_ASIDE.exists():
+                COURSES_SET_ASIDE.rename(SHOWN / "courses")
         print(f"   {self.folder.name}'s courses and {SHOWN}'s own put back")
         return False
 

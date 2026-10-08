@@ -264,6 +264,22 @@ class TheBlockIsReplacedNotAppendedTests(unittest.TestCase):
             # A second deploy leaves it exactly where it is.
             self.assertEqual(self.write(public_dir), text)
 
+    def test_a_header_put_between_our_slash_star_and_our_policy_line_does_not_keep_the_old_policy(self):
+        # marker, `/*`, their header, THEN our old policy line: the old hash
+        # must not survive beside the new one (#462's own failure).
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const b = 2;</script>", encoding="utf-8")
+            (public_dir / "_headers").write_text(
+                netlify_badge.MANAGED_MARKER + "\n/*\n  X-Frame-Options: DENY\n"
+                "  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-OLD=';\n", encoding="utf-8")
+            text = self.write(public_dir)
+            self.assertEqual(text.count("Content-Security-Policy"), 1)
+            self.assertNotIn("sha256-OLD=", text)
+            self.assertIn(_digest("const b = 2;"), text)
+            self.assertTrue(text.startswith("/*\n  X-Frame-Options: DENY\n"))
+            self.assertEqual(self.write(public_dir), text)
+
     def test_a_marked_block_first_in_the_file_keeps_an_added_header_under_its_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             public_dir = Path(tmp)

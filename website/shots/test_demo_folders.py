@@ -544,7 +544,7 @@ class TheWindowsCapturersFolders(unittest.TestCase):
                                          "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
         self.course(shown, "THEIRS", {"deploy_target": "netlify"})
 
-        def broken(_folder):
+        def broken(*_arguments):
             raise PermissionError("refused")
 
         saved = self.scenes.make_publish_folders
@@ -561,6 +561,73 @@ class TheWindowsCapturersFolders(unittest.TestCase):
         self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
                                     .read_text(encoding="utf-8"))["deploy_folder_path"],
                          str(marketing / "Websites" / "ICS4U"))
+
+    def test_a_config_that_cannot_be_read_strands_nothing(self):
+        # A course_config.json that is not UTF-8 used to raise inside
+        # rewrite() on the way in AND on the way out, so the undo never
+        # renamed anything and the courses stayed on the Desktop.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        broken = marketing / "courses" / "BROKEN"
+        broken.mkdir(parents=True)
+        (broken / "course_config.json").write_bytes(b"\xff\xfe not utf-8")
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+        with self.scenes.ShownAsTeaching(marketing):
+            self.assertTrue((shown / "courses" / "BROKEN").is_dir())
+            self.assertEqual(json.loads((shown / "courses" / "ICS4U" / "course_config.json")
+                                        .read_text(encoding="utf-8"))["deploy_folder_path"],
+                             str(shown / "Websites" / "ICS4U"))
+        self.assertTrue((marketing / "courses" / "BROKEN").is_dir())
+        self.assertEqual((broken / "course_config.json").read_bytes(), b"\xff\xfe not utf-8")
+        self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
+                                    .read_text(encoding="utf-8"))["deploy_folder_path"],
+                         str(marketing / "Websites" / "ICS4U"))
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+
+    def test_a_rewrite_that_fails_both_ways_still_puts_the_courses_back(self):
+        # Whatever rewrite() raises, on the way in and again in the undo,
+        # the renames in __exit__ still run.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "netlify"})
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+
+        def broken(*_arguments):
+            raise OSError("refused")
+
+        saved = self.scenes.ShownAsTeaching.__dict__["rewrite"]
+        self.scenes.ShownAsTeaching.rewrite = staticmethod(broken)
+        try:
+            with self.assertRaises(OSError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.ShownAsTeaching.rewrite = saved
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+
+    def test_folders_made_before_a_failure_are_taken_away(self):
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        shown.mkdir(parents=True)
+        real = self.scenes.make_publish_folders
+
+        def made_one_then_failed(folder, made=None):
+            real(folder, made)
+            raise PermissionError("refused after the first folder")
+
+        self.scenes.make_publish_folders = made_one_then_failed
+        try:
+            with self.assertRaises(PermissionError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.make_publish_folders = real
+        self.assertFalse((shown / "Websites").exists())
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
 
     def test_a_destination_outside_the_folder_is_never_made(self):
         marketing = self.scenes.MARKETING
