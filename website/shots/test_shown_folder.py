@@ -60,6 +60,18 @@ class ShownFolder(unittest.TestCase):
             pass
         self.assertEqual(self.config.stat().st_mtime_ns, before, "a second run must not touch the config")
 
+    def test_a_path_with_backslashes_and_a_quote_is_found_in_its_json_form(self):
+        # #461: on Windows a path's backslashes are doubled inside JSON, so a
+        # search for the raw path matched nothing. Written through json.dumps
+        # here, so this mac run proves the Windows shape.
+        old = 'C:\\Users\\teacher\\Plantoir "Marketing"'
+        new = 'C:\\Users\\teacher\\Desktop\\Teaching'
+        self.config.write_text(json.dumps({"deploy_folder": old + "\\School Web Space"}), encoding="utf-8")
+        self.assertNotIn(old, self.config.read_text(encoding="utf-8"))
+        capture.MarketingFolderShownAsTeaching(self.marketing).rewrite(self.marketing, old, new)
+        written = json.loads(self.config.read_text(encoding="utf-8"))
+        self.assertEqual(written["deploy_folder"], new + "\\School Web Space")
+
     def test_both_go_back_when_a_scene_fails(self):
         with self.assertRaises(RuntimeError):
             with capture.MarketingFolderShownAsTeaching(self.marketing):
