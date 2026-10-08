@@ -66,11 +66,15 @@ Neither app contains toolchain logic of its own: they write the same
    the Swift or watch it being tested, so a change that exists only in Swift is
    one they will re-derive from scratch — usually after shipping the same bug
    once. A change is not finished until:
-   - **the closing comment on the issue says what landed, what was
-     measured, and which model did which review.** It is the record of the
-     piece; a piece with no issue of its own records that in its merge
-     commit. The `windows` issue two bullets down carries what Windows must
-     do, and the `documentation/` section carries why. (Until 2026-10-08 this bullet
+   - **the closing comment on the piece's OWN issue says what landed, what
+     was measured, and which model did which review.** It is the record of
+     the piece — so every NEW piece has an issue (open one if none exists,
+     before the merge) and that issue carries the release milestone before
+     it closes, or the piece drops out of the changelog below. Going forward
+     only (Russell, 2026-10-08): nothing is opened for the 748 rows already
+     logged. The `windows`
+     issue two bullets down carries what Windows must do, and the
+     `documentation/` section carries why. (Until 2026-10-08 this bullet
      asked for a `GUI-IMPROVEMENTS.md` row with a usable "Notes for Windows
      port" cell; the log is closed to new entries since then — #480 — because
      a row restated the closing comment and the section, and its numbering
@@ -134,12 +138,14 @@ Neither app contains toolchain logic of its own: they write the same
      `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
-   - **The closed issues, filtered by milestone, are the record of the
-     product** — of what a teacher can see on either platform in a release —
-     so an issue that is pinned to a release carries its milestone when it
-     closes. Nobody opens an issue just to have one (Russell, 2026-10-08).
-     Before the cut, `RELEASING.md`'s "Landed since … ships in the next
-     release" table says which platforms have each piece. (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
+   - **the piece's own issue — opened before the merge if none exists, as
+     rule 3 says — carries the release milestone before it closes.** The
+     closed issues, filtered by milestone, are the record of
+     the product — of what a teacher can see on either platform in a release
+     — and an issue closed without one is a change that release's record
+     does not show. Before the cut, `RELEASING.md`'s "Landed since … ships
+     in the next release" table says which platforms have each piece.
+     (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
      anything a teacher can see; the log is closed to new entries, #480.)
    - **anything measured is written with its NUMBERS and the hardware they
      came from.** The mac side cannot find out what a Windows teacher's
@@ -216,7 +222,8 @@ Neither app contains toolchain logic of its own: they write the same
      have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
-     not. "A coherent piece" keeps its old meaning — one thing a teacher
+     not YET (rule 3: the piece gets its issue before the merge). "A coherent
+     piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
      whole afternoon. When Russell approves the merge, merge with `--no-ff`
      so the piece stays one readable unit in history.
