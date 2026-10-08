@@ -254,7 +254,7 @@ enum AssistContract {
             ),
             "deployClosedAnOpenPreview": AssistWording.deployClosedAnOpenPreview(course: course, section: section),
             "courseIsBeingCopied": AssistWording.courseIsBeingCopied(course: course),
-            // A Claude session opened from Plantoir holding its course (#458).
+            // A Claude or Codex session opened from Plantoir holding its course (#458).
             // Two keys for each counted sentence, one rendering per branch.
             "availableOnceYouFinishRevisingWithClaude": AssistWording.availableOnceYouFinishRevisingWithClaude,
             "courseIsAlreadyBeingRevised": AssistWording.courseIsAlreadyBeingRevised(course: course),

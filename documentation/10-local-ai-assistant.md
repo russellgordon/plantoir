@@ -6432,7 +6432,7 @@ for TOML and then the shell like the other four
 (`CodexLauncher.configurationOverrides`). The name is written once, as
 `AssistMCPServer.doorCourseVariable`, and pinned against
 `app-rules.json` → `outsideAgents.doorCourseVariable` and each door's
-`serverEnvironment`). The argv stays `--mcp-stdio <folder>`: #430's trap was a
+`serverEnvironment`. The argv stays `--mcp-stdio <folder>`: #430's trap was a
 course in the argv being read as a lock, and nothing keys on it.
 
 **The server.** `AssistMCPServer.serve` reads the variable after it has opened

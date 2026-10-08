@@ -100,8 +100,8 @@ nonisolated enum WorkLeaseFiles {
     static let publishKind: String = "publish"
 
     /// The lease an assistant session holds on the course it is revising —
-    /// on the mac, `Plantoir --mcp-stdio` holds it on the course the Claude
-    /// door named in `AssistMCPServer.doorCourseVariable` (#458), as
+    /// on the mac, `Plantoir --mcp-stdio` holds it on the course the Claude or
+    /// Codex door named in `AssistMCPServer.doorCourseVariable` (#458), as
     /// Windows' `plantoir-mcp` does. Never a lock, and never in a build's
     /// way: it greys the Revise items and the structural work on that
     /// course in the OTHER programs (`CourseActivity.structuralHoldReason`),

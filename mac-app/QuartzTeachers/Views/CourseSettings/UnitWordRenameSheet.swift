@@ -198,8 +198,8 @@ struct UnitWordRenameSheet: View {
     }
 
     /// Why the rename cannot start now, or nil. `courseIsBusy` — this
-    /// process's previews, deploys and copies — and deliberately NOT a Claude
-    /// session holding the course elsewhere (#458 ruling 2: Windows does not
+    /// process's previews, deploys and copies — and deliberately NOT a Claude or
+    /// Codex session holding the course elsewhere (#458 ruling 2: Windows does not
     /// hold its unit-word rename, so the mac does not either).
     static func busyProblem(courseCode: String, workingFolderPath: String) -> String? {
         if CourseActivity.courseIsBusy(folderPath: workingFolderPath, courseCode: courseCode) {

@@ -586,7 +586,7 @@ final class DoorCourseHoldTests: XCTestCase {
     }
 
     /// The unit-word rename is not held (ruling 2; Windows does not hold its
-    /// own). MUST FAIL if its check widens to the Claude session's hold.
+    /// own). MUST FAIL if its check widens to the Claude or Codex session's hold.
     func testTheUnitWordRenameIsNotHeld() throws {
         let made: (root: URL, workspace: WorkspaceModel) = try makeFolder()
         try writeOthersLeases(["assist"], in: made.root)

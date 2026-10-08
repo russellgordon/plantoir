@@ -301,7 +301,9 @@ final class CodexLauncherTests: XCTestCase {
 
         let scriptPath: String = try CodexLauncher.writeLauncherScript(
             workspacePath: awkwardFolder,
-            courseCode: "ICS3U_ROUNDTRIP_TEST",
+            // A code that CAN occur and is awkward for a shell: a space, and
+            // dashes at both ends (`course-management.json` → `courseCode`).
+            courseCode: "-AP CALC-",
             codexPath: stubPath.path,
             serverPath: "/Applications/Plan \"toir\".app/Contents/MacOS/Plantoir",
             prompt: ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science")
@@ -337,7 +339,7 @@ final class CodexLauncherTests: XCTestCase {
         XCTAssertEqual(arrived[4], "-c")
         XCTAssertEqual(arrived[6], "-c")
         XCTAssertEqual(arrived[8], "-c")
-        XCTAssertEqual(arrived[9], "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"ICS3U_ROUNDTRIP_TEST\"")
+        XCTAssertEqual(arrived[9], "mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE=\"-AP CALC-\"")
         XCTAssertEqual(arrived[10], ClaudeCodeLauncher.greeting(courseCode: "ICS3U", courseName: "Grade 11 Computer Science"))
 
         // And the value Codex would parse really is an ARRAY of two strings,
