@@ -283,7 +283,9 @@ appliesOn windows):
   A remembered skip was given to an offer that had a Skip button.
 - **The offer shows Install and Reopen alone.** Esc is handled by the dialog
   itself (`PreviewKeyDown` → `Hide`), because what a `ContentDialog` with no
-  Close button does on Esc was not measured, and a window the teacher cannot
+  Close button does on Esc was not measured. **The handler is unproved too**
+  until the first cut that passes `--critical-versions`, which RELEASING.md
+  asks to check, and a window the teacher cannot
   leave was rejected (Russell's ruling on the plan, 2026-10-08). Esc is "not
   now", written on the trail, and the next daily check offers it again. An
   important offer never remembers a skip.
@@ -325,7 +327,15 @@ Now (`appUpdates.anOfferNobodySawIsNotAnAnswer`):
   offer left open for over an hour met the next hourly look, which found the
   day not done and its OWN offer in front (DialogGate). Without the guard
   that is a retry every minute for as long as the offer stays open. The plan
-  review found it.
+  review found it, and `AppUpdaterTests.AnOfferStillOpenIsNotMetByTheNextLookAndAShownOneResetsTheBackoff`
+  holds an offer open to pin it.
+- **A shown offer does the day's check, whoever asked** (implementation
+  review, L1). Otherwise a daily retry left over from an unseen offer would put
+  the same offer back minutes after the teacher answered it through Check for
+  Updates…. And a check that finds nothing new starts the backoff again at a
+  minute (L5). Why an offer was not shown goes to `startup.log` only. That
+  includes a dialog that fails to go up at all, which before #465 left "not
+  now" on the trail and is now retried, never less often than hourly.
 - **No new trail event** (Russell, 2026-10-08): `update found` with no
   `update answered` already reads as "not yet answered", which is how the
   contract words `update found`. Rejected as well: only moving the start (a

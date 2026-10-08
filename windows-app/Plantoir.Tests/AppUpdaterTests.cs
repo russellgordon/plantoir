@@ -29,12 +29,14 @@ public class AppUpdaterTests
         public (string Path, string Args)? Installed;
         /// <summary>What the teacher answers each offer; Install unless a test says otherwise.</summary>
         public UpdateAnswer Answer = UpdateAnswer.Install;
+        /// <summary>When set, the offer stays open until the test completes this.</summary>
+        public TaskCompletionSource<UpdateAnswer>? Open;
         public readonly List<(string Version, bool Important)> Offers = new();
         public Task<UpdateAnswer> OfferAsync(string version, string? notes, bool important)
         {
             Shown.Add("offer " + version);
             Offers.Add((version, important));
-            return Task.FromResult(Answer);
+            return Open?.Task ?? Task.FromResult(Answer);
         }
         public Task ShowUpToDateAsync() { Shown.Add("upToDate"); return Task.CompletedTask; }
         public Task ShowCouldNotCheckAsync() { Shown.Add("couldNotCheck"); return Task.CompletedTask; }
@@ -162,7 +164,8 @@ public class AppUpdaterTests
     [Fact]
     public async Task AnOfferNobodySawIsNotTheDaysCheck()
     {
-        string trail = Path.Combine(Directory.CreateTempSubdirectory("plantoir-465").FullName, "activity.txt");
+        string scratch = Directory.CreateTempSubdirectory("plantoir-465").FullName;
+        string trail = Path.Combine(scratch, "activity.txt");
         Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(trail);
         try
         {
@@ -190,7 +193,88 @@ public class AppUpdaterTests
             lines = File.ReadAllLines(trail);
             Assert.Single(lines, l => l.Contains("999.0.1: not now"));
         }
-        finally { Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
+        finally
+        {
+            Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+            try { Directory.Delete(scratch, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// #465, the plan review's F2: while an offer is still open, another daily
+    /// look does nothing (no second offer, no second fetch). Without the guard,
+    /// an offer left open past the hourly look met itself in front and asked to
+    /// be tried again every minute. Then the backoff: two unseen offers double
+    /// it, and a shown one starts it again at a minute.
+    /// </summary>
+    [Fact]
+    public async Task AnOfferStillOpenIsNotMetByTheNextLookAndAShownOneResetsTheBackoff()
+    {
+        var prompts = new FakePrompts { Open = new TaskCompletionSource<UpdateAnswer>() };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+
+        var first = updater.DailyCheckAsync();
+        for (int waited = 0; prompts.Offers.Count == 0 && waited < 300; waited++) await Task.Delay(20);
+        Assert.Single(prompts.Offers);
+        Assert.False(first.IsCompleted, "the offer did not stay open, so this proves nothing");
+        int readsWhileOpen = reader.Reads;
+        var second = updater.DailyCheckAsync();                // the next look, while the offer is open
+        // Bounded: without the guard the second look offers again and waits on
+        // the same open offer, so it never finishes (measured: the test hung).
+        Assert.True(await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10))) == second,
+            "the next look did not return at once while the offer was open: it went on to offer again");
+        Assert.Single(prompts.Offers);
+        Assert.Equal(readsWhileOpen, reader.Reads);
+        prompts.Open.SetResult(UpdateAnswer.NotShown);
+        await first;
+
+        prompts.Open = null;
+        prompts.Answer = UpdateAnswer.NotShown;
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry * 2, updater.LastRetryScheduled);
+        prompts.Answer = UpdateAnswer.NotNow;
+        await updater.DailyCheckAsync();                       // shown: the backoff starts again
+        prompts.Answer = UpdateAnswer.NotShown;
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry, updater.LastRetryScheduled);
+    }
+
+    /// <summary>
+    /// Review L1: an offer the teacher SAW through Check for Updates… does the
+    /// day's check, so a daily retry left over from an unseen offer cannot put
+    /// the same offer back minutes after it was answered.
+    /// </summary>
+    [Fact]
+    public async Task AShownCheckForUpdatesDoesTheDaysCheck()
+    {
+        DateTime? last = null;
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader).RememberingDailyChecksIn(() => last, when => last = when);
+        await updater.DailyCheckAsync();
+        Assert.True(updater.DailyCheckIsDue(DateTime.UtcNow));
+        prompts.Answer = UpdateAnswer.NotNow;
+        await updater.CheckAsync(teacherAsked: true);
+        Assert.NotNull(last);
+        Assert.False(updater.DailyCheckIsDue(DateTime.UtcNow));
+    }
+
+    /// <summary>Review L5: a check that finds nothing new ends a run of unseen offers, so the next waits a minute again.</summary>
+    [Fact]
+    public async Task ACheckThatFindsNothingNewStartsTheBackoffAgain()
+    {
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+        await updater.DailyCheckAsync();
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry * 2, updater.LastRetryScheduled);
+        reader.Feed = FeedOf(("0.0.1", false));                 // older than anything running: nothing new
+        await updater.DailyCheckAsync();
+        reader.Feed = FeedOf(("999.0.1", false));
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry, updater.LastRetryScheduled);
     }
 
     /// <summary>#465: the backoff stops growing at the hourly look.</summary>
