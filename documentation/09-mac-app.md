@@ -6518,8 +6518,8 @@ Sparkle 2.9.6's source (`SPUStandardUserDriver.m`, `SUUpdateAlert.m`,
    check past that 3 s; off the main actor it no longer can, and it was a
    weak cause anyway — the slow copy is the first launch after an update,
    when there is nothing new to offer. A launch-time offer is now held only
-   when the feed answers more than 3 s after `start()`, the system is not
-   idle, or the app is not frontmost.)
+   when the app is not frontmost, or when the feed answers more than 3 s
+   after `start()` with the system not idle.)
 2. **Can anything the app writes as `update answered` ("not now") come from
    a window the teacher never saw?** No. The only path that writes that line
    is the `SPUUpdaterDelegate` callback
@@ -6609,9 +6609,11 @@ field.**
 **What changed.** `WizardFieldChrome` and `SearchablePickerChrome` are
 deleted; the four fields wear `.borderedTextField()` like every other, with
 `.multilineTextAlignment(.leading)` and `.frame(maxWidth: .infinity)` kept
-from the chrome (the Form right-aligned a field's text without the alignment,
-the UI test records). The course-code field's chevron stays as the overlay it
-always was, now on the real bezel; the FIELD's measured numbers (24pt, a 6pt
+from the chrome on the two picker fields (the explicit `LabeledContent`
+wrappers are what keep the wizard's text reading leading, the UI test
+records — the alignment alone never did — which is why the three wizard
+fields could drop it). The course-code field's chevron stays overlaid on the
+field, now as a real `NSButton` (below); the FIELD's measured numbers (24pt, a 6pt
 radius, the text insets, the baseline nudge) are gone from
 `CourseCodePickerView` — the chevron's own measured numbers remain. The three
 `@FocusState`s the wizard kept only so the chrome could draw a focus ring

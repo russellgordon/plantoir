@@ -21,9 +21,9 @@ class WorkspaceModel {
     /// The key holding the most recently chosen folder.
     static let storedPathKey: String = "workspacePath"
 
-    /// Where each working folder's `.toolchain` stands — being copied,
-    /// ready, failed — is `ToolchainReadiness.shared` (#476), one record per
-    /// folder; until then it was a process-wide set of "fresh" paths here.
+    // Where each working folder's `.toolchain` stands — being copied,
+    // ready, failed — is `ToolchainReadiness.shared` (#476), one record per
+    // folder; until then it was a process-wide set of "fresh" paths here.
 
     /// True when the hosted test suite is running. Tests drive the real
     /// window, and must not leave the teacher pointed at a fixture folder
@@ -2898,9 +2898,10 @@ class WorkspaceModel {
         // the tests, chiefly, which assert what lands on disk and would
         // otherwise have to await a background thread to find out.
         //
-        // The tracker is cleared first because a folder being set up has no
-        // toolchain yet, whatever an earlier folder of the same path in this
-        // run of the app may have had — the defect row 279 fixed.
+        // The registry's entry is cleared first because a folder being set
+        // up has no toolchain yet, whatever an earlier folder of the same
+        // path in this run of the app may have had — the defect row 279
+        // fixed.
         ToolchainReadiness.shared.forgetEverything(about: workspaceURL)
         var problem: String? = WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
         if problem == nil {
@@ -2936,7 +2937,7 @@ class WorkspaceModel {
         }
         isInitializingWorkspace = true
         let startedAt: Date = Date()
-        // Both touches of the shared tracker happen HERE, on the main actor,
+        // Both touches of the registry happen HERE, on the main actor,
         // never inside the detached work — see `setUpFolderOnDisk`.
         ToolchainReadiness.shared.forgetEverything(about: workspaceURL)
         var problem: String? = await Task.detached(priority: .userInitiated) {

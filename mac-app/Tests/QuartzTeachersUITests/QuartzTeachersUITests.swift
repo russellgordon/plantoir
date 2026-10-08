@@ -288,12 +288,9 @@ final class QuartzTeachersUITests: XCTestCase {
         // because an `NSTextField`'s AX frame is its ~18pt text box (confirmed
         // across two modifier orderings, 2026-08-23) — but SwiftUI hoisted
         // the shape's identifier onto the whole Form row, so that check never
-        // measured the field at all (see the note further down).
-        // Since #456 the field wears the real bezel and draws no background
-        // shape of its own, so the comparison is against the text field's
-        // frame. The old containment check compared the button with the
-        // shape's identifier, which SwiftUI hoisted onto the whole Form row
-        // (see the note below) — it never measured the field.
+        // measured the field at all. Since #456 the field wears the real
+        // bezel and draws no shape of its own, so the comparison is against
+        // the text field's frame.
         let fieldFrame: CGRect = codeField.frame
         let buttonFrame: CGRect = revealButton.frame
         XCTAssertGreaterThan(buttonFrame.midX, fieldFrame.midX, "The reveal button should sit on the trailing half of the field")
