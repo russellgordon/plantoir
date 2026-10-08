@@ -22,13 +22,25 @@
        `/bin/bash ./deploy.sh ARGS` becomes `powershell.exe -File <path>\deploy.ps1 ARGS`,
        where the path is this folder when lsof said 'here', another folder
        when it said 'elsewhere', and '.\' (no folder to tell) when it said
-       nothing; a scheduled deploy's launchd script becomes the Task
-       Scheduler wrapper the app writes. Cases whose evidence has no Windows
-       shape are skipped with the reason.
+       nothing, and a spaced course is QUOTED as the app quotes it; a
+       scheduled deploy's launchd script becomes the Task Scheduler wrapper
+       the app writes, named with the case's folder id (#309), and the app's
+       launchd runner line becomes Plantoir.exe --run-scheduled-deploy
+       "<task name>". Since #467 every case runs (none has to be skipped),
+       plus Windows-only rows the contract cannot carry.
 
     3. app-rules.json -> buildFreshness.previewBuild.cases, through
        deploy.ps1's Test-CarriesLiveReload (#272), each tree written to a
        temporary public\ folder.
+
+    4. Where a --to-folder value publishes, through deploy.ps1's
+       Resolve-PublishFolder (#304; Windows-only cases).
+
+    5. shared-rules.json -> deployWhileItsSectionDeploys.launcherCases (#467 /
+       mac #439), every one, through Get-WhatIsDeployingThisSection as EACH
+       launcher carries it (one marked block, the same in both), checking
+       who refused as well as whether; then the four sentences and the trail
+       lines word for word against the contract.
 
     Run with:  powershell -NoProfile -File windows-app\test_launcher_rules.ps1
 #>
