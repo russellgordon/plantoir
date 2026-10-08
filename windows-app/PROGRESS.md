@@ -578,8 +578,8 @@ Tracked until 2026-10-08 in the **Windows status** section of
 entries 1–264 assessed), frozen with the log when it closed to new entries
 (#480); since then the open `windows` issues are the list, and the closed
 issues by milestone are what shipped. Nothing here duplicates either, because
-a second copy is a copy that goes stale — that count itself had been reading "179 rows" for
-days after the log passed 250.
+a second copy is a copy that goes stale — that count itself had been reading
+"179 rows" for days after the log passed 250.
 
 **What to do with that assessment** is the open `windows` issues, plus
 [`documentation/12-windows-app.md`](../documentation/12-windows-app.md) →

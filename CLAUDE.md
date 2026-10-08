@@ -71,7 +71,7 @@ Neither app contains toolchain logic of its own: they write the same
      the piece — so every piece has an issue (open one if none exists, before
      the merge) and that issue carries the release milestone before it
      closes, or the piece drops out of the changelog below. The `windows`
-     issue in the next bullet carries what Windows must do, and the
+     issue two bullets down carries what Windows must do, and the
      `documentation/` section carries why. (Until 2026-10-08 this bullet
      asked for a `GUI-IMPROVEMENTS.md` row with a usable "Notes for Windows
      port" cell; the log is closed to new entries since then — #480 — because
@@ -136,8 +136,9 @@ Neither app contains toolchain logic of its own: they write the same
      `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
-   - **the piece's own issue carries the release milestone before it
-     closes.** The closed issues, filtered by milestone, are the record of
+   - **the piece's own issue — opened before the merge if none exists, as
+     rule 3 says — carries the release milestone before it closes.** The
+     closed issues, filtered by milestone, are the record of
      the product — of what a teacher can see on either platform in a release
      — and an issue closed without one is a change that release's record
      does not show. Before the cut, `RELEASING.md`'s "Landed since … ships
@@ -219,7 +220,8 @@ Neither app contains toolchain logic of its own: they write the same
      have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
-     not. "A coherent piece" keeps its old meaning — one thing a teacher
+     not YET (rule 3: the piece gets its issue before the merge). "A coherent
+     piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
      whole afternoon. When Russell approves the merge, merge with `--no-ff`
      so the piece stays one readable unit in history.
@@ -1019,8 +1021,9 @@ changelog, and a manual — and only the third was worth keeping. The to-do list
 is now GitHub issues, the changelog is the closed issues by milestone (it was
 `GUI-IMPROVEMENTS.md` until that log closed on 2026-10-08, #480), and the
 manual is `documentation/`, where somebody looking up how a thing works will
-actually find it. **Do not recreate them.** A change written for the other platform goes
-in the documentation page that owns its subject, and the issue points at it.
+actually find it. **Do not recreate them.** A change written for the other
+platform goes in the documentation page that owns its subject, and the issue
+points at it.
 
 (The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
 how the assistant was built, and it now lives in

@@ -197,9 +197,11 @@ reasons rather than tasks:
   what you rejected, and — for anything measured — the numbers **with the
   hardware they came from**. "The Vulkan
   build was faster" cannot be acted on; "43 tok/s against 11 on CPU, Intel Iris
-  Xe" can. That write-up is the closing comment on the issue and the `mac`
-  issue it opens; `GUI-IMPROVEMENTS.md` is closed to new entries since
-  2026-10-08 (#480), so no row.
+  Xe" can. That write-up is the closing comment on the piece's own issue
+  (every piece has one, opened before the merge if need be, and it carries
+  the release milestone before it closes — the closed issues by milestone are
+  the changelog) and the `mac` issue it opens; `GUI-IMPROVEMENTS.md` is
+  closed to new entries since 2026-10-08 (#480), so no row.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** If you add a right-click menu, a double-click, a hover or a keyboard
   shortcut, it needs a handoff line **even though nothing on screen changed** —

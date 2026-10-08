@@ -385,7 +385,9 @@ from scratch, usually badly, and usually after shipping the same bug once.
 So a macOS change is not finished until BOTH of these are true:
 
 1. **The `windows` issue says what Windows must do, and the closing comment
-   on the issue says what landed.** Useful notes say what Windows must do
+   on the piece's own issue says what landed** (every piece has one, with the
+   release milestone on it before it closes — `CLAUDE.md` rules 3 and 4).
+   Useful notes say what Windows must do
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
    fine note when true; an empty one never is. (`GUI-IMPROVEMENTS.md` carried
@@ -455,8 +457,8 @@ windows, quantisation, Metal, GPU layers, inference. If a sentence would only
 make sense to somebody who has read the source, it is not ready to show.
 
 Two exceptions, both non-teacher-facing: the closing comment on the issue
-and the write-ups record what was measured and must name models precisely, and code
-comments should too. The rule is about what appears on screen.
+and the write-ups record what was measured and must name models precisely,
+and code comments should too. The rule is about what appears on screen.
 
 ## Open investigations — read these before touching the area
 
