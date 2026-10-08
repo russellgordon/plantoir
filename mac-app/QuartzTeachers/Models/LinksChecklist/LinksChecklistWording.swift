@@ -123,11 +123,11 @@ nonisolated enum LinksChecklistWording {
     // MARK: - Refusals and results
 
     static func deployUnderWay(course: String) -> String {
-        return "\(course) is being published just now. Try again when that has finished."
+        return "\(course) is being deployed just now. Try again when that has finished."
     }
 
     static func needsAPreviewFirst(course: String, section: String) -> String {
-        return "Pages in \(course) have changed since Section \(section) was last previewed or published. "
+        return "Pages in \(course) have changed since Section \(section) was last previewed or deployed. "
              + "Preview it again, and this list will be up to date."
     }
 

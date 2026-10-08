@@ -745,7 +745,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         )
         XCTAssertTrue(sentence.contains("ICS3U Section 2"))
         XCTAssertTrue(sentence.contains("needed an answer nobody was there to give"))
-        XCTAssertTrue(sentence.contains("Publish this section once yourself"))
+        XCTAssertTrue(sentence.contains("Deploy this section once yourself"))
     }
 
     /// A build that stopped for a question names no destination, and sends
@@ -754,8 +754,8 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
     /// Both halves matter. The record still carries `buildDestinationName` on
     /// its second line, so asserting the sentence does NOT contain it is what
     /// pins "no destination is named" rather than a wish about the wording.
-    /// And previewing is what asks the question, so "Publish this section" —
-    /// which is what this case said until GitHub issue #132 — sent a teacher
+    /// And previewing is what asks the question, so "Publish this section" ("Deploy" since
+    /// #443) — which is what this case said until GitHub issue #132 — sent a teacher
     /// to the wrong button.
     func testTheSentenceForAStoppedBuildSendsTheTeacherToPreview() throws {
         let stopped = ScheduledPublishOutcome.Stopped(
@@ -769,6 +769,7 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         XCTAssertTrue(sentence.contains("ICS3U Section 2"))
         XCTAssertTrue(sentence.contains("building the pages needed an answer"))
         XCTAssertTrue(sentence.contains("Preview this section once yourself"))
+        XCTAssertFalse(sentence.contains("Deploy this section once yourself"))
         XCTAssertFalse(sentence.contains("Publish this section once yourself"))
         XCTAssertFalse(
             sentence.contains(ScheduledPublishOutcome.buildDestinationName),
