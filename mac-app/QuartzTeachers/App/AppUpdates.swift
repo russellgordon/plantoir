@@ -1004,10 +1004,11 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
 /// plan review's finding 13: a repeated `showUpdateInFocus` makes the alert
 /// key with Install focused, and a Return typed into Plantoir would install).
 ///
-/// Gentle reminders are declared supported so the two callbacks below are
-/// consulted; `shouldHandleShowingScheduledUpdate` answers YES, so the
-/// standard driver keeps showing the update exactly as before — the app only
-/// LISTENS.
+/// `shouldHandleShowingScheduledUpdate` answers YES, so the standard driver
+/// keeps showing the update exactly as before — the app only LISTENS. (The
+/// gentle-reminders flag below is declared for honesty's sake; in Sparkle
+/// 2.9.6 it gates only a log line for background apps, not whether these
+/// callbacks are consulted.)
 final class UpdateReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
 
     // MARK: - Stored properties
