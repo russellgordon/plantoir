@@ -111,14 +111,15 @@ def _is_our_policy_pair(lines: list[str], index: int) -> bool:
 def _without_our_blocks(text: str) -> str:
     """`text` with every block this module wrote taken out, the rest kept.
 
-    Two shapes are ours. A MARKED block: the marker line, then `/*` and our
-    policy line (if somebody edited round it, only the marker goes and the
-    lines under it are kept as theirs). And an OLD unmarked block, appended
-    before the marker existed: a `/*` line, our policy line, and nothing
-    else indented under it. Any header somebody else put under a `/*` keeps
-    its `/*`: an unmarked block with one is kept whole, and a marked one
-    loses only the marker and our policy line, so their header is never
-    left under whatever path came before. Blank-line runs are collapsed and
+    Two shapes are ours. A MARKED block: the marker line, then `/*` and the
+    headers indented under it, of which our policy line (wherever it sits
+    among them) is ours; if the marker is not followed by `/*` at all, only
+    the marker goes. And an OLD unmarked block, appended before the marker
+    existed: a `/*` line, our policy line, and nothing else indented under
+    it. Any header somebody else put under a `/*` keeps its `/*`: an
+    unmarked block with one is kept whole, and a marked one loses only the
+    marker and our policy line, so their header is never left under
+    whatever path came before. Blank-line runs are collapsed and
     the end is trimmed, so the result depends only on the lines that are
     kept.
     """
@@ -129,12 +130,20 @@ def _without_our_blocks(text: str) -> str:
         line = lines[index]
         if line.rstrip() == MANAGED_MARKER:
             index += 1
-            if _is_our_policy_pair(lines, index):
-                after = index + 2
-                if after < len(lines) and lines[after].startswith((" ", "\t")):
-                    # Somebody added a header under our `/*`: it keeps its
-                    # path; only our policy line goes.
+            if index < len(lines) and lines[index].rstrip() == "/*":
+                # Our `/*` and every header indented under it. Our policy
+                # line goes wherever it sits among them (somebody may have
+                # put a header above it); any other header stays, under its
+                # own `/*`, so it is never left under the path before.
+                theirs: list[str] = []
+                after = index + 1
+                while after < len(lines) and lines[after].startswith((" ", "\t")):
+                    if not lines[after].startswith(_OUR_POLICY_PREFIX):
+                        theirs.append(lines[after])
+                    after += 1
+                if theirs:
                     kept.append(lines[index])
+                    kept.extend(theirs)
                 index = after
             continue
         if _is_our_policy_pair(lines, index):
