@@ -331,13 +331,16 @@ final class AssistToolchainWork: AssistSiteWork {
             return AssistSiteWorkResult(succeeded: false, message: message)
         }
 
-        if deployRunner.legs.first?.buildFailed == true {
+        // A build refused because the section was still being deployed
+        // (#439) is said as itself here, not as "could not be built" — the
+        // shared answer decides which.
+        if let buildAnswer = MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish(
+            course: course.code, section: String(sectionNumber), firstLeg: deployRunner.legs.first
+        ) {
             // The findings travel even when the build failed: a missing
             // curriculum or Media folder is a likely CAUSE of the failure, and
             // over stdio there is no other way to mention it.
-            var message: String = AssistWording.couldNotBuildBeforeDeploying(
-                course: course.code, section: String(sectionNumber)
-            )
+            var message: String = buildAnswer.message
             if let runner = deployRunner.legs.first?.runner {
                 message = SiteHealthFinding.appending(to: message, from: runner, courseDirectory: course.directoryURL)
             }

@@ -702,10 +702,12 @@ final class ScheduledDeployTests: XCTestCase {
     /// the binary gone. Its `Process` child SURVIVED, in a process group of
     /// its own — so the wrapper finishes the old deploy as an orphan. It
     /// cannot remove the new deploy (its only plist line is its first, long
-    /// since run, and it boots nothing out), but it is not harmless: the
-    /// ended run's leases read as stale while it works, so a second deploy
-    /// of the section can overlap it (doc 07, "Set again while the run
-    /// works (#409)"). This test pins only the boot-out order.
+    /// since run, and it boots nothing out). The ended run's leases read as
+    /// stale while it works, which is why, since #439, the launchers refuse
+    /// a second deploy of the section while its script runs and the newly
+    /// set run waits for it (doc 07, "Set again while the run works (#409)";
+    /// `DeployWhileItsSectionDeploysTests`). This test pins only the
+    /// boot-out order.
     func testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst() throws {
         try prepare()
         let course: Course = try makeCourse()
@@ -723,6 +725,95 @@ final class ScheduledDeployTests: XCTestCase {
         XCTAssertEqual(launchControl.bootOuts, [label], "the running job is booted out even with no plist on disk")
         XCTAssertEqual(launchControl.plistExistedAtBootOut, [false], "and before the new plist is written")
         XCTAssertTrue(FileManager.default.fileExists(atPath: plistURL.path))
+    }
+
+    /// Setting a section again while its run's script still works leaves a
+    /// line on the trail saying that deploy will finish on its own (#439):
+    /// nothing else will, since the run's app has just been ended. Asked
+    /// AFTER the boot-out; no line when nothing is working.
+    func testSettingASectionAgainWhileItsDeployWorksSaysSoOnTheTrail() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let trailFolder: URL = workspaceURL.deletingLastPathComponent().appendingPathComponent("trail")
+        try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        let launchControl: FakeLaunchControl = FakeLaunchControl()
+        var askedAfterBootOut: [Bool] = []
+        ScheduledDeploy.earlierDeployIsWorkingOverride = { (script: String) -> Bool in
+            askedAfterBootOut.append(!launchControl.bootedOutLabels.isEmpty)
+            return true
+        }
+        addTeardownBlock {
+            MainActor.assumeIsolated {
+                ActivityTrail.store = previousTrail
+                ScheduledDeploy.earlierDeployIsWorkingOverride = nil
+            }
+        }
+
+        ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: launchControl
+        )
+
+        XCTAssertEqual(askedAfterBootOut, [true], "asked once, after the boot-out")
+        var written: String = ""
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: trailFolder.path)) ?? [] {
+            written += (try? String(contentsOf: trailFolder.appendingPathComponent(name), encoding: .utf8)) ?? ""
+        }
+        XCTAssertTrue(written.contains("ICS3U/1 · set this section's deploy again"), written)
+        XCTAssertTrue(written.contains("that deploy will finish on its own"), written)
+
+        ScheduledDeploy.earlierDeployIsWorkingOverride = { (script: String) -> Bool in return false }
+        let before: Int = written.components(separatedBy: "that deploy will finish on its own").count
+        ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: launchControl
+        )
+        var after: String = ""
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: trailFolder.path)) ?? [] {
+            after += (try? String(contentsOf: trailFolder.appendingPathComponent(name), encoding: .utf8)) ?? ""
+        }
+        XCTAssertEqual(after.components(separatedBy: "that deploy will finish on its own").count, before)
+    }
+
+    /// A re-set macOS refuses says only that it could not be set — never that
+    /// the section was set again (#439 review, finding 11): the line waits
+    /// for the new job to be accepted.
+    func testARefusedReSetNeverSaysItWasSetAgain() throws {
+        try prepare()
+        let course: Course = try makeCourse()
+        let trailFolder: URL = workspaceURL.deletingLastPathComponent().appendingPathComponent("trail-refused")
+        try FileManager.default.createDirectory(at: trailFolder, withIntermediateDirectories: true)
+        let previousTrail: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: trailFolder)
+        let launchControl: FakeLaunchControl = FakeLaunchControl()
+        launchControl.bootstrapFailure = "Bootstrap failed: 5: Input/output error"
+        ScheduledDeploy.earlierDeployIsWorkingOverride = { (script: String) -> Bool in
+            return true
+        }
+        addTeardownBlock {
+            MainActor.assumeIsolated {
+                ActivityTrail.store = previousTrail
+                ScheduledDeploy.earlierDeployIsWorkingOverride = nil
+            }
+        }
+
+        let problem: String? = ScheduledDeploy.scheduleDeploy(
+            course: course, sectionNumber: 1, when: sixThirtyTomorrow(),
+            workspaceURL: workspaceURL, cloudflareAccountID: "", runner: launchControl
+        )
+
+        XCTAssertNotNil(problem)
+        var written: String = ""
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: trailFolder.path)) ?? [] {
+            written += (try? String(contentsOf: trailFolder.appendingPathComponent(name), encoding: .utf8)) ?? ""
+        }
+        XCTAssertTrue(written.contains("could not set a scheduled deploy"), written)
+        XCTAssertFalse(written.contains("set this section's deploy again"), written)
+        // …but the earlier deploy the boot-out left working is still said
+        // (#439 fixes review, finding 2).
+        XCTAssertTrue(written.contains("earlier deploy was still working, and will finish on its own"), written)
     }
 
     func testCancellingRemovesTheAgent() throws {

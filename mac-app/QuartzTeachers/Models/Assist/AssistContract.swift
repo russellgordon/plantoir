@@ -233,6 +233,12 @@ enum AssistContract {
             ),
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
             "deployNeedsAnAnswer": AssistWording.deployNeedsAnAnswer(course: course, section: section),
+            "deployRefusedWhileALaterDeployWorks": AssistWording.deployRefusedWhileALaterDeployWorks(
+                course: course, section: section
+            ),
+            "deployRefusedWhileItsSectionDeploys": AssistWording.deployRefusedWhileItsSectionDeploys(
+                course: course, section: section
+            ),
             "deployNeedsAnAnswerAt": AssistWording.deployNeedsAnAnswerAt(
                 course: course, section: section, destinations: "{destinations}"
             ),
