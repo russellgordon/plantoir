@@ -18,7 +18,7 @@ Notes:
 - Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
 - You must build first (the static site goes to 'public/' in that section folder).
 - --target chooses where the built site goes. netlify (the default) or cloudflare.
-- The token for whichever service you publish to is stored as a Windows Generic
+- The token for whichever service you deploy to is stored as a Windows Generic
   Credential and injected securely at runtime. Netlify and Cloudflare tokens are
   stored separately, so using one never disturbs the other.
 - A Cloudflare token needs one permission: Account - Cloudflare Pages - Edit.
@@ -193,12 +193,12 @@ for ($i = 2; $i -lt $args.Count; $i++) {
 }
 
 if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
-  Write-Host ("Unknown publishing target '{0}'. Use netlify or cloudflare." -f $TARGET)
+  Write-Host ("Unknown deploy target '{0}'. Use netlify or cloudflare." -f $TARGET)
   exit 1
 }
 
 # Called immediately before every question this script asks. Under
-# --non-interactive there is nobody to answer it - the publish was set to
+# --non-interactive there is nobody to answer it - the deploy was set to
 # happen on its own, at half six, with the app closed - so it REFUSES and says
 # which question it could not ask, rather than waiting for an answer that will
 # never come or quietly taking a default.
@@ -209,10 +209,10 @@ if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
 function Assert-CanAsk([string]$question, [string]$whatToDo) {
   if (-not $NON_INTERACTIVE) { return }
   Write-Host ""
-  Write-Host "This publish was set to happen on its own, so nobody is here to answer:"
+  Write-Host "This deploy was set to happen on its own, so nobody is here to answer:"
   Write-Host ("   {0}" -f $question)
   Write-Host (" {0}" -f $whatToDo)
-  Write-Host " Nothing was published."
+  Write-Host " Nothing was deployed."
   exit 3
 }
 
@@ -227,7 +227,7 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   if ((Test-Path $suggestedCfg) -and -not (Test-Path $originalCfg)) {
     Write-Host ("I see setup data for '{0}' on disk." -f $suggested)
   }
-  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Publish this section once from Plantoir, where you can answer it."
+  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Deploy this section once from Plantoir, where you can answer it."
   $ans = Read-Host ("Fix course code to '{0}'? [Y/n]" -f $suggested)
   if (-not $ans) { $ans = 'Y' }
   if ($ans -match '^[Yy]$') {
@@ -270,7 +270,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   } catch {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings file could not be read. Nothing was published."
+    Write-Host "   its settings file could not be read. Nothing was deployed."
     exit 1
   }
   # .NET regex: `\s` matches a newline, so no flattening is needed here — and
@@ -286,7 +286,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   if ($referenceText -cmatch '[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:') {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host "   its settings say something other than true or false. Nothing was deployed."
     Write-Host ""
     exit 1
   }
@@ -295,7 +295,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
       -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]')) {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host "   its settings say something other than true or false. Nothing was deployed."
     Write-Host ""
     exit 1
   }
@@ -498,7 +498,7 @@ if (-not $builtFound) {
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
   Write-Host " If you have just built, check this section still has its front page."
-  Write-Host " A section without one produces no website, so there is nothing to publish."
+  Write-Host " A section without one produces no website, so there is nothing to deploy."
   Write-Host ""
   Write-Host "Build first:"
   Write-Host (" .\preview.bat {0} {1} --build-only" -f $COURSE_CODE, $SECTION_NUM)
@@ -523,8 +523,8 @@ if ($TO_FOLDER) {
   # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
   $folderAsked = Resolve-PublishFolder $TO_FOLDER $ScriptDir
   if (-not $folderAsked) {
-    Write-Host "That publishing folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
-    Write-Host "   Give the folder's full location, then try again. Nothing was published."
+    Write-Host "That deploy folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
+    Write-Host "   Give the folder's full location, then try again. Nothing was deployed."
     exit 1
   }
   $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
@@ -571,11 +571,11 @@ if ($TO_FOLDER) {
       # unanswered. A caller that saw 1 here would tell the teacher their
       # publish failed, when what it needs to say is which question nobody
       # was there to answer.
-      Write-Host "Could not rebuild this site for publishing: it needed an answer."
+      Write-Host "Could not rebuild this site before deploying it: it needed an answer."
       exit 3
     }
     if ($LASTEXITCODE -ne 0) {
-      Write-Host "Could not rebuild this site for publishing."
+      Write-Host "Could not rebuild this site before deploying it."
       exit 1
     }
     # Wait for the rebuild to become VISIBLE here before copying. On the mac
@@ -605,12 +605,12 @@ if ($TO_FOLDER) {
     # loop fell through, and robocopy mirrored an empty directory while
     # reporting success. Found by review on 2026-09-05.
     if (-not (Test-Path -LiteralPath $publishedIndex)) {
-      Write-Host "The rebuilt site has not appeared. Nothing was published."
+      Write-Host "The rebuilt site has not appeared. Nothing was deployed."
       exit 1
     }
   }
 
-  Write-Host ("Publishing {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
+  Write-Host ("Deploying {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
   # below 8 all mean success.
   robocopy $PUBLIC_DIR_HOST $targetDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -618,14 +618,14 @@ if ($TO_FOLDER) {
     # deploy.sh's own words for the same failure (#304), so the app's one
     # explanation lifts both; the copy's number stays for whoever reads on.
     $copyExit = $LASTEXITCODE
-    Write-Host ("{0} Not every page could be copied into the publishing folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
+    Write-Host ("{0} Not every page could be copied into the deploy folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
     Write-Host ("   Folder: {0}" -f $targetDir)
     Write-Host ("   (copy error {0})" -f $copyExit)
     exit 1
   }
   $global:LASTEXITCODE = 0
   Record-PublishedPages $SECTION_DIR_HOST $COURSE_CODE $SECTION_NUM "folder"
-  Write-Host "Published."
+  Write-Host "Deployed."
   Write-Host (" Folder: {0}" -f $targetDir)
   Write-Host " Upload that folder to your web host however you prefer (e.g. SFTP)."
   # The app reads this line to offer the folder in Explorer.
@@ -770,7 +770,7 @@ function Read-CloudflareAccountId {
 @"
 One more thing from Cloudflare.
 
-The token you just made is allowed to publish, but not to look up which
+The token you just made is allowed to deploy, but not to look up which
 Cloudflare account it belongs to - so the account's ID is needed as well.
 This is the only time you will be asked for it.
 
@@ -839,7 +839,7 @@ if ($RESET_TOKEN -and $TARGET -eq 'cloudflare') {
   Write-Host "Clearing saved Cloudflare token from Windows Credential Manager..."
   Remove-CfTokenInCredMan
   Remove-CfAccountInCredMan
-  Write-Host "Done. Next publish will ask for a new token."
+  Write-Host "Done. Next deploy will ask for a new token."
   exit 0
 }
 
@@ -869,7 +869,7 @@ if ($TARGET -eq 'cloudflare') {
 Connect to Cloudflare.
 
 Cloudflare hosts this section's website for free, and it needs to know that
-the publishing is coming from you. It does that with an API token - a long
+the deploys are coming from you. It does that with an API token - a long
 code that acts like a password made just for this app. Creating one takes
 about two minutes, and you will not be asked again: it is saved securely on
 this computer.
@@ -881,16 +881,16 @@ this computer.
   4. Give it ONE permission, chosen from the three dropdowns:
      Account  ->  Cloudflare Pages  ->  Edit
   5. Under "Account Resources", choose "Include" and then your own account
-     by name. A token that names no account cannot publish anything, and
+     by name. A token that names no account cannot deploy anything, and
      what you get back if you skip this does not mention accounts at all.
   6. Under "TTL", set the end date to after the end of your school year -
      next July is a safe choice - or leave it with no end date. An expired
-     token stops your publishing working, with nothing to say why.
+     token stops your deploys working, with nothing to say why.
   7. Choose "Continue to summary", then "Create Token".
   8. Copy the long code Cloudflare shows you - it is only shown once - and
      paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
-    Assert-CanAsk "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+    Assert-CanAsk "Paste Cloudflare token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
     $pastedSec = Read-Host -AsSecureString "Paste Cloudflare token"
     $plain = $null
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -962,7 +962,7 @@ if (-not $TOKEN) {
 Connect to Netlify.
 
 Netlify hosts this section's website for free, and it needs to know that the
-publishing is coming from you. It does that with an access token - a long
+deploys are coming from you. It does that with an access token - a long
 code that acts like a password made just for this app. Creating one takes
 about a minute, and you will not be asked again: it is saved securely on
 this computer.
@@ -974,14 +974,14 @@ this computer.
   3. Describe it as something you will recognise later, such as
      "Class websites".
   4. Change the expiry - it starts at 7 days. A token that expires stops
-     your publishing working, with nothing on screen to say why, so set a
+     your deploys working, with nothing on screen to say why, so set a
      date after the end of your school year: next July is a safe choice.
      Choose "No expiration" instead if it is offered.
   5. Choose "Generate token", then copy the long code Netlify shows you -
      it is only shown once.
   6. Paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
-  Assert-CanAsk "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+  Assert-CanAsk "Paste Netlify token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
   $pastedSec = Read-Host -AsSecureString "Paste Netlify token"
   $plain = $null
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)

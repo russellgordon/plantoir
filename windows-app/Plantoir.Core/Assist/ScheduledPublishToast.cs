@@ -53,18 +53,18 @@ public static class ScheduledPublishToast
 
     public sealed record Decision(Action Action, int? Window, bool SelectsTheSection, bool OpensAWindow, string TrailSays);
 
-    public const string Opened = "opened the section from its scheduled publish notification";
-    public const string OpenedInANewWindow = "opened the section from its scheduled publish notification, in a new window";
+    public const string Opened = "opened the section from its scheduled deploy notification";
+    public const string OpenedInANewWindow = "opened the section from its scheduled deploy notification, in a new window";
     public const string OpenedInTheChoosingWindow =
-        "opened the section from its scheduled publish notification, in the window that was choosing a working folder";
+        "opened the section from its scheduled deploy notification, in the window that was choosing a working folder";
     public const string LeftBusyWindowAlone =
-        "brought the working folder's window forward from a scheduled publish notification, and left it as it was because it was in the middle of something";
+        "brought the working folder's window forward from a scheduled deploy notification, and left it as it was because it was in the middle of something";
     public const string FolderGone =
-        "a scheduled publish notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward";
+        "a scheduled deploy notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward";
     public const string SectionGone =
-        "showed the working folder from a scheduled publish notification; that section is no longer in it";
+        "showed the working folder from a scheduled deploy notification; that section is no longer in it";
     public const string NamedNoSection =
-        "a scheduled publish notification was clicked, but it did not say which section it was about";
+        "a scheduled deploy notification was clicked, but it did not say which section it was about";
 
     /// <summary>
     /// Show THAT section, in a window on the working folder the run was for:

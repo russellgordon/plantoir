@@ -282,9 +282,13 @@ public sealed class PublishingChoiceView
 
         _additionalArea.Children.Add(new TextBlock
         {
-            Text = "Also publish to, for redundancy",
+            Text = "Also deploy to, for redundancy",
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
         });
+        // The one place that says what these switches DO. The mac's caption
+        // (PublishingChoiceView.swift), word for word; Windows had the label
+        // alone until #441 (v1.4.4).
+        _additionalArea.Children.Add(FormBuilders.ExampleCaption("Deploying sends your website to every destination switched on here, one after another. If one host is down or having trouble, the others still go out. Most teachers leave this off — it is here for anyone who wants a second copy live."));
 
         foreach (string type in availableTypes)
         {

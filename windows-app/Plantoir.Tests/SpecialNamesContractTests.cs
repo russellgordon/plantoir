@@ -86,7 +86,8 @@ public class SpecialNamesContractTests
     /// from the sentence that names it — which it had, before this piece: the
     /// Course Settings toggle read "Include Curriculum Coverage map" while the
     /// contract told teachers to turn off "Publish the curriculum coverage
-    /// map".
+    /// map". (Both say "Include the curriculum coverage map" since v1.4.4,
+    /// #441.)
     /// </summary>
     [Fact]
     public void EveryBlockedSentenceNamesASwitchTheAppActuallyHas()

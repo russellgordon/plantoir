@@ -345,8 +345,8 @@ public sealed class MultiDestinationDeployRunner : INotifyPropertyChanged
 
         string joined = JoinedWithAnd(destinationNames);
         string sentence = recorded
-            ? $"marked {course.Code}-S{sectionNumber}'s pages as published to {joined}"
-            : $"published {course.Code}-S{sectionNumber} to {joined}, but could not note it down — the window will still say Edited";
+            ? $"recorded {course.Code}-S{sectionNumber}'s pages as deployed to {joined}"
+            : $"deployed {course.Code}-S{sectionNumber} to {joined}, but could not note it down — the window will still say Edited";
         ActivityTrail.Note(ActivityTrail.Event.SectionContentMarkedPublished, sentence, course.Code, sectionNumber);
     }
 
