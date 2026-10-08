@@ -1912,12 +1912,14 @@ final class AssistToolRunner {
         detail += "\n\n" + previewNote
         // Not "and their PREVIEW" when an outside assistant's change left the
         // open preview as it was (#433): that would be false.
-        // Nor when the headless rebuild did not build (#471) — refused while
-        // the section was being deployed, or stopped by anything the
-        // explainer lifts: the preview is as it was, and saying it changed
-        // would be false. (Matched by sentence: a rebuild that stopped at a
-        // question, or could not launch, still gets the old ending — a
-        // pre-existing gap this does not close.)
+        // Nor when the headless rebuild RAN and did not build (#471) —
+        // whether the launcher refused it or it failed for any other reason:
+        // the preview is as it was, and saying it changed would be false.
+        // (Matched by sentence: a rebuild that stopped at a question, could
+        // not launch, or was declined before it ran — this copy deploying
+        // the section, a copy of the course being zipped, no working folder
+        // — still gets the old ending, a pre-existing gap this does not
+        // close.)
         let previewLeftAsItWas: Bool =
             previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
                 course: course.code, section: String(sectionNumber)

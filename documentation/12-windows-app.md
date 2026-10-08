@@ -1516,7 +1516,7 @@ What replaces the old container concepts:
       question) in those two paths is still read as a failed build — a
       separate gap. Unpublishing single PAGES never rebuilds on this side
       (`Apply` returns before the build when the plan hides), so it cannot
-      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and is held open by name in `NamedGapLedger` against #479 in the meantime, not marked `appliesOn`.
+      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and this side owes holding it open by name in `NamedGapLedger` against #479 until then (or implementing the rebuild) — not marking it `appliesOn`.
     - **No new trail event (rule 5).** The launcher already writes "build
       declined, course busy elsewhere" for the refusal (`launcherLines`).
   - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
