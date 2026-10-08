@@ -62,7 +62,7 @@ enum TaskMilestones {
         TaskMilestone(label: "Opening the preview…", marker: "Done processing"),
     ]
 
-    /// Publishing a section to Netlify.
+    /// Deploying a section to Netlify.
     static let deploy: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
@@ -74,7 +74,7 @@ enum TaskMilestones {
         TaskMilestone(label: "Finishing up…", marker: "Deploy complete"),
     ]
 
-    /// Publishing when the site has to be rebuilt first — one task from
+    /// Deploying when the site has to be rebuilt first — one task from
     /// the teacher's point of view, so one progress bar.
     static let buildAndDeploy: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
@@ -113,16 +113,16 @@ enum TaskMilestones {
         TaskMilestone(label: "Finishing up…", marker: "Deploy complete"),
     ]
 
-    /// Publishing a section to a folder on this Mac. Netlify is never
+    /// Deploying a section to a folder on this Mac. Netlify is never
     /// involved, and neither is the container: the built site already
-    /// sits on this Mac, so the whole publish is a quick local copy.
+    /// sits on this Mac, so the whole deploy is a quick local copy.
     static let deployToFolder: [TaskMilestone] = [
         TaskMilestone(label: "Checking your site…", marker: "Host timezone offset"),
         TaskMilestone(label: "Copying your files…", marker: "to a folder"),
         TaskMilestone(label: "Finishing up…", marker: "PUBLISHED_FOLDER="),
     ]
 
-    /// Publishing to a folder when the site has to be rebuilt first.
+    /// Deploying to a folder when the site has to be rebuilt first.
     static let buildAndDeployToFolder: [TaskMilestone] = [
         TaskMilestone(label: "Getting this Mac ready…", marker: "Setting up this Mac"),
         TaskMilestone(label: "Building your website builder…", marker: "Building your website builder"),
