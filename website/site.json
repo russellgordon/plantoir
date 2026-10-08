@@ -14,7 +14,7 @@
       "platform": "macOS",
       "asset": "Plantoir-macOS.dmg",
       "meta": "macOS 15 or later, Apple silicon",
-      "pinned": "1.4.4"
+      "pinned": null
     },
     {
       "platform": "Windows",
