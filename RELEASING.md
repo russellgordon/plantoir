@@ -346,8 +346,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 6. **Deploy plantoir.app deliberately**: `python3 website/build.py --deploy`
    builds `site/` and deploys it to Netlify (delta upload; the token comes
-   from the `containerized-quartz-netlify` Keychain item, the site id from
-   `website/site.json`). The Netlify site is NOT connected to GitHub —
+   from `NETLIFY_AUTH_TOKEN`, or else the stored credential
+   `containerized-quartz-netlify` — the Keychain item on a Mac, the generic
+   Windows credential of the same name on Windows (#452) — and the site id
+   from `website/site.json`). `site/_headers` needs no hand-cleaning before
+   it: the deploy replaces its own block (#462). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
    It first reads every picture the pages show a Mac visitor and refuses if
    any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
