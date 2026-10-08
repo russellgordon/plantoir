@@ -178,27 +178,27 @@ nonisolated enum ScheduledPublishNotice {
         case .posted:
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "told the teacher how a scheduled publish went, with a notification",
+                "told the teacher how a scheduled deploy went, with a notification",
                 course: course, section: section
             )
         case .notAllowed:
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "did not send a notification about a scheduled publish, because notifications "
+                "did not send a notification about a scheduled deploy, because notifications "
                 + "are turned off for Plantoir",
                 course: course, section: section
             )
         case .notAskedYet:
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "did not send a notification about a scheduled publish, because Plantoir has "
+                "did not send a notification about a scheduled deploy, because Plantoir has "
                 + "not been given permission to send them yet",
                 course: course, section: section
             )
         case .couldNotBeSent:
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "a notification about a scheduled publish could not be sent",
+                "a notification about a scheduled deploy could not be sent",
                 course: course, section: section
             )
         case .nothingToSay:
@@ -284,20 +284,20 @@ nonisolated enum ScheduledPublishNotice {
         }
         ActivityTrail.note(
             .scheduledPublishNotification,
-            "asked whether Plantoir may send a notification when a scheduled publish finishes",
+            "asked whether Plantoir may send a notification when a scheduled deploy finishes",
             course: course, section: section
         )
         let allowed: Bool = await poster.askPermission()
         if allowed {
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "the teacher allowed notifications about scheduled publishes",
+                "the teacher allowed notifications about scheduled deploys",
                 course: course, section: section
             )
         } else {
             ActivityTrail.note(
                 .scheduledPublishNotification,
-                "the teacher did not allow notifications about scheduled publishes",
+                "the teacher did not allow notifications about scheduled deploys",
                 course: course, section: section
             )
         }

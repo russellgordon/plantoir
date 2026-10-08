@@ -141,10 +141,10 @@ enum QuitConfirmation {
         _ = previews
         if publishes.count == 1 {
             let only: CourseActivity.PublishRecord = publishes[0]
-            return "publishing Section \(only.sectionNumber) of \(only.courseCode)"
+            return "deploying Section \(only.sectionNumber) of \(only.courseCode)"
         }
         if publishes.count > 1 {
-            return "publishing \(publishes.count) sections"
+            return "deploying \(publishes.count) sections"
         }
         if previewBuilds.count == 1 {
             let only: CourseActivity.PreviewBuildRecord = previewBuilds[0]
