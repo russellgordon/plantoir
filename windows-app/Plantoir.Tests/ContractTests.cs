@@ -213,6 +213,16 @@ public class ContractTests
         Assert.Equal(wording["pagesAChangeCouldNotFinishNamingSeveral"]!.ToString(),
                      AssistWording.PagesAChangeCouldNotFinishNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
 
+        // #440: settler S3's pointer — the contract holds the INSTANCE for a
+        // latest unit of 2 (the generator's fixture, mac AssistContract.swift),
+        // never a template, so each form is built with that unit here.
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasing"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasing(ClassNoun.Class, 2));
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasingInAModuleCourse"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasingInAModuleCourse("Module", ClassNoun.Class, 2));
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasingInANumberedCourse"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun.Meeting));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
