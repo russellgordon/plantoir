@@ -185,7 +185,7 @@ def read_token() -> str:
              "-s", CREDENTIAL_NAME, "-a", os.environ.get("USER", ""), "-w"],
             capture_output=True, text=True,
         )
-        token = result.stdout.strip()
+        token = _usable_token(result.stdout.strip())
         if token:
             return token
         raise SystemExit(
