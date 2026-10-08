@@ -96,8 +96,8 @@
                                                TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
                                 </StackPanel>
                                 <StackPanel Spacing="2">
-                                    <TextBlock Text="First-time publishing" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="Uploading your entire website for the first time takes a bit longer. Future publishes only upload the pages you’ve changed."
+                                    <TextBlock Text="First-time deploying" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="Uploading your entire website for the first time takes a bit longer. Future deploys only upload the pages you’ve changed."
                                                TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
                                 </StackPanel>
                                 <StackPanel Spacing="2">
@@ -107,7 +107,7 @@
                                 </StackPanel>
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="Internet connection" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="When publishing online, upload speed depends on your current internet connection."
+                                    <TextBlock Text="When deploying online, upload speed depends on your current internet connection."
                                                TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
                                 </StackPanel>
                             </StackPanel>

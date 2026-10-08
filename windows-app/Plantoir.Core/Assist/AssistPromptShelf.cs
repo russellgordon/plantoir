@@ -63,7 +63,7 @@ public static class AssistPromptShelf
     /// unit cards (each would be refused there) and no "Publish Week 2" /
     /// "Unpublish Week 2", because publishing one page by its title goes to
     /// the model and no routing measurement has been made in a club. Every
-    /// card on it but "Cancel scheduled deploy" is matched in code.
+    /// card on it is matched in code (the cancel card since #466).
     /// </summary>
     public static IReadOnlyList<(string Title, IReadOnlyList<string> Phrasings)> GroupsFor(
         Plantoir.Core.Models.ClassPageNaming naming, Plantoir.Core.Models.ClassNoun noun)

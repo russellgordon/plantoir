@@ -148,9 +148,14 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
     public string WarningGlyph => Glyphs.Warning;
     public Visibility WarningVisibility =>
         PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
-    public string WarningTooltip => PublishStopped is { } when
-        ? $"The publish set to happen on its own did not go out on {when:dddd d MMMM}. " +
-          "Open this section to see why."
+    // The mac's sentence (SidebarView.stoppedPublishTooltip), word for word
+    // since #441 (v1.4.4). It names no date deliberately: the badge can stand
+    // for days if nobody dismisses it, and a hover that said "on Tuesday"
+    // would have to be right about WHICH Tuesday; the section's own notice
+    // carries the date in full.
+    public string WarningTooltip => PublishStopped is not null
+        ? "A deploy that was set to happen on its own did not get through. " +
+          "Open this section to see what happened."
         : "";
 }
 

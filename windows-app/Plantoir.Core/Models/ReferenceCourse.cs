@@ -158,7 +158,7 @@ public static class ReferenceCourse
         ["copyIsASnapshot"] =
             "This records {course} as it is today. You can keep teaching it as usual — nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
         ["keepACopyLeavesAddOnsBehind"] =
-            "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can publish it. {course} keeps them.",
+            "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can put it online. {course} keeps them.",
         ["codeAlreadyInThatYear"] = "You already have a {code} kept for reference from {year}. Choose a different school year.",
         ["codeAlreadyWithNoYear"] = "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
         ["groupTitle"] = "Reference Courses",

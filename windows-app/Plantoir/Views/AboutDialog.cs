@@ -46,7 +46,7 @@ public sealed class AboutDialog : ContentDialog
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "Turns a folder of Markdown notes into a fast, searchable class website you own.",
+            Text = "Turns a folder of Markdown notes into a fast, searchable class website.",
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
             Margin = new Thickness(0, 14, 0, 0),
