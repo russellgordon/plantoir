@@ -103,7 +103,7 @@
         "carries": "the course a Claude or Codex session opened from Plantoir is holding - nothing else: no page, no section, no process id in the sentence",
         "event": "outside session held a course",
         "line": "a Claude or Codex session started from Plantoir is holding {course} while it is open",
-        "why": "#458 (the mac) and #430 (Windows): while a Claude or Codex session is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp owes the same line, and the words 'or Codex' with its Codex door (Russell, #458, 2026-10-07: both doors hold)."
+        "why": "#458 (the mac) and #430 (Windows): while a Claude or Codex session is open on a course, Rename Course, Add Section, restoring a backup and the three Revise items wait for it, and its backup is kept. Without this line a report shows those items greyed with nothing on the trail to say why: 'assistant opened' says a door was opened, never which course its server went on to hold. Written by the server (Plantoir --mcp-stdio; plantoir-mcp on Windows) when it takes its assist lease. There is deliberately no matching 'let go' line: measured on the mac (doorCourseHold.release.measured), every ordinary way of ending a Claude session kills the server (Codex was not measured), so a let-go line would almost never be written and its absence would be read as a session still open. The sentence says 'while it is open' for that reason. No appliesOn: Windows' plantoir-mcp writes the same line since 1.4.4 (#468), with its Codex door holding its course too (Russell, #458, 2026-10-07: both doors hold)."
       },
       {
         "carries": "course, section, and how long the engine took",
@@ -21627,7 +21627,7 @@
     "whichDoors": {
       "claude": true,
       "codex": true,
-      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door names no course today and owes the fifth override (the windows issue from #458). Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
+      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a server started by hand does.",
@@ -21731,7 +21731,7 @@
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "the in-app assistant is open on this course: the Claude door names that window", "appliesOn": ["mac"], "onWindows": "Windows' assistant window runs its own server, which takes the assist lease on its course, so on Windows the doors on that course grey with availableOnceYouFinishRevisingWithClaude instead (CanReviseNow). Whether Windows says the window's own cause is its decision, in the windows issue from #458.",
+        "name": "the in-app assistant is open on this course: the Claude door names that window", "appliesOn": ["mac"], "onWindows": "Windows' assistant window runs its own server, which takes the assist lease on its course, so on Windows the doors on that course are greyed too (CanReviseNow) - and since #468 (1.4.4) they say the window's own cause, not availableOnceYouFinishRevisingWithClaude: WindowHoldWording.AvailableOnceTheAssistantCloses, 'Available once you close the assistant for {course} Section {section}'. Windows tells its window's server from an outside session's by a registry of the server processes it started (WindowServers); decided under #468.",
         "item": "claude",
         "revisedElsewhere": false,
         "active": {
@@ -21741,7 +21741,7 @@
         "expect": "closeTheAssistantFirst"
       },
       {
-        "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door with availableOnceYouFinishRevisingWithClaude.",
+        "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door, saying WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}') since #468.",
         "item": "codex",
         "revisedElsewhere": false,
         "active": {
@@ -21761,7 +21761,7 @@
         "expect": null
       },
       {
-        "name": "the in-app assistant open on this very section: the local item brings it forward", "appliesOn": ["mac"], "onWindows": "Windows' window holds the assist lease through its own server process, which the app reads as another program, so the local item on the course the window is open on is greyed there (CanReviseNow) rather than bringing the window forward.",
+        "name": "the in-app assistant open on this very section: the local item brings it forward", "appliesOn": ["mac"], "onWindows": "Windows' window holds the assist lease through its own server process, which the app reads as another program, so the local item on the course the window is open on is greyed there (CanReviseNow) rather than bringing the window forward - since #468 with the window's own words, WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}'), not availableOnceYouFinishRevisingWithClaude.",
         "item": "local",
         "revisedElsewhere": false,
         "active": {

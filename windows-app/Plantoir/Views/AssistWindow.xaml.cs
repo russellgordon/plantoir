@@ -471,7 +471,7 @@ public sealed partial class AssistWindow : Window
             return;
         }
 
-        _tools = await McpClient.Start(server, _folder, _course.Code, _closing.Token);
+        _tools = await McpClient.Start(server, _folder, _course.Code, _section, _closing.Token);
         if (_tools is null)
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,

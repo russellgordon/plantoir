@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -255,6 +257,89 @@ public static partial class AssistWording
     /// </summary>
     public const string ScheduleADeployNeedsATime =
         "What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to.";
+
+    // ---- Settler S3's pointer (#440, mac AssistWording.nextClassNeedsItsOwnPhrasing) ----
+
+    /// <summary>
+    /// Settler S3's answer in a course whose unit word is "Unit": nothing was
+    /// added, and the two sentences that do it — both answered in code. The
+    /// days sentence names the course's LATEST unit (the plain next page's),
+    /// never a fixed number: "Unit 4" typed back in a Unit 2 course would start
+    /// Unit 4 at Day 1 and skip Unit 3. The contract holds the INSTANCE for a
+    /// latest unit of 2 (assist-wording.json); <see cref="AssistNextClassUnits.Pointer"/>
+    /// picks among the three forms.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasing(ClassNoun noun, int latestUnit) =>
+        $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest unit. " +
+        $"To start a new unit, say “Start a new unit”. To add several days to Unit {latestUnit}, " +
+        $"say “Add five more days to Unit {latestUnit}”.";
+
+    /// <summary>
+    /// S3's answer in a course with its own unit word ("Module"): the quoted
+    /// sentences still say "unit", because the cards read the word unit as the
+    /// course's own word — and the sentence says so.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasingInAModuleCourse(string unitWord, ClassNoun noun, int latestUnit)
+    {
+        string word = unitWord.ToLowerInvariant();
+        return $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest {word}. " +
+               $"To start a new {word}, say “Start a new unit”. To add several days to {unitWord} {latestUnit}, " +
+               $"say “Add five more days to Unit {latestUnit}”, since I read the word unit as {unitWord} here.";
+    }
+
+    /// <summary>S3's answer in a numbered course (#274), which has no units: one page at a time.</summary>
+    public static string NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun noun) =>
+        $"Nothing was added. This course numbers its pages one after another and has no units, so I add one " +
+        $"{Singular(noun)} at a time: say “Add the next {Singular(noun)} page” once for each one you want.";
+
+    /// <summary>"class" or "meeting", as the mac's <c>ClassNoun.singular</c>.</summary>
+    private static string Singular(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
+
+    // ---- Both doors hold the course (#468, mac #458) ----------------------
+    //
+    // Every sentence names BOTH doors, because plantoir-mcp cannot tell which
+    // one started it: the Claude door and the Codex door pass the same
+    // variable (AssistWorkspace.DoorCourseVariable). The in-app window's own
+    // server holds the course too, and its cause gets the window's own words
+    // (WindowHoldWording, beside WindowServers), never these.
+
+    /// <summary>Under a greyed Revise item while an outside session holds the course.</summary>
+    public const string AvailableOnceYouFinishRevisingWithClaude = "Available once you finish revising with Claude or Codex";
+
+    /// <summary>The title of the refusal a door gives at click time while the course is held.</summary>
+    public static string CourseIsAlreadyBeingRevised(string course) => $"{course} is already being revised";
+
+    /// <summary>The message under <see cref="CourseIsAlreadyBeingRevised"/> when an outside session holds it.</summary>
+    public const string FinishTheClaudeSessionFirst =
+        "A Claude or Codex session is working on this course already. Finish that session, then start again here.";
+
+    /// <summary>Rename Course, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseRename(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then rename.";
+
+    /// <summary>Restoring a backup, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseRestore(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then restore.";
+
+    /// <summary>Add Section, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseAddSection(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then add the section.";
+
+    /// <summary>The delete-several confirmation: one backup kept because an outside session made it.</summary>
+    public static string BackupKeptForAClaudeSession(string course) =>
+        $"One of these is kept: a Claude or Codex session still open on {course} made it.";
+
+    /// <summary>The delete-several confirmation: several kept because an outside session made them.</summary>
+    public static string BackupsKeptForAClaudeSession(string course, int count) =>
+        $"{count} of these are kept: a Claude or Codex session still open on {course} made them.";
+
+    /// <summary>After a delete (or a single Delete Backup) that kept one backup an outside session made.</summary>
+    public static string FinishTheClaudeSessionToDeleteItsBackup(string course) =>
+        $"Finish the Claude or Codex session working on {course} first. It made this backup, so it was kept.";
+
+    /// <summary>After a delete that kept several backups an outside session made.</summary>
+    public static string FinishTheClaudeSessionToDeleteItsBackups(string course) =>
+        $"Finish the Claude or Codex session working on {course} first. It made these backups, so they were kept.";
 
     // ---- A publish that stops part way (#436 item 2, mac #412) ------------
 

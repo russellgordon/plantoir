@@ -213,6 +213,30 @@ public class ContractTests
         Assert.Equal(wording["pagesAChangeCouldNotFinishNamingSeveral"]!.ToString(),
                      AssistWording.PagesAChangeCouldNotFinishNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
 
+        // #440: settler S3's pointer — the contract holds the INSTANCE for a
+        // latest unit of 2 (the generator's fixture, mac AssistContract.swift),
+        // never a template, so each form is built with that unit here.
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasing"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasing(ClassNoun.Class, 2));
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasingInAModuleCourse"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasingInAModuleCourse("Module", ClassNoun.Class, 2));
+        Assert.Equal(wording["nextClassNeedsItsOwnPhrasingInANumberedCourse"]!.ToString(),
+                     AssistWording.NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun.Meeting));
+
+        // #468 (mac #458): both doors hold the course — rendered with the
+        // contract's own placeholder, and the generator's count of 2.
+        Assert.Equal(wording["courseIsAlreadyBeingRevised"]!.ToString(), AssistWording.CourseIsAlreadyBeingRevised("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseRename"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRename("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseRestore"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRestore("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseAddSection"]!.ToString(),
+                     AssistWording.ClaudeIsRevisingTheCourseAddSection("{course}"));
+        Assert.Equal(wording["backupKeptForAClaudeSession"]!.ToString(), AssistWording.BackupKeptForAClaudeSession("{course}"));
+        Assert.Equal(wording["backupsKeptForAClaudeSession"]!.ToString(), AssistWording.BackupsKeptForAClaudeSession("{course}", 2));
+        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackup"]!.ToString(),
+                     AssistWording.FinishTheClaudeSessionToDeleteItsBackup("{course}"));
+        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackups"]!.ToString(),
+                     AssistWording.FinishTheClaudeSessionToDeleteItsBackups("{course}"));
+
         // #467 (mac #439): a deploy refused while its section was still being deployed.
         Assert.Equal(wording["deployRefusedWhileALaterDeployWorks"]!.ToString(),
                      AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"));
