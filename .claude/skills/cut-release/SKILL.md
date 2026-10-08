@@ -348,7 +348,9 @@ so the `--deploy` step publishes it with the rest of the site.
 The output is deterministic, so **the normal outcome is no diff at all** —
 `git status` stays quiet and you commit only the version line. Do not
 report that as a failure or re-run it. Files change only when the icon,
-the palette or the tagline moved since the last release.
+the palette or the tagline moved since the last release — or when Pillow
+changed underneath: a newer Pillow can re-encode an unchanged PNG or move the
+wordmark a pixel (12.2.0, #446). Look at the pictures before calling that a stop.
 
 If it does produce a diff, stop and show the user the changed images
 before committing: `site/social-card.png` is a public, widely-cached
