@@ -21108,8 +21108,8 @@
         ]
       },
       "panel": "The window's failure explanation is the launcher's first line with the cross taken off (failureExplanationCases), lifted as previewWhileItsSectionDeploys lifts its own.",
-      "assistant": "wording.deployRefusedWhileALaterDeployWorks when the deploy set for later was the reason, wording.deployRefusedWhileItsSectionDeploys otherwise - said by the in-app assistant and an outside assistant's deploy_section instead of 'did not finish', when every leg that ran was refused this way.",
-      "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1)."
+      "assistant": "wording.deployRefusedWhileALaterDeployWorks when the deploy set for later was the reason, wording.deployRefusedWhileItsSectionDeploys otherwise - said by the in-app assistant and an outside assistant's deploy_section instead of 'did not finish', when every leg that ran was refused this way. When it is not a deploy but a rebuild that is refused - an outside assistant's rebuild_preview, publish_pages or unpublish_pages (a page, or a whole unit) rebuilding the preview after its write - the answer says the launcher's own build line, lifted as the window lifts it (failureExplanationCases' expect), after what was already done, and never wording.whereTheOutputIs: the server has no window (refusedBuildAnswers, #471).",
+      "why": "It names WHAT is deploying. After a re-set the app shows only the new time, so 'is being deployed right now' would read as false; 'a deploy that was set for later' is the thing the teacher set. 'Deployed', the word on the button (DEPLOY = going online; nothing here is about publishing a page). The build leg says 'built' rather than 'deployed again' because an assistant's rebuild of the preview runs the same leg - which is also why a refused rebuild says the LIFTED build line rather than wording.deployRefusedWhileItsSectionDeploys: that sentence says the section was not deployed again, which is false of a rebuild, and a new wording key can be added only where assist-wording.json is generated. The lifted line keeps the launcher's lower-case 'section 2'; that is accepted rather than re-cased, because it is the same line the window shows and a teacher who sees both should read one sentence, not two. No 'script', 'workspace' or 'container' (CLAUDE.md rule 1)."
     },
     "launcherLines": "activityTrail.mustRecord 'build declined, course busy elsewhere' -> launcherLineWhenALaterDeployIsStillWorking and launcherLineWhenItsSectionIsAlreadyBeingDeployed, with {leg} 'deploy' (deploy.sh) or 'build' (preview.sh --build-only).",
     "launcherCasesShape": "Run by scripts/test_deploy_while_its_section_deploys.py against the REAL guard, cut out of deploy.sh AND preview.sh (the two copies must match), with a pretend ps and lsof - the shape of previewWhileItsSectionDeploys.launcherCasesShape. leg is 'deploy' (default) or 'build'. The deploy asked for is ICS4U section 2 in the folder 'here'. who is the sentence expected when refused: 'later' (laterDeploy/laterBuild) or 'another' (anotherDeploy/anotherBuild). parentArgs is this run's parent's command line (default '-bash').",
@@ -21488,6 +21488,62 @@
         "output": "❌ ICS4U section 2 is already being deployed, so it cannot be built until that has finished.\n   Nothing was changed.",
         "expect": "ICS4U section 2 is already being deployed, so it cannot be built until that has finished.",
         "assistant": "deployRefusedWhileItsSectionDeploys"
+      }
+    ],
+    "refusedBuildAnswersShape": "Each case drives an outside assistant's tool once, in a working folder whose ICS4U section 2 has a class page 'Unit 2, Day 3' (unpublished for publish_pages, published for unpublish_pages), with the preview's --build-only failing (exit 1) with failureExplanationCases[failureExplanationCase].output as its output - its cross replaced by crossArrivesAs when that is given. arguments are the tool's own beside course 'ICS4U' and section 2; pages is the contract's semicolon-separated string (a side that takes an array splits it). The answer must contain that case's expect, whole, must not contain the cross in the form it arrived in (or the real cross), and must not contain wording.whereTheOutputIs. Where the next words go is each side's: the page and unit answers say what was already done first.",
+    "refusedBuildAnswers": [
+      {
+        "name": "an outside assistant's rebuild, refused by the deploy set for later",
+        "tool": "rebuild_preview",
+        "arguments": {},
+        "failureExplanationCase": 1,
+        "why": "The answer used to be 'the preview couldn't be built' with the launcher's whole output after it; the teacher could not tell a broken build from one that will work in a few minutes."
+      },
+      {
+        "name": "an outside assistant's rebuild, refused by another deploy, with the cross arriving as '?'",
+        "tool": "rebuild_preview",
+        "arguments": {},
+        "failureExplanationCase": 3,
+        "crossArrivesAs": "?",
+        "why": "The server reads the launcher without naming an encoding, so a cross the console cannot show arrives as '?'."
+      },
+      {
+        "name": "publishing a page, refused by another deploy",
+        "tool": "publish_pages",
+        "arguments": {
+          "pages": "Unit 2, Day 3"
+        },
+        "failureExplanationCase": 3,
+        "why": "The page is already written when the rebuild is refused, so the answer says that first and the refusal after it; it used to point at 'that section's window', which a server does not have."
+      },
+      {
+        "name": "publishing a page, refused by the deploy set for later, with the cross arriving as mojibake",
+        "tool": "publish_pages",
+        "arguments": {
+          "pages": "Unit 2, Day 3"
+        },
+        "failureExplanationCase": 1,
+        "crossArrivesAs": "â\u009dŒ",
+        "why": "The cross's UTF-8 bytes read in a Western code page are three characters, not one; everything before the course code is taken off, not only a cross or '?'."
+      },
+      {
+        "name": "publishing a whole unit, refused by another deploy",
+        "tool": "publish_pages",
+        "arguments": {
+          "pages": "Unit 2"
+        },
+        "failureExplanationCase": 3,
+        "why": "A unit's name reaches the whole-unit path, which writes the unit's pages and then rebuilds with its own answer."
+      },
+      {
+        "name": "unpublishing a whole unit, refused by the deploy set for later, with the cross arriving as mojibake",
+        "tool": "unpublish_pages",
+        "arguments": {
+          "pages": "Unit 2"
+        },
+        "failureExplanationCase": 1,
+        "crossArrivesAs": "â\u009dŒ",
+        "why": "The whole-unit path's answer, with the same mojibake as the page path's case."
       }
     ],
     "theNewRunWaits": {

@@ -1729,6 +1729,13 @@ public sealed partial class AssistWorkspace
             return new AssistResult(false,
                 AppendingFindings(course, section, build, 
                     AssistWording.PreviewBuildNeedsAnAnswer(course.Code, section.ToString())), null);
+        // Refused because the section is still being deployed (#471, the
+        // build half of #467): said as the launcher's own line, which is the
+        // sentence a teacher can act on, rather than as a broken build.
+        if (RefusedWhileItsSectionDeploys(build) is { } refused)
+            return new AssistResult(false,
+                AppendingFindings(course, section, build,
+                    $"Nothing was changed, and the preview couldn’t be built: {refused}"), null);
         return build.Succeeded
             ? new AssistResult(true,
                 AppendingFindings(course, section, build, 
@@ -1889,7 +1896,13 @@ public sealed partial class AssistWorkspace
                                         _folder, progress, cancellation);
         if (!build.Succeeded)
             return new AssistResult(false,
-                $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}" +
+                // Refused while the section is being deployed (#471): the
+                // launcher's own line, and no pointer at a window this
+                // process does not have. Any other failure keeps its one
+                // clean sentence (never the raw log).
+                (RefusedWhileItsSectionDeploys(build) is { } refused
+                    ? $"{WhatSurvived(changed)}, but the preview couldn’t be built: {refused}"
+                    : $"{WhatSurvived(changed)}, but the preview couldn’t be built. {AssistWording.WhereTheOutputIs}") +
                 (declined.Count > 0 ? " " + AssistWording.PagesWhoseSettingsCannotBeAddedTo(declined) : ""), backup);
 
         return new AssistResult(true, Summary(changed, previewed: true, course.Code, section, plan.Hiding, declined), backup);
@@ -2130,10 +2143,32 @@ public sealed partial class AssistWorkspace
         progress?.Report($"Building a preview of Section {section} of {course.Code}…");
         var build = await _launcher.Run("preview", new[] { course.Code, section.ToString(), "--build-only", "--non-interactive" },
                                         _folder, progress, cancellation);
-        return build.Succeeded
-            ? new AssistResult(true, summary, backup)
+        if (build.Succeeded) return new AssistResult(true, summary, backup);
+        // As in Apply (#471): a refusal is said as the launcher's own line.
+        return RefusedWhileItsSectionDeploys(build) is { } refusal
+            ? new AssistResult(false, $"{summary} But the preview couldn’t be built: {refusal}", backup)
             : new AssistResult(false, $"{summary} But the preview couldn’t be built. {AssistWording.WhereTheOutputIs}", backup);
     }
+
+    /// <summary>
+    /// The launcher's own sentence when a <c>--build-only</c> was refused
+    /// because the same section is still being deployed, or null for any
+    /// other outcome (#471; contracts/shared-rules.json →
+    /// <c>deployWhileItsSectionDeploys.refusedBuildAnswers</c>).
+    /// </summary>
+    /// <remarks>
+    /// The LIFTED line ("… so it cannot be built until that has finished."),
+    /// not <c>wording.deployRefusedWhileItsSectionDeploys</c>: that sentence
+    /// says the section "was not deployed again", which is false of a
+    /// rebuild, and a new wording key can only be added on the mac, where
+    /// assist-wording.json is generated. The launcher's line is contract data
+    /// already (<c>failureExplanationCases</c>), and its build flavour exists
+    /// precisely because an assistant's rebuild runs the same leg.
+    /// </remarks>
+    private static string? RefusedWhileItsSectionDeploys(LaunchOutcome build) =>
+        build.Succeeded || build.NeededAnAnswer
+            ? null
+            : FailureExplainer.SectionDeployRefusalOf(build.Message)?.Sentence;
 
     /// <summary>
     /// Point the section's front page at its most recent published class, and

@@ -116,9 +116,11 @@ public static class FailureExplainer
     /// null. Detection reads only the ASCII markers, so a cross that reached
     /// plantoir-mcp as '?' or as mojibake (it reads the launcher without
     /// naming an encoding) cannot hide the refusal; there only
-    /// <see cref="SectionDeployRefusal.ByALaterDeploy"/> is used, to choose
-    /// the assistant's sentence. The window reads the console as UTF-8, so
-    /// the lifted sentence it shows has a real cross to take off.
+    /// <see cref="SectionDeployRefusal.ByALaterDeploy"/> was used until
+    /// #471, which made the server's rebuild, publish and unpublish answers
+    /// say the lifted <see cref="SectionDeployRefusal.Sentence"/> itself — so
+    /// every leading character up to the course code is taken off, whatever
+    /// form the cross arrived in, rather than only a real cross or '?'.
     /// </summary>
     public static SectionDeployRefusal? SectionDeployRefusalOf(string? output)
     {
@@ -127,7 +129,13 @@ public static class FailureExplainer
         {
             string line = raw.Trim();
             if (!SectionDeployRefusalMarkers.Any(marker => line.EndsWith(marker, StringComparison.Ordinal))) continue;
-            string sentence = line.TrimStart('❌', '?', ' ');
+            // Everything before the course code goes, whatever it arrived as:
+            // a real cross, '?', or the cross's UTF-8 bytes read in the
+            // console's code page ("â\u009dŒ", escaped here). A course code starts
+            // with an ASCII letter or digit, and nothing before it is words.
+            int start = 0;
+            while (start < line.Length && !char.IsAsciiLetterOrDigit(line[start])) start++;
+            string sentence = line[start..];
             return new SectionDeployRefusal(sentence.Contains(LaterDeployMarker, StringComparison.Ordinal), sentence);
         }
         return null;
