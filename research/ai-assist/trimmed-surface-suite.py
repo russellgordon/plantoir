@@ -576,6 +576,20 @@ def intercepted(message, window_course=None, window_section=None):
     counts = r"(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)"
     if re.fullmatch(r"add %s more days to unit \d+" % counts, tidied):
         return "add_next_class"
+    # #440: "add three days to unit 2", "add two more classes to unit 4",
+    # "add another day to unit 4" - AssistCardCommand.daysToAUnit. The count
+    # agrees with the noun; pinned against contracts/assist-cases.json ->
+    # nextClassUnits by assert_next_class_units_matches_contract() below.
+    days = re.fullmatch(r"add (\S+) (more )?(day|days|class|classes) to unit (\d+)", tidied)
+    if days and int(days.group(4)) > 0:
+        count = days.group(1)
+        spelled = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+                   "eleven", "twelve"]
+        one = count in ("a", "another", "one") or (count.isdigit() and int(count) == 1)
+        known = one or count in spelled or (count.isdigit() and int(count) > 0)
+        a_more = days.group(2) and count in ("a", "another")
+        if known and not a_more and one == (days.group(3) in ("day", "class")):
+            return "add_next_class"
     room = re.fullmatch(r"make room for (\S+) (class|classes) at unit \d+,? day \d+", tidied)
     if room and re.fullmatch("a|%s" % counts, room.group(1)):
         # The Swift refuses a plural count with a singular noun, and the
@@ -1332,6 +1346,43 @@ def assert_hide_is_unpublish_matches_contract():
     return len(family["accepted"]) + len(family["refused"])
 
 
+def assert_next_class_units_matches_contract():
+    """Fail the run if the #440 next-class frames have drifted from the contract.
+
+    The same argument as the functions above (review F6 of the #440 plan):
+    an accepted row this guard missed would be SENT to the model and scored
+    as routing for a sentence the app answers itself, and a pointed or
+    measured-control row it intercepted would be a model sentence it never
+    sends. Accepted rows must be intercepted as add_next_class; notThis,
+    pointed and every runs row marked reachesModel must not be intercepted.
+    """
+    with open(ROOT / "contracts" / "assist-cases.json", encoding="utf-8") as handle:
+        family = json.load(handle).get("nextClassUnits")
+    if not family:
+        sys.exit("contracts/assist-cases.json carries no nextClassUnits rows to check against.")
+    wrong = []
+    for row in family["accepted"]:
+        reached = intercepted(row["input"])
+        if reached != row["expectTool"]:
+            wrong.append("accepted as %s and this guard says %r: %r"
+                         % (row["expectTool"], reached, row["input"]))
+    model_rows = family["notThis"] + family["pointed"]
+    for row in family["runs"]:
+        if row.get("reachesModel"):
+            model_rows.append(row)
+    for row in model_rows:
+        reached = intercepted(row["input"])
+        if reached is not None:
+            wrong.append("reaches the model and intercepted as %s anyway: %r" % (reached, row["input"]))
+    if wrong:
+        sys.exit(
+            "intercepted() no longer agrees with contracts/assist-cases.json "
+            "-> nextClassUnits:\n  %s\nFix it before quoting a number from this suite."
+            % "\n  ".join(wrong)
+        )
+    return len(family["accepted"]) + len(model_rows)
+
+
 def assert_links_question_matches_contract():
     """Fail the run if the links family (#167) has drifted from the contract.
 
@@ -1441,6 +1492,7 @@ CARD_LABELS = [probe for _, _, probe, _ in PROMISED]
 DEPLOY_ROWS_CHECKED = assert_deploy_at_a_time_matches_contract()
 HIDE_ROWS_CHECKED = assert_hide_is_unpublish_matches_contract()
 LINKS_ROWS_CHECKED = assert_links_question_matches_contract()
+NEXT_CLASS_ROWS_CHECKED = assert_next_class_units_matches_contract()
 INTERCEPTED = {}
 for acceptable, prompt, probe, needs_date in CASES:
     tool = intercepted(prompt.replace("EXC2O", COURSE).replace("exc2o", COURSE.lower()),
@@ -1471,6 +1523,8 @@ print("### hide-is-unpublish guard agrees with %d contract rows"
       % HIDE_ROWS_CHECKED)
 print("### links-question guard agrees with %d contract rows"
       % LINKS_ROWS_CHECKED)
+print("### next-class-units guard agrees with %d contract rows"
+      % NEXT_CLASS_ROWS_CHECKED)
 print("### intercepted in code before the model (%d of %d probes): %s" % (
     len(INTERCEPTED), len(CASES),
     ", ".join("%s -> %s" % (p, t) for p, t in INTERCEPTED.items())))

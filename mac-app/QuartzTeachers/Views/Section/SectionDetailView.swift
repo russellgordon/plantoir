@@ -2175,19 +2175,19 @@ struct SectionDetailView: View {
         // how many destinations were configured — none of them were ever
         // reached, so the wording says "could not be built", not "did
         // not finish", which would wrongly suggest the upload failed.
-        if deployRunner.legs.first?.buildFailed == true {
+        // A build refused because the section was still being deployed
+        // (#439) is said as itself, not as "could not be built" — the shared
+        // answer, which the windowless assistant asks too, decides which.
+        if let buildAnswer = MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish(
+            course: course.code, section: String(sectionNumber), firstLeg: deployRunner.legs.first
+        ) {
             // Show the folder problems HERE too. A build that failed because
             // the curriculum folder or Media is missing is the case where the
             // finding is most likely to be the cause, and moving the call
             // below the early return had quietly dropped it altogether —
             // de-headlining it was the intent, discarding it was not.
             showHealthFindings(from: deployRunner.legs.first?.runner, cameFromPublishing: true, buildHasFinished: true)
-            return said(AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.couldNotBuildBeforeDeploying(
-                    course: course.code, section: String(sectionNumber)
-                )
-            ))
+            return said(buildAnswer)
         }
 
         // What the build said about this course's folders — AFTER the failure
