@@ -493,6 +493,32 @@ public sealed class ToolchainReadinessTests : IDisposable
     }
 
     [Fact]
+    public async Task TheSweepRemovesOnlyMarkersItCanReadAndWhoseProgramIsGone()
+    {
+        using var gone = Process.Start(new ProcessStartInfo("cmd.exe", "/c exit 0") { CreateNoWindow = true, UseShellExecute = false })!;
+        gone.WaitForExit();
+        using var alive = Process.Start(new ProcessStartInfo("cmd.exe", "/c ping -n 30 127.0.0.1 >nul") { CreateNoWindow = true, UseShellExecute = false })!;
+        try
+        {
+            int emptyPid = gone.Id + 1_000_000;   // a marker caught mid-write by an older Plantoir: no body yet
+            WriteMarker(emptyPid, "");
+            WriteMarker(gone.Id, $"{gone.Id}\nPlantoir\n{DateTime.UtcNow:O}\n");
+            WriteMarker(alive.Id, $"{alive.Id}\ncmd\n{DateTime.UtcNow:O}\n");
+            var copy = new HeldCopy();
+            copy.LetGo();
+            ToolchainReadiness.Copier = copy.Copy;
+
+            await ToolchainReadiness.Ensure(_folder, "bundled");
+
+            Assert.True(File.Exists(ToolchainReadiness.MarkerPath(_folder, emptyPid)), "an unreadable marker was swept");
+            Assert.False(File.Exists(ToolchainReadiness.MarkerPath(_folder, gone.Id)), "a dead program's marker stayed");
+            Assert.True(File.Exists(ToolchainReadiness.MarkerPath(_folder, alive.Id)), "a live program's marker was swept");
+            Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(ToolchainReadiness.MarkerPath(_folder, 1))!, "writing-*"));
+        }
+        finally { try { alive.Kill(); } catch { } }
+    }
+
+    [Fact]
     public void AMarkerWhoseIdNowBelongsToAnotherProcessCountsForNothing()
     {
         // This process's id and name, but a start that is not this process's:

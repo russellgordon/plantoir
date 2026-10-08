@@ -4311,7 +4311,7 @@ read `*.lease`, and this holds no course — the precedent is `BackupDeleter`'s
 `<COURSE>.held-backup.<pid>`. The marker is written only when `courses\`
 already exists, so it never turns a folder with no courses into one with an
 empty list, and writing one sweeps away any left by a Plantoir killed
-mid-copy (already ignored; this only stops them piling up). **The marker
+mid-copy (already ignored; this only stops them piling up) — but never one whose body does not read, which is what a live marker looks like for a moment while a program writes it in place. This app writes its own under a `writing-…tmp` name and moves it into place, so its marker is never seen empty. **The marker
 exists only WHILE a copy runs, so plantoir-mcp cannot see a FAILED copy** —
 by design: a failed copy is usually a file that could not be written, the
 assistant's build then fails on its own with the launcher's own words, and a

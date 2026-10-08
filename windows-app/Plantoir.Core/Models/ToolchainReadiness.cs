@@ -334,7 +334,11 @@ public static class ToolchainReadiness
             string path = MarkerPath(workspacePath, Environment.ProcessId);
             Directory.CreateDirectory(ActivityDirectory(workspacePath));
             SweepDeadMarkers(workspacePath);
-            File.WriteAllText(path, WorkLease.LeaseBody(withStart: true));
+            // Written under another name and MOVED into place, so no reader —
+            // another Plantoir's sweep included — ever sees the marker empty.
+            string writing = Path.Combine(ActivityDirectory(workspacePath), $"writing-{MarkerPrefix}{Environment.ProcessId}.tmp");
+            File.WriteAllText(writing, WorkLease.LeaseBody(withStart: true));
+            File.Move(writing, path, overwrite: true);
             return path;
         }
         catch { return null; }
@@ -347,17 +351,20 @@ public static class ToolchainReadiness
     /// </summary>
     private static void SweepDeadMarkers(string workspacePath)
     {
-        foreach (var (marker, pid, alive) in Markers(workspacePath))
+        foreach (var (marker, pid, alive, parsed) in Markers(workspacePath))
         {
-            if (alive || pid == Environment.ProcessId) continue;
+            // Never one whose body did not read: an older Plantoir writes its
+            // marker in place, so for a moment a LIVE marker is empty, and
+            // deleting it then would hide that copy from plantoir-mcp.
+            if (!parsed || alive || pid == Environment.ProcessId) continue;
             try { File.Delete(marker); } catch { }
         }
     }
 
     /// <summary>Every marker in the folder, with its owner and whether that owner lives.</summary>
-    private static List<(string Marker, int Pid, bool Alive)> Markers(string workspacePath)
+    private static List<(string Marker, int Pid, bool Alive, bool Parsed)> Markers(string workspacePath)
     {
-        var found = new List<(string, int, bool)>();
+        var found = new List<(string, int, bool, bool)>();
         IEnumerable<string> markers;
         try { markers = Directory.EnumerateFiles(ActivityDirectory(workspacePath), MarkerPrefix + "*").ToList(); }
         catch { return found; }
@@ -369,7 +376,8 @@ public static class ToolchainReadiness
             try { body = File.ReadAllText(marker); }
             catch { continue; }
             var (name, start) = WorkLease.ReadBody(body);
-            found.Add((marker, pid, name is not null && WorkLease.OwnerIsAlive(pid, name, start, "toolchain-copying")));
+            found.Add((marker, pid, name is not null && WorkLease.OwnerIsAlive(pid, name, start, "toolchain-copying"),
+                       name is not null));
         }
         return found;
     }
