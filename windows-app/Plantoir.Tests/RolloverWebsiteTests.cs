@@ -409,12 +409,19 @@ public class RolloverWebsiteTests : IDisposable
         Assert.DoesNotContain(AssistWording.RolloverTurnedOffTheScheduledPublish, said);
     }
 
-    /// <summary>A section with no scheduled publish is told nothing about one.</summary>
+    /// <summary>
+    /// A section with no scheduled deploy is told nothing about one.
+    ///
+    /// Named by the constants rather than by a phrase typed here: a typed
+    /// phrase goes on passing, vacuously, the day the product's words change
+    /// (#443 found the old "set to publish on its own" doing exactly that).
+    /// </summary>
     [Fact]
     public async Task WithNoScheduledPublishNothingIsSaidAboutOne()
     {
         string said = await ReDate(rollover: "yes", website: "new");
-        Assert.DoesNotContain("set to publish on its own", said);
+        Assert.DoesNotContain(AssistWording.RolloverTurnedOffTheScheduledPublish, said);
+        Assert.DoesNotContain(AssistWording.RolloverCouldNotTurnOffTheScheduledPublish, said);
     }
 
     /// <summary>Keeping the same website must not touch the scheduled publish.</summary>

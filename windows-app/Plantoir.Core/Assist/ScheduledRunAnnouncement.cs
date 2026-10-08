@@ -55,10 +55,10 @@ public static class ScheduledRunAnnouncement
     public enum Said { Told, TurnedOff, CouldNotBeSent, NothingToSay }
 
     // The contract's `trailSays`, after the course/section prefix the trail puts on the line.
-    public const string ToldLine = "told the teacher how a scheduled publish went, with a notification";
+    public const string ToldLine = "told the teacher how a scheduled deploy went, with a notification";
     public const string TurnedOffLine =
-        "did not send a notification about a scheduled publish, because notifications are turned off for Plantoir";
-    public const string CouldNotBeSentLine = "a notification about a scheduled publish could not be sent";
+        "did not send a notification about a scheduled deploy, because notifications are turned off for Plantoir";
+    public const string CouldNotBeSentLine = "a notification about a scheduled deploy could not be sent";
 
     /// <summary>File times on some volumes are kept to two seconds.</summary>
     private static readonly TimeSpan Slack = TimeSpan.FromSeconds(2);

@@ -597,15 +597,15 @@ public static class ScheduledPublishOutcome
     internal static string TrailSentence(Result result) => result.Outcome switch
     {
         Kind.NeededAnAnswer =>
-            $"the publish set to happen on its own stopped — {result.Destination} needed an answer",
+            $"the deploy set to happen on its own stopped — {result.Destination} needed an answer",
         Kind.BuildNeededAnAnswer =>
-            "the publish set to happen on its own stopped — building the pages needed an answer",
+            "the deploy set to happen on its own stopped — building the pages needed an answer",
         Kind.DidNotFinish =>
-            $"the publish set to happen on its own did not finish — {result.Destination} stopped",
+            $"the deploy set to happen on its own did not finish — {result.Destination} stopped",
         Kind.Succeeded =>
-            $"the publish set to happen on its own went out to {result.Destination}",
+            $"the deploy set to happen on its own went out to {result.Destination}",
         Kind.BuildDidNotFinish =>
-            "the publish set to happen on its own did not finish — the pages could not be built, so no destination was reached",
+            "the deploy set to happen on its own did not finish — the pages could not be built, so no destination was reached",
         Kind.TooLateToRun =>
             "turned off: the day it was set for had gone by, by more than the course allows, so it stood down",
         Kind.CourseWasBusy =>
@@ -630,28 +630,28 @@ public static class ScheduledPublishOutcome
         result.Outcome switch
         {
             Kind.NeededAnAnswer =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped " +
-                $"because publishing to {result.Destination} needed an answer nobody was there to give. " +
-                "Publish this section once yourself, answer the question, and it can publish on its own " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped " +
+                $"because deploying to {result.Destination} needed an answer nobody was there to give. " +
+                "Deploy this section once yourself, answer the question, and it can deploy on its own " +
                 "after that.",
 
             Kind.BuildNeededAnAnswer =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped " +
                 "before it started, because building the pages needed an answer nobody was there to " +
-                "give. Preview this section once yourself, answer the question, and it can publish on " +
+                "give. Preview this section once yourself, answer the question, and it can deploy on " +
                 "its own after that.",
 
             Kind.DidNotFinish =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it did not " +
-                $"finish — publishing to {result.Destination} stopped, so nothing went up there. " +
-                "Publish it yourself to see what happens.",
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it did not " +
+                $"finish — deploying to {result.Destination} stopped, so nothing went up there. " +
+                "Deploy it yourself to see what happens.",
 
             Kind.Succeeded =>
-                $"{courseCode} Section {sectionNumber} published on its own to {result.Destination}. " +
-                "Your students have the new pages.",
+                $"{courseCode} Section {sectionNumber} deployed on its own to {result.Destination}. " +
+                "Your website has the new pages.",
 
             Kind.BuildDidNotFinish =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped before it " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped before it " +
                 "started — the pages could not be built, so nothing went up anywhere. Preview this section once " +
                 "yourself, and the reason will be in that section's window.",
 
