@@ -14,13 +14,24 @@ NOT photographed.
 
 Two working folders, both made by the app itself (the ``provision`` scene:
 the New Course panel for each course, Keep a Copy for Reference's code for
-last year's ICS3U):
+last year's ICS3U). Which courses, which sections, which school year the
+reference copy is filed under and where each marketing course deploys are
+all read from ``marketing/folders.json``, the file the mac reads (#445,
+#459); nothing here lists a course of its own:
 
-- DEMO, ``~/Teaching`` -- ENG2D, MCV4U and SCH3U, the demo courses the hero,
-  the preview, the progress and the assistant pictures show. Disposable:
-  it is deleted and made again whenever it is missing a course.
-- MARKETING, ``~/School Web Space`` -- ICS3U, ICS4U and last year's ICS3U, the
-  v1.4.0 scenes' folder. Kept.
+- DEMO, ``~/Teaching`` -- folders.json's ``demo.courses`` (ENG2D, MCV4U and
+  SCH3U), the courses the hero, the preview, the progress and the assistant
+  pictures show. Disposable: it is deleted and made again whenever it is
+  missing a course or a course has other sections than folders.json's (the
+  app's provision scene leaves a course that is already there as it is).
+  Then, every run, the demo STATE is applied (``capture_windows.provision_demo``:
+  the colour schemes, the teacher's name, the stand-in site markers and the
+  front pages, through ``plantoir-mcp.exe``); a section already right costs
+  nothing.
+- MARKETING, ``~/School Web Space`` -- ``marketing.courses`` (ICS3U, ICS4U)
+  and the reference copy, the v1.4.0 scenes' folder. Kept. A course with no
+  folder destination yet is given folders.json's ``publishTo``; one already
+  pointed somewhere keeps it.
 
 Every picture's path bar shows ``~/Desktop/Teaching``, as the mac's do: each
 folder's courses are put there for its scenes (``ShownAsTeaching``), so
@@ -54,6 +65,7 @@ IMAGE_DIR = REPO / "site" / "img"
 sys.path.insert(0, str(HERE))
 
 from images import prepare, WIDEST_WINDOW_PIXELS  # noqa: E402
+import demo_folders  # noqa: E402
 import hero_windows as desk  # noqa: E402
 
 DEMO = Path.home() / "Teaching"
@@ -64,9 +76,25 @@ MARKETING = Path.home() / "School Web Space"
 # for its scenes, with whatever is there set aside, and both are put back.
 SHOWN = Path.home() / "Desktop" / "Teaching"
 COURSES_SET_ASIDE = SHOWN / ".courses set aside for the pictures"
-DEMO_COURSES = "ENG2D:1, 2;MCV4U:1, 2;SCH3U:1, 2"
-MARKETING_COURSES = "ICS3U:1, 2;ICS4U:1"
-MARKETING_REFERENCE = "ICS3U:2025"
+
+
+def publish_folders(folder: Path) -> list[Path]:
+    """Every folder destination the courses in `folder` are set to deploy
+    to, read from their own course_config.json — the kept folder's
+    (`Websites`, `Websites\\ICS4U`) and a fresh one's (folders.json's
+    `publishTo`) alike. A sheet that offers to deploy to a folder that does
+    not exist warns about it instead, so these are made before a scene."""
+    import marketing_folder
+    found: list[Path] = []
+    courses = folder / "courses"
+    if not courses.is_dir():
+        return found
+    for course_dir in sorted(courses.iterdir()):
+        config = demo_folders.read_config(course_dir) or {}
+        path = str(config.get("deploy_folder_path", ""))
+        if config.get("deploy_target") == marketing_folder.FOLDER_DESTINATION and path:
+            found.append(Path(path))
+    return found
 
 
 class ShownAsTeaching:
@@ -96,19 +124,31 @@ class ShownAsTeaching:
                     pass   # a reference course is locked, and deploys nowhere
 
     def __enter__(self) -> Path:
-        self.had_websites = (SHOWN / "Websites").exists()
         if COURSES_SET_ASIDE.exists():
             raise SystemExit(f"{COURSES_SET_ASIDE} is still there from an earlier run: put it back first.")
         if (SHOWN / "courses").exists():
             (SHOWN / "courses").rename(COURSES_SET_ASIDE)
         (self.folder / "courses").rename(SHOWN / "courses")
         self.rewrite(SHOWN / "courses", self.folder, SHOWN)
+        # Where these courses deploy while they are shown here (`Websites`
+        # for the kept folder, `School Web Space` for one made from
+        # folders.json): made for the scenes, and only what was not there
+        # already is taken away again on the way out.
+        self.made_here: list[Path] = []
+        for destination in publish_folders(SHOWN):
+            try:
+                top = SHOWN / destination.relative_to(SHOWN).parts[0]
+            except (ValueError, IndexError):
+                continue
+            if not top.exists() and top not in self.made_here:
+                self.made_here.append(top)
+            destination.mkdir(parents=True, exist_ok=True)
         print(f"   {self.folder.name}'s courses are at {SHOWN} for their pictures")
         return SHOWN
 
     def __exit__(self, *_) -> bool:
-        if not self.had_websites:
-            shutil.rmtree(SHOWN / "Websites", ignore_errors=True)
+        for top in self.made_here:
+            shutil.rmtree(top, ignore_errors=True)
         self.rewrite(SHOWN / "courses", SHOWN, self.folder)
         (SHOWN / "courses").rename(self.folder / "courses")
         if COURSES_SET_ASIDE.exists():
@@ -237,25 +277,60 @@ def demo_is_whole() -> bool:
     launcher = DEMO / "preview.ps1"
     if not launcher.exists() or launcher.stat().st_size < 2000:
         return False
-    for code in ("ENG2D", "MCV4U", "SCH3U"):
-        if not (DEMO / "courses" / code / "course_config.json").exists():
+    # Every course folders.json names, with exactly its sections: the
+    # provision scene leaves a course that is already there as it is, so a
+    # folder made when the demo had other sections would keep them forever.
+    for course in demo_folders.demo_courses():
+        config = demo_folders.read_config(DEMO / "courses" / course["code"])
+        if config is None or list(config.get("section_numbers") or []) != list(course["sections"]):
             return False
     return True
 
 
+def give_marketing_courses_their_destinations(report) -> None:
+    """folders.json's `publishTo` for a marketing course with no folder
+    destination yet; a course already pointed at a folder keeps it (the kept
+    folder's ICS3U deploys to `Websites`, its ICS4U to `Websites\\ICS4U`).
+    `marketing_folder.publish_to_folder` would leave those alone too, but it
+    makes folders.json's folder first, which would put an empty
+    `School Web Space` inside the kept folder on every run."""
+    import marketing_folder
+    for course in demo_folders.marketing_courses():
+        course_dir = MARKETING / "courses" / course["code"]
+        config = demo_folders.read_config(course_dir)
+        if config is None:
+            continue
+        if config.get("deploy_target") == marketing_folder.FOLDER_DESTINATION and config.get("deploy_folder_path"):
+            report.skip(f"{course['code']} publishes to {config['deploy_folder_path']}; left as it is")
+            continue
+        marketing_folder.publish_to_folder(course_dir, MARKETING / course["publishTo"], report)
+
+
 def ensure_folders(exe: Path, folders: set[Path]) -> None:
-    if DEMO in folders and not demo_is_whole():
-        shutil.rmtree(DEMO, ignore_errors=True)
-        provision(exe, DEMO, DEMO_COURSES)
+    from datetime import date
+    if DEMO in folders:
+        if not demo_is_whole():
+            shutil.rmtree(DEMO, ignore_errors=True)
+            provision(exe, DEMO, demo_folders.provision_courses_argument(demo_folders.demo_courses()))
+        # The demo STATE: colours, the teacher's name, site markers and the
+        # front pages, through plantoir-mcp.exe. A folder in the wrong state
+        # is never photographed.
+        import capture_windows
+        if capture_windows.provision_demo(DEMO, exe) != 0:
+            raise SystemExit(f"{DEMO} does not match marketing/folders.json yet (see 'still to do' above)")
     if MARKETING in folders:
-        provision(exe, MARKETING, MARKETING_COURSES, MARKETING_REFERENCE)
-        # Where ICS3U and ICS4U deploy (their folder destination): a sheet
-        # that offers to deploy there refuses while it does not exist, and the
-        # first schedule-sheet picture showed exactly that warning.
-        (MARKETING / "Websites" / "ICS4U").mkdir(parents=True, exist_ok=True)
+        provision(exe, MARKETING, demo_folders.provision_courses_argument(demo_folders.marketing_courses()),
+                  demo_folders.reference_copy_argument(MARKETING, date.today()))
         import marketing_folder
         report = marketing_folder.Report()
+        give_marketing_courses_their_destinations(report)
+        # Where each course deploys: a sheet that offers to deploy to a folder
+        # that does not exist warns about it instead, and the first
+        # schedule-sheet picture showed exactly that warning.
+        for destination in publish_folders(MARKETING):
+            destination.mkdir(parents=True, exist_ok=True)
         marketing_folder.add_how_i_teach(MARKETING / "courses" / marketing_folder.CURRICULUM_COURSE, report)
+        print(f"   {marketing_folder.summary(report)}")
 
 
 def bring_forward(hwnd: int) -> None:
@@ -285,9 +360,12 @@ def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Pat
     scene, _ = SCENES[identifier]
     folder = SHOWN
     if scene == "schedule-sheet":
-        # Where ICS3U deploys while it is shown here: a sheet that offers to
-        # deploy to a folder that does not exist says so instead.
-        (SHOWN / "Websites" / "ICS4U").mkdir(parents=True, exist_ok=True)
+        # Where the courses deploy while they are shown here (each course's
+        # own destination, made by ShownAsTeaching; again here in case a
+        # scene before this one took it away): a sheet that offers to deploy
+        # to a folder that does not exist says so instead.
+        for destination in publish_folders(SHOWN):
+            destination.mkdir(parents=True, exist_ok=True)
     if scene == "progress":
         # The progress picture is a build caught part-way, and the build is
         # then ended; a scaffold ended part-way refuses the next build ("the
@@ -514,7 +592,8 @@ def capture_notification(exe: Path, theme: str, parts: Path) -> Path:
     schedule is cancelled afterwards whatever happened (cancel_scheduled_deploy
     is safe when nothing is set)."""
     from datetime import datetime, timedelta
-    (MARKETING / "Websites").mkdir(exist_ok=True)
+    for destination in publish_folders(MARKETING):
+        destination.mkdir(parents=True, exist_ok=True)
     when = (datetime.now() + timedelta(minutes=3)).replace(second=0, microsecond=0)
     before = set(notification_windows())
     reply = ask_over_mcp(exe, "schedule_deploy", {"course": "ICS3U", "section": 1, "when": when.strftime("%Y-%m-%d %H:%M")})
