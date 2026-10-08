@@ -384,12 +384,13 @@ from scratch, usually badly, and usually after shipping the same bug once.
 
 So a macOS change is not finished until BOTH of these are true:
 
-1. **`GUI-IMPROVEMENTS.md` has an entry, and its "Notes for Windows port"
-   column actually says something.** That column is not optional. Every one
-   of the entries so far has one. Useful notes say what Windows must do
+1. **The `windows` issue says what Windows must do, and the closing comment
+   on the issue says what landed.** Useful notes say what Windows must do
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
-   fine note when true; an empty cell never is.
+   fine note when true; an empty one never is. (`GUI-IMPROVEMENTS.md` carried
+   this as a "Notes for Windows port" column until it closed to new entries on
+   2026-10-08, #480 — do not add a row.)
 2. **Anything architectural also gets a section in the `documentation/` page
    that owns its subject.** A
    log row records a decision; the deep dive explains it well enough to

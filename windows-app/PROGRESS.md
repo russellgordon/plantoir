@@ -575,7 +575,8 @@ read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
 
 Tracked in one place only: the **Windows status** section of
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md) (264 rows as of 2026-08-18,
-entries 1–264 assessed). Nothing here duplicates it, because a second copy is
+entries 1–264 assessed — and frozen with the log, which closed to new entries
+on 2026-10-08, #480; what shipped since is the closed issues by milestone). Nothing here duplicates it, because a second copy is
 a copy that goes stale — that count itself had been reading "179 rows" for
 days after the log passed 250.
 

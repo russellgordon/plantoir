@@ -66,10 +66,14 @@ Neither app contains toolchain logic of its own: they write the same
    the Swift or watch it being tested, so a change that exists only in Swift is
    one they will re-derive from scratch — usually after shipping the same bug
    once. A change is not finished until:
-   - **`GUI-IMPROVEMENTS.md` has an entry whose "Notes for Windows port" column
-     says something usable** — what to do differently, what is inherited
-     unchanged, or the trap that would pass review. "Shared Python, nothing to
-     mirror" is fine when true; an empty cell never is.
+   - **the closing comment on the issue says what landed, what was
+     measured, and which model did which review.** It is the record of the
+     piece: the `windows` issue below carries what Windows must do, and the
+     `documentation/` section carries why. (Until 2026-10-08 this bullet
+     asked for a `GUI-IMPROVEMENTS.md` row with a usable "Notes for Windows
+     port" cell; the log is closed to new entries since then — #480 — because
+     a row restated the closing comment and the section, and its numbering
+     conflicted on every merge that landed two pieces.)
    - **anything architectural also has a section in the
      [`documentation/`](documentation/README.md) page that owns its subject** —
      the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
@@ -129,8 +133,10 @@ Neither app contains toolchain logic of its own: they write the same
      `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
-   - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
-     the log stays the record of the product rather than of one platform.
+   - **The closed issues, filtered by milestone, are the record of the
+     product** — of what a teacher can see on either platform in a release.
+     (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
+     anything a teacher can see; the log is closed to new entries, #480.)
    - **anything measured is written with its NUMBERS and the hardware they
      came from.** The mac side cannot find out what a Windows teacher's
      machine does; "the Vulkan build was faster" is not usable, "43 tok/s
@@ -474,7 +480,8 @@ Neither app contains toolchain logic of its own: they write the same
       on the default — the default subagent model is configured outside this
       repository, so a session that omits it cannot tell what it got. Say
       which model did which review in the write-up, the way row 480 of
-      `GUI-IMPROVEMENTS.md` does.
+      `GUI-IMPROVEMENTS.md` does — in the closing comment on the issue since
+      2026-10-08, when the log was closed to new entries (#480).
 
       *(Superseded, kept because a session may meet its consequences. On
       2026-09-09 the order was FABLE for every subagent review, restoring the
@@ -967,7 +974,7 @@ it rather than restating it:
 | What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, **when quitting asks the teacher first (and when it must never ask)**, **when the app may install a new version of itself, and what a quit does to one that is ready (#204)**, and **when the links checklist is offered, what it says, and what Publish writes from it (#379)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
-| WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
+| WHAT changed, WHEN, and what it cost | The closed [GitHub issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aissue+is%3Aclosed), filtered by milestone — the milestone is the release, and the closing comment says what landed, what was measured and which model did which review. Before 2026-10-08, [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), a dated log now **closed to new entries** (#480) and kept as append-only history: a row records what was true that day, is not edited when the behaviour changes again, and is never quoted as the current wording. |
 | How does the whole feature work? | [`documentation/10-local-ai-assistant.md`](documentation/10-local-ai-assistant.md). |
 | What did we MEASURE? | [`research/`](research/README.md) — routing accuracy, model tiers, preview staleness. Never asserted in a test; each file states its own conditions. |
 | Which rules override default behaviour? | This file. |
@@ -1000,9 +1007,10 @@ work already shipped on the Windows port are archived in
 
 The reason they went: each had become three things at once — a to-do list, a
 changelog, and a manual — and only the third was worth keeping. The to-do list
-is now GitHub issues, the changelog is `GUI-IMPROVEMENTS.md`, and the manual is
-`documentation/`, where somebody looking up how a thing works will actually
-find it. **Do not recreate them.** A change written for the other platform goes
+is now GitHub issues, the changelog is the closed issues by milestone (it was
+`GUI-IMPROVEMENTS.md` until that log closed on 2026-10-08, #480), and the
+manual is `documentation/`, where somebody looking up how a thing works will
+actually find it. **Do not recreate them.** A change written for the other platform goes
 in the documentation page that owns its subject, and the issue points at it.
 
 (The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
@@ -1031,8 +1039,10 @@ agreed. What follows is the same reading order, in short:
    assistant's behaviour is tested rather than eyeballed. **Do not retype the
    sentences or the scenarios into your test files** — deserialise them.
 5. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
-   what changed recently and why. Read it as history; where a row and the
-   contract disagree, the contract is what is true now.
+   what changed up to 2026-10-08 and why; it is closed to new entries since
+   then (#480), and the closed issues by milestone carry what changed after.
+   Read it as history; where a row and the contract disagree, the contract is
+   what is true now.
 6. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
@@ -1046,7 +1056,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | Read this | When |
 |---|---|
 | [`documentation/`](documentation/README.md) | How the toolchain works AND why, numbered 01–13: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy, Windows app, and the Windows-port archive. Since 2026-09-08 this is also where the reasoning behind a decision lives — what was chosen, what was rejected, what was measured. |
-| [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
+| [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change up to 2026-10-08, rows 1 to 748 — **closed to new entries** since then (#480; the closing comment on the issue and the `documentation/` section carry what a row did). Read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |
