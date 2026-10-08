@@ -770,9 +770,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             }
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
-            return plan.ChangesNothing
+            var answer = plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
                 : Proposing(plan.Describe(), plan.Describe(noun));
+            // #440: where a PLAIN next class lands, for the window's settler
+            // S3 — only when this WAS the plain plan (no unit, no days), so a
+            // card's plan never carries a reading of some other request.
+            if (string.IsNullOrWhiteSpace(unit) && days <= 0 &&
+                workspace.NextClassReading(course, section) is { } reading)
+            {
+                answer.Meta ??= new JsonObject();
+                answer.Meta[AssistToolAnswer.NextClassKey] = reading.ToJson();
+            }
+            return answer;
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]

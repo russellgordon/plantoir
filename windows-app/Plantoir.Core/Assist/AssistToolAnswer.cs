@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -72,6 +74,40 @@ public sealed record AssistToolAnswer(string Summary, string Detail, bool IsPlan
     /// </summary>
     public const string NoPageFoundKey = "plantoir.app/noPageFound";
 
+    /// <summary>
+    /// The <c>_meta</c> key carrying where a PLAIN "add the next class" would
+    /// land (#440): its unit and day, the course's unit word, whether it is
+    /// numbered, and its noun — <see cref="AssistNextClassReading.ToJson"/>.
+    /// Sent by <c>plan_add_next_class</c> only when it was asked with course
+    /// and section alone and could plan; a refusal (no dates, course gone)
+    /// carries none. Settler S3 reads it to judge a model's add_next_class
+    /// against the teacher's sentence, so the window never parses a sentence
+    /// written for the model, and no second planner exists in the window.
+    /// </summary>
+    public const string NextClassKey = "plantoir.app/nextClass";
+
+    /// <summary>What <see cref="NextClassKey"/> carried, or null. See there.</summary>
+    public AssistNextClassReading? NextClass { get; init; }
+
     /// <summary>The same words to both, which is most tools.</summary>
     public static AssistToolAnswer Same(string both) => new(both, both);
+
+    /// <summary>
+    /// An answer from what an MCP result carries: its text (the
+    /// <paramref name="detail"/>) and its <c>_meta</c>. ONE reader of every
+    /// key above, shared by the window's <c>McpClient</c> and the tests'
+    /// in-process servers, so a key added here cannot be read by one and
+    /// missed by the other (stack-2 plan review, M1).
+    /// </summary>
+    public static AssistToolAnswer FromResult(string detail, JsonNode? meta)
+    {
+        bool isPlan = meta?[IsPlanKey]?.GetValue<bool>() == true;
+        string? summary = meta?[TeacherSummaryKey]?.GetValue<string>();
+        string? backup = meta?[ConversationBackupKey]?.GetValue<string>();
+        bool noPage = meta?[NoPageFoundKey]?.GetValue<bool>() == true;
+        var nextClass = AssistNextClassReading.FromJson(meta?[NextClassKey]);
+        return string.IsNullOrWhiteSpace(summary)
+            ? Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage, NextClass = nextClass }
+            : new AssistToolAnswer(summary, detail, isPlan, backup, noPage) { NextClass = nextClass };
+    }
 }

@@ -1,0 +1,69 @@
+#440 (Windows half) - add_next_class's `unit` and `days` leave the local model's view
+PRE-REGISTRATION. Written and committed BEFORE the first request of this run
+(Windows, v1.4.4, branch issue/440-468-assistant, 2026-10-08).
+
+WHAT CHANGED THAT THE MODEL CAN SEE
+  AssistAgent.CardOnlyArguments gains add_next_class.unit, add_next_class.days,
+  plan_add_next_class.unit, plan_add_next_class.days (mirrored in
+  research/ai-assist/narrow-tools.py -> CARD_ONLY_ARGUMENTS; NarrowToolsMirrorTests
+  pins the two). So the local add_next_class shows ONLY course and section, the
+  mac's shape. plan_add_next_class is not a local tool; its pair is mirror-only.
+  The SERVER (plantoir-mcp tools/list) is unchanged: the binder needs unit and
+  days declared for the cards. So ONE raw dump serves both arms, and every
+  difference between them comes from the narrowing, or from chance.
+  Not visible to the model, and not what this measures: settler S2 widened
+  (unit and days dropped from every model add_next_class), the new frames, and
+  settler S3 (a pointed sentence never reaches a write). Those are pinned by
+  the unit suite (NextClassUnitsTests, the scenarios), not here.
+
+CONDITIONS (as #424)
+  Intel Core i5-8365U (4C/8T), 16 GB, Intel UHD 620, Windows 11 Pro 26200.
+  llama-server from windows-app\Vendor\llama (b10435, Vulkan):
+    --model %LOCALAPPDATA%\Plantoir\models\qwen2.5-1.5b-instruct-q4_k_m.gguf
+    --port 8099 --host 127.0.0.1 --ctx-size 8192 --threads 4 --reasoning off
+    --reasoning-budget 0 --jinja --parallel 1 --n-gpu-layers 999
+  (the SMALLER assistant; #424's flags). One fresh server for all six runs,
+  stopped afterwards. 10 greedy trials. Nothing else heavy runs beside it
+  (a sibling worktree may be running dotnet tests: noted if it was).
+
+  THE LARGER ASSISTANT IS NOT MEASURED. Its weights (qwen3-4b-q4_k_m.gguf) are
+  not on this PC, and CardOnlyArguments is tier-blind, so the larger tier
+  ships this change UNMEASURED on Windows. (The mac measured both of its
+  tiers for #440: research/ai-assist/next-class-unit-440-results.txt.)
+
+ARMS
+  BEFORE  narrow-tools.py as on origin/dev (unit and days VISIBLE).
+  AFTER   narrow-tools.py on this branch (unit and days HIDDEN).
+  Sanity, before any request: AFTER's add_next_class shows only course and
+  section; BEFORE's shows unit and days as well.
+
+SUITES (each arm)
+  S1  trimmed-surface-suite.py <arm>.json 10 --date-appended --real-course
+      --course EXC2O --prompt shipped --app-body --writing-limit-ms=30000
+  S2  teachers-say-suite.py 8099 10 <arm>-EXC2O.json --writing-limit-ms=30000
+      (prints add_next_class's arguments IN FULL and counts unit "next")
+  S3  S1 with --course ICS3U.
+  `--prompt shipped` reads the MAC's AssistAgent.swift system prompt
+  (trimmed-surface-suite.py), which is not Windows' request either: #424's
+  precedent, kept so the numbers compare with #420/#424's.
+
+PASS RULE (all must hold)
+  (a) S2's count of unit "next" on add_next_class goes from what BEFORE shows
+      (#424 found 50/50) to 0/50 AFTER. NEAR-AUTOMATIC: a model can hardly
+      send an argument it is not shown. A pass is NOT to be read as (a).
+  (b) VETO: ZERO polarity inversions (a hide routed to a publishing tool, or a
+      publish to a hiding one), in every suite of both arms.
+  (c) No probe drops AFTER against BEFORE: per probe, every suite, AFTER's
+      hits >= BEFORE's hits.
+  (b) and (c) are the real tests: hiding two arguments shortens the prompt
+  and changes the add_next_class schema the router sees, which can move
+  OTHER probes (#411 on the mac: "HIDE - the inversion case" 10 -> 0 when the
+  arguments were ADDED).
+  Recorded, deciding nothing: whether the model still emits a unit or days
+  key it was not shown (S2 prints arguments in full; S2-the-settler strips
+  them anyway), and per-trial wall time.
+
+SAID IN ADVANCE
+  Any failed rule is reported as it is, with the probe and the suite named, on
+  #440 for Russell before the merge; nothing here is re-run to look for a
+  better number. A failed (b) is a veto.

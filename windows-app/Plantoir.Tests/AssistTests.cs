@@ -1086,7 +1086,8 @@ public class AssistWorkspaceTests : IDisposable
         {
             WriteAssistLease("ICS3U", child.Id, child.ProcessName);
 
-            Assert.Equal("Available once you finish revising with Claude",
+            // An outside session (#468): the contract's sentence, both doors named.
+            Assert.Equal(ContractLoader.LoadJson("assist-wording.json")["wording"]!["availableOnceYouFinishRevisingWithClaude"]!.ToString(),
                 Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "ICS3U"));
             Assert.Null(Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "SNC1W"));
             Assert.Null(Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "EXC2O"));

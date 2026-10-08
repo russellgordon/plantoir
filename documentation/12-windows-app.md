@@ -2670,6 +2670,20 @@ a sentence in the description telling the model not to use it — is the thing
 CLAUDE.md warns about: one clarifying sentence in `publish_pages`' description
 once took a probe suite from 110/110 to 90/110.
 
+**Since #440 (v1.4.4) `unit` and `days` are card-only too**, on `add_next_class`
+and `plan_add_next_class` alike: the router had been shown them since the tool
+shipped and sent `unit: "next"` — START A NEW UNIT — on 50 of 50 plain "add the
+next class" calls (v1.4.3 bundle A, i5-8365U / UHD 620). The server still
+DECLARES both, for the same reason it declares `duplicate`: the binder drops an
+undeclared key, and the cards ("Start a new unit", "Add three days to Unit 2")
+send them. What the router may not send it also may not keep — settler S2
+strips `unit` and `days` from every `add_next_class` the MODEL sends
+(`AssistAgent.WithoutCardOnlyArguments`), and settler S3 points a sentence
+about units or counts at the phrasings that do it (doc 10, "#440"). The local
+`add_next_class` now shows course and section only, the mac's shape (the narrowed `add_next_class` equals the contract's local shape exactly; the departures already recorded on four other local tools (`preview` on `publish_class_on`, `publish_pages` and `unpublish_pages`; `scope` and `revise` on `read_remembered_timetable`) stand, so this is a claim about this tool, not the whole surface);
+`NextClassUnitsTests.TheLocalModelSeesOnlyCourseAndSection` narrows the REAL
+served schema and compares it with the contract's.
+
 **The general lesson**: a silent drop is invisible to any test that does not go
 looking, and "the tool ran and returned something sensible" is exactly what it
 looks like.
