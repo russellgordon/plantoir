@@ -5,6 +5,30 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.4.4</title>
+      <description>New in Plantoir 1.4.4
+
+Plantoir now says "deploy" for putting your website online and "publish" only for marking a page to be included. The words are kept apart everywhere you read them: in the app, in what the assistant says, in the starter pages a new course comes with, and on plantoir.app.
+
+Type "schedule a deploy for tomorrow at 6:30 am" to the assistant and it sets that up for you to agree to; "schedule a deploy" with no time asks you for one and never deploys right away; "cancel that scheduled deploy" or the shelf's "Cancel scheduled deploy" cancels it.
+
+"Start a new unit with the next class" and "Add three more days to Unit 2" are answered by the assistant exactly as you say them. A request it cannot be sure about is pointed at the wording that does it, rather than adding a page you did not ask for.
+
+A Claude or Codex session opened from Plantoir keeps hold of the course it was opened from, the way the built-in assistant does: its backup is kept, a second session on the same course is refused, and renaming or restoring the course waits until the session ends.
+
+A deploy no longer starts while that section is still being deployed, including by a deploy that was set for later: it tells you to try again when that has finished. A scheduled deploy's notification now reads "deployed on its own to ...", and says that your website has the new pages. Dismissing that notice in Plantoir also takes it out of Windows' notification centre.
+
+The title bar follows your Windows light or dark setting.
+
+An update marked important offers Install and Reopen only, and is offered even if you had skipped that version. An update offer that could not be shown, because Plantoir was still starting or another dialog was in front, is no longer counted as you saying "not now"; it is offered again a little later.
+
+The About window says "Grow a class website."</description>
+      <pubDate>Thu, 08 Oct 2026 05:22:05 -04:00</pubDate>
+      <sparkle:version>1.4.4</sparkle:version>
+      <sparkle:shortVersionString>1.4.4</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.4/PlantoirSetup.exe" sparkle:version="1.4.4" sparkle:shortVersionString="1.4.4" length="237432904" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="J8U/Fc+G7B2F6OhhNdTpakTKsF5/onxA33Ee2Q09TD0oo2WxZFXHG06uEEZeQavw6RoR7qLC0sZH/OL309QHBA==" />
+    </item>
+    <item>
       <title>Plantoir 1.4.3</title>
       <description>New in Plantoir 1.4.3
 
@@ -30,7 +54,7 @@ From this version on, when Plantoir offers an update it shows what is new in eve
       <pubDate>Wed, 07 Oct 2026 18:23:35 -04:00</pubDate>
       <sparkle:version>1.4.3</sparkle:version>
       <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.3/PlantoirSetup.exe" sparkle:version="1.4.3" sparkle:shortVersionString="1.4.3" length="237396952" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="2a1daOj8JuEh37kYHFTD2wPFGbptxGVwX+kccf0lCgnRdqmIM01feHdQN0StInTdPPcit9QLVWc5NS4u5OreCA==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.3/PlantoirSetup.exe" sparkle:version="1.4.3" sparkle:shortVersionString="1.4.3" length="237396952" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="2a1daOj8JuEh37kYHFTD2wPFGbptxGVwX+kccf0lCgnRdqmIM01feHdQN0StInTdPPcit9QLVWc5NS4u5OreCA==" />
     </item>
     <item>
       <title>Plantoir 1.4.2</title>
