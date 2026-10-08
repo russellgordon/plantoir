@@ -2020,8 +2020,15 @@ say `deployRefusedWhileALaterDeployWorks` or
 leg that ran was refused this way, and instead of "could not be built" when the
 build leg was (a refused `--build-only` run exits 1 like a broken build, so
 `MultiDestinationDeployRunner.answerWhenTheBuildDidNotFinish` asks for the
-refusal first, for both assistants). The launcher writes its own trail line,
-under "build declined, course busy elsewhere".
+refusal first, for both assistants). An outside assistant's
+`rebuild_preview`, and the rebuild after its `publish_pages` /
+`unpublish_pages`, run the same `--build-only` leg; there the answer says what
+was already done and then the launcher's own build line, lifted as the window
+lifts it, and never "the output is in that section's window"
+(`deployWhileItsSectionDeploys.refusedBuildAnswers`, #471). Windows does this
+since 2026-10-08; the mac still answers those paths with `previewDidNotBuild`
+or "couldn't be built" and has #471 to match. The launcher writes its own
+trail line, under "build declined, course busy elsewhere".
 
 **Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
 script's process id (misses Terminal, leaves a gap, touches a shared format);
