@@ -374,7 +374,8 @@ public class AssistSurfaceContractTests
     /// incompatibility and nothing should assert one from it.</para>
     ///
     /// <para><b>This list is now EXERCISED, and was not when it was written.</b>
-    /// All five entries below belong to MCP-only tools, and
+    /// All five entries below belong to MCP-only tools (three of them said
+    /// commas until issue #469 moved them to semicolons on 2026-10-08), and
     /// <c>EveryToolTheContractsMcpSurfaceNamesIsServedTheSameWayHere</c> used
     /// to stop at an earlier assertion and never reach them: it had been red
     /// on <c>dev</c> since before this was written, behind THREE stacked
@@ -390,10 +391,14 @@ public class AssistSurfaceContractTests
     /// </remarks>
     private static readonly Dictionary<string, string> SeparatorHere = new(StringComparer.Ordinal)
     {
-        // "separated by commas", and Split(',') in the runner.
-        ["remember_timetable.dates"] = ",",
-        ["plan_remember_timetable.dates"] = ",",
-        ["plan_scheduled_deploy.classes"] = ",",
+        // "separated by semicolons" since #469 (2026-10-08). The classes
+        // runner splits on ';' and line breaks only (PlantoirTools.ClassTitles);
+        // the dates runners stay forgiving and also take commas and spaces.
+        ["remember_timetable.dates"] = ";",
+        ["plan_remember_timetable.dates"] = ";",
+        ["plan_scheduled_deploy.classes"] = ";",
+        // "separated by commas", and Split(',') in the runner — as the
+        // contract says too: an expectation code holds no comma.
         ["add_curriculum_mentions.codes"] = ",",
         ["plan_curriculum_mentions.codes"] = ",",
     };
@@ -407,30 +412,37 @@ public class AssistSurfaceContractTests
     /// separator difference is a routing difference nobody chose, and a
     /// resolved one left listed makes this a record of what once differed.</para>
     ///
-    /// <para><b>Why the two that differ, differ.</b> The mac advertises
-    /// semicolons for anything that can carry a page or class TITLE, because
-    /// "Unit 2, Day 3" is the name nearly every class page in these courses
-    /// has and a comma-separated list would cut it in half. That reasoning
-    /// applies to <c>plan_scheduled_deploy.classes</c> here too and this side
-    /// says commas — worth revisiting, and NOT a fix to make silently, since
-    /// changing what a schema advertises is a routing change and the routing
-    /// suites are hand-run. <c>dates</c> are YYYY-MM-DD and can hold no comma,
-    /// so that one is cosmetic.</para>
+    /// <para><b>Empty since 2026-10-08, and meant to stay that way.</b> Three
+    /// differences were agreed here until then — <c>plan_scheduled_deploy.classes</c>
+    /// and the two <c>dates</c> — with this side advertising commas where the
+    /// mac advertises semicolons. The mac uses semicolons for anything that
+    /// can carry a page or class TITLE, because "Unit 2, Day 3" is the name
+    /// nearly every class page in these courses has and a comma-separated list
+    /// cuts it in half; that reasoning applied to <c>classes</c> here too, and
+    /// an outside assistant passing "Unit 2, Day 3; Unit 2, Day 4" had four
+    /// titles checked, none of which exists. Issue #469 closed all three:
+    /// the descriptions now carry the contract's text and the classes runner
+    /// splits on semicolons and line breaks. The departure had been recorded
+    /// as "NOT a fix to make silently, since changing what a schema advertises
+    /// is a routing change"; it was safe to make because all three are
+    /// MCP-only tools that <c>AssistAgent.ForTheLocalModel</c> never shows the
+    /// on-device model, so no local routing run is owed. The dates were
+    /// cosmetic (YYYY-MM-DD holds no comma) and their runners still accept
+    /// commas and spaces, so a client that learned the old wording is not
+    /// broken. <c>classes</c> stays a STRING rather than becoming a JSON array:
+    /// an array would be a type departure from the contract, which is a bigger
+    /// difference than the one being closed.</para>
     /// </remarks>
     private static void AssertOnlyTheSeparatorDifferencesWeHaveAgreed(
         List<string> found, HashSet<string> onThisSurface)
     {
-        // Scoped to the surface, exactly as the type departures are. All
-        // three of these are MCP-only tools, so on the LOCAL surface they
-        // produce no entries at all — and an unscoped list would then fail
-        // saying three differences had been resolved, which is the same
-        // mistake in the same shape as the third outcome #83 first left out.
-        var agreed = new[]
-        {
-            "remember_timetable.dates (there ;, here ,)",
-            "plan_remember_timetable.dates (there ;, here ,)",
-            "plan_scheduled_deploy.classes (there ;, here ,)",
-        }.Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
+        // Scoped to the surface, exactly as the type departures are: an entry
+        // added here for an MCP-only tool produces nothing on the LOCAL
+        // surface, and an unscoped list would then fail saying the difference
+        // had been resolved, which is the same mistake in the same shape as
+        // the third outcome #83 first left out. Empty since #469 (see above).
+        var agreed = Array.Empty<string>()
+            .Where(d => onThisSurface.Contains(d[..d.IndexOf('.')])).ToArray();
 
         var unexpected = found.Except(agreed).OrderBy(d => d, StringComparer.Ordinal).ToList();
         Assert.True(unexpected.Count == 0,
