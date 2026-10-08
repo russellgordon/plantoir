@@ -182,6 +182,12 @@ enum AssistMCPServer {
             }
             Task { @MainActor in
                 await AssistMCPServer.stopOwnWorkBeforeLeaving()
+                // Never leave in the middle of the folder's tools copy
+                // (#476): a client that closes its input within seconds of
+                // starting the server would otherwise kill the detached copy
+                // part-way and leave `.toolchain/` half old and half new —
+                // the same reason the app's quit waits.
+                await ToolchainReadiness.shared.waitForAllCopies()
                 exit(0)
             }
         }

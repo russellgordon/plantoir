@@ -6445,7 +6445,9 @@ folder ready after an update (#473)"), with the mac's differences named:**
   sends a preview straight away is never refused for a copy the server
   itself started (finding 2). In that process a copy that FAILED is tried
   again at the next build rather than refused for ever with a sentence
-  naming a File menu it has not got. **Not done on purpose:** a cross-process marker.
+  naming a File menu it has not got. And, like the quit, the server never
+  leaves mid-copy: at the end of its input it waits for a running copy
+  before exiting (the fixes review's finding 1). **Not done on purpose:** a cross-process marker.
   Windows wrote `toolchain-copying.<pid>` so one process could see another's
   copy; the mac does not, because every file is written atomically from the
   same bundle, so two copies at once write the same bytes and the worse
@@ -6622,9 +6624,14 @@ the mouse-down that places the caret.
 **The accepted trade.** Text long enough to reach the chevron runs under it
 — a course code may be 12 characters ("AP CALC AB"), and the Copy a Page
 search is free text. The drawn chrome kept a 34pt trailing inset for this;
-`.roundedBorder` offers no way to inset its text. Measured in the real app
-(the closing comment on #456) and accepted, because the alternative is a
-third bezel.
+`.roundedBorder` offers no way to inset its text. Accepted, because the
+alternative is a third bezel; a code that long is rare and still readable
+by scrolling the field. The searchable picker's old tap workaround went
+with the chrome on the strength of AppKit's own hit-testing for a bordered
+field, not a measurement — the UI tests that drive the wizard
+(`testCourseCodeRevealButtonOpensThePopup`,
+`testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel`) are what
+was run through the real interface for this piece.
 
 **Tests.** `TextFieldStyleScanTests` has no chrome allow-list any more: every
 `TextField` wears `.borderedTextField()` or is one of the three remaining

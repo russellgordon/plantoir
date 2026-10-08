@@ -140,40 +140,31 @@ struct SearchablePickerField: View {
                 return onCommitHighlight() ? .handled : .ignored
             }
             // The ONE bezel every field wears (#374), since #456 — the
-            // 24pt drawn imitation is gone. A real bordered field takes a
-            // click anywhere in its bezel, so the tap workaround the drawn
-            // one needed (a `.plain` field hit-tests only its text) goes
-            // with it; checked by driving the real app, #456.
+            // 24pt drawn imitation is gone. A real bordered `NSTextField`
+            // takes a click anywhere in its bezel (AppKit's own hit-testing,
+            // the same as Course name's field), so the tap workaround the
+            // drawn one needed — a `.plain` field hit-tests only its text,
+            // and an EMPTY one a caret's width of it — goes with it; kept, it
+            // would have risked swallowing the mouse-down that places the
+            // caret (#456's plan review).
             .borderedTextField()
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity)
             // The cue a Mac user already knows: a trailing chevron reads as
             // "there is a menu behind this field", the way a combo box always
             // shows one. It is a second way in, not a different control.
+            // A real AppKit button (`RevealChevronButton`): the real bezel's
+            // `NSTextField` takes a click meant for a SwiftUI overlay (#456).
             .overlay(alignment: .trailing) {
-                Button {
+                RevealChevronButton(
+                    accessibilityIdentifier: "\(fieldIdentifier)-reveal",
+                    accessibilityLabel: "Browse the whole list"
+                ) {
+                    isFocused = true
                     hasFocus = true
                     onRevealRequested()
-                } label: {
-                    RoundedRectangle(cornerRadius: CourseCodePickerView.revealButtonCornerRadius)
-                        .fill(CourseCodePickerView.revealButtonFillColor)
-                        .overlay(
-                            Image(systemName: "chevron.down")
-                                .font(.system(
-                                    size: CourseCodePickerView.revealButtonGlyphSize,
-                                    weight: .semibold
-                                ))
-                                .foregroundStyle(.primary)
-                        )
-                        .frame(
-                            width: CourseCodePickerView.revealButtonWidth,
-                            height: CourseCodePickerView.revealButtonHeight
-                        )
                 }
-                .buttonStyle(.plain)
                 .padding(.trailing, CourseCodePickerView.revealButtonTrailingInset)
-                .accessibilityIdentifier("\(fieldIdentifier)-reveal")
-                .accessibilityLabel("Browse the whole list")
             }
             .onChange(of: hasFocus) {
                 isFocused = hasFocus

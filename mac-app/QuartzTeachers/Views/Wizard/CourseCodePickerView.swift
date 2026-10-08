@@ -223,46 +223,25 @@ struct CourseCodePickerView: View {
             // illustration). Tapping it opens the popup and puts the
             // cursor in the field, same as clicking the field itself
             // would — it's a second way in, not a different control.
+            // A real AppKit button (`RevealChevronButton`): the real bezel's
+            // `NSTextField` takes a click meant for a SwiftUI overlay (#456).
+            // Untinted, the way a real combo box's button is — see
+            // `revealButtonFillColor`; the history of the tint and the glyph
+            // colour is on those constants.
             .overlay(alignment: .trailing) {
-                Button {
+                RevealChevronButton(
+                    accessibilityIdentifier: "courseCodeRevealButton",
+                    accessibilityLabel: "Browse course codes"
+                ) {
+                    // The wizard's own focus flag as well as the field's:
+                    // the popup follows the former, and a focus write from
+                    // an AppKit button's action is not always mirrored into
+                    // `@FocusState` in the same turn (#456).
+                    isFocused = true
                     codeFieldHasFocus = true
                     onRevealRequested()
-                } label: {
-                    RoundedRectangle(cornerRadius: CourseCodePickerView.revealButtonCornerRadius)
-                        // Filled with the accent colour specifically so
-                        // there's always strong contrast against the
-                        // field's own background, in both light and
-                        // dark appearance — Russell's explicit
-                        // requirement, and the one thing missing from
-                        // the very first attempt at this same day.
-                        // Untinted, the way a real combo box's button
-                        // is — see `revealButtonFillColor`. This was
-                        // `Color.accentColor` for a day, which is what
-                        // made ours read as a blue pill beside the
-                        // native control's near-invisible one.
-                        .fill(CourseCodePickerView.revealButtonFillColor)
-                        .overlay(
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: CourseCodePickerView.revealButtonGlyphSize, weight: .semibold))
-                                // Ordinary label colour. The old
-                                // accent-luminance calculation existed
-                                // only to keep a white-or-black glyph
-                                // legible on a TINTED pill; with no
-                                // tint there is nothing to compensate
-                                // for, and plain label colour is what
-                                // AppKit draws (measured at 222,222,222
-                                // in dark and 36,36,36 in light).
-                                .foregroundStyle(.primary)
-                        )
-                        .frame(
-                            width: CourseCodePickerView.revealButtonWidth,
-                            height: CourseCodePickerView.revealButtonHeight
-                        )
                 }
-                .buttonStyle(.plain)
                 .padding(.trailing, CourseCodePickerView.revealButtonTrailingInset)
-                .accessibilityIdentifier("courseCodeRevealButton")
-                .accessibilityLabel("Browse course codes")
             }
             .onChange(of: codeFieldHasFocus) {
                 isFocused = codeFieldHasFocus
