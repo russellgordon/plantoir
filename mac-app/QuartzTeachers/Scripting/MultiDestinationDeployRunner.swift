@@ -45,6 +45,11 @@ class MultiDestinationDeployRunner {
         /// one asked.
         var buildNeededAnAnswer: Bool = false
         var neededAnAnswer: Bool = false
+        /// Set when this leg's build or deploy was refused because the same
+        /// section was still being deployed (GitHub #439) — read from the
+        /// launcher's own line, so the assistants can say why rather than
+        /// "did not finish".
+        var refusedWhileItsSectionDeploys: FailureExplainer.SectionDeployRefusal?
     }
 
     // MARK: - Stored properties
@@ -90,7 +95,16 @@ class MultiDestinationDeployRunner {
         var succeeded: [CourseConfiguration.DeployDestination] = []
         var askedForAnAnswer: [CourseConfiguration.DeployDestination] = []
         var anySucceeded: Bool = false
+        var refusals: [FailureExplainer.SectionDeployRefusal] = []
+        var anyFailedOtherwise: Bool = false
         for leg in legs where leg.isFinished {
+            if !leg.succeeded {
+                if let refusal = leg.refusedWhileItsSectionDeploys {
+                    refusals.append(refusal)
+                } else {
+                    anyFailedOtherwise = true
+                }
+            }
             if leg.succeeded {
                 anySucceeded = true
                 succeeded.append(leg.destination)
@@ -101,11 +115,19 @@ class MultiDestinationDeployRunner {
                 askedForAnAnswer.append(leg.destination)
             }
         }
+        // Only when EVERY leg that ran was refused this way: a refusal comes
+        // before anything is changed, so a run with any other failure, or
+        // any success, is told the ordinary way.
+        var refusal: FailureExplainer.SectionDeployRefusal?
+        if !anySucceeded && !anyFailedOtherwise && !refusals.isEmpty {
+            refusal = refusals[0]
+        }
         return Outcome(
             anySucceeded: anySucceeded,
             failedDestinations: failed,
             succeededDestinations: succeeded,
-            destinationsThatNeededAnAnswer: askedForAnAnswer
+            destinationsThatNeededAnAnswer: askedForAnAnswer,
+            refusedWhileItsSectionDeploys: refusal
         )
     }
 
@@ -117,6 +139,9 @@ class MultiDestinationDeployRunner {
         /// allowed to ask (#378). Always empty for the window's Deploy,
         /// which is never `unattended`.
         var destinationsThatNeededAnAnswer: [CourseConfiguration.DeployDestination] = []
+        /// Set when every leg that ran was refused because the section was
+        /// still being deployed (GitHub #439).
+        var refusedWhileItsSectionDeploys: FailureExplainer.SectionDeployRefusal?
 
         var allSucceeded: Bool {
             return anySucceeded && failedDestinations.isEmpty
@@ -322,6 +347,9 @@ class MultiDestinationDeployRunner {
                     legs[index].isFinished = true
                     legs[index].buildFailed = true
                     legs[index].buildNeededAnAnswer = unattended && runner.lastExitCode == 3
+                    legs[index].refusedWhileItsSectionDeploys = FailureExplainer.sectionDeployRefusal(
+                        in: runner.transcript.recentText(maximumCharacters: 8000)
+                    )
                     break
                 }
                 // Still true here on the success path — cleared by the
@@ -351,6 +379,11 @@ class MultiDestinationDeployRunner {
             legs[index].isFinished = true
             legs[index].succeeded = deployed
             legs[index].neededAnAnswer = !deployed && unattended && runner.lastExitCode == 3
+            if !deployed {
+                legs[index].refusedWhileItsSectionDeploys = FailureExplainer.sectionDeployRefusal(
+                    in: runner.transcript.recentText(maximumCharacters: 8000)
+                )
+            }
             if runner.wasCancelled || runner.wasStoppedByUser {
                 wasCancelled = wasCancelled || runner.wasCancelled
                 wasStoppedByUser = wasStoppedByUser || runner.wasStoppedByUser
@@ -384,12 +417,12 @@ class MultiDestinationDeployRunner {
         // The failure branch is recorded too, and matters MORE than the
         // success: the marker is derived, so a section that stayed
         // "Edited" because the stamp could not be written looks exactly
-        // like one that was never published. Without this line the report
-        // "it still says Edited after I published" has nothing to read.
+        // like one that was never deployed. Without this line the report
+        // "it still says Edited after I deployed" has nothing to read.
         let destinationNames: String = MultiDestinationDeployRunner.joinedWithAnd(names)
-        var sentence: String = "marked this section\u{2019}s pages as published to " + destinationNames
+        var sentence: String = "recorded this section\u{2019}s pages as deployed to " + destinationNames
         if !recorded {
-            sentence = "published to " + destinationNames
+            sentence = "deployed to " + destinationNames
                 + ", but could not note it down — the window will still say Edited"
         }
         ActivityTrail.note(
@@ -436,6 +469,53 @@ class MultiDestinationDeployRunner {
         return result
     }
 
+    /// What an assistant says when the shared BUILD step did not finish, or
+    /// nil when it finished or was not needed. Both assistant paths — the
+    /// windowless one (`AssistSiteWork`) and the one with a section window
+    /// (`SectionDetailView.deployAndWait`) — ask this before `result(...)`,
+    /// because nothing was sent anywhere and "did not finish" would name the
+    /// upload.
+    ///
+    /// A build refused because the section was still being deployed (#439)
+    /// is said as ITSELF, not as "could not be built": a refused
+    /// `preview.sh --build-only` exits 1 like a broken build, and a stale
+    /// site — the usual state after a teacher edits and sets a deploy again —
+    /// always takes this path, so checking for the refusal only in
+    /// `result(...)` let the assistants name the wrong cause (#439 review,
+    /// finding 1).
+    static func answerWhenTheBuildDidNotFinish(course: String, section: String, firstLeg: Leg?) -> AssistSiteWorkResult? {
+        guard let firstLeg, firstLeg.buildFailed else {
+            return nil
+        }
+        if let refusal = firstLeg.refusedWhileItsSectionDeploys {
+            return MultiDestinationDeployRunner.refusalAnswer(course: course, section: section, refusal: refusal)
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.couldNotBuildBeforeDeploying(course: course, section: section)
+        )
+    }
+
+    /// The sentence for a deploy refused because its section was still being
+    /// deployed (#439): which one depends on whether a deploy set for later
+    /// is the one working.
+    static func refusalAnswer(
+        course: String,
+        section: String,
+        refusal: FailureExplainer.SectionDeployRefusal
+    ) -> AssistSiteWorkResult {
+        if refusal.byALaterDeploy {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.deployRefusedWhileALaterDeployWorks(course: course, section: section)
+            )
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.deployRefusedWhileItsSectionDeploys(course: course, section: section)
+        )
+    }
+
     /// The final `AssistSiteWorkResult` for a finished run — the single
     /// place that decides which sentence a teacher hears, whether that is
     /// the unchanged single-destination wording (`destinationCount <= 1`,
@@ -474,6 +554,12 @@ class MultiDestinationDeployRunner {
                 )
             }
             return AssistSiteWorkResult(succeeded: false, message: message)
+        }
+        // Refused because the section was still being deployed (#439): said
+        // as itself, for one destination or several, since nothing was
+        // changed anywhere.
+        if let refusal = outcome.refusedWhileItsSectionDeploys {
+            return MultiDestinationDeployRunner.refusalAnswer(course: course, section: section, refusal: refusal)
         }
         if destinationCount <= 1 {
             if outcome.anySucceeded {

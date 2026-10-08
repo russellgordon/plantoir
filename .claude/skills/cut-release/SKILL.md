@@ -157,6 +157,12 @@ Style rules, in order of importance:
   Many commits produce NO line — that is correct behaviour.
 - Merge related commits into one line (three commits fixing the same
   sidebar bug are one bullet).
+- **Keep the app's two words apart** (#443, v1.4.4): DEPLOY is putting a
+  site online — Netlify, Cloudflare or a folder; PUBLISH is only marking a
+  page so that the next deploy includes it, and nothing leaves the
+  computer. "Deploy a section to more than one place at once", never
+  "Publish a section to…". (This skill's own "publish a release" is about
+  GitHub releases, a third sense, and stays.)
 - Cover BOTH platforms when the release carries both assets; label
   platform-specific items "(Windows)" / "(macOS)" only when they truly
   apply to one side.
@@ -342,7 +348,9 @@ so the `--deploy` step publishes it with the rest of the site.
 The output is deterministic, so **the normal outcome is no diff at all** —
 `git status` stays quiet and you commit only the version line. Do not
 report that as a failure or re-run it. Files change only when the icon,
-the palette or the tagline moved since the last release.
+the palette or the tagline moved since the last release — or when Pillow
+changed underneath: a newer Pillow can re-encode an unchanged PNG or move the
+wordmark a pixel (12.2.0, #446). Look at the pictures before calling that a stop.
 
 If it does produce a diff, stop and show the user the changed images
 before committing: `site/social-card.png` is a public, widely-cached

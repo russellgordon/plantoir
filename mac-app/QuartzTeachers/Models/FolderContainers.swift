@@ -182,7 +182,7 @@ enum FolderContainers {
             return "stopped the website builder for “\(folderName)” \(because)"
         case .leftAFoldersBuilderRunning:
             return "left the website builder for “\(folderName)” running because "
-                + "a publish or preview for that folder is still going"
+                + "a deploy or preview for that folder is still going"
         case .couldNotStopAFoldersBuilder:
             return "tried to stop the website builder for “\(folderName)” \(because), "
                 + "and it would not stop"
@@ -623,7 +623,7 @@ enum FolderContainers {
         lines.append("      " + noteCall(
             .leftTheSharedSetupRunning,
             occasion: occasion,
-            reasonSomethingElseIsUsingIt: "a publish or preview is still going"
+            reasonSomethingElseIsUsingIt: "a deploy or preview is still going"
         ))
         lines.append("    elif [ -n \"$sharing\" ]; then")
         lines.append("      " + noteCall(

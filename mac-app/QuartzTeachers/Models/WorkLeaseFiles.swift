@@ -99,6 +99,20 @@ nonisolated enum WorkLeaseFiles {
     static let previewKind: String = "preview"
     static let publishKind: String = "publish"
 
+    /// The lease an assistant session holds on the course it is revising —
+    /// on the mac, `Plantoir --mcp-stdio` holds it on the course the Claude or
+    /// Codex door named in `AssistMCPServer.doorCourseVariable` (#458), as
+    /// Windows' `plantoir-mcp` does. Never a lock, and never in a build's
+    /// way: it greys the Revise items and the structural work on that
+    /// course in the OTHER programs (`CourseActivity.structuralHoldReason`),
+    /// and it is what makes the session's held-backup record count.
+    static let assistKind: String = "assist"
+
+    /// The end of a held-backup record's name: `<COURSE>.held-backup.<pid>`
+    /// (#283 for another program, #458 on the mac). No `.lease` suffix, so
+    /// no lease reader ever mistakes one for a lease.
+    static let heldBackupRecordMarker: String = "held-backup"
+
     /// What stands in the way of a BUILD started here.
     ///
     /// `build` because two builds of one section clear the same folder.
@@ -204,6 +218,98 @@ nonisolated enum WorkLeaseFiles {
         try? FileManager.default.removeItem(at: url)
     }
 
+    /// `<COURSE>.held-backup.<pid>` — the record a session writes beside its
+    /// lease naming the backup its conversation made (Windows' format,
+    /// `contracts/file-formats.json` → `heldBackupRecord`).
+    static func heldBackupRecordName(courseCode: String, pid: Int32) -> String {
+        return "\(courseCode.uppercased()).\(heldBackupRecordMarker).\(pid)"
+    }
+
+    /// The process id a held-backup record's name carries, or nil for a name
+    /// that is not one.
+    static func pidOfHeldBackupRecord(named fileName: String) -> Int32? {
+        let parts: [Substring] = fileName.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count < 3 {
+            return nil
+        }
+        if String(parts[parts.count - 2]) != heldBackupRecordMarker {
+            return nil
+        }
+        return Int32(String(parts[parts.count - 1]))
+    }
+
+    /// The process ids of the OTHER live programs holding an `assist` lease
+    /// on ANY course in this folder — the programs whose held-backup records
+    /// count. Read with the same liveness rule every lease reader uses, so a
+    /// killed session's leftover lease (and with it its record) holds nothing.
+    static func assistHolders(
+        coursesDirectory: URL,
+        ownPID: Int32 = getpid(),
+        ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
+    ) -> Set<Int32> {
+        var holders: Set<Int32> = []
+        let held: [(course: String, holding: Holding)] = WorkLeaseFiles.everyLeaseHeldElsewhere(
+            coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
+        )
+        for entry in held where entry.holding.kind.lowercased() == assistKind {
+            holders.insert(entry.holding.pid)
+        }
+        return holders
+    }
+
+    /// The backups OTHER programs' live assistant sessions have on record in
+    /// this folder, as the paths the records name, each with the course its
+    /// record is filed under.
+    ///
+    /// A record counts only while its process holds a live `assist` lease
+    /// (`assistHolders`) — Windows' rule: a session killed before it could
+    /// tidy up leaves a record that holds nothing, rather than a backup the
+    /// teacher can never delete. This process's own records are skipped, as
+    /// its own leases are.
+    static func backupsHeldByOtherSessions(
+        coursesDirectory: URL,
+        ownPID: Int32 = getpid(),
+        ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
+    ) -> [(path: String, courseCode: String)] {
+        var held: [(path: String, courseCode: String)] = []
+        let living: Set<Int32> = WorkLeaseFiles.assistHolders(
+            coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
+        )
+        if living.isEmpty {
+            return held
+        }
+        let directory: URL = WorkLeaseFiles.activityDirectory(coursesDirectory: coursesDirectory)
+        let names: [String]
+        do {
+            names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        } catch {
+            return held
+        }
+        for name in names {
+            guard let pid = WorkLeaseFiles.pidOfHeldBackupRecord(named: name) else {
+                continue
+            }
+            if pid == ownPID || !living.contains(pid) {
+                continue
+            }
+            guard let data = try? Data(contentsOf: directory.appendingPathComponent(name)) else {
+                continue
+            }
+            let path: String = String(decoding: data, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if path.isEmpty {
+                continue
+            }
+            let marker: String = "." + heldBackupRecordMarker + "."
+            var courseCode: String = name
+            if let range = name.range(of: marker, options: .backwards) {
+                courseCode = String(name[name.startIndex..<range.lowerBound])
+            }
+            held.append((path: path, courseCode: courseCode))
+        }
+        return held
+    }
+
     /// The leases OTHER live processes hold on a course.
     ///
     /// This process's own are left out — a process is never in its own way;
@@ -217,18 +323,33 @@ nonisolated enum WorkLeaseFiles {
         ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
     ) -> [Holding] {
         var holdings: [Holding] = []
+        let held: [(course: String, holding: Holding)] = WorkLeaseFiles.everyLeaseHeldElsewhere(
+            coursesDirectory: coursesDirectory, ownPID: ownPID, ownerIsAlive: ownerIsAlive
+        )
+        for entry in held where entry.course.lowercased() == courseCode.lowercased() {
+            holdings.append(entry.holding)
+        }
+        return holdings
+    }
+
+    /// Every lease OTHER live processes hold in this folder, on any course,
+    /// each with the course its name carries — the one reading both
+    /// `heldElsewhere` and `assistHolders` are made from.
+    static func everyLeaseHeldElsewhere(
+        coursesDirectory: URL,
+        ownPID: Int32 = getpid(),
+        ownerIsAlive: (Int32, String?, String?) -> Bool = ProcessLiveness.ownerIsAlive
+    ) -> [(course: String, holding: Holding)] {
+        var held: [(course: String, holding: Holding)] = []
         let directory: URL = WorkLeaseFiles.activityDirectory(coursesDirectory: coursesDirectory)
         let names: [String]
         do {
             names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
         } catch {
-            return holdings
+            return held
         }
         for name in names {
             guard let parsed = WorkLeaseFiles.parse(fileName: name) else {
-                continue
-            }
-            if parsed.course.lowercased() != courseCode.lowercased() {
                 continue
             }
             if parsed.pid == ownPID {
@@ -252,11 +373,12 @@ nonisolated enum WorkLeaseFiles {
             if !ownerIsAlive(parsed.pid, judgedName, facts.start) {
                 continue
             }
-            holdings.append(
-                Holding(kind: parsed.kind, pid: parsed.pid, moment: WorkLeaseFiles.momentLine(in: text))
-            )
+            held.append((
+                course: parsed.course,
+                holding: Holding(kind: parsed.kind, pid: parsed.pid, moment: WorkLeaseFiles.momentLine(in: text))
+            ))
         }
-        return holdings
+        return held
     }
 
     /// The first holding that stands in the way, or nil when the way is clear
@@ -384,7 +506,7 @@ nonisolated enum WorkLeaseFiles {
         case WorkLeaseFiles.previewKind:
             return "previewed by process \(holding.pid)"
         case WorkLeaseFiles.publishKind:
-            return "published by process \(holding.pid)"
+            return "deployed by process \(holding.pid)"
         default:
             return "built by process \(holding.pid)"
         }

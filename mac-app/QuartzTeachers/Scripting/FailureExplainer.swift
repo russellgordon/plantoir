@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
+        if let refusal = sectionDeployRefusal(in: output) {
+            return refusal.sentence
+        }
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
@@ -50,7 +53,7 @@ struct FailureExplainer {
         return nil
     }
 
-    /// What a teacher reads when a publish to a folder could not copy every
+    /// What a teacher reads when a deploy to a folder could not copy every
     /// page. Contract data: `app-rules.json` → `failureExplanations`.
     ///
     /// It names no single cause on purpose: the same "finished in part" comes
@@ -58,14 +61,14 @@ struct FailureExplainer {
     /// that cannot be read (measured in review: one unreadable page, 312 of
     /// 313 copied), so blaming the folder would be a confident wrong guess.
     static let folderCopyDidNotFinish: String =
-        "Plantoir could not copy every page into your publishing folder, so it is not up to date. "
-        + "Try publishing again; if the same thing happens, one of your pages may not open "
+        "Plantoir could not copy every page into your deploy folder, so it is not up to date. "
+        + "Try deploying again; if the same thing happens, one of your pages may not open "
         + "or the folder may not be taking new files."
 
-    /// A publish to a folder stopped part way (GitHub issue #227).
+    /// A deploy to a folder stopped part way (GitHub issue #227).
     ///
     /// `deploy.sh` now reads the copy's own exit status instead of throwing
-    /// it away, and fails — rather than saying "Published" — when the copy
+    /// it away, and fails — rather than saying "Deployed" — when the copy
     /// did not finish, INCLUDING when it finished in part: a page left behind
     /// may be one the teacher took down. Its line names the copy's error
     /// number, which means nothing to a teacher, so the line is matched here
@@ -75,7 +78,7 @@ struct FailureExplainer {
     /// lines can carry words that check matches, and this output is about a
     /// folder on this Mac, not the internet.
     static func folderCopyDidNotFinishExplanation(in output: String) -> String? {
-        if output.contains("could be copied into the publishing folder") {
+        if output.contains("could be copied into the deploy folder") {
             return folderCopyDidNotFinish
         }
         return nil
@@ -103,6 +106,64 @@ struct FailureExplainer {
                 sentence.removeFirst()
             }
             return sentence.trimmingCharacters(in: .whitespaces)
+        }
+        return nil
+    }
+
+    /// What `deploy.sh`, or `preview.sh --build-only`, refused with while
+    /// the same section was still being deployed (GitHub #439) —
+    /// `shared-rules.json` → `deployWhileItsSectionDeploys`.
+    struct SectionDeployRefusal: Equatable {
+
+        // MARK: - Stored properties
+
+        /// True when what was in the way is a deploy that was set for later
+        /// (its run's script still working, including a run ended by setting
+        /// the section again); false when it was another `deploy.sh` for the
+        /// section, such as one typed in Terminal.
+        let byALaterDeploy: Bool
+
+        /// The launcher's first line with the cross taken off: the sentence
+        /// the window shows.
+        let sentence: String
+    }
+
+    /// The words the launchers' #439 refusal always carries, one pair per
+    /// leg. `sentences.launcher` in the contract is the source; the test
+    /// pins these to it.
+    static let sectionDeployRefusalMarkers: [String] = [
+        "so it cannot be deployed again until that has finished.",
+        "so it cannot be built until that has finished."
+    ]
+
+    /// The part of the first line that says the deploy set for later was
+    /// the reason, rather than another deploy of the section.
+    static let laterDeployMarker: String = "is still being deployed by a deploy that was set for later"
+
+    /// The launcher refused a deploy, or its build leg, because that same
+    /// section was still being deployed. LIFTED, as #381's refusal is: the
+    /// launcher's line already is the sentence a teacher can act on.
+    /// Pinned by `deployWhileItsSectionDeploys.failureExplanationCases`.
+    static func sectionDeployRefusal(in output: String) -> SectionDeployRefusal? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            var carriesAMarker: Bool = false
+            for marker in sectionDeployRefusalMarkers {
+                if line.contains(marker) {
+                    carriesAMarker = true
+                }
+            }
+            if !carriesAMarker {
+                continue
+            }
+            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
+            while let first = sentence.first, first == "❌" || first == " " {
+                sentence.removeFirst()
+            }
+            sentence = sentence.trimmingCharacters(in: .whitespaces)
+            return SectionDeployRefusal(
+                byALaterDeploy: sentence.contains(laterDeployMarker),
+                sentence: sentence
+            )
         }
         return nil
     }
@@ -312,7 +373,7 @@ struct FailureExplainer {
         return nil
     }
 
-    /// Publishing was asked for before anything had been built.
+    /// A deploy was asked for before anything had been built.
     static func missingBuildExplanation(in output: String) -> String? {
         if output.contains("Built site not found") {
             return "This website hasn't been built yet. Preview it once, then deploy."
@@ -324,15 +385,15 @@ struct FailureExplainer {
     /// website, because the section has no front page.
     ///
     /// Asked BEFORE `missingBuildExplanation`, and the order is the whole
-    /// point. A publish runs the build and then the deploy on one transcript,
+    /// point. A deploy runs the build and then the upload on one transcript,
     /// so when a front page is missing the output carries both lines — and
     /// "hasn't been built yet" is the wrong one to say to somebody who just
     /// watched it build. The build's own reason is the specific one, so it
     /// wins.
     static func missingFrontPageExplanation(in output: String) -> String? {
         if output.contains("no front page, so no website was produced") {
-            return "This section has no front page, so there is no website to publish. "
-                 + "Put the front page back, then publish again."
+            return "This section has no front page, so there is no website to deploy. "
+                 + "Put the front page back, then deploy again."
         }
         return nil
     }
@@ -344,7 +405,7 @@ struct FailureExplainer {
     /// back" would send a teacher to restore a page they can see — with a
     /// repair that would find it and say it was already put right. Asked
     /// BEFORE `missingBuildExplanation` for the same reason as the missing
-    /// front page is: a publish's transcript carries the deploy's "Built site
+    /// front page is: a deploy's transcript carries the upload's "Built site
     /// not found" after it, and the build's reason is the specific one.
     ///
     /// The line the build's reader stopped near travels in the output as
@@ -356,12 +417,12 @@ struct FailureExplainer {
             return nil
         }
         let headline: String = "The settings at the top of this section's front page could not be read, "
-            + "so there is no website to publish. "
+            + "so there is no website to deploy. "
         if let line = lineNumber(after: "(near line ", in: output[signRange.upperBound...]) {
             return headline + "Open the front page in Obsidian, fix its settings near line \(line), "
-                + "then publish again."
+                + "then deploy again."
         }
-        return headline + "Open the front page in Obsidian, fix its settings, then publish again."
+        return headline + "Open the front page in Obsidian, fix its settings, then deploy again."
     }
 
     /// The whole number written straight after `marker` on the same line of
