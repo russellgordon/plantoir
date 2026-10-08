@@ -4178,10 +4178,10 @@ daily update check after the window; the freeze itself is this issue.
 working folder `C:\Users\lenov\Teaching`, read from
 `%LOCALAPPDATA%\Plantoir\startup.log`):
 
-| Run | Launch → window | Launch → copy finished (Preview usable) |
+| Run | Launch → window | Copy's own duration, then launch → copy finished (Preview usable) |
 |---|---|---|
-| `.toolchain\` removed entirely (12,753 files to copy) | **2.9 s** (`App.OnLaunched starting` 08:42:02.557 → `MainWindow.Activate called` 08:42:05.489) | 17.4 s (08:42:20.460), in the background, the window usable throughout |
-| `.toolchain\` present, every one of its 12,753 files made different (a byte appended, its time moved) | **2.7 s** (08:48:15.140 → 08:48:17.880) | 15.2 s (08:48:30.676) |
+| `.toolchain\` removed entirely (12,753 files to copy) | **2.9 s** (`App.OnLaunched starting` 08:42:02.557 → `MainWindow.Activate called` 08:42:05.489) | 17.4 s; finished 17.9 s after launch (08:42:20.460), in the background, the window usable throughout |
+| `.toolchain\` present, every one of its 12,753 files made different (a byte appended, its time moved) | **2.7 s** (08:48:15.140 → 08:48:17.880) | 15.2 s; finished 15.5 s after launch (08:48:30.676) |
 | BEFORE, 2026-10-07, the installed 1.4.3 → 1.4.4 first launch | no window for 119.7 s and 93.7 s | the same moment |
 
 The caveat that keeps these honest: both AFTER runs had a WARM disk cache —
