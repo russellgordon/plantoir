@@ -81,7 +81,12 @@ public sealed record AssistNextClassReading(string UnitWord, bool IsNumbered, Cl
 /// numbers are read with <see cref="long.TryParse(string?, out long)"/> — or
 /// "unit 3000000000" would be kind b on the mac and run here; and Swift walks
 /// grapheme clusters, so a decomposed "é" is ONE non-letter there but "e" and
-/// a separator here — the sentence is normalised to Form C first.</para>
+/// a separator here — the sentence is normalised to Form C first.
+/// Two differences REMAIN, deliberately, since no contract row exercises them
+/// and both need exotic input that only changes which non-words are seen: a
+/// multi-character grapheme (an a-z letter with a combining mark that has no
+/// precomposed form) is a letter in Swift's comparison and a separator here,
+/// and 'İ' lower-cases to "i" here where Swift gives "i̇".</para>
 /// </remarks>
 public static class AssistNextClassUnits
 {

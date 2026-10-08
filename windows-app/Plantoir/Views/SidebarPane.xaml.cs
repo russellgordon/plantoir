@@ -528,7 +528,8 @@ public sealed partial class SidebarPane : UserControl
         // its backup while the confirmation was up must not lose it.
         var outcome = BackupDeleter.Delete(chosen, HeldBackups.For(askedIn, Workspace.BackupItems));
         var madeBySessions = HeldBackups.ByOtherSessions(askedIn);
-        ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes, madeBySessions));
+        if (BackupDeleter.WritesATrailLine(outcome))
+            ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes, madeBySessions));
         if (Workspace.Selection is SidebarSelection.BackupEntry(var id) && outcome.Deleted.Any(b => b.Id == id))
             Workspace.Selection = null;
         Workspace.Reload();
@@ -1453,7 +1454,7 @@ public sealed partial class SidebarPane : UserControl
         // Measured BEFORE it goes, so the line can say what it took.
         var sizes = new Dictionary<string, long?> { [item.FilePath] = BackupSizes.LogicalSize(item.FilePath) };
         var outcome = BackupDeleter.Delete(new[] { item }, HeldBackups.For(askedIn, Workspace.BackupItems));
-        if (outcome.Deleted.Count > 0)
+        if (BackupDeleter.WritesATrailLine(outcome))
         {
             ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted,
                 BackupDeleter.TrailLine(outcome, sizes, HeldBackups.ByOtherSessions(askedIn)));

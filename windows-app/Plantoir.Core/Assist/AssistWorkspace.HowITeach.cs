@@ -42,6 +42,15 @@ public sealed partial class AssistWorkspace
         $"a Claude or Codex session started from Plantoir is holding {courseCode} while it is open";
 
     /// <summary>
+    /// Whether a server writes <see cref="HoldingTrailLine"/>: only when it
+    /// holds a course AND serves a door. This app's own window's server holds
+    /// the course it is locked to as well, and must never be written up as "a
+    /// Claude or Codex session" (#468). <c>plantoir-mcp</c>'s start-up asks this.
+    /// </summary>
+    public static bool NotesAnOutsideHold(string? heldCourse, bool servesTheLocalWindow) =>
+        heldCourse is not null && !servesTheLocalWindow;
+
+    /// <summary>
     /// The course this server should hold an <c>assist</c> lease on: the one
     /// it is locked to, else the door's course when that course exists here
     /// (<c>doorCourseHold.courseToHold</c>: trimmed, matched without regard to
