@@ -46,8 +46,8 @@ public static class SavedSettings
         "you just saved.";
 
     public const string SavedWhilePublishing =
-        "This course is being published right now, and that publish uses the settings from before this save. " +
-        "Publish again once it has finished to send what you just saved.";
+        "This course is being deployed right now, and that deploy uses the settings from before this save. " +
+        "Deploy again once it has finished to send what you just saved.";
 
     public const string PreviewAgainNothingOpen =
         "That preview has stopped since, so there is nothing to preview again. Open the section and press Preview " +

@@ -285,13 +285,13 @@ public static partial class AssistWording
 
     /// <summary>
     /// What the WINDOW says when Preview or Deploy is declined because another
-    /// program on this computer is building, publishing or previewing the
+    /// program on this computer is building, deploying or previewing the
     /// course (#289, mac #156). An assistant is told <see cref="CourseIsBusy"/>
     /// instead: on Windows both assistants are <c>plantoir-mcp</c>, the process
     /// talking to the program whose course is busy.
     /// </summary>
     public static string CourseIsBeingBuiltElsewhere(string course) =>
-        $"{course} is being previewed or published somewhere else on this computer right now — by an assistant " +
+        $"{course} is being previewed or deployed somewhere else on this computer right now — by an assistant " +
         "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
         "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
 
@@ -400,7 +400,7 @@ public static partial class AssistWording
         "Because other classes move, “Undo that” will not take this back afterwards — the copy made before any of it is in Plantoir's Backups list.";
 
     /// <summary>The make-room reply's last line. Windows said "…before you deploy it." until #346; it says the mac's now.</summary>
-    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you publish.";
+    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you deploy.";
 
     public static string UndidPartly(string whatHappened, int leftAlone)
     {
@@ -476,18 +476,18 @@ public static partial class AssistWording
     /// <summary>Confirming a new website, when the section had one to be cut loose from.</summary>
     public static string RolloverStartedANewWebsite(string keptAs) =>
         RolloverIsOnANewWebsite + " Last year's details are kept at " + keptAs +
-        ", so you can go back to it. The next time you publish this section, Plantoir will ask " +
+        ", so you can go back to it. The next time you deploy this section, Plantoir will ask " +
         "what to call the new website.";
 
-    /// <summary>Confirming a new website for a section that had never been published.</summary>
+    /// <summary>Confirming a new website for a section that had never been deployed.</summary>
     public const string RolloverHadNoWebsiteYet =
-        "This section had not been published anywhere yet, so there was no website to move away " +
-        "from. The first time you publish it, Plantoir will ask what to call it.";
+        "This section had not been deployed anywhere yet, so there was no website to move away " +
+        "from. The first time you deploy it, Plantoir will ask what to call it.";
 
     /// <summary>Confirming the same website.</summary>
     public const string RolloverKeptTheSameWebsite =
-        "This section still publishes to the same website as last year, so every link anybody " +
-        "saved keeps working. Nothing goes out until you publish.";
+        "This section still deploys to the same website as last year, so every link anybody " +
+        "saved keeps working. Nothing goes out until you deploy.";
 
     /// <summary>What a teacher is told when the question was never answered.</summary>
     /// <remarks>
@@ -498,7 +498,7 @@ public static partial class AssistWording
     /// leave them believing the website was dealt with.
     /// </remarks>
     public const string RolloverWebsiteNotDecided =
-        "I have not changed which website this section publishes to — publishing it will still " +
+        "I have not changed which website this section deploys to — deploying it will still " +
         "go to last year's website. Ask me to roll it over again if you would like to choose.";
 
     /// <summary>A destination that could not be released, so the section is still pinned to it.</summary>
@@ -506,17 +506,17 @@ public static partial class AssistWording
     /// Its own sentence because the alternative said the opposite. A marker
     /// that exists and cannot be moved used to produce the same empty result
     /// as one that was never there, so a teacher was told "this section had
-    /// not been published anywhere yet" about a section that is still
-    /// publishing over last year's site — a lie about the one fact this whole
+    /// not been deployed anywhere yet" about a section that is still
+    /// deploying over last year's site — a lie about the one fact this whole
     /// feature turns on.
     /// </remarks>
     public static string RolloverCouldNotStartANewWebsite(string stillPinned) =>
-        "I could not move this section off " + stillPinned + ", so publishing it will still " +
+        "I could not move this section off " + stillPinned + ", so deploying it will still " +
         "replace last year's website there. Try again, or check whether that file is locked or " +
         "open somewhere else.";
 
     /// <summary>
-    /// Added when releasing a website turned off a publish that was set to
+    /// Added when releasing a website turned off a deploy that was set to
     /// happen on its own.
     /// </summary>
     /// <remarks>
@@ -525,20 +525,20 @@ public static partial class AssistWording
     /// the address students actually read stopped updating.
     /// </remarks>
     public const string RolloverTurnedOffTheScheduledPublish =
-        "This section was set to publish on its own. Starting a new website turned that off — " +
-        "set it again from the section's menu once you have published the new website for the " +
+        "This section was set to deploy on its own. Starting a new website turned that off — " +
+        "set it again from the section's menu once you have deployed the new website for the " +
         "first time.";
 
-    /// <summary>When turning that scheduled publish off did NOT work.</summary>
+    /// <summary>When turning that scheduled deploy off did NOT work.</summary>
     /// <remarks>
     /// The dangerous state, and so the one that must not be described by the
-    /// sentence above. A publish still set to run has nobody to ask what the
+    /// sentence above. A deploy still set to run has nobody to ask what the
     /// new website should be called, so it would go ahead and make one — the
     /// exact outcome turning it off exists to prevent.
     /// </remarks>
     public const string RolloverCouldNotTurnOffTheScheduledPublish =
-        "This section was also set to publish on its own, and Plantoir could not turn that off. " +
-        "It may still try to publish, and it has no way to ask what the new website should be " +
+        "This section was also set to deploy on its own, and Plantoir could not turn that off. " +
+        "It may still try to deploy, and it has no way to ask what the new website should be " +
         "called — turn it off from the section's menu.";
 
     // MARK: - Class planning (hoisted 2026-09-30, #157)

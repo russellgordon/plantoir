@@ -90,7 +90,7 @@ public class ScheduledDeployCompletionTests : IDisposable
 
         string logged = File.ReadAllText(_tempLogPath);
         Assert.Contains("ICS3U/3", logged);
-        Assert.Contains("marked ICS3U-S3", logged);
+        Assert.Contains("recorded ICS3U-S3", logged);
         Assert.Contains("scheduled deploy", logged);
     }
 

@@ -202,8 +202,12 @@ this step is the deploy. `deploy.ps1` prints "..." where deploy.sh prints "…"
 (every line it prints is ASCII, and the file has no byte-order mark for
 Windows PowerShell 5.1 to read one by).
 `LauncherRulesContractTests.TheRebuildLinesAreDeploySHsWordForWord` reads both
-lines from deploy.sh rather than retyping them. The other rebuild lines, and
-every line still saying "published" for a deploy, are #441 (v1.4.4).
+lines from deploy.sh rather than retyping them. The other three rebuild lines
+("Could not rebuild this site before deploying it…", "The rebuilt site has not
+appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
+pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
+that said "published" for a deploy moved with them ("Deploy and publish: the
+two words (v1.4.4, #443)", below).
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
@@ -3550,12 +3554,41 @@ probe, 0 inversions (M4 Pro, b10435;
 `research/ai-assist/outside-assistant-descriptions-443-results.txt`).
 
 **The guard.** `scripts/test_deploy_words.py` scans the mac app's string
-literals, the three `.sh` launchers and the shared Python for 36 exact
-phrases that each meant a deploy and said publish. Exact on purpose: a guard
-on the bare word fails on "Publish Unit 2, Day 3", which is right. It cannot
-see a NEW wrong wording, comments, or Windows' half.
+literals, all six launchers (`.sh` and, since #441, `.ps1`), the shared
+Python and, since #441, the Windows app's product sources (`Plantoir`,
+`Plantoir.Core`, `Plantoir.Mcp`: C# string literals and XAML, `bin/` and
+`obj/` pruned) for 46 exact phrases that each meant a deploy and said
+publish. Exact on purpose: a guard on the bare word fails on "Publish Unit 2,
+Day 3", which is right — and so does "for publishing", which #441's review
+found in page-sense text on both apps (`AssistCardCommand.swift`'s "stays
+rejected for publishing", `undo_last_change`'s "the fix for publishing the
+wrong class"), so the Windows-only additions are whole phrases ("rebuild this
+site for publishing", "Next publish will ask"…). It cannot see a NEW wrong
+wording, comments (C# `//`, XAML `<!-- -->`, `#` lines) or either app's
+tests, and it skips both apps' frozen trail event keys.
 
-**Windows** inherits the shared Python and `deploy.sh`'s words free; it owes
-`deploy.ps1`'s twins, `FailureExplainer.cs`'s matcher, `CredentialRequests.cs`,
-its views and `AssistWording.cs`, and is red on the moved contract cases until
-it does — that is the request, under #441.
+**The mac must KNOW: the guard now couples the two apps.** Every clone
+carries `mac-app/` and `windows-app/`, so `verify.sh` on the mac fails on a
+Windows sentence that says publish for a deploy, and Windows'
+`PythonToolchainTests` fails on a mac one. That is deliberate — the words
+rule is one product's — and a red line naming a file under `windows-app/` is
+a Windows sentence to fix (or a Windows issue to open), not damage to the mac.
+
+**Windows (#441, v1.4.4)** inherited the shared Python and `deploy.sh`'s words
+free and matched the rest in one change: `deploy.ps1`'s twins (the scheduled
+refusal, both reference refusals, the three rebuild lines, the folder copy,
+the credential heredocs) and its own lines with no mac twin (`--help`'s token
+line, "Unknown deploy target", the blank deploy folder refusal, "Deployed."
+after a folder copy, "Next deploy will ask"); `FailureExplainer.cs`'s matcher
+in the same commit as the line it reads; `CredentialRequests.cs`;
+`AssistWording.cs`; every `scheduledPublishStopped` sentence, notification
+and toast line; the coverage switch and its refusals; the views; the MCP
+descriptions and `list_courses`' line; and the Windows-only trail lines and
+scheduled wrapper. It also added the caption under "Also deploy to, for
+redundancy" that the mac had shown alone, and the sidebar's warning hover
+took the mac's whole sentence, dropping its date for the mac's reason. Two
+Windows-only cancel sentences were reworded by ruling rather than copied: a
+cancelled launcher run in `plantoir-mcp` says "This was stopped before it
+finished." (`deploy_section` runs `preview.ps1` as its build leg, so naming
+either launcher would be wrong half the time), and `rebuild_preview` says
+"The preview build was stopped before it finished."
