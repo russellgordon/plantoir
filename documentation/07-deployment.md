@@ -206,7 +206,8 @@ lines from deploy.sh rather than retyping them. The other three rebuild lines
 ("Could not rebuild this site before deploying it…", "The rebuilt site has not
 appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
 pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
-that said "published" for a deploy moved with them (next section).
+that said "published" for a deploy moved with them ("Deploy and publish: the
+two words (v1.4.4, #443)", below).
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
