@@ -1476,6 +1476,47 @@ What replaces the old container concepts:
     all-legs-refused, and keeps its own "The build failed…" message for an
     ordinary failure, because `CouldNotBuildBeforeDeploying` points at a
     window that process does not have.
+  - **The other three answers that build (#471, 2026-10-08).** An outside
+    assistant's `rebuild_preview`, `publish_pages` (a page or a whole unit)
+    and `unpublish_pages` (a whole unit) rebuild with the same
+    `--build-only` leg, so they meet the same refusal.
+    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` now ask
+    `RefusedWhileItsSectionDeploys` inside their failed-build branch and say
+    what was already done, then the launcher's own line, lifted as the window
+    lifts it ("…, but the preview couldn’t be built: ICS4U section 2 is
+    already being deployed, so it cannot be built until that has finished.").
+    Not `DeployRefusedWhileItsSectionDeploys`, which says the section "was not
+    deployed again" — false of a rebuild — and not a new wording key, which
+    only the mac can add (assist-wording.json is generated there). The lifted
+    line is contract data already, and its build flavour exists because a
+    rebuild runs that leg. Pinned by `shared-rules.json` →
+    `deployWhileItsSectionDeploys.refusedBuildAnswers`, run here by
+    `RefusedBuildAnswersTests` through the real `PlantoirTools`.
+    - **The cross.** `plantoir-mcp`'s `LauncherRunner` reads the launcher
+      without naming an encoding, so the cross arrives as `?` or as three
+      characters of mojibake. Detection never cared (the markers are ASCII);
+      since these answers SAY the sentence, `SectionDeployRefusalOf` now takes
+      off everything before the course code's first letter or digit. The
+      runner's encoding was deliberately left alone in this piece.
+    - **What is left as it was.** An ORDINARY build failure in `Apply` and
+      `ApplyWholeUnit` still ends with `WhereTheOutputIs`, which points at a
+      window the server does not have. Dropping it would leave "the preview
+      couldn't be built" with no reason, and pasting the raw log back is the
+      bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
+      prevent; the right answer is a headless variant of `previewDidNotBuild`,
+      which is a wording key, so it is the mac's to add (#471). The same
+      key would cover a THIRD gap, pre-existing and also left alone:
+      `RebuildPreview`'s ordinary failure still appends `build.Message`
+      whole, so an outside assistant's `rebuild_preview` hands back the raw
+      launcher output — "(The launcher exited with code 1.)" and "Last
+      output:" included, a machinery word in a teacher's answer. A headless
+      `previewDidNotBuild` should replace that too. An exit 3 (a
+      question) in those two paths is still read as a failed build — a
+      separate gap. Unpublishing single PAGES never rebuilds on this side
+      (`Apply` returns before the build when the plan hides), so it cannot
+      meet the refusal at all, and the contract has no case for it.
+    - **No new trail event (rule 5).** The launcher already writes "build
+      declined, course busy elsewhere" for the refusal (`launcherLines`).
   - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
     read and shown, never written.
   - **What is NOT built: the mac's thirty-minute wait.** A re-set leaves the

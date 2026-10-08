@@ -5186,7 +5186,8 @@ way.** The first plan had each entry say `{"here": "string", "windows":
 "array"}`. That would have shipped **three false statements**: of the nine,
 `remember_timetable.dates`, `plan_remember_timetable.dates` and
 `plan_scheduled_deploy.classes` are strings on BOTH platforms and merely split
-on different characters — semicolons here, commas there. Windows asserts its
+on different characters — semicolons here, commas there (until Windows moved
+all three to semicolons on 2026-10-08, issue #469; below). Windows asserts its
 departures as an exact set in both directions, so three phantom entries would
 have turned that suite red with "these departures are resolved, delete them".
 
@@ -5218,13 +5219,31 @@ them in the runner's `Split(...)` and in `[Description]` prose, neither
 reachable from a schema. Consuming this key removed the SHARED copy, not that
 one.
 
-**And one difference that side flagged back, which is a decision rather than a
-defect.** `plan_scheduled_deploy.classes` advertises semicolons here and commas
-there. The reasoning for semicolons — that "Unit 2, Day 3" is what a class page
-is called, so a comma-separated list cuts it in half — applies to that surface
-identically. It has not been changed, because what a schema advertises is a
-routing change and the routing suites are hand-run. `dates` differs the same
-way and is cosmetic: a YYYY-MM-DD date holds no comma.
+**And one difference that side flagged back, recorded as a decision and then
+closed (issue #469, 2026-10-08).** `plan_scheduled_deploy.classes` advertised
+semicolons here and commas there, and Windows' server SPLIT on commas too, so
+an outside assistant that passed "Unit 2, Day 3; Unit 2, Day 4" had four titles
+checked, none of which exists — the plan could not say the unpublished one was
+unpublished, which is the one thing it is there to catch. The reasoning for
+semicolons — that "Unit 2, Day 3" is what a class page is called, so a
+comma-separated list cuts it in half — applied to that surface identically. It
+was first left alone as "a routing change, and the routing suites are
+hand-run"; that turned out not to bind, because all three are MCP-only tools
+that the on-device model is never shown (`AssistAgent.ForTheLocalModel`), so no
+local routing run is owed. Windows now carries the contract's descriptions for
+`classes` and both `dates`, splits `classes` on semicolons and line breaks
+(`PlantoirTools.ClassTitles`, this side's `AssistToolRunner.names` rule), and
+keeps its `dates` runners forgiving — commas, semicolons and spaces all still
+read — so a client that learned the old wording is not broken. `classes` stayed
+a string rather than becoming an array: that would have been a TYPE departure,
+a bigger difference than the one being closed. Windows' agreed separator
+differences are an empty set from that day, and `AssistSurfaceContractTests`
+fails if one reappears: `SeparatorHere` is hand-kept, so on its own it could
+not see the server drift back to "separated by commas", and
+`EveryListShapedParameterIsDescribedInTheContractsWords` holds every parameter
+in it to `toolSchemas.mcp`'s description byte for byte — which names the
+separator, so a drifted description fails there even while the table still
+says `;`.
 
 **Not a routing change.** `separatedList` renders `"type": "string"`, so the
 emitted schemas are byte-identical: verified by diffing `toolSchemas.local`
@@ -5250,8 +5269,9 @@ Windows' hand-written copy entirely; it removes the half that is shared.
 **One caution for anyone consuming this.** The separator recorded is what the
 schema tells the MODEL, not the only character the runner accepts.
 `AssistToolRunner` is deliberately forgiving — `pages` splits on semicolon or
-newline, `codes` and `dates` on comma, semicolon and newline — so a Windows
-comma-separated date list is parsed correctly here today. A separator
+newline, `codes` and `dates` on comma, semicolon and newline — so a
+comma-separated date list from an older Windows build is parsed correctly here.
+Windows' `dates` runners are forgiving the same way. A separator
 difference is a difference in what each side ADVERTISES, and a suite should
 not assert an incompatibility from it.
 
