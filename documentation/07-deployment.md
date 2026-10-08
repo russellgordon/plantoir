@@ -762,7 +762,7 @@ normally do (SFTP, a network share, a sync client), and no third-party
 account is involved at all.
 
 Because the copy is host-side, this path prints `PUBLISHED_FOLDER=<path>`
-rather than a live URL, and the apps show a "copied to its publishing folder"
+rather than a live URL, and the apps show a "deployed to a folder"
 panel with a reveal-in-file-manager button instead of a link — plus a note
 that pages opened straight from disk won't look right, since the site expects
 to be served over HTTP.
@@ -815,11 +815,11 @@ folder whose own name has a colon is fine: the result still starts with `/`.
 **And it reads rsync's own exit status.** It used to pipe rsync into
 `grep -c … || true`, which threw the status away. Now any non-zero status —
 including **23 and 24, a copy that finished only in part** — exits 1 with a
-cross line and no `PUBLISHED_FOLDER=`, so the app's "copied to its publishing
+cross line and no `PUBLISHED_FOLDER=`, so the app's "deployed to a
 folder" panel never appears. A partial copy is a failure on purpose (director's
 ruling): measured with a stale folder `--delete` could not remove, the new pages
 landed, the page the teacher had taken down stayed, and the launcher said
-`Published: 2`. The cross line is matched by the app and replaced with
+`Published: 2` (the line has said `Deployed:` since v1.4.4, #443). The cross line is matched by the app and replaced with
 `FailureExplainer.folderCopyDidNotFinish` (`app-rules.json` →
 `failureExplanations`), because "copy error 23" means nothing to a teacher.
 
@@ -1517,7 +1517,13 @@ delivery is theirs: their run is PowerShell under Task Scheduler with no app
 process alive, so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
-it; GitHub #212 carries the ask.
+it; GitHub #212 carries the ask. Windows' toast shipped with #324 and **posted
+nothing until #448** (2026-10-04): its toast step read the job file after the
+run, and the run's own one-shot clearing had deleted it. What the toast needs
+is now read before the run; `documentation/12-windows-app.md` → "The
+scheduled-publish toast (#324)" has the measurement and the fix. The mac's
+`announceThenLeave` posts before the job is booted out, so it never had this
+shape.
 
 ### Clicking the notification opens the section (#306)
 
@@ -3082,7 +3088,7 @@ folder on this computer" — never a path (a path is machinery on a card, and a
 folder not chosen yet would be blank; #322's contract case pins "a folder").
 Two vocabularies for one list is pre-existing and deliberate; the contract
 pins both (`planOpening.cases[].sheet` and `.card`). `destination(of:)`, the
-primary-only name, was still used by `list_courses`' "publishes to:" — not
+primary-only name, was still used by `list_courses`' "publishes to:" line (it says "deploys to:" since v1.4.4, #443) — not
 scheduling, so out of this piece. It went with
 [#403](https://github.com/russellgordon/plantoir/issues/403): `list_courses`
 now says `everyDestination(of:)` too, and `destination(of:)` is deleted (a
@@ -3121,7 +3127,7 @@ a course with one destination the line is what it always was. The
 | immediate deploy's results (`deployWentOutTo`, `deployNeedsAnAnswerAt`) | yes | unchanged |
 | assistant's `deploy_section` card | names none, on purpose | unchanged |
 | scheduled-publish notification, after-Save sentence | yes, joined with ", " | unchanged; the different join is known and out of scope — do not "fix" one to match the other in passing |
-| `list_courses` "publishes to:" (MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
+| `list_courses` "deploys to:" ("publishes to:" before v1.4.4; MCP and the app's assistant window) | yes, since #403, by type | `everyDestination(of:)`, `planOpening.listCoursesLine` |
 | refusal trail line | the cause, since #396 | above |
 
 **Rejected**, so nobody proposes them again: keeping the unpublished list
@@ -3350,3 +3356,85 @@ mac has no share modes; nothing to mirror.
 click opens that section (`ScheduledPublishToast`; trail `scheduled publish
 notification`). It is unproven on a real click (the desktop was locked), and
 nothing about it is ledgered — `NamedGapLedger` has been empty since bundle 9.
+
+## Deploy and publish: the two words (v1.4.4, #443)
+
+**The rule (Russell, 2026-10-03; decisions on the inventory 2026-10-04):
+DEPLOY is what puts a site online — Netlify, Cloudflare Pages or a folder.
+PUBLISH is only marking a page so a deploy includes it; nothing leaves the
+computer.** Every sentence a teacher reads uses each word in its own sense.
+Until v1.4.4 the two were mixed: Course Settings said "Also publish to, for
+redundancy" under a header that said Deploying, the scheduled deploy's
+notification said "…published on its own to…", and the launchers said
+"Nothing was published." after refusing a deploy.
+
+**What changed on the mac, the launchers and the shared Python** (the
+sentences themselves are in the contracts and the code, not repeated here):
+Course Settings ("Also deploy to, for redundancy"; the caption now starts
+"Deploying sends your website to every destination…" because a plain swap
+read "Deploying deploys"); the coverage-map switch is **"Include the
+curriculum coverage map"**, the wizard's existing label, so one setting has
+one name (both refusals in `SpecialNames` quote it); every scheduled-deploy
+sentence and the success notification ("…deployed on its own to <place>.
+Your website has the new pages." — "your website" rather than "your
+students", because for a FOLDER destination the students see the pages only
+once the school's host serves that folder); the quit, update-held, rename,
+settings-saved, links-checklist, site-health and rollover sentences; the
+credential sheets ("the deploys are coming from you", "stops your deploys
+working"); every `deploy.sh`, `deploy.py` and `build_site.py` line that meant
+a deploy. Copy a Page keeps "publish" (it IS the right word) and adds the
+deploy it was silently claiming: "…until you publish them and deploy."
+Obsidian's own add-ons "can put these pages online" — neither of Plantoir's
+words, for somebody else's tool.
+
+**What deliberately did NOT change**, because something parses it or a key
+is frozen: the `PUBLISHED_FOLDER=` marker, the work-lease kind `publish`,
+frontmatter `publish:` / `publishForSectionN`, tool names (`publish_pages`,
+`explain_publishing`…), contract KEYS (`scheduledPublishStopped`,
+`rolloverTurnedOffTheScheduledPublish`, `settingsSavedWhilePublishing`…),
+`ActivityTrail.Event` raw values ("scheduled publish finished" and the rest —
+never written into a line), Swift type and file names, and the 13 tools the
+local model is shown.
+
+**Three couplings that must move together**, and did, in one commit each:
+- `deploy.sh`'s "Not every page could be copied into the deploy folder"
+  line, `FailureExplainer.folderCopyDidNotFinishExplanation`'s matcher and
+  `app-rules.json` → `failureExplanations.cases` (decision 1). Rewording the
+  launcher alone gives the teacher the raw line back;
+  `scripts/test_deploy_folder_target.py` fails if the cross line has no case.
+- The build's "❌ Nothing to deploy for <course> Section <n>: …" lines and
+  their `failureExplanations` output fixtures (the app matches the reason
+  half, "no front page, so no website was produced", which did not change).
+- `ScheduledDeploy`'s run line keeps the words "set to deploy to": the
+  contract's `theDestination` cases read `notesTheChange` by that phrase.
+
+**The trail: lines changed, keys did not.** A trail that spans the upgrade
+says "scheduled publish" before v1.4.4 and "scheduled deploy" after, so a
+search looks for both (`activityTrail.note` says so). Rejected: leaving the
+lines alone so searches stay whole — rule 5 says a changed behaviour changes
+its line, and a teacher reads these lines in a problem report. Rejected:
+renaming the keys too — they are pinned between both apps' code and the
+contract, and no teacher ever reads one.
+
+**What outside assistants read** (decision 5): `list_courses` says
+"  deploys to: " and four descriptions only MCP clients see (`list_courses`,
+`re_date_classes`, `make_room_for_classes`, `plan_scheduled_deploy`'s
+`classes`) say deploy. The local 13-tool digest is unchanged
+(`46b96562…2cd96cb6`); the MCP digest moved `85bc3f80…05aa7639f` →
+`a7c0823d…ad04e1733`. Measured before shipping, as `toolDescriptions.rule`
+asks, as a PROXY because the real readers (Claude Code, Codex) cannot be run
+as a controlled suite: the smaller assistant on the whole 37-tool MCP surface,
+11 probes × 10 trials, 70/110 before and 70/110 after, identical probe for
+probe, 0 inversions (M4 Pro, b10435;
+`research/ai-assist/outside-assistant-descriptions-443-results.txt`).
+
+**The guard.** `scripts/test_deploy_words.py` scans the mac app's string
+literals, the three `.sh` launchers and the shared Python for 36 exact
+phrases that each meant a deploy and said publish. Exact on purpose: a guard
+on the bare word fails on "Publish Unit 2, Day 3", which is right. It cannot
+see a NEW wrong wording, comments, or Windows' half.
+
+**Windows** inherits the shared Python and `deploy.sh`'s words free; it owes
+`deploy.ps1`'s twins, `FailureExplainer.cs`'s matcher, `CredentialRequests.cs`,
+its views and `AssistWording.cs`, and is red on the moved contract cases until
+it does — that is the request, under #441.

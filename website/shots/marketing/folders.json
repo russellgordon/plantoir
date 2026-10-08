@@ -34,7 +34,7 @@
       "schoolYear": "previous"
     },
     "collegeBoardPages": {
-      "about": "The College Board's own words never enter this repository. A Mac makes 56 of the 66 pages from the public Course and Exam Description (college_board.py, csp-codes.json); the other ten quote drawn code and are set out by a person. Russell's are hand-copied from ~/Plantoir Marketing/.sources/College Board Curriculum. Windows has no PDF reader for them (ced_statements.swift is PDFKit), so a Windows folder has no College Board pages and the scenes that need them are taken on the Mac.",
+      "about": "The College Board's own words never enter this repository. A Mac makes 56 of the 66 pages from the public Course and Exam Description (college_board.py, csp-codes.json); the other ten quote drawn code and are set out by a person. Russell's are hand-copied from ~/Plantoir Marketing/.sources/College Board Curriculum. Windows has no PDF reader for them (ced_statements.swift is PDFKit), so a Windows folder makes none: Windows' pictures of the scenes that need them are taken with the Mac's courses copied in by Russell (#460).",
       "folder": "College Board Curriculum",
       "source": "hand-copied by Russell"
     },
