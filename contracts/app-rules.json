@@ -933,6 +933,21 @@
         "expect" : null,
         "output" : "Traceback (most recent call last):\n  File \"build_site.py\", line 42\nKeyError: 'x'",
         "why" : "Recognised as nothing, so nothing is said and the app shows the output itself."
+      },
+      {
+        "expect" : null,
+        "output" : "Website builder version: src-7f4290c1\n❌ The website could not be built.\nKeyError: 'x'",
+        "why" : "GitHub #482. Every build prints the image's tag, an eight-digit hash, so about one tag in seven hundred carries the digits 429 (six places, 1 in 4,096 each), and timings and counts add more. The rate-limit match used to fire on a bare 429 anywhere in the output, which made an ordinary failed build say Netlify was limiting deploys. It now matches the launcher's own phrase, 'Netlify API error 429' (deploy.py), or the words 'rate limit'."
+      },
+      {
+        "expect" : null,
+        "output" : "Built in 429ms\nTraceback (most recent call last):\nKeyError: 'x'",
+        "why" : "GitHub #482: the same mistake from a timing rather than a hash."
+      },
+      {
+        "expect" : null,
+        "output" : "Cloudflare API error 429: Too many requests",
+        "why" : "GitHub #482. The rate-limit sentence names NETLIFY, so it must not be said about a Cloudflare 429: that falls back to the raw output until Cloudflare has a sentence of its own. Matching 'API error 429' without the name was rejected for exactly this case."
       }
     ],
     "note" : "A failed task's raw output is written for whoever wrote the tools — API codes, hostnames, stack traces. This turns the ones we recognise into a sentence a teacher can act on. Both apps read the SAME output from the same shared scripts, so both must recognise the same things and say the same words. When nothing is recognised, say NOTHING and show the raw output: an honest fallback beats a confident guess."

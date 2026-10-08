@@ -21,7 +21,7 @@
         "why": "The assistant flags and chat template handling depend on the engine build. The helper versions isolate whether a machine is running what Plantoir expects - but only if they are MEASURED: the launchers use whatever copy is already installed and download only what is missing, so a line naming the pinned versions described a machine that did not exist, and on a Mac with Homebrew's tools it once sent a diagnosis the wrong way (issue #222). On macOS the line is written a moment after the other two launch lines, once the programs have answered."
       },
       {
-        "carries": "the folder path, redacted",
+        "carries": "the folder path, redacted, and — since #457, on the mac — ' from File ▸ Open Recent' when it was chosen from that menu rather than in the Open panel",
         "event": "working folder opened",
         "why": "Almost every question about a course begins with which folder it is in. On the mac, a folder outside the home folder used to bind-mount as an EMPTY folder inside the container, and a container made that old way still does until it is recreated; the launchers refuse such a folder since #221, and since #290 the app refuses it when a window chooses or reopens it, writing \"working folder refused\" or \"working folder not reopened\" instead of this line. This line is the teacher's CHOICE only: a folder the app reopened by itself writes \"working folder reopened\" (#311)."
       },
@@ -32,17 +32,22 @@
       },
       {
         "event": "working folder not reopened",
-        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
+        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own, the last working folder, or — since #457, on the mac — 'a folder chosen from Open Recent', which cannot be opened for one of the first five reasons; one out of the builder's reach is refused as a chosen folder is) and the remembered path (redacted)",
         "why": "\"Plantoir forgot my folder\" is the report #311 exists to prevent; when it happens anyway, the reason and the path are what can no longer be looked for afterwards — the drive gets plugged back in, the Trash emptied, the permission granted."
       },
       {
         "event": "working folder refused",
-        "carries": "the chosen folder's path (redacted), and whether the folder itself or its courses lead outside the home folder",
-        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only the picker writes it; a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
+        "carries": "the chosen folder's path (redacted), whether the folder itself or its courses lead outside the home folder, and where it was chosen (the picker, or since #457 File ▸ Open Recent)",
+        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only a CHOSEN folder writes it — in the Open panel (the picker's, or since #457 File ▸ Open Working Folder…'s with no window open; both say 'chosen in the picker') or from File ▸ Open Recent (since #457, saying 'chosen from File ▸ Open Recent'); a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
         "appliesOn": [
           "mac"
         ],
         "appliesOnWhy": "PERMANENT: Windows builds natively, so no folder it can read is out of the builder's reach (shared-rules.json → workingFolderReach)."
+      },
+      {
+        "event": "recent working folders cleared",
+        "carries": "how many folders the Open Recent list held",
+        "why": "GitHub #457. File ▸ Open Recent lists the working folders a teacher has opened (openRecent), so the folder they want is one choice away even with no window open. 'Open Recent is empty and I never cleared it' — or 'it forgot my folders' — has no answer without this line; the list is otherwise only ever added to."
       },
       {
         "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a deploy of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause)",
@@ -12042,7 +12047,7 @@
         "the Course Settings FORM itself - a reference course's row opens a short read-only summary instead (the real code and name, its school year with the Set School Year... action beside it, its sections, and the two sentences). The form asked a never-deployed course to choose a deploy folder, greyed Save for ever with no explanation, and let every OTHER setting be saved - including the deploying settings whose emptiness is what makes an older Plantoir refuse the course",
         "Course Settings' writes: the folder and unit-word renames, and Restore Section N...",
         "the Site Health REPAIR button. The findings may still be reported; the button may not be drawn, because a repair returns no attempts on a frozen course and the zero-attempt branch reads as 'That is already put right. Nothing needed changing.' - about a folder that is really missing",
-        "Rename from EVERY route, not just the context menu: the Edit menu item and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
+        "Rename from EVERY route, not just the context menu: the Edit menu item (Course ▸ Rename… since v1.5.0, #457) and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
         "Site Health repairs, which CREATE files inside the course - and would succeed, because the folders are deliberately left unlocked so the preview can work",
         "Revise with Claude... and Revise with Codex...",
         "Revise with Local AI Assistant...",
@@ -21864,6 +21869,654 @@
     "knownLimits": [
       "A session ended the ordinary way leaves its assist lease and any held-backup record behind (release.measured). Both hold nothing: every reader skips a lease whose owner has gone (workLeases.liveness - the process id with its name and start time, so a recycled id is not mistaken for it), and a record counts only while its process holds a live assist lease. One lease file, and at most one record per course backed up, accumulate per session; nothing sweeps them, as for a killed build lease.",
       "A session's lease appears and disappears while Terminal is in front, and another program's file changes nothing the app observes; the mac re-reads which courses are held when the folder is shown, when Plantoir becomes the active app, and at every click that acts on it. A menu opened without Plantoir ever being left can show the answer from the last of those; the click is still refused."
+    ]
+  },
+  "subjectMenus": {
+    "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
+    "situationDefaults": {
+      "hasFolder": false,
+      "folderGettingReady": false,
+      "sheetIsUp": false,
+      "row": "none",
+      "keptForReference": false,
+      "structuralHold": false,
+      "busy": false,
+      "copying": false,
+      "deploying": false,
+      "hasSchedule": false,
+      "hasStartOfYearUndo": false,
+      "hasLinksOffer": false,
+      "reviseBlocked": [],
+      "obsidianInstalled": false,
+      "settingsMaySave": false,
+      "settingsMayRevert": false,
+      "previewButtonEnabled": false,
+      "deployButtonEnabled": false,
+      "previewIsShowing": false,
+      "canGoBack": false,
+      "canGoForward": false
+    },
+    "situationKeys": {
+      "hasFolder": "A Plantoir window is in front with a working folder open. False with no window, or with the assistant, Settings or About in front.",
+      "folderGettingReady": "The folder's tools are still being copied after an update, or the copy failed (#476).",
+      "sheetIsUp": "A sheet or alert is attached to the window in front, or the app is in a modal session. Greys EVERY item here, Open Working Folder… and Open Recent included: with a sheet up they would open a second window behind it.",
+      "row": "What is selected in the sidebar: none, course, section, backup, archived, allBackups.",
+      "keptForReference": "The selected course, or the selected section's course, is kept for reference.",
+      "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a Claude or Codex session is open on it in another program (#458).",
+      "busy": "The course is previewing or deploying.",
+      "copying": "A copy of the course is being zipped — a backup, or the archive before a restore or removal (#351).",
+      "deploying": "A deploy of the course is running.",
+      "hasSchedule": "The selected section has a deploy scheduled.",
+      "hasStartOfYearUndo": "The selected section holds a start-of-the-year undo (#96).",
+      "hasLinksOffer": "The selected section's last build left a links checklist (#379).",
+      "reviseBlocked": "Which Revise targets are greyed for a reason (#458): claude, codex, localAssistant.",
+      "obsidianInstalled": "Obsidian is installed.",
+      "settingsMaySave": "Course Settings is showing with an unsaved change Save would write.",
+      "settingsMayRevert": "Course Settings is showing with an unsaved change Revert would discard.",
+      "previewButtonEnabled": "The section window's Preview (or Stop Preview) button is enabled.",
+      "deployButtonEnabled": "The section window's Deploy button would be enabled (it is not drawn on a course kept for reference).",
+      "previewIsShowing": "The section window is showing a preview.",
+      "canGoBack": "The preview can go back a page.",
+      "canGoForward": "The preview can go forward a page."
+    },
+    "items": [
+      "openWorkingFolder",
+      "openRecent",
+      "newCourse",
+      "importCoursesForReference",
+      "restoreFromArchive",
+      "reloadCourses",
+      "addSection",
+      "copyAPage",
+      "saveCourseSettings",
+      "revertCourseSettings",
+      "rename",
+      "setSchoolYear",
+      "keepACopyForReference",
+      "backUpNow",
+      "restoreFromBackup",
+      "courseReviseWithClaude",
+      "courseReviseWithCodex",
+      "courseReviseWithLocalAssistant",
+      "courseOpenInObsidian",
+      "courseShowInFinder",
+      "courseNewTerminalAtFolder",
+      "deleteBackup",
+      "deleteArchive",
+      "removeCourse",
+      "preview",
+      "deploy",
+      "openInBrowser",
+      "scheduleDeploy",
+      "cancelScheduledDeploy",
+      "getReadyForTheStartOfTheYear",
+      "undoGettingReady",
+      "publishPagesLinksLeadTo",
+      "sectionReviseWithClaude",
+      "sectionReviseWithCodex",
+      "sectionReviseWithLocalAssistant",
+      "sectionOpenInObsidian",
+      "sectionShowInFinder",
+      "sectionNewTerminalAtFolder",
+      "removeSection",
+      "back",
+      "forward",
+      "reloadPage"
+    ],
+    "cases": [
+      {
+        "why": "No Plantoir window in front (none open, or the assistant, Settings or About is key): every File item that acts on a window, and every Course, Section and View item, is greyed. Open Working Folder… and Open Recent are not: with no window they choose a folder and open one on it.",
+        "situation": {},
+        "enabled": [
+          "openRecent",
+          "openWorkingFolder"
+        ]
+      },
+      {
+        "why": "A working folder open and nothing selected.",
+        "situation": {
+          "hasFolder": true
+        },
+        "enabled": [
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses"
+        ]
+      },
+      {
+        "why": "The folder's tools are still being copied after an update (#476): New Course waits, the rest of File does not.",
+        "situation": {
+          "hasFolder": true,
+          "folderGettingReady": true,
+          "row": "course",
+          "obsidianInstalled": true
+        },
+        "enabled": [
+          "addSection",
+          "backUpNow",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseReviseWithClaude",
+          "courseReviseWithCodex",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeCourse",
+          "rename"
+        ]
+      },
+      {
+        "why": "A live course row, Course Settings showing an unsaved change. The Section menu is greyed; the Course menu's Revise and folder group is live because the ROW is a course. Local AI Assistant is greyed on a course row (it works per section).",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "course",
+          "settingsMaySave": true,
+          "settingsMayRevert": true
+        },
+        "enabled": [
+          "addSection",
+          "backUpNow",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseReviseWithClaude",
+          "courseReviseWithCodex",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeCourse",
+          "rename",
+          "revertCourseSettings",
+          "saveCourseSettings"
+        ]
+      },
+      {
+        "why": "A live course row while one of its sections previews: Add Section and Rename wait (#458's structural hold), Keep a Copy waits (busy), Back Up Now and Copy a Page do not, because they only read the course.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "course",
+          "structuralHold": true,
+          "busy": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseReviseWithClaude",
+          "courseReviseWithCodex",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeCourse"
+        ]
+      },
+      {
+        "why": "A live course row while a copy of it is being zipped (#351): Back Up Now and Remove Course wait.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "course",
+          "copying": true
+        },
+        "enabled": [
+          "addSection",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseReviseWithClaude",
+          "courseReviseWithCodex",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "rename"
+        ]
+      },
+      {
+        "why": "A live course row with Claude open on it in another program (#458): Rename and Add Section wait, and both outside assistants are greyed.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "course",
+          "structuralHold": true,
+          "reviseBlocked": [
+            "claude",
+            "codex"
+          ]
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeCourse"
+        ]
+      },
+      {
+        "why": "A live section row, idle: Preview and Deploy are live because the section window's own buttons are, Open in Browser is not because nothing is showing. Course items act on the section's course; the Course menu's Revise and folder group is greyed because the Section menu's copy of it is the live one.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true
+        },
+        "enabled": [
+          "addSection",
+          "backUpNow",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
+        "why": "A live section previewing, with a deploy scheduled, a start-of-the-year undo held and a links checklist waiting; the local assistant is open on another section of the course.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "previewIsShowing": true,
+          "canGoBack": true,
+          "hasSchedule": true,
+          "hasStartOfYearUndo": true,
+          "hasLinksOffer": true,
+          "structuralHold": true,
+          "busy": true,
+          "reviseBlocked": [
+            "localAssistant"
+          ]
+        },
+        "enabled": [
+          "back",
+          "backUpNow",
+          "cancelScheduledDeploy",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "importCoursesForReference",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishPagesLinksLeadTo",
+          "reloadCourses",
+          "reloadPage",
+          "removeSection",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionShowInFinder",
+          "undoGettingReady"
+        ]
+      },
+      {
+        "why": "A live section while its course deploys: the section window greys Preview and Deploy, and the start-of-the-year group waits.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "deploying": true,
+          "structuralHold": true,
+          "busy": true,
+          "hasStartOfYearUndo": true,
+          "hasLinksOffer": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeSection",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
+        "why": "A course kept for reference: only what reads it, its school year, and the folder actions. Nothing that changes it.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "course",
+          "keptForReference": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "courseNewTerminalAtFolder",
+          "courseOpenInObsidian",
+          "courseShowInFinder",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "removeCourse",
+          "setSchoolYear"
+        ]
+      },
+      {
+        "why": "A section of a course kept for reference, with a deploy still recorded as scheduled: neither Schedule nor Cancel — nothing deploys from a kept course, its section row's context menu offers neither, and the menu bar may not disagree with it (the director's ruling on #457's implementation review; Plantoir turns such a schedule off itself, ScheduledDeployCleanup). Deploy is greyed even though nothing else is running; Preview is not.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "keptForReference": true,
+          "hasSchedule": true,
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "reloadCourses",
+          "removeSection",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionShowInFinder",
+          "setSchoolYear"
+        ]
+      },
+      {
+        "why": "A backup row.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "backup"
+        },
+        "enabled": [
+          "courseShowInFinder",
+          "deleteBackup",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "restoreFromBackup"
+        ]
+      },
+      {
+        "why": "A backup row while its course is being copied: Restore from Backup waits.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "backup",
+          "copying": true
+        },
+        "enabled": [
+          "courseShowInFinder",
+          "deleteBackup",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses"
+        ]
+      },
+      {
+        "why": "An archived row: restored from File ▸ Restore from Archive…, deleted from Course ▸ Delete Archive….",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "archived"
+        },
+        "enabled": [
+          "courseShowInFinder",
+          "deleteArchive",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses",
+          "restoreFromArchive"
+        ]
+      },
+      {
+        "why": "All Backups: nothing in the subject menus acts on the summary row.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "allBackups"
+        },
+        "enabled": [
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "reloadCourses"
+        ]
+      },
+      {
+        "why": "A sheet or alert is up on a live section that could otherwise do everything: EVERYTHING greys — Open Working Folder… and Open Recent too, which would otherwise open a second window behind the sheet — so a key equivalent cannot act behind it (a real ⇧⌘D with a sheet attached ran Deploy until this rule).",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "previewIsShowing": true,
+          "settingsMaySave": true,
+          "sheetIsUp": true
+        },
+        "enabled": []
+      }
+    ],
+    "rejected": [
+      "One 'Actions' menu for everything (Russell, 2026-10-07): a menu whose half applies to courses and half to sections, with no name for either, is where things go to be lost.",
+      "A menu per window kind, swapped in as the window in front changes (rejected as Canopy rejected it, documentation/09-mac-app.md): the menu bar is the app's command memory, and a menu that changes its NAME with focus cannot be learned.",
+      "Hiding items that do not apply to the selection, the way the context menus do: the menu bar's items would come and go with every click.",
+      "The same verb in both subject menus acting on the same thing (the plan review, #457 item 4 — 'no word appears twice'): New Course is in File only, the backup's restore is 'Restore from Backup…' so it is not File's 'Restore from Archive…', and the Revise and folder group appears in both menus only because the two act on different rows and only one is ever live.",
+      "Leaving the menu items live under a sheet and relying on each action's own refusal: several actions have none (Delete Backup, Copy a Page), and those that do would say it in a second alert behind the first."
+    ]
+  },
+  "openRecent": {
+    "note": "GitHub #457 (Russell, 2026-10-08: 'Choosing a different working folder should not require opening a window on the existing one first'). File ▸ Open Recent lists the working folders a teacher has OPENED, newest first, so another folder is one choice away even with no window open. Opening one with a Plantoir window in front switches that window, the same as Open Working Folder… does; with none in front it opens a new window on it.",
+    "rule": "A folder joins the list, at the TOP, when it is OPENED: chosen with Open Working Folder…, chosen from Open Recent, or reopened by the app at launch. NEVER when a window merely comes to the front — that happens on every app switch, and with two windows on two folders it would reorder the list on every switch, each reorder a menu-bar rebuild (measured by the plan review, #457). Opening the folder already at the top writes nothing. The same folder spelled two ways (case, Unicode form, /private) is one entry, kept at the spelling just opened. At most `cap` entries; the oldest falls off. Clear Menu empties it. A folder that has gone is NOT filtered out of the menu — that would mean asking the disk while the menu is drawn — and choosing it says why it could not be opened (wording), writing 'working folder not reopened' with the occasion 'a folder chosen from Open Recent'. A folder outside the home folder is refused with the same words the picker uses (workingFolderReach).",
+    "cap": 10,
+    "titleRule": "Each entry is titled with the folder's own name. When two entries share a name, each of THOSE is titled '<name> — <the folder it is in>', Xcode-style, so the two can be told apart; when that still collides (two folders of one name in two folders of one name), as much more of the path as tells them apart, joined with '/' ('Courses — A/2025').",
+    "wording": {
+      "title": "“{folder}” could not be opened",
+      "gone": "It can’t be found — if you moved it, choose it again with File ▸ Open Working Folder… from its new place.",
+      "inTrash": "It is in the Trash — put it back and choose it again, or choose another folder.",
+      "driveNotConnected": "It is on a drive that isn’t connected — connect the drive, then choose it again.",
+      "unreadable": "You don’t have permission to read it — check who is allowed to open it, then choose it again.",
+      "privacyDenied": "Plantoir isn’t allowed to open it — turn Plantoir on in System Settings ▸ Privacy & Security ▸ Files & Folders, then choose it again."
+    },
+    "wordingWhy": "NEW sentences rather than reopeningTheLastWorkingFolder.wording's: those say 'the working folder you had open LAST TIME … open Plantoir again', which is wrong for a folder the teacher has just picked from a menu (the plan review, #457). The folder's name is in the title, so the sentence does not repeat it. outsideHome and coursesOutsideHome have no sentence here: those are refused with workingFolderReach's own words, as a folder chosen in the picker is.",
+    "addingCases": [
+      {
+        "why": "The first folder ever opened.",
+        "before": [],
+        "opened": "/Users/t/Courses",
+        "after": [
+          "/Users/t/Courses"
+        ]
+      },
+      {
+        "why": "A newer folder goes to the top.",
+        "before": [
+          "/Users/t/Courses"
+        ],
+        "opened": "/Users/t/Clubs",
+        "after": [
+          "/Users/t/Clubs",
+          "/Users/t/Courses"
+        ]
+      },
+      {
+        "why": "Opening one already in the list brings it to the top; it is not listed twice.",
+        "before": [
+          "/Users/t/Clubs",
+          "/Users/t/Courses",
+          "/Users/t/Old"
+        ],
+        "opened": "/Users/t/Courses",
+        "after": [
+          "/Users/t/Courses",
+          "/Users/t/Clubs",
+          "/Users/t/Old"
+        ]
+      },
+      {
+        "why": "Opening the folder already at the top changes nothing, and writes nothing.",
+        "before": [
+          "/Users/t/Courses",
+          "/Users/t/Clubs"
+        ],
+        "opened": "/Users/t/Courses",
+        "after": [
+          "/Users/t/Courses",
+          "/Users/t/Clubs"
+        ],
+        "writes": false
+      },
+      {
+        "why": "The eleventh folder pushes the oldest off.",
+        "before": [
+          "/Users/t/F1",
+          "/Users/t/F2",
+          "/Users/t/F3",
+          "/Users/t/F4",
+          "/Users/t/F5",
+          "/Users/t/F6",
+          "/Users/t/F7",
+          "/Users/t/F8",
+          "/Users/t/F9",
+          "/Users/t/F10"
+        ],
+        "opened": "/Users/t/F11",
+        "after": [
+          "/Users/t/F11",
+          "/Users/t/F1",
+          "/Users/t/F2",
+          "/Users/t/F3",
+          "/Users/t/F4",
+          "/Users/t/F5",
+          "/Users/t/F6",
+          "/Users/t/F7",
+          "/Users/t/F8",
+          "/Users/t/F9"
+        ]
+      },
+      {
+        "why": "One folder spelled two ways is one entry, kept at the spelling just opened (#189). The mac's disk is case-insensitive, so the test makes {home}/Courses on disk and opens it as {home}/courses.",
+        "appliesOn": [
+          "mac"
+        ],
+        "appliesOnWhy": "The two spellings are a fact about this Mac's file system; Windows compares its own way (its paths are case-insensitive by rule).",
+        "makeFolders": [
+          "{home}/Courses"
+        ],
+        "before": [
+          "{home}/Courses",
+          "{home}/Clubs"
+        ],
+        "opened": "{home}/courses",
+        "after": [
+          "{home}/courses",
+          "{home}/Clubs"
+        ]
+      }
+    ],
+    "titleCases": [
+      {
+        "folders": [
+          "/Users/t/Courses",
+          "/Users/t/Clubs"
+        ],
+        "titles": [
+          "Courses",
+          "Clubs"
+        ]
+      },
+      {
+        "folders": [
+          "/Users/t/2025/Courses",
+          "/Users/t/2026/Courses",
+          "/Users/t/Clubs"
+        ],
+        "titles": [
+          "Courses — 2025",
+          "Courses — 2026",
+          "Clubs"
+        ]
+      },
+      {
+        "folders": [
+          "/A/2025/Courses",
+          "/B/2025/Courses",
+          "/Users/t/Clubs"
+        ],
+        "titles": [
+          "Courses — A/2025",
+          "Courses — B/2025",
+          "Clubs"
+        ]
+      }
+    ],
+    "rejected": [
+      "The system's own Open Recent (NSDocumentController's recent documents): it lists only what the app claims as a DOCUMENT type, and claiming folders would put Plantoir in Finder's Open With menu for every folder on the Mac.",
+      "Recording a folder each time its window comes to the front (the plan, before review): the list would reorder on every app switch — see rule.",
+      "Leaving gone folders out of the menu: asking the disk while the menu bar is drawn is the trap Canopy recorded (no I/O in the commands tree); choosing one says why instead."
     ]
   }
 }

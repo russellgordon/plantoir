@@ -2605,7 +2605,7 @@ whose chain has neither `.borderedTextField()` nor a bordered chrome, and on
 any field that chooses a style of its own — even alongside
 `.borderedTextField()`, because the style nearest the view wins and a `.plain`
 there draws it borderless. A second test allows `.textFieldStyle(` only in the
-modifier, inside the two chromes' definitions, and in the listed exceptions.
+modifier itself.
 
 **Per row, for the closing comment.** *Class pages are named / Front page
 heading / The assistant calls a page a*: read-only locked values (not fields),
@@ -2615,15 +2615,23 @@ action; the button says where it is changed, and `renameLockedNumbered` says
 why when it is disabled. Neither needs a border, because neither can be typed
 in.
 
-**Allowed, with the reason, because each draws its own border** (the
-wizard's and the searchable picker's 24pt chromes were on this list until
-#456 made every field the real bezel): the sidebar's
-`renameField` (`.plain` inside its own card, because the row sits on the
-selection colour, #293), the assistant's `assistComposerField` (`.plain`
-inside the composer's own rounded stroke), and `taskAnswerField` (inside an
-`.alert`, where AppKit draws the field). An exception whose field has gone
-fails the test until it leaves the list. `TextEditor`s are not text fields;
-the footer's already strokes its own border.
+**No exemptions, since #457** (Russell: "no exemptions"). The scan had an
+allow-list — the wizard's and the searchable picker's 24pt chromes until #456
+made every field the real bezel, then three fields until v1.5.0 — and has none
+now. The three: the sidebar's rename field wears `.borderedTextField()` inside
+its card, which keeps its text-background FILL (that is what keeps the red
+problem line readable on the selection colour, #293) and lost its stroke so two
+borders do not nest — driven in Light and Dark on a selected row, the bezel
+reads on the blue with or without the card; the assistant's composer wears it
+instead of the Messages-shaped stroke it drew itself (the plan review measured
+24, 40 and 72 points tall for one, two and four lines, stopping at four), with
+the send button just outside the trailing edge; and the alert's
+`taskAnswerField` carries it although AppKit draws a field inside an `.alert`
+and ignores it — written so a field that ever moves out of the alert is
+bordered without anyone remembering. `TextEditor`s are not text fields; the
+footer's already strokes its own border. (The composer was not driven
+visually in this batch: opening it starts the assistant. The model-free
+scan pins the modifier.)
 
 REJECTED: converting the wizard's chrome fields to `.roundedBorder` (2pt out
 of line with the picker, measured); a scan for `.plain` alone (an unstyled
@@ -2649,6 +2657,245 @@ its id `quartz-standard`, which every course stores and both wizards default
 to, did not change — and `scripts/test_colour_scheme_names.py` now holds every
 scheme name against the same `forbidden` list, whole-word. It is pure Python,
 so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
+
+## Mac conventions: the menu bar, keys and text fields (#457)
+
+Russell, 2026-10-07/08: Plantoir did things a teacher could reach only by
+right-clicking a sidebar row, pressing a button inside a window, or asking the
+local assistant. The macOS Human Interface Guidelines put a window's commands
+in the menu bar — where somebody looks for a command they cannot find, and the
+only place a key equivalent is advertised. The model followed is Canopy's
+correction of 2026-08-30 (`Canopy/Documentation/v2/technical/mac-window-conventions.md`
+§3–4b). Batch A of v1.5.0 landed the menus, keys and fields; the assistant's
+own verbs (#457 item 3) are batch B and go into the Section menu after Open in
+Browser, where a comment marks the place.
+
+### The menu bar, measured before and after
+
+Step 0 read the real `NSApp.mainMenu` in the hosted app on `dev` before
+anything was written. What it found, and what is true now:
+
+| | Before (dev, 2026-10-08) | Since #457 |
+|---|---|---|
+| Menus | Plantoir · File · Edit · View (empty) · **Preview** · Window · Help | Plantoir · File · Edit · View · **Course** · **Section** · Window · Help |
+| File | **New ▸** New Plantoir Window ⌘N / New Assistant Window; Open Working Folder… ⌘O, Import…, Restore from Archive…, Reload Courses ⇧⌘R — all greyed with no window | New Window ⌘N, New Course… ⇧⌘N · Open Working Folder… ⌘O, Open Recent ▸ · Import…, Restore from Archive…, Reload Courses ⇧⌘R · Close ⌘W |
+| Edit | the system's, plus **Rename Course** | the system's only |
+| View | nothing of Plantoir's | Back ⌘[, Forward ⌘], Reload Page ⌘R, before the system's items |
+| Window | listed **About Plantoir** a second time | windows only (`.commandsRemoved()` on the About scene) |
+| Print / Page Setup | none (so ⇧⌘P was free) | none |
+
+The whole tree is pinned by `MenuBarTreeTests` against
+`mac-app/Tests/Goldens/menu-bar.txt`, read out of the real menu bar — titles,
+keys and dividers, never enablement (that is `subjectMenus`' job).
+
+### The shape: one focused value per OWNER of the state
+
+The window publishes values through `focusedSceneValue`, the App's `.commands`
+reads them with `@FocusedValue`, and every value is Equatable on what the menu
+SHOWS so a republish that changes nothing does not rebuild the menu bar
+(`App/MenuCommandValues.swift`). The Course and Section menus need state three
+views own: the SIDEBAR (the selection, and every sheet a row's menu opens),
+the SECTION WINDOW (its preview and deploy runners), and COURSE SETTINGS (Save
+and Revert). Each publishes its own value — `SidebarMenuCommands`,
+`SectionSiteCommands`, `CourseSettingsCommands` — and `MenuSituation` puts
+them together. Each carries a `perform(item)` closure that reads the
+selection when it RUNS: equality ignores the closure, so an "equal" republish
+keeps the old one, and a closure that had captured its row would act on a row
+the teacher has left.
+
+**Which items can be used is decided in one pure place**,
+`SubjectMenuRules.enabledItems(situation)`, and its cases are the contract:
+`contracts/shared-rules.json` → `subjectMenus` (neutral item names, so
+Windows can run them). **Presence follows the Mac, enablement follows the
+selection**: a Revise With target is DRAWN only when this Mac has it
+(`OutsideAssistantPresence`, asked at launch and on becoming active, never
+while the menu is drawn), and ENABLED by the rule. Everything else GREYS
+rather than disappears; the context menus keep HIDING, because they are about
+one row.
+
+**The same code, not a copy.** Every menu item calls what its other route
+calls: the sidebar's `performMenuItem` dispatches to the same functions the
+context menus call (`addSection(to:)`, `reviseWithLocalAssistant`, …);
+Section ▸ Preview calls the toolbar's own `previewButtonPressed()` — so the
+question about today's class (#397) is asked from the menu too, and
+`class-planning.json` → `askedFrom` now names both; Deploy… calls
+`startDeploy()` on the button's own predicate (`deployButtonIsEnabled`);
+Save Course Settings calls `save()` on `saveIsEnabled`. Each perform asks its
+predicate again at the click.
+
+### A sheet greys everything, and the action asks again
+
+The plan review's blocker, measured on a model app and then on the real one:
+a menu key equivalent FIRES while a sheet is attached to its window — the
+focused values are still there and the item reads enabled — so a real ⇧⌘D
+sent through `NSApp.sendEvent` with a sheet up ran Deploy. Two guards now:
+`WorkspaceModel.sheetIsUp`, set from AppKit's own `willBeginSheet` /
+`didEndSheet` notifications in `WindowRootView` (one place that sees every
+presenter), greys every verb; and `MenuRoute.run` asks the window again
+(`attachedSheet`, `NSApp.modalWindow`) when the item runs. Driven in the
+built app: New Course's wizard up on a selected section, Section ▸ Deploy…
+greyed, ⇧⌘D did nothing, no deploy line on the trail.
+`MenuKeysBehindASheetTests` sends a real ⇧⌘D to the real window: the control
+press (no sheet) must reach the item, the press with a sheet must not; with
+both guards removed it went red (Deploy ran twice behind the sheet).
+Synthesising the key needs `charactersIgnoringModifiers: "d"` — "D" matched
+nothing, measured.
+
+### Key equivalents
+
+On menu items, never on a view's button — `KeyEquivalentPlacementScanTests`
+fails on any character shortcut under `Views/`; Return and Escape for a
+dialog's buttons are the exceptions. ⌘S moved off Course Settings' Save button
+onto Course ▸ Save Course Settings.
+
+| Key | Item |
+|---|---|
+| ⌘N | File ▸ New Window |
+| ⇧⌘N | File ▸ New Course… |
+| ⌘O | File ▸ Open Working Folder… |
+| ⇧⌘R | File ▸ Reload Courses |
+| ⌘[ ⌘] ⌘R | View ▸ Back, Forward, Reload Page (on menu items because a focused web view swallows keys before toolbar shortcuts see them) |
+| ⌥⌘N | Course ▸ Add Section… |
+| ⇧⌘C | Course ▸ Copy a Page from This Course… (there is no Format menu, so no Show Colors to collide with) |
+| ⌘S | Course ▸ Save Course Settings |
+| ⇧⌘O | Open in Obsidian — Course's, or Section's when a section is selected |
+| ⇧⌘P | Section ▸ Preview / Stop Preview |
+| ⇧⌘D | Section ▸ Deploy… |
+
+Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥⌘T ⌘Z ⇧⌘Z ⌘X ⌘C ⌘V ⌘A ⌘F
+⌘G ⇧⌘G ⌘E ⌘P ⌘T ⇧⌘/ ⌘. ⌃⌘Space ⌥⌘D (the Dock, system-wide) ⇧⌘Q ⌃⌘Q ⌥⌘Esc
+⇧⌘3/4/5 ⌥⌘I, and ⌥⌘S (SwiftUI's hidden sidebar toggle, measured in Help).
+`MenuBarTreeTests.testEachKeyEquivalentMeansOneThing` fails on any key on two
+visible items.
+
+**Why ⇧⌘O moves rather than sitting on both Open in Obsidian items** — the
+director's ruling allowed one key on two items that are never enabled at the
+same time, and it does not work. Measured with a plain AppKit menu on macOS
+26: a key equivalent on a DISABLED item earlier in the menu bar SWALLOWS the
+key — `performKeyEquivalent` returns true and runs nothing — so with a section
+selected, Course's greyed ⇧⌘O (Course comes first) would have eaten the key.
+And SwiftUI never gets that far: the implementation review measured a SwiftUI
+app with two `CommandMenu`s and ⇧⌘O on both items — SwiftUI DRAWS the key on
+the FIRST item only (the second's `keyEquivalent` is empty even while it is
+enabled), so on a section row ⇧⌘O fired nothing at all. REJECTED for both
+reasons: one key on two items. So the key is drawn on Course's item unless a
+section row is selected, and on Section's then (`.keyboardShortcut(nil)` on
+the other) — measured to fire the live item on course, section and empty
+rows, and to cost no extra rebuilds (20 row flips, 20 body evaluations of each
+menu either way).
+
+Rename… has no key, deliberately: Return renames in the sidebar, as in Finder,
+but a bare Return as a menu key equivalent is matched before the responder
+chain and would be taken from every field and default button in the window.
+
+### File with no window open
+
+Russell, 2026-10-08: with no window open, File offered a New ▸ submenu of two
+kinds of window and greyed everything else, so choosing another working
+folder meant opening a window on the old one first — and the assistant could
+be opened with no course behind it. `FileCommands` replaces `.newItem`:
+
+- **New Window ⌘N** — SwiftUI's automatic New submenu is gone, and with it
+  "New Assistant Window". The assistant opens only from Revise With ▸ Local AI
+  Assistant… on a section. Moving ⌘N to the top level also fixed #306's
+  no-window notification click in passing: `SectionFromNotification`'s
+  fallback looks for ⌘N one level down and never found it in the submenu
+  (the plan review measured it; `MenuBarTreeTests` pins the lookup).
+- **Open Working Folder… and Open Recent work with no window.** With a
+  Plantoir window in front they switch THAT window — Russell's decision, and
+  what Open… always did. With a SHEET up on that window they are greyed like
+  every verb (`subjectMenus` → `openWorkingFolder`, `openRecent`). Left live
+  — which the implementation review measured — they would have opened an
+  app-modal panel and a SECOND window behind the sheet: that part was found by
+  reading the code (`freeWindowModel` is nil under a sheet, so the no-window
+  branch runs), not measured. SwiftUI keeps a submenu's own item enabled
+  whatever `.disabled` says (measured), so it is Open Recent's ENTRIES that
+  grey. With none, an app-level
+  `NSOpenPanel` (or the recent folder) is set as
+  `WorkspaceModel.folderToOpenInNextNewWindow` and a new window opens on it
+  through `chooseWorkspace`, as the teacher's choice: the #290 refusal, the
+  "working folder opened" line and the last-folder memory all apply. The
+  value is taken once, in `adoptFolderForNewWindow` after its guard (so a
+  window being RESTORED never consumes it), and dropped when the app resigns
+  active — the rule `folderForNextNewWindow` has — so a window the teacher
+  opens an hour later is not captured by a choice whose window never
+  appeared. Driven: ⌘W on the last window, File ▸ Open Working Folder…
+  enabled, a folder chosen, a window opened on it and the trail said "opened
+  the working folder".
+- **Open Recent** (`RecentWorkingFolders`, `shared-rules.json` →
+  `openRecent`): the folders OPENED — chosen, chosen from the menu, or
+  reopened at launch — newest first, one entry per folder however spelled,
+  at most ten, Clear Menu last (which writes "recent working folders
+  cleared"). NOT recorded when a window comes to the front: that runs on
+  every app switch, and with two windows on two folders it would reorder the
+  list each time, each reorder a menu-bar rebuild. A folder that has gone is
+  not filtered out of the menu (no disk I/O while the menu is drawn); choosing
+  it goes through `RememberedFolder`'s decision and says why in
+  `OpenRecentWording` — new sentences, because `ReopenWording`'s "the folder
+  you had open last time… open Plantoir again" is wrong for a folder just
+  picked — on the picker, or in an alert over a window that keeps its folder,
+  and writes "working folder not reopened" with the occasion "a folder chosen
+  from Open Recent". One outside the home folder is refused with the picker's
+  own words, and the trail says "(chosen from File ▸ Open Recent)". Titles
+  that collide get the parent folder's name, Xcode-style ("Courses — 2025"),
+  and more of the path when that still collides ("Courses — A/2025"). The
+  first read seeds the list from the last working folder and the remembered
+  windows, so it is not empty after the update.
+
+### A course kept for reference: the menu bar and its rows agree
+
+Two disagreements the implementation review found, both decided by the
+director: **Section ▸ Cancel Deploy at…** is greyed on a course kept for
+reference — its section row's context menu has no Cancel, nothing deploys from
+a kept course, and Plantoir turns any schedule it still has off itself
+(`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`); the plan's
+"gate by direction" for the menu bar was REJECTED for that reason. And **Open
+in Obsidian on a reference SECTION** reveals the SECTION's folder from every
+route — the toolbar button beside it always did, while the row and the menu
+bar revealed the course — through one rule, `FolderActions.obsidianFolder`;
+the locked-pages note, shown the first time, now opens the folder it was
+asked for. (The toolbar button still opens without that note; noted for the
+HIG sweep.)
+
+### Context menus select their row first
+
+A context-menu item acts on the row under the pointer and SELECTS it first,
+Finder-style (#457 item 4), so what is selected afterwards is what the item
+acted on and the Course and Section menus name the same thing. The exception
+is Rename Course: a rename field opened in the same turn as a selection change
+loses focus to the sidebar's deferred focus and closes (#293, the table above),
+and the field works on an unselected row.
+
+### Rejected
+
+- **One "Actions" menu** (Russell, 2026-10-07): half of it about courses and
+  half about sections, with a name for neither.
+- **A menu per window kind**, swapped as focus moves (as Canopy rejected it):
+  a menu that changes its NAME with focus cannot be learned.
+- **`CommandMenu("View")`** for Back/Forward/Reload: macOS draws a View menu
+  for every app, even with no window open (measured), so that makes two.
+  They go into the system's own with `CommandGroup(before: .toolbar)`.
+- **Hiding what does not apply in the menu bar**: items would come and go
+  with every click. Greyed is the accepted cost of a stable menu bar.
+- **The same words twice** (#457 item 4): New Course… is in File only;
+  the backup's restore is "Restore from Backup…", not File's "Restore from
+  Archive…"; Revise With and the folder group appear in both subject menus
+  only because they act on different rows and only one copy is ever live.
+- **One focused value for all four owners' state**, and **moving every
+  sheet's state into `WorkspaceModel`**: a merge or a refactor no teacher
+  would see.
+- **Install flags in the focused value** (the plan): with no Plantoir window
+  key there is no value, so the menu's SHAPE would change with focus.
+- **`NSDocumentController`'s recent documents**: they list only document
+  types, and claiming folders would put Plantoir in Finder's Open With menu
+  for every folder.
+- **Recording recents on focus** — see above.
+- **`reopen(_:occasion:)` for Open Recent** (the plan): its failure is silent
+  in a window that keeps its folder, its words say "last time", and it never
+  lets go of the folder being left.
+- **One key on two items** — see ⇧⌘O above.
+- **Leaving Open Working Folder… and Open Recent live under a sheet** — see
+  File above.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -3126,7 +3373,8 @@ students.
 
 ## Renaming a course in the sidebar: two claims on the keyboard (#293)
 
-Return, Edit ▸ Rename Course or the row's context menu turns a course's row
+Return, Course ▸ Rename… (Edit ▸ Rename Course until v1.5.0, #457) or the
+row's context menu turns a course's row
 into a field (`CourseCodeField` in `SidebarView.swift`). What it shows under
 itself and what Return refuses are ONE function,
 `WorkspaceModel.renameFieldProblem(_:typed:)`; Return goes through
@@ -4491,7 +4739,8 @@ touched a week before the import. The commonest year gets all four right.
 
 #### Where the interface lives, and two SwiftUI facts behind it
 
-The menu item is in the **File menu**, beside Open Working Folder…, because it
+The menu item is in the **File menu**, under Open Working Folder… and Open
+Recent, because it
 is the same kind of act: it starts by choosing a folder. It is deliberately NOT
 on the sidebar's `+` button, which opens the New Course wizard on a single
 click — putting a menu in front of the thing a teacher presses most often to
@@ -8387,11 +8636,13 @@ purpose:
   checks, live, that the frame match finds the window when it is showing — so
   the tree half of the check is not dead code that always says "missing".
 
-**Reading the totals.** A normal full run has **3 skipped** — the three tests
-that want `INTEGRATION_WORKSPACE` — plus a fourth,
+**Reading the totals.** A normal full run has **4 skipped** — the three tests
+that want `INTEGRATION_WORKSPACE`, and `FolderIdentityTests.testCanonicalPathIsWhatBinPwdPrintsInEveryPlace`,
+which wants `PLANTOIR_TEST_EVERY_PLACE=1` (#189; this said 3 until 2026-10-08,
+when #457's review measured 4 on `dev` and on the branch alike) — plus a fifth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
 any launcher is running on the Mac (a preview in the app, another session's
-`verify.sh`; #243 is fixing that class). More than 3 means read the skip
+`verify.sh`; #243 is fixing that class). More than 4 means read the skip
 reasons: a Space skip says so, and so does that one. **A run made while the
 screen is locked — the overnight gates, with nobody at the Mac — shows 8 more
 skipped and 0 failures** (`AccessibilityInspectorTests` 2 — the two live

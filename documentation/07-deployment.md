@@ -1723,7 +1723,11 @@ ruled out. These are on Russell's list in the piece's hand-over:
 - the #311 restore ordering (a click that launches the app with two windows
   remembered), and before it the plainer question: with the default "Close
   windows when quitting", quit, click, and check whether ANY window appears. If
-  none does, the File ▸ New Window fallback above is what should open one;
+  none does, the File ▸ New Window fallback above is what should open one —
+  and since #457 it can: until v1.5.0 ⌘N sat in a nested File ▸ New ▸
+  submenu, the fallback's one-level lookup found nothing, and the click parked
+  instead (the #457 plan review, measured; `SectionFromNotification.newWindowMenuItem`,
+  pinned by `MenuBarTreeTests.testTheNotificationsNewWindowOpenerFindsNewWindow`);
 - that `openWindow` captured from a window that has since closed still opens
   one (the "no windows open" row). The fallback, if not, is the App-level
   `@Environment(\.openWindow)`.
