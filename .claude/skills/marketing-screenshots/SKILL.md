@@ -363,6 +363,16 @@ python3 website/shots/capture.py --provision-demo   # creates the three courses 
 python3 website/shots/capture.py --publish          # builds and publishes them
 ```
 
+On Windows the `--app` pass makes and states `~/Teaching` itself (#459): the
+`provision` scene makes folders.json's courses through the New Course panel,
+then `capture_windows.provision_demo` gives them their state. A `~/Teaching`
+whose courses have other sections than folders.json's is deleted and made
+again first. By hand, for a folder whose courses the app has already made:
+
+```powershell
+python website/shots/capture_windows.py --provision-demo $HOME\Teaching   # no pictures: the state only
+```
+
 Provisioning drives the app's own new-course panel three times and runs the
 real setup script, so it takes a long while and needs Docker. Then it gives
 the folder the state `website/shots/marketing/folders.json` describes
