@@ -1,0 +1,1120 @@
+#440 raw output, 2026-10-07, Mac16,8 (M4 Pro), b10435 Metal. Every suite run in the order it ran, with the
+per-trial rows taken out (they are one line per request; the per-probe summaries below count them). The A' arm's
+add_next_class arguments are kept as a count of each distinct argument object per probe. See next-class-unit-440-results.txt.
+
+################ small M1a-before
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            210/290 (72%)
+the 21 the model SEES:  150/210 (71%)   — the rest are answered in code
+Windows-comparable 18: 120/180
+promise-card 11 (WINDOWS' ExampleRequests): 90/110
+promise-card, the 4 the model sees: 30/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 50
+responses needing type coercion: 0
+malformed tool calls: 10   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3641 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3666 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3669 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3707 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3714 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3730 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3732 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3794 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3984 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4043 ms
+turns the server ended on 'length' rather than on the model finishing: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3641 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3666 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3669 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3707 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3714 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3730 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3732 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3794 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3984 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4043 ms
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 39, max 512   (thinking off is tens, not hundreds)
+turn latency: median 333 ms, max 4043 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               0/10   10x (declined)  [MISS]  (answered in code, not routed)
+card: schedule a deploy        0/10   10x deploy_section  [MISS]
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   0/10   10x publish_pages  [MISS]
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           0/10   10x check_section  [MISS]  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              0/10   10x deploy_section  [MISS]
+deploy now                     0/10   10x publish_class_on  [MISS]
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       0/10   10x publish_pages  [MISS]
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        0/10   10x rebuild_preview  [MISS]
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on
+
+################ small M1b-before
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              10/10
+  control  ctl check_section          0/10   <-- not clean
+  control  ctl publish_class_on       0/10   <-- not clean
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        0/10   <-- not clean
+  control  ctl cancel_scheduled       0/10   <-- not clean
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        10/10
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 110/150 (73%)
+OVERALL: 210/250 (84%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 0
+add_next_class sent unit "next" (a NEW unit): never
+misroutes, by probe:
+   ctl cancel_scheduled       (declined) x10
+   ctl check_section          (declined) x10
+   ctl publish_class_on       publish_pages x10
+   ctl schedule_deploy        deploy_section x10
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1}
+
+################ small M1a-after
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### next-class-units guard agrees with 60 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            210/290 (72%)
+the 21 the model SEES:  150/210 (71%)   — the rest are answered in code
+Windows-comparable 18: 120/180
+promise-card 11 (WINDOWS' ExampleRequests): 90/110
+promise-card, the 4 the model sees: 30/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 50
+responses needing type coercion: 0
+malformed tool calls: 10   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3778 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3779 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3795 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3808 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3814 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3861 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3871 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3926 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3962 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4033 ms
+turns the server ended on 'length' rather than on the model finishing: 10
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3778 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3779 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3795 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3808 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3814 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3861 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3871 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3926 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 3962 ms
+   publish tomorrow, with links -> publish_pages, 512 completion tokens, 4033 ms
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 39, max 512   (thinking off is tens, not hundreds)
+turn latency: median 328 ms, max 4033 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               0/10   10x (declined)  [MISS]  (answered in code, not routed)
+card: schedule a deploy        0/10   10x deploy_section  [MISS]
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   0/10   10x publish_pages  [MISS]
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           0/10   10x check_section  [MISS]  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              0/10   10x deploy_section  [MISS]
+deploy now                     0/10   10x publish_class_on  [MISS]
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       0/10   10x publish_pages  [MISS]
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        0/10   10x rebuild_preview  [MISS]
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on
+
+################ small M1b-after
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              10/10
+  control  ctl check_section          0/10   <-- not clean
+  control  ctl publish_class_on       0/10   <-- not clean
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        0/10   <-- not clean
+  control  ctl cancel_scheduled       0/10   <-- not clean
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        10/10
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 110/150 (73%)
+OVERALL: 210/250 (84%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 0
+add_next_class sent unit "next" (a NEW unit): never
+misroutes, by probe:
+   ctl cancel_scheduled       (declined) x10
+   ctl check_section          (declined) x10
+   ctl publish_class_on       publish_pages x10
+   ctl schedule_deploy        deploy_section x10
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1}
+
+################ small M1a-aprime
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### next-class-units guard agrees with 60 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            200/290 (69%)
+the 21 the model SEES:  130/210 (62%)   — the rest are answered in code
+Windows-comparable 18: 110/180
+promise-card 11 (WINDOWS' ExampleRequests): 90/110
+promise-card, the 4 the model sees: 30/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 60
+responses needing type coercion: 0
+malformed tool calls: 10   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 10
+   typos -> publish_pages, 512 completion tokens, 3926 ms
+   typos -> publish_pages, 512 completion tokens, 3951 ms
+   typos -> publish_pages, 512 completion tokens, 3953 ms
+   typos -> publish_pages, 512 completion tokens, 3957 ms
+   typos -> publish_pages, 512 completion tokens, 3974 ms
+   typos -> publish_pages, 512 completion tokens, 3986 ms
+   typos -> publish_pages, 512 completion tokens, 3996 ms
+   typos -> publish_pages, 512 completion tokens, 4059 ms
+   typos -> publish_pages, 512 completion tokens, 4256 ms
+turns the server ended on 'length' rather than on the model finishing: 10
+   typos -> publish_pages, 512 completion tokens, 3926 ms
+   typos -> publish_pages, 512 completion tokens, 3951 ms
+   typos -> publish_pages, 512 completion tokens, 3953 ms
+   typos -> publish_pages, 512 completion tokens, 3957 ms
+   typos -> publish_pages, 512 completion tokens, 3974 ms
+   typos -> publish_pages, 512 completion tokens, 3986 ms
+   typos -> publish_pages, 512 completion tokens, 3996 ms
+   typos -> publish_pages, 512 completion tokens, 4059 ms
+   typos -> publish_pages, 512 completion tokens, 4256 ms
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 42, max 512   (thinking off is tens, not hundreds)
+turn latency: median 351 ms, max 4256 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     0/10   10x (declined)  [MISS]  (answered in code, not routed)
+card: deploy now               10/10  10x deploy_section  (answered in code, not routed)
+card: schedule a deploy        0/10   10x deploy_section  [MISS]
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   0/10   10x publish_pages  [MISS]
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      0/10   10x (declined)  [MISS]
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           10/10  10x read_page  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              0/10   10x deploy_section  [MISS]
+deploy now                     0/10   10x publish_pages  [MISS]
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       0/10   10x publish_pages  [MISS]
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        0/10   10x rebuild_preview  [MISS]
+out of scope                   10/10  10x (declined)
+typos                          0/10   10x publish_pages  [MISS]
+
+################ small M1b-aprime
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/aprime-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              10/10
+  control  ctl check_section          0/10   <-- not clean
+  control  ctl publish_class_on       0/10   <-- not clean
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        0/10   <-- not clean
+  control  ctl cancel_scheduled       10/10
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        0/10   <-- not clean
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 110/150 (73%)
+OVERALL: 210/250 (84%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 10
+add_next_class sent unit "next" (a NEW unit): never
+misroutes, by probe:
+   ctl check_section          (declined) x10
+   ctl decline: delete        rebuild_preview x10
+   ctl publish_class_on       (cut off) x10
+   ctl schedule_deploy        deploy_section x10
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1, "newUnit": true, "unit": 2, "days": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+
+################ small M2-after
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local.json trials=10 course=VVH2O dateline='(Today is 2026-10-07, a Wednesday.)' cap=512
+group      sentence                                             chose                    ms     tok   arguments
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+  pointed-a  Make the next class the first day of a new unit      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  We're starting a new unit tomorrow, add the page     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start the next unit                                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Add the next class for the next unit                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start a new unit?                                    add_next_class  0  declined 10  other write  0  extra keys: none  ok
+  pointed-a  Don't start a new unit, just add the next class      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start a new module                                   add_next_class  0  declined 10  other write  0  extra keys: none  ok
+  pointed-a  Start a new unit for the meetings                    add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class as Unit 2, Day 8                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class as Unit 3, Day 7                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Unit three                     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Module 4                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next meeting to Unit 2                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next two classes                             add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add three classes                                    add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add three days to Unit 2, please                     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add pages for the next three classes                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next 2 classes                               add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add a couple of class pages                          add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next two meetings                            add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add the next class                                   add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add an entry for the next class                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add tomorrow's class page                            add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Start the next class                                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Make a page for our next class                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Set up next day's lesson                             add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add the next class page for this unit                add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class in this unit                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class to Unit 2                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class as Unit 2, Day 6                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add tomorrow's class page, I teach two classes tomor add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class for period 2                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class, tomorrow is a Day 2              add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Set up the next few lessons                          add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+--------------------------------------------------------------------------------------------------------------------------------------------
+sentences: 37   trials each: 10   failing the M2 rule: 0
+  add_next_class arguments, by probe (count x argument object):
+    Make the next class the first day of a new unit      10x {"course": "VVH2O", "section": 1}
+    We're starting a new unit tomorrow, add the page     10x {"course": "VVH2O", "section": 1}
+    Start the next unit                                  10x {"course": "VVH2O", "section": 1}
+    Add the next class for the next unit                 10x {"course": "VVH2O", "section": 1}
+    Don't start a new unit, just add the next class      10x {"course": "VVH2O", "section": 1}
+    Start a new unit for the meetings                    10x {"course": "VVH2O", "section": 1}
+    The next class begins Unit 3                         20x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit 3                         10x {"course": "VVH2O", "section": 1}
+    Add the next class as Unit 2, Day 8                  10x {"course": "VVH2O", "section": 1}
+    Add the next class as Unit 3, Day 7                  10x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit three                     10x {"course": "VVH2O", "section": 1}
+    Add the next class to Module 4                       10x {"course": "VVH2O", "section": 4}
+    Add the next meeting to Unit 2                       10x {"course": "VVH2O", "section": 1}
+    Add the next two classes                             10x {"course": "VVH2O", "section": 1}
+    Add three classes                                    10x {"course": "VVH2O", "section": 1}
+    Add three days to Unit 2, please                     10x {"course": "VVH2O", "section": 1}
+    Add pages for the next three classes                 10x {"course": "VVH2O", "section": 1}
+    Add the next 2 classes                               10x {"course": "VVH2O", "section": 1}
+    Add a couple of class pages                          10x {"course": "VVH2O", "section": 1}
+    Add the next two meetings                            10x {"course": "VVH2O", "section": 1}
+    Add the next class                                   10x {"course": "VVH2O", "section": 1}
+    Add an entry for the next class                      10x {"course": "VVH2O", "section": 1}
+    Add tomorrow's class page                            10x {"course": "VVH2O", "section": 1}
+    Start the next class                                 10x {"course": "VVH2O", "section": 1}
+    Make a page for our next class                       10x {"course": "VVH2O", "section": 1}
+    Set up next day's lesson                             10x {"course": "VVH2O", "section": 1}
+    Add the next class page for this unit                10x {"course": "VVH2O", "section": 1}
+    Add the next class in this unit                      10x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit 2                         10x {"course": "VVH2O", "section": 1}
+    Add the next class as Unit 2, Day 6                  10x {"course": "VVH2O", "section": 1}
+    Add tomorrow's class page, I teach two classes tomor 10x {"course": "VVH2O", "section": 1}
+    Add the next class for period 2                      10x {"course": "VVH2O", "section": 1}
+    Add the next class, tomorrow is a Day 2              10x {"course": "VVH2O", "section": 1}
+    Set up the next few lessons                          10x {"course": "VVH2O", "section": 1}
+
+################ small M2-aprime
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/aprime.json trials=10 course=VVH2O dateline='(Today is 2026-10-07, a Wednesday.)' cap=512
+group      sentence                                             chose                    ms     tok   arguments
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+  pointed-a  Make the next class the first day of a new unit      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  We're starting a new unit tomorrow, add the page     add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start the next unit                                  add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Add the next class for the next unit                 add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new unit?                                    add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Don't start a new unit, just add the next class      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new module                                   add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=true x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new unit for the meetings                    add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class as Unit 2, Day 8                  add_next_class 10  declined  0  other write  0  extra keys: days=8 x10, newUnit=true x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class as Unit 3, Day 7                  add_next_class 10  declined  0  other write  0  extra keys: days=7 x10, newUnit=true x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Unit three                     add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Module 4                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=4 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next meeting to Unit 2                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next two classes                             add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add three classes                                    add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add three days to Unit 2, please                     add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add pages for the next three classes                 add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next 2 classes                               add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add a couple of class pages                          add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next two meetings                            add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  control    Add the next class                                   add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  control    Add an entry for the next class                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  FAILS (a control below 10/10, or extra keys)
+  control    Add tomorrow's class page                            add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  FAILS (a control below 10/10, or extra keys)
+  control    Start the next class                                 add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  control    Make a page for our next class                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  FAILS (a control below 10/10, or extra keys)
+  runs       Set up next day's lesson                             add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  ok
+  control    Add the next class page for this unit                add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  FAILS (a control below 10/10, or extra keys)
+  runs       Add the next class in this unit                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  ok
+  runs       Add the next class to Unit 2                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=2 x10  ok
+  runs       Add the next class as Unit 2, Day 6                  add_next_class 10  declined  0  other write  0  extra keys: days=6 x10, newUnit=true x10, unit=2 x10  ok
+  runs       Add tomorrow's class page, I teach two classes tomor add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=1 x10  ok
+  runs       Add the next class for period 2                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Add the next class, tomorrow is a Day 2              add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Set up the next few lessons                          add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=1 x10  ok
+  runs       The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=true x10, unit=3 x10  ok
+--------------------------------------------------------------------------------------------------------------------------------------------
+sentences: 37   trials each: 10   failing the M2 rule: 28
+   FAILS: Make the next class the first day of a new unit
+   FAILS: We're starting a new unit tomorrow, add the page
+   FAILS: Start the next unit
+   FAILS: Add the next class for the next unit
+   FAILS: Start a new unit?
+   FAILS: Don't start a new unit, just add the next class
+   FAILS: Start a new module
+   FAILS: Start a new unit for the meetings
+   FAILS: The next class begins Unit 3
+   FAILS: Add the next class to Unit 3
+   FAILS: Add the next class as Unit 2, Day 8
+   FAILS: Add the next class as Unit 3, Day 7
+   FAILS: Add the next class to Unit three
+   FAILS: Add the next class to Module 4
+   FAILS: Add the next meeting to Unit 2
+   FAILS: Add the next two classes
+   FAILS: Add three classes
+   FAILS: Add three days to Unit 2, please
+   FAILS: Add pages for the next three classes
+   FAILS: Add the next 2 classes
+   FAILS: Add a couple of class pages
+   FAILS: Add the next two meetings
+   FAILS: Add the next class
+   FAILS: Add an entry for the next class
+   FAILS: Add tomorrow's class page
+   FAILS: Start the next class
+   FAILS: Make a page for our next class
+   FAILS: Add the next class page for this unit
+  add_next_class arguments, by probe (count x argument object):
+    Make the next class the first day of a new unit      10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    We're starting a new unit tomorrow, add the page     10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    Start the next unit                                  10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    Add the next class for the next unit                 10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    Start a new unit?                                    10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    Don't start a new unit, just add the next class      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Start a new module                                   10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 2, "days": 3}
+    Start a new unit for the meetings                    10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 1}
+    The next class begins Unit 3                         20x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 3, "days": 1}
+    Add the next class to Unit 3                         10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 3, "days": 1}
+    Add the next class as Unit 2, Day 8                  10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 2, "days": 8}
+    Add the next class as Unit 3, Day 7                  10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 3, "days": 7}
+    Add the next class to Unit three                     10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 3, "days": 1}
+    Add the next class to Module 4                       10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 4, "days": 1}
+    Add the next meeting to Unit 2                       10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next two classes                             10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 2}
+    Add three classes                                    10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 3}
+    Add three days to Unit 2, please                     10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+    Add pages for the next three classes                 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 3}
+    Add the next 2 classes                               10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 2}
+    Add a couple of class pages                          10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+    Add the next two meetings                            10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 2}
+    Add the next class                                   10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 2, "days": 1}
+    Add an entry for the next class                      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Add tomorrow's class page                            10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Start the next class                                 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Make a page for our next class                       10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Set up next day's lesson                             10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Add the next class page for this unit                10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Add the next class in this unit                      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+    Add the next class to Unit 2                         10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 2, "days": 1}
+    Add the next class as Unit 2, Day 6                  10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 2, "days": 6}
+    Add tomorrow's class page, I teach two classes tomor 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 2}
+    Add the next class for period 2                      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next class, tomorrow is a Day 2              10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Set up the next few lessons                          10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 1, "days": 1}
+
+################ large M1a-before
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            290/290 (100%)
+the 21 the model SEES:  210/210 (100%)   — the rest are answered in code
+Windows-comparable 18: 180/180
+promise-card 11 (WINDOWS' ExampleRequests): 110/110
+promise-card, the 4 the model sees: 40/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 0
+responses needing type coercion: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+turns the server ended on 'length' rather than on the model finishing: 0
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 41, max 50   (thinking off is tens, not hundreds)
+turn latency: median 657 ms, max 5199 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               10/10  10x deploy_section  (answered in code, not routed)
+card: schedule a deploy        10/10  10x schedule_deploy
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   10/10  10x publish_class_on
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           10/10  10x read_page  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              10/10  10x schedule_deploy
+deploy now                     10/10  10x deploy_section
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       10/10  10x publish_class_on
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        10/10  10x (declined)
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on
+
+################ large M1b-before
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              0/10   <-- not clean
+  control  ctl check_section          10/10
+  control  ctl publish_class_on       10/10
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        10/10
+  control  ctl cancel_scheduled       10/10
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        10/10
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 140/150 (93%)
+OVERALL: 240/250 (96%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 0
+add_next_class sent unit "next" (a NEW unit): never
+misroutes, by probe:
+   ctl read_page              check_section x10
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1}
+
+################ large M1a-after
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### next-class-units guard agrees with 60 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            290/290 (100%)
+the 21 the model SEES:  210/210 (100%)   — the rest are answered in code
+Windows-comparable 18: 180/180
+promise-card 11 (WINDOWS' ExampleRequests): 110/110
+promise-card, the 4 the model sees: 40/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 0
+responses needing type coercion: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+turns the server ended on 'length' rather than on the model finishing: 0
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 41, max 50   (thinking off is tens, not hundreds)
+turn latency: median 647 ms, max 903 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               10/10  10x deploy_section  (answered in code, not routed)
+card: schedule a deploy        10/10  10x schedule_deploy
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   10/10  10x publish_class_on
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           10/10  10x read_page  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              10/10  10x schedule_deploy
+deploy now                     10/10  10x deploy_section
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       10/10  10x publish_class_on
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        10/10  10x (declined)
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on
+
+################ large M1b-after
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              0/10   <-- not clean
+  control  ctl check_section          10/10
+  control  ctl publish_class_on       10/10
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        10/10
+  control  ctl cancel_scheduled       10/10
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        10/10
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 140/150 (93%)
+OVERALL: 240/250 (96%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 0
+add_next_class sent unit "next" (a NEW unit): never
+misroutes, by probe:
+   ctl read_page              check_section x10
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1}
+
+################ large M1a-aprime
+### date-appended=True date-prepended=False real-course=True
+### prompt=shipped temperature=0.0 app-body=True trials=10 course=VVH2O
+### max_tokens=512 (read from mac-app/QuartzTeachers/Models/Assist/AssistModelClient.swift)
+### em-dashes in the shipped literal, folded for the hyphen form: 6
+### deploy-at-a-time guard agrees with 144 contract rows
+### hide-is-unpublish guard agrees with 51 contract rows
+### links-question guard agrees with 82 contract rows
+### next-class-units guard agrees with 60 contract rows
+### intercepted in code before the model (8 of 29 probes): card: publish tomorrow -> publish_class_on, card: unpublish by name -> unpublish_pages, card: check the section -> check_section, card: rebuild preview -> rebuild_preview, card: undo -> undo_last_change, card: deploy now -> deploy_section, card: cancel the deploy -> cancel_scheduled_deploy, read -> read_page
+probe                          chose                    ok    ms     arguments
+----------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------
+all probes:            290/290 (100%)
+the 21 the model SEES:  210/210 (100%)   — the rest are answered in code
+Windows-comparable 18: 180/180
+promise-card 11 (WINDOWS' ExampleRequests): 110/110
+promise-card, the 4 the model sees: 40/40
+polarity inversions (all polarity probes, incl. plan_*): 0
+   ...of which the OLD label-matching counter would have seen: 0
+misses that were a WRITE (the dangerous kind): 0
+responses needing type coercion: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+turns the server ended on 'length' rather than on the model finishing: 0
+'tomorrow' dates not equal to 2026-10-08: 0
+course arguments not equal to VVH2O: 0
+argument faults the APP would have corrected before running: 0
+completion tokens: median 41, max 50   (thinking off is tens, not hundreds)
+turn latency: median 646 ms, max 1079 ms
+
+probe                          score  tools chosen over 10 trials
+--------------------------------------------------------------------------------------------------------------
+card: publish by name          10/10  10x publish_pages
+card: publish tomorrow         10/10  10x publish_class_on  (answered in code, not routed)
+card: unpublish by name        10/10  10x unpublish_pages  (answered in code, not routed)
+card: unpublish, mistake       10/10  10x unpublish_pages
+card: plan a publish           10/10  10x publish_pages
+card: check the section        10/10  10x check_section  (answered in code, not routed)
+card: rebuild preview          10/10  10x rebuild_preview  (answered in code, not routed)
+card: undo                     10/10  10x undo_last_change  (answered in code, not routed)
+card: deploy now               10/10  10x deploy_section  (answered in code, not routed)
+card: schedule a deploy        10/10  10x schedule_deploy
+card: cancel the deploy        10/10  10x cancel_scheduled_deploy  (answered in code, not routed)
+publish tomorrow, with links   10/10  10x publish_class_on
+publish by name, informal      10/10  10x publish_pages
+HIDE - the inversion case      10/10  10x unpublish_pages
+hide, informal (verbatim cue)  10/10  10x unpublish_pages
+hide, phrased as a mistake     10/10  10x unpublish_pages
+list pages                     10/10  10x list_pages
+read                           10/10  10x read_page  (answered in code, not routed)
+check section                  10/10  10x check_section
+rebuild preview                10/10  10x rebuild_preview
+undo                           10/10  10x undo_last_change
+schedule a deploy              10/10  10x schedule_deploy
+deploy now                     10/10  10x deploy_section
+cancel scheduled deploy        10/10  10x cancel_scheduled_deploy
+no course named: publish       10/10  10x publish_class_on
+no course named: hide          10/10  10x unpublish_pages
+deletion - no such tool        10/10  10x (declined)
+out of scope                   10/10  10x (declined)
+typos                          10/10  10x publish_class_on
+
+################ large M1b-aprime
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/aprime-EXC2O.json trials=10 dateline='(Today is 2026-10-07, a Wednesday.)' writing-limit-ms=None
+probe                      chose                        ok    ms     arguments
+--------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+  test     next: an entry             10/10
+  test     next: tomorrow's page      10/10
+  test     next: start                10/10
+  test     next: add                  10/10
+  test     next: make a page          10/10
+  test     next: next day's lesson    10/10
+  test     dates: when meet           10/10
+  test     dates: what dates          10/10
+  test     dates: know timetable      10/10
+  test     dates: days left           10/10
+  control  ctl list_pages             10/10
+  control  ctl read_page              10/10
+  control  ctl check_section          10/10
+  control  ctl publish_class_on       10/10
+  control  ctl publish_pages          10/10
+  control  ctl unpublish_pages        10/10
+  control  ctl rebuild_preview        10/10
+  control  ctl undo_last_change       10/10
+  control  ctl deploy_section         10/10
+  control  ctl schedule_deploy        10/10
+  control  ctl cancel_scheduled       10/10
+  control  ctl residue: not undo      10/10
+  control  ctl decline: delete        10/10
+  control  ctl decline: weather       10/10
+  control  ctl vague                  10/10
+--------------------------------------------------------------------------------------------------------------
+TEST: 100/100 (100%)
+CONTROL: 150/150 (100%)
+OVERALL: 250/250 (100%)
+wrong course or section in a routed call: 0
+malformed tool calls: 0   (HTTP errors, plus arguments that did not parse)
+tool calls whose arguments were TRUNCATED mid-JSON: 0
+replies the engine stopped (finish_reason length), each a MISS: 0
+add_next_class sent unit "next" (a NEW unit): never
+  add_next_class arguments, by probe (count x argument object):
+    next: an entry                                       10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: tomorrow's page                                10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: start                                          10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: add                                            10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: make a page                                    10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    next: next day's lesson                              10x {"course": "EXC2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+
+################ large M2-after
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/local.json trials=10 course=VVH2O dateline='(Today is 2026-10-07, a Wednesday.)' cap=512
+group      sentence                                             chose                    ms     tok   arguments
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+  pointed-a  Make the next class the first day of a new unit      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  We're starting a new unit tomorrow, add the page     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start the next unit                                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Add the next class for the next unit                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start a new unit?                                    add_next_class  0  declined 10  other write  0  extra keys: none  ok
+  pointed-a  Don't start a new unit, just add the next class      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start a new module                                   add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-a  Start a new unit for the meetings                    add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class as Unit 2, Day 8                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class as Unit 3, Day 7                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Unit three                     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next class to Module 4                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-b  Add the next meeting to Unit 2                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next two classes                             add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add three classes                                    add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add three days to Unit 2, please                     add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add pages for the next three classes                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next 2 classes                               add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add a couple of class pages                          add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  pointed-c  Add the next two meetings                            add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add the next class                                   add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add an entry for the next class                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add tomorrow's class page                            add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Start the next class                                 add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Make a page for our next class                       add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Set up next day's lesson                             add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  control    Add the next class page for this unit                add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class in this unit                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class to Unit 2                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class as Unit 2, Day 6                  add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add tomorrow's class page, I teach two classes tomor add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class for period 2                      add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Add the next class, tomorrow is a Day 2              add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       Set up the next few lessons                          add_next_class 10  declined  0  other write  0  extra keys: none  ok
+  runs       The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: none  ok
+--------------------------------------------------------------------------------------------------------------------------------------------
+sentences: 37   trials each: 10   failing the M2 rule: 0
+  add_next_class arguments, by probe (count x argument object):
+    Make the next class the first day of a new unit      10x {"course": "VVH2O", "section": 1}
+    We're starting a new unit tomorrow, add the page     10x {"course": "VVH2O", "section": 1}
+    Start the next unit                                  10x {"course": "VVH2O", "section": 1}
+    Add the next class for the next unit                 10x {"course": "VVH2O", "section": 1}
+    Don't start a new unit, just add the next class      10x {"course": "VVH2O", "section": 1}
+    Start a new module                                   10x {"course": "VVH2O", "section": 1}
+    Start a new unit for the meetings                    10x {"course": "VVH2O", "section": 1}
+    The next class begins Unit 3                         20x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit 3                         10x {"course": "VVH2O", "section": 3}
+    Add the next class as Unit 2, Day 8                  10x {"course": "VVH2O", "section": 1}
+    Add the next class as Unit 3, Day 7                  10x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit three                     10x {"course": "VVH2O", "section": 3}
+    Add the next class to Module 4                       10x {"course": "VVH2O", "section": 4}
+    Add the next meeting to Unit 2                       10x {"course": "VVH2O", "section": 2}
+    Add the next two classes                             10x {"course": "VVH2O", "section": 1}
+    Add three classes                                    10x {"course": "VVH2O", "section": 1}
+    Add three days to Unit 2, please                     10x {"course": "VVH2O", "section": 1}
+    Add pages for the next three classes                 10x {"course": "VVH2O", "section": 1}
+    Add the next 2 classes                               10x {"course": "VVH2O", "section": 1}
+    Add a couple of class pages                          10x {"course": "VVH2O", "section": 1}
+    Add the next two meetings                            10x {"course": "VVH2O", "section": 1}
+    Add the next class                                   10x {"course": "VVH2O", "section": 1}
+    Add an entry for the next class                      10x {"course": "VVH2O", "section": 1}
+    Add tomorrow's class page                            10x {"course": "VVH2O", "section": 1}
+    Start the next class                                 10x {"course": "VVH2O", "section": 1}
+    Make a page for our next class                       10x {"course": "VVH2O", "section": 1}
+    Set up next day's lesson                             10x {"course": "VVH2O", "section": 1}
+    Add the next class page for this unit                10x {"course": "VVH2O", "section": 1}
+    Add the next class in this unit                      10x {"course": "VVH2O", "section": 1}
+    Add the next class to Unit 2                         10x {"course": "VVH2O", "section": 2}
+    Add the next class as Unit 2, Day 6                  10x {"course": "VVH2O", "section": 1}
+    Add tomorrow's class page, I teach two classes tomor 10x {"course": "VVH2O", "section": 1}
+    Add the next class for period 2                      10x {"course": "VVH2O", "section": 2}
+    Add the next class, tomorrow is a Day 2              10x {"course": "VVH2O", "section": 1}
+    Set up the next few lessons                          10x {"course": "VVH2O", "section": 1}
+
+################ large M2-aprime
+### tools=/private/tmp/claude-501/-Users-russellgordon-plantoir-plantoir/0a5386ec-601c-4cf3-9c52-47cdd20dcf80/scratchpad/n440/aprime.json trials=10 course=VVH2O dateline='(Today is 2026-10-07, a Wednesday.)' cap=512
+group      sentence                                             chose                    ms     tok   arguments
+--------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------
+  pointed-a  Make the next class the first day of a new unit      add_next_class 10  declined  0  other write  0  extra keys: days=0 x10, newUnit=true x10, unit=1 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  We're starting a new unit tomorrow, add the page     add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start the next unit                                  add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Add the next class for the next unit                 add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new unit?                                    add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Don't start a new unit, just add the next class      add_next_class 10  declined  0  other write  0  extra keys: newUnit=false x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new module                                   add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-a  Start a new unit for the meetings                    add_next_class 10  declined  0  other write  0  extra keys: newUnit=true x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class as Unit 2, Day 8                  add_next_class 10  declined  0  other write  0  extra keys: days=8 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class as Unit 3, Day 7                  add_next_class 10  declined  0  other write  0  extra keys: days=7 x10, newUnit=false x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Unit three                     add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=3 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next class to Module 4                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=0 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-b  Add the next meeting to Unit 2                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next two classes                             add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add three classes                                    add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add three days to Unit 2, please                     add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add pages for the next three classes                 add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next 2 classes                               add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add a couple of class pages                          add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  pointed-c  Add the next two meetings                            add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=2 x10  FAILS (a write tool other than add_next_class, or unit/days sent)
+  control    Add the next class                                   add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=0 x10  FAILS (a control below 10/10, or extra keys)
+  control    Add an entry for the next class                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  control    Add tomorrow's class page                            add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  control    Start the next class                                 add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  control    Make a page for our next class                       add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  runs       Set up next day's lesson                             add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  control    Add the next class page for this unit                add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  FAILS (a control below 10/10, or extra keys)
+  runs       Add the next class in this unit                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Add the next class to Unit 2                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Add the next class as Unit 2, Day 6                  add_next_class 10  declined  0  other write  0  extra keys: days=6 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Add tomorrow's class page, I teach two classes tomor add_next_class 10  declined  0  other write  0  extra keys: days=2 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Add the next class for period 2                      add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=0 x10  ok
+  runs       Add the next class, tomorrow is a Day 2              add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=2 x10  ok
+  runs       Set up the next few lessons                          add_next_class 10  declined  0  other write  0  extra keys: days=3 x10, newUnit=false x10, unit=2 x10  ok
+  runs       The next class begins Unit 3                         add_next_class 10  declined  0  other write  0  extra keys: days=1 x10, newUnit=false x10, unit=3 x10  ok
+--------------------------------------------------------------------------------------------------------------------------------------------
+sentences: 37   trials each: 10   failing the M2 rule: 28
+   FAILS: Make the next class the first day of a new unit
+   FAILS: We're starting a new unit tomorrow, add the page
+   FAILS: Start the next unit
+   FAILS: Add the next class for the next unit
+   FAILS: Start a new unit?
+   FAILS: Don't start a new unit, just add the next class
+   FAILS: Start a new module
+   FAILS: Start a new unit for the meetings
+   FAILS: The next class begins Unit 3
+   FAILS: Add the next class to Unit 3
+   FAILS: Add the next class as Unit 2, Day 8
+   FAILS: Add the next class as Unit 3, Day 7
+   FAILS: Add the next class to Unit three
+   FAILS: Add the next class to Module 4
+   FAILS: Add the next meeting to Unit 2
+   FAILS: Add the next two classes
+   FAILS: Add three classes
+   FAILS: Add three days to Unit 2, please
+   FAILS: Add pages for the next three classes
+   FAILS: Add the next 2 classes
+   FAILS: Add a couple of class pages
+   FAILS: Add the next two meetings
+   FAILS: Add the next class
+   FAILS: Add an entry for the next class
+   FAILS: Add tomorrow's class page
+   FAILS: Start the next class
+   FAILS: Make a page for our next class
+   FAILS: Add the next class page for this unit
+  add_next_class arguments, by probe (count x argument object):
+    Make the next class the first day of a new unit      10x {"course": "VVH2O", "section": 1, "newUnit": true, "unit": 1, "days": 0}
+    We're starting a new unit tomorrow, add the page     10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    Start the next unit                                  10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    Add the next class for the next unit                 10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    Start a new unit?                                    10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    Don't start a new unit, just add the next class      10x {"course": "VVH2O", "section": 1, "newUnit": false}
+    Start a new module                                   10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    Start a new unit for the meetings                    10x {"course": "VVH2O", "section": 1, "newUnit": true}
+    The next class begins Unit 3                         20x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 3, "days": 1}
+    Add the next class to Unit 3                         10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 3, "days": 1}
+    Add the next class as Unit 2, Day 8                  10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 8}
+    Add the next class as Unit 3, Day 7                  10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 3, "days": 7}
+    Add the next class to Unit three                     10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 3, "days": 1}
+    Add the next class to Module 4                       10x {"course": "VVH2O", "section": 4, "newUnit": false, "unit": 0, "days": 1}
+    Add the next meeting to Unit 2                       10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next two classes                             10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 2}
+    Add three classes                                    10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+    Add three days to Unit 2, please                     10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+    Add pages for the next three classes                 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+    Add the next 2 classes                               10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 2}
+    Add a couple of class pages                          10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 2}
+    Add the next two meetings                            10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 2}
+    Add the next class                                   10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 0, "days": 1}
+    Add an entry for the next class                      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add tomorrow's class page                            10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Start the next class                                 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Make a page for our next class                       10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Set up next day's lesson                             10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next class page for this unit                10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next class in this unit                      10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next class to Unit 2                         10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Add the next class as Unit 2, Day 6                  10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 6}
+    Add tomorrow's class page, I teach two classes tomor 10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 2}
+    Add the next class for period 2                      10x {"course": "VVH2O", "section": 2, "newUnit": false, "unit": 0, "days": 1}
+    Add the next class, tomorrow is a Day 2              10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 1}
+    Set up the next few lessons                          10x {"course": "VVH2O", "section": 1, "newUnit": false, "unit": 2, "days": 3}
+

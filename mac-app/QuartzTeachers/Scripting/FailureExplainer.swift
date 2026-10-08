@@ -20,6 +20,9 @@ struct FailureExplainer {
         if let reason = sectionIsBeingDeployedExplanation(in: output) {
             return reason
         }
+        if let refusal = sectionDeployRefusal(in: output) {
+            return refusal.sentence
+        }
         if let reason = vaultLinkExplanation(in: output) {
             return reason
         }
@@ -103,6 +106,64 @@ struct FailureExplainer {
                 sentence.removeFirst()
             }
             return sentence.trimmingCharacters(in: .whitespaces)
+        }
+        return nil
+    }
+
+    /// What `deploy.sh`, or `preview.sh --build-only`, refused with while
+    /// the same section was still being deployed (GitHub #439) —
+    /// `shared-rules.json` → `deployWhileItsSectionDeploys`.
+    struct SectionDeployRefusal: Equatable {
+
+        // MARK: - Stored properties
+
+        /// True when what was in the way is a deploy that was set for later
+        /// (its run's script still working, including a run ended by setting
+        /// the section again); false when it was another `deploy.sh` for the
+        /// section, such as one typed in Terminal.
+        let byALaterDeploy: Bool
+
+        /// The launcher's first line with the cross taken off: the sentence
+        /// the window shows.
+        let sentence: String
+    }
+
+    /// The words the launchers' #439 refusal always carries, one pair per
+    /// leg. `sentences.launcher` in the contract is the source; the test
+    /// pins these to it.
+    static let sectionDeployRefusalMarkers: [String] = [
+        "so it cannot be deployed again until that has finished.",
+        "so it cannot be built until that has finished."
+    ]
+
+    /// The part of the first line that says the deploy set for later was
+    /// the reason, rather than another deploy of the section.
+    static let laterDeployMarker: String = "is still being deployed by a deploy that was set for later"
+
+    /// The launcher refused a deploy, or its build leg, because that same
+    /// section was still being deployed. LIFTED, as #381's refusal is: the
+    /// launcher's line already is the sentence a teacher can act on.
+    /// Pinned by `deployWhileItsSectionDeploys.failureExplanationCases`.
+    static func sectionDeployRefusal(in output: String) -> SectionDeployRefusal? {
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            var carriesAMarker: Bool = false
+            for marker in sectionDeployRefusalMarkers {
+                if line.contains(marker) {
+                    carriesAMarker = true
+                }
+            }
+            if !carriesAMarker {
+                continue
+            }
+            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
+            while let first = sentence.first, first == "❌" || first == " " {
+                sentence.removeFirst()
+            }
+            sentence = sentence.trimmingCharacters(in: .whitespaces)
+            return SectionDeployRefusal(
+                byALaterDeploy: sentence.contains(laterDeployMarker),
+                sentence: sentence
+            )
         }
         return nil
     }
