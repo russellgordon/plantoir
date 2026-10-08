@@ -50,7 +50,7 @@ Students rarely read a wall of plain text; they scan for structure and key terms
 - `## Headings` organise your page into sections.
 
 > [!important] Why headings matter in Plantoir
-> Every `##` heading you write automatically becomes a clickable link in the **Navigate this page** table of contents on the right side of your published website! You never have to build a table of contents by hand.
+> Every `##` heading you write automatically becomes a clickable link in the **Navigate this page** table of contents on the right side of each page on your class website! You never have to build a table of contents by hand.
 
 ### Your Goal
 In the practice box below, format the raw draft announcement:
@@ -261,10 +261,10 @@ Students: Please bring your project rough draft to class tomorrow.
 > - Line 1: `Students: Please bring your project rough draft to class tomorrow.`
 > - Line 2: `%` `% Reminder to self: Period 2 is running 10 minutes ahead of Period 4. %` `%`
 > 
-> **How it looks to your students on the published website:**
+> **How it looks to your students on your class website:**
 > > Students: Please bring your project rough draft to class tomorrow.
 > 
-> *(The private comment is completely stripped out during the build and never exists on the published site!)*
+> *(The private comment is completely stripped out during the build and never exists on your class website!)*
 
 ---
 
