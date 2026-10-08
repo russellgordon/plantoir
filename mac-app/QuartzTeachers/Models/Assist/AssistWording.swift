@@ -1845,7 +1845,7 @@ nonisolated enum AssistWording {
     /// and Add Section…. Menu-length, in the shape of
     /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
     /// with "or Codex" added, so one sentence greys the same items on both
-    /// platforms once Windows' Codex door holds its course too.
+    /// platforms — Windows' Codex door holds its course too, since #468.
     ///
     /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
     /// BOTH doors name their course to the server, which holds it. The
