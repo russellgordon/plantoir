@@ -223,6 +223,20 @@ public class ContractTests
         Assert.Equal(wording["nextClassNeedsItsOwnPhrasingInANumberedCourse"]!.ToString(),
                      AssistWording.NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun.Meeting));
 
+        // #468 (mac #458): both doors hold the course — rendered with the
+        // contract's own placeholder, and the generator's count of 2.
+        Assert.Equal(wording["courseIsAlreadyBeingRevised"]!.ToString(), AssistWording.CourseIsAlreadyBeingRevised("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseRename"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRename("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseRestore"]!.ToString(), AssistWording.ClaudeIsRevisingTheCourseRestore("{course}"));
+        Assert.Equal(wording["claudeIsRevisingTheCourseAddSection"]!.ToString(),
+                     AssistWording.ClaudeIsRevisingTheCourseAddSection("{course}"));
+        Assert.Equal(wording["backupKeptForAClaudeSession"]!.ToString(), AssistWording.BackupKeptForAClaudeSession("{course}"));
+        Assert.Equal(wording["backupsKeptForAClaudeSession"]!.ToString(), AssistWording.BackupsKeptForAClaudeSession("{course}", 2));
+        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackup"]!.ToString(),
+                     AssistWording.FinishTheClaudeSessionToDeleteItsBackup("{course}"));
+        Assert.Equal(wording["finishTheClaudeSessionToDeleteItsBackups"]!.ToString(),
+                     AssistWording.FinishTheClaudeSessionToDeleteItsBackups("{course}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
