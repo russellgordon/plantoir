@@ -385,9 +385,8 @@ from scratch, usually badly, and usually after shipping the same bug once.
 So a macOS change is not finished until BOTH of these are true:
 
 1. **The `windows` issue says what Windows must do, and the closing comment
-   on the piece's own issue says what landed** (every piece has one, with the
-   release milestone on it before it closes — `CLAUDE.md` rules 3 and 4).
-   Useful notes say what Windows must do
+   on the issue says what landed** (or the merge commit, for a piece with no
+   issue of its own — `CLAUDE.md` rules 3 and 4). Useful notes say what Windows must do
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
    fine note when true; an empty one never is. (`GUI-IMPROVEMENTS.md` carried
