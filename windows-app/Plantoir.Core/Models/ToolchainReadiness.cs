@@ -353,9 +353,12 @@ public static class ToolchainReadiness
     {
         foreach (var (marker, pid, alive, parsed) in Markers(workspacePath))
         {
-            // Never one whose body did not read: an older Plantoir writes its
-            // marker in place, so for a moment a LIVE marker is empty, and
-            // deleting it then would hide that copy from plantoir-mcp.
+            // Never one whose body did not read: a marker caught mid-write by
+            // a writer that does not move it into place would be empty for a
+            // moment while its owner is LIVE, and deleting it then would hide
+            // that copy from plantoir-mcp. Nothing released writes it that way
+            // (this app writes to a temporary name and moves it); the rule is
+            // kept so a future writer cannot be hidden either.
             if (!parsed || alive || pid == Environment.ProcessId) continue;
             try { File.Delete(marker); } catch { }
         }
