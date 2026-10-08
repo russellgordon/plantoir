@@ -50,10 +50,14 @@ final class MenuKeysBehindASheetTests: XCTestCase {
 
     /// Section ▸ Deploy…, freshly updated.
     func deployItem() -> NSMenuItem? {
-        guard let section = MenuBarTreeTests.topMenu(named: "Section") else {
+        return item(titled: "Deploy…", inMenu: "Section")
+    }
+
+    func item(titled title: String, inMenu menuName: String) -> NSMenuItem? {
+        guard let menu = MenuBarTreeTests.topMenu(named: menuName) else {
             return nil
         }
-        for item in MenuBarTreeTests.visibleItems(of: section) where item.title == "Deploy…" {
+        for item in MenuBarTreeTests.visibleItems(of: menu) where item.title == title {
             return item
         }
         return nil
@@ -115,6 +119,18 @@ final class MenuKeysBehindASheetTests: XCTestCase {
         await settle(seconds: 0.5)
         XCTAssertTrue(workspace.sheetIsUp, "the window knows a sheet is up")
         XCTAssertEqual(deployItem()?.isEnabled, false, "Deploy… greys while a sheet is up")
+        // And File's Open items, which would otherwise open a SECOND window
+        // behind the sheet (the director's ruling on #457's review).
+        XCTAssertEqual(item(titled: "Open Working Folder…", inMenu: "File")?.isEnabled, false, "Open Working Folder… greys while a sheet is up")
+        // Open Recent's own item stays enabled — SwiftUI keeps a submenu's
+        // item live whatever `.disabled` says (measured) — so what greys is
+        // every entry inside it.
+        let openRecent: NSMenu = try XCTUnwrap(item(titled: "Open Recent", inMenu: "File")?.submenu)
+        let entries: [NSMenuItem] = MenuBarTreeTests.visibleItems(of: openRecent)
+        XCTAssertFalse(entries.isEmpty)
+        for entry in entries where !entry.isSeparatorItem {
+            XCTAssertFalse(entry.isEnabled, "Open Recent ▸ \(entry.title) greys while a sheet is up")
+        }
         NSApp.sendEvent(try shiftCommandD(for: sheet))
         NSApp.sendEvent(try shiftCommandD(for: window))
         await settle(seconds: 0.3)

@@ -29,6 +29,13 @@ final class OutsideAssistantPresence {
     private(set) var codexIsInstalled: Bool = false
     private(set) var localAssistantCanRun: Bool = false
 
+    // MARK: - Computed properties
+
+    /// Whether the Revise With submenu has anything in it at all.
+    var anyReviseTargetExists: Bool {
+        return claudeIsInstalled || codexIsInstalled || localAssistantCanRun
+    }
+
     // MARK: - Functions
 
     /// Asks the Mac again.
@@ -45,10 +52,5 @@ final class OutsideAssistantPresence {
         if local != localAssistantCanRun {
             localAssistantCanRun = local
         }
-    }
-
-    /// Whether the Revise With submenu has anything in it at all.
-    var anyReviseTargetExists: Bool {
-        return claudeIsInstalled || codexIsInstalled || localAssistantCanRun
     }
 }
