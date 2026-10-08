@@ -78,6 +78,16 @@ def sections_as_typed(sections: list[int]) -> str:
     return ", ".join(words)
 
 
+
+def provision_courses_argument(courses: list[dict]) -> str:
+    """The courses as Windows' `--stage-scene provision --courses` takes them:
+    `ENG2D:1, 2;MCV4U:1` (MarketingScene.CourseList), each course's sections
+    as a teacher types them into the new-course panel."""
+    entries: list[str] = []
+    for course in courses:
+        entries.append(f"{course['code']}:{sections_as_typed(course['sections'])}")
+    return ";".join(entries)
+
 def month_and_day(text: str) -> tuple[int, int]:
     month, day = text.split("-")
     return int(month), int(day)
@@ -152,6 +162,15 @@ def reference_school_year(folder: Path, today: date, spec: dict | None = None) -
         return current - 1
     return current
 
+
+
+def reference_copy_argument(folder: Path, today: date, spec: dict | None = None) -> str:
+    """`--reference-copy` for Windows' provision scene: `ICS3U:2025`, the
+    course folders.json keeps a copy of and the school year it is filed
+    under (reference_school_year: a kept copy's own year wins)."""
+    if spec is None:
+        spec = load_spec()
+    return f"{spec['marketing']['referenceCopy']['of']}:{reference_school_year(folder, today, spec)}"
 
 # ---------- Reading a course ----------
 

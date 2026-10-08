@@ -124,10 +124,93 @@ public static class CourseActivity
         if (previewing) return "Available once preview completed";
         if (publishing) return "Available once deploy completed";
         // Said in the app's voice, naming the thing the teacher started rather
-        // than the process that holds the lease.
-        if (IsAssisting(folderPath, courseCode)) return "Available once you finish revising with Claude";
+        // than the process that holds the lease — and since #468 naming WHICH
+        // thing: an outside session, or this app's own assistant window.
+        return ReviseHoldReason(folderPath, courseCode);
+    }
+
+    // ---- Who holds a course's assist lease (#468, mac #458) ---------------
+
+    /// <summary>
+    /// True when a Claude or Codex session — an outside <c>plantoir-mcp</c>,
+    /// not one of this app's window servers (<see cref="Assist.WindowServers"/>)
+    /// — holds a live assist lease on the course. The mac's
+    /// <c>isRevisedElsewhere</c>.
+    /// </summary>
+    public static bool IsRevisedElsewhere(string folderPath, string courseCode) =>
+        AssistLeases(folderPath, courseCode).Any(pid => Assist.WindowServers.Find(pid) is null);
+
+    /// <summary>This app's assistant window holding the course through its own server, or null.</summary>
+    public static Assist.WindowServers.Entry? WindowRevising(string folderPath, string courseCode) =>
+        AssistLeases(folderPath, courseCode).Select(Assist.WindowServers.Find).FirstOrDefault(entry => entry is not null);
+
+    private static IEnumerable<int> AssistLeases(string folderPath, string courseCode) =>
+        Assist.WorkLease.LiveLeasesOfOthers(folderPath)
+            .Where(lease => lease.Kind == Assist.WorkLease.Assisting
+                            && string.Equals(lease.Course, courseCode, StringComparison.OrdinalIgnoreCase))
+            .Select(lease => lease.Pid);
+
+    /// <summary>
+    /// The sentence under a greyed item while an assistant holds the course,
+    /// or null: an outside session first (the teacher may not have it in
+    /// front of them), else this app's own window — whose hold stays, only in
+    /// its own words.
+    /// </summary>
+    public static string? ReviseHoldReason(string folderPath, string courseCode)
+    {
+        if (IsRevisedElsewhere(folderPath, courseCode)) return Assist.AssistWording.AvailableOnceYouFinishRevisingWithClaude;
+        if (WindowRevising(folderPath, courseCode) is { } window)
+            return Assist.WindowHoldWording.AvailableOnceTheAssistantCloses(window.CourseCode, window.SectionNumber);
         return null;
     }
+
+    /// <summary>The three Revise items on a course (<c>doorCourseHold.reviseCases</c> → <c>item</c>).</summary>
+    public enum ReviseItem { Claude, Codex, Local }
+
+    /// <summary>
+    /// The pure rule of <c>doorCourseHold.reviseCases</c> on Windows: an
+    /// outside session greys ALL THREE items with
+    /// <see cref="Assist.AssistWording.AvailableOnceYouFinishRevisingWithClaude"/>.
+    /// The mac's <c>reviseUnavailableReason</c> minus its <c>active</c> half,
+    /// which describes the mac's lease-less, one-at-a-time window; Windows'
+    /// window holds a lease of its own and is answered by
+    /// <see cref="ReviseHoldReason"/>.
+    /// </summary>
+    public static string? ReviseUnavailableReason(ReviseItem item, bool revisedElsewhere) =>
+        revisedElsewhere ? Assist.AssistWording.AvailableOnceYouFinishRevisingWithClaude : null;
+
+    /// <summary>The structural work an assist lease holds (<c>doorCourseHold.holds.structuralWork</c>).</summary>
+    public enum StructuralWork { Rename, Restore, AddSection }
+
+    /// <summary>
+    /// The refusal for structural work held ONLY by an assistant (not by a
+    /// preview or deploy, which keep their own sentences), or null: the
+    /// contract's <c>claudeIsRevisingTheCourse*</c> for an outside session,
+    /// the window's own words for this app's window. The mac's
+    /// <c>structuralHoldReason</c>.
+    /// </summary>
+    public static string? AssistHoldRefusal(string folderPath, string courseCode, StructuralWork work)
+    {
+        if (IsRevisedElsewhere(folderPath, courseCode))
+            return work switch
+            {
+                StructuralWork.Rename => Assist.AssistWording.ClaudeIsRevisingTheCourseRename(courseCode),
+                StructuralWork.Restore => Assist.AssistWording.ClaudeIsRevisingTheCourseRestore(courseCode),
+                _ => Assist.AssistWording.ClaudeIsRevisingTheCourseAddSection(courseCode),
+            };
+        if (WindowRevising(folderPath, courseCode) is { } window)
+            return work switch
+            {
+                StructuralWork.Rename => Assist.WindowHoldWording.CloseTheAssistantThenRename(window.CourseCode, window.SectionNumber),
+                StructuralWork.Restore => Assist.WindowHoldWording.CloseTheAssistantThenRestore(window.CourseCode, window.SectionNumber),
+                _ => Assist.WindowHoldWording.CloseTheAssistantThenAddSection(window.CourseCode, window.SectionNumber),
+            };
+        return null;
+    }
+
+    /// <summary>A preview or a deploy of the course is running in this app — the half of <see cref="BusyReason"/> that is not an assistant.</summary>
+    public static bool IsPreviewingOrPublishing(string folderPath, string courseCode) =>
+        IsPreviewing(folderPath, courseCode) || IsPublishing(folderPath, courseCode);
 
     public static void Reset()
     {

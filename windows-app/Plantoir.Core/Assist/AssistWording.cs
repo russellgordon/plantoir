@@ -1,3 +1,5 @@
+using Plantoir.Core.Models;
+
 namespace Plantoir.Core.Assist;
 
 /// <summary>
@@ -106,6 +108,21 @@ public static partial class AssistWording
 
     public static string DeployDidNotFinish(string course, string section) =>
         $"The deploy of {course} Section {section} did not finish. {WhereTheOutputIs}";
+
+    /// <summary>
+    /// #467 / mac #439: every leg that ran was refused because a deploy that
+    /// was set for later is still deploying this section. Said instead of
+    /// "did not finish" (and, for a refused build leg, instead of "could not
+    /// be built"), by the window's assistant and plantoir-mcp's deploy_section.
+    /// </summary>
+    public static string DeployRefusedWhileALaterDeployWorks(string course, string section) =>
+        $"{course} Section {section} is still being deployed by a deploy that was set for later, " +
+        "so it was not deployed again. Try again once that deploy has finished.";
+
+    /// <summary>The same refusal when another deploy of the section was in the way (#467 / mac #439).</summary>
+    public static string DeployRefusedWhileItsSectionDeploys(string course, string section) =>
+        $"{course} Section {section} is already being deployed, so it was not deployed again. " +
+        "Try again once that deploy has finished.";
 
     /// <summary>
     /// Said only when a course has MORE THAN ONE deploy destination
@@ -241,6 +258,89 @@ public static partial class AssistWording
     public const string ScheduleADeployNeedsATime =
         "What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to.";
 
+    // ---- Settler S3's pointer (#440, mac AssistWording.nextClassNeedsItsOwnPhrasing) ----
+
+    /// <summary>
+    /// Settler S3's answer in a course whose unit word is "Unit": nothing was
+    /// added, and the two sentences that do it — both answered in code. The
+    /// days sentence names the course's LATEST unit (the plain next page's),
+    /// never a fixed number: "Unit 4" typed back in a Unit 2 course would start
+    /// Unit 4 at Day 1 and skip Unit 3. The contract holds the INSTANCE for a
+    /// latest unit of 2 (assist-wording.json); <see cref="AssistNextClassUnits.Pointer"/>
+    /// picks among the three forms.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasing(ClassNoun noun, int latestUnit) =>
+        $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest unit. " +
+        $"To start a new unit, say “Start a new unit”. To add several days to Unit {latestUnit}, " +
+        $"say “Add five more days to Unit {latestUnit}”.";
+
+    /// <summary>
+    /// S3's answer in a course with its own unit word ("Module"): the quoted
+    /// sentences still say "unit", because the cards read the word unit as the
+    /// course's own word — and the sentence says so.
+    /// </summary>
+    public static string NextClassNeedsItsOwnPhrasingInAModuleCourse(string unitWord, ClassNoun noun, int latestUnit)
+    {
+        string word = unitWord.ToLowerInvariant();
+        return $"Nothing was added. I add one {Singular(noun)} at a time, after the last one in your latest {word}. " +
+               $"To start a new {word}, say “Start a new unit”. To add several days to {unitWord} {latestUnit}, " +
+               $"say “Add five more days to Unit {latestUnit}”, since I read the word unit as {unitWord} here.";
+    }
+
+    /// <summary>S3's answer in a numbered course (#274), which has no units: one page at a time.</summary>
+    public static string NextClassNeedsItsOwnPhrasingInANumberedCourse(ClassNoun noun) =>
+        $"Nothing was added. This course numbers its pages one after another and has no units, so I add one " +
+        $"{Singular(noun)} at a time: say “Add the next {Singular(noun)} page” once for each one you want.";
+
+    /// <summary>"class" or "meeting", as the mac's <c>ClassNoun.singular</c>.</summary>
+    private static string Singular(ClassNoun noun) => noun == ClassNoun.Meeting ? "meeting" : "class";
+
+    // ---- Both doors hold the course (#468, mac #458) ----------------------
+    //
+    // Every sentence names BOTH doors, because plantoir-mcp cannot tell which
+    // one started it: the Claude door and the Codex door pass the same
+    // variable (AssistWorkspace.DoorCourseVariable). The in-app window's own
+    // server holds the course too, and its cause gets the window's own words
+    // (WindowHoldWording, beside WindowServers), never these.
+
+    /// <summary>Under a greyed Revise item while an outside session holds the course.</summary>
+    public const string AvailableOnceYouFinishRevisingWithClaude = "Available once you finish revising with Claude or Codex";
+
+    /// <summary>The title of the refusal a door gives at click time while the course is held.</summary>
+    public static string CourseIsAlreadyBeingRevised(string course) => $"{course} is already being revised";
+
+    /// <summary>The message under <see cref="CourseIsAlreadyBeingRevised"/> when an outside session holds it.</summary>
+    public const string FinishTheClaudeSessionFirst =
+        "A Claude or Codex session is working on this course already. Finish that session, then start again here.";
+
+    /// <summary>Rename Course, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseRename(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then rename.";
+
+    /// <summary>Restoring a backup, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseRestore(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then restore.";
+
+    /// <summary>Add Section, refused while an outside session holds the course.</summary>
+    public static string ClaudeIsRevisingTheCourseAddSection(string course) =>
+        $"A Claude or Codex session is working on {course} right now. Finish that session, then add the section.";
+
+    /// <summary>The delete-several confirmation: one backup kept because an outside session made it.</summary>
+    public static string BackupKeptForAClaudeSession(string course) =>
+        $"One of these is kept: a Claude or Codex session still open on {course} made it.";
+
+    /// <summary>The delete-several confirmation: several kept because an outside session made them.</summary>
+    public static string BackupsKeptForAClaudeSession(string course, int count) =>
+        $"{count} of these are kept: a Claude or Codex session still open on {course} made them.";
+
+    /// <summary>After a delete (or a single Delete Backup) that kept one backup an outside session made.</summary>
+    public static string FinishTheClaudeSessionToDeleteItsBackup(string course) =>
+        $"Finish the Claude or Codex session working on {course} first. It made this backup, so it was kept.";
+
+    /// <summary>After a delete that kept several backups an outside session made.</summary>
+    public static string FinishTheClaudeSessionToDeleteItsBackups(string course) =>
+        $"Finish the Claude or Codex session working on {course} first. It made these backups, so they were kept.";
+
     // ---- A publish that stops part way (#436 item 2, mac #412) ------------
 
     /// <summary>
@@ -270,13 +370,13 @@ public static partial class AssistWording
 
     /// <summary>
     /// What the WINDOW says when Preview or Deploy is declined because another
-    /// program on this computer is building, publishing or previewing the
+    /// program on this computer is building, deploying or previewing the
     /// course (#289, mac #156). An assistant is told <see cref="CourseIsBusy"/>
     /// instead: on Windows both assistants are <c>plantoir-mcp</c>, the process
     /// talking to the program whose course is busy.
     /// </summary>
     public static string CourseIsBeingBuiltElsewhere(string course) =>
-        $"{course} is being previewed or published somewhere else on this computer right now — by an assistant " +
+        $"{course} is being previewed or deployed somewhere else on this computer right now — by an assistant " +
         "working from another app, another copy of Plantoir, or a deploy set for later. Both would build the same " +
         "pages in the same place, so doing it here as well would spoil both. Try again once that has finished.";
 
@@ -385,7 +485,7 @@ public static partial class AssistWording
         "Because other classes move, “Undo that” will not take this back afterwards — the copy made before any of it is in Plantoir's Backups list.";
 
     /// <summary>The make-room reply's last line. Windows said "…before you deploy it." until #346; it says the mac's now.</summary>
-    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you publish.";
+    public const string LookTheSectionOverBeforePublishing = "Look the section over in Plantoir before you deploy.";
 
     public static string UndidPartly(string whatHappened, int leftAlone)
     {
@@ -461,18 +561,18 @@ public static partial class AssistWording
     /// <summary>Confirming a new website, when the section had one to be cut loose from.</summary>
     public static string RolloverStartedANewWebsite(string keptAs) =>
         RolloverIsOnANewWebsite + " Last year's details are kept at " + keptAs +
-        ", so you can go back to it. The next time you publish this section, Plantoir will ask " +
+        ", so you can go back to it. The next time you deploy this section, Plantoir will ask " +
         "what to call the new website.";
 
-    /// <summary>Confirming a new website for a section that had never been published.</summary>
+    /// <summary>Confirming a new website for a section that had never been deployed.</summary>
     public const string RolloverHadNoWebsiteYet =
-        "This section had not been published anywhere yet, so there was no website to move away " +
-        "from. The first time you publish it, Plantoir will ask what to call it.";
+        "This section had not been deployed anywhere yet, so there was no website to move away " +
+        "from. The first time you deploy it, Plantoir will ask what to call it.";
 
     /// <summary>Confirming the same website.</summary>
     public const string RolloverKeptTheSameWebsite =
-        "This section still publishes to the same website as last year, so every link anybody " +
-        "saved keeps working. Nothing goes out until you publish.";
+        "This section still deploys to the same website as last year, so every link anybody " +
+        "saved keeps working. Nothing goes out until you deploy.";
 
     /// <summary>What a teacher is told when the question was never answered.</summary>
     /// <remarks>
@@ -483,7 +583,7 @@ public static partial class AssistWording
     /// leave them believing the website was dealt with.
     /// </remarks>
     public const string RolloverWebsiteNotDecided =
-        "I have not changed which website this section publishes to — publishing it will still " +
+        "I have not changed which website this section deploys to — deploying it will still " +
         "go to last year's website. Ask me to roll it over again if you would like to choose.";
 
     /// <summary>A destination that could not be released, so the section is still pinned to it.</summary>
@@ -491,17 +591,17 @@ public static partial class AssistWording
     /// Its own sentence because the alternative said the opposite. A marker
     /// that exists and cannot be moved used to produce the same empty result
     /// as one that was never there, so a teacher was told "this section had
-    /// not been published anywhere yet" about a section that is still
-    /// publishing over last year's site — a lie about the one fact this whole
+    /// not been deployed anywhere yet" about a section that is still
+    /// deploying over last year's site — a lie about the one fact this whole
     /// feature turns on.
     /// </remarks>
     public static string RolloverCouldNotStartANewWebsite(string stillPinned) =>
-        "I could not move this section off " + stillPinned + ", so publishing it will still " +
+        "I could not move this section off " + stillPinned + ", so deploying it will still " +
         "replace last year's website there. Try again, or check whether that file is locked or " +
         "open somewhere else.";
 
     /// <summary>
-    /// Added when releasing a website turned off a publish that was set to
+    /// Added when releasing a website turned off a deploy that was set to
     /// happen on its own.
     /// </summary>
     /// <remarks>
@@ -510,20 +610,20 @@ public static partial class AssistWording
     /// the address students actually read stopped updating.
     /// </remarks>
     public const string RolloverTurnedOffTheScheduledPublish =
-        "This section was set to publish on its own. Starting a new website turned that off — " +
-        "set it again from the section's menu once you have published the new website for the " +
+        "This section was set to deploy on its own. Starting a new website turned that off — " +
+        "set it again from the section's menu once you have deployed the new website for the " +
         "first time.";
 
-    /// <summary>When turning that scheduled publish off did NOT work.</summary>
+    /// <summary>When turning that scheduled deploy off did NOT work.</summary>
     /// <remarks>
     /// The dangerous state, and so the one that must not be described by the
-    /// sentence above. A publish still set to run has nobody to ask what the
+    /// sentence above. A deploy still set to run has nobody to ask what the
     /// new website should be called, so it would go ahead and make one — the
     /// exact outcome turning it off exists to prevent.
     /// </remarks>
     public const string RolloverCouldNotTurnOffTheScheduledPublish =
-        "This section was also set to publish on its own, and Plantoir could not turn that off. " +
-        "It may still try to publish, and it has no way to ask what the new website should be " +
+        "This section was also set to deploy on its own, and Plantoir could not turn that off. " +
+        "It may still try to deploy, and it has no way to ask what the new website should be " +
         "called — turn it off from the section's menu.";
 
     // MARK: - Class planning (hoisted 2026-09-30, #157)

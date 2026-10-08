@@ -387,7 +387,7 @@ public class ReferenceRefusalTests : IDisposable
     {
         // deploy.ps1's own shape: no cross, a plain hyphen, the reason on the next line.
         Assert.Equal(Refusal, FailureExplainer.Explanation("\nICS3U " + ReferenceCourse.RefusalSentenceTemplate["{course} ".Length..] + "\n"));
-        Assert.Equal("Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read. Nothing was published.",
-            FailureExplainer.Explanation("\nPlantoir cannot tell whether ICS3U-2025 is kept for reference -\r\n   its settings file could not be read. Nothing was published.\r\n"));
+        Assert.Equal("Plantoir cannot tell whether ICS3U-2025 is kept for reference — its settings file could not be read. Nothing was deployed.",
+            FailureExplainer.Explanation("\nPlantoir cannot tell whether ICS3U-2025 is kept for reference -\r\n   its settings file could not be read. Nothing was deployed.\r\n"));
     }
 }

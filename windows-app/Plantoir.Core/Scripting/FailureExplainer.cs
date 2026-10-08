@@ -10,6 +10,7 @@ public static class FailureExplainer
     public static string? Explanation(string output) =>
         ReferenceCourseExplanation(output)
         ?? SectionIsBeingDeployedExplanation(output)
+        ?? SectionDeployRefusalOf(output)?.Sentence
         ?? FolderCopyExplanation(output)
         ?? SetupExplanation(output)
         ?? VaultLinkExplanation(output)
@@ -89,15 +90,59 @@ public static class FailureExplainer
     }
 
     /// <summary>
-    /// A folder publish whose copy did not finish (#304, mac #227): deploy.sh's
+    /// What deploy.ps1, or preview.ps1 --build-only, refused with while the
+    /// same section was still being deployed (#467 / mac #439,
+    /// shared-rules.json -> deployWhileItsSectionDeploys).
+    /// <paramref name="ByALaterDeploy"/> is true when the deploy set for
+    /// later was in the way, false when another deploy of the section was;
+    /// <paramref name="Sentence"/> is the launcher's first line with the
+    /// cross taken off - the sentence the window shows.
+    /// </summary>
+    public sealed record SectionDeployRefusal(bool ByALaterDeploy, string Sentence);
+
+    /// <summary>The words the refusal always carries, one per leg (sentences.launcher; pinned by a test).</summary>
+    public static readonly string[] SectionDeployRefusalMarkers =
+    {
+        "so it cannot be deployed again until that has finished.",
+        "so it cannot be built until that has finished.",
+    };
+
+    /// <summary>The part of the first line that names the deploy set for later.</summary>
+    public const string LaterDeployMarker = "is still being deployed by a deploy that was set for later";
+
+    /// <summary>
+    /// The refusal in a launcher's output, LIFTED as #386's is (the
+    /// launcher's line already is the sentence a teacher can act on), or
+    /// null. Detection reads only the ASCII markers, so a cross that reached
+    /// plantoir-mcp as '?' or as mojibake (it reads the launcher without
+    /// naming an encoding) cannot hide the refusal; there only
+    /// <see cref="SectionDeployRefusal.ByALaterDeploy"/> is used, to choose
+    /// the assistant's sentence. The window reads the console as UTF-8, so
+    /// the lifted sentence it shows has a real cross to take off.
+    /// </summary>
+    public static SectionDeployRefusal? SectionDeployRefusalOf(string? output)
+    {
+        if (string.IsNullOrEmpty(output)) return null;
+        foreach (string raw in output.Replace("\r", "").Split('\n'))
+        {
+            string line = raw.Trim();
+            if (!SectionDeployRefusalMarkers.Any(marker => line.EndsWith(marker, StringComparison.Ordinal))) continue;
+            string sentence = line.TrimStart('❌', '?', ' ');
+            return new SectionDeployRefusal(sentence.Contains(LaterDeployMarker, StringComparison.Ordinal), sentence);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A folder deploy whose copy did not finish (#304, mac #227): deploy.sh's
     /// cross line, and deploy.ps1's own robocopy-failure line, both mean the
     /// folder is not up to date. Matched on the launcher's words; the copy's
     /// error number means nothing to a teacher.
     /// </summary>
     private static string? FolderCopyExplanation(string output) =>
-        output.Contains("Not every page could be copied into the publishing folder", StringComparison.Ordinal)
-            ? "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try " +
-              "publishing again; if the same thing happens, one of your pages may not open or the folder may " +
+        output.Contains("Not every page could be copied into the deploy folder", StringComparison.Ordinal)
+            ? "Plantoir could not copy every page into your deploy folder, so it is not up to date. Try " +
+              "deploying again; if the same thing happens, one of your pages may not open or the folder may " +
               "not be taking new files."
             : null;
 
@@ -212,12 +257,12 @@ public static class FailureExplainer
 
     private static string? MissingFrontPageExplanation(string output) =>
         output.Contains("no front page, so no website was produced")
-            ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
+            ? "This section has no front page, so there is no website to deploy. Put the front page back, then deploy again."
             : null;
 
     /// <summary>
     /// A section whose FRONT PAGE's settings cannot be read (#300, the mac's
-    /// #246): the build hides such a page, so there is no website to publish.
+    /// #246): the build hides such a page, so there is no website to deploy.
     /// Asked before the missing-front-page and missing-build cards — the
     /// build's line deliberately never says "no front page", and it is
     /// followed by "Built site not found" — and the line number is read only
@@ -230,10 +275,10 @@ public static class FailureExplainer
         int at = output.IndexOf(sign, StringComparison.Ordinal);
         if (at < 0) return null;
         const string headline = "The settings at the top of this section's front page could not be read, "
-            + "so there is no website to publish. ";
+            + "so there is no website to deploy. ";
         return LineNumberAfter("(near line ", output[(at + sign.Length)..]) is { } line
-            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then publish again."
-            : headline + "Open the front page in Obsidian, fix its settings, then publish again.";
+            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then deploy again."
+            : headline + "Open the front page in Obsidian, fix its settings, then deploy again.";
     }
 
     /// <summary>The number after <paramref name="marker"/>, only when the marker is on the same line.</summary>

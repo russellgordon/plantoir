@@ -191,7 +191,7 @@ public class ScheduledHealthFindingsTests : IDisposable
         // from whatever Select-String last returned.
         Assert.Contains("if ($buildExit -eq 3) {", script);
         Assert.Contains("} elseif ($buildExit -ne 0) {", script);
-        Assert.Contains("Write-Host 'Could not build this section, so nothing was published.'", script);
+        Assert.Contains("Write-Host 'Could not build this section, so nothing was deployed.'", script);
 
         // A wider check — "nothing between the build and the deploy legs reads
         // $LASTEXITCODE" — was written here and then removed. It cannot be

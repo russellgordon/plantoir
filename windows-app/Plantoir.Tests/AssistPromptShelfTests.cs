@@ -82,7 +82,11 @@ public class AssistPromptShelfTests
             // unpublish frame answers it in code, as it does on the mac.
             // "Deploy at 6:30 AM" left this set with #193: the deploy-at-a-time
             // family answers it in code, as it does on the mac.
-            "Cancel scheduled deploy",
+            // "Cancel scheduled deploy" left it with #466 (the mac's #449,
+            // 2026-10-07): the cancel frame accepts the shelf's own sentence,
+            // with no determiner, so the card is answered in code and the set
+            // is empty. It stays, empty, so a new card that should go to the
+            // model is still a decision somebody writes down here.
         };
 
         var seen = new HashSet<string>(StringComparer.Ordinal);

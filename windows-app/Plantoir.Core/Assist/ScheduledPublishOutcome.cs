@@ -116,6 +116,18 @@ public static class ScheduledPublishOutcome
         /// is the reason, and the sentence says it.
         /// </summary>
         CouldNotRunAsSetNow,
+
+        /// <summary>
+        /// The mac's run found its OWN section's earlier deploy still working
+        /// after thirty minutes and stood down (#439, contract
+        /// scheduledPublishStopped.kinds.earlierDeployStillWorking). READ AND
+        /// SHOWN only: Windows' run survives a re-set (ClearIfStillMine), so
+        /// it has no leftover run to wait for and nothing here ever writes
+        /// this kind (#467). It exists so the two kind lists stay equal and a
+        /// record of it, however it came to be on disk, is shown rather than
+        /// dropped.
+        /// </summary>
+        EarlierDeployStillWorking,
     }
 
     /// <summary>
@@ -220,6 +232,7 @@ public static class ScheduledPublishOutcome
         Kind.TooLateToRun => "too-late-to-run",
         Kind.CourseWasBusy => "course-was-busy",
         Kind.CouldNotRunAsSetNow => "could-not-run-as-set-now",
+        Kind.EarlierDeployStillWorking => "earlier-deploy-still-working",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -233,6 +246,7 @@ public static class ScheduledPublishOutcome
         "too-late-to-run" => Kind.TooLateToRun,
         "course-was-busy" => Kind.CourseWasBusy,
         "could-not-run-as-set-now" => Kind.CouldNotRunAsSetNow,
+        "earlier-deploy-still-working" => Kind.EarlierDeployStillWorking,
         _ => null,
     };
 
@@ -597,21 +611,23 @@ public static class ScheduledPublishOutcome
     internal static string TrailSentence(Result result) => result.Outcome switch
     {
         Kind.NeededAnAnswer =>
-            $"the publish set to happen on its own stopped — {result.Destination} needed an answer",
+            $"the deploy set to happen on its own stopped — {result.Destination} needed an answer",
         Kind.BuildNeededAnAnswer =>
-            "the publish set to happen on its own stopped — building the pages needed an answer",
+            "the deploy set to happen on its own stopped — building the pages needed an answer",
         Kind.DidNotFinish =>
-            $"the publish set to happen on its own did not finish — {result.Destination} stopped",
+            $"the deploy set to happen on its own did not finish — {result.Destination} stopped",
         Kind.Succeeded =>
-            $"the publish set to happen on its own went out to {result.Destination}",
+            $"the deploy set to happen on its own went out to {result.Destination}",
         Kind.BuildDidNotFinish =>
-            "the publish set to happen on its own did not finish — the pages could not be built, so no destination was reached",
+            "the deploy set to happen on its own did not finish — the pages could not be built, so no destination was reached",
         Kind.TooLateToRun =>
             "turned off: the day it was set for had gone by, by more than the course allows, so it stood down",
         Kind.CourseWasBusy =>
             "turned off: another program on this computer was still building the course after ten minutes, so it stood down",
         Kind.CouldNotRunAsSetNow =>
             $"turned off: it could not deploy the way the course is set now — {result.Destination}",
+        Kind.EarlierDeployStillWorking =>
+            "turned off: this section's earlier deploy was still working after thirty minutes, so it stood down",
         _ => throw new ArgumentOutOfRangeException(nameof(result)),
     };
 
@@ -630,28 +646,28 @@ public static class ScheduledPublishOutcome
         result.Outcome switch
         {
             Kind.NeededAnAnswer =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped " +
-                $"because publishing to {result.Destination} needed an answer nobody was there to give. " +
-                "Publish this section once yourself, answer the question, and it can publish on its own " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped " +
+                $"because deploying to {result.Destination} needed an answer nobody was there to give. " +
+                "Deploy this section once yourself, answer the question, and it can deploy on its own " +
                 "after that.",
 
             Kind.BuildNeededAnAnswer =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped " +
                 "before it started, because building the pages needed an answer nobody was there to " +
-                "give. Preview this section once yourself, answer the question, and it can publish on " +
+                "give. Preview this section once yourself, answer the question, and it can deploy on " +
                 "its own after that.",
 
             Kind.DidNotFinish =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it did not " +
-                $"finish — publishing to {result.Destination} stopped, so nothing went up there. " +
-                "Publish it yourself to see what happens.",
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it did not " +
+                $"finish — deploying to {result.Destination} stopped, so nothing went up there. " +
+                "Deploy it yourself to see what happens.",
 
             Kind.Succeeded =>
-                $"{courseCode} Section {sectionNumber} published on its own to {result.Destination}. " +
-                "Your students have the new pages.",
+                $"{courseCode} Section {sectionNumber} deployed on its own to {result.Destination}. " +
+                "Your website has the new pages.",
 
             Kind.BuildDidNotFinish =>
-                $"{courseCode} Section {sectionNumber} was set to publish on its own, and it stopped before it " +
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, and it stopped before it " +
                 "started — the pages could not be built, so nothing went up anywhere. Preview this section once " +
                 "yourself, and the reason will be in that section's window.",
 
@@ -670,6 +686,12 @@ public static class ScheduledPublishOutcome
                 $"{courseCode} Section {sectionNumber} was set to deploy on its own, but it could not deploy the way " +
                 $"the course is set now — {result.Destination} — so Plantoir left the site as it was. Deploy it " +
                 "yourself from the section, or schedule another from the section’s menu.",
+
+            Kind.EarlierDeployStillWorking =>
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, but the deploy that was set " +
+                "before it was still working after thirty minutes of waiting, so Plantoir left the site as that " +
+                "deploy leaves it rather than deploy it twice at once. Deploy it yourself when that has finished, " +
+                "or schedule another from the section’s menu.",
 
             _ => throw new ArgumentOutOfRangeException(nameof(result)),
         };
@@ -701,6 +723,7 @@ public static class ScheduledPublishOutcome
         Kind.TooLateToRun => "tooLateToRun",
         Kind.CourseWasBusy => "courseWasBusy",
         Kind.CouldNotRunAsSetNow => "couldNotRunAsSetNow",
+        Kind.EarlierDeployStillWorking => "earlierDeployStillWorking",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -721,7 +744,7 @@ public static class ScheduledPublishOutcome
             ActivityTrail.Event.ScheduledPublishFinished,
         // A run that stood down leaves the same event a removal does: the
         // teacher's alarm is gone, and the reason is what differs (#239).
-        Kind.TooLateToRun or Kind.CourseWasBusy or Kind.CouldNotRunAsSetNow =>
+        Kind.TooLateToRun or Kind.CourseWasBusy or Kind.CouldNotRunAsSetNow or Kind.EarlierDeployStillWorking =>
             ActivityTrail.Event.ScheduledDeployTurnedOff,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };

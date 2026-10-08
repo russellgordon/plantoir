@@ -228,7 +228,7 @@ public sealed class LauncherRunner : ILauncherRunner
         catch (OperationCanceledException)
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
-            return new LaunchOutcome(false, "The publish was stopped before it finished.");
+            return new LaunchOutcome(false, "This was stopped before it finished.");
         }
 
         string transcript;
@@ -254,7 +254,7 @@ public sealed class LauncherRunner : ILauncherRunner
         var message = new StringBuilder();
         if (transcript.Contains("token", StringComparison.OrdinalIgnoreCase) ||
             transcript.Contains("log in", StringComparison.OrdinalIgnoreCase))
-            message.Append("This looks like a missing publishing token. Publish this section once from Plantoir " +
+            message.Append("This looks like a missing deploy token. Deploy this section once from Plantoir " +
                            "so the token is stored, then try again. ");
         message.Append($"(The launcher exited with code {exitCode}.)");
         if (transcript.Length > 0) message.Append("\n\nLast output:\n").Append(transcript);

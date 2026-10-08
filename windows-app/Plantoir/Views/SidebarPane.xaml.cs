@@ -148,9 +148,14 @@ public sealed class SidebarRow : System.ComponentModel.INotifyPropertyChanged
     public string WarningGlyph => Glyphs.Warning;
     public Visibility WarningVisibility =>
         PublishStopped is null ? Visibility.Collapsed : Visibility.Visible;
-    public string WarningTooltip => PublishStopped is { } when
-        ? $"The publish set to happen on its own did not go out on {when:dddd d MMMM}. " +
-          "Open this section to see why."
+    // The mac's sentence (SidebarView.stoppedPublishTooltip), word for word
+    // since #441 (v1.4.4). It names no date deliberately: the badge can stand
+    // for days if nobody dismisses it, and a hover that said "on Tuesday"
+    // would have to be right about WHICH Tuesday; the section's own notice
+    // carries the date in full.
+    public string WarningTooltip => PublishStopped is not null
+        ? "A deploy that was set to happen on its own did not get through. " +
+          "Open this section to see what happened."
         : "";
 }
 
@@ -488,6 +493,11 @@ public sealed partial class SidebarPane : UserControl
         var held = HeldBackups.For(askedIn, Workspace.BackupItems);
         var going = chosen.Where(b => !held.Contains(Path.GetFullPath(b.FilePath))).ToList();
         var kept = chosen.Except(going).ToList();
+        // Told by SOURCE (#468, mac #458): a Claude or Codex session's backups,
+        // grouped per course, apart from the ones this app's window holds.
+        var bySessions = HeldBackups.ByOtherSessions(askedIn);
+        var keptBySession = kept.Where(k => bySessions.Contains(Path.GetFullPath(k.FilePath))).ToList();
+        var keptByWindow = kept.Except(keptBySession).ToList();
         var goingSizes = going.Select(b => sizes.TryGetValue(b.FilePath, out var s) ? s : null).ToList();
         string together = going.Count > 0 && goingSizes.All(s => s is not null)
             ? $", {BackupSizes.Describe(goingSizes.Sum(s => s!.Value))} together"
@@ -496,10 +506,13 @@ public sealed partial class SidebarPane : UserControl
             ? ""
             : $"{going.Count} backup{(going.Count == 1 ? " is" : "s are")} deleted for good{together}. " +
               "The courses themselves stay put.";
-        if (kept.Count > 0)
-            content += (content.Length > 0 ? "\n\n" : "") + string.Join("\n", kept.Select(k =>
+        var keptLines = keptByWindow.Select(k =>
                 $"The backup of {k.CourseCode} made {k.WhenDescription} is kept: an open assistant conversation can still " +
-                $"restore from it. {KeptBackupAdvice(k)}"));
+                $"restore from it. {KeptBackupAdvice(k)}")
+            .Concat(SessionKeptLines(keptBySession, nothingGoes: going.Count == 0))
+            .ToList();
+        if (keptLines.Count > 0)
+            content += (content.Length > 0 ? "\n\n" : "") + string.Join("\n", keptLines);
         var dialog = new ContentDialog
         {
             Title = going.Count == 0 ? "These backups are kept" : $"Delete {going.Count} backup{(going.Count == 1 ? "" : "s")}?",
@@ -514,7 +527,9 @@ public sealed partial class SidebarPane : UserControl
         // Re-read the hold at the moment of deleting: a conversation that made
         // its backup while the confirmation was up must not lose it.
         var outcome = BackupDeleter.Delete(chosen, HeldBackups.For(askedIn, Workspace.BackupItems));
-        ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes));
+        var madeBySessions = HeldBackups.ByOtherSessions(askedIn);
+        if (BackupDeleter.WritesATrailLine(outcome))
+            ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted, BackupDeleter.TrailLine(outcome, sizes, madeBySessions));
         if (Workspace.Selection is SidebarSelection.BackupEntry(var id) && outcome.Deleted.Any(b => b.Id == id))
             Workspace.Selection = null;
         Workspace.Reload();
@@ -530,7 +545,29 @@ public sealed partial class SidebarPane : UserControl
         if (outcome.Failed.Count > 0)
             await ShowError("Some backups could not be deleted",
                 string.Join("\n", outcome.Failed.Select(f => $"{f.Item.CourseCode}, {f.Item.WhenDescription}: {f.Problem}")));
+        // After the delete, what a Claude or Codex session kept, and how to let it go.
+        var sessionKept = outcome.Kept.Where(k => madeBySessions.Contains(Path.GetFullPath(k.FilePath))).ToList();
+        if (sessionKept.Count > 0)
+            await ShowError("These backups are kept", string.Join("\n", SessionKeptLines(sessionKept, nothingGoes: true)));
     }
+
+    /// <summary>
+    /// What a Claude or Codex session kept, one line per course (#468):
+    /// <c>backupKeptForAClaudeSession</c> / <c>backupsKeptForAClaudeSession</c>
+    /// while the teacher is choosing, <c>finishTheClaudeSessionToDeleteItsBackup(s)</c>
+    /// once nothing more will go.
+    /// </summary>
+    private static IEnumerable<string> SessionKeptLines(IReadOnlyList<BackupItem> kept, bool nothingGoes) =>
+        kept.GroupBy(k => k.CourseCode, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => (Course: group.First().CourseCode, Count: group.Count()))
+            .Select(entry => nothingGoes
+                ? entry.Count == 1
+                    ? AssistWording.FinishTheClaudeSessionToDeleteItsBackup(entry.Course)
+                    : AssistWording.FinishTheClaudeSessionToDeleteItsBackups(entry.Course)
+                : entry.Count == 1
+                    ? AssistWording.BackupKeptForAClaudeSession(entry.Course)
+                    : AssistWording.BackupsKeptForAClaudeSession(entry.Course, entry.Count));
 
     /// <summary>The words a second assistant window is refused with, turned to this case.</summary>
     private static string KeptBackupAdvice(BackupItem item) =>
@@ -755,26 +792,32 @@ public sealed partial class SidebarPane : UserControl
         var reviseItems = ReviseItems(course, section: null);
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
         foreach (var item in reviseItems) menu.Items.Add(item);
+        var reviseNote = ReviseNote();
+        menu.Items.Add(reviseNote);
         // The staleness lesson from the mac (row 104): menu content is built
         // when the ROW renders, not when the teacher opens it — so the busy
         // state is read the moment the menu opens, never captured earlier.
         menu.Opening += (_, _) =>
         {
-            string? reason = Workspace.WorkspacePath is { } folder
-                ? CourseActivity.BusyReason(folder, course.Code) : null;
+            string? folder = Workspace.WorkspacePath;
+            string? reason = folder is not null ? CourseActivity.BusyReason(folder, course.Code) : null;
             // Renaming and Add Section both require the course to be quiet.
             renameItem.IsEnabled = reason is null;
             addItem.IsEnabled = reason is null;
-            busyNote.Text = reason ?? "";
-            busyNote.Visibility = reason is null ? Visibility.Collapsed : Visibility.Visible;
+            // An assistant's hold is said ONCE, under the Revise items
+            // (doorCourseHold.holds.reviseItems); the note under Add Section
+            // says a preview's or a deploy's, which the assistant's is not.
+            string? revising = folder is not null ? CourseActivity.ReviseHoldReason(folder, course.Code) : null;
+            string? busyText = reason == revising ? null : reason;
+            busyNote.Text = busyText ?? "";
+            busyNote.Visibility = busyText is null ? Visibility.Collapsed : Visibility.Visible;
 
             // Starting a conversation waits only for ANOTHER assistant. A
             // preview running is not in the way — it is the thing the teacher
             // is looking at while they decide what to ask for next, and gating
             // this on the same reason as Add Section stopped them from opening
             // a conversation about the preview in front of them.
-            bool canRevise = CanReviseNow(course);
-            foreach (var item in reviseItems) item.IsEnabled = canRevise;
+            ShowReviseHold(reviseItems, reviseNote, course);
         };
         menu.Items.Add(new MenuFlyoutSeparator());
         menu.Items.Add(MenuItem("Show in File Explorer", ExplorerGlyph, () => FolderActions.ShowInFileExplorer(course.DirectoryPath)));
@@ -790,6 +833,7 @@ public sealed partial class SidebarPane : UserControl
     private void ReviseWithClaude(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        if (RefusedWhileRevised(folder, course)) return;
         if (ClaudeCodeLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
         _ = ShowError("Claude didn’t open",
@@ -801,6 +845,7 @@ public sealed partial class SidebarPane : UserControl
     private void ReviseWithCodex(Course course)
     {
         if (Workspace.WorkspacePath is not { } folder) return;
+        if (RefusedWhileRevised(folder, course)) return;
         if (CodexLauncher.Open(folder, course.Code, course.Configuration.CourseName)) return;
 
         _ = ShowError("Codex didn’t open",
@@ -829,6 +874,10 @@ public sealed partial class SidebarPane : UserControl
         // preview can stay on screen beside the conversation changing it.
         var reviseItems = ReviseItems(course, number);
         foreach (var item in reviseItems) menu.Items.Add(item);
+        // Once under them, while an assistant holds the course (#468): the
+        // section menu greyed them with nothing said until then.
+        var sectionReviseNote = ReviseNote();
+        menu.Items.Add(sectionReviseNote);
         // The revise group is its own idea; a divider keeps "talk to an
         // assistant" from reading as one list with the actions below it.
         if (reviseItems.Count > 0) menu.Items.Add(new MenuFlyoutSeparator());
@@ -881,11 +930,7 @@ public sealed partial class SidebarPane : UserControl
 
         // Read when the menu OPENS, never captured at render — the staleness
         // lesson from row 104, which cost a live debugging session.
-        menu.Opening += (_, _) =>
-        {
-            bool canRevise = CanReviseNow(course);
-            foreach (var item in reviseItems) item.IsEnabled = canRevise;
-        };
+        menu.Opening += (_, _) => ShowReviseHold(reviseItems, sectionReviseNote, course);
         return menu;
     }
 
@@ -1077,15 +1122,41 @@ public sealed partial class SidebarPane : UserControl
         // since a session can start between the menu opening and the click.
         // Deliberately NOT a check for previews or deploys — those can happily
         // run alongside a conversation, and only a build is exclusive.
-        if (CourseActivity.IsAssisting(folder, course.Code))
-        {
-            _ = ShowError($"{course.Code} is already being revised",
-                "There is an assistant working on this course already. Finish in that window, " +
-                "close it, then start again here.");
-            return;
-        }
+        if (RefusedWhileRevised(folder, course)) return;
 
         new AssistWindow(folder, course, number, _window).Activate();
+    }
+
+    /// <summary>
+    /// The click-time half of the hold (#468): a door, or the local window,
+    /// refused while any assistant holds the course — since a session can
+    /// start between the menu opening and the click. Each cause in its own
+    /// words: a Claude or Codex session (<c>finishTheClaudeSessionFirst</c>),
+    /// or this app's own window, whose hold is the same and whose sentence is
+    /// the one this refusal always said.
+    /// </summary>
+    private bool RefusedWhileRevised(string folder, Course course)
+    {
+        if (!CourseActivity.IsAssisting(folder, course.Code)) return false;
+        _ = ShowError(AssistWording.CourseIsAlreadyBeingRevised(course.Code),
+            CourseActivity.IsRevisedElsewhere(folder, course.Code)
+                ? AssistWording.FinishTheClaudeSessionFirst
+                : WindowHoldWording.FinishInThatWindowFirst);
+        return true;
+    }
+
+    /// <summary>The greyed line under the Revise items, saying which assistant holds the course.</summary>
+    private static MenuFlyoutItem ReviseNote() => new() { IsEnabled = false, Visibility = Visibility.Collapsed };
+
+    /// <summary>Grey the Revise items while an assistant holds the course, and say why once under them.</summary>
+    private void ShowReviseHold(List<MenuFlyoutItem> reviseItems, MenuFlyoutItem note, Course course)
+    {
+        bool canRevise = CanReviseNow(course);
+        foreach (var item in reviseItems) item.IsEnabled = canRevise;
+        string? why = canRevise || Workspace.WorkspacePath is not { } folder
+            ? null : CourseActivity.ReviseHoldReason(folder, course.Code);
+        note.Text = why ?? "";
+        note.Visibility = why is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private MenuFlyout ArchivedMenu(ArchivedItem item)
@@ -1292,11 +1363,19 @@ public sealed partial class SidebarPane : UserControl
         string? askedIn = Workspace.WorkspacePath;
         // Restoring rewrites the course's folders — never mid-copy (row 104's rule).
         if (Workspace.WorkspacePath is { } folder
-            && CourseActivity.BusyReason(folder, item.CourseCode) is not null)
+            && CourseActivity.IsPreviewingOrPublishing(folder, item.CourseCode))
         {
             await ShowError($"{item.CourseCode} is busy right now",
                 "Restoring replaces the course's folders and files, and a preview or deploy " +
                 "of this course is still using them. Try again when it finishes.");
+            return;
+        }
+        // An assistant's hold, in its own words (#468): a Claude or Codex
+        // session, or this app's own window — never "a preview or deploy".
+        if (Workspace.WorkspacePath is { } heldIn
+            && CourseActivity.AssistHoldRefusal(heldIn, item.CourseCode, CourseActivity.StructuralWork.Restore) is { } held)
+        {
+            await ShowError(AssistWording.CourseIsAlreadyBeingRevised(item.CourseCode), held);
             return;
         }
 
@@ -1345,6 +1424,14 @@ public sealed partial class SidebarPane : UserControl
     {
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
+        // A backup an assistant can still restore from is KEPT, said at once
+        // (#468; doorCourseHold.holds.backups names this path). Until #468 the
+        // single delete went straight to the file, held or not.
+        if (askedIn is not null && KeptSentence(item, askedIn) is { } keptAtOnce)
+        {
+            await ShowError("This backup is kept", keptAtOnce);
+            return;
+        }
         string consequence = IsOnlyRemainingCopy(item.CourseCode, item.FilePath)
             ? $"This backup is the only remaining copy of {item.CourseCode} — the course is no longer " +
               $"in Courses & Clubs. Deleting it removes {item.CourseCode} for good."
@@ -1360,18 +1447,41 @@ public sealed partial class SidebarPane : UserControl
         };
         if (await ShowDialogSafelyAsync(dialog) != ContentDialogResult.Primary) return;
         if (TheFolderMovedUnderThisConfirmation(askedIn)) return;
-        try
+        if (askedIn is null) return;
+        // The one-item case of the delete-several: re-read the hold at the
+        // moment of deleting, and leave the same trail line ("backups deleted":
+        // "written by the single delete and the delete-several alike").
+        // Measured BEFORE it goes, so the line can say what it took.
+        var sizes = new Dictionary<string, long?> { [item.FilePath] = BackupSizes.LogicalSize(item.FilePath) };
+        var outcome = BackupDeleter.Delete(new[] { item }, HeldBackups.For(askedIn, Workspace.BackupItems));
+        if (BackupDeleter.WritesATrailLine(outcome))
         {
-            CourseRestorer.DeleteBackup(item);
+            ActivityTrail.Note(ActivityTrail.Event.BackupsDeleted,
+                BackupDeleter.TrailLine(outcome, sizes, HeldBackups.ByOtherSessions(askedIn)));
             if (Workspace.Selection is SidebarSelection.BackupEntry(var id) && id == item.Id)
                 Workspace.Selection = null;
             Workspace.Reload();
             _window.ApplyState();
         }
-        catch (Exception error)
-        {
-            await ShowError("Could not delete", error.Message);
-        }
+        else if (outcome.Kept.Count > 0 && KeptSentence(item, askedIn) is { } keptNow)
+            await ShowError("This backup is kept", keptNow);
+        if (outcome.Failed.Count > 0)
+            await ShowError("Could not delete", outcome.Failed[0].Problem);
+    }
+
+    /// <summary>
+    /// Why this one backup is kept, or null when it may go: a Claude or Codex
+    /// session's (<c>finishTheClaudeSessionToDeleteItsBackup</c>) or this app's
+    /// window's (the advice the delete-several gives), told apart (#468).
+    /// </summary>
+    private static string? KeptSentence(BackupItem item, string folder)
+    {
+        string full = Path.GetFullPath(item.FilePath);
+        if (!HeldBackups.For(folder, Array.Empty<BackupItem>()).Contains(full)) return null;
+        return HeldBackups.ByOtherSessions(folder).Contains(full)
+            ? AssistWording.FinishTheClaudeSessionToDeleteItsBackup(item.CourseCode)
+            : $"An open assistant conversation can still restore from the backup of {item.CourseCode} made " +
+              $"{item.WhenDescription}. {KeptBackupAdvice(item)}";
     }
 
     public async void ConfirmDeleteArchive(ArchivedItem item)
@@ -1607,11 +1717,17 @@ public sealed partial class SidebarPane : UserControl
         // setup, which rewrites folders a live preview or publish may be
         // mid-copy of. Decline while the course is busy anywhere.
         if (Workspace.WorkspacePath is { } folder
-            && CourseActivity.BusyReason(folder, course.Code) is not null)
+            && CourseActivity.IsPreviewingOrPublishing(folder, course.Code))
         {
             await ShowError($"{course.Code} is busy right now",
                 "Adding a section rewrites the course's folders and files, and a " +
                 "preview or deploy of this course is still using them. Try again when it finishes.");
+            return;
+        }
+        if (Workspace.WorkspacePath is { } heldIn
+            && CourseActivity.AssistHoldRefusal(heldIn, course.Code, CourseActivity.StructuralWork.AddSection) is { } held)
+        {
+            await ShowError(AssistWording.CourseIsAlreadyBeingRevised(course.Code), held);
             return;
         }
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
@@ -1645,10 +1761,16 @@ public sealed partial class SidebarPane : UserControl
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = folder;
 
-        string? busy = CourseActivity.BusyReason(folder, course.Code);
-        if (busy is not null)
+        if (CourseActivity.IsPreviewingOrPublishing(folder, course.Code))
         {
             await ShowError("Course is busy", $"{course.Code} is previewing or deploying right now. Stop that first, then rename.");
+            return;
+        }
+        // Until #468 an assistant's hold was told "is previewing or deploying"
+        // here too — the wrong cause. Each now in its own words.
+        if (CourseActivity.AssistHoldRefusal(folder, course.Code, CourseActivity.StructuralWork.Rename) is { } held)
+        {
+            await ShowError("Course is busy", held);
             return;
         }
 
