@@ -7,6 +7,14 @@ namespace Plantoir.Core.Models;
 /// container — one updater (the app) drives every layer. Extraneous files
 /// are REMOVED from the mirror: they would change the hash and force
 /// rebuilds for nothing.
+///
+/// <para><b>This class only copies; it decides nothing about WHEN.</b> Since
+/// #473 the once-per-folder-per-process rule, the background thread the copy
+/// runs on and the question "may this folder be built from yet?" all belong
+/// to <see cref="ToolchainReadiness"/>. The launchers (six small files) are
+/// still refreshed synchronously on every <c>WorkspaceViewModel.Reload()</c>
+/// by <see cref="RefreshLaunchers"/>; the recipe (thousands of files, about
+/// two minutes on the first launch after an update on an i5-8365U) is not.</para>
 /// </summary>
 public static class ToolchainMirror
 {
@@ -28,10 +36,24 @@ public static class ToolchainMirror
 
     public static readonly IReadOnlyList<string> RecipeFolders = new[] { "patches", "scripts", "support", "contracts" };
 
-    private static readonly HashSet<string> FoldersWithFreshToolchain = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// What one mirror pass did: files copied or removed, and files it could
+    /// NOT copy or remove — with the FIRST of those and why, which is what
+    /// the trail line names. A pass with any failure leaves the folder not
+    /// ready (#473): before, every failure was swallowed and returned 0, so a
+    /// half-copied recipe was taken for a fresh one for the rest of the run.
+    /// </summary>
+    public readonly record struct CopyResult(int Changed, int Failed,
+                                             string? FirstFailedPath = null, string? FirstProblem = null)
+    {
+        public static CopyResult operator +(CopyResult a, CopyResult b) =>
+            new(a.Changed + b.Changed, a.Failed + b.Failed,
+                a.FirstFailedPath ?? b.FirstFailedPath,
+                a.FirstFailedPath is not null ? a.FirstProblem : b.FirstProblem);
 
-    /// <summary>Testing hook to force re-mirroring.</summary>
-    public static void ResetFreshToolchains() => FoldersWithFreshToolchain.Clear();
+        /// <summary>One file that could not be copied or removed, and why.</summary>
+        public static CopyResult OneFailure(string path, Exception error) => new(0, 1, path, error.Message);
+    }
 
     /// <summary>
     /// Refreshes any launcher that ALREADY exists in the folder and differs
@@ -70,23 +92,35 @@ public static class ToolchainMirror
         return refreshed;
     }
 
+    /// <summary>Whether a folder is a working folder, and so gets a .toolchain at all.</summary>
+    public static bool IsAWorkingFolder(string workspacePath) =>
+        File.Exists(Path.Combine(workspacePath, Workspace.MarkerLauncher));
+
     /// <summary>
     /// Mirrors the full recipe into &lt;workspace&gt;/.toolchain — but only for a
-    /// folder that already IS a workspace. Returns the change count.
+    /// folder that already IS a workspace — in place, file by file (only what
+    /// differs is written). Synchronous and unguarded: call it through
+    /// <see cref="ToolchainReadiness.Ensure"/>, which runs it off the UI
+    /// thread, once per folder per process, and says when it is done.
     /// </summary>
-    public static int RefreshToolchain(string workspacePath, string bundledRoot)
+    public static CopyResult RefreshToolchain(string workspacePath, string bundledRoot)
     {
-        if (!File.Exists(Path.Combine(workspacePath, Workspace.MarkerLauncher))) return 0;
-        if (FoldersWithFreshToolchain.Contains(workspacePath)) return 0;
-        FoldersWithFreshToolchain.Add(workspacePath);
+        if (!IsAWorkingFolder(workspacePath)) return default;
 
         string toolchainRoot = Path.Combine(workspacePath, ".toolchain");
-        int changed = 0;
+        var result = default(CopyResult);
         foreach (string name in RecipeRootFiles)
-            changed += SyncFile(Path.Combine(bundledRoot, name), Path.Combine(toolchainRoot, name));
+            result += SyncFile(Path.Combine(bundledRoot, name), Path.Combine(toolchainRoot, name));
         foreach (string folder in RecipeFolders)
-            changed += SyncDirectory(Path.Combine(bundledRoot, folder), Path.Combine(toolchainRoot, folder));
-        return changed;
+            result += SyncDirectory(Path.Combine(bundledRoot, folder), Path.Combine(toolchainRoot, folder));
+        // Named from the working folder down (".toolchain\scripts\x.py"): the
+        // part worth reading, and no user name to redact.
+        if (result.FirstFailedPath is { } failed)
+        {
+            try { result = result with { FirstFailedPath = Path.GetRelativePath(workspacePath, failed) }; }
+            catch { }
+        }
+        return result;
     }
 
     /// <summary>Whether two files can be taken for the same file without reading them.</summary>
@@ -97,24 +131,27 @@ public static class ToolchainMirror
         return Math.Abs((srcInfo.LastWriteTimeUtc - dstInfo.LastWriteTimeUtc).TotalSeconds) < 0.002;
     }
 
-    /// <summary>Copy when missing or byte-different; never touch an identical file.</summary>
-    internal static int SyncFile(string source, string destination, HashSet<string>? createdDirs = null)
+    /// <summary>
+    /// Copy when missing or byte-different; never touch an identical file.
+    /// A copy that throws is COUNTED as a failure rather than swallowed.
+    /// </summary>
+    internal static CopyResult SyncFile(string source, string destination, HashSet<string>? createdDirs = null)
     {
         try
         {
             var srcInfo = new FileInfo(source);
-            if (!srcInfo.Exists) return 0;
+            if (!srcInfo.Exists) return default;
             var dstInfo = new FileInfo(destination);
             if (dstInfo.Exists)
             {
-                if (FilesLookIdentical(srcInfo, dstInfo)) return 0;
+                if (FilesLookIdentical(srcInfo, dstInfo)) return default;
                 if (srcInfo.Length == dstInfo.Length)
                 {
                     byte[] sourceBytes = File.ReadAllBytes(source);
                     if (sourceBytes.AsSpan().SequenceEqual(File.ReadAllBytes(destination)))
                     {
                         CopyModificationDate(srcInfo, dstInfo);
-                        return 0;
+                        return default;
                     }
                 }
             }
@@ -126,9 +163,9 @@ public static class ToolchainMirror
             }
             File.Copy(source, destination, overwrite: true);
             CopyModificationDate(srcInfo, new FileInfo(destination));
-            return 1;
+            return new CopyResult(1, 0);
         }
-        catch { return 0; }
+        catch (Exception error) { return CopyResult.OneFailure(destination, error); }
     }
 
     private static void CopyModificationDate(FileInfo src, FileInfo dst)
@@ -136,10 +173,13 @@ public static class ToolchainMirror
         try { File.SetLastWriteTimeUtc(dst.FullName, src.LastWriteTimeUtc); } catch { }
     }
 
-    /// <summary>A true mirror: copy what differs AND delete what should not be there.</summary>
-    internal static int SyncDirectory(string sourceRoot, string destinationRoot)
+    /// <summary>
+    /// A true mirror: copy what differs AND delete what should not be there.
+    /// Copies and deletes that fail are counted in <see cref="CopyResult.Failed"/>.
+    /// </summary>
+    internal static CopyResult SyncDirectory(string sourceRoot, string destinationRoot)
     {
-        int changed = 0;
+        var result = default(CopyResult);
         var sourceRelatives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var createdDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(sourceRoot))
@@ -152,7 +192,7 @@ public static class ToolchainMirror
                 string destFile = Path.Combine(destinationRoot, relative);
                 var dstInfo = new FileInfo(destFile);
                 if (dstInfo.Exists && FilesLookIdentical(fileInfo, dstInfo)) continue;
-                changed += SyncFile(fileInfo.FullName, destFile, createdDirs);
+                result += SyncFile(fileInfo.FullName, destFile, createdDirs);
             }
         }
         if (Directory.Exists(destinationRoot))
@@ -162,17 +202,22 @@ public static class ToolchainMirror
             {
                 string relative = Path.GetRelativePath(destinationRoot, fileInfo.FullName);
                 if (sourceRelatives.Contains(relative)) continue;
-                try { fileInfo.Delete(); changed++; } catch { }
+                try { fileInfo.Delete(); result += new CopyResult(1, 0); }
+                catch (Exception error) { result += CopyResult.OneFailure(fileInfo.FullName, error); }
             }
         }
-        return changed;
+        return result;
     }
 
 
     /// <summary>
     /// Sets an empty folder up as a working folder: launchers copied in,
     /// courses/ created, and .toolchain/ populated. Throws with teacher-facing
-    /// wording on failure.
+    /// wording on failure. The recipe is copied through
+    /// <see cref="ToolchainReadiness.Ensure"/> and WAITED for, so a window
+    /// already copying into the same folder is joined rather than raced, and
+    /// a copy that failed earlier is tried again. Call it off the UI thread
+    /// (the picker does).
     /// </summary>
     public static void InitializeWorkspace(string workspacePath, string bundledRoot)
     {
@@ -185,6 +230,6 @@ public static class ToolchainMirror
             File.Copy(source, Path.Combine(workspacePath, name), overwrite: true);
         }
         Directory.CreateDirectory(Workspace.CoursesDirectory(workspacePath));
-        RefreshToolchain(workspacePath, bundledRoot);
+        ToolchainReadiness.Ensure(workspacePath, bundledRoot, retryAFailedCopy: true).GetAwaiter().GetResult();
     }
 }

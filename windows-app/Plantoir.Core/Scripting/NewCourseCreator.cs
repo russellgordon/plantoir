@@ -52,6 +52,14 @@ public sealed class NewCourseCreator
             PreparationProblem = "This working folder isn't ready yet. Choose it from the File menu first, then create the course.";
             return;
         }
+        // And for the same reason, before anything is written (#473): while
+        // the app is still copying its tools into the folder, or could not
+        // finish, setup.ps1 would build from a half-copied folder.
+        if (ToolchainReadiness.Refusal(workspacePath) is { } notReady)
+        {
+            PreparationProblem = notReady;
+            return;
+        }
 
         try
         {
@@ -97,6 +105,13 @@ public sealed class NewCourseCreator
     public async Task InstallExampleCourse(string workspacePath)
     {
         PreparationProblem = null;
+        InstalledExampleCode = null;
+        // Before anything runs (#473), as CreateCourse does.
+        if (ToolchainReadiness.Refusal(workspacePath) is { } notReady)
+        {
+            PreparationProblem = notReady;
+            return;
+        }
         IsCreating = true;
         Runner.Milestones = TaskMilestones.ExampleCourse;
         Runner.Run("setup.ps1", new[] { "--install-example" }, workspacePath);
