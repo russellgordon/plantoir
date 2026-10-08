@@ -79,6 +79,12 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
             ["redate my meetings"] = ("re_date_classes", new()),
             ["start a new unit for the next class"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["start a new unit"] = ("add_next_class", new() { ["unit"] = "next" }),
+            // The two ways the smaller assistant was measured hearing as "the
+            // next day of this unit" (#440, mac 2026-10-07: 5 of 5 each, one
+            // page in the CURRENT unit, success reported). Exact, like every
+            // line here.
+            ["add the next class in a new unit"] = ("add_next_class", new() { ["unit"] = "next" }),
+            ["start a new unit with the next class"] = ("add_next_class", new() { ["unit"] = "next" }),
             ["when are my next classes?"] = ("read_remembered_timetable", new()),
             ["when are my next classes"] = ("read_remembered_timetable", new()),
             ["when is my next class?"] = ("read_remembered_timetable", new()),
@@ -146,6 +152,7 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         if (HideOrUnpublish(tidied) is { } hidden) return hidden;
         if (WholeUnit(tidied) is { } unit) return unit;
         if (MoreDays(tidied) is { } more) return more;
+        if (DaysToAUnit(tidied) is { } days) return days;
         if (MakeRoom(tidied) is { } room) return room;
         if (numberedPageWord is not null && MakeRoomNumbered(tidied, numberedPageWord) is { } numbered) return numbered;
         if (DeployAtATime(tidied) is { } scheduled) return scheduled;
@@ -414,6 +421,60 @@ public sealed partial record AssistCardCommand(string ToolName, IReadOnlyDiction
         {
             ["unit"] = unit.ToString(),
             ["days"] = howMany.ToString(),
+        });
+    }
+
+    /// <summary>
+    /// "Add three days to Unit 2", "Add another class to Unit 4" (#440) — the
+    /// mac's <c>daysToAUnit</c>, ported literally. The local add_next_class
+    /// no longer shows the model <c>unit</c> and <c>days</c> (#411 measured
+    /// what declaring them costs), so the sentence is read here.
+    /// </summary>
+    /// <remarks>
+    /// Six or seven words exactly: <c>add</c>, a count, an optional
+    /// <c>more</c>, the noun, <c>to unit</c>, a number. The count is a digit,
+    /// a word up to twelve, or — for one — <c>a</c>, <c>one</c> or
+    /// <c>another</c>; it must AGREE with the noun (<c>another day</c>,
+    /// <c>three days</c>). Term-blind, like every frame here: only the word
+    /// "unit". Anything else — a question mark, a "please", a course or
+    /// section named, a negation — falls through to the model, where settler
+    /// S3 (<see cref="AssistNextClassUnits"/>) stops it and points at the
+    /// phrasing. Numbers are read as <see cref="int"/>, unlike S3's 64-bit
+    /// reading: the server binds <c>unit</c> and <c>days</c> as ints, so a
+    /// count past that range is not a card this app could run, and it falls
+    /// through to the model and S3 (which points it, kind c) instead.
+    /// </remarks>
+    private static AssistCardCommand? DaysToAUnit(string tidied)
+    {
+        var spelled = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["a"] = 1, ["another"] = 1, ["one"] = 1, ["two"] = 2, ["three"] = 3, ["four"] = 4, ["five"] = 5,
+            ["six"] = 6, ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12,
+        };
+        string[] words = tidied.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if ((words.Length != 6 && words.Length != 7) || words[0] != "add") return null;
+        int last = words.Length - 1;
+        if (words[last - 2] != "to" || words[last - 1] != "unit") return null;
+        if (!int.TryParse(words[last], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int unit) || unit <= 0)
+            return null;
+        // "a more day" and "another more day" are not sentences.
+        if (words.Length == 7 && (words[2] != "more" || words[1] == "a" || words[1] == "another")) return null;
+        bool isSingular;
+        switch (words[last - 3])
+        {
+            case "day": case "class": isSingular = true; break;
+            case "days": case "classes": isSingular = false; break;
+            default: return null;
+        }
+        int howMany;
+        if (spelled.TryGetValue(words[1], out int word)) howMany = word;
+        else if (!int.TryParse(words[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out howMany)) return null;
+        if (howMany <= 0) return null;
+        if ((howMany == 1) != isSingular) return null;
+        return new AssistCardCommand("add_next_class", new Dictionary<string, string>
+        {
+            ["unit"] = unit.ToString(CultureInfo.InvariantCulture),
+            ["days"] = howMany.ToString(CultureInfo.InvariantCulture),
         });
     }
 

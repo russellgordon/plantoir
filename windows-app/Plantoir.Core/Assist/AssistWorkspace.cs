@@ -4185,6 +4185,36 @@ public sealed partial class AssistWorkspace
         return PlanAddClasses(courseCode, sectionNumber, next.Unit, next.Day, 1);
     }
 
+    /// <summary>
+    /// Where a PLAIN "add the next class" would land, for settler S3 (#440) —
+    /// the mac's <c>AssistToolRunner.nextClassReading</c>, ported as it is:
+    /// the plan is made ONLY to learn whether one can be made (no remembered
+    /// dates, or the course gone, is a refusal and gives null, so the real
+    /// call runs and asks for the dates — ruling 7), and the unit and day come
+    /// from <see cref="NextClassPlanner.NextUnitAndDay(IEnumerable{string}, ClassPageNaming)"/>
+    /// over the section's pages, independently of the plan (stack-2 plan
+    /// review, M1: a plan that changes nothing has no day to read). The unit
+    /// word is the NAMING word — "Week" in a numbered course.
+    /// </summary>
+    public AssistNextClassReading? NextClassReading(string courseCode, int sectionNumber)
+    {
+        try
+        {
+            PlanAddNextClass(courseCode, sectionNumber);
+            var course = Course(courseCode);
+            int section = Section(course, sectionNumber);
+            var naming = course.Configuration.Naming;
+            var titles = ClassPages(course, section).Select(p => Path.GetFileNameWithoutExtension(p) ?? "");
+            var next = NextClassPlanner.NextUnitAndDay(titles, naming);
+            return new AssistNextClassReading(naming.Word, naming.IsNumbered, course.Configuration.ClassNoun,
+                                              next.Unit, next.Day);
+        }
+        catch (AssistRefusal)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Create the pages the plan describes. Backed up first, and undoable.</summary>
     public AssistResult ApplyAddClasses(NewClassesPlan plan, IProgress<string>? progress = null)
     {
