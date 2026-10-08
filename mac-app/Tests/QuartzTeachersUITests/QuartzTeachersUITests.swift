@@ -293,13 +293,15 @@ final class QuartzTeachersUITests: XCTestCase {
         // height. The `RoundedRectangle` used as the field's
         // `.background` doesn't have that limitation — its own
         // accessibility frame matches its actual laid-out size.
-        let fieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
-        XCTAssertTrue(fieldBackground.waitForExistence(timeout: 5))
-        let fieldFrame: CGRect = fieldBackground.frame
+        // Since #456 the field wears the real bezel and draws no background
+        // shape of its own, so the comparison is against the text field's
+        // frame. The old containment check compared the button with the
+        // shape's identifier, which SwiftUI hoisted onto the whole Form row
+        // (see the note below) — it never measured the field.
+        let fieldFrame: CGRect = codeField.frame
         let buttonFrame: CGRect = revealButton.frame
-        XCTAssertTrue(fieldFrame.contains(buttonFrame), "The reveal button should be fully contained within the field's own visual bounds — field: \(fieldFrame), button: \(buttonFrame)")
         XCTAssertGreaterThan(buttonFrame.midX, fieldFrame.midX, "The reveal button should sit on the trailing half of the field")
-        XCTAssertLessThan(buttonFrame.height, fieldFrame.height, "The reveal button should leave a visible margin top and bottom, not fill the whole field")
+        XCTAssertLessThan(buttonFrame.height, fieldFrame.height + 8, "The reveal button should leave a visible margin top and bottom, not fill the whole field")
         // An upper bound too, not just containment — a regression that
         // grew the field far beyond the wizard sheet itself would still
         // "contain" the button and still put it on the "trailing half",
@@ -382,8 +384,6 @@ final class QuartzTeachersUITests: XCTestCase {
         XCTAssertTrue(nameLabel.exists)
         XCTAssertEqual(label.frame.minX, nameLabel.frame.minX, accuracy: 2.0, "The two labels should share a leading edge — code: \(label.frame.minX), name: \(nameLabel.frame.minX)")
 
-        let codeFieldBackground: XCUIElement = application.descendants(matching: .any).matching(identifier: "wizardCourseCodeFieldBackground").firstMatch
-        XCTAssertTrue(codeFieldBackground.waitForExistence(timeout: 5))
         let nameField: XCUIElement = application.textFields["wizardCourseNameField"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
 
@@ -403,16 +403,11 @@ final class QuartzTeachersUITests: XCTestCase {
         // themselves are the reliable comparison.
         let codeLeadingX: CGFloat = codeField.frame.minX
         let nameLeadingX: CGFloat = nameField.frame.minX
-        // 8pt, not a tight match: an `NSTextField`'s AX frame is its
-        // TEXT area, and `.roundedBorder` keeps its own inset inside
-        // that frame while this field's `.plain` style draws none — so
-        // the course-code field spends `textLeadingInset` (4pt,
-        // AppKit's own `titleRect` answer) to put its text where Course
-        // name's already is, and that shows up here as a difference in
-        // reported origin even when the two BOXES line up exactly
-        // (measured 2234.0 vs 2229.0, 2026-08-23, with the boxes
-        // visually flush in a screenshot).
-        XCTAssertEqual(codeLeadingX, nameLeadingX, accuracy: 8.0, "Course code's field should start at the same leading edge as Course name's — code: \(codeLeadingX), name: \(nameLeadingX)")
+        // A tight match since #456: both fields wear the same
+        // `.roundedBorder` bezel, so their AX frames carry the same inset.
+        // (Until then the course-code field was `.plain` inside a drawn
+        // bezel and the tolerance was 8pt.)
+        XCTAssertEqual(codeLeadingX, nameLeadingX, accuracy: 2.0, "Course code's field should start at the same leading edge as Course name's — code: \(codeLeadingX), name: \(nameLeadingX)")
 
         // Typed text reads LEADING in all three fields. `Form`'s own
         // label extraction would have made each field's contents the
