@@ -57,7 +57,10 @@ public class GettingReadyUiTests
         app.SelectSection(CourseFixtures.Renamed, 1);
         var preview = app.Find("previewButton", "the Preview button");
         var deploy = app.Find("deployButton", "the Deploy button");
-        if (app.Readiness() == "copying")
+        if (app.Readiness() != "copying")
+            Console.WriteLine("#473 fixture: the copy finished before the section opened, so the disabled Preview, " +
+                              "Deploy and banner were NOT checked on this run (the window-while-copying and + checks above were).");
+        else
         {
             Assert.False(preview.IsEnabled, "Preview was offered while the folder was still being got ready");
             Assert.False(deploy.IsEnabled, "Deploy was offered while the folder was still being got ready");

@@ -49,8 +49,14 @@ public static class ToolchainReadiness
         Failed,
     }
 
-    /// <summary>What the last copy of a folder did.</summary>
-    public sealed record Status(State State, int FilesChanged, int FilesFailed, double Seconds, string? Problem);
+    /// <summary>
+    /// What the last copy of a folder did. <paramref name="FirstFailedPath"/>
+    /// is the first file it could not copy or remove (from the working folder
+    /// down), and <paramref name="Problem"/> why — that file's error, or the
+    /// error that stopped the copy outright.
+    /// </summary>
+    public sealed record Status(State State, int FilesChanged, int FilesFailed, double Seconds, string? Problem,
+                                string? FirstFailedPath = null);
 
     // ---- The words a teacher reads (rule 1: no machinery) ----------------
 
@@ -160,13 +166,18 @@ public static class ToolchainReadiness
         if (string.IsNullOrEmpty(workspacePath) || !ToolchainMirror.IsAWorkingFolder(workspacePath))
             return Task.CompletedTask;
         string key = Key(workspacePath);
+        // The mac's own check (WorkspaceModel.shouldMirrorToolchain): a folder
+        // counted ready whose recipe has since gone from disk — deleted by
+        // hand, a sync client, a restore — is copied again. One File.Exists,
+        // so cheap enough for every Reload.
+        bool recipeStillThere = File.Exists(Path.Combine(workspacePath, ".toolchain", ToolchainMirror.RecipeRootFiles[0]));
         Task copy;
         lock (Gate)
         {
             if (!Folders.TryGetValue(key, out var entry)) Folders[key] = entry = new Entry();
             switch (entry.State)
             {
-                case State.Ready:
+                case State.Ready when recipeStillThere:
                 case State.Copying:
                     return entry.Copy;
                 case State.Failed when !retryAFailedCopy:
@@ -174,11 +185,15 @@ public static class ToolchainReadiness
             }
             entry.State = State.Copying;
             var copier = Copier;
-            // Started INSIDE the lock, so a second caller that arrives a moment
-            // later finds Copying and this very task, never a gap between them.
-            entry.Copy = copy = Task.Run(() => CopyNow(workspacePath, key, bundledRoot, copier));
+            // Made INSIDE the lock, so a second caller that arrives a moment
+            // later finds Copying and this very task, never a gap between them
+            // — but STARTED only after "started" has been said, so no window
+            // can hear "finished" first (a copy with nothing to do ends in
+            // milliseconds).
+            entry.Copy = copy = new Task(() => CopyNow(workspacePath, key, bundledRoot, copier));
         }
         RaiseChanged(workspacePath);
+        copy.Start(TaskScheduler.Default);
         return copy;
     }
 
@@ -206,7 +221,8 @@ public static class ToolchainReadiness
 
         bool ready = result.Failed == 0;
         var status = new Status(ready ? State.Ready : State.Failed, result.Changed, result.Failed,
-                                clock.Elapsed.TotalSeconds, problem);
+                                clock.Elapsed.TotalSeconds, problem ?? result.FirstProblem,
+                                problem is null ? result.FirstFailedPath : null);
         lock (Gate)
         {
             if (Folders.TryGetValue(key, out var entry))
@@ -236,10 +252,16 @@ public static class ToolchainReadiness
         string files = status.FilesChanged == 1 ? "1 file" : $"{status.FilesChanged} files";
         string seconds = status.Seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         if (status.State == State.Ready)
-            return $"got the working folder ready after an update — {files} brought up to date in {seconds} s — {workspacePath}";
+            return $"got the working folder ready — {files} brought up to date in {seconds} s — {workspacePath}";
         string failed = status.FilesFailed == 1 ? "1 file" : $"{status.FilesFailed} files";
-        string why = status.Problem is { Length: > 0 } p ? $" ({p})" : "";
-        return $"could not finish getting the working folder ready — {failed} could not be copied{why}, " +
+        string first = (status.FirstFailedPath, status.Problem) switch
+        {
+            ({ Length: > 0 } path, { Length: > 0 } why) => $" (first: {path}, {why})",
+            ({ Length: > 0 } path, _) => $" (first: {path})",
+            (_, { Length: > 0 } why) => $" ({why})",
+            _ => "",
+        };
+        return $"could not finish getting the working folder ready — {failed} could not be copied or removed{first}, " +
                $"{files} brought up to date in {seconds} s; Preview and Deploy wait for Reload Courses — {workspacePath}";
     }
 
@@ -311,10 +333,45 @@ public static class ToolchainReadiness
             if (!Directory.Exists(Workspace.CoursesDirectory(workspacePath))) return null;
             string path = MarkerPath(workspacePath, Environment.ProcessId);
             Directory.CreateDirectory(ActivityDirectory(workspacePath));
+            SweepDeadMarkers(workspacePath);
             File.WriteAllText(path, WorkLease.LeaseBody(withStart: true));
             return path;
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Removes markers left by a Plantoir that was killed mid-copy. They are
+    /// already ignored by every reader; this only keeps them from piling up.
+    /// Never this process's own, never a live one. Best-effort.
+    /// </summary>
+    private static void SweepDeadMarkers(string workspacePath)
+    {
+        foreach (var (marker, pid, alive) in Markers(workspacePath))
+        {
+            if (alive || pid == Environment.ProcessId) continue;
+            try { File.Delete(marker); } catch { }
+        }
+    }
+
+    /// <summary>Every marker in the folder, with its owner and whether that owner lives.</summary>
+    private static List<(string Marker, int Pid, bool Alive)> Markers(string workspacePath)
+    {
+        var found = new List<(string, int, bool)>();
+        IEnumerable<string> markers;
+        try { markers = Directory.EnumerateFiles(ActivityDirectory(workspacePath), MarkerPrefix + "*").ToList(); }
+        catch { return found; }
+        foreach (string marker in markers)
+        {
+            string suffix = Path.GetFileName(marker)[MarkerPrefix.Length..];
+            if (!int.TryParse(suffix, out int pid)) continue;
+            string body;
+            try { body = File.ReadAllText(marker); }
+            catch { continue; }
+            var (name, start) = WorkLease.ReadBody(body);
+            found.Add((marker, pid, name is not null && WorkLease.OwnerIsAlive(pid, name, start, "toolchain-copying")));
+        }
+        return found;
     }
 
     /// <summary>
@@ -324,22 +381,6 @@ public static class ToolchainReadiness
     /// belongs to another process (a different start time on line 4), counts
     /// for nothing: a killed Plantoir must not lock the assistant out.
     /// </summary>
-    public static bool AnotherProgramIsGettingReady(string workspacePath)
-    {
-        IEnumerable<string> markers;
-        try { markers = Directory.EnumerateFiles(ActivityDirectory(workspacePath), MarkerPrefix + "*").ToList(); }
-        catch { return false; }
-        foreach (string marker in markers)
-        {
-            string suffix = Path.GetFileName(marker)[MarkerPrefix.Length..];
-            if (!int.TryParse(suffix, out int pid)) continue;
-            string body;
-            try { body = File.ReadAllText(marker); }
-            catch { continue; }
-            var (name, start) = WorkLease.ReadBody(body);
-            if (name is null) continue;
-            if (WorkLease.OwnerIsAlive(pid, name, start, "toolchain-copying")) return true;
-        }
-        return false;
-    }
+    public static bool AnotherProgramIsGettingReady(string workspacePath) =>
+        Markers(workspacePath).Any(marker => marker.Alive);
 }

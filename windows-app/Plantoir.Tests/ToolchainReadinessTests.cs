@@ -50,6 +50,10 @@ public sealed class ToolchainReadinessTests : IDisposable
             Interlocked.Increment(ref _runs);
             _letGo.Wait(TimeSpan.FromSeconds(30));
             if (Throws) throw new IOException("the disk is full");
+            // What a real copy leaves: the recipe's first root file, which a
+            // Ready folder is checked for.
+            Directory.CreateDirectory(Path.Combine(folder, ".toolchain"));
+            File.WriteAllText(Path.Combine(folder, ".toolchain", "Dockerfile"), "FROM x");
             return Result;
         }
         public void LetGo() => _letGo.Set();
@@ -93,6 +97,48 @@ public sealed class ToolchainReadinessTests : IDisposable
 
         Assert.Equal(1, copy.Runs);
         Assert.Equal(ToolchainReadiness.State.Ready, ToolchainReadiness.StateOf(_folder));
+    }
+
+    [Fact]
+    public async Task AReadyFolderWhoseRecipeHasGoneIsCopiedAgain()
+    {
+        var copy = new HeldCopy();
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+        await ToolchainReadiness.Ensure(_folder, "bundled");
+        Assert.Equal(1, copy.Runs);
+
+        File.Delete(Path.Combine(_folder, ".toolchain", "Dockerfile"));   // a sync client, a restore, a hand
+        await ToolchainReadiness.Ensure(_folder, "bundled");
+
+        Assert.Equal(2, copy.Runs);
+        Assert.Equal(ToolchainReadiness.State.Ready, ToolchainReadiness.StateOf(_folder));
+    }
+
+    [Fact]
+    public async Task EveryWindowHearsStartedBeforeFinished()
+    {
+        // A copy with nothing to do ends in milliseconds; "finished" must
+        // never reach a window (or startup.log) before "started".
+        var copy = new HeldCopy { Result = new(0, 0) };
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+        var heard = new System.Collections.Concurrent.ConcurrentQueue<ToolchainReadiness.State>();
+        void Listen(string folder) { if (folder == _folder) heard.Enqueue(ToolchainReadiness.StateOf(folder)); }
+        ToolchainReadiness.Changed += Listen;
+        try
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                ToolchainReadiness.Reset();
+                ToolchainReadiness.Copier = copy.Copy;
+                while (heard.TryDequeue(out _)) { }
+                await ToolchainReadiness.Ensure(_folder, "bundled");
+                Assert.True(SpinWait.SpinUntil(() => heard.Count >= 2, TimeSpan.FromSeconds(5)));
+                Assert.Equal(new[] { ToolchainReadiness.State.Copying, ToolchainReadiness.State.Ready }, heard.ToArray());
+            }
+        }
+        finally { ToolchainReadiness.Changed -= Listen; }
     }
 
     [Fact]
@@ -183,6 +229,8 @@ public sealed class ToolchainReadinessTests : IDisposable
             var result = ToolchainMirror.SyncDirectory(source, dest);
             Assert.Equal(1, result.Failed);
             Assert.Equal(0, result.Changed);
+            Assert.Equal(Path.Combine(dest, "a.py"), result.FirstFailedPath);   // the first one, and why
+            Assert.False(string.IsNullOrEmpty(result.FirstProblem));
         }
     }
 
@@ -213,24 +261,32 @@ public sealed class ToolchainReadinessTests : IDisposable
         copy.LetGo();
         ToolchainReadiness.Copier = copy.Copy;
 
-        await ToolchainReadiness.Ensure(_folder, "bundled");
+        // A trail file of its own for the length of the test, put back to the
+        // suite's scratch trail afterwards (never to null, the REAL trail).
+        string ownTrail = Path.Combine(_root, "activity.txt");
+        ActivityTrail.SetCustomLogPathForTesting(ownTrail);
+        try { await ToolchainReadiness.Ensure(_folder, "bundled"); }
+        finally { ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath); }
 
-        string trail;
-        using (var stream = new FileStream(TestTrailRedirect.ScratchTrailPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-        using (var reader = new StreamReader(stream))
-            trail = reader.ReadToEnd();
-        Assert.Contains("got the working folder ready after an update — 1234 files brought up to date in", trail);
+        string trail = File.ReadAllText(ownTrail);
+        Assert.Contains("got the working folder ready — 1234 files brought up to date in", trail);
         Assert.Equal("working folder tools copied", ActivityTrail.KeyFor(ActivityTrail.Event.WorkingFolderToolsCopied));
     }
 
     [Fact]
     public void TheTrailLineSaysWhichOutcomeItWas()
     {
-        var failed = new ToolchainReadiness.Status(ToolchainReadiness.State.Failed, 40, 2, 12.34, "access denied");
+        var failed = new ToolchainReadiness.Status(ToolchainReadiness.State.Failed, 40, 2, 12.34, "access denied",
+                                                   @".toolchain\scripts\build_site.py");
         string line = ToolchainReadiness.TrailLine(@"C:\work", failed);
-        Assert.StartsWith("could not finish getting the working folder ready — 2 files could not be copied (access denied), 40 files brought up to date in 12.3 s", line);
+        Assert.StartsWith("could not finish getting the working folder ready — 2 files could not be copied or removed " +
+                          @"(first: .toolchain\scripts\build_site.py, access denied), 40 files brought up to date in 12.3 s", line);
+        var threw = new ToolchainReadiness.Status(ToolchainReadiness.State.Failed, 0, 1, 0.1, "the disk is full");
+        Assert.Contains("1 file could not be copied or removed (the disk is full)", ToolchainReadiness.TrailLine(@"C:\work", threw));
         var ready = new ToolchainReadiness.Status(ToolchainReadiness.State.Ready, 1, 0, 0.5, null);
-        Assert.StartsWith("got the working folder ready after an update — 1 file brought up to date in 0.5 s", ToolchainReadiness.TrailLine(@"C:\work", ready));
+        Assert.StartsWith("got the working folder ready — 1 file brought up to date in 0.5 s", ToolchainReadiness.TrailLine(@"C:\work", ready));
+        // Written for a folder set up from nothing too, so it never says "update".
+        Assert.DoesNotContain("update", ToolchainReadiness.TrailLine(@"C:\work", ready));
     }
 
     // ---- What the window shows: state → buttons and banner ----------------
@@ -419,6 +475,21 @@ public sealed class ToolchainReadinessTests : IDisposable
         int pid = gone.Id;
         WriteMarker(pid, $"{pid}\ncmd\n{DateTime.UtcNow:O}\n");
         Assert.False(ToolchainReadiness.AnotherProgramIsGettingReady(_folder));
+    }
+
+    [Fact]
+    public async Task ACopySweepsAwayMarkersLeftByAKilledPlantoir()
+    {
+        using var gone = Process.Start(new ProcessStartInfo("cmd.exe", "/c exit 0") { CreateNoWindow = true, UseShellExecute = false })!;
+        gone.WaitForExit();
+        WriteMarker(gone.Id, $"{gone.Id}\nPlantoir\n{DateTime.UtcNow:O}\n");
+        var copy = new HeldCopy();
+        copy.LetGo();
+        ToolchainReadiness.Copier = copy.Copy;
+
+        await ToolchainReadiness.Ensure(_folder, "bundled");
+
+        Assert.False(File.Exists(ToolchainReadiness.MarkerPath(_folder, gone.Id)));
     }
 
     [Fact]

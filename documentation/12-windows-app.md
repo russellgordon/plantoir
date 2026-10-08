@@ -4174,7 +4174,22 @@ gap between `App.OnLaunched starting` and `MainWindow.Activate called` in
 opened on a folder whose `.toolchain\` was stale. #465 had already moved the
 daily update check after the window; the freeze itself is this issue.
 
-**AFTER: <director fills in>**
+**AFTER** (2026-10-08, same PC, the x64 Debug build of this branch, a real
+working folder `C:\Users\lenov\Teaching`, read from
+`%LOCALAPPDATA%\Plantoir\startup.log`):
+
+| Run | Launch → window | Launch → copy finished (Preview usable) |
+|---|---|---|
+| `.toolchain\` removed entirely (12,753 files to copy) | **2.9 s** (`App.OnLaunched starting` 08:42:02.557 → `MainWindow.Activate called` 08:42:05.489) | 17.4 s (08:42:20.460), in the background, the window usable throughout |
+| `.toolchain\` present, every one of its 12,753 files made different (a byte appended, its time moved) | **2.7 s** (08:48:15.140 → 08:48:17.880) | 15.2 s (08:48:30.676) |
+| BEFORE, 2026-10-07, the installed 1.4.3 → 1.4.4 first launch | no window for 119.7 s and 93.7 s | the same moment |
+
+The caveat that keeps these honest: both AFTER runs had a WARM disk cache —
+the bundle had just been read by the UI tests and by the previous copy —
+whereas the first launch after a real install reads 12.7k freshly written
+files cold, so 15–17 s is a lower bound on the copy, not a prediction of it.
+The number that matters, launch to a usable window, no longer depends on the
+copy at all.
 
 For scale, measured while writing the UI test (2026-10-08, same PC, x64 Debug):
 deleting the folder's `.toolchain\support\skeletons` (2,389 files) before
@@ -4252,14 +4267,22 @@ and `PreviewStopper` does not go through `ScriptRunner` anyway.
 **2. Whether two windows on the same folder share one copy.** Yes.
 `ToolchainReadiness` (Plantoir.Core) keeps one entry per folder, keyed on the
 full path case-insensitively (the old `FoldersWithFreshToolchain` set's rule),
-under a lock. `Ensure` starts the copy on `Task.Run` INSIDE the lock, so a
-second window — or the picker setting a folder up — arriving a moment later
-finds Copying and is handed the very same task. A folder is marked ready only
+under a lock. `Ensure` makes the copy's task INSIDE the lock, so a second
+window — or the picker setting a folder up — arriving a moment later finds
+Copying and is handed the very same task; it STARTS the task only after
+telling every window "started", so nobody can hear "finished" first (a copy
+with nothing to do ends in milliseconds, and the first version logged the two
+in either order). A folder counted ready is copied again if its
+`.toolchain\Dockerfile` has since gone from disk — the mac's own check in
+`WorkspaceModel.shouldMirrorToolchain`, one `File.Exists` per reload. A folder is marked ready only
 AFTER a pass in which nothing failed. Both halves fix what the old code did:
 the set was a plain `HashSet` read and written from whatever thread, filled
 BEFORE the copy ran, and `SyncFile` swallowed every exception and answered 0,
 so a copy that half failed counted as fresh for the rest of the run.
-`SyncFile`/`SyncDirectory` now return a `CopyResult(Changed, Failed)`.
+`SyncFile`/`SyncDirectory` now return a `CopyResult(Changed, Failed,
+FirstFailedPath, FirstProblem)` — failed REMOVALS count too, since a stale file
+left behind changes the recipe's hash — and the trail line names the first
+failure and its error.
 
 A FAILED copy is tried again only on File → Reload Courses
 (`WorkspaceViewModel.ReloadTryingAgain`) or when a window is newly pointed at
@@ -4287,7 +4310,23 @@ different start time, counts for nothing). Deliberately NOT a `.lease` name:
 read `*.lease`, and this holds no course — the precedent is `BackupDeleter`'s
 `<COURSE>.held-backup.<pid>`. The marker is written only when `courses\`
 already exists, so it never turns a folder with no courses into one with an
-empty list.
+empty list, and writing one sweeps away any left by a Plantoir killed
+mid-copy (already ignored; this only stops them piling up). **The marker
+exists only WHILE a copy runs, so plantoir-mcp cannot see a FAILED copy** —
+by design: a failed copy is usually a file that could not be written, the
+assistant's build then fails on its own with the launcher's own words, and a
+marker kept after a failure would need someone to remove it, which a killed
+app never does. The app's own window still refuses with `CouldNotGetReady`.
+
+**The app's own robots wait instead of being refused.** The command-line
+automation hooks (`--auto-preview`, `--auto-deploy`, `--auto-wizard`,
+`--auto-createcourse`, `--auto-select`, `--auto-addsection`, `--auto-course`)
+and every marketing-capture scene (`MarketingShotCapturer.OpenMain`, and
+`Provision` before it makes courses) used to act after a fixed 1.5 s. They
+now await the same `Ensure` — joining their own launch's copy, never starting
+another — before pressing anything, so a picture never shows the "Cannot
+Preview Yet" dialog; a FAILED copy makes a scene answer `refused: <the
+sentence>` and a hook log `automation hook refused: …` and do nothing.
 
 **The scheduled run is unchanged in this piece.** It never mirrors
 `.toolchain\` at all, and its wrapper's fingerprint reads
@@ -4343,9 +4382,16 @@ its `appliesOnWhy` says why it is permanent rather than a gap) is written once
 per copy that changed or failed something, never for the ordinary pass:
 
 ```
-… · got the working folder ready after an update — 2389 files brought up to date in 5.3 s — C:\…\workspace
-… · could not finish getting the working folder ready — 2 files could not be copied (…), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
+… · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
+… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
 ```
+
+It does not say "after an update": the same copy fills a folder the picker sets
+up from nothing, and refreshes any stale one. And a pass that changed NOTHING
+but still took more than a second (a slow disk comparing 12,753 files) shows
+the banner and writes no line — which is fine: the banner was true while it
+was up, and a line saying "0 files" on every slow launch would bury the one
+that explains a real copy; the `startup.log` lines below still time it.
 
 For a developer, `startup.log` brackets it: `tools copy started for '<folder>'`
 and `tools copy finished for '<folder>': Ready, N changed, M failed, S s`. Time
