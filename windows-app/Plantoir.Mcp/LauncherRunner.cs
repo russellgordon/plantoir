@@ -32,6 +32,12 @@ public sealed class LauncherRunner : ILauncherRunner
         string script = Path.Combine(workingFolder, launcher + (OperatingSystem.IsWindows() ? ".ps1" : ".sh"));
         if (!File.Exists(script))
             return new LaunchOutcome(false, $"This working folder has no {Path.GetFileName(script)}.");
+        // #473: Plantoir is copying its tools into this folder right now (the
+        // first window after an update does, in the background), so a build
+        // started here would read a half-copied folder. The app's marker file
+        // says so; a marker whose program is gone counts for nothing.
+        if (Plantoir.Core.Models.ToolchainReadiness.AnotherProgramIsGettingReady(workingFolder))
+            return new LaunchOutcome(false, Plantoir.Core.Models.ToolchainReadiness.GettingReadyMessage);
 
         var info = new ProcessStartInfo
         {

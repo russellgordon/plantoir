@@ -1684,8 +1684,29 @@ public sealed partial class SidebarPane : UserControl
 
     // ---- Dialog launchers ------------------------------------------------
 
+    /// <summary>
+    /// #473: the + button is disabled, with the reason as its tooltip, while
+    /// the app is copying what it needs into the folder (or could not finish)
+    /// — a new course runs setup.ps1, which builds from those files. Null
+    /// puts it back. Called by the window whenever readiness changes.
+    /// </summary>
+    public void ShowWhetherCoursesCanBeAdded(string? refusal)
+    {
+        AddCourseButton.IsEnabled = refusal is null;
+        ToolTipService.SetToolTip(AddCourseButton, refusal ?? "Add a course or club");
+        AutomationProperties.SetHelpText(AddCourseButton, refusal ?? "");   // read aloud, unlike a tooltip
+    }
+
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)
     {
+        // #473: every way in (the + button, the empty pane's "Add a Course…",
+        // the automation hooks) — the button is greyed, this is what the
+        // others meet. Before the wizard opens, so nothing is typed in vain.
+        if (ToolchainReadiness.Refusal(Workspace.WorkspacePath) is { } notReady)
+        {
+            await ShowError("Cannot Add a Course Yet", notReady);
+            return;
+        }
         // Which folder this confirmation belongs to, taken BEFORE it goes up.
         string? askedIn = Workspace.WorkspacePath;
         if (EffectiveXamlRoot is null) return;

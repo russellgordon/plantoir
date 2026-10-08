@@ -250,6 +250,7 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     private string? PointAtFolder(string path)
     {
         string? leftBehind = _state.PointAt(path);
+        _tryAFailedCopyAgain = true;   // a window newly on this folder tries a failed copy again (#473)
         Reload();
         // Only when a folder was actually left, so a window adopting its
         // FIRST folder still notifies exactly what it always did — that one
@@ -335,6 +336,8 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
     public void Reload()
     {
         App.LogDiagnostic("WorkspaceViewModel.Reload starting");
+        bool tryAFailedCopyAgain = _tryAFailedCopyAgain;
+        _tryAFailedCopyAgain = false;
         Courses = new List<Course>();
         ArchivedItems = new List<ArchivedItem>();
         BackupItems = new List<BackupItem>();
@@ -342,8 +345,13 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         State = null;
         if (_state.FolderPath is null) { NotifyLoaded(); return; }
 
+        // The launchers here and now (six small files); the recipe in the
+        // BACKGROUND (#473) — about two minutes on the first launch after an
+        // update, which used to keep the window from appearing at all.
+        // ToolchainReadiness says when it is done; until then Preview, Deploy
+        // and New Course are disabled with the reason.
         App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace starting");
-        BundledToolchain.RefreshWorkspace(_state.FolderPath);
+        BundledToolchain.RefreshWorkspace(_state.FolderPath, tryAFailedCopyAgain);
         App.LogDiagnostic("WorkspaceViewModel.Reload: RefreshWorkspace finished, Classify starting");
         State = Workspace.Classify(_state.FolderPath);
         App.LogDiagnostic($"WorkspaceViewModel.Reload: State is {State}");
@@ -377,6 +385,26 @@ public sealed class WorkspaceViewModel : INotifyPropertyChanged
         App.LogDiagnostic("WorkspaceViewModel.Reload: NotifyLoaded() done");
     }
 
+
+    /// <summary>
+    /// Set by the two moments a copy of the tools that FAILED is tried again
+    /// (#473): File → Reload Courses (<see cref="ReloadTryingAgain"/>) and a
+    /// window newly pointed at a folder (<see cref="PointAtFolder"/>). The
+    /// sidebar's routine reloads — after a rename, an archive, a restore —
+    /// leave a failed copy failed rather than start a two-minute copy each.
+    /// Read and cleared by <see cref="Reload"/>.
+    /// </summary>
+    private bool _tryAFailedCopyAgain;
+
+    /// <summary>
+    /// File → Reload Courses: reload, and try the copy of the tools again if
+    /// it failed — the banner's failure sentence names this menu item.
+    /// </summary>
+    public void ReloadTryingAgain()
+    {
+        _tryAFailedCopyAgain = true;
+        Reload();
+    }
 
     public async Task InitializeWorkspaceAsync()
     {
