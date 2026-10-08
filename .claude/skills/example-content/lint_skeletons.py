@@ -6,8 +6,11 @@ that have one the teacher declined — so a mistake here is a mistake in
 about 1,900 courses. The checks
 are deliberately blunt: every link resolves, every page is titled, every
 sentinel is where the installer expects it, no template token — %PERCENT% or
-{brace} — survived into the output, and the subject never lands in front of a
-noun it does not fit ("a this course course", #328).
+{brace} — survived into the output, the subject never lands in front of a
+noun it does not fit ("a this course course", #328), and the class website is
+never called "the published website" (#443). That last rule also reads the
+Example Course (`support/example_course/`, EXC2O), whose template pages carry
+the same sentences and which no other linter reads.
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -25,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts"))
 import markdown_code  # noqa: E402
 SKELETONS = ROOT / "support" / "skeletons"
+EXAMPLE_COURSE = ROOT / "support" / "example_course"
 
 LINK = re.compile(r"!?\[\[([^\]|#]+?)(?:\\?\|[^\]]*)?(?:#[^\]|]*)?\]\]")
 CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
@@ -57,6 +61,18 @@ ARTICLE_LOWER = re.compile(r"\b(a|an) ([A-Za-z][A-Za-z-]*)")
 ARTICLE_UPPER = re.compile(r"(?<![A-Za-z,] )\b(A|An) ([A-Za-z][A-Za-z-]*)")
 UPPER_START_OF_THIS_OR_THE = re.compile(r"(?<![A-Za-z,] )\bA (this|the)\b")
 
+# The site students see is never "the published page / website / site" (#443,
+# decided by Russell 2026-10-04): DEPLOY is what puts a site online, and
+# PUBLISH only marks a page so a deploy includes it. A sentence about the
+# website says "your class website"; a sentence about marking a page
+# ("publish: true", "the newest published page", "never published") is
+# right and stays — which is why the rule names the SITE, and a page only
+# straight after "the" or "your". `[\s>]` lets the phrase wrap inside a callout.
+SITE_CALLED_PUBLISHED = re.compile(
+    r"\bpublished[\s>]+(?:web\s*)?sites?\b|\b(?:the|your)[\s>]+published[\s>]+pages?\b",
+    re.IGNORECASE,
+)
+
 # Shapes the checks must accept and refuse, run before every lint so a
 # widened rule cannot start biting real prose (or stop catching the #328
 # shapes) unnoticed. A failure here is a broken LINTER, not a broken page.
@@ -73,6 +89,10 @@ MUST_BE_ACCEPTED = [
     "Units: \\mathrm {kg} per \\text {m}.",
     "$$\\begin{aligned} x &= \\frac{a}{b} \\\\ y^{2} \\end{aligned}$$",
     "written for this course. This class asks people to try things.",
+    "It starts at Unit 4, Day 21 because that is the newest PUBLISHED page in All Classes.",
+    "it stays strictly on your computer and is never published or uploaded anywhere.",
+    "on the right side of the page on your class website.",
+    "A shared page can be published to one section and held back from another.",
 ]
 MUST_BE_REFUSED = [
     "When an idea in {subject} needs explaining",
@@ -85,6 +105,10 @@ MUST_BE_REFUSED = [
     "a urban studies course",
     "an unit",
     "an one-page summary",
+    "the table of contents on the right side of the published page.",
+    "a clickable link on the right side of your published\n> website!",
+    "How it looks to your students on the published website:",
+    "never exists on the published site!",
 ]
 
 
@@ -122,6 +146,12 @@ def prose_problems(prose: str) -> list:
             if article.lower() != article_for(word):
                 problems.append(f'"{article}" in front of {word!r}: {match.group(0)!r}')
                 break
+    published = SITE_CALLED_PUBLISHED.search(text)
+    if published:
+        problems.append(
+            f'the class website called "published" (#443 — say "your class website"): '
+            f"{published.group(0)!r}"
+        )
     return problems
 
 
@@ -331,6 +361,27 @@ def check(family: str) -> list:
     return problems
 
 
+def example_course_problems() -> list:
+    """The #443 phrase rule over the Example Course (EXC2O).
+
+    Only that ONE rule: EXC2O is hand-written course content, not a skeleton,
+    so the skeleton-shape checks (sentinels, manifests, every link) do not
+    apply to it. It copies the skeleton template sentences, though, and was
+    missed once because nothing read it (review of #443, 2026-10-07).
+    """
+    problems = []
+    for page in sorted(EXAMPLE_COURSE.rglob("*.md")):
+        text = page.read_text(encoding="utf-8")
+        published = SITE_CALLED_PUBLISHED.search(text)
+        if published:
+            where = page.relative_to(EXAMPLE_COURSE)
+            problems.append(
+                f'{where}: the class website called "published" (#443 — say '
+                f'"your class website"): {published.group(0)!r}'
+            )
+    return problems
+
+
 def main():
     broken = check_the_checks()
     if broken:
@@ -349,7 +400,17 @@ def main():
                 print(f"   {line}")
             if len(problems) > 12:
                 print(f"   … and {len(problems) - 12} more")
-    print(f"\n{len(families)} skeletons checked; "
+    if not sys.argv[1:]:
+        problems = example_course_problems()
+        total += len(problems)
+        if problems:
+            print(f"\nexample_course: {len(problems)} problem(s)")
+            for line in problems[:12]:
+                print(f"   {line}")
+    checked = f"{len(families)} skeletons"
+    if not sys.argv[1:]:
+        checked += " and the Example Course"
+    print(f"\n{checked} checked; "
           + ("clean" if not total else f"{total} problem(s)"))
     return 1 if total else 0
 
