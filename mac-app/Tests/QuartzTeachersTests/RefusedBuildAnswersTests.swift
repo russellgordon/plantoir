@@ -144,7 +144,9 @@ final class RefusedBuildAnswersTests: XCTestCase {
     /// cross, a `?`, or three characters of mojibake.
     func testTheLiftTakesOffEveryFormOfTheCross() {
         let sentence: String = "ICS4U section 2 is already being deployed, so it cannot be built until that has finished."
-        for front in ["❌ ", "? ", "â\u{009D}\u{008C} ", "   ❌   ", ""] {
+        // The mojibake is the contract's own form (`crossArrivesAs`, read
+        // on a Western code page), not retyped.
+        for front in ["❌ ", "? ", "â\u{009D}Œ ", "   ❌   ", ""] {
             let refusal: FailureExplainer.SectionDeployRefusal? = FailureExplainer.sectionDeployRefusal(
                 in: front + sentence + "\n   Nothing was changed."
             )
