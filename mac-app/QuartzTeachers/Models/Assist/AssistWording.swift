@@ -121,6 +121,63 @@ nonisolated enum AssistWording {
             + "Say “\(sayMorning)” or “\(sayEvening)”."
     }
 
+    /// The answer to "schedule a deploy" with no time the app can set, and
+    /// to a deploy-now answer from the model for a sentence that named a
+    /// later time (#449, from Windows' #424). Asked in code; nothing is
+    /// scheduled, nothing runs, and the question is never sent to the model.
+    ///
+    /// **Windows' sentence byte for byte**, curly quotes and apostrophe
+    /// included: it was written there first and Windows' wording comparison
+    /// reads this generated key. The example it names, "deploy tomorrow at
+    /// 6:30 am", is one the deploy-at-a-time family accepts, so typing it
+    /// puts the scheduled deploy's card up on the very next turn —
+    /// `ScheduleAndCancelFramesTests` pins that.
+    static let scheduleADeployNeedsATime: String =
+        "What time should this section deploy? Say it with the time, for example “deploy tomorrow at "
+        + "6:30 am”, and I’ll set it up for you to agree to."
+
+    /// Settler S3's answer (#440): the model chose a plain add_next_class for
+    /// a sentence asking for a new unit, a unit or day other than the next
+    /// one, or several pages. Nothing is added, and the teacher is given the
+    /// sentences that DO it.
+    ///
+    /// **Every sentence it quotes is one the window accepts, in that very
+    /// course** (ruling 1 of the #440 review, pinned by `NextClassUnitsTests`
+    /// for a Unit, a Module and a numbered course): "Start a new unit" and
+    /// "Add five more days to Unit 2" are answered in code, term-blind, and
+    /// plan the course's own word ("Module 2, Day 7"). The days sentence
+    /// names `latestUnit` — the unit the plain next page goes in — rather
+    /// than a fixed example: typed back, "Add five more days to Unit 4" in a
+    /// course whose latest unit is 2 would start Unit 4 at Day 1 and skip
+    /// Unit 3 (review N-impl F4). A numbered course has
+    /// no units, so it is told the one thing it can do — "Add the next
+    /// meeting page" — once per page. Quoting the course's own word ("Start a
+    /// new module") was REJECTED: the frames read only "unit", so that
+    /// sentence would go to the model and be stopped here again, round and
+    /// round (review finding F2).
+    static func nextClassNeedsItsOwnPhrasing(
+        unitWord: String,
+        isNumbered: Bool,
+        noun: ClassNoun,
+        latestUnit: Int
+    ) -> String {
+        if isNumbered {
+            return "Nothing was added. This course numbers its pages one after another and has no units, "
+                + "so I add one \(noun.singular) at a time: say “Add the next \(noun.singular) page” once for "
+                + "each one you want."
+        }
+        let word: String = unitWord.lowercased()
+        let opening: String = "Nothing was added. I add one \(noun.singular) at a time, after the last one in "
+            + "your latest \(word)."
+        if word == "unit" {
+            return opening + " To start a new unit, say “Start a new unit”. To add several days to Unit "
+                + "\(latestUnit), say “Add five more days to Unit \(latestUnit)”."
+        }
+        return opening + " To start a new \(word), say “Start a new unit”. To add several days to "
+            + "\(unitWord) \(latestUnit), say “Add five more days to Unit \(latestUnit)”, since I read the "
+            + "word unit as \(unitWord) here."
+    }
+
     /// The answer to a deploy time written a way the app can read but does
     /// not set — "deploy at 6.30 pm", "deploy at 6:30 tonight" (issue #277).
     /// Answered in code; nothing is scheduled and nothing is sent to the
@@ -187,6 +244,26 @@ nonisolated enum AssistWording {
 
     static func deployDidNotFinish(course: String, section: String) -> String {
         return "The deploy of \(course) Section \(section) did not finish. " + AssistWording.whereTheOutputIs
+    }
+
+    /// A deploy from the in-app assistant or an outside assistant's
+    /// `deploy_section` was refused by the launchers because the section was
+    /// still being deployed by a deploy that was set for later — its run
+    /// still working, including one ended by setting the section again
+    /// (GitHub #439). Said instead of "did not finish", which would send the
+    /// teacher looking for a fault. Names what is deploying, because after a
+    /// re-set the app shows only the new time. `shared-rules.json` →
+    /// `deployWhileItsSectionDeploys.sentences.assistant`.
+    static func deployRefusedWhileALaterDeployWorks(course: String, section: String) -> String {
+        return "\(course) Section \(section) is still being deployed by a deploy that was set for later, "
+             + "so it was not deployed again. Try again once that deploy has finished."
+    }
+
+    /// The same refusal when what was in the way is another deploy of the
+    /// section — one typed in Terminal, say (GitHub #439).
+    static func deployRefusedWhileItsSectionDeploys(course: String, section: String) -> String {
+        return "\(course) Section \(section) is already being deployed, so it was not deployed again. "
+             + "Try again once that deploy has finished."
     }
 
     /// A deploy from a caller with no window (an assistant in another app,
