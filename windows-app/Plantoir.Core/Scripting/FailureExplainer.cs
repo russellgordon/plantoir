@@ -134,7 +134,7 @@ public static class FailureExplainer
     }
 
     /// <summary>
-        /// A folder deploy whose copy did not finish (#304, mac #227): deploy.sh's
+    /// A folder deploy whose copy did not finish (#304, mac #227): deploy.sh's
     /// cross line, and deploy.ps1's own robocopy-failure line, both mean the
     /// folder is not up to date. Matched on the launcher's words; the copy's
     /// error number means nothing to a teacher.

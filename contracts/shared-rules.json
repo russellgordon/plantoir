@@ -20931,7 +20931,7 @@
       "mac",
       "windows"
     ],
-    "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows owes the same guard in preview.ps1 (its own process table, never a remembered process id). Until Windows implements it, its cases are a named gap against the windows issue opened with #381."
+    "appliesOnWhy": "The rule and the window's cases are for both apps. The launcherCases are the mac's preview.sh; Windows has the same guard in preview.ps1 since #386 (its own process table, never a remembered process id), and runs every launcherCase there through windows-app/test_launcher_rules.ps1; since #467 none is skipped."
   },
   "deployWhileItsSectionDeploys": {
     "rule": "A deploy of a section refuses, before anything is changed, while that same section is still being deployed in this working folder: by a deploy that was set for later whose script is still running - including one whose run was ended by setting the section again (a 'leftover run') - or by deploy.sh for that course and section. It is asked by the launchers, so every caller is covered: the window's Deploy and an assistant's deploy (their build leg, preview.sh --build-only, and their deploy.sh legs), a scheduled run's own legs, and a deploy typed in Terminal. A preview being served is not this rule's (previewWhileItsSectionDeploys). Before it starts its script, a newly set run waits for a leftover run of its own section to finish (theNewRunWaits, below).",
