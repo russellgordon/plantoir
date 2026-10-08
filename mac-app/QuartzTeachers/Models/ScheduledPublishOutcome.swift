@@ -478,7 +478,7 @@ nonisolated enum ScheduledPublishOutcome {
         case .neededAnAnswer:
             ActivityTrail.note(
                 .scheduledPublishNeededAnAnswer,
-                "a scheduled publish stopped, publishing to " + stopped.destination,
+                "a scheduled deploy stopped, deploying to " + stopped.destination,
                 course: course, section: section, at: stopped.when
             )
         case .buildNeededAnAnswer:
@@ -492,7 +492,7 @@ nonisolated enum ScheduledPublishOutcome {
             // `activityTrail.mustRecord` for that event, which says so.
             ActivityTrail.note(
                 .scheduledPublishNeededAnAnswer,
-                "a scheduled publish stopped — building the pages needed an answer",
+                "a scheduled deploy stopped — building the pages needed an answer",
                 course: course, section: section, at: stopped.when
             )
         case .buildDidNotFinish:
@@ -504,19 +504,19 @@ nonisolated enum ScheduledPublishOutcome {
             // `activityTrail.mustRecord` for that event, which says so.
             ActivityTrail.note(
                 .scheduledPublishDidNotFinish,
-                "a scheduled publish stopped — the pages could not be built",
+                "a scheduled deploy stopped — the pages could not be built",
                 course: course, section: section, at: stopped.when
             )
         case .didNotFinish:
             ActivityTrail.note(
                 .scheduledPublishDidNotFinish,
-                "a scheduled publish stopped, publishing to " + stopped.destination,
+                "a scheduled deploy stopped, deploying to " + stopped.destination,
                 course: course, section: section, at: stopped.when
             )
         case .succeeded:
             ActivityTrail.note(
                 .scheduledPublishFinished,
-                "a scheduled publish finished, publishing to " + stopped.destination,
+                "a scheduled deploy finished, deploying to " + stopped.destination,
                 course: course, section: section, at: stopped.when
             )
         case .tooLateToRun:
@@ -577,35 +577,35 @@ nonisolated enum ScheduledPublishOutcome {
     static func sentence(for stopped: Stopped, course: String, section: Int) -> String {
         switch stopped.kind {
         case .neededAnAnswer:
-            return "\(course) Section \(section) was set to publish on its own, and it stopped "
-                 + "because publishing to \(stopped.destination) needed an answer nobody was "
-                 + "there to give. Publish this section once yourself, answer the question, and "
-                 + "it can publish on its own after that."
+            return "\(course) Section \(section) was set to deploy on its own, and it stopped "
+                 + "because deploying to \(stopped.destination) needed an answer nobody was "
+                 + "there to give. Deploy this section once yourself, answer the question, and "
+                 + "it can deploy on its own after that."
         case .buildNeededAnAnswer:
             // No destination, on purpose: none was reached. And it sends the
-            // teacher to PREVIEW rather than Publish, because previewing is
+            // teacher to PREVIEW rather than Deploy, because previewing is
             // what asks the question.
-            return "\(course) Section \(section) was set to publish on its own, and it stopped "
+            return "\(course) Section \(section) was set to deploy on its own, and it stopped "
                  + "before it started, because building the pages needed an answer nobody was "
                  + "there to give. Preview this section once yourself, answer the question, and "
-                 + "it can publish on its own after that."
+                 + "it can deploy on its own after that."
         case .buildDidNotFinish:
             // No destination, on purpose: none was reached (#137). It sends
             // the teacher to PREVIEW, which rebuilds the pages and shows why
             // they would not build; the last clause echoes
             // `AssistWording.couldNotBuildBeforeDeploying`. Russell's starting
             // wording, 2026-09-23, his to polish.
-            return "\(course) Section \(section) was set to publish on its own, and it stopped "
+            return "\(course) Section \(section) was set to deploy on its own, and it stopped "
                  + "before it started — the pages could not be built, so nothing went up "
                  + "anywhere. Preview this section once yourself, and the reason will be in "
                  + "that section's window."
         case .didNotFinish:
-            return "\(course) Section \(section) was set to publish on its own, and it did not "
-                 + "finish — publishing to \(stopped.destination) stopped, so nothing went up "
-                 + "there. Publish it yourself to see what happens."
+            return "\(course) Section \(section) was set to deploy on its own, and it did not "
+                 + "finish — deploying to \(stopped.destination) stopped, so nothing went up "
+                 + "there. Deploy it yourself to see what happens."
         case .succeeded:
-            return "\(course) Section \(section) published on its own to "
-                 + "\(stopped.destination). Your students have the new pages."
+            return "\(course) Section \(section) deployed on its own to "
+                 + "\(stopped.destination). Your website has the new pages."
         case .tooLateToRun:
             // No destination, on purpose: none was reached, and none was
             // going to be. The sentence says what Plantoir chose and why, so

@@ -417,12 +417,12 @@ class MultiDestinationDeployRunner {
         // The failure branch is recorded too, and matters MORE than the
         // success: the marker is derived, so a section that stayed
         // "Edited" because the stamp could not be written looks exactly
-        // like one that was never published. Without this line the report
-        // "it still says Edited after I published" has nothing to read.
+        // like one that was never deployed. Without this line the report
+        // "it still says Edited after I deployed" has nothing to read.
         let destinationNames: String = MultiDestinationDeployRunner.joinedWithAnd(names)
-        var sentence: String = "marked this section\u{2019}s pages as published to " + destinationNames
+        var sentence: String = "recorded this section\u{2019}s pages as deployed to " + destinationNames
         if !recorded {
-            sentence = "published to " + destinationNames
+            sentence = "deployed to " + destinationNames
                 + ", but could not note it down — the window will still say Edited"
         }
         ActivityTrail.note(

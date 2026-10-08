@@ -1066,7 +1066,7 @@ nonisolated enum ActivityTrail {
         /// other pages, classes), how many are listed under another page and
         /// how many would be published as offered — rows that GO or that a ticked class brings (#398),
         /// not rows whose own tick is on (#385) — and the occasion: after a preview, after
-        /// publishing, on opening after a publish Plantoir did not watch
+        /// publishing, on opening after a deploy Plantoir did not watch
         /// (scheduled, the assistant, outside), or from the menu. #333's alert
         /// was shown and nobody could tell afterwards whether it had been seen;
         /// "why did it ask me to publish 40 pages?" is answered by the counts.

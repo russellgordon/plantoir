@@ -621,7 +621,7 @@ Notes:
 - Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
 - You must build first (the static site goes to 'public/' in that section folder).
 - --target chooses where the built site goes: netlify (the default) or cloudflare.
-- With --to-folder <path>, the site is published to <path>/section<N> on THIS
+- With --to-folder <path>, the site is deployed to <path>/section<N> on THIS
   computer instead of Netlify — an incremental copy (only changed files move),
   for teachers who upload to their own web host (e.g. over SFTP). A relative
   <path> is taken from this working folder.
@@ -632,7 +632,7 @@ Notes:
   when it cannot (a token scoped only to Pages cannot list its own account).
 - Use --reset-token (or --logout) to remove the saved PAT and re-link on next run;
   combine it with --target cloudflare to clear the Cloudflare one instead.
-- --image REF publishes using a particular already-built image; normally the
+- --image REF deploys using a particular already-built image; normally the
   image is built locally from this folder's recipe when missing.
 - If your course code ends with '0' (zero), you'll be prompted to correct it to 'O' for Open-level courses.
 USAGE
@@ -702,10 +702,10 @@ done
 assert_can_ask() {
   [[ "$NON_INTERACTIVE" == "true" ]] || return 0
   echo ""
-  echo "This publish was set to happen on its own, so nobody is here to answer:"
+  echo "This deploy was set to happen on its own, so nobody is here to answer:"
   echo "   $1"
   echo " $2"
-  echo " Nothing was published."
+  echo " Nothing was deployed."
   exit 3
 }
 
@@ -718,7 +718,7 @@ if [[ "$COURSE_CODE" =~ ^[A-Z]{3}[0-9]0$ ]]; then
   if [[ -f "courses/$SUGGESTED/course_config.json" && ! -f "courses/$COURSE_CODE/course_config.json" ]]; then
     echo " I see setup data for '$SUGGESTED' on disk."
   fi
-  assert_can_ask "Fix course code to '$SUGGESTED'? [Y/n]" "Publish this section once from Plantoir, where you can answer it."
+  assert_can_ask "Fix course code to '$SUGGESTED'? [Y/n]" "Deploy this section once from Plantoir, where you can answer it."
   read -rp " Fix course code to '$SUGGESTED'? [Y/n]: " _ans
   _ans="${_ans:-Y}"
   if [[ "$_ans" =~ ^[Yy]$ ]]; then
@@ -758,7 +758,7 @@ _course_config="courses/${COURSE_CODE}/course_config.json"
 if [[ -f "$_course_config" ]]; then
   if ! _config_text="$(cat "$_course_config" 2>/dev/null)"; then
     echo "❌ Plantoir cannot tell whether $COURSE_CODE is kept for reference —"
-    echo "   its settings file could not be read. Nothing was published."
+    echo "   its settings file could not be read. Nothing was deployed."
     exit 1
   fi
   # ONE LINE, because `grep` works a line at a time and `[[:space:]]` cannot
@@ -779,13 +779,11 @@ if [[ -f "$_course_config" ]]; then
   # launcher, deploy.ps1, the shared Python and the app) must agree on is
   # contracts/shared-rules.json -> referenceCourses.markerAgreement.
   #
-  # "Nothing was published." is OLD, and stays only because it is pinned. A
-  # site is DEPLOYED and a page is PUBLISHED (Russell, 2026-09-20; every line
-  # is to use each word only in its own sense, 2026-10-03), but this sentence
-  # is asserted by two shared Python tests, a contract case and Windows' own
-  # tests, so it moves in one change with Windows rather than here alone —
-  # contracts/shared-rules.json -> whyTheLaunchersStillSayPublished names
-  # every such line.
+  # "Nothing was deployed." — a site is DEPLOYED and a page is PUBLISHED
+  # (Russell, 2026-09-20; every line uses each word only in its own sense,
+  # 2026-10-03, #443). The sentence is asserted by two shared Python tests and
+  # a contract case, so Windows' deploy.ps1 is red on it until it matches
+  # (#441) — contracts/shared-rules.json -> whyTheLaunchersStillSayPublished.
   _reference_code="$COURSE_CODE"
   # A marker that is THERE with a value that is neither true nor false — `1`,
   # `"true"`, a key written with \u escapes. Somebody plainly meant it, and
@@ -811,7 +809,7 @@ if [[ -f "$_course_config" ]]; then
        && ! printf '%s' "$_flat_config" | grep -Eq '"[^"]*ept_for_reference"[[:space:]]*:[[:space:]]*[Ff][Aa][Ll][Ss][Ee]'; }; then
     echo ""
     echo "❌ Plantoir cannot tell whether ${COURSE_CODE} is kept for reference —"
-    echo "   its settings say something other than true or false. Nothing was published."
+    echo "   its settings say something other than true or false. Nothing was deployed."
     echo ""
     exit 1
   fi
@@ -1083,7 +1081,7 @@ if [[ "$_BUILT_FOUND" != "true" ]]; then
   echo " ${PUBLIC_DIR_HOST}"
   echo
   echo " If you have just built, check this section still has its front page."
-  echo " A section without one produces no website, so there is nothing to publish."
+  echo " A section without one produces no website, so there is nothing to deploy."
   echo
   echo " Build first:"
   echo " ${PREVIEW_CMD} ${COURSE_CODE} ${SECTION_NUM} --build-only"
@@ -1301,7 +1299,7 @@ if [[ -n "$TO_FOLDER" ]]; then
     fi
   fi
 
-  echo "📦 Publishing ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
+  echo "📦 Deploying ${COURSE_CODE} section ${SECTION_NUM} to a folder…"
   # -a preserves what matters, --delete mirrors removals, and the
   # itemized output is counted so the teacher sees how little moved.
   #
@@ -1317,7 +1315,7 @@ if [[ -n "$TO_FOLDER" ]]; then
   _rsync_rc=0
   _rsync_said="$(rsync -a --delete --itemize-changes "${PUBLIC_DIR_HOST}/" "${TARGET_DIR}/")" || _rsync_rc=$?
   if [[ $_rsync_rc -ne 0 ]]; then
-    echo "❌ Not every page could be copied into the publishing folder, so it is not up to date."
+    echo "❌ Not every page could be copied into the deploy folder, so it is not up to date."
     echo "   Folder: ${TARGET_DIR}"
     echo "   (copy error ${_rsync_rc})"
     exit 1
@@ -1325,7 +1323,7 @@ if [[ -n "$TO_FOLDER" ]]; then
   CHANGED_COUNT="$(printf '%s\n' "$_rsync_said" | grep -c '^[<>ch.]f' || true)"
   # After the copy succeeded, never before (#379).
   record_published_pages "$SECTION_DIR_HOST" "$COURSE_CODE" "$SECTION_NUM" "folder"
-  echo "✅ Published: ${CHANGED_COUNT} file(s) updated."
+  echo "✅ Deployed: ${CHANGED_COUNT} file(s) updated."
   echo "   Folder: ${TARGET_DIR}"
   echo "   Upload that folder to your web host however you prefer (e.g. SFTP)."
   # The app reads this line to offer the folder in Finder.
@@ -1450,7 +1448,7 @@ prompt_for_cf_account() {
 
 One more thing from Cloudflare.
 
-The token you just made is allowed to publish, but not to look up which
+The token you just made is allowed to deploy, but not to look up which
 Cloudflare account it belongs to — so the account's ID is needed as well.
 This is the only time you will be asked for it.
 
@@ -1563,7 +1561,7 @@ if [[ "$TARGET" == "cloudflare" ]]; then
 Connect to Cloudflare.
 
 Cloudflare hosts this section's website for free, and it needs to know that
-the publishing is coming from you. It does that with an API token — a long
+the deploys are coming from you. It does that with an API token — a long
 code that acts like a password made just for this app. Creating one takes
 about two minutes, and you will not be asked again: it is saved securely on
 this computer.
@@ -1575,17 +1573,17 @@ this computer.
   4. Give it ONE permission, chosen from the three dropdowns:
      Account  ->  Cloudflare Pages  ->  Edit
   5. Under "Account Resources", choose "Include" and then your own account
-     by name. A token that names no account cannot publish anything, and
+     by name. A token that names no account cannot deploy anything, and
      what you get back if you skip this does not mention accounts at all.
   6. Under "TTL", set the end date to after the end of your school year —
      next July is a safe choice — or leave it with no end date. An expired
-     token stops your publishing working, with nothing to say why.
+     token stops your deploys working, with nothing to say why.
   7. Choose "Continue to summary", then "Create Token".
   8. Copy the long code Cloudflare shows you — it is only shown once — and
      paste it below. Nothing appears as you paste; that is normal.
 
 MSG
-    assert_can_ask "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+    assert_can_ask "Paste Cloudflare token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
     read -rsp "Paste Cloudflare token: " cf_pasted; echo
     if ! validate_cf_token "$cf_pasted"; then
       echo "❌ Cloudflare did not accept that token."
@@ -1696,7 +1694,7 @@ if [[ -z "$TOKEN" ]]; then
 Connect to Netlify.
 
 Netlify hosts this section's website for free, and it needs to know that the
-publishing is coming from you. It does that with an access token — a long
+deploys are coming from you. It does that with an access token — a long
 code that acts like a password made just for this app. Creating one takes
 about a minute, and you will not be asked again: it is saved securely on
 this computer.
@@ -1708,7 +1706,7 @@ this computer.
   3. Describe it as something you will recognise later, such as
      "Class websites".
   4. Change the expiry — it starts at 7 days. A token that expires stops
-     your publishing working, with nothing on screen to say why, so set a
+     your deploys working, with nothing on screen to say why, so set a
      date after the end of your school year: next July is a safe choice.
      Choose "No expiration" instead if it is offered.
   5. Choose "Generate token", then copy the long code Netlify shows you —
@@ -1717,7 +1715,7 @@ this computer.
 
 MSG
   echo ""
-  assert_can_ask "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+  assert_can_ask "Paste Netlify token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
   read -rsp "Paste Netlify token: " pasted; echo
   if ! validate_token "$pasted"; then
     echo "❌ Token invalid (Netlify rejected it). Please try again."

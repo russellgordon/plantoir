@@ -57,7 +57,7 @@ nonisolated enum UnitWordRenameWording {
         "One link was updated to match."
 
     static let donePublish: String =
-        "Publish each section for its website to use the new names."
+        "Deploy each section for its website to use the new names."
 
     static let doneBackup: String =
         "A backup of the whole course was saved first, and is listed under Backups."

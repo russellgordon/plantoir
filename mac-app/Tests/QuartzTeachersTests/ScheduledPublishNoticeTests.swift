@@ -235,7 +235,7 @@ final class ScheduledPublishNoticeTests: XCTestCase {
         XCTAssertEqual(result.announcement, .couldNotBeSent)
         XCTAssertEqual(fake.postsAttempted, 1)
         let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
-        XCTAssertTrue(trail.contains("a notification about a scheduled publish could not be sent"), trail)
+        XCTAssertTrue(trail.contains("a notification about a scheduled deploy could not be sent"), trail)
     }
 
     /// A permission check that never answers is bounded by the same ceiling.
