@@ -410,14 +410,14 @@ final class QuitScriptRunsTests: XCTestCase {
             "The shared machine was stopped while another folder's preview was running"
         )
         XCTAssertTrue(
-            trail.contains("a publish or preview is still going"),
+            trail.contains("a deploy or preview is still going"),
             "The trail says: \(trail)"
         )
     }
 
     /// The background warm-up (bundle B) holds the shared machine as any
     /// launcher does, and the trail says it was the warm-up — never "a
-    /// publish or preview", which nobody started.
+    /// deploy or preview", which nobody started.
     @MainActor
     func testTheBackgroundWarmUpHoldsTheSharedMachineAndIsNamed() throws {
         let scratch: Scratch = try makeScratch()
@@ -436,7 +436,7 @@ final class QuitScriptRunsTests: XCTestCase {
 
         XCTAssertFalse(callsMade(in: scratch).contains("colima stop"))
         XCTAssertTrue(trail.contains("still being got ready to build websites, in the background"), trail)
-        XCTAssertFalse(trail.contains("publish or preview"), trail)
+        XCTAssertFalse(trail.contains("deploy or preview"), trail)
     }
 
     /// A folder's own launcher holds its builder, and a neighbour whose name

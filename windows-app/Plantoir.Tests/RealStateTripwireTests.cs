@@ -27,7 +27,6 @@ public class RealStateTripwireTests
         ["CodexLauncher.cs"] = (2, "finds the user's own Codex install (home folder, npm under APPDATA); read-only"),
         ["TaskScheduling.cs"] = (3, "the installed exe path; the wrapper's runtime line; and StateDirExpression, the one place $healthDir and $pendingDir name LOCALAPPDATA (#179: overridable by PLANTOIR_TEST_WRAPPER_STATE_DIR inside TEMP only)"),
         ["FolderActions.cs"] = (1, "reads Obsidian's vault registry under APPDATA; never written by tests"),
-        ["MarketingShotCapturer.cs"] = (2, "the developer-only marketing capture's default Teaching folder"),
         ["BuildOutputLocation.cs"] = (1, "the home folder, to say whether a builds root is under it; a parameter in tests"),
         ["App.xaml.cs"] = (1, "LOCALAPPDATA for the per-user install check (#337): where the INSTALLER put the app, not where state is kept"),
         ["MachineWork.cs"] = (1, "the REAL settings path, on purpose: the busy check before a kill or an install must not read a redirected one (#155/#337)"),

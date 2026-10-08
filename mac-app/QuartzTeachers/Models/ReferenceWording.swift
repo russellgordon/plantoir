@@ -101,7 +101,7 @@ nonisolated enum ReferenceWording {
     /// being taught keeps them, which is the half a teacher will worry about.
     static func keepACopyLeavesAddOnsBehind(course: String) -> String {
         return "The copy is made without \(course)'s Obsidian add-ons and their settings, "
-             + "so nothing in them can publish it. \(course) keeps them."
+             + "so nothing in them can put it online. \(course) keeps them."
     }
 
     /// Keep a Copy for Reference… refused because a copy of the same name
