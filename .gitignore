@@ -58,3 +58,6 @@ mac-app/Vendor/.helpers.*/
 *.priv
 netsparkle*.key
 
+
+# site/updates/ is a build-time copy of website/updates/ (build.py); the deploy reads the working copy, and git would normalise the Windows feed's CR LF
+site/updates/
