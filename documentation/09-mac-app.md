@@ -6437,11 +6437,15 @@ folder ready after an update (#473)"), with the mac's differences named:**
   open the empty raw-output panel (finding 6).
 - **The app's own robots wait instead of being refused.** `Plantoir
   --mcp-stdio` adopts its folder before reading a request, and that reload
-  starts the copy in ITS process; the first request is read only once the
-  copy has finished (`AssistMCPServer.serve`), and a headless rebuild or
-  deploy (`AssistToolchainWork`) waits the same way, so a client that sends
-  a preview straight away is never refused for a copy the server itself
-  started (finding 2). **Not done on purpose:** a cross-process marker.
+  starts the copy in ITS process. Requests are read AT ONCE — a client's
+  start-up timeout must not wait on a copy that can take a minute on a slow
+  Mac (the implementation review's finding 4) — and the two tools that
+  build, `AssistToolchainWork.rebuildPreview` and `deploy`, wait for the
+  copy themselves (`ToolchainReadiness.waitUntilReady`), so a client that
+  sends a preview straight away is never refused for a copy the server
+  itself started (finding 2). In that process a copy that FAILED is tried
+  again at the next build rather than refused for ever with a sentence
+  naming a File menu it has not got. **Not done on purpose:** a cross-process marker.
   Windows wrote `toolchain-copying.<pid>` so one process could see another's
   copy; the mac does not, because every file is written atomically from the
   same bundle, so two copies at once write the same bytes and the worse
@@ -6451,8 +6455,9 @@ folder ready after an update (#473)"), with the mac's differences named:**
   `--stop` (`PreviewStopper`) is its own process too, so neither meets the
   backstop (finding 1).
 - **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
-  the synced-folder notice) appears only once the copy has actually WRITTEN
-  or removed a file, and on a failure — not on a timer (Windows' one second
+  the synced-folder notice) appears only once the copy has actually written
+  or removed its first file (`syncDirectory` says so once, for a write or a
+  removal), and on a failure — not on a timer (Windows' one second
   against its half-second compare): the ordinary launch compares every file
   for 0.9 s and writes nothing, and a slower Mac would have flashed a timed
   banner on every launch (finding 9). The buttons are greyed from the copy's
@@ -6473,8 +6478,15 @@ folder ready after an update (#473)"), with the mac's differences named:**
   its own folder, builds nothing from a copy that failed, since the image
   would carry the wrong tag.
 
-**Measured after** — to be filled in from a real launch of this build with
-a stale `.toolchain/` (the closing comment on #476 carries it).
+**Measured after** (this build, Apple M4 Pro, warm cache, a scratch working
+folder with one course and NO `.toolchain/`, the window polled through
+System Events every quarter second): **first window at 0.34 s** after
+launch; the copy ran behind it and finished **3.8 s** after launch (12,753
+files, the trail line "got the working folder ready: 12753 file(s) brought
+up to date in 3.8 s"). Before this piece the same launch would have shown
+its window at about 4 s. The number that matters, launch to a usable
+window, no longer depends on the copy at all — Windows' sentence, true here
+too.
 
 ### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
 
@@ -6531,22 +6543,31 @@ Sparkle 2.9.6's source (`SPUStandardUserDriver.m`, `SUUpdateAlert.m`,
    chose to close the gap (2026-10-08) rather than accept it**, so the mac now
    matches the rule's second half by another route than Windows':
 
-   - **The driver says whether it held the offer.** `SPUStandardUserDriver`
-     gets a delegate (`UpdateReminderDelegate`): gentle reminders declared
-     supported so `standardUserDriverShouldHandleShowingScheduledUpdate(_:
-     andInImmediateFocus:)` is consulted — it answers YES, so Sparkle shows
-     the update exactly as before, and the app only LISTENS to
-     `immediateFocus`; and `standardUserDriverDidReceiveUserAttention(
-     forUpdate:)` says the alert was seen.
+   - **The driver says whether it held the offer, with the offer in hand.**
+     `SPUStandardUserDriver` gets a delegate (`UpdateReminderDelegate`):
+     `standardUserDriverShouldHandleShowingScheduledUpdate(_:
+     andInImmediateFocus:)` answers YES, so Sparkle shows the update exactly
+     as before, and the app only LISTENS — and it is THERE that the app is
+     told the offer was handed over, because the driver asks inside its own
+     `showUpdateFound`, before any window is shown: told before, the flag is
+     the previous offer's; told after, an alert shown at once may already
+     have been seen and cleared (the implementation review's finding 2; it
+     also found the gentle-reminders flag gates only a log line, not the
+     callback). `standardUserDriverDidReceiveUserAttention(forUpdate:)` says
+     the alert was seen.
    - **A held offer is brought forward later** (`UpdateReminders`,
      `AppUpdates.scheduledOfferWasHandedToSparkle`): after 1, 2, 4, 8, 16,
      32 then every 60 minutes, while the offer is still pending and the app
      is active, `showUpdateInFocus()` — the call Check for Updates… makes —
      shows the held alert (`SPUStandardUserDriver.m` :466-470, :184-192).
-     Only while ACTIVE: when the app is inactive Sparkle itself shows the
-     alert the moment it is activated, and bringing it forward from behind
-     would pull Plantoir in front of whatever the teacher is doing (the plan
-     review's finding 14). The retries stop at the first attention or answer
+     Only while ACTIVE, and only after ten quiet seconds of no keyboard or
+     mouse input (`CGEventSource.secondsSinceLastEventType`, the idle test
+     Sparkle itself uses): when the app is inactive Sparkle shows the alert
+     the moment it is activated, and bringing it forward from behind would
+     pull Plantoir in front of whatever the teacher is doing (the plan
+     review's finding 14); and the alert comes up key with Install focused,
+     so brought forward mid-keystroke a Return typed into Plantoir would
+     install the update (the implementation review's finding 3). The retries stop at the first attention or answer
      — a teacher who leaves the alert open is never made to look at it again
      (finding 13: a repeated `showUpdateInFocus` makes the alert key with
      Install focused, and a Return typed into Plantoir would have installed).

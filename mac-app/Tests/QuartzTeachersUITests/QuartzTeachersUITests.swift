@@ -284,15 +284,11 @@ final class QuartzTeachersUITests: XCTestCase {
         // by geometry rather than a screenshot: this machine's screen
         // capture has been unreliable mid-session (grabbing an unrelated
         // window), so frame containment is the trustworthy check here.
-        // Against the background SHAPE's own frame, not `codeField`'s —
-        // an `NSTextField`'s reported AX frame reflects the underlying
-        // control's own intrinsic content bounds (~18pt tall) regardless
-        // of a later `.frame(height:)` giving it more room to sit inside
-        // (confirmed identical across two different modifier orderings,
-        // 2026-08-23), so it under-reports this field's real 30pt visual
-        // height. The `RoundedRectangle` used as the field's
-        // `.background` doesn't have that limitation — its own
-        // accessibility frame matches its actual laid-out size.
+        // Until #456 this compared against a background SHAPE's frame,
+        // because an `NSTextField`'s AX frame is its ~18pt text box (confirmed
+        // across two modifier orderings, 2026-08-23) — but SwiftUI hoisted
+        // the shape's identifier onto the whole Form row, so that check never
+        // measured the field at all (see the note further down).
         // Since #456 the field wears the real bezel and draws no background
         // shape of its own, so the comparison is against the text field's
         // frame. The old containment check compared the button with the
@@ -301,7 +297,13 @@ final class QuartzTeachersUITests: XCTestCase {
         let fieldFrame: CGRect = codeField.frame
         let buttonFrame: CGRect = revealButton.frame
         XCTAssertGreaterThan(buttonFrame.midX, fieldFrame.midX, "The reveal button should sit on the trailing half of the field")
-        XCTAssertLessThan(buttonFrame.height, fieldFrame.height + 8, "The reveal button should leave a visible margin top and bottom, not fill the whole field")
+        // Inside the field's trailing edge (a chevron drawn detached to the
+        // right would pass the check above), and vertically within it. The
+        // text field's AX frame is its ~18pt text box, 2-4pt inside the
+        // 26pt bezel, so the button's edges are allowed a few points past it.
+        XCTAssertLessThanOrEqual(buttonFrame.maxX, fieldFrame.maxX + 4, "The reveal button should sit inside the field's trailing edge — field: \(fieldFrame), button: \(buttonFrame)")
+        XCTAssertTrue(fieldFrame.minY - 4 <= buttonFrame.midY && buttonFrame.midY <= fieldFrame.maxY + 4, "The reveal button should sit on the field's own row — field: \(fieldFrame), button: \(buttonFrame)")
+        XCTAssertLessThan(buttonFrame.height, 26, "The reveal button should leave a visible margin top and bottom inside a 26pt bezel, not fill it")
         // An upper bound too, not just containment — a regression that
         // grew the field far beyond the wizard sheet itself would still
         // "contain" the button and still put it on the "trailing half",
