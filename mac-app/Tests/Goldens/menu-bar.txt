@@ -1,0 +1,80 @@
+# Plantoir's menu bar (#457), as MenuBarTreeTests reads it out of the real
+# NSApp.mainMenu: titles, key equivalents and dividers; hidden items skipped;
+# enablement NOT pinned (SubjectMenuRules and contracts/shared-rules.json ->
+# subjectMenus pin that). View shows only its own group (Back to Reload Page),
+# not the system's tab, toolbar and full-screen items around it.
+# A line tagged [if claude] / [if codex] / [if local] / [if any reviser] is
+# expected only on a Mac that has it: presence follows the Mac.
+# Open in Obsidian's key (Shift-Command-O) is checked on its own: it moves to
+# whichever of the two items is live.
+menus: Plantoir · File · Edit · View · Course · Section · Window · Help
+== File
+  New Window  [⌘N]
+  New Course…  [⇧⌘N]
+  ----
+  Open Working Folder…  [⌘O]
+  Open Recent
+    Clear Menu
+  ----
+  Import Courses for Reference…
+  Restore from Archive…
+  Reload Courses  [⇧⌘R]
+  ----
+  ----
+  Close  [⌘W]
+  Close All  [⌥⌘W]  (alternate)
+== View
+  Back  [⌘[]
+  Forward  [⌘]]
+  Reload Page  [⌘R]
+== Course
+  Add Section…  [⌥⌘N]
+  Copy a Page from This Course…  [⇧⌘C]
+  ----
+  Save Course Settings  [⌘S]
+  Revert Course Settings
+  ----
+  Rename…
+  Set School Year…
+  Keep a Copy for Reference…
+  ----
+  Back Up Now
+  Restore from Backup…
+  ----
+  Revise With  [if any reviser]
+    Claude…  [if claude]
+    Codex…  [if codex]
+    Local AI Assistant…  [if local]
+  ----
+  Open in Obsidian
+  Show in Finder
+  New Terminal at Folder
+  ----
+  Delete Backup…
+  Delete Archive…
+  Remove Course…
+== Section
+  Preview  [⇧⌘P]
+  Deploy…  [⇧⌘D]
+  Open in Browser
+  ----
+  Schedule Deploy…
+  Cancel Deploy at…
+  ----
+  Get Ready for the Start of the Year…
+  Undo Getting Ready for the Start of the Year…
+  Publish Pages That Links Lead To…
+  ----
+  Revise With  [if any reviser]
+    Claude…  [if claude]
+    Codex…  [if codex]
+    Local AI Assistant…  [if local]
+  ----
+  Open in Obsidian
+  Show in Finder
+  New Terminal at Folder
+  ----
+  Remove Section…
+== Help
+  Plantoir Help
+  Report a Problem…

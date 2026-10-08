@@ -421,6 +421,15 @@ struct CourseSettingsView: View {
             .padding(12)
         }
         .navigationTitle(course.displayCode)
+        // Course ▸ Save Course Settings ⌘S and Revert Course Settings (#457).
+        // ⌘S lived on the Save button until then — a shortcut hung on a
+        // button is one nobody discovers, and the menu item is where macOS
+        // advertises it. Same predicates as the buttons, same actions.
+        .focusedSceneValue(\.courseSettingsMenu, CourseSettingsCommands(
+            maySave: saveIsEnabled,
+            mayRevert: SaveEnablement.revertIsEnabled(hasUnsavedChanges: course.configuration.hasUnsavedChanges),
+            perform: performSettingsMenuItem
+        ))
         .toolbar {
             ToolbarItem {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
@@ -504,7 +513,6 @@ struct CourseSettingsView: View {
             Button("Save") {
                 save()
             }
-            .keyboardShortcut("s", modifiers: .command)
             .buttonStyle(.borderedProminent)
             .disabled(!saveIsEnabled)
             .accessibilityIdentifier("saveButton")
@@ -512,7 +520,6 @@ struct CourseSettingsView: View {
             Button("Save") {
                 save()
             }
-            .keyboardShortcut("s", modifiers: .command)
             .buttonStyle(.bordered)
             .disabled(!saveIsEnabled)
             .accessibilityIdentifier("saveButton")
@@ -909,6 +916,23 @@ struct CourseSettingsView: View {
             return "shared"
         case .perSection:
             return "per-section"
+        }
+    }
+
+    /// Course ▸ Save Course Settings and Revert Course Settings, each asking
+    /// its button's own predicate again at the click.
+    func performSettingsMenuItem(_ item: SubjectMenuRules.Item) {
+        switch item {
+        case .saveCourseSettings:
+            if saveIsEnabled {
+                save()
+            }
+        case .revertCourseSettings:
+            if SaveEnablement.revertIsEnabled(hasUnsavedChanges: course.configuration.hasUnsavedChanges) {
+                revertToFile()
+            }
+        default:
+            break
         }
     }
 

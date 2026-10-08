@@ -276,6 +276,26 @@ struct SectionDetailView: View {
         return previewRunner.isRunning || deployRunner.isRunning
     }
 
+    /// The Preview (or Stop Preview) button's enablement — read by the
+    /// button and by Section ▸ Preview alike (#457).
+    ///
+    /// Not while a copy of the course is being zipped (#351): a restore or
+    /// removal is waiting on that zip to replace the folder a preview would
+    /// be serving from. Nor while the folder's tools are still being copied,
+    /// or that copy failed (#476): the help says why, no dialog.
+    var previewButtonIsEnabled: Bool {
+        if previewRunner.isRunning {
+            return true
+        }
+        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+    }
+
+    /// The Deploy button's enablement — read by the button and by Section ▸
+    /// Deploy… alike (#457). See the button for each clause's reason.
+    var deployButtonIsEnabled: Bool {
+        return !(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -416,7 +436,7 @@ struct SectionDetailView: View {
             ToolbarItemGroup {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
                     FolderActions.openInObsidian(
-                        revealing: course.sectionDirectoryURL(forSection: sectionNumber),
+                        revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber),
                         vaultURL: course.directoryURL
                     )
                 }
@@ -430,14 +450,7 @@ struct SectionDetailView: View {
                     previewRunner.isRunning ? "Stop Preview" : "Preview",
                     systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
                 ) {
-                    if previewRunner.isRunning {
-                        stopPreview()
-                    } else {
-                        // The BUTTON, and only the button, may ask about
-                        // today's class first (#397); every other way in calls
-                        // `startPreview()` and is never held up by a question.
-                        pressPreview()
-                    }
+                    previewButtonPressed()
                 }
                 // The icon alone doesn't say what these two buttons do, so
                 // they wear their titles; the neighbouring icons are the
@@ -448,7 +461,7 @@ struct SectionDetailView: View {
                 // folder a preview would be serving from.
                 // Nor while the folder's tools are still being copied, or
                 // that copy failed (#476): the help says why, no dialog.
-                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady))
+                .disabled(!previewButtonIsEnabled)
                 .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
@@ -476,7 +489,7 @@ struct SectionDetailView: View {
                 // sequence against the first's.
                 // Nor while a copy of the course is being zipped (#351): a
                 // removal waiting on that zip deletes what this would publish.
-                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+                .disabled(!deployButtonIsEnabled)
                 .help(workspace.folderReadinessReason ?? "Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
                 }
@@ -491,6 +504,16 @@ struct SectionDetailView: View {
             }
         }
         .focusedSceneValue(\.previewController, previewURL != nil ? previewController : nil)
+        // Section ▸ Preview, Deploy… and Open in Browser (#457): the
+        // toolbar's own actions and predicates, so the menu item and the
+        // button beside it cannot disagree.
+        .focusedSceneValue(\.sectionSiteMenu, SectionSiteCommands(
+            previewIsRunning: previewRunner.isRunning,
+            previewButtonEnabled: previewButtonIsEnabled,
+            deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
+            previewIsShowing: previewURL != nil,
+            perform: performSiteMenuItem
+        ))
         // The assistant cannot drive a preview itself — it holds neither the
         // port lease nor the web view — so this window hands it the things it
         // alone can do. Registered rather than observed: the assistant has to
@@ -1228,6 +1251,44 @@ struct SectionDetailView: View {
     }
 
     // MARK: - Today's class on the front page (#397)
+
+    /// The Preview button, pressed — by the teacher at the toolbar, or by
+    /// the teacher at Section ▸ Preview, which IS pressing it (#457). Stops
+    /// a running preview; otherwise `pressPreview`, the one way in that may
+    /// ask about today's class first.
+    func previewButtonPressed() {
+        if previewRunner.isRunning {
+            stopPreview()
+        } else {
+            // The BUTTON, and only the button (from the toolbar or the
+            // menu bar), may ask about today's class first (#397); every
+            // other way in calls `startPreview()` and is never held up by a
+            // question.
+            pressPreview()
+        }
+    }
+
+    /// Section ▸ Preview, Deploy… and Open in Browser. Each asks the
+    /// button's own predicate again: the menu may have been drawn before
+    /// something started.
+    func performSiteMenuItem(_ item: SubjectMenuRules.Item) {
+        switch item {
+        case .preview:
+            if previewButtonIsEnabled {
+                previewButtonPressed()
+            }
+        case .deploy:
+            if deployButtonIsEnabled && !course.isKeptForReference {
+                startDeploy()
+            }
+        case .openInBrowser:
+            if previewURL != nil {
+                openInBrowser()
+            }
+        default:
+            break
+        }
+    }
 
     /// The Preview button's action. Asks about today's class when there is
     /// something to ask; otherwise, and after the answer, previews.

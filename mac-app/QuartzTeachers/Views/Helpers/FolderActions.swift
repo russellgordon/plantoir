@@ -6,6 +6,19 @@ enum FolderActions {
 
     // MARK: - Functions
 
+    /// The folder Open in Obsidian reveals for a row — the ONE answer the
+    /// section window's toolbar button, the sidebar's context menu and the
+    /// menu bar's Course and Section items all use (#457: a menu item and
+    /// the button beside it may not disagree). A section reveals its own
+    /// folder, for a course kept for reference too; a course row reveals the
+    /// course. The vault is the course folder either way.
+    static func obsidianFolder(for course: Course, sectionNumber: Int?) -> URL {
+        if let sectionNumber {
+            return course.sectionDirectoryURL(forSection: sectionNumber)
+        }
+        return course.directoryURL
+    }
+
     /// Shows the folder inside its parent, selected — what "Show in
     /// Finder" means everywhere in the app, path bar included.
     static func showInFinder(_ folderURL: URL) {

@@ -96,7 +96,7 @@ final class CourseRenameInterfaceTests: XCTestCase {
         workspace.expandedCourseCodes.insert(originalCode)
         await settle()
 
-        // What Edit ▸ Rename Course does, and what Return in the sidebar
+        // What Course ▸ Rename… does, and what Return in the sidebar
         // does — both land here.
         XCTAssertNotNil(
             workspace.courseThatCanBeRenamed,

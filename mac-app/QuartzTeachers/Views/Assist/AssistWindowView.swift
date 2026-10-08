@@ -387,16 +387,19 @@ struct AssistWindowView: View {
         }
     }
 
-    /// The box, shaped the way Messages shapes it: one rounded field with the
-    /// send button living inside its right end, rather than a plain rule of a
-    /// text field with a button parked beside it.
+    /// The box: the bordered field every field in Plantoir wears, growing
+    /// to four lines, with the send button just outside its trailing edge.
+    ///
+    /// Until #457 it was Messages-shaped — a `.plain` field inside a rounded
+    /// stroke the composer drew itself, the send button inside its right end
+    /// — and the one field the bordered rule exempted. Russell's rule is no
+    /// exemptions, so it wears the real bezel now (measured by the plan
+    /// review: 24, 40 and 72 points tall for one, two and four lines, and it
+    /// stops growing at four).
     private var composer: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .bottom, spacing: 8) {
             TextField("Ask about this section…", text: $typing, axis: .vertical)
-                // .plain inside the Messages-shaped rounded border this
-                // composer strokes itself — listed in TextFieldStyleScanTests.
-                .textFieldStyle(.plain)
-                .accessibilityIdentifier("assistComposerField")
+                .borderedTextField()
                 .lineLimit(1...4)
                 .onSubmit {
                     // Ignored while the assistant is mid-run: it does one
@@ -470,22 +473,8 @@ struct AssistWindowView: View {
             .disabled(!isSendAvailable)
             .accessibilityIdentifier("assistSendButton")
         }
-        // A continuous rounded rectangle rather than a Capsule: at one line
-        // the two are indistinguishable, and when the box grows to four lines
-        // a capsule's ends bow outwards while this keeps its shape.
-        .padding(.leading, 12)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(Color.secondary.opacity(0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1)
-        )
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(.bar)
     }
 

@@ -404,11 +404,20 @@ final class TodaysClassOnTheFrontPageTests: XCTestCase {
         XCTAssertFalse(start.contains("todaysClass"), "startPreview() must never ask")
         XCTAssertFalse(start.contains("pressPreview"), "startPreview() must never ask")
 
-        // The toolbar's not-running branch presses; nothing else does.
+        // The Preview button's not-running branch presses; nothing else
+        // does. The button's action is `previewButtonPressed()`, which the
+        // toolbar button and Section ▸ Preview both call — the menu item IS
+        // the teacher pressing Preview (#457; class-planning.json →
+        // askedFrom names both, and nothing else).
         XCTAssertEqual(view.components(separatedBy: "pressPreview()").count - 1, 2,
-                       "pressPreview() is declared once and called only from the toolbar")
-        let toolbar: String = try XCTUnwrap(view.components(separatedBy: "stopPreview()\n                    } else {").dropFirst().first)
-        XCTAssertTrue(toolbar.prefix(400).contains("pressPreview()"))
+                       "pressPreview() is declared once and called only from previewButtonPressed()")
+        let pressed: String = try TodaysClassOnTheFrontPageTests.body(of: "func previewButtonPressed()", in: view)
+        let notRunning: String = try XCTUnwrap(pressed.components(separatedBy: "stopPreview()").dropFirst().first)
+        XCTAssertTrue(notRunning.contains("pressPreview()"), "the not-running branch presses")
+        XCTAssertEqual(view.components(separatedBy: "previewButtonPressed()").count - 1, 3,
+                       "previewButtonPressed() is declared once and called by the toolbar button and the Section menu's route")
+        let siteMenu: String = try TodaysClassOnTheFrontPageTests.body(of: "func performSiteMenuItem(", in: view)
+        XCTAssertTrue(siteMenu.contains("previewButtonPressed()"), "Section ▸ Preview presses the same button")
 
         // Plan review, 1: the answer never starts the preview from inside the
         // alert's own action; `afterThePreviewAlert` does, once it has gone.

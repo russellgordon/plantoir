@@ -369,6 +369,9 @@ nonisolated struct FolderNotOpened: Equatable, Sendable {
         case chosen
         /// Remembered from last time.
         case remembered
+        /// Chosen from File ▸ Open Recent (#457), which has its own words:
+        /// the folder was picked a moment ago, not "had open last time".
+        case recent
     }
 
     // MARK: - Stored properties
@@ -391,6 +394,9 @@ nonisolated struct FolderNotOpened: Equatable, Sendable {
         if how == .remembered {
             return nil
         }
+        if how == .recent {
+            return OpenRecentWording.title(folderName: folderName)
+        }
         if reason == .coursesOutsideHome {
             return WorkingFolderReachWording.coursesHeadline(folderName: folderName)
         }
@@ -404,6 +410,9 @@ nonisolated struct FolderNotOpened: Equatable, Sendable {
                 return WorkingFolderReachWording.whatToDoForCourses
             }
             return WorkingFolderReachWording.whatToDo
+        }
+        if how == .recent, let sentence = OpenRecentWording.sentence(for: reason) {
+            return sentence
         }
         return ReopenWording.sentence(for: reason, folderName: folderName)
     }

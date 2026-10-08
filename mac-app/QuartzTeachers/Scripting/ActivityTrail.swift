@@ -53,6 +53,10 @@ nonisolated enum ActivityTrail {
         /// whether it was the folder or its courses that lead outside the
         /// home folder. A refused folder leaves nothing else behind.
         case workingFolderRefused = "working folder refused"
+        /// File ▸ Open Recent ▸ Clear Menu (#457): carries how many folders
+        /// the list held. Without it, "Open Recent is empty and I never
+        /// cleared it" has no answer.
+        case recentWorkingFoldersCleared = "recent working folders cleared"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
         /// Course Settings held changes that could not be saved because they

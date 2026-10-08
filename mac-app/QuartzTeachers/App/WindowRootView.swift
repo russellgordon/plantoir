@@ -103,6 +103,20 @@ struct WindowRootView: View {
                     workspace.rememberAsTheLastWorkingFolder()
                 }
             }
+            // A sheet or alert on THIS window greys every menu verb (#457):
+            // a menu key equivalent fires behind a sheet otherwise. AppKit's
+            // own notifications rather than each presenter's state, because
+            // the window has a dozen presenters and this sees all of them.
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { notification in
+                if (notification.object as? NSWindow) === workspace.window {
+                    workspace.sheetIsUp = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { notification in
+                if (notification.object as? NSWindow) === workspace.window {
+                    workspace.sheetIsUp = false
+                }
+            }
             .onDisappear {
                 WorkspaceModel.unregisterWindowModel(workspace)
             }
