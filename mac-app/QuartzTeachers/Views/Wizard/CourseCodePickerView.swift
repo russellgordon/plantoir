@@ -211,8 +211,8 @@ struct CourseCodePickerView: View {
             // #456: the 24pt imitation of an AppKit bezel this used to draw
             // is gone, so this field, Course name beside it and every other
             // field are the same height by construction. The chevron is
-            // overlaid on the real field; text long enough to reach it is
-            // the accepted trade (measured in #456's closing comment).
+            // overlaid on the real field; text long enough to reach it runs
+            // under it, the accepted trade (#456).
             .borderedTextField()
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity)

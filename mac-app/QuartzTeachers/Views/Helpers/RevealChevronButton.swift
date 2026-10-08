@@ -84,6 +84,11 @@ struct RevealChevronButton: NSViewRepresentable {
 /// The button itself: borderless, drawing the measured pill and glyph.
 final class ChevronNSButton: NSButton {
 
+    // MARK: - Stored properties
+
+    /// The window's mouse-down monitor, while the button is in a window.
+    nonisolated(unsafe) private var mouseDownMonitor: Any?
+
     // MARK: - Initializer
 
     override init(frame: NSRect) {
@@ -129,6 +134,7 @@ final class ChevronNSButton: NSButton {
         return true
     }
 
+
     /// The click, taken from the window before AppKit's hit-testing hands
     /// it to the text field underneath.
     ///
@@ -142,8 +148,6 @@ final class ChevronNSButton: NSButton {
     /// the button watches the window's mouse-downs itself: one inside its
     /// frame is its own, performed here and swallowed, so the field never
     /// sees it. Scoped to this window and removed with the button.
-    nonisolated(unsafe) private var mouseDownMonitor: Any?
-
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let mouseDownMonitor {
