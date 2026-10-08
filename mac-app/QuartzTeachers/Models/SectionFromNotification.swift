@@ -93,26 +93,26 @@ enum SectionFromNotification {
         var line: String {
             switch self {
             case .shown:
-                return "opened the section from its scheduled publish notification"
+                return "opened the section from its scheduled deploy notification"
             case .shownInNewWindow:
-                return "opened the section from its scheduled publish notification, in a new window"
+                return "opened the section from its scheduled deploy notification, in a new window"
             case .shownInChooser:
-                return "opened the section from its scheduled publish notification, "
+                return "opened the section from its scheduled deploy notification, "
                     + "in the window that was choosing a working folder"
             case .busy:
-                return "brought the working folder's window forward from a scheduled publish notification, "
+                return "brought the working folder's window forward from a scheduled deploy notification, "
                     + "and left it as it was because it was in the middle of something"
             case .sectionGone:
-                return "showed the working folder from a scheduled publish notification; "
+                return "showed the working folder from a scheduled deploy notification; "
                     + "that section is no longer in it"
             case .folderGone:
-                return "a scheduled publish notification was clicked, but its working folder is no longer "
+                return "a scheduled deploy notification was clicked, but its working folder is no longer "
                     + "where it was, so Plantoir was only brought forward"
             case .cannotBeOpened:
-                return "a scheduled publish notification was clicked, but its working folder could not be opened "
+                return "a scheduled deploy notification was clicked, but its working folder could not be opened "
                     + "here, so Plantoir was only brought forward"
             case .namesNothing:
-                return "a scheduled publish notification was clicked, but it did not say which section it was about"
+                return "a scheduled deploy notification was clicked, but it did not say which section it was about"
             }
         }
     }

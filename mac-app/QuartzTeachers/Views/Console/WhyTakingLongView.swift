@@ -18,8 +18,8 @@ struct WhyTakingLongView: View {
                 )
 
                 ExplanationRow(
-                    title: "First-time publishing",
-                    description: "Uploading your entire website for the first time takes a bit longer. Future publishes only upload the pages you’ve changed."
+                    title: "First-time deploying",
+                    description: "Uploading your entire website for the first time takes a bit longer. Future deploys only upload the pages you’ve changed."
                 )
 
                 ExplanationRow(
@@ -29,7 +29,7 @@ struct WhyTakingLongView: View {
 
                 ExplanationRow(
                     title: "Internet connection",
-                    description: "When publishing online, upload speed depends on your current internet connection."
+                    description: "When deploying online, upload speed depends on your current internet connection."
                 )
             }
             .font(.callout)

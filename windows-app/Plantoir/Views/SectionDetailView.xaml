@@ -65,9 +65,15 @@
                     AutomationProperties.AutomationId="openInObsidianButton">
                 <FontIcon Glyph="&#xE70F;" FontSize="14" />
             </Button>
+            <!-- Preview and Deploy carry their visible words as their Name: a
+                 Button whose content is a StackPanel (icon + text) is NOT
+                 named from it, so a screen reader said only "button" (#426's
+                 UiFact, v1.4.3 cut). Preview's Name follows its label in
+                 code-behind, "Stop Preview" while one runs. -->
             <Button x:Name="PreviewButton" Grid.Column="6" Click="PreviewOrStop_Click"
                     MinWidth="34" MinHeight="30"
                     ToolTipService.ToolTip="Preview this section's website"
+                    AutomationProperties.Name="Preview"
                     AutomationProperties.AutomationId="previewButton">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon x:Name="PreviewIcon" Glyph="&#xE768;" FontSize="14" />
@@ -85,6 +91,7 @@
             <Button x:Name="DeployButton" Grid.Column="7" Click="Deploy_Click"
                     MinWidth="34" MinHeight="30"
                     ToolTipService.ToolTip="Deploy this section's website"
+                    AutomationProperties.Name="Deploy"
                     AutomationProperties.AutomationId="deployButton">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon Glyph="&#xE724;" FontSize="14" />

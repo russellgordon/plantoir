@@ -105,7 +105,7 @@ internal static class NamedGapLedger
     /// the entries are that milestone's BURN-DOWN LIST, and the milestone
     /// cannot close — nor a Windows release be cut — while any remains
     /// (Russell, 2026-09-25, reconfirmed 2026-09-30; <c>contracts/README.md</c>
-    /// → "Named gaps"; <c>WINDOWS-PARITY.md</c> → section 8).
+    /// → "Named gaps"; it was section 8 of <c>WINDOWS-PARITY.md</c>, deleted 2026-10-04).
     /// </summary>
     private const string Parity = "Windows: parity with mac v1.4.0";
 

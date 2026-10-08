@@ -3760,7 +3760,7 @@ links to stays put, and the result says which and why — a server that does not
 keep such a page must fix the behaviour first or the sentence lies to the
 router and to Claude Code.
 
-**Hashes.** (After merging #209, `toolSchemas.mcp` is n=35 `777bf545…2fdcc54` — #209's own change, identical on `dev`; `local` is unchanged.) The piece moved no byte the mac's model reads, and says so with the
+**Hashes.** (After merging #209, `toolSchemas.mcp` is n=35 `777bf545…2fdcc54` — #209's own change, identical on `dev`; `local` is unchanged.) (Since #443, v1.4.4: four MCP-only descriptions say deploy for a deploy — `list_courses`, `re_date_classes`, `make_room_for_classes` and `plan_scheduled_deploy`'s `classes` — and `toolSchemas.mcp` n=37 moved `85bc3f80…05aa7639f` → `a7c0823d…ad04e1733`, measured before shipping as a proxy (`research/ai-assist/outside-assistant-descriptions-443-results.txt`: 70/110 both arms, identical); `local` n=13 is unchanged. `documentation/07-deployment.md` → "Deploy and publish: the two words".) The piece moved no byte the mac's model reads, and says so with the
 form quoted above, before and after regenerating the contracts:
 `toolSchemas.local` n=13 `46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6`,
 `toolSchemas.mcp` n=32 `9bcc7eb7911d06009a70edef1db5721af4a52072726a31d0798662049cef36f7`

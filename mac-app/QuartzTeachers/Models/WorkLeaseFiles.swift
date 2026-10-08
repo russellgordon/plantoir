@@ -506,7 +506,7 @@ nonisolated enum WorkLeaseFiles {
         case WorkLeaseFiles.previewKind:
             return "previewed by process \(holding.pid)"
         case WorkLeaseFiles.publishKind:
-            return "published by process \(holding.pid)"
+            return "deployed by process \(holding.pid)"
         default:
             return "built by process \(holding.pid)"
         }

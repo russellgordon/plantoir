@@ -303,8 +303,8 @@ enum SiteHealthRepair {
     /// when you last published", which asserts a publish that may never have
     /// happened. This one is true either way.
     static let notPublishedYet: String =
-        "Publishing is what puts this in front of students, so it is not on "
-        + "their site until you publish again. You can preview it now to check "
+        "Deploying is what puts this in front of students, so it is not on "
+        + "their site until you deploy again. You can preview it now to check "
         + "the change looks right."
 
     /// How one repair went.
