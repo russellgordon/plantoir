@@ -861,7 +861,11 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            .help("Add a course or club")
+            // Greyed while the folder's tools are being copied, or that copy
+            // failed (#476), with the reason as its help; the creator refuses
+            // too, before anything is written, for every other way in.
+            .disabled(workspace.folderIsGettingReady)
+            .help(workspace.folderReadinessReason ?? "Add a course or club")
             .accessibilityIdentifier("addCourseButton")
 
             Button {

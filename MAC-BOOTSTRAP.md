@@ -162,9 +162,13 @@ bundle from the Dock. Test, then build, then stop.
 
 ### 6. Write it up, and commit as you go
 
-- `GUI-IMPROVEMENTS.md` gets a row, with a **"Notes for Windows port"** cell
-  that says something usable. Say what you measured, not only what you decided.
-  Record the options REJECTED, or they get proposed again.
+- The **closing comment on the piece's own issue** says what landed, what
+  you measured (not only what you decided), which model did which review, and
+  the options REJECTED, or they get proposed again. Every piece has that
+  issue — open one before the merge if none exists — and it carries the
+  release milestone before it closes, because the closed issues by milestone
+  are the changelog (`CLAUDE.md` rules 3 and 4; `GUI-IMPROVEMENTS.md` is
+  closed to new entries since 2026-10-08, #480 — no row).
 - Anything architectural also gets a section in the `documentation/` page that
   owns its subject, and any
   guidance the change made WRONG is corrected there in the same breath. Stale

@@ -31,6 +31,16 @@ public static class ActivityTrail
         TaskFinished,
         AskedForACredential,
         AssistantOpened,
+        /// <summary>
+        /// A Claude or Codex session's server took its assist lease on the
+        /// course its door was opened from (#468, mac #458). Written by
+        /// <c>plantoir-mcp</c> for a DOOR only, never for this app's own
+        /// window's server; the course and nothing else. There is no matching
+        /// "let go" line: every ordinary way of ending a session kills the
+        /// server (measured on the mac), so its absence would be read as a
+        /// session still open.
+        /// </summary>
+        OutsideSessionHeldACourse,
         AssistantReady,
         AssistantWouldNotStart,
         AssistantAsked,
@@ -546,6 +556,15 @@ public static class ActivityTrail
         UpdateSetAside,
         /// <summary>#337: the update stopped, in a plain category with the detail in brackets; the daily check's at most once per launch.</summary>
         UpdateStopped,
+        /// <summary>
+        /// #473: the app copied its tools into a working folder in the
+        /// background (or could not finish): the folder (redacted), files
+        /// brought up to date, files that failed, seconds, and the outcome in
+        /// the sentence. Only when something changed or failed. Windows only:
+        /// the teacher now SEES a banner for this, and the mac mirrors the
+        /// same files with only an os_log line.
+        /// </summary>
+        WorkingFolderToolsCopied,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -563,6 +582,7 @@ public static class ActivityTrail
         Event.TaskFinished => "task finished",
         Event.AskedForACredential => "asked for a publishing credential",
         Event.AssistantOpened => "assistant opened",
+        Event.OutsideSessionHeldACourse => "outside session held a course",
         Event.AssistantReady => "assistant ready",
         Event.AssistantWouldNotStart => "assistant would not start",
         Event.AssistantAsked => "assistant asked",
@@ -657,6 +677,7 @@ public static class ActivityTrail
         Event.UpdateInstalling => "update installing",
         Event.UpdateSetAside => "update set aside",
         Event.UpdateStopped => "update stopped",
+        Event.WorkingFolderToolsCopied => "working folder tools copied",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

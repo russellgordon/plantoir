@@ -265,14 +265,101 @@ item at the cut — every old note repeated in every item, and correct only
 while whoever cuts remembers. The release side is RELEASING.md → "The update
 feed (Windows)".
 
-**Not yet honoured on Windows: the important mark.**
+**The important mark is honoured on Windows since v1.4.4 (#453).**
 `appUpdates.notes.requiredWarningMarksTheUpdateImportant` says an update
-with a required warning offers no Skip and no Remind Me Later. The Windows
-app reads `IsCriticalUpdate` only to add "; marked important" to the
-`update found` trail line: Skip This Version is still offered, and the daily
-check returns early for a skipped version, so a skipped important release is
-never offered again by it. Owed in v1.4.4 (its own `windows` issue); 1.4.3 is
-not marked, so nothing changes for it.
+with a required warning offers no Skip and no Remind Me Later. Until #453 the
+Windows app read `IsCriticalUpdate` only to add "; marked important" to the
+`update found` trail line: Skip This Version was still offered, and the daily
+check returned early for a skipped version. Now `AppUpdates.DecideOffer`
+decides, played from the authored `appUpdates.offerCases` (8 cases,
+appliesOn windows):
+
+- **ANY newer release marked important makes the offer important**, not only
+  the newest. A teacher who skipped an important 1.4.4 is still bound by it
+  when 1.4.5 is offered, which is what Sparkle does on the mac by itself ("a
+  later release keeps the earlier one important for teachers still below it",
+  RELEASING.md). `update found` says "; marked important" by the same rule.
+- **An important offer is shown even when the newest version was skipped.**
+  A remembered skip was given to an offer that had a Skip button.
+- **The offer shows Install and Reopen alone.** Esc is handled by the dialog
+  itself (`PreviewKeyDown` → `Hide`), because what a `ContentDialog` with no
+  Close button does on Esc was not measured. **The handler is unproved too**
+  until the first cut that passes `--critical-versions`, which RELEASING.md
+  asks to check, and a window the teacher cannot
+  leave was rejected (Russell's ruling on the plan, 2026-10-08). Esc is "not
+  now", written on the trail, and the next daily check offers it again. An
+  important offer never remembers a skip.
+- **Rejected:** trapping the teacher in the offer (cancelling `Closing`), and
+  honouring a skip given before the mark. Not changed: the install gate, the
+  quit (never refused), and the cumulative notes, which carry the warning.
+
+Proved by `AppUpdaterTests` through the REAL NetSparkle engine with a feed
+signed by a throwaway Ed25519 key made in the test (the items are 999.x,
+because NetSparkle compares against the ENTRY assembly's version, which in a
+test is the test host's). A Debug build carries no feed, so the end-to-end
+proof of an important offer is a release cut with `--critical-versions`,
+which nobody does casually: say so in the cut's notes when one is first
+marked.
+
+**An offer nobody saw is not an answer (#465, v1.4.4).** Seen on 2026-10-07
+proving 1.4.3 on the installed 1.4.2 (i5-8365U, Windows 11 Pro 26200): the
+first launch after an update copies its bundled tools into the working folder
+inside `OpenWindow`, about two minutes on that PC, before any window exists.
+The daily check, started in `OnLaunched` with its first look at one minute,
+found 1.4.3, had no window to show it in, and wrote `1.4.3: not now`. (Since
+#473 that copy runs in the background after the window appears —
+`documentation/12-windows-app.md` → "Getting a folder ready after an update
+(#473)" — but the ordering below stays.) The day
+was already stamped, so the teacher was offered nothing until the next day.
+Now (`appUpdates.anOfferNobodySawIsNotAnAnswer`):
+
+- **The check starts at the end of `OnLaunched`, after the windows are open**
+  (`OpenWindow` is synchronous), and never inside `OpenWindow`, because the
+  marketing captures open their windows through it and must never check. The
+  scheduled run (`Program.Main`, which exits before the app is built) and
+  `plantoir-mcp.exe` never construct an updater at all.
+- **`UpdatePrompts.ShowAsync` answers null when nothing was shown** (no
+  window, another dialog in front, a failure), which is
+  `UpdateAnswer.NotShown`. A shown dialog closed with Esc still answers
+  `None`, which is "not now". NotShown writes no `update answered` line and
+  does not stamp the day, and the look is tried again after 1, 2, 4, 8
+  minutes, up to the hourly look the timer keeps anyway. The backoff is there
+  because each look fetches the feed again and a dialog can stay open for
+  hours.
+- **One daily check at a time.** With the stamp moved after the offer, an
+  offer left open for over an hour met the next hourly look, which found the
+  day not done and its OWN offer in front (DialogGate). Without the guard
+  that is a retry every minute for as long as the offer stays open. The plan
+  review found it, and `AppUpdaterTests.AnOfferStillOpenIsNotMetByTheNextLookAndAShownOneResetsTheBackoff`
+  holds an offer open to pin it.
+- **A shown offer does the day's check, whoever asked** (implementation
+  review, L1). Otherwise a daily retry left over from an unseen offer would put
+  the same offer back minutes after the teacher answered it through Check for
+  Updates…. And a check that finds nothing new starts the backoff again at a
+  minute (L5). Why an offer was not shown goes to `startup.log` only. That
+  includes a dialog that fails to go up at all, which before #465 left "not
+  now" on the trail and is now retried, never less often than hourly.
+- **No new trail event** (Russell, 2026-10-08): `update found` with no
+  `update answered` already reads as "not yet answered", which is how the
+  contract words `update found`. Rejected as well: only moving the start (a
+  dialog in front still loses the offer); only not counting the unshown offer
+  (a slow start then waits up to an hour); queueing the offer on the window's
+  `Activated` (more moving parts for the same result); and making the
+  two-minute copy asynchronous, which is the right long-term fix for the
+  frozen first window but a different issue (drafted separately).
+- **One spelling of the version.** The updater and `app updated` used
+  `ProblemReportEnvironment.AppVersion`, "1.4 (2)", beside the feed's
+  "1.4.3". Both now use `AppUpdates.Spell` ("1.4.3"). A stored
+  `LastLaunchedVersion` of the old form is read by `AppUpdates.Respell`, so
+  the first 1.4.4 launch writes "updated from 1.4.3 to 1.4.4". The problem
+  report keeps its own "1.4 (3)" form, which is out of scope here.
+
+Proved by `AppUpdaterTests` (the signed fake feed: an unshown offer leaves the
+day due, writes no answer, backs off 1 then 2 minutes and never past the
+hour; the answer is written once it is shown) and a source pin on where
+`Start` runs. The real proof is the next update on an installed copy with a
+slow first launch: install 1.4.4, and watch the 1.4.5 offer arrive once the
+window is up.
 
 | Decision | Choice | Rejected, and why |
 |---|---|---|

@@ -164,6 +164,8 @@
     "planWasCancelled" : "Left as it was — nothing was changed.",
     "previewBuildNeedsAnAnswer" : "The preview for {course} Section {section} needs one answer before it can be built from here. Build it once from its window in Plantoir, where the question can be answered.",
     "previewDidNotBuild" : "The preview for {course} Section {section} did not finish building. The output is in that section's window in Plantoir.",
+    "previewDidNotBuildBecause" : "The preview for {course} Section {section} did not finish building: {reason}",
+    "previewDidNotBuildForACallerWithNoWindow" : "The preview for {course} Section {section} did not finish building. Build it once from its window in Plantoir to see what stopped it.",
     "previewIsRebuilding" : "The preview for {course} Section {section} is rebuilding now, and will appear in that section's window when it is ready.",
     "publishedTheClassOn" : "Published the class on 2026-09-14.",
     "publishedTheClassOnForAMeeting" : "Published the meeting on 2026-09-14.",

@@ -49,16 +49,29 @@ public static class ScheduledRunAnnouncement
 
         /// <summary>Show it, replacing any with the same tag; true when it landed. May throw.</summary>
         bool Post(string tag, string launchArgument, string sentence);
+
+        /// <summary>
+        /// Take the notification with this tag (in <see cref="ToastGroup"/>) out of
+        /// Notification Center, if it is there. May throw. (#464)
+        /// </summary>
+        void Withdraw(string tag);
     }
+
+    /// <summary>
+    /// The group every scheduled-deploy toast is posted under, and withdrawn from.
+    /// One constant, so the post and the withdrawal can never name different groups:
+    /// a removal by tag AND group that names the wrong group removes nothing.
+    /// </summary>
+    public const string ToastGroup = "scheduled";
 
     /// <summary>What the announcement did — for the tests and the diagnostic log.</summary>
     public enum Said { Told, TurnedOff, CouldNotBeSent, NothingToSay }
 
     // The contract's `trailSays`, after the course/section prefix the trail puts on the line.
-    public const string ToldLine = "told the teacher how a scheduled publish went, with a notification";
+    public const string ToldLine = "told the teacher how a scheduled deploy went, with a notification";
     public const string TurnedOffLine =
-        "did not send a notification about a scheduled publish, because notifications are turned off for Plantoir";
-    public const string CouldNotBeSentLine = "a notification about a scheduled publish could not be sent";
+        "did not send a notification about a scheduled deploy, because notifications are turned off for Plantoir";
+    public const string CouldNotBeSentLine = "a notification about a scheduled deploy could not be sent";
 
     /// <summary>File times on some volumes are kept to two seconds.</summary>
     private static readonly TimeSpan Slack = TimeSpan.FromSeconds(2);
@@ -135,6 +148,42 @@ public static class ScheduledRunAnnouncement
         ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishNotification,
                            sent ? ToldLine : CouldNotBeSentLine, section.CourseCode, section.Section);
         return sent ? Said.Told : Said.CouldNotBeSent;
+    }
+
+    /// <summary>
+    /// The teacher dismissed the section's band in the app (#464): the record
+    /// goes, and so does the notification about it, as on the mac
+    /// (<c>ScheduledPublishNotice.teacherDismissed</c>) and as
+    /// <c>notification.onShow</c>'s dismiss case says. That section's and no
+    /// other's: the tag is the section-per-folder record name.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The record first, the notification second, and a failed
+    /// withdrawal never stops the dismissal</b>: the band is what the teacher
+    /// acted on, and a notification left in Notification Center is the lesser
+    /// fault. It goes to the diagnostic log only.</para>
+    ///
+    /// <para><b>No trail line.</b> The mac writes none for the withdrawal, the
+    /// contract's <c>scheduled publish notification</c> event carries told /
+    /// not sent / clicked, and the dismissal is the teacher's own act in the
+    /// window.</para>
+    ///
+    /// <para><b>Not withdrawn elsewhere:</b> a record cleared by a later run that
+    /// got through (that run's own notification replaces this one by tag), and a
+    /// run that no longer stands (it posts nothing).</para>
+    /// </remarks>
+    /// <param name="outcomeDirectory">Null in the app: the real records' folder,
+    /// through <see cref="ScheduledPublishOutcome.Dismiss"/> (which also tells the
+    /// app-wide watcher). A folder of its own in tests.</param>
+    public static void TeacherDismissed(ScheduledPublishToast.Target section, IPoster poster,
+                                        string? outcomeDirectory = null, Action<string>? diagnostic = null)
+    {
+        if (outcomeDirectory is null)
+            ScheduledPublishOutcome.Dismiss(section.CourseCode, section.Section, section.WorkingFolder);
+        else
+            ScheduledPublishOutcome.Clear(outcomeDirectory, section.CourseCode, section.Section, section.WorkingFolder);
+        try { poster.Withdraw(TagFor(section)); }
+        catch (Exception error) { diagnostic?.Invoke("scheduled toast withdraw: " + error.Message); }
     }
 
     /// <summary>

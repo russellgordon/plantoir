@@ -1157,7 +1157,9 @@ dialog has never been seen by anybody checking that it works.
 4. **A stub `deploy.ps1` does not survive.** `ToolchainMirror.RefreshLaunchers`
    rewrites any launcher that differs byte-for-byte from the bundled copy, and
    it runs on every `WorkspaceViewModel.Reload()` with no once-per-folder
-   guard. (`RefreshToolchain` DOES have that guard, so a stub written into
+   guard. (The recipe copy into `.toolchain` DOES have that guard — once per
+   folder per process, owned by `ToolchainReadiness` and run in the background
+   since #473 — so a stub written into
    `.toolchain\scripts` after the first reload would survive — worth knowing
    before anyone reaches for it, but it rescues nothing, because reason 2 stops
    the run before `deploy.py` is reached.)
@@ -1453,7 +1455,88 @@ What replaces the old container concepts:
   previewed (#381)"); and never a remembered process id. Built in bundle 4
   (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
   window's `CourseActivity.IsPublishingSection` — see "Preview and publish
-  mechanics that match the mac (bundle 4)" above.
+  mechanics that match the mac (bundle 4)" above. #467 (2026-10-08) found two
+  bugs that guard had from its first day. Its scheduled half never matched a
+  wrapper set since #309, because the name had no folder id. And a course with
+  a space never matched, because callers quote it. Both are fixed in the
+  shared block below; see 03 → "A section being deployed".
+- **A deploy refuses while that section is still being deployed (#467 / mac
+  #439).**
+  - **The launcher.** `deploy.ps1`, and `preview.ps1 --build-only`, refuse
+    before anything changes while the section's scheduled wrapper is running
+    in this folder, or another `deploy.ps1` of it is. The block holding this
+    is identical in both launchers, with #386's reader moved into it (03 →
+    "A section still being deployed is not deployed again").
+  - **The app.** The window lifts the launcher's line
+    (`FailureExplainer.SectionDeployRefusalOf`). The window's Deploy asks
+    `MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish` before
+    `Result`. So a refused build leg says `DeployRefusedWhileALaterDeployWorks`
+    or `DeployRefusedWhileItsSectionDeploys`, and an ordinary broken build
+    now says `CouldNotBuildBeforeDeploying` instead of "did not finish" (mac
+    parity: that key existed and was never called). `AssistWorkspace` (in
+    `plantoir-mcp`) says the refusal for a refused build leg or for
+    all-legs-refused, and keeps its own "The build failed…" message for an
+    ordinary failure, because `CouldNotBuildBeforeDeploying` points at a
+    window that process does not have.
+  - **The other three answers that build (#471, 2026-10-08).** An outside
+    assistant's `rebuild_preview`, `publish_pages` (a page or a whole unit)
+    and `unpublish_pages` (a whole unit) rebuild with the same
+    `--build-only` leg, so they meet the same refusal.
+    `AssistWorkspace.RebuildPreview`, `Apply` and `ApplyWholeUnit` now ask
+    `RefusedWhileItsSectionDeploys` inside their failed-build branch and say
+    what was already done, then the launcher's own line, lifted as the window
+    lifts it ("…, but the preview couldn’t be built: ICS4U section 2 is
+    already being deployed, so it cannot be built until that has finished.").
+    Not `DeployRefusedWhileItsSectionDeploys`, which says the section "was not
+    deployed again" — false of a rebuild — and not a new wording key, which
+    only the mac can add (assist-wording.json is generated there). The lifted
+    line is contract data already, and its build flavour exists because a
+    rebuild runs that leg. Pinned by `shared-rules.json` →
+    `deployWhileItsSectionDeploys.refusedBuildAnswers`, run here by
+    `RefusedBuildAnswersTests` through the real `PlantoirTools`.
+    - **The cross.** `plantoir-mcp`'s `LauncherRunner` reads the launcher
+      without naming an encoding, so the cross arrives as `?` or as three
+      characters of mojibake. Detection never cared (the markers are ASCII);
+      since these answers SAY the sentence, `SectionDeployRefusalOf` now takes
+      off everything before the course code's first letter or digit. The
+      runner's encoding was deliberately left alone in this piece.
+    - **What is left as it was.** An ORDINARY build failure in `Apply` and
+      `ApplyWholeUnit` still ends with `WhereTheOutputIs`, which points at a
+      window the server does not have. Dropping it would leave "the preview
+      couldn't be built" with no reason, and pasting the raw log back is the
+      bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
+      prevent; the right answer is a headless variant of `previewDidNotBuild`,
+      which is a wording key, so it was the mac's to add — and it did, the same day: `previewDidNotBuildForACallerWithNoWindow` and `previewDidNotBuildBecause` are in `assist-wording.json` now, and #481 is Windows' issue to declare them (or `ContractTests` stays red) and then say them here. The same
+      key would cover a THIRD gap, pre-existing and also left alone:
+      `RebuildPreview`'s ordinary failure still appends `build.Message`
+      whole, so an outside assistant's `rebuild_preview` hands back the raw
+      launcher output — "(The launcher exited with code 1.)" and "Last
+      output:" included, a machinery word in a teacher's answer. A headless
+      `previewDidNotBuild` should replace that too. An exit 3 (a
+      question) in those two paths is still read as a failed build — a
+      separate gap. Unpublishing single PAGES never rebuilds on this side
+      (`Apply` returns before the build when the plan hides), so it cannot
+      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and this side owes holding it open by name in `NamedGapLedger` against #479 until then (or implementing the rebuild) — not marking it `appliesOn`.
+    - **No new trail event (rule 5).** The launcher already writes "build
+      declined, course busy elsewhere" for the refusal (`launcherLines`).
+  - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
+    read and shown, never written.
+  - **What is NOT built: the mac's thirty-minute wait.** A re-set leaves the
+    working run alone (`ClearIfStillMine`), so there is no leftover run.
+  - **The residual.** A run ended mid-deploy by something other than a re-set
+    — Task Manager, or the task's `PT72H` limit — leaves its wrapper
+    `powershell.exe` working, with leases that now read as stale. The guard
+    then refuses other deploys of that section, which is correct. But a later
+    run of the section does not wait: its leases look free, its build leg is
+    refused, and it is recorded as `buildDidNotFinish`. Rare enough to record
+    rather than build.
+  - **Measured: a re-set whose moment arrives while the earlier run still
+    works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
+    "Set again while the run works (#409)", and the fix is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
+  - **Known limits.** A deploy run inside another process (typed at a prompt,
+    or `-Command`) is not seen, and neither is an elevated one; the
+    self-relaunch that would see the first was rejected (03).
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
   8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
@@ -1707,7 +1790,11 @@ the same day.)
   warning is not lost; each Windows item carries only its own. (This said
   NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
-  `site/appcast-windows.xml`, and before that one shared appcast.)
+  `site/appcast-windows.xml`, and before that one shared appcast.) Since
+  v1.4.4: an update marked important offers Install and Reopen alone and is
+  offered again even when skipped (#453), and the daily check starts once the
+  first window is up and never counts an offer nobody saw as an answer
+  (#465). Both are in `11-release-strategy.md` → "Updating itself on Windows".
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -1872,22 +1959,23 @@ change the radius.
    highlighting existed. It now inverts to a white capsule with accent text.
    A passing test did not catch this — looking at a screenshot did.
 
-### The chrome is shared, and that was a trade
+### The chrome is shared, and that was a trade — reversed by #456
 
-All three fields in the wizard's Basics section (course code, course name,
-timetable section numbers) now wear one `WizardFieldChrome` modifier, so they
-cannot drift apart. The cost, stated rather than buried: two fields that wore a
-real AppKit bezel now wear an imitation of one, because that was the only way to
-get them to the native 24pt. The imitation is measured against the real control
-rather than eyeballed. The alternative — wrapping a real `NSTextField` in an
-`NSViewRepresentable` for all three — buys genuine native chrome at the price of
-hand-managing first responder and binding updates, and remains open if the
-imitation ever starts costing more than it saves.
+Until 2026-10-08 all three fields in the wizard's Basics section (course
+code, course name, timetable section numbers) wore one `WizardFieldChrome`
+modifier: an imitation of AppKit's bezel drawn at the native 24pt, measured
+against the real control rather than eyeballed, because SwiftUI's
+`.roundedBorder` is 26pt and cannot be forced to 24. **#456 reversed that on
+purpose** (Russell, 2026-10-07): every other field in Plantoir wears the real
+`.roundedBorder` bezel since #374, so the standard is the SwiftUI field, and
+the drawn chrome — and the searchable picker's — is deleted; the four fields
+are the same height as every other by construction, and text long enough to
+reach the course-code chevron runs under it, the accepted trade.
 
-**If WinUI's own field is already the right height, none of this applies to you
-— keep the real control.** The mac ended up here because it had already been
-forced off the native control for the flyout's sake; do not inherit that
-position by accident.
+**For this side, the rule is the one this section always gave: keep WinUI's
+own text box.** Match whatever ITS standard height is, with every field in
+the wizard and in Copy a Page the same height — never 24pt, which this
+section used to tell you to match. The `windows` issue from #456 says so.
 
 ## Reading a page's visibility: four .NET defaults that get it wrong
 
@@ -2625,6 +2713,20 @@ ship is worse than no score. The alternative — leaving it visible and writing
 a sentence in the description telling the model not to use it — is the thing
 CLAUDE.md warns about: one clarifying sentence in `publish_pages`' description
 once took a probe suite from 110/110 to 90/110.
+
+**Since #440 (v1.4.4) `unit` and `days` are card-only too**, on `add_next_class`
+and `plan_add_next_class` alike: the router had been shown them since the tool
+shipped and sent `unit: "next"` — START A NEW UNIT — on 50 of 50 plain "add the
+next class" calls (v1.4.3 bundle A, i5-8365U / UHD 620). The server still
+DECLARES both, for the same reason it declares `duplicate`: the binder drops an
+undeclared key, and the cards ("Start a new unit", "Add three days to Unit 2")
+send them. What the router may not send it also may not keep — settler S2
+strips `unit` and `days` from every `add_next_class` the MODEL sends
+(`AssistAgent.WithoutCardOnlyArguments`), and settler S3 points a sentence
+about units or counts at the phrasings that do it (doc 10, "#440"). The local
+`add_next_class` now shows course and section only, the mac's shape (the narrowed `add_next_class` equals the contract's local shape exactly; the departures already recorded on four other local tools (`preview` on `publish_class_on`, `publish_pages` and `unpublish_pages`; `scope` and `revise` on `read_remembered_timetable`) stand, so this is a claim about this tool, not the whole surface);
+`NextClassUnitsTests.TheLocalModelSeesOnlyCourseAndSection` narrows the REAL
+served schema and compares it with the contract's.
 
 **The general lesson**: a silent drop is invisible to any test that does not go
 looking, and "the tool ran and returned something sensible" is exactly what it
@@ -3846,8 +3948,35 @@ the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
 a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
 is posted (moving the clearing out of `Execute`) — the clearing is what makes
 the task one-shot and is guarded by the job's token; a second caller in charge
-of it is a deploy that can recur. Still owed from #212: withdrawing the toast
-when the band is dismissed (`onShow`'s dismiss case).
+of it is a deploy that can recur.
+
+**Dismissing the band takes the toast down (#464, v1.4.4).** The last of
+#212's owed items. The band's Dismiss and its X both go through
+`ScheduledRunAnnouncement.TeacherDismissed`: the record first, then
+`IPoster.Withdraw(TagFor(section))`, which `SystemToasts` does with
+`AppNotificationManager.RemoveByTagAndGroupAsync(tag, ToastGroup)`. The group
+is one constant, used by both the post and the withdrawal. A failed withdrawal
+goes to `startup.log` and never stops the dismissal. There is no trail line,
+as on the mac (`teacherDismissed`). `ScheduledRunAnnouncementTests.TheContractsOnShowCases`
+plays all four `notification.onShow` cases, the first Windows reader of them.
+The app's own `Register()` and the poster's now share one process-wide flag,
+so a withdrawal never registers twice in the app.
+
+**Measured, because a stand-in cannot show it:** the toast is posted by a
+DIFFERENT process (the scheduled run) from the one that withdraws it.
+`Plantoir.UiTests/ScheduledToastWithdrawalUiTests` runs a job set thirty days
+ago with the x64 Debug build, exactly as Task Scheduler would, so it stands
+down as too late and posts. It then finds the toast in `wpndatabase.db`,
+checks it is still there once the section is open, presses Dismiss, and finds
+it gone. Passed twice on 2026-10-08 (i5-8365U, Windows 11 Pro 26200), the
+toast filed under `{809579B5-…}`: one `HKCU\Software\Classes\AppUserModelId\{GUID}`
+per executable path, so a run and the app of the same copy share an
+identity. A toast posted by a DIFFERENT copy (the installed app against a
+Debug tree) has another identity, and this copy cannot withdraw it; only a
+developer meets that. **Rejected:** removing by tag alone (it would also take
+a same-tag toast of another group); clearing the record from the toast's own
+click; withdrawing when a later run clears the record (its own post already
+replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
 
@@ -4000,7 +4129,9 @@ window of that process and ends it, and everything still naming the folder
   without `--state-dir`, so its record and trail lines are written to the
   real state folder of the machine taking the pictures.)
 - **The folders are made by the app.** `--stage-scene provision --courses
-  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` sets a folder up and makes
+  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` (both strings built from
+  `website/shots/marketing/folders.json` by `demo_folders.provision_courses_argument`
+  and `reference_copy_argument` since #459, never written in the script) sets a folder up and makes
   each course through the New Course panel (`AutoCreate`, after the code is
   filled in as typed, so the course gets the name a teacher is offered — the
   first folder made without that was called "Course Website"), then keeps a
@@ -4019,6 +4150,323 @@ the app set up a folder of that name; each argument now carries its own
 quotes. The app must be started through ShellExecute, never with redirected
 stdio (the leak `DrivenApp.cs` measured, which hangs course creation).
 WinUI's system title bar does NOT follow dark mode on its own: in a dark
-picture the content is dark and the title bar light, which is how the app
-looks to a teacher today, so the pictures show it (a product question, not a
-capture one).
+picture taken on 2026-10-04 the content is dark and the title bar light,
+which is how the app looked to a teacher then, so the pictures show it (a
+product question, not a capture one). Fixed on 2026-10-07 — see the next
+section; `Dress` now re-syncs the caption after it sets a scene's theme, so
+pictures taken after that carry a dark bar in the dark scenes.
+
+## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
+
+Russell's order: "The title bar should be in dark mode when the computer is in
+dark mode." Neither window extends its content into the title bar, so the
+caption is drawn by the system — and the system draws it LIGHT unless the
+window says otherwise, whatever Windows' colour mode is. In dark mode the
+content went dark under a near-white strip.
+
+**What was done.** `Services/WindowTheme.cs` is the one place: `Apply(window)`
+sets `AppWindow.TitleBar.PreferredTheme` (Windows App SDK 1.7+; the app
+resolves 1.8) to `Dark` or `Light` from the root element's `ActualTheme`
+(`RequestedTheme` first when it is set, the application's theme when the
+root has not resolved one yet), and re-applies it on the root's
+`ActualThemeChanged` and `Loaded`, with `UISettings.ColorValuesChanged`
+(marshalled to the window's dispatcher, unhooked on `Closed`) as a backstop for
+the live switch. `MainWindow` and `AssistWindow` — the only two `Window`
+subclasses; a section opens inside the main window, not in one of its own —
+call it right after `InitializeComponent`, and `MarketingShotCapturer.Dress`
+calls `WindowTheme.Sync` after setting a scene's theme. `WindowThemeSourceTests`
+fails for any `Window` subclass under `windows-app/Plantoir` that does not call
+`WindowTheme.Apply(this)`, so a window added later cannot keep the white bar.
+
+**Measured** on this PC (Windows 11 Pro 26200, x64 Debug, `--state-dir`), by
+`PrintWindow` captures of the live windows and a pixel read at the caption's
+centre: dark mode, main window caption (31, 32, 34) over content (26, 35, 34);
+the assistant window (30, 33, 34). Switching Settings to light with the app
+open turned the caption to (239, 244, 247) within four seconds, no restart,
+and back again. The caption is drawn on the same Mica as the content, so it
+reads as one surface rather than a stripe in both modes.
+
+**Rejected.** Hand-set `AppWindow.TitleBar` colours (the twelve
+`Background`/`Button*`/`Inactive*` slots): both windows sit on a Mica backdrop
+tinted by the wallpaper, so any fixed colour reads as a band against it, and
+twelve slots are twelve chances to look unlike Windows' own hover, pressed and
+inactive states. `PreferredTheme = UseDefaultAppMode`: it follows the SYSTEM,
+not the content, and the marketing capture themes the content directly, so a
+dark scene taken on a light PC would get a light bar. `DwmSetWindowAttribute`
+with `DWMWA_USE_IMMERSIVE_DARK_MODE`: the same result through P/Invoke, where
+the Windows App SDK property already exists. `ExtendsContentIntoTitleBar` with
+a custom bar: a redesign of both windows' chrome for a colour fix, and nothing
+in the app uses it today. The mac inherits nothing: its title bars already
+follow the system.
+
+## Getting a folder ready after an update (#473)
+
+**What was wrong.** Every working folder carries a copy of the app's tools in
+`.toolchain\` (the recipe the launchers build from; `ToolchainMirror`). The app
+brings it up to date with its own bundled copy the first time it touches a
+folder in a run, and after an update that means copying thousands of files.
+That copy ran inside `WorkspaceViewModel.Reload()`, which the `MainWindow`
+constructor calls through `AdoptRestoredPath` — on the UI thread, before
+`App.OpenWindow` could call `Activate()`. So on the first launch after an
+update the teacher clicked Plantoir and saw **no window at all** for
+**119.7 s and 93.7 s** (two launches, 2026-10-07, installed 1.4.2 → 1.4.3,
+Lenovo 20QES70500, Intel Core i5-8365U, Windows 11 Pro 26200, read from the
+gap between `App.OnLaunched starting` and `MainWindow.Activate called` in
+`%LOCALAPPDATA%\Plantoir\startup.log`). The same freeze followed any window
+opened on a folder whose `.toolchain\` was stale. #465 had already moved the
+daily update check after the window; the freeze itself is this issue.
+
+**AFTER** (2026-10-08, same PC, the x64 Debug build of this branch, a real
+working folder `C:\Users\lenov\Teaching`, read from
+`%LOCALAPPDATA%\Plantoir\startup.log`):
+
+| Run | Launch → window | Copy's own duration, then launch → copy finished (Preview usable) |
+|---|---|---|
+| `.toolchain\` removed entirely (12,753 files to copy) | **2.9 s** (`App.OnLaunched starting` 08:42:02.557 → `MainWindow.Activate called` 08:42:05.489) | 17.4 s; finished 17.9 s after launch (08:42:20.460), in the background, the window usable throughout |
+| `.toolchain\` present, every one of its 12,753 files made different (a byte appended, its time moved) | **2.7 s** (08:48:15.140 → 08:48:17.880) | 15.2 s; finished 15.5 s after launch (08:48:30.676) |
+| BEFORE, 2026-10-07, the installed 1.4.3 → 1.4.4 first launch | no window for 119.7 s and 93.7 s | the same moment |
+
+The caveat that keeps these honest: both AFTER runs had a WARM disk cache —
+the bundle had just been read by the UI tests and by the previous copy —
+whereas the first launch after a real install reads 12.7k freshly written
+files cold, so 15–17 s is a lower bound on the copy, not a prediction of it.
+The number that matters, launch to a usable window, no longer depends on the
+copy at all.
+
+For scale, measured while writing the UI test (2026-10-08, same PC, x64 Debug):
+deleting the folder's `.toolchain\support\skeletons` (2,389 files) before
+launch, the window was shown 2.2 s after the copy started and the copy
+finished 3.1 s after that (5.3 s in all); the banner and the disabled buttons
+covered exactly that gap. The whole bundled recipe is 12,753 files, 9,829 of
+them in `support\example_content`.
+
+### The three questions the issue asked
+
+**1. What the window shows while it waits, and whether Preview and Deploy are
+disabled or queued.** DISABLED, with the reason — Russell's decision, and no
+dialog. The window appears at once, with its sidebar and every page readable
+and editable; what builds from the copied tools waits:
+
+- **Preview and Deploy** in a section are greyed, their tooltip and their
+  automation help text (a screen reader reads the second; it does not read a
+  tooltip) saying `ToolchainReadiness.GettingReadyMessage`.
+- **New Course** (the sidebar's `+`) is greyed the same way, and every other way
+  into the wizard (the empty pane's "Add a Course…", the automation hooks) is
+  refused by `SidebarPane.OpenNewCourseWizard` with the same sentence. Inside
+  the wizard, Create and Add Example Course ask again before the progress view
+  replaces the form, and `NewCourseCreator` refuses BEFORE `course_config.json`
+  or the `course created` trail line is written — next to its existing
+  setup.ps1 check, for the reason that check exists (a half-made course blocks
+  a retry).
+- **A banner** (`gettingReadyNotice`, an `InfoBar` under the synced-folder
+  notice in the same grid row) says `GettingReadyTitle` and
+  `GettingReadyMessage`, not closable, informational. It opens only if the copy
+  is still running ONE SECOND after the window was shown
+  (`ToolchainReadiness.BannerDelay`): the ordinary launch, with nothing to copy,
+  still compares every file, about half a second, and a banner for that would
+  flash on every launch. **The buttons are disabled for that half second on
+  every launch regardless** — a teacher who clicks Preview within half a
+  second of the window appearing gets the refusal dialog; nobody has.
+- **If the copy cannot finish** (any file that could not be copied or deleted,
+  or the copy threw), the banner turns into an error saying
+  `ToolchainReadiness.CouldNotGetReady`, which names File → Reload Courses; it
+  stays, and so do the disabled buttons, until that reload or a new window on
+  the folder tries again.
+
+The words are in `ToolchainReadiness` (rule 1: nothing about tools, scripts or
+containers; "Deploy" because that is the button's caption, #443):
+
+| | |
+|---|---|
+| Banner title | `GettingReadyTitle` — "Getting this folder ready…" |
+| Banner, tooltip, refusal while copying | `GettingReadyMessage` — "Plantoir is copying what it needs into this folder. Preview and Deploy will work in a moment." |
+| Error banner, tooltip, refusal after a failure | `CouldNotGetReady` — "Plantoir couldn't finish getting this folder ready. Choose Reload Courses from the File menu to try again." |
+
+Quoted here once so a reader can see them; the constants are the truth, and
+`ToolchainReadinessTests.TheWordsNameNoMachineryAndCallADeployADeploy` pins
+the rule they follow. They are not in the contract: a window's mechanics are
+not shared (`contracts/README.md`), and the mac has no such window state.
+
+**Where the refusal is asked.** At every ENTRY POINT, before any lease is
+taken and before any question is asked, beside the refusals already there
+(`RefusedWhileThisSectionDeploys`, `AnotherProgramStandsInTheWay`), so #406's
+order — a preview that is going to be refused is refused with no
+today's-class question first — holds: `PreviewOrStop_Click`,
+`StartAutomatedPreview`, `DeployAsync` (which hands the assistant the same
+sentence as its outcome), `MainWindow.ShowPreviewFor`, `DeployFor` and
+`DeployForAsync` (before the selection moves), Course Settings' Preview Again
+(before it stops any preview, and before its trail line), and the wizard.
+All of them go through `MainWindow.RefusedWhileTheFolderIsGettingReady`, which
+shows a dialog titled "Cannot Preview Yet" / "Cannot Deploy Yet".
+`ScriptRunner.Run` is a BACKSTOP for a way in nobody thought of: it refuses a
+folder that is Copying or Failed — never NotStarted, which is every folder the
+unit tests and the marketing captures drive — with the same sentence as
+`LaunchProblem`, AND sets `LastExitCode` to -1, so nothing that waits on the
+run (the preview's wait for its server, a deploy leg's `WaitUntilFinished`)
+waits for a process that never started. A stop (`--stop`) is never refused,
+and `PreviewStopper` does not go through `ScriptRunner` anyway.
+
+**2. Whether two windows on the same folder share one copy.** Yes.
+`ToolchainReadiness` (Plantoir.Core) keeps one entry per folder, keyed on the
+full path case-insensitively (the old `FoldersWithFreshToolchain` set's rule),
+under a lock. `Ensure` makes the copy's task INSIDE the lock, so a second
+window — or the picker setting a folder up — arriving a moment later finds
+Copying and is handed the very same task; it STARTS the task only after
+telling every window "started", so nobody can hear "finished" first (a copy
+with nothing to do ends in milliseconds, and the first version logged the two
+in either order). A folder counted ready is copied again if its
+`.toolchain\Dockerfile` has since gone from disk — the mac's own check in
+`WorkspaceModel.shouldMirrorToolchain`, one `File.Exists` per reload. A folder is marked ready only
+AFTER a pass in which nothing failed. Both halves fix what the old code did:
+the set was a plain `HashSet` read and written from whatever thread, filled
+BEFORE the copy ran, and `SyncFile` swallowed every exception and answered 0,
+so a copy that half failed counted as fresh for the rest of the run.
+`SyncFile`/`SyncDirectory` now return a `CopyResult(Changed, Failed,
+FirstFailedPath, FirstProblem)` — failed REMOVALS count too, since a stale file
+left behind changes the recipe's hash — and the trail line names the first
+failure and its error.
+
+A FAILED copy is tried again only on File → Reload Courses
+(`WorkspaceViewModel.ReloadTryingAgain`) or when a window is newly pointed at
+the folder (`PointAtFolder`) — never on the sidebar's routine reloads (about
+fifteen call sites: after a rename, an archive, a restore), or a folder that
+cannot be written would be put through a two-minute copy after each of them.
+`ToolchainMirror.InitializeWorkspace` (the picker's "set this folder up")
+waits for the same `Ensure`, retrying a failed copy, on its background thread.
+
+`Reload()` keeps its exact shape (`SharedRuleContractTests.BodyOfReload` reads
+its body): it still refreshes the six launchers synchronously on every reload —
+milliseconds; "The new-site dialog" above (reason 4) says what that means for a
+stubbed launcher — and now only STARTS the recipe copy.
+
+**Other programs.** `plantoir-mcp` (the Claude/Codex door, and the app's own
+assistant window, which talks to it) cannot see the app's memory. For the
+length of a copy the app writes
+`courses\.internal\activity\toolchain-copying.<pid>` — body
+`WorkLease.LeaseBody(withStart: true)` — and deletes it after, failure
+included. `LauncherRunner.Run` refuses with `GettingReadyMessage` while a LIVE
+marker exists, judged by `WorkLease.OwnerIsAlive` (so a marker left by a killed
+Plantoir, or one whose process id now belongs to another process with a
+different start time, counts for nothing). Deliberately NOT a `.lease` name:
+`WorkLease.Others`, the update gate's `SweepLeasesOf` and reference staging all
+read `*.lease`, and this holds no course — the precedent is `BackupDeleter`'s
+`<COURSE>.held-backup.<pid>`. The marker is written only when `courses\`
+already exists, so it never turns a folder with no courses into one with an
+empty list, and writing one sweeps away any left by a Plantoir killed
+mid-copy (already ignored; this only stops them piling up) — but never one whose body does not read, which is what a live marker looks like for a moment while a program writes it in place. This app writes its own under a `writing-…tmp` name and moves it into place, so its marker is never seen empty. **The marker
+exists only WHILE a copy runs, so plantoir-mcp cannot see a FAILED copy** —
+by design: a failed copy is usually a file that could not be written, the
+assistant's build then fails on its own with the launcher's own words, and a
+marker kept after a failure would need someone to remove it, which a killed
+app never does. The app's own window still refuses with `CouldNotGetReady`.
+
+**The app's own robots wait instead of being refused.** The command-line
+automation hooks (`--auto-preview`, `--auto-deploy`, `--auto-wizard`,
+`--auto-createcourse`, `--auto-select`, `--auto-addsection`, `--auto-course`)
+and every marketing-capture scene (`MarketingShotCapturer.OpenMain`, and
+`Provision` before it makes courses) used to act after a fixed 1.5 s. They
+now await the same `Ensure` — joining their own launch's copy, never starting
+another — before pressing anything, so a picture never shows the "Cannot
+Preview Yet" dialog; a FAILED copy makes a scene answer `refused: <the
+sentence>` and a hook log `automation hook refused: …` and do nothing.
+
+**The scheduled run is unchanged in this piece.** It never mirrors
+`.toolchain\` at all, and its wrapper's fingerprint reads
+`.toolchain\scripts`, so whether a 06:30 run should wait for a copy the app
+is making is its own question; the director opens it as an issue.
+
+**3. Whether the mac's equivalent blocks the same way.** It did, and #476
+(the mac, 2026-10-08) measured and then matched this design: the copy held
+the main actor for 0.9–3.9 s on an M4 Pro with a warm cache (about four
+seconds at worst; cold and Intel not measured), and Russell chose the
+Windows design anyway. The mac's copy now runs off the main actor through
+one `ToolchainReadiness` registry, with Preview, Deploy and New Course greyed
+and a banner once a file is written; it marks a folder fresh only after a
+copy with nothing failed (the same defect, fixed the same way); its MCP
+server and headless rebuilds wait for their own copy; it writes the same
+`working folder tools copied` line; and ⌘Q waits for a running copy, which
+this side does not (a `windows` issue). Two differences, both on purpose: no
+cross-process marker (every file is written atomically from the same bundle,
+so two copies at once write the same bytes), and the banner follows the
+first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
+"Getting a folder ready after an update, off the main actor (#476)".
+
+### What was rejected
+
+- **Copy into a temporary folder and rename it into place.** Atomic, but it
+  rewrites all 12,753 files on every update instead of the few hundred that
+  changed — the in-place mirror only writes what differs, and the launchers
+  hash the folder, so a whole new tree buys nothing. The residual risk is
+  recorded instead: a preview ALREADY RUNNING from another process (a
+  command-line launcher, a scheduled run) while the app copies can read a mix
+  of old and new files. That is unchanged from before #473 — the copy was
+  never atomic — and the app's own builds now wait for it.
+- **Queueing** Preview and Deploy until the copy finishes. Russell chose
+  disabled with a reason: a queued press is invisible work that starts on its
+  own minutes later, and a teacher who pressed Deploy and walked away cannot
+  tell a queued deploy from a lost one.
+- **Gating only in `ScriptRunner.Run`.** One check would cover every path, but
+  it fires AFTER the leases are taken, after the running preview was stopped
+  for a deploy, and after #406's today's-class question — a refusal that
+  arrives after the window has already acted. So the gates are at the entry
+  points and `ScriptRunner` is the backstop.
+- **A wait in the scheduled run.** See above: the run never mirrors, so it is
+  its own issue rather than a patch here.
+- **A modal "please wait" dialog.** It would block exactly what the teacher
+  can safely do meanwhile (read and edit pages, settings) and is the shape of
+  the freeze this fixes.
+- **A contract key** for the banner states: window mechanics are not contract
+  (`contracts/README.md`). The state → enabled and state → banner mappings are
+  pure functions in Core (`ToolchainReadiness.RefusalFor`, `BannerFor`,
+  `AutomationStatus`) pinned by `ToolchainReadinessTests`.
+
+### The trail, and measuring it
+
+`working folder tools copied` (`ActivityTrail.Event.WorkingFolderToolsCopied`;
+`shared-rules.json` → `activityTrail.mustRecord`, `appliesOn: ["windows"]` —
+its `appliesOnWhy` says why it is permanent rather than a gap) is written once
+per copy that changed or failed something, never for the ordinary pass:
+
+```
+… · got the working folder ready — 2389 files brought up to date in 5.3 s — C:\…\workspace
+… · could not finish getting the working folder ready — 2 files could not be copied or removed (first: .toolchain\scripts\build_site.py, <its error>), 40 files brought up to date in 12.3 s; Preview and Deploy wait for Reload Courses — C:\…
+```
+
+It does not say "after an update": the same copy fills a folder the picker sets
+up from nothing, and refreshes any stale one. And a pass that changed NOTHING
+but still took more than a second (a slow disk comparing 12,753 files) shows
+the banner and writes no line — which is fine: the banner was true while it
+was up, and a line saying "0 files" on every slow launch would bury the one
+that explains a real copy; the `startup.log` lines below still time it.
+
+For a developer, `startup.log` brackets it: `tools copy started for '<folder>'`
+and `tools copy finished for '<folder>': Ready, N changed, M failed, S s`. Time
+from launch to window is `App.OnLaunched starting` (or `Program.Main starting`)
+to `MainWindow.Activate called`; launch to a usable Preview is the same start to
+`tools copy finished`.
+
+### Testing it
+
+`ToolchainReadinessTests` (Core): one copy for sixteen concurrent `Ensure`
+calls under two spellings of one folder; not ready until the copy has
+finished; one failed file → Failed, not retried by a routine reload, retried
+when asked; a copy that throws → Failed with its reason; the real
+`SyncDirectory` counting a file it could not write; `InitializeWorkspace`
+waiting and leaving the folder Ready; the trail line; the state → buttons and
+banner mapping; the backstop refusing Copying and Failed (with
+`LastExitCode` set) but never NotStarted or a stop; the wizard's preflight
+writing nothing; the marker's lifetime, a dead pid, a recycled pid, and
+`plantoir-mcp` refusing on a live one.
+
+`GettingReadyUiTests` (UiFact) makes the copy real: it deletes the fixture's
+`.toolchain\support\skeletons` before launch and asserts the window and the
+sidebar arrive while the menu bar's ItemStatus says `copying`, that `+`,
+Preview and Deploy are disabled with `GettingReadyMessage` as their help text,
+that the banner shows, and that everything clears when the status becomes
+`ready`. The status is on the MENU BAR because UI Automation needs an element
+present from the window's first moment with a peer of its own: a `StackPanel`
+has none, and a closed `InfoBar` is not reliably in the tree. Every other UI
+test now waits for `ready` in `DrivenApp`'s constructor (up to 90 s): on a
+fixture `InitializeWorkspace` has already brought up to date that is the
+ordinary half-second pass, and without the wait a test pressing Preview the
+moment the sidebar appears would meet the disabled button.

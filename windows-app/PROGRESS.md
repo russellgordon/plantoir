@@ -339,7 +339,9 @@ snapshot), #165 (a partial publish answers), #164 (argument names on the
 trail), #203/#342 (the walk stops at a class both ways, and says so), #359
 (Markdown-style links; check_section names ten), #305 ("What does X link to?"
 in code, transcript only), #340 (How I Teach tools), #210 (Codex door; start-up
-not measured, Codex not installed). Partly: #114 (needs a routing
+not measured, Codex not installed; since #468 it holds its course as the Claude
+door does), #440 (add_next_class's unit and days hidden from the router; units
+and counts answered in code; settler S3). Partly: #114 (needs a routing
 measurement), #392/#399/#405 (the links checklist's LOGIC, record and release
 are done and contract-tested; the WinUI sheet, the menu item and when it is
 shown are not built). Manuals: doc 10's "On Windows" sections; doc 12 → "The
@@ -571,11 +573,13 @@ read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
 
 ## Spec coverage
 
-Tracked in one place only: the **Windows status** section of
+Tracked until 2026-10-08 in the **Windows status** section of
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md) (264 rows as of 2026-08-18,
-entries 1–264 assessed). Nothing here duplicates it, because a second copy is
-a copy that goes stale — that count itself had been reading "179 rows" for
-days after the log passed 250.
+entries 1–264 assessed), frozen with the log when it closed to new entries
+(#480); since then the open `windows` issues are the list, and the closed
+issues by milestone are what shipped. Nothing here duplicates either, because
+a second copy is a copy that goes stale — that count itself had been reading
+"179 rows" for days after the log passed 250.
 
 **What to do with that assessment** is the open `windows` issues, plus
 [`documentation/12-windows-app.md`](../documentation/12-windows-app.md) →

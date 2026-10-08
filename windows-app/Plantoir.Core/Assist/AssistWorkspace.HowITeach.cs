@@ -20,8 +20,10 @@ public sealed partial class AssistWorkspace
     public const string LocalWindowVariable = "PLANTOIR_LOCAL_WINDOW";
 
     /// <summary>
-    /// The course an outside door was opened FROM, set by the Claude door in
-    /// its configuration's <c>env</c> (bundle A fix round, ruling 3). The
+    /// The course an outside door was opened FROM, set by BOTH doors (bundle A
+    /// fix round, ruling 3; the Codex door since #468): the Claude door in its
+    /// configuration's <c>env</c>, the Codex door as a fifth
+    /// <c>-c mcp_servers.plantoir.env.</c> override. The
     /// server takes an <c>assist</c> lease on it WITHOUT locking to it: the
     /// door still reaches every course in the folder (#430, argv stays
     /// folder-only), and the course it was opened from keeps the protections
@@ -31,8 +33,28 @@ public sealed partial class AssistWorkspace
     public const string DoorCourseVariable = "PLANTOIR_DOOR_COURSE";
 
     /// <summary>
+    /// The trail's line when a DOOR's server takes its assist lease (#468,
+    /// <c>activityTrail.mustRecord</c> → "outside session held a course"): the
+    /// course and nothing else. "Claude or Codex" because the server cannot
+    /// tell which door started it.
+    /// </summary>
+    public static string HoldingTrailLine(string courseCode) =>
+        $"a Claude or Codex session started from Plantoir is holding {courseCode} while it is open";
+
+    /// <summary>
+    /// Whether a server writes <see cref="HoldingTrailLine"/>: only when it
+    /// holds a course AND serves a door. This app's own window's server holds
+    /// the course it is locked to as well, and must never be written up as "a
+    /// Claude or Codex session" (#468). <c>plantoir-mcp</c>'s start-up asks this.
+    /// </summary>
+    public static bool NotesAnOutsideHold(string? heldCourse, bool servesTheLocalWindow) =>
+        heldCourse is not null && !servesTheLocalWindow;
+
+    /// <summary>
     /// The course this server should hold an <c>assist</c> lease on: the one
-    /// it is locked to, else the door's course when that course exists here.
+    /// it is locked to, else the door's course when that course exists here
+    /// (<c>doorCourseHold.courseToHold</c>: trimmed, matched without regard to
+    /// case, answered as the folder spells it, never a refusal).
     /// </summary>
     public string? CourseToHoldForTheConversation(string? doorCourse)
     {

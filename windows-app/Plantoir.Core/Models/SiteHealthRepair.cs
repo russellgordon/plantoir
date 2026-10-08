@@ -185,8 +185,8 @@ public static class SiteHealthRepair
     /// out. It says what publishing WILL do, never what it did.</para>
     /// </summary>
     public const string NotPublishedYet =
-        "Publishing is what puts this in front of students, so it is not on " +
-        "their site until you publish again. You can preview it now to check " +
+        "Deploying is what puts this in front of students, so it is not on " +
+        "their site until you deploy again. You can preview it now to check " +
         "the change looks right.";
 
     /// <summary>

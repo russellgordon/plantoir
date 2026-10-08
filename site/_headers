@@ -1,0 +1,3 @@
+# Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; edit the lines outside this block, not these.
+/*
+  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-DNuhgzuN4Kt7cF6dSj1cZNaGUgPODTOTcuUIWEuaaco=';

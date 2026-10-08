@@ -27,7 +27,17 @@ public class AppUpdaterTests
     {
         public readonly List<string> Shown = new();
         public (string Path, string Args)? Installed;
-        public Task<UpdateAnswer> OfferAsync(string version, string? notes) { Shown.Add("offer " + version); return Task.FromResult(UpdateAnswer.Install); }
+        /// <summary>What the teacher answers each offer; Install unless a test says otherwise.</summary>
+        public UpdateAnswer Answer = UpdateAnswer.Install;
+        /// <summary>When set, the offer stays open until the test completes this.</summary>
+        public TaskCompletionSource<UpdateAnswer>? Open;
+        public readonly List<(string Version, bool Important)> Offers = new();
+        public Task<UpdateAnswer> OfferAsync(string version, string? notes, bool important)
+        {
+            Shown.Add("offer " + version);
+            Offers.Add((version, important));
+            return Open?.Task ?? Task.FromResult(Answer);
+        }
         public Task ShowUpToDateAsync() { Shown.Add("upToDate"); return Task.CompletedTask; }
         public Task ShowCouldNotCheckAsync() { Shown.Add("couldNotCheck"); return Task.CompletedTask; }
         public Task ShowHeldAsync(string work, bool onceInstalling) { Shown.Add("held " + work); return Task.CompletedTask; }
@@ -42,8 +52,261 @@ public class AppUpdaterTests
 
     private static AppUpdater Make(string feed, FakePrompts prompts, FakeReader reader,
                                    Func<AppUpdates.Snapshot>? snapshot = null, Func<IReadOnlyList<int>>? servers = null) =>
-        new(feed, "", prompts, snapshot ?? Nothing, servers ?? (() => Array.Empty<int>()), "1.1 (0)", perUserInstall: true,
+        new(feed, "", prompts, snapshot ?? Nothing, servers ?? (() => Array.Empty<int>()), "1.1.0", perUserInstall: true,
             feedReaderForTests: () => reader);
+
+    // ---- A SIGNED fake feed (#453, #465) ----------------------------------------
+    //
+    // Strict refuses an unsigned feed, so the tests above only ever reach
+    // "refused". These sign one with a throwaway Ed25519 key made from a fixed
+    // seed, so the real engine parses it, compares it with the running version
+    // and hands this class an offer. NetSparkle compares against the ENTRY
+    // assembly's version (the test host's), so the items are 999.x: anything
+    // lower might not be "newer" than whatever runs the tests.
+
+    private static readonly byte[] Seed = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+    private static string TestPublicKey => Convert.ToBase64String(Chaos.NaCl.Ed25519.PublicKeyFromSeed(Seed));
+    private static string SignedBy(string text) => Convert.ToBase64String(
+        Chaos.NaCl.Ed25519.Sign(Encoding.UTF8.GetBytes(text), Chaos.NaCl.Ed25519.ExpandedPrivateKeyFromSeed(Seed)));
+
+    /// <summary>A feed reader that answers the feed and its detached signature, as plantoir.app does.</summary>
+    private sealed class SignedReader : IAppCastDataDownloader
+    {
+        public int Reads;
+        public string Feed = "";
+        public string DownloadAndGetAppCastData(string url) { Reads++; return url.EndsWith(".signature") ? SignedBy(Feed) : Feed; }
+        public Task<string> DownloadAndGetAppCastDataAsync(string url) => Task.FromResult(DownloadAndGetAppCastData(url));
+        public Encoding GetAppCastEncoding() => Encoding.UTF8;
+    }
+
+    private static string FeedOf(params (string Version, bool Important)[] items) =>
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+        "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\"><channel><title>Plantoir</title>\n" +
+        string.Concat(items.Select(i =>
+            $"<item><title>Plantoir {i.Version}</title><description>New in {i.Version}</description><sparkle:version>{i.Version}</sparkle:version>" +
+            $"<enclosure url=\"https://example.invalid/{i.Version}/PlantoirSetup.exe\" sparkle:version=\"{i.Version}\" length=\"1\" " +
+            $"sparkle:os=\"windows\" type=\"application/octet-stream\" sparkle:criticalUpdate=\"{(i.Important ? "true" : "false")}\" " +
+            $"sparkle:signature=\"{SignedBy(i.Version)}\" /></item>\n")) +
+        "</channel></rss>";
+
+    private static AppUpdater MakeSigned(FakePrompts prompts, SignedReader reader, string? skipped = null) =>
+        new("https://example.invalid/windows.xml", TestPublicKey, prompts, Nothing, () => Array.Empty<int>(), "1.1.0",
+            perUserInstall: true, skippedVersion: skipped, feedReaderForTests: () => reader);
+
+    [Fact]
+    public async Task ASignedFeedReachesTheOfferAndAPlainOneAllowsSkip()
+    {
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotNow };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+        await updater.CheckAsync(teacherAsked: true);
+        Assert.True(reader.Reads > 0, "the fake feed was never read");
+        Assert.Equal(("999.0.1", false), Assert.Single(prompts.Offers));
+    }
+
+    /// <summary>#453: the newest is plain, an older newer one is important — the offer is important.</summary>
+    [Fact]
+    public async Task AnyNewerImportantReleaseMakesTheOfferImportant()
+    {
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotNow };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.2", false), ("999.0.1", true)) };
+        using var updater = MakeSigned(prompts, reader);
+        await updater.CheckAsync(teacherAsked: false);
+        Assert.Equal(("999.0.2", true), Assert.Single(prompts.Offers));
+    }
+
+    /// <summary>#453: a skipped important release is offered again by the DAILY check.</summary>
+    [Fact]
+    public async Task ASkippedImportantReleaseIsOfferedAgainByTheDailyCheck()
+    {
+        DateTime? last = null;
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotNow };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", true)) };
+        using var updater = MakeSigned(prompts, reader, skipped: "999.0.1").RememberingDailyChecksIn(() => last, when => last = when);
+        await updater.CheckAsync(teacherAsked: false);
+        Assert.Equal(("999.0.1", true), Assert.Single(prompts.Offers));
+        Assert.NotNull(last);   // shown and answered: the day is done
+    }
+
+    /// <summary>The other half, unchanged: a skipped PLAIN release is not offered by the daily check, and the day is done.</summary>
+    [Fact]
+    public async Task ASkippedPlainReleaseIsNotOfferedByTheDailyCheck()
+    {
+        DateTime? last = null;
+        var prompts = new FakePrompts();
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader, skipped: "999.0.1").RememberingDailyChecksIn(() => last, when => last = when);
+        await updater.CheckAsync(teacherAsked: false);
+        Assert.True(reader.Reads > 0, "the fake feed was never read");
+        Assert.Empty(prompts.Offers);
+        Assert.NotNull(last);
+    }
+
+    /// <summary>#453: an important offer never writes a skip, even if one came back.</summary>
+    [Fact]
+    public async Task AnImportantOfferNeverRemembersASkip()
+    {
+        var remembered = new List<string?>();
+        var prompts = new FakePrompts { Answer = UpdateAnswer.Skip };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", true)) };
+        using var updater = new AppUpdater("https://example.invalid/windows.xml", TestPublicKey, prompts, Nothing,
+            () => Array.Empty<int>(), "1.1.0", perUserInstall: true, rememberSkip: remembered.Add, feedReaderForTests: () => reader);
+        await updater.CheckAsync(teacherAsked: false);
+        Assert.Single(prompts.Offers);
+        Assert.Empty(remembered);
+    }
+
+    /// <summary>
+    /// #465: an offer nobody saw is not an answer. Nothing is written for it,
+    /// the day is NOT done, and the check asks to look again in a minute, then
+    /// two — backing off, never every minute for ever.
+    /// </summary>
+    [Fact]
+    public async Task AnOfferNobodySawIsNotTheDaysCheck()
+    {
+        string scratch = Directory.CreateTempSubdirectory("plantoir-465").FullName;
+        string trail = Path.Combine(scratch, "activity.txt");
+        Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(trail);
+        try
+        {
+            DateTime? last = null;
+            var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+            var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+            using var updater = MakeSigned(prompts, reader).RememberingDailyChecksIn(() => last, when => last = when);
+
+            await updater.DailyCheckAsync();
+            Assert.Single(prompts.Offers);
+            Assert.Null(last);
+            Assert.True(updater.DailyCheckIsDue(DateTime.UtcNow));
+            Assert.Equal(AppUpdater.FirstRetry, updater.LastRetryScheduled);
+            await updater.DailyCheckAsync();
+            Assert.Equal(AppUpdater.FirstRetry * 2, updater.LastRetryScheduled);
+
+            string[] lines = File.Exists(trail) ? File.ReadAllLines(trail) : [];
+            Assert.Single(lines, l => l.Contains("found 999.0.1, running 1.1.0; the daily check"));   // once per launch
+            Assert.DoesNotContain(lines, l => l.Contains("999.0.1: not now"));
+
+            // Then the teacher sees it and answers: the day is done, the answer written.
+            prompts.Answer = UpdateAnswer.NotNow;
+            await updater.DailyCheckAsync();
+            Assert.NotNull(last);
+            lines = File.ReadAllLines(trail);
+            Assert.Single(lines, l => l.Contains("999.0.1: not now"));
+        }
+        finally
+        {
+            Plantoir.Core.Scripting.ActivityTrail.SetCustomLogPathForTesting(TestTrailRedirect.ScratchTrailPath);
+            try { Directory.Delete(scratch, recursive: true); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// #465, the plan review's F2: while an offer is still open, another daily
+    /// look does nothing (no second offer, no second fetch). Without the guard,
+    /// an offer left open past the hourly look met itself in front and asked to
+    /// be tried again every minute. Then the backoff: two unseen offers double
+    /// it, and a shown one starts it again at a minute.
+    /// </summary>
+    [Fact]
+    public async Task AnOfferStillOpenIsNotMetByTheNextLookAndAShownOneResetsTheBackoff()
+    {
+        var prompts = new FakePrompts { Open = new TaskCompletionSource<UpdateAnswer>() };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+
+        var first = updater.DailyCheckAsync();
+        for (int waited = 0; prompts.Offers.Count == 0 && waited < 300; waited++) await Task.Delay(20);
+        Assert.Single(prompts.Offers);
+        Assert.False(first.IsCompleted, "the offer did not stay open, so this proves nothing");
+        int readsWhileOpen = reader.Reads;
+        var second = updater.DailyCheckAsync();                // the next look, while the offer is open
+        // Bounded: without the guard the second look offers again and waits on
+        // the same open offer, so it never finishes (measured: the test hung).
+        Assert.True(await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10))) == second,
+            "the next look did not return at once while the offer was open: it went on to offer again");
+        Assert.Single(prompts.Offers);
+        Assert.Equal(readsWhileOpen, reader.Reads);
+        prompts.Open.SetResult(UpdateAnswer.NotShown);
+        await first;
+
+        prompts.Open = null;
+        prompts.Answer = UpdateAnswer.NotShown;
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry * 2, updater.LastRetryScheduled);
+        prompts.Answer = UpdateAnswer.NotNow;
+        await updater.DailyCheckAsync();                       // shown: the backoff starts again
+        prompts.Answer = UpdateAnswer.NotShown;
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry, updater.LastRetryScheduled);
+    }
+
+    /// <summary>
+    /// Review L1: an offer the teacher SAW through Check for Updates… does the
+    /// day's check, so a daily retry left over from an unseen offer cannot put
+    /// the same offer back minutes after it was answered.
+    /// </summary>
+    [Fact]
+    public async Task AShownCheckForUpdatesDoesTheDaysCheck()
+    {
+        DateTime? last = null;
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader).RememberingDailyChecksIn(() => last, when => last = when);
+        await updater.DailyCheckAsync();
+        Assert.True(updater.DailyCheckIsDue(DateTime.UtcNow));
+        prompts.Answer = UpdateAnswer.NotNow;
+        await updater.CheckAsync(teacherAsked: true);
+        Assert.NotNull(last);
+        Assert.False(updater.DailyCheckIsDue(DateTime.UtcNow));
+    }
+
+    /// <summary>Review L5: a check that finds nothing new ends a run of unseen offers, so the next waits a minute again.</summary>
+    [Fact]
+    public async Task ACheckThatFindsNothingNewStartsTheBackoffAgain()
+    {
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+        await updater.DailyCheckAsync();
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry * 2, updater.LastRetryScheduled);
+        reader.Feed = FeedOf(("0.0.1", false));                 // older than anything running: nothing new
+        await updater.DailyCheckAsync();
+        reader.Feed = FeedOf(("999.0.1", false));
+        await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.FirstRetry, updater.LastRetryScheduled);
+    }
+
+    /// <summary>#465: the backoff stops growing at the hourly look.</summary>
+    [Fact]
+    public async Task TheRetryNeverWaitsLongerThanTheHourlyLook()
+    {
+        var prompts = new FakePrompts { Answer = UpdateAnswer.NotShown };
+        var reader = new SignedReader { Feed = FeedOf(("999.0.1", false)) };
+        using var updater = MakeSigned(prompts, reader);
+        for (int i = 0; i < 10; i++) await updater.DailyCheckAsync();
+        Assert.Equal(AppUpdater.HourlyLook, updater.LastRetryScheduled);
+    }
+
+    /// <summary>
+    /// #465: the daily check starts once the first window is up, in OnLaunched
+    /// after the windows are opened, and never inside OpenWindow (the marketing
+    /// captures open windows through it). Source-read: the test project cannot
+    /// reference the WinUI app.
+    /// </summary>
+    [Fact]
+    public void TheDailyCheckStartsOnceTheFirstWindowIsUp()
+    {
+        string app = File.ReadAllText(Path.Combine(ContractLoader.RepositoryRoot, "windows-app", "Plantoir", "App.xaml.cs"));
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(app, @"Updater\??\.Start\(\)").Count);
+        int start = app.IndexOf("Updater?.Start();", StringComparison.Ordinal);
+        int windowsOpened = app.IndexOf("OpenWindow(entry.Path, entry);", StringComparison.Ordinal);
+        int openWindow = app.IndexOf("public static MainWindow OpenWindow(", StringComparison.Ordinal);
+        Assert.True(start > windowsOpened && windowsOpened > 0, "the daily check starts before the windows are opened");
+        Assert.True(start < openWindow, "the daily check starts inside OpenWindow, where the marketing captures would start it too");
+        int scene = app.IndexOf("_ = MarketingShotCapturer.StageAsync(scene);", StringComparison.Ordinal);
+        Assert.True(scene > 0 && scene < start, "a marketing capture returns after the daily check has started");
+    }
 
     [Fact]
     public void TheReleasedAppReadsTheContractsFeedWithAKey()

@@ -59,7 +59,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
 
     [McpServerTool(Name = "list_courses", Title = "List courses", ReadOnly = true, Destructive = false)]
     [Description("TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses in this working " +
-                 "folder: the code, the name, which sections each one has, and where each publishes to. Call this " +
+                 "folder: the code, the name, which sections each one has, and where each deploys to. Call this " +
                  "first when a teacher mentions a course and you are not certain of its exact code — guessing a code " +
                  "reaches the wrong course silently.")]
     public string ListCourses()
@@ -99,7 +99,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             text.AppendLine($"  sections: {string.Join(", ", course.SectionNumbers)}");
             // EVERY destination by type (#404, mac #403) — it used to name the
             // primary alone, and a folder with no path chosen yet as Netlify.
-            text.AppendLine($"  publishes to: {DeployCommand.EveryDestinationByType(configuration)}");
+            text.AppendLine($"  deploys to: {DeployCommand.EveryDestinationByType(configuration)}");
             // To an outside door only (#340, howITeachPage.listCoursesLine).
             if (workspace.HowITeachListingLine(course) is { } howITeach) text.AppendLine(howITeach);
         }
@@ -446,7 +446,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
         [Description(WhenHelp)] string when,
-        [Description("The class pages this deploy is meant to publish, separated by commas. Checked for whether they are published yet.")]
+        [Description("The class pages this deploy is meant to carry, separated by semicolons. Checked for whether they are published yet.")]
         string classes = "")
         => Guarded(() =>
         {
@@ -458,10 +458,25 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             // the card said tomorrow. Issue #144's family, read end.
             if (ScheduledDeploy.ReadTheMoment(Settled(when)) is not { } moment)
                 throw new AssistRefusal($"“{when}” isn't a time I can read. Use YYYY-MM-DD HH:MM.");
-            return Proposing(workspace.PlanScheduledDeploy(course, section, moment,
-                classes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            return Proposing(workspace.PlanScheduledDeploy(course, section, moment, ClassTitles(classes))
                 .Describe());
         });
+
+    /// <summary>
+    /// A list of class page titles, split the way the mac's
+    /// <c>AssistToolRunner.names</c> splits one: on semicolons and line breaks,
+    /// NEVER on commas.
+    /// </summary>
+    /// <remarks>
+    /// Nearly every class page in these courses is called "Unit 2, Day 3", so
+    /// a comma-separated list cuts each title in half and checks four pages
+    /// that do not exist instead of the two that do (issue #469). This side
+    /// advertised and split on commas until 2026-10-08; the contract and the
+    /// mac had said semicolons all along.
+    /// </remarks>
+    internal static string[] ClassTitles(string classes)
+        => (classes ?? "").Split([';', '\n', '\r'],
+                                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     [McpServerTool(Name = "schedule_deploy", Title = "Deploy at a set time",
                    Destructive = false, Idempotent = true)]
@@ -676,7 +691,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "unpublished.\n\nCall plan_make_room_for_classes FIRST and show the teacher what it said. The course " +
                  "is backed up first. Once other classes have moved, \"undo that\" can no longer take this back and " +
                  "the backup is the way out — so tell the teacher to look the section over in Plantoir before " +
-                 "publishing anything.")]
+                 "deploying anything.")]
     public CallToolResult MakeRoomForClasses(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
@@ -770,9 +785,19 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             }
 
             var plan = workspace.PlanAddNextClass(course, section, unit, days > 0 ? days : null);
-            return plan.ChangesNothing
+            var answer = plan.ChangesNothing
                 ? Answering("The next class page already exists.", plan.Describe())
                 : Proposing(plan.Describe(), plan.Describe(noun));
+            // #440: where a PLAIN next class lands, for the window's settler
+            // S3 — only when this WAS the plain plan (no unit, no days), so a
+            // card's plan never carries a reading of some other request.
+            if (string.IsNullOrWhiteSpace(unit) && days <= 0 &&
+                workspace.NextClassReading(course, section) is { } reading)
+            {
+                answer.Meta ??= new JsonObject();
+                answer.Meta[AssistToolAnswer.NextClassKey] = reading.ToJson();
+            }
+            return answer;
         });
 
     [McpServerTool(Name = "add_next_class", Title = "Add the next class page", Destructive = false, Idempotent = false)]
@@ -826,7 +851,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult PlanRememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
+        [Description("Every day this class meets, as YYYY-MM-DD, separated by semicolons — for example \"2026-09-08; 2026-09-10; 2026-09-14\". Give the dates themselves; this tool does not open timetable files or work dates out from a pattern.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
         => Guarded(() =>
@@ -1014,7 +1039,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     public CallToolResult RememberTimetable(
         [Description("The course code, for example ICS3U.")] string course,
         [Description("The section number, for example 1.")] int section,
-        [Description("Every date this section meets, as YYYY-MM-DD, separated by commas.")] string dates,
+        [Description("Every day this class meets, as YYYY-MM-DD, separated by semicolons — for example \"2026-09-08; 2026-09-10; 2026-09-14\". Give the dates themselves; this tool does not open timetable files or work dates out from a pattern.")] string dates,
         [Description("Where these came from, in the teacher's words — \"timetable.xlsx, block H\", \"typed in by hand\".")]
         string source = "the teacher")
         => GuardedResult(() =>
@@ -1133,7 +1158,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // Costs no routing accuracy — re_date_classes and its twin are not in
         // AssistAgent.ForTheLocalModel, so no local model reads either schema.
         // Recorded in AssistSurfaceContractTests' agreed departures.
-        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should deploy to.")]
         string rollover = "")
         => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: false, firstDay,
                   cancellation, website, rollover);
@@ -1143,12 +1168,12 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     [Description("Start a section again for a new year, after the teacher has copied the course from a prior one. " +
                  "Re-dates every class onto the new timetable, moves each lesson's materials with it, and moves the " +
                  "year-round pages — what Key Links points at, and the curriculum — to the first day of class. " +
-                 "Also cuts the section loose from last year's website so the next publish makes a new one rather " +
+                 "Also cuts the section loose from last year's website so the next deploy makes a new one rather " +
                  "than overwriting it. The course is backed up first, automatically. " +
                  "\n\nAsk the teacher two things before calling this: what the first day of class is, and where their " +
                  "timetable spreadsheet is. Call plan_re_date_classes first and show them the dates. " +
                  "\n\nThis deliberately does NOT hide anything: the teacher should preview the site and check the " +
-                 "dates and structure before deciding what students see. Afterwards the section has to be published " +
+                 "dates and structure before deciding what students see. Afterwards the section has to be deployed " +
                  "once from Plantoir, where the teacher chooses what the new site is called.")]
     public async Task<string> RollOverSection(
         [Description("The course code, for example ICS3U.")] string course,
@@ -1212,7 +1237,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
                  "Links points at move to the first day of class. Curriculum pages are left alone, " +
                  "because Plantoir dates those itself on every build. " +
                  "Set `website` when the teacher is rolling a section over to a NEW YEAR and has said " +
-                 "which website they want: \"new\" starts a fresh one, so publishing no longer replaces " +
+                 "which website they want: \"new\" starts a fresh one, so deploying no longer replaces " +
                  "last year's site, and \"same\" keeps last year's address. Ask them first — never choose " +
                  "for them, and leave it out for an ordinary re-dating.")]
     public Task<CallToolResult> ReDateClasses(
@@ -1250,7 +1275,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
         // Costs no routing accuracy — re_date_classes and its twin are not in
         // AssistAgent.ForTheLocalModel, so no local model reads either schema.
         // Recorded in AssistSurfaceContractTests' agreed departures.
-        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should publish to.")]
+        [Description("Pass \"yes\" when this is a rollover to a new year rather than an ordinary re-dating, so the teacher is asked which website it should deploy to.")]
         string rollover = "")
         => ReDate(course, section, timetable, block, pages, meetings, startYear, apply: true, firstDay,
                   cancellation, website, rollover);
@@ -1407,16 +1432,16 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
     /// generator change for tool SCHEMA departures; it does not reach this.)
     /// </remarks>
     private static string WhatStartingANewWebsiteDoes() =>
-        "start a new website for this section, so publishing it no longer replaces last year's. " +
-        "Last year's details are kept, and any publish set to happen on its own is turned off.";
+        "start a new website for this section, so deploying it no longer replaces last year's. " +
+        "Last year's details are kept, and any deploy set to happen on its own is turned off.";
 
     /// <summary>What a plan says the website half would do.</summary>
     private static string WhatSettlingTheWebsiteWouldDo(string website) =>
         WouldStartANewWebsite(website)
-            ? "Start a new website for this section, so publishing it no longer replaces last " +
-              "year's. Last year's details are kept, and any publish set to happen on its own " +
+            ? "Start a new website for this section, so deploying it no longer replaces last " +
+              "year's. Last year's details are kept, and any deploy set to happen on its own " +
               "is turned off."
-            : "Keep publishing this section to the same website as last year.";
+            : "Keep deploying this section to the same website as last year.";
 
     /// <summary>
     /// The question, the two sentences that answer it, and the plain statement
@@ -1543,7 +1568,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             released.ReleasedAnything
                 ? "rolled the section over onto a new website — last year's details kept at "
                   + string.Join(", ", released.KeptFiles)
-                : "rolled the section over onto a new website — it had not been published anywhere yet",
+                : "rolled the section over onto a new website — it had not been deployed anywhere yet",
             courseCode, sectionNumber);
     }
 
@@ -1942,7 +1967,7 @@ public sealed class PlantoirTools(AssistWorkspace workspace)
             return result.Message;
         }
         catch (AssistRefusal refusal) { return refusal.Message; }
-        catch (OperationCanceledException) { return "The publish was stopped before it finished."; }
+        catch (OperationCanceledException) { return "The preview build was stopped before it finished."; }
     }
 
     [McpServerTool(Name = "back_up_course", Title = "Back up a course", Destructive = false, Idempotent = false)]

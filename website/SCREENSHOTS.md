@@ -278,10 +278,11 @@ Every run first runs `test_demo_folders.py` and stops if it is red (no
 come from `website/shots/marketing/folders.json`, the file the mac reads, and
 `--provision-demo <folder>` gives a demo folder its state (colours, the
 teacher's name, site markers, front pages) through `plantoir-mcp.exe` and the
-shared `demo_folders.py`. Still the `windows` issue for #445 (#459): the
-`provision` scene takes its course lists and reference year from constants
-in `app_scenes_windows.py` rather than from `folders.json`, and does not run
-`--provision-demo` afterwards. The College Board scenes are taken with the
+shared `demo_folders.py`. Since #459 the `provision` scene is given its
+courses, sections and reference year from `folders.json` too, and every
+`--app` run that wants the demo folder applies that state right after it
+(remaking `~/Teaching` first if a course has other sections than the file's).
+The College Board scenes are taken with the
 mac's courses copied in by hand, by design (`ced_statements.swift` is
 macOS-only, and their words are never committed).
 

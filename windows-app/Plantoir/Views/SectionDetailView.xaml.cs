@@ -293,8 +293,25 @@ public sealed partial class SectionDetailView : UserControl
         // closed, so this is the first moment there is anywhere to say it.
         // On Loaded rather than in the constructor: presenting needs a
         // XamlRoot, and the view has none until it is in the tree.
-        Loaded += (_, _) => { TakeAnythingTheScheduledDeployFound(); OfferTheLinksChecklistIfWaiting(); };
-        Unloaded += (_, _) => { _isTornDown = true; StopPreview(); _window.Activated -= OnWindowActivated; };
+        Loaded += (_, _) =>
+        {
+            // #473: the buttons follow the folder's readiness as the copy of
+            // the tools starts and ends. Subscribed here and let go on
+            // Unloaded: the event is static, and a view is replaced on every
+            // change of selection, so one left subscribed is rooted for good.
+            ToolchainReadiness.Changed -= OnReadinessChanged;
+            ToolchainReadiness.Changed += OnReadinessChanged;
+            RefreshChrome();
+            TakeAnythingTheScheduledDeployFound();
+            OfferTheLinksChecklistIfWaiting();
+        };
+        Unloaded += (_, _) =>
+        {
+            _isTornDown = true;
+            ToolchainReadiness.Changed -= OnReadinessChanged;
+            StopPreview();
+            _window.Activated -= OnWindowActivated;
+        };
         RefreshChrome();
         _ = RefreshPublishedMarker();
     }
@@ -352,6 +369,19 @@ public sealed partial class SectionDetailView : UserControl
 
     // ---- Chrome state ----------------------------------------------------
 
+    /// <summary>
+    /// A folder's copy of the tools started or ended (#473), on whatever thread
+    /// the copy runs on: redraw the buttons on this view's own thread.
+    /// </summary>
+    private void OnReadinessChanged(string folder)
+    {
+        DispatcherQueue?.TryEnqueue(() =>
+        {
+            if (_isTornDown) return;
+            RefreshChrome();
+        });
+    }
+
     private void RefreshChrome()
     {
         bool previewShown = _previewUrl is not null;
@@ -372,9 +402,18 @@ public sealed partial class SectionDetailView : UserControl
         // publishing"): Deploy_Click stops the preview itself and waits for
         // the stop — sweep included — before building. Only a deploy already
         // running disables the button.
-        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building;
-        if (building)
+        // #473: while the app is still copying what it needs into this folder
+        // (or could not finish), nothing here may build from it. Disabled, not
+        // queued (Russell's decision), with the banner's own sentence as the
+        // reason. Read from the folder on screen, like `building` above.
+        string? notReady = ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath);
+        DeployButton.IsEnabled = !_deployRunner.IsRunning && !_isPreparingDeploy && !building && notReady is null;
+        if (notReady is not null)
+            ToolTipService.SetToolTip(DeployButton, notReady);
+        else if (building)
             ToolTipService.SetToolTip(DeployButton, $"Available in a moment — {_course.Code} is being built");
+        else
+            ToolTipService.SetToolTip(DeployButton, "Deploy this section's website");
 
         bool running = _previewRunner.IsRunning;
         PreviewLabel.Text = running ? "Stop Preview" : "Preview";
@@ -382,10 +421,14 @@ public sealed partial class SectionDetailView : UserControl
         PreviewIcon.Glyph = running ? Glyphs.Stop : Glyphs.Play;
         ToolTipService.SetToolTip(PreviewButton,
             running ? "Stop previewing this section"
+            : notReady is not null ? notReady
             : building ? $"Available in a moment — {_course.Code} is being built"
             : "Preview this section's website");
         // Stopping a preview already under way is always allowed.
-        PreviewButton.IsEnabled = running || (!IsBusy && !building);
+        PreviewButton.IsEnabled = running || (!IsBusy && !building && notReady is null);
+        // The reason, where a screen reader reads it too (a tooltip is not).
+        AutomationProperties.SetHelpText(PreviewButton, running ? "" : notReady ?? "");
+        AutomationProperties.SetHelpText(DeployButton, notReady ?? "");
 
         // Which task owns the console: the running one, else the most recent.
         // Bind ONCE per runner (in the constructor) and only swap which is
@@ -563,8 +606,8 @@ public sealed partial class SectionDetailView : UserControl
         bool wrong = ScheduledPublishOutcome.NeedsAttention(outcome.Outcome);
         ScheduledPublishNotice.Severity = wrong ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
         ScheduledPublishNotice.Title = wrong
-            ? "Your scheduled publish did not go out"
-            : "Your scheduled publish went out";
+            ? "Your scheduled deploy did not go out"
+            : "Your scheduled deploy went out";
         ScheduledPublishNotice.Message =
             ScheduledPublishOutcome.Sentence(_course.Code, _sectionNumber, outcome);
         ScheduledPublishNotice.IsOpen = true;
@@ -614,8 +657,11 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // The record AND its notification in Notification Center (#464).
             if (_window.Workspace.WorkspacePath is { } folder)
-                ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber, folder);
+                ScheduledRunAnnouncement.TeacherDismissed(
+                    new ScheduledPublishToast.Target(_course.Code, _sectionNumber, folder),
+                    new Services.ScheduledPublishNotifier.SystemToasts(), diagnostic: App.LogDiagnostic);
             SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
         }
         catch (Exception ex)
@@ -969,7 +1015,7 @@ public sealed partial class SectionDetailView : UserControl
             || CourseActivity.IsPublishing(workspacePath, _course.Code))
         {
             return new SiteHealthRepair.Outcome(
-                "Plantoir is publishing this course just now.",
+                "Plantoir is deploying this course just now.",
                 // Deliberately not "press Preview Again": this is the outcome
                 // whose button is withheld, and naming a button that is not on
                 // screen is worse than saying nothing.
@@ -1116,6 +1162,7 @@ public sealed partial class SectionDetailView : UserControl
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
             // FIRST, before any lease is released or taken (#386).
             if (await RefusedWhileThisSectionDeploys(workspacePath)) return;
+            if (await _window.RefusedWhileTheFolderIsGettingReady(workspacePath, "Cannot Preview Yet")) return;   // #473
             // Decided here, so the stop that follows names the same folder.
             _folderThisSectionWorksIn = workspacePath;
 
@@ -1314,6 +1361,9 @@ public sealed partial class SectionDetailView : UserControl
             // FIRST, before any lease is taken or anything stopped (#386).
             if (_window.Workspace.WorkspacePath is { } deployingFolder &&
                 await RefusedWhileThisSectionDeploys(deployingFolder)) return;
+            // #473: the folder's tools still being copied — also before any
+            // lease, and before today's-class question below (#406's order).
+            if (await _window.RefusedWhileTheFolderIsGettingReady(_window.Workspace.WorkspacePath, "Cannot Preview Yet")) return;
             if (await AnotherProgramStandsInTheWay("Preview", "Cannot Preview Yet") is not null) return;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return;
 
@@ -1722,6 +1772,13 @@ public sealed partial class SectionDetailView : UserControl
                 });
                 return AssistWording.DeployRefusedForAReferenceCourse(kept);
             }
+            // #473: nothing is stopped or built while the folder's tools are
+            // still being copied in, and the assistant hears the same sentence.
+            if (ToolchainReadiness.Refusal(_window.Workspace.WorkspacePath) is { } notReady)
+            {
+                await _window.RefusedWhileTheFolderIsGettingReady(_window.Workspace.WorkspacePath, "Cannot Deploy Yet");
+                return notReady;
+            }
             if (await AnotherProgramStandsInTheWay("Deploy", "Cannot Deploy Yet") is { } declined)
                 return declined;
             if (_window.Workspace.WorkspacePath is not { } workspacePath) return outcomeMessage;
@@ -1885,8 +1942,14 @@ public sealed partial class SectionDetailView : UserControl
             // assistant, relaying it) hears — success, all-destinations,
             // partial, or every-destination-failed — from what actually
             // happened, not from having reached this line.
-            outcomeMessage = MultiDestinationDeployRunner.Result(
-                _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
+            // The build first (the mac's deployAndWait): nothing was sent
+            // anywhere, so "did not finish" would name the upload - and a
+            // build refused while the section was still being deployed is
+            // said as itself (#467 / mac #439).
+            outcomeMessage = (MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish(
+                                  _course.Code, _sectionNumber.ToString(), _deployRunner.Legs.FirstOrDefault())
+                              ?? MultiDestinationDeployRunner.Result(
+                                  _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome)).Message;
             // Added to what the assistant says, too (#357): it pressed this button.
             if (savedNotice is not null) outcomeMessage += " " + savedNotice;
             EndPublishActivity();

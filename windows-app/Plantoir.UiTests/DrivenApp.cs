@@ -210,7 +210,15 @@ public sealed class DrivenApp : IDisposable
         }
     }
 
-    public DrivenApp(Action<string> buildCourses)
+    /// <param name="buildCourses">Writes the fixture's courses into <c>courses\</c>.</param>
+    /// <param name="beforeLaunch">Given the working folder after it is set up and
+    /// before the app starts — #473's test uses it to make the folder's copy of
+    /// the tools stale, so the app has something to copy.</param>
+    /// <param name="waitUntilReady">Whether to wait, after the sidebar appears,
+    /// until the window says its folder is ready (#473): until then Preview,
+    /// Deploy and New Course are disabled by design, and a test that pressed
+    /// one would be testing the wait rather than what it meant to.</param>
+    public DrivenApp(Action<string> buildCourses, Action<string>? beforeLaunch = null, bool waitUntilReady = true)
     {
         // Closed rather than refused: two copies would fight over the
         // foreground, and a physical click meant for the sidebar would land in
@@ -258,6 +266,7 @@ public sealed class DrivenApp : IDisposable
         ToolchainMirror.InitializeWorkspace(
             WorkspacePath, Path.Combine(Path.GetDirectoryName(ExecutablePath)!, "Toolchain"));
         buildCourses(Path.Combine(WorkspacePath, "courses"));
+        beforeLaunch?.Invoke(WorkspacePath);
 
         File.WriteAllText(Path.Combine(stateDir, "settings.json"), new JsonObject
         {
@@ -325,12 +334,62 @@ public sealed class DrivenApp : IDisposable
             // assumed. `addCourseButton` is our own, on a plain Button, and is
             // there only in the ready state.
             _ = Find("addCourseButton", "the course list");
+
+            // #473: the app copies what it needs into the folder in the
+            // background after the window appears, and Preview, Deploy and
+            // New Course stay disabled until it is done. On the fixture
+            // InitializeWorkspace has already brought up to date, that is the
+            // ordinary pass that only compares files — about half a second.
+            if (waitUntilReady) WaitUntilReady(ReadyPatience);
         }
         catch
         {
             Dispose();
             throw;
         }
+    }
+
+    // ---- Getting the folder ready (#473) ---------------------------------
+
+    /// <summary>
+    /// How long a folder may take to be got ready before a test gives up.
+    /// The ordinary pass, with nothing to copy, is about half a second; a
+    /// whole copy into an empty folder took 119.7 s on this PC (i5-8365U)
+    /// after an update, so this covers a slow machine's ordinary pass with
+    /// room to spare and says so when it does not.
+    /// </summary>
+    public static readonly TimeSpan ReadyPatience = TimeSpan.FromSeconds(90);
+
+    /// <summary>
+    /// The window's readiness as UI Automation reads it: the menu bar's
+    /// ItemStatus, "copying", "ready" or "failed", present from the moment
+    /// the window exists. Empty when the tree did not answer.
+    /// </summary>
+    public string Readiness()
+    {
+        try
+        {
+            var bar = Window.FindFirstDescendant(cf => cf.ByAutomationId("appMenuBar"));
+            return bar?.Properties.ItemStatus.ValueOrDefault ?? "";
+        }
+        catch (System.Runtime.InteropServices.COMException) { return ""; }
+    }
+
+    /// <summary>Wait (polling every 100 ms) until the window says its folder is ready.</summary>
+    public void WaitUntilReady(TimeSpan within)
+    {
+        var until = DateTime.UtcNow + within;
+        string last = "";
+        while (DateTime.UtcNow < until)
+        {
+            last = Readiness();
+            if (last == "ready") return;
+            if (last == "failed")
+                throw new InvalidOperationException("Plantoir said it could not finish getting the working folder ready.");
+            Thread.Sleep(100);
+        }
+        throw new InvalidOperationException(
+            $"Plantoir was still getting the working folder ready after {within.TotalSeconds:0} s (last status '{last}').");
     }
 
     // ---- Finding things ---------------------------------------------------

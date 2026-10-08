@@ -18,7 +18,7 @@ Notes:
 - Deploys from /teaching/courses/<COURSE>/.merged_output/section<SECTION> inside the container.
 - You must build first (the static site goes to 'public/' in that section folder).
 - --target chooses where the built site goes. netlify (the default) or cloudflare.
-- The token for whichever service you publish to is stored as a Windows Generic
+- The token for whichever service you deploy to is stored as a Windows Generic
   Credential and injected securely at runtime. Netlify and Cloudflare tokens are
   stored separately, so using one never disturbs the other.
 - A Cloudflare token needs one permission: Account - Cloudflare Pages - Edit.
@@ -193,12 +193,12 @@ for ($i = 2; $i -lt $args.Count; $i++) {
 }
 
 if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
-  Write-Host ("Unknown publishing target '{0}'. Use netlify or cloudflare." -f $TARGET)
+  Write-Host ("Unknown deploy target '{0}'. Use netlify or cloudflare." -f $TARGET)
   exit 1
 }
 
 # Called immediately before every question this script asks. Under
-# --non-interactive there is nobody to answer it - the publish was set to
+# --non-interactive there is nobody to answer it - the deploy was set to
 # happen on its own, at half six, with the app closed - so it REFUSES and says
 # which question it could not ask, rather than waiting for an answer that will
 # never come or quietly taking a default.
@@ -209,10 +209,10 @@ if ($TARGET -ne 'netlify' -and $TARGET -ne 'cloudflare') {
 function Assert-CanAsk([string]$question, [string]$whatToDo) {
   if (-not $NON_INTERACTIVE) { return }
   Write-Host ""
-  Write-Host "This publish was set to happen on its own, so nobody is here to answer:"
+  Write-Host "This deploy was set to happen on its own, so nobody is here to answer:"
   Write-Host ("   {0}" -f $question)
   Write-Host (" {0}" -f $whatToDo)
-  Write-Host " Nothing was published."
+  Write-Host " Nothing was deployed."
   exit 3
 }
 
@@ -227,7 +227,7 @@ if ($COURSE_CODE -match '^[A-Z]{3}[0-9]0$') {
   if ((Test-Path $suggestedCfg) -and -not (Test-Path $originalCfg)) {
     Write-Host ("I see setup data for '{0}' on disk." -f $suggested)
   }
-  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Publish this section once from Plantoir, where you can answer it."
+  Assert-CanAsk ("Fix course code to '{0}'? [Y/n]" -f $suggested) "Deploy this section once from Plantoir, where you can answer it."
   $ans = Read-Host ("Fix course code to '{0}'? [Y/n]" -f $suggested)
   if (-not $ans) { $ans = 'Y' }
   if ($ans -match '^[Yy]$') {
@@ -270,7 +270,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   } catch {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings file could not be read. Nothing was published."
+    Write-Host "   its settings file could not be read. Nothing was deployed."
     exit 1
   }
   # .NET regex: `\s` matches a newline, so no flattening is needed here — and
@@ -286,7 +286,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
   if ($referenceText -cmatch '[{,]\s*"[^"]*\\u[0-9a-fA-F]{4}[^"]*"\s*:') {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host "   its settings say something other than true or false. Nothing was deployed."
     Write-Host ""
     exit 1
   }
@@ -295,7 +295,7 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
       -not ($referenceText -cmatch '"[^"]*ept_for_reference"\s*:\s*[Ff][Aa][Ll][Ss][Ee]')) {
     Write-Host ""
     Write-Host ("Plantoir cannot tell whether {0} is kept for reference -" -f $COURSE_CODE)
-    Write-Host "   its settings say something other than true or false. Nothing was published."
+    Write-Host "   its settings say something other than true or false. Nothing was deployed."
     Write-Host ""
     exit 1
   }
@@ -317,6 +317,269 @@ if (Test-Path -LiteralPath $referenceCfg -PathType Leaf) {
     exit 1
   }
 }
+
+# >>> DEPLOY WHILE ITS SECTION DEPLOYS BLOCK >>> - identical in preview.ps1 and
+# deploy.ps1. LauncherRulesContractTests checks that the two copies match, and
+# windows-app/test_launcher_rules.ps1 runs every contract case against EACH
+# copy. Keep the markers. ASCII only: both files are read by Windows
+# PowerShell 5.1 without a BOM, so the cross, the dot and the dash are
+# written as code points.
+
+# One line on the teacher's activity trail, for a refusal made HERE - a
+# launcher typed at a command line has no app to read a marker, and a refusal
+# a teacher met there is exactly the one nobody else saw. Same file, same
+# stamp, same lock as the app's own writer (ActivityTrail.Append: the named
+# mutex Local\PlantoirActivityTrail, an append opened to share), so two
+# writers cannot tear a line. Never fails the launcher.
+function Write-TrailLine {
+    param([string]$What)
+    try {
+        $dir = Join-Path $env:LOCALAPPDATA 'Plantoir\Logs'
+        if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Force -Path $dir }
+        $line = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) + ' ' + [char]0x00B7 + ' ' + $What + [Environment]::NewLine
+        $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($line)
+        $mutex = New-Object System.Threading.Mutex($false, 'Local\PlantoirActivityTrail')
+        $held = $false
+        try {
+            try { $held = $mutex.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+            $share = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+            $stream = New-Object IO.FileStream((Join-Path $dir 'activity.txt'), [IO.FileMode]::Append, [IO.FileAccess]::Write, $share)
+            try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+        } finally {
+            if ($held) { $mutex.ReleaseMutex() }
+            $mutex.Dispose()
+        }
+    } catch {}
+}
+
+# ---- Who is deploying this section, from the LIVE process table ----
+# Two guards ask this, and both read Win32_Process - never a remembered
+# process id, a lease file or an outcome record, so nothing left on disk can
+# refuse a deploy for ever:
+#   * preview.ps1 on a SERVING run (#386 / mac #381,
+#     contracts/shared-rules.json -> previewWhileItsSectionDeploys);
+#   * deploy.ps1, and preview.ps1 --build-only (#467 / mac #439,
+#     contracts/shared-rules.json -> deployWhileItsSectionDeploys).
+# What counts, each only as the PROGRAM (Get-LaunchedScriptIndex):
+#   * 'later' - a deploy set for later of C/S whose wrapper is running: the
+#     script Task Scheduler's run hands powershell.exe, named
+#     SafeName(TaskScheduling.NameFor(C, S, folder)) + '.ps1', carrying THIS
+#     folder's id (#309), or the folder-less name a task set before #309
+#     still runs (counted for every folder: it names none). The app's own
+#     `Plantoir.exe --run-scheduled-deploy "<task name>"` line does NOT count
+#     on its own: that run waits up to ten minutes for the course BEFORE it
+#     writes and starts its wrapper, and counting it would refuse the
+#     window's own deploy while the run waits for the window. LauncherRules-
+#     ContractTests pins these names against the app's own.
+#   * 'another' - deploy.ps1 C S, whose own arguments BEGIN with the course,
+#     read whole ("AP CALC" is two words however the caller quoted it; CALC 2
+#     is not AP CALC 2), then exactly this section (1 is not 12) - not
+#     --reset-token, --logout or --help, which deploy nothing. Its folder is
+#     the script's own directory when the path names one; a relative path
+#     names none, and a deploy of this very section whose folder cannot be
+#     told still counts (the safe side for the deploy).
+# 'later' wins when both are seen: a wrapper's own deploy leg is in the table
+# beside it. This run and its ancestors never count, so a scheduled run's own
+# legs are never refused by its own wrapper, and a folder deploy's own
+# rebuild is never refused by the deploy.ps1 that started it. A table that
+# cannot be read - the query fails or times out, or its answer does not list
+# this run ($PID) - lets the run THROUGH: failing closed would refuse every
+# deploy, and every scheduled run's own legs, for as long as it cannot read.
+# Known limit: a script typed at an interactive prompt (.\deploy.ps1 ICS4U 2)
+# runs INSIDE that prompt's process, whose line names no script, so it is not
+# seen; nor is a process started elevated, whose line an ordinary one cannot
+# read (documentation/03-launcher-scripts.md).
+function Split-CommandLine([string]$Line) {
+    $words = New-Object System.Collections.Generic.List[string]
+    if (-not $Line) { return ,$words }
+    foreach ($m in [regex]::Matches($Line, '"([^"]*)"|(\S+)')) {
+        if ($m.Groups[1].Success) { $words.Add($m.Groups[1].Value) } else { $words.Add($m.Groups[2].Value) }
+    }
+    return ,$words
+}
+
+# Which word is the script a process is RUNNING, or -1: the word after -File
+# (or -f, -fi, -fil - Windows PowerShell takes any of them), or, for
+# powershell.exe and pwsh themselves, the first *.ps1 handed to them as a
+# plain word. Nothing after -Command or -EncodedCommand is a program: that
+# script is only mentioned, or run by a shell whose own child is the program.
+function Get-LaunchedScriptIndex($Words) {
+    if ($null -eq $Words -or $Words.Count -lt 2) { return -1 }
+    $program = ($Words[0] -split '[\\/]')[-1]
+    $isShell = $program -imatch '^(powershell|pwsh)(\.exe)?$'
+    for ($i = 1; $i -lt $Words.Count; $i++) {
+        $word = [string]$Words[$i]
+        if ($word.Length -gt 1 -and ($word.StartsWith('-') -or $word.StartsWith('/'))) {
+            $option = $word.Substring(1)
+            if ('file'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase)) {
+                if ($i + 1 -lt $Words.Count) { return $i + 1 }
+                return -1
+            }
+            if ('command'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase) -or
+                'encodedcommand'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase) -or
+                $option -ieq 'ec') { return -1 }
+            continue
+        }
+        if ($isShell -and $word -ilike '*.ps1') { return $i }
+    }
+    return -1
+}
+
+# The names a deploy set for later of C/S in THIS folder can carry: the task
+# TaskScheduling.NameFor names (with the folder id, #309) and the one
+# OldNameFor named (none) - a task set before #309 still runs under it, and
+# names no folder, so it counts for every folder. Must stay the app's own
+# shape; LauncherRulesContractTests compares them with the app's.
+function Get-ScheduledDeployTaskNames([string]$Course, [string]$Section, [string]$FolderId) {
+    $old = 'Plantoir deploy ' + $Course.ToUpperInvariant() + ' section ' + $Section
+    if ($FolderId) { return @(($old + ' ' + $FolderId), $old) }
+    return @($old)
+}
+
+# The wrapper each of those tasks runs: TaskScheduling.WrapperScriptPath's
+# leaf, through SafeName (letters and digits kept, anything else '-').
+function Get-ScheduledDeployScriptNames([string]$Course, [string]$Section, [string]$FolderId) {
+    foreach ($name in @(Get-ScheduledDeployTaskNames $Course $Section $FolderId)) {
+        (-join ($name.ToCharArray() | ForEach-Object { if ([char]::IsLetterOrDigit($_)) { $_ } else { '-' } })) + '.ps1'
+    }
+}
+
+# 'later', 'another', or $null (nothing, or a table that cannot be trusted).
+# Pure over its arguments, so test_launcher_rules.ps1 can run the cases.
+function Get-WhatIsDeployingThisSection {
+    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
+    if ($null -eq $Snapshot) { return $null }
+    $rows = @($Snapshot)
+    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $null }
+
+    # This run's own ancestors never count.
+    $ancestors = New-Object 'System.Collections.Generic.HashSet[uint32]'
+    $cursor = $Self
+    for ($depth = 0; $depth -lt 64; $depth++) {
+        $row = $rows | Where-Object { [uint32]$_.ProcessId -eq $cursor } | Select-Object -First 1
+        if (-not $row -or $null -eq $row.ParentProcessId) { break }
+        $parent = [uint32]$row.ParentProcessId
+        if ($parent -eq 0 -or -not $ancestors.Add($parent)) { break }
+        $cursor = $parent
+    }
+
+    $courseWords = @(($Course.Trim() -split '\s+') | Where-Object { $_ })
+    $scheduledNames = @(Get-ScheduledDeployScriptNames ($courseWords -join ' ') $Section $FolderId)
+    $seen = $null
+    foreach ($proc in $rows) {
+        $processId = [uint32]$proc.ProcessId
+        if ($processId -eq $Self -or $ancestors.Contains($processId)) { continue }
+        $words = Split-CommandLine ([string]$proc.CommandLine)
+        $at = Get-LaunchedScriptIndex $words
+        if ($at -lt 0) { continue }
+        $script = $words[$at]
+        $leaf = ($script -split '[\\/]')[-1]
+        if ($scheduledNames -icontains $leaf) { return 'later' }
+        if ($leaf -ine 'deploy.ps1') { continue }
+
+        # Its own arguments, each split into words: the app and the wrapper
+        # QUOTE a course with a space ("AP CALC"), and one quoted word must
+        # read as the two the course is.
+        $own = New-Object System.Collections.Generic.List[string]
+        for ($k = $at + 1; $k -lt $words.Count; $k++) {
+            foreach ($piece in ([string]$words[$k] -split '\s+')) { if ($piece) { $own.Add($piece) } }
+        }
+        if ($own.Count -lt $courseWords.Count + 1) { continue }
+        $same = $true
+        for ($w = 0; $w -lt $courseWords.Count; $w++) { if ($own[$w] -ine $courseWords[$w]) { $same = $false; break } }
+        if (-not $same -or $own[$courseWords.Count] -cne $Section) { continue }
+        $deploysNothing = $false
+        foreach ($flag in $own) { if ($flag -in @('--reset-token', '--logout', '--help', '-h')) { $deploysNothing = $true } }
+        if ($deploysNothing) { continue }
+
+        if ($script -match '^[A-Za-z]:[\\/]|^[\\/][\\/]') {
+            try {
+                $folder = Get-PhysicalPath (Split-Path -Parent $script)
+                if ($folder -and $Here -and ($folder -ine $Here)) { continue }
+            } catch {}
+        }
+        $seen = 'another'
+    }
+    return $seen
+}
+
+# #386's question: is this section being deployed at all? Everything the
+# deploy guard counts, and one thing more: a deploy set for later whose run is
+# still WAITING for the course - Plantoir.exe --run-scheduled-deploy "<task>"
+# for C/S, before it has started its wrapper. A preview counts that run (mac
+# #381's rule: its runner lives for the whole run) because the preview would
+# be serving from the folder the run is about to build into; a DEPLOY does
+# not, because that run may be waiting for the very deploy it would refuse.
+function Test-SectionIsBeingDeployed {
+    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
+    if (Get-WhatIsDeployingThisSection -Snapshot $Snapshot -Course $Course -Section $Section -Here $Here -FolderId $FolderId -Self $Self) { return $true }
+    if ($null -eq $Snapshot) { return $false }
+    $rows = @($Snapshot)
+    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $false }
+    $courseWords = @(($Course.Trim() -split '\s+') | Where-Object { $_ })
+    $taskNames = @(Get-ScheduledDeployTaskNames ($courseWords -join ' ') $Section $FolderId)
+    foreach ($proc in $rows) {
+        if ([uint32]$proc.ProcessId -eq $Self) { continue }
+        $words = Split-CommandLine ([string]$proc.CommandLine)
+        if ($words.Count -lt 1 -or (($words[0] -split '[\\/]')[-1]) -inotmatch '^Plantoir(\.exe)?$') { continue }
+        for ($i = 1; $i -lt $words.Count - 1; $i++) {
+            if ($words[$i] -ieq '--run-scheduled-deploy' -and ($taskNames -icontains $words[$i + 1])) { return $true }
+        }
+    }
+    return $false
+}
+
+# The live table, or $null when it cannot be read. Thirty seconds at most: a
+# wedged WMI service must not turn "let it through" into a run that hangs
+# with its leases held at six in the morning.
+function Get-ProcessTable {
+    try {
+        return ,@(Get-CimInstance Win32_Process -OperationTimeoutSec 30 -ErrorAction Stop | Select-Object ProcessId, ParentProcessId, CommandLine)
+    } catch {
+        return $null
+    }
+}
+
+# ---- A section still being deployed is not deployed again (#467 / mac #439) ----
+# Asked by deploy.ps1 (not with --reset-token or --logout, which deploy
+# nothing) and by preview.ps1 on a --build-only run only - a serving preview
+# has #386's own guard, which counts every deploy - after the arguments are
+# checked and before anything is changed. LEG is 'deploy' or 'build'. The
+# sentences are contracts/shared-rules.json -> deployWhileItsSectionDeploys.
+# sentences.launcher, and the trail lines that entry's launcherLines; both are
+# checked word for word by test_launcher_rules.ps1. Exit 1, as #386's.
+function Stop-WhileThisSectionDeploys([string]$Course, [string]$Section, [string]$Leg) {
+    $who = Get-WhatIsDeployingThisSection -Snapshot (Get-ProcessTable) -Course $Course -Section $Section -Here $WORKDIR_PHYSICAL -FolderId $WORKDIR_ID -Self ([uint32]$PID)
+    if (-not $who) { return }
+    $cross = [char]::ConvertFromUtf32(0x274C)
+    $dot = [char]0x00B7
+    $dash = [char]0x2014
+    Write-Host ""
+    if ($who -eq 'later' -and $Leg -eq 'build') {
+        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be built until that has finished." -f $cross, $Course, $Section)
+    } elseif ($who -eq 'later') {
+        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
+    } elseif ($Leg -eq 'build') {
+        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be built until that has finished." -f $cross, $Course, $Section)
+    } else {
+        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
+    }
+    Write-Host "   Nothing was changed."
+    Write-Host ""
+    if ($who -eq 'later') {
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was still being deployed by a deploy that was set for later" -f $Course, $Section, $dot, $Leg, $dash)
+    } else {
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was already being deployed" -f $Course, $Section, $dot, $Leg, $dash)
+    }
+    exit 1
+}
+# <<< DEPLOY WHILE ITS SECTION DEPLOYS BLOCK <<<
+
+# ---------- A section still being deployed is not deployed again (#467) ----------
+# After the Open-code question and the reference-course refusal (the order
+# deploy.sh asks in), before anything is changed. Not for --reset-token or
+# --logout, which deploy nothing; --help has already exited.
+if (-not $RESET_TOKEN) { Stop-WhileThisSectionDeploys $COURSE_CODE ([string]$SECTION_NUM) 'deploy' }
 
 # Where a --to-folder value publishes, resolved ONCE against the working
 # folder (#304), or $null when it cannot be told. A plain relative name
@@ -498,7 +761,7 @@ if (-not $builtFound) {
   Write-Host " $PUBLIC_DIR_HOST"
   Write-Host ""
   Write-Host " If you have just built, check this section still has its front page."
-  Write-Host " A section without one produces no website, so there is nothing to publish."
+  Write-Host " A section without one produces no website, so there is nothing to deploy."
   Write-Host ""
   Write-Host "Build first:"
   Write-Host (" .\preview.bat {0} {1} --build-only" -f $COURSE_CODE, $SECTION_NUM)
@@ -523,8 +786,8 @@ if ($TO_FOLDER) {
   # exist on .NET Framework (PowerShell 5.1), hence the Join-Path first.
   $folderAsked = Resolve-PublishFolder $TO_FOLDER $ScriptDir
   if (-not $folderAsked) {
-    Write-Host "That publishing folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
-    Write-Host "   Give the folder's full location, then try again. Nothing was published."
+    Write-Host "That deploy folder is blank or only partly written: a drive with no folder after it, or a folder with no drive."
+    Write-Host "   Give the folder's full location, then try again. Nothing was deployed."
     exit 1
   }
   $targetDir = [IO.Path]::Combine($folderAsked.TrimEnd('\','/'), ("section{0}" -f $SECTION_NUM))
@@ -571,11 +834,11 @@ if ($TO_FOLDER) {
       # unanswered. A caller that saw 1 here would tell the teacher their
       # publish failed, when what it needs to say is which question nobody
       # was there to answer.
-      Write-Host "Could not rebuild this site for publishing: it needed an answer."
+      Write-Host "Could not rebuild this site before deploying it: it needed an answer."
       exit 3
     }
     if ($LASTEXITCODE -ne 0) {
-      Write-Host "Could not rebuild this site for publishing."
+      Write-Host "Could not rebuild this site before deploying it."
       exit 1
     }
     # Wait for the rebuild to become VISIBLE here before copying. On the mac
@@ -605,12 +868,12 @@ if ($TO_FOLDER) {
     # loop fell through, and robocopy mirrored an empty directory while
     # reporting success. Found by review on 2026-09-05.
     if (-not (Test-Path -LiteralPath $publishedIndex)) {
-      Write-Host "The rebuilt site has not appeared. Nothing was published."
+      Write-Host "The rebuilt site has not appeared. Nothing was deployed."
       exit 1
     }
   }
 
-  Write-Host ("Publishing {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
+  Write-Host ("Deploying {0} section {1} to a folder..." -f $COURSE_CODE, $SECTION_NUM)
   # /MIR mirrors (copies changes, deletes removals); robocopy exit codes
   # below 8 all mean success.
   robocopy $PUBLIC_DIR_HOST $targetDir /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -618,14 +881,14 @@ if ($TO_FOLDER) {
     # deploy.sh's own words for the same failure (#304), so the app's one
     # explanation lifts both; the copy's number stays for whoever reads on.
     $copyExit = $LASTEXITCODE
-    Write-Host ("{0} Not every page could be copied into the publishing folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
+    Write-Host ("{0} Not every page could be copied into the deploy folder, so it is not up to date." -f [char]::ConvertFromUtf32(0x274C))
     Write-Host ("   Folder: {0}" -f $targetDir)
     Write-Host ("   (copy error {0})" -f $copyExit)
     exit 1
   }
   $global:LASTEXITCODE = 0
   Record-PublishedPages $SECTION_DIR_HOST $COURSE_CODE $SECTION_NUM "folder"
-  Write-Host "Published."
+  Write-Host "Deployed."
   Write-Host (" Folder: {0}" -f $targetDir)
   Write-Host " Upload that folder to your web host however you prefer (e.g. SFTP)."
   # The app reads this line to offer the folder in Explorer.
@@ -770,7 +1033,7 @@ function Read-CloudflareAccountId {
 @"
 One more thing from Cloudflare.
 
-The token you just made is allowed to publish, but not to look up which
+The token you just made is allowed to deploy, but not to look up which
 Cloudflare account it belongs to - so the account's ID is needed as well.
 This is the only time you will be asked for it.
 
@@ -839,7 +1102,7 @@ if ($RESET_TOKEN -and $TARGET -eq 'cloudflare') {
   Write-Host "Clearing saved Cloudflare token from Windows Credential Manager..."
   Remove-CfTokenInCredMan
   Remove-CfAccountInCredMan
-  Write-Host "Done. Next publish will ask for a new token."
+  Write-Host "Done. Next deploy will ask for a new token."
   exit 0
 }
 
@@ -869,7 +1132,7 @@ if ($TARGET -eq 'cloudflare') {
 Connect to Cloudflare.
 
 Cloudflare hosts this section's website for free, and it needs to know that
-the publishing is coming from you. It does that with an API token - a long
+the deploys are coming from you. It does that with an API token - a long
 code that acts like a password made just for this app. Creating one takes
 about two minutes, and you will not be asked again: it is saved securely on
 this computer.
@@ -881,16 +1144,16 @@ this computer.
   4. Give it ONE permission, chosen from the three dropdowns:
      Account  ->  Cloudflare Pages  ->  Edit
   5. Under "Account Resources", choose "Include" and then your own account
-     by name. A token that names no account cannot publish anything, and
+     by name. A token that names no account cannot deploy anything, and
      what you get back if you skip this does not mention accounts at all.
   6. Under "TTL", set the end date to after the end of your school year -
      next July is a safe choice - or leave it with no end date. An expired
-     token stops your publishing working, with nothing to say why.
+     token stops your deploys working, with nothing to say why.
   7. Choose "Continue to summary", then "Create Token".
   8. Copy the long code Cloudflare shows you - it is only shown once - and
      paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
-    Assert-CanAsk "Paste Cloudflare token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+    Assert-CanAsk "Paste Cloudflare token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
     $pastedSec = Read-Host -AsSecureString "Paste Cloudflare token"
     $plain = $null
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)
@@ -962,7 +1225,7 @@ if (-not $TOKEN) {
 Connect to Netlify.
 
 Netlify hosts this section's website for free, and it needs to know that the
-publishing is coming from you. It does that with an access token - a long
+deploys are coming from you. It does that with an access token - a long
 code that acts like a password made just for this app. Creating one takes
 about a minute, and you will not be asked again: it is saved securely on
 this computer.
@@ -974,14 +1237,14 @@ this computer.
   3. Describe it as something you will recognise later, such as
      "Class websites".
   4. Change the expiry - it starts at 7 days. A token that expires stops
-     your publishing working, with nothing on screen to say why, so set a
+     your deploys working, with nothing on screen to say why, so set a
      date after the end of your school year: next July is a safe choice.
      Choose "No expiration" instead if it is offered.
   5. Choose "Generate token", then copy the long code Netlify shows you -
      it is only shown once.
   6. Paste it below. Nothing appears as you paste; that is normal.
 "@ | Out-Host
-  Assert-CanAsk "Paste Netlify token" "Publish this section once from Plantoir, where you can paste it. It is saved afterwards."
+  Assert-CanAsk "Paste Netlify token" "Deploy this section once from Plantoir, where you can paste it. It is saved afterwards."
   $pastedSec = Read-Host -AsSecureString "Paste Netlify token"
   $plain = $null
   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pastedSec)

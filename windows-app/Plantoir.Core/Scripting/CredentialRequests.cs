@@ -27,7 +27,7 @@ public static class CredentialRequests
     public static readonly CredentialRequest NetlifyToken = new(
         Name: "netlifyToken",
         Title: "Connect to Netlify",
-        Explanation: "Netlify hosts this section's website for free, and it needs to know that the publishing is coming from you. " +
+        Explanation: "Netlify hosts this section's website for free, and it needs to know that the deploys are coming from you. " +
                      "It does that with an access token — a long code that acts like a password made just for this app. " +
                      "Creating one takes about a minute, and you will not be asked again: it is saved securely on this computer.",
         FieldLabel: "Netlify token",
@@ -40,7 +40,7 @@ public static class CredentialRequests
             "Open the Netlify page linked below, and sign in if you are asked to.",
             "Choose “New access token”.",
             "Describe it as something you will recognise later, such as “Class websites”.",
-            "Change the expiry — it starts at 7 days. A token that expires stops your publishing working, with nothing on screen to say why, " +
+            "Change the expiry — it starts at 7 days. A token that expires stops your deploys working, with nothing on screen to say why, " +
             "so set a date after the end of your school year: next July is a safe choice. Choose “No expiration” instead if it is offered.",
             "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
             "Paste it below."
@@ -49,7 +49,7 @@ public static class CredentialRequests
     public static readonly CredentialRequest CloudflareToken = new(
         Name: "cloudflareToken",
         Title: "Connect to Cloudflare",
-        Explanation: "Cloudflare hosts this section's website for free, and it needs to know that the publishing is coming from you. " +
+        Explanation: "Cloudflare hosts this section's website for free, and it needs to know that the deploys are coming from you. " +
                      "It does that with an API token — a long code that acts like a password made just for this app. " +
                      "Creating one takes about two minutes, and you will not be asked again: it is saved securely on this computer.",
         FieldLabel: "Cloudflare token",
@@ -63,10 +63,10 @@ public static class CredentialRequests
             "Choose “Create Token”, then “Create Custom Token”.",
             "Name it something you will recognise later, such as “Class websites”.",
             "Give it one permission, chosen from the three dropdowns: Account, then Cloudflare Pages, then Edit.",
-            "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot publish anything, " +
+            "Under “Account Resources”, choose “Include” and then your own account by name. A token that names no account cannot deploy anything, " +
             "and what you get back if you skip this does not mention accounts at all.",
             "Under “TTL”, set the end date to after the end of your school year — next July is a safe choice — or leave it with no end date. " +
-            "An expired token stops your publishing working, with nothing on screen to say why.",
+            "An expired token stops your deploys working, with nothing on screen to say why.",
             "Choose “Continue to summary”, then “Create Token”.",
             "Copy the long code Cloudflare shows you — it is only shown once — and paste it below."
         ]);
@@ -74,7 +74,7 @@ public static class CredentialRequests
     public static readonly CredentialRequest CloudflareAccountID = new(
         Name: "cloudflareAccountID",
         Title: "One more thing from Cloudflare",
-        Explanation: "The token you just made is allowed to publish, but not to look up which Cloudflare account it belongs to — " +
+        Explanation: "The token you just made is allowed to deploy, but not to look up which Cloudflare account it belongs to — " +
                      "so the account's ID is needed as well. This is the only time you will be asked for it.",
         FieldLabel: "Account ID",
         IsSecret: false,
@@ -85,8 +85,8 @@ public static class CredentialRequests
     public static readonly CredentialRequest CloudflareAccountIDHelp = new(
         Name: "cloudflareAccountIDHelp",
         Title: "Where to find your Account ID",
-        Explanation: "Cloudflare gives every account a 32-character ID, and it says which account your class websites are published into. " +
-                     "It identifies you rather than a class, so you enter it once here and every course published to Cloudflare uses it.",
+        Explanation: "Cloudflare gives every account a 32-character ID, and it says which account your class websites are deployed into. " +
+                     "It identifies you rather than a class, so you enter it once here and every course deployed to Cloudflare uses it.",
         FieldLabel: "Account ID",
         IsSecret: false,
         LinkAddress: "https://dash.cloudflare.com",
@@ -112,7 +112,7 @@ public static class CredentialRequests
     public static readonly CredentialRequest SiteName = new(
         Name: "siteName",
         Title: "Choose a Website Address",
-        Explanation: "Every website published to Netlify (*.netlify.app) or Cloudflare Pages (*.pages.dev) needs a unique web address. " +
+        Explanation: "Every website deployed to Netlify (*.netlify.app) or Cloudflare Pages (*.pages.dev) needs a unique web address. " +
                      "On Netlify, this name is shared globally with all users across the world.",
         FieldLabel: "Website address",
         IsSecret: false,

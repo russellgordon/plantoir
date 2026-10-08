@@ -66,9 +66,10 @@ go, without stopping to ask permission for each step.
    GENERATED from the mac and must never be hand-edited; the other seven are
    authored and can be corrected from either side — `contracts/README.md` says
    which is which.
-5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed recently and
-   why. Read it as HISTORY: where a row and a contract disagree, the contract
-   is what is true now.
+5. **`GUI-IMPROVEMENTS.md`**, newest rows first, for what changed up to
+   2026-10-08 and why — closed to new entries since then (#480); the closed
+   issues by milestone carry what changed after. Read it as HISTORY: where a
+   row and a contract disagree, the contract is what is true now.
 6. **`windows-app/PROGRESS.md`** for where this app actually stands.
 
 ---
@@ -196,7 +197,11 @@ reasons rather than tasks:
   what you rejected, and — for anything measured — the numbers **with the
   hardware they came from**. "The Vulkan
   build was faster" cannot be acted on; "43 tok/s against 11 on CPU, Intel Iris
-  Xe" can. Anything a teacher can see also gets a row in `GUI-IMPROVEMENTS.md`.
+  Xe" can. That write-up is the closing comment on the piece's own issue
+  (every piece has one, opened before the merge if need be, and it carries
+  the release milestone before it closes — the closed issues by milestone are
+  the changelog) and the `mac` issue it opens; `GUI-IMPROVEMENTS.md` is
+  closed to new entries since 2026-10-08 (#480), so no row.
 - **An affordance that lives only in a context menu is invisible to everyone
   else.** If you add a right-click menu, a double-click, a hover or a keyboard
   shortcut, it needs a handoff line **even though nothing on screen changed** —

@@ -222,7 +222,10 @@ def provision_demo(folder: Path, plantoir_exe: Path) -> int:
     The courses themselves are made by the app's own New Course panel first
     (folders.json → demo.courses; on Windows that is app_scenes_windows.py's
     `provision` scene, `Plantoir.exe --stage-scene provision`), exactly as on
-    the Mac; this step then sets each section's colour scheme,
+    the Mac, and `app_scenes_windows.ensure_folders` runs this step right
+    after it on every `--app` run that wants the demo folder (#459), so no
+    picture is taken in a folder in the wrong state. It sets each section's
+    colour scheme,
     the teacher's last name and the sites' stand-in markers, and asks the
     app's own door to put every front page on the latest class dated on or
     before January 15 with every class after it unpublished. The same
