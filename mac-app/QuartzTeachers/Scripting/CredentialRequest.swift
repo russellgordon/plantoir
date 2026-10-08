@@ -1,6 +1,6 @@
 import Foundation
 
-/// The first publish of a section stops on one line: "Paste Netlify token:".
+/// The first deploy of a section stops on one line: "Paste Netlify token:".
 ///
 /// That line is the whole question a teacher used to be asked. It names
 /// something they have never heard of, does not say where to get it, and
@@ -50,13 +50,13 @@ struct CredentialRequest: Equatable {
     // MARK: - Computed properties
 
     /// Netlify's personal access token, asked for the first time a section
-    /// is published there.
+    /// is deployed there.
     static var netlifyToken: CredentialRequest {
         return CredentialRequest(
             name: "netlifyToken",
             title: "Connect to Netlify",
             explanation: "Netlify hosts this section's website for free, and it needs to know that "
-                       + "the publishing is coming from you. It does that with an access token — a "
+                       + "the deploys are coming from you. It does that with an access token — a "
                        + "long code that acts like a password made just for this app. Creating one "
                        + "takes about a minute, and you will not be asked again: it is saved "
                        + "securely on this computer.",
@@ -65,7 +65,7 @@ struct CredentialRequest: Equatable {
                 "Choose “New access token”.",
                 "Describe it as something you will recognise later, such as “Class websites”.",
                 "Change the expiry — it starts at 7 days. A token that expires stops your "
-                    + "publishing working, with nothing on screen to say why, so set a date "
+                    + "deploys working, with nothing on screen to say why, so set a date "
                     + "after the end of your school year: next July is a safe choice. Choose "
                     + "“No expiration” instead if it is offered.",
                 "Choose “Generate token”, then copy the long code Netlify shows you — it is only shown once.",
@@ -80,13 +80,13 @@ struct CredentialRequest: Equatable {
     }
 
     /// Cloudflare's API token, asked for the first time a section is
-    /// published to Cloudflare Pages.
+    /// deployed to Cloudflare Pages.
     static var cloudflareToken: CredentialRequest {
         return CredentialRequest(
             name: "cloudflareToken",
             title: "Connect to Cloudflare",
             explanation: "Cloudflare hosts this section's website for free, and it needs to know that "
-                       + "the publishing is coming from you. It does that with an API token — a long "
+                       + "the deploys are coming from you. It does that with an API token — a long "
                        + "code that acts like a password made just for this app. Creating one takes "
                        + "about two minutes, and you will not be asked again: it is saved securely on "
                        + "this computer.",
@@ -97,11 +97,11 @@ struct CredentialRequest: Equatable {
                 "Give it one permission, chosen from the three dropdowns: Account, then "
                     + "Cloudflare Pages, then Edit.",
                 "Under “Account Resources”, choose “Include” and then your own account by "
-                    + "name. A token that names no account cannot publish anything, and what "
+                    + "name. A token that names no account cannot deploy anything, and what "
                     + "you get back if you skip this does not mention accounts at all.",
                 "Under “TTL”, set the end date to after the end of your school year — next "
                     + "July is a safe choice — or leave it with no end date. An expired token "
-                    + "stops your publishing working, with nothing on screen to say why.",
+                    + "stops your deploys working, with nothing on screen to say why.",
                 "Choose “Continue to summary”, then “Create Token”.",
                 "Copy the long code Cloudflare shows you — it is only shown once — and paste it below.",
             ],
@@ -132,7 +132,7 @@ struct CredentialRequest: Equatable {
         return CredentialRequest(
             name: "cloudflareAccountID",
             title: "One more thing from Cloudflare",
-            explanation: "The token you just made is allowed to publish, but not to look up which "
+            explanation: "The token you just made is allowed to deploy, but not to look up which "
                        + "Cloudflare account it belongs to — so the account's ID is needed as well. "
                        + "This is the only time you will be asked for it.",
             steps: CredentialRequest.accountIDSteps,
@@ -150,7 +150,7 @@ struct CredentialRequest: Equatable {
     ///
     /// A separate request rather than a flag on the one above, because the
     /// two are asking at opposite moments and only the WHY differs. The
-    /// launcher's version arrives mid-publish and explains itself as "one
+    /// launcher's version arrives mid-deploy and explains itself as "one
     /// more thing"; this one is opened by somebody filling in a form who
     /// has quite reasonably no idea what a Cloudflare account ID is, and
     /// may not have made a token yet — so it must not talk about the token
@@ -160,9 +160,9 @@ struct CredentialRequest: Equatable {
             name: "cloudflareAccountIDHelp",
             title: "Where to find your Account ID",
             explanation: "Cloudflare gives every account a 32-character ID, and it says which "
-                       + "account your class websites are published into. It identifies you "
+                       + "account your class websites are deployed into. It identifies you "
                        + "rather than a class, so you enter it once here and every course "
-                       + "published to Cloudflare uses it.",
+                       + "deployed to Cloudflare uses it.",
             steps: CredentialRequest.accountIDSteps,
             linkTitle: "Open the Cloudflare dashboard",
             linkAddress: URL(string: "https://dash.cloudflare.com")!,
@@ -193,12 +193,12 @@ struct CredentialRequest: Equatable {
         )
     }
 
-    /// The website address (subdomain), asked the first time a section is published.
+    /// The website address (subdomain), asked the first time a section is deployed.
     static var siteName: CredentialRequest {
         return CredentialRequest(
             name: "siteName",
             title: "Choose a Website Address",
-            explanation: "Every website published to Netlify (*.netlify.app) or Cloudflare Pages "
+            explanation: "Every website deployed to Netlify (*.netlify.app) or Cloudflare Pages "
                        + "(*.pages.dev) needs a unique web address. On Netlify, this name is shared "
                        + "globally with all users across the world.",
             steps: [
