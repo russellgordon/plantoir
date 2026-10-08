@@ -1707,7 +1707,11 @@ the same day.)
   warning is not lost; each Windows item carries only its own. (This said
   NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
-  `site/appcast-windows.xml`, and before that one shared appcast.)
+  `site/appcast-windows.xml`, and before that one shared appcast.) Since
+  v1.4.4: an update marked important offers Install and Reopen alone and is
+  offered again even when skipped (#453), and the daily check starts once the
+  first window is up and never counts an offer nobody saw as an answer
+  (#465). Both are in `11-release-strategy.md` → "Updating itself on Windows".
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -3846,8 +3850,35 @@ the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
 a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
 is posted (moving the clearing out of `Execute`) — the clearing is what makes
 the task one-shot and is guarded by the job's token; a second caller in charge
-of it is a deploy that can recur. Still owed from #212: withdrawing the toast
-when the band is dismissed (`onShow`'s dismiss case).
+of it is a deploy that can recur.
+
+**Dismissing the band takes the toast down (#464, v1.4.4).** The last of
+#212's owed items. The band's Dismiss and its X both go through
+`ScheduledRunAnnouncement.TeacherDismissed`: the record first, then
+`IPoster.Withdraw(TagFor(section))`, which `SystemToasts` does with
+`AppNotificationManager.RemoveByTagAndGroupAsync(tag, ToastGroup)`. The group
+is one constant, used by both the post and the withdrawal. A failed withdrawal
+goes to `startup.log` and never stops the dismissal. There is no trail line,
+as on the mac (`teacherDismissed`). `ScheduledRunAnnouncementTests.TheContractsOnShowCases`
+plays all four `notification.onShow` cases, the first Windows reader of them.
+The app's own `Register()` and the poster's now share one process-wide flag,
+so a withdrawal never registers twice in the app.
+
+**Measured, because a stand-in cannot show it:** the toast is posted by a
+DIFFERENT process (the scheduled run) from the one that withdraws it.
+`Plantoir.UiTests/ScheduledToastWithdrawalUiTests` runs a job set thirty days
+ago with the x64 Debug build, exactly as Task Scheduler would, so it stands
+down as too late and posts. It then finds the toast in `wpndatabase.db`,
+checks it is still there once the section is open, presses Dismiss, and finds
+it gone. Passed twice on 2026-10-08 (i5-8365U, Windows 11 Pro 26200), the
+toast filed under `{809579B5-…}`: one `HKCU\Software\Classes\AppUserModelId\{GUID}`
+per executable path, so a run and the app of the same copy share an
+identity. A toast posted by a DIFFERENT copy (the installed app against a
+Debug tree) has another identity, and this copy cannot withdraw it; only a
+developer meets that. **Rejected:** removing by tag alone (it would also take
+a same-tag toast of another group); clearing the record from the toast's own
+click; withdrawing when a later run clears the record (its own post already
+replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
 
