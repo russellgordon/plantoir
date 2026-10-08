@@ -6798,8 +6798,10 @@ record and then the lease, exit 0.
 
 **The trail.** `plantoir-mcp` writes `outside session held a course`
 (`AssistWorkspace.HoldingTrailLine`) when a DOOR's server takes its lease —
-gated on `!ServesTheLocalWindow`, because the window's own server holds its
-course too and must not be written up as "a Claude or Codex session".
+gated on `!ServesTheLocalWindow` (`AssistWorkspace.NotesAnOutsideHold`, pinned
+both ways by `DoorCourseHoldTests.OnlyADoorsServerWritesTheHoldingLine`), because
+the window's own server holds its course too and must not be written up as "a
+Claude or Codex session". Only the door case was driven by hand.
 
 **Two causes, one hold — the decision Windows had to make.** Windows' assistant
 window runs its own `plantoir-mcp`, locked with `--course`, and that server

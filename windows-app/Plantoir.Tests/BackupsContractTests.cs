@@ -266,6 +266,23 @@ public class BackupDeleterTests
         Assert.Contains("kept because an open assistant conversation can restore from it: ICS3U_backup_2026-09-02_120000_assistant-section2.zip", line);
     }
 
+    /// <summary>A delete that deleted nothing leaves no "backups deleted" line, on either path.</summary>
+    [Fact]
+    public void ADeleteThatDeletedNothingWritesNoLine()
+    {
+        // "One line per delete, and none when nothing was deleted": both
+        // delete paths ask this (review L4) — a hold that appeared for every
+        // chosen backup between the confirmation and the delete writes nothing.
+        var a = Item("ICS3U_backup_2026-09-01_120000.zip");
+        var kept = new BackupDeleter.Outcome(Array.Empty<BackupItem>(), new[] { a }, Array.Empty<BackupDeleter.Failure>());
+        var failed = new BackupDeleter.Outcome(Array.Empty<BackupItem>(), Array.Empty<BackupItem>(),
+                                               new[] { new BackupDeleter.Failure(a, "in use") });
+        Assert.False(BackupDeleter.WritesATrailLine(kept));
+        Assert.False(BackupDeleter.WritesATrailLine(failed));
+        Assert.True(BackupDeleter.WritesATrailLine(
+            new BackupDeleter.Outcome(new[] { a }, Array.Empty<BackupItem>(), Array.Empty<BackupDeleter.Failure>())));
+    }
+
     /// <summary>
     /// #468 (mac #458, <c>backups deleted.carries</c>): what a Claude or Codex
     /// session still open made is named APART from what the window holds —

@@ -57,6 +57,15 @@ public static class BackupDeleter
     /// <paramref name="madeByOtherSessions"/>, from
     /// <see cref="HeldBackups.ByOtherSessions"/>.
     /// </summary>
+    /// <summary>
+    /// Whether a delete leaves a <c>backups deleted</c> line: only when at least
+    /// one backup went ("One line per delete, and none when nothing was
+    /// deleted" — <c>activityTrail.mustRecord</c>). The single Delete Backup and
+    /// the delete-several both ask this, so a hold that appears between the
+    /// confirmation and the delete for every chosen backup writes nothing.
+    /// </summary>
+    public static bool WritesATrailLine(Outcome outcome) => outcome.Deleted.Count > 0;
+
     public static string TrailLine(Outcome outcome, IReadOnlyDictionary<string, long?> sizes,
                                    IReadOnlySet<string>? madeByOtherSessions = null)
     {

@@ -81,9 +81,9 @@ IDisposable? lease = held is not null
 // A DOOR's session says so on the trail (#468, "outside session held a
 // course"); this app's own window's server, locked with --course, holds its
 // course too and must not be written up as "a Claude or Codex session".
-if (held is not null && !workspace.ServesTheLocalWindow)
+if (AssistWorkspace.NotesAnOutsideHold(held, workspace.ServesTheLocalWindow))
     Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.OutsideSessionHeldACourse,
-        AssistWorkspace.HoldingTrailLine(held));
+        AssistWorkspace.HoldingTrailLine(held!));
 // Its own work stops BEFORE any lease goes (#289): a build this server started
 // must not keep writing the section's folder after the course reads as free.
 AppDomain.CurrentDomain.ProcessExit += (_, _) =>

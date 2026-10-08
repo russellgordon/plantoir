@@ -86,6 +86,20 @@ public sealed class DoorCourseHoldTests : IDisposable
                      Plantoir.Core.Scripting.ActivityTrail.KeyFor(Plantoir.Core.Scripting.ActivityTrail.Event.OutsideSessionHeldACourse));
     }
 
+    /// <summary>
+    /// The line is written for a DOOR's server only (review L1): this app's own
+    /// window's server holds its locked course too, and must never be written
+    /// up as "a Claude or Codex session"; a server holding nothing writes nothing.
+    /// </summary>
+    [Fact]
+    public void OnlyADoorsServerWritesTheHoldingLine()
+    {
+        Assert.True(AssistWorkspace.NotesAnOutsideHold("ICS3U", servesTheLocalWindow: false));
+        Assert.False(AssistWorkspace.NotesAnOutsideHold("ICS3U", servesTheLocalWindow: true));
+        Assert.False(AssistWorkspace.NotesAnOutsideHold(null, servesTheLocalWindow: false));
+        Assert.False(AssistWorkspace.NotesAnOutsideHold(null, servesTheLocalWindow: true));
+    }
+
     // ---- What a hold greys, and what it says ------------------------------
 
     /// <summary>
