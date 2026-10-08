@@ -86,11 +86,12 @@ public class ToolchainMirrorTests
             File.SetLastWriteTimeUtc(Path.Combine(dest, "keep.txt"), DateTime.UtcNow.AddMinutes(-10));
             File.WriteAllText(Path.Combine(dest, "stale.txt"), "remove me");   // changes the hash for nothing
 
-            int changed = ToolchainMirror.SyncDirectory(source, dest);
+            var result = ToolchainMirror.SyncDirectory(source, dest);
 
             Assert.Equal("new", File.ReadAllText(Path.Combine(dest, "keep.txt")));
             Assert.False(File.Exists(Path.Combine(dest, "stale.txt")));   // extraneous file gone
-            Assert.Equal(2, changed);   // one copy, one delete
+            Assert.Equal(2, result.Changed);   // one copy, one delete
+            Assert.Equal(0, result.Failed);
         }
         finally { try { Directory.Delete(root, true); } catch { } }
     }

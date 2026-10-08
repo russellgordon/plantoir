@@ -31,8 +31,14 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Menu bar: File and Preview commands act on this window. -->
-        <MenuBar Grid.Row="0" x:Name="AppMenuBar">
+        <!-- Menu bar: File and Preview commands act on this window.
+             It also carries the window's READINESS for UI Automation (#473):
+             AutomationProperties.ItemStatus is "copying", "ready" or "failed"
+             from the moment the window exists, set in code-behind. The menu
+             bar because it is always there and has an automation peer; a
+             panel has none, and the banner is absent while it is closed. -->
+        <MenuBar Grid.Row="0" x:Name="AppMenuBar"
+                 AutomationProperties.AutomationId="appMenuBar">
             <MenuBarItem Title="File">
                 <MenuFlyoutItem x:Name="OpenWorkingFolderItem" Text="Open Working Folder…" Click="OpenWorkingFolder_Click" KeyboardAcceleratorTextOverride="Ctrl+O" />
                 <MenuFlyoutItem x:Name="NewWindowItem" Text="New Window" Click="NewWindow_Click" KeyboardAcceleratorTextOverride="Ctrl+N" />
@@ -83,7 +89,8 @@
              path bar can never be pushed off screen (the mac's inline-banner
              regression), and nothing is drawn over the section toolbar (which
              an overlay would have covered). Dismissable; never a dialog. -->
-        <InfoBar x:Name="SyncNotice" Grid.Row="1" Margin="12,8,12,0"
+        <StackPanel Grid.Row="1">
+        <InfoBar x:Name="SyncNotice" Margin="12,8,12,0"
                  IsOpen="False" Severity="Informational" IsClosable="True"
                  Closed="SyncNotice_Closed"
                  AutomationProperties.AutomationId="syncedFolderNotice">
@@ -98,6 +105,19 @@
                         AutomationProperties.AutomationId="syncedFolderNoticeDismiss" />
             </StackPanel>
         </InfoBar>
+        <!-- #473: the app is copying what it needs into this folder, in the
+             background, after the window has appeared. Opened only if the
+             copy is still running a second after the window was shown (the
+             ordinary launch compares every file in about half a second, and
+             a banner for that would flash); an error, and kept, if the copy
+             could not finish. Not closable: it says why Preview and Deploy
+             are greyed, and it goes by itself when they come back. Same row
+             as the synced-folder notice, under it, so the content row still
+             absorbs the height. Words: ToolchainReadiness. -->
+        <InfoBar x:Name="GettingReadyNotice" Margin="12,8,12,0"
+                 IsOpen="False" Severity="Informational" IsClosable="False"
+                 AutomationProperties.AutomationId="gettingReadyNotice" />
+        </StackPanel>
 
         <views:WorkspacePickerView x:Name="Picker" Grid.Row="2" Visibility="Collapsed" />
 

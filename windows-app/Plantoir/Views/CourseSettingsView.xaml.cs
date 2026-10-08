@@ -1241,6 +1241,15 @@ public sealed partial class CourseSettingsView : UserControl
                 "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
             return;
         }
+        // #473: never stop a preview that could not be started again — asked
+        // before anything is said or stopped, so the button and the trail
+        // line below stay true.
+        if (open.Select(lease => lease.FolderPath).FirstOrDefault(folder => ToolchainReadiness.Refusal(folder) is not null)
+                is { } notReadyFolder && App.WindowFor(notReadyFolder) is { } notReadyWindow)
+        {
+            await notReadyWindow.RefusedWhileTheFolderIsGettingReady(notReadyFolder, "Cannot Preview Yet");
+            return;
+        }
         SaveStatus.Text = SaveStatus.Text.Replace(" " + SavedSettings.SavedWhilePreviewing, "")
                                          .Replace(SavedSettings.SavedWhilePreviewing, "");
         PreviewAgainButton.Visibility = Visibility.Collapsed;

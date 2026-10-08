@@ -184,6 +184,25 @@ public sealed class ScriptRunner : INotifyPropertyChanged
         }
         NotifyRunState();
 
+        // The BACKSTOP for #473: every way into a build asks
+        // ToolchainReadiness first and says why, before any lease is taken or
+        // any question asked; this catches a way nobody thought of. Refuses
+        // only a folder whose copy of the tools is RUNNING or FAILED — never
+        // one no Reload ensured (tests, the marketing captures). Sets
+        // LastExitCode as well as LaunchProblem, so nothing waiting on this
+        // run — the preview's wait for its server, a deploy leg — waits for a
+        // process that never started. A stop is never refused.
+        if (!arguments.Contains("--stop") && Plantoir.Core.Models.ToolchainReadiness.Refusal(workingDirectory) is { } notReady)
+        {
+            LaunchProblem = notReady;
+            LastExitCode = -1;
+            Notify(nameof(LaunchProblem));
+            Notify(nameof(LastExitCode));
+            ActivityTrail.Note(ActivityTrail.Event.TaskFinished,
+                $"could not start {scriptName} — {notReady}");
+            return;
+        }
+
         string scriptPath = Path.Combine(workingDirectory, scriptName);
         if (!File.Exists(scriptPath))
         {
