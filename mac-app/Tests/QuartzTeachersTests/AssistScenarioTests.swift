@@ -275,6 +275,17 @@ final class AssistScenarioTests: XCTestCase {
             day += 1
         }
 
+        // The section's remembered class dates, written before the turn
+        // (#449; the key came from Windows with #411/#440's settler S2). The
+        // same two calls the rollover fixture below uses, so a case that
+        // names dates gets exactly what a teacher's timetable would leave.
+        if let dates = scenario.given["rememberedDates"] as? [String] {
+            let plan: RememberTimetablePlan = try SectionTimetableStore.planRememberTimetable(
+                dates: dates, source: "typed in by hand", forSection: 1, in: made.course
+            )
+            try SectionTimetableStore.applyRememberTimetable(plan)
+        }
+
         switch scenario.when {
         case "approve", "decline", "say":
             try await runApproval(scenario, made: made)
