@@ -140,9 +140,10 @@ so, rather than fail on a tree that holds only the menu bar. They skip only
 when the window is actually missing from the tree, so a lock never hides a
 test that could have run. A run made while the Mac is locked shows 8 more
 skipped, each naming #315. Being in the background is fine and is the normal
-case. **A normal full run has 3 skipped (a fourth,
+case. **A normal full run has 4 skipped — the four opt-in integration tests
+named in `CLAUDE.md`'s Testing table (a fifth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, skips while
-any launcher is running on the Mac); more than 3 skipped means read the skip
+any launcher is running on the Mac); more than 4 skipped means read the skip
 reasons.** Why, and what was rejected:
 `documentation/09-mac-app.md` → "Testing: the tests that read the real window,
 and a window on another Space or a locked screen (#249, #315)".
