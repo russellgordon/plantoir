@@ -81,13 +81,6 @@ struct NewCourseWizardView: View {
     /// answer.
     @State var highlightedCourseCode: String?
 
-    /// Focus for the two plain fields, so `WizardFieldChrome` can draw
-    /// their accent ring — a `ViewModifier` can't own focus for the view
-    /// it decorates, so it has to be told.
-    @FocusState var courseNameFieldHasFocus: Bool
-    @FocusState var sectionNumbersFieldHasFocus: Bool
-    @FocusState var customShortNameFieldHasFocus: Bool
-
     /// The last name this view filled in automatically. Auto-fill only
     /// ever replaces its own suggestion, never a name the teacher typed.
     @State var lastAutoFilledName: String = ""
@@ -894,21 +887,15 @@ struct NewCourseWizardView: View {
                         // content again, and its text starts at the
                         // leading edge like any other text field's.
                         LabeledContent(WizardWording.panelWords(isClub: isClubCourse).nameLabel) {
-                            // `WizardFieldChrome`, not
-                            // `.roundedBorder`: every AppKit control
-                            // this stands in for is 24pt tall and
-                            // SwiftUI's own bezel is 26, which left
-                            // this row 2pt out from the course-code
-                            // field beside it (Russell, 2026-08-23).
-                            // `.frame(height:)` does not fix that — see
-                            // the note on `WizardFieldChrome`.
+                            // The real `.roundedBorder` bezel, like every
+                            // field in Plantoir (#374) — since #456, when
+                            // the course-code field beside it stopped
+                            // drawing a 24pt imitation of AppKit's bezel
+                            // and all four fields became the same height
+                            // by construction.
                             TextField("", text: $courseName)
-                                .focused($courseNameFieldHasFocus)
                                 .accessibilityIdentifier("wizardCourseNameField")
-                                .modifier(WizardFieldChrome(
-                                    isFocused: courseNameFieldHasFocus,
-                                    trailingInset: CourseCodePickerView.textLeadingInset
-                                ))
+                                .borderedTextField()
                         }
                         ExampleCaption("e.g. Chemistry")
                     }
@@ -940,8 +927,8 @@ struct NewCourseWizardView: View {
                     // The same shape as Course Name and Timetable Section
                     // Numbers: an explicit `LabeledContent` so the label
                     // sits in the leading column and the typed text reads
-                    // leading, plus `WizardFieldChrome` so the box is the
-                    // same 24pt. It had neither — its label was still
+                    // leading, plus the shared bezel so the box is the same
+                    // height. It had neither — its label was still
                     // placeholder text inside the field and its value was
                     // pushed to the trailing edge, which is exactly the
                     // pre-`LabeledContent` look every other row was moved
@@ -949,12 +936,8 @@ struct NewCourseWizardView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         LabeledContent("Short label") {
                             TextField("", text: $customShortName)
-                                .focused($customShortNameFieldHasFocus)
                                 .accessibilityIdentifier("wizardCustomShortNameField")
-                                .modifier(WizardFieldChrome(
-                                    isFocused: customShortNameFieldHasFocus,
-                                    trailingInset: CourseCodePickerView.textLeadingInset
-                                ))
+                                .borderedTextField()
                         }
                         ExampleCaption("Shown beside the emoji — 12 characters at most")
                     }
@@ -981,12 +964,8 @@ struct NewCourseWizardView: View {
                         LabeledContent("Timetable section numbers") {
                             // See Course Name's own note.
                             TextField("", text: $sectionNumbersText)
-                                .focused($sectionNumbersFieldHasFocus)
                                 .accessibilityIdentifier("wizardSectionNumbersField")
-                                .modifier(WizardFieldChrome(
-                                    isFocused: sectionNumbersFieldHasFocus,
-                                    trailingInset: CourseCodePickerView.textLeadingInset
-                                ))
+                                .borderedTextField()
                         }
                         if let problem = sectionNumbersProblem {
                             // The same orange every other warning wears.

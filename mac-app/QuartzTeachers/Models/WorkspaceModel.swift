@@ -25,6 +25,16 @@ class WorkspaceModel {
     /// in this run of the app. See `refreshToolchain` for why once is enough.
     static var foldersWithFreshToolchain: Set<String> = []
 
+    /// Folders whose last mirror could not copy or remove every file (#476).
+    /// Skipped by the routine reloads — after every rename, backup, restore
+    /// and archive — exactly as a fresh folder is, because a failure that
+    /// does not go away (a file the folder will not take, a dataless cloud
+    /// file) would otherwise bring back the multi-second pause on every one
+    /// of them. Retried only when the teacher chooses File ▸ Reload Courses
+    /// or a window is newly pointed at the folder — Windows' rule under
+    /// #473, matched here on purpose.
+    static var foldersWhoseToolchainCopyFailed: Set<String> = []
+
     /// True when the hosted test suite is running. Tests drive the real
     /// window, and must not leave the teacher pointed at a fixture folder
     /// that is deleted when the run ends. Asked of `RealHome`, which keeps
@@ -801,6 +811,8 @@ class WorkspaceModel {
     /// done to it: not adopted, not remembered, nothing written into it, and
     /// the folder this window had stays exactly as it was.
     func chooseWorkspace(at url: URL) {
+        // A window newly pointed at the folder retries a copy that failed (#476).
+        WorkspaceModel.forgetFailedToolchainCopy(of: url)
         if let refusal = WorkingFolderReach.refusal(forFolder: url) {
             refuseChosenFolder(refusal)
             return
@@ -1213,10 +1225,68 @@ class WorkspaceModel {
         if !shouldMirrorToolchain(into: workspaceURL) {
             return
         }
-        noteToolchainMirrored(into: workspaceURL)
-        let changed: Int = copyToolchainFiles(into: workspaceURL)
-        if changed > 0 {
-            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(changed) file(s)")
+        let startedAt: Date = Date()
+        let outcome: MirrorOutcome = copyToolchainFiles(into: workspaceURL)
+        let seconds: String = String(format: "%.1f", Date().timeIntervalSince(startedAt))
+        // Marked fresh AFTER the copy, and only when nothing failed (#476,
+        // 2026-10-08; the shape Windows fixed under #473). It used to be
+        // marked BEFORE, so a copy that failed part-way — a file the folder
+        // would not take, a removal refused — left the folder marked fresh
+        // for the rest of the run, and every later reload skipped the mirror
+        // while the teacher's next build ran with a half-updated recipe. A
+        // copy with a failure is remembered as FAILED instead, which the
+        // routine reloads skip and File ▸ Reload Courses retries.
+        if outcome.failed == 0 {
+            noteToolchainMirrored(into: workspaceURL)
+            WorkspaceModel.foldersWhoseToolchainCopyFailed.remove(workspaceURL.path)
+        } else {
+            WorkspaceModel.foldersWhoseToolchainCopyFailed.insert(workspaceURL.path)
+            AppLog.interface.error("could not refresh .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.failed) file(s) failed, \(outcome.changed) written")
+        }
+        if outcome.changed > 0 {
+            AppLog.interface.info("refreshed .toolchain in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.changed) file(s)")
+        }
+        // The trail line Windows writes for the same copy (#473), now on
+        // both platforms (#476): once per copy that changed or failed
+        // something, never for the ordinary pass that finds nothing to do.
+        if outcome.changed > 0 || outcome.failed > 0 {
+            var sentence: String
+            if outcome.failed == 0 {
+                sentence = "got the working folder ready: \(outcome.changed) file(s) brought up to date in \(seconds) s"
+            } else {
+                sentence = "could not finish getting the working folder ready: \(outcome.failed) file(s) could not be copied or removed, \(outcome.changed) brought up to date, in \(seconds) s"
+                if let firstFailure = outcome.firstFailure {
+                    sentence += " — first: \(firstFailure)"
+                }
+            }
+            ActivityTrail.note(.workingFolderToolsCopied, sentence + " (\(workspaceURL.path))")
+        }
+    }
+
+    /// What a mirror pass did: how many files it wrote or removed, and how
+    /// many it could not. The second number is why this is not an `Int`
+    /// (#476): a count of successes cannot say whether the folder is now
+    /// up to date, and the mark that skips the next pass depends on it.
+    nonisolated struct MirrorOutcome: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        var changed: Int = 0
+        var failed: Int = 0
+
+        /// The first file that could not be copied or removed, from the
+        /// working folder down, with its error — what a problem report
+        /// needs and a count cannot give.
+        var firstFailure: String? = nil
+
+        // MARK: - Functions
+
+        nonisolated static func += (left: inout MirrorOutcome, right: MirrorOutcome) {
+            left.changed += right.changed
+            left.failed += right.failed
+            if left.firstFailure == nil {
+                left.firstFailure = right.firstFailure
+            }
         }
     }
 
@@ -1247,7 +1317,19 @@ class WorkspaceModel {
            fileManager.fileExists(atPath: dockerfileURL.path) {
             return false
         }
+        // A folder whose copy failed is not retried on a routine reload
+        // (#476; see `foldersWhoseToolchainCopyFailed`).
+        if WorkspaceModel.foldersWhoseToolchainCopyFailed.contains(workspaceURL.path) {
+            return false
+        }
         return true
+    }
+
+    /// Lets the next reload mirror a folder whose copy failed (#476): called
+    /// when a window is newly pointed at the folder and from File ▸ Reload
+    /// Courses, the two moments Windows retries at.
+    static func forgetFailedToolchainCopy(of workspaceURL: URL) {
+        WorkspaceModel.foldersWhoseToolchainCopyFailed.remove(workspaceURL.path)
     }
 
     /// Records that this folder's mirror is up to date for this run.
@@ -1262,9 +1344,9 @@ class WorkspaceModel {
     /// change while the app runs, and writes into one folder. It touches no
     /// model state and no shared set, so there is nothing here for a
     /// background thread to race against. Answers how many files it wrote.
-    nonisolated static func copyToolchainFiles(into workspaceURL: URL) -> Int {
+    nonisolated static func copyToolchainFiles(into workspaceURL: URL) -> MirrorOutcome {
         let toolchainURL: URL = workspaceURL.appendingPathComponent(".toolchain")
-        var changed: Int = 0
+        var changed: MirrorOutcome = MirrorOutcome()
         var rootFiles: [String] = ["Dockerfile"]
         rootFiles += ["setup.sh", "preview.sh", "deploy.sh"]
         rootFiles += ["setup.bat", "preview.bat", "deploy.bat"]
@@ -1285,7 +1367,7 @@ class WorkspaceModel {
     }
 
     /// Copies one file when the destination differs or is missing.
-    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncFile(from sourceURL: URL, to destinationURL: URL) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
 
         // The cheap question first: same size, same modification date.
@@ -1296,11 +1378,13 @@ class WorkspaceModel {
         // reloaded, which is after every rename, backup, restore and archive.
         // Two stat calls answer the same question for almost all of them.
         if WorkspaceModel.filesLookIdentical(sourceURL, destinationURL) {
-            return 0
+            return MirrorOutcome()
         }
 
         guard let sourceData = try? Data(contentsOf: sourceURL) else {
-            return 0
+            // A bundle file that cannot be read is a failure too (#476): the
+            // folder is not up to date, whatever else was written.
+            return MirrorOutcome(changed: 0, failed: 1, firstFailure: "\(sourceURL.lastPathComponent): could not be read from the app")
         }
         if let existing = try? Data(contentsOf: destinationURL), existing == sourceData {
             // Same bytes, different stamp — which is every file in the bundle
@@ -1308,7 +1392,7 @@ class WorkspaceModel {
             // cheap check can answer next time instead of re-reading 61 MB
             // for the rest of the session.
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return 0
+            return MirrorOutcome()
         }
         do {
             try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1317,9 +1401,14 @@ class WorkspaceModel {
                 try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destinationURL.path)
             }
             WorkspaceModel.copyModificationDate(from: sourceURL, to: destinationURL)
-            return 1
+            return MirrorOutcome(changed: 1, failed: 0)
         } catch {
-            return 0
+            // Counted, not swallowed (#476): `mirrorToolchain` marks the
+            // folder fresh only when this is zero.
+            return MirrorOutcome(
+                changed: 0, failed: 1,
+                firstFailure: "\(destinationURL.lastPathComponent): \(error.localizedDescription)"
+            )
         }
     }
 
@@ -1387,9 +1476,9 @@ class WorkspaceModel {
         return nil
     }
 
-    nonisolated static func syncDirectory(from sourceURL: URL, to destinationURL: URL) -> Int {
+    nonisolated static func syncDirectory(from sourceURL: URL, to destinationURL: URL) -> MirrorOutcome {
         let fileManager: FileManager = FileManager.default
-        var changed: Int = 0
+        var changed: MirrorOutcome = MirrorOutcome()
 
         // A SET, not an array. This was an array, and the removal pass below
         // asked it `contains` once per destination file — 11,354 files each
@@ -1425,8 +1514,17 @@ class WorkspaceModel {
                 }
             }
             for fileURL in toRemove {
-                try? fileManager.removeItem(at: fileURL)
-                changed += 1
+                do {
+                    try fileManager.removeItem(at: fileURL)
+                    changed.changed += 1
+                } catch {
+                    // A stray file that will not go changes the recipe's
+                    // hash, so the folder is not up to date (#476).
+                    changed.failed += 1
+                    if changed.firstFailure == nil {
+                        changed.firstFailure = "\(fileURL.lastPathComponent): \(error.localizedDescription)"
+                    }
+                }
             }
         }
         return changed
@@ -1554,6 +1652,15 @@ class WorkspaceModel {
 
     /// Scans `<workspace>/courses/` for course folders containing a
     /// `course_config.json` and loads each one.
+    /// File ▸ Reload Courses: the one routine reload that retries a
+    /// toolchain copy that failed (#476), because the teacher asked.
+    func reloadCoursesFromTheMenu() {
+        if let workspaceURL {
+            WorkspaceModel.forgetFailedToolchainCopy(of: workspaceURL)
+        }
+        reloadCourses()
+    }
+
     func reloadCourses() {
         courses = []
         archivedItems = []
@@ -2892,8 +2999,13 @@ class WorkspaceModel {
         }
 
         // The build recipe itself — the expensive part, and the reason this
-        // runs off the main thread.
-        _ = WorkspaceModel.copyToolchainFiles(into: workspaceURL)
+        // runs off the main thread. A copy that fails part-way is the
+        // folder's problem, not a success (#476): the callers mark the
+        // folder fresh only when this answers nil.
+        let outcome: MirrorOutcome = WorkspaceModel.copyToolchainFiles(into: workspaceURL)
+        if outcome.failed > 0 {
+            return "Could not copy every file the website builder needs into this folder (\(outcome.failed) could not be written). Check that the folder can be written to, then try again."
+        }
         return nil
     }
 

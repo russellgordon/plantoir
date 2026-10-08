@@ -6372,6 +6372,57 @@ version, reopening its windows, re-mirrors a changed `.toolchain/` into the
 folder a scheduled `preview.sh --build-only` may be building from. That is why
 the install waits.
 
+### The first launch after an update: what the mirror costs, measured (#476, 2026-10-08)
+
+Raised from the Windows side while #473 was planned: there, the first window
+after an update was absent for 94 to 120 s (Intel i5-8365U) while the tools
+were copied on the UI thread, and Windows moved the copy to a background task
+with a banner. The mac has the same shape — `WorkspaceModel.reloadCourses()`
+calls `refreshLaunchersIfNeeded()` → `refreshToolchain(in:)` →
+`mirrorToolchain(into:)` → `copyToolchainFiles(into:)` synchronously, and
+`nonisolated` only PERMITS running elsewhere; called from the main actor it
+runs on the main thread — so the question was how long it blocks.
+
+**Measured**, with a throwaway XCTest timing `copyToolchainFiles(into:)`
+against a folder with `preview.sh` in it (Apple M4 Pro, 48 GB, macOS 26.6,
+warm disk cache; the bundle's `.toolchain` is 12,758 files, about 72 MB,
+`support/` being 12,645 of them):
+
+| The folder's `.toolchain/` | Time | Files written |
+|---|---|---|
+| Missing altogether (a folder whose mirror was removed) | 3.81 s | 12,758 |
+| Identical (the stat-only pass every later reload pays) | 0.87 s | 0 |
+| Same bytes, every stamp different (the first launch after a rebuild or update whose recipe did not change) | 1.72 s | 0 |
+| Every file's bytes different (an update that changed the whole recipe — the worst case) | 3.93 s | 12,758 |
+
+So the window is held back by **about four seconds at worst** on this Mac,
+and under two on the launch a teacher actually meets after most updates. The
+issue's own threshold was "seconds: record and close; tens of seconds: do what
+Windows did", and this is seconds, so the copy stays where it is. **Not
+measured, and said so:** a cold disk cache, and an Intel Mac — both would be
+slower, and nobody has a number. If a teacher reports a blank window after an
+update, the Windows design (`12-windows-app.md` → "Getting a folder ready after
+an update (#473)": window first, copy on a background task, a plain-words
+banner, Preview and Deploy disabled with the reason until it finishes) is the
+one to copy; the pieces are already there — `copyToolchainFiles` is
+`nonisolated` and `BuilderWarmUp` runs it off the main thread today.
+
+**What DID change: a copy that fails is no longer remembered as done.**
+`mirrorToolchain` used to mark the folder fresh
+(`foldersWithFreshToolchain`) BEFORE copying, so a copy that failed part-way —
+a file the folder would not take, a stray file that would not go — left the
+folder marked for the rest of the run, every later reload skipped the mirror,
+and the next build ran with a half-updated recipe. Windows had the same shape
+and #473 moved the mark after a copy with zero failures. The mac now does the
+same: `copyToolchainFiles`, `syncFile` and `syncDirectory` answer a
+`MirrorOutcome` — files changed AND files failed, where a failure is a write
+that threw, a bundle file that could not be read, or a removal that threw —
+and `mirrorToolchain` marks the folder fresh only when `failed == 0`, logging
+the count otherwise so the next reload tries again.
+`ToolchainMirrorTests.testAFolderWhoseCopyFailedIsNotMarkedFreshUntilACopySucceeds`
+pins it against a read-only `.toolchain`. Nothing a teacher sees changes, so
+no trail line and no contract case; Windows already has its half.
+
 ### What the teacher reads
 
 Ours, all in `UpdateWording`, retyped from `appUpdates.wording` and pinned
@@ -6411,6 +6462,66 @@ which only an admin can write); cancelling that aborts SILENTLY
 `update stopped` with the admin category. 4008 ("authorize later") never
 reaches `didAbortWithError` (`SPUUpdater.m` :803), so it is written from the
 end of the cycle instead.
+
+### An offer nobody saw: what the mac matches, and the one narrow case it does not (#472, 2026-10-08)
+
+Windows found (#465) that its daily check could run before the first window
+was up, find a version, have nowhere to show the offer, and write `1.4.3: not
+now` — an answer nobody gave — while also marking the day done. The authored
+rule that came of it is `shared-rules.json` →
+`appUpdates.anOfferNobodySawIsNotAnAnswer`: no answer line for an offer that
+was not shown, and the day's check not done until it has been. #472 asked
+whether the mac has the same gap. Answered from this app's code and from
+Sparkle 2.9.6's source (the Opus plan review read `SPUStandardUserDriver.m`,
+`SUUpdateAlert.m` and `SPUUpdater.m` at the 2.9.6 tag); nothing changed in
+code.
+
+1. **Can a scheduled check reach the offer before the app has a window, or
+   while a sheet is up — and what happens then?** The updater is created and
+   started only in `applicationDidFinishLaunching` (`AppUpdates.start()`,
+   `AppUpdates.swift` ~190), so no check runs before launch has finished,
+   and `reloadCourses()`'s mirror (#476, above) holds the main thread for
+   0.9 to 3.9 s there, so the alert cannot appear before the window does.
+   What Sparkle does with a scheduled offer is NOT "show it behind other
+   apps" — that is for background apps only. For a regular app
+   (`SPUStandardUserDriver.m` 265-281, 340-346) the standard driver shows
+   the alert at once only when the app is active and the check began within
+   the last 3 s or the system has been idle; otherwise it HOLDS the alert
+   until `NSApplicationDidBecomeActive`, which is what "may hold its window
+   back until the app is in front" in the trail section below has said since
+   #204. A sheet or modal in Plantoir neither blocks nor dismisses it. The
+   mirror's 0.9–3.9 s at launch can itself push a launch-time check past
+   that 3 s window into the hold — so moving the mirror off the main actor
+   one day changes this behaviour too, and both sections say so.
+2. **Can anything the app writes as `update answered` ("not now") come from
+   a window the teacher never saw?** No. The only path that writes that line
+   is the `SPUUpdaterDelegate` callback
+   `updater(_:userDidMake:forUpdate:state:)` (`AppUpdates.swift` ~625-645),
+   and Sparkle calls it only with what the alert replied: `SUUpdateAlert.m`
+   replies Dismiss from the info link (:148), Remind Me Later (:158) and the
+   close box (:502) and from nothing else, and a held alert has not been
+   shown, so nothing can reply for it. `HoldingUserDriver.showUpdateFound`
+   hands the reply straight to the standard driver except in the installing
+   stage, where the app's own held notice answers
+   (`teacherAnsweredResumedWindow`); `isSettingAside` keeps a quit's
+   stand-down from being written as an answer; and the app's one way into
+   `dismissUpdateInstallation` (`HoldingUserDriver.closeTheUpdatersWindows`)
+   runs only while an install is held. An alert still open when Plantoir
+   quits never replies, so nothing is written.
+3. **Does a held alert use up the day's check?** Yes, and this is the one
+   place the mac does NOT match the rule's second half. `SPUUpdater.m` writes
+   the last-check date when the check STARTS (:789) and again when it ends
+   (:822), so a held alert counts as today's check. A teacher who keeps
+   Plantoir in front all day, or quits before switching back to it, is
+   offered the update by the next day's check rather than today's. Narrower
+   than Windows' fault in every way that matters — no false answer is
+   written, the trail reads `update found` with no `update answered`, which
+   is exactly "offered, not yet answered", and Check for Updates… brings the
+   held alert forward at once (`showUpdateInFocus`) — and **proposed as accepted
+   rather than fixed** — the decision asked of Russell on #472, 2026-10-08;
+   retrying the look the way Windows does would mean driving Sparkle's
+   scheduler from outside it.
+   The rule's `why` in the contract records the difference.
 
 ### The trail — eight events
 
