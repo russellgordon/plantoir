@@ -57,7 +57,7 @@ function Import-LauncherFunctions([string]$Launcher, [string[]]$Names) {
     }
 }
 
-Import-LauncherFunctions (Join-Path $repo 'preview.ps1') @('Find-FreePreviewPort', 'Split-CommandLine', 'Get-ScheduledDeployScriptName', 'Test-SectionIsBeingDeployed')
+Import-LauncherFunctions (Join-Path $repo 'preview.ps1') @('Find-FreePreviewPort', 'Split-CommandLine', 'Get-LaunchedScriptIndex', 'Get-ScheduledDeployTaskNames', 'Get-ScheduledDeployScriptNames', 'Get-WhatIsDeployingThisSection', 'Test-SectionIsBeingDeployed')
 Import-LauncherFunctions (Join-Path $repo 'deploy.ps1') @('Test-CarriesLiveReload', 'Resolve-PublishFolder')
 # preview.ps1's Get-PhysicalPath needs a type compiled at run time; the
 # folders in these cases do not exist, so the full path is what it would give.
@@ -110,20 +110,55 @@ $guard = $shared.previewWhileItsSectionDeploys
 $here = 'C:\Users\t\Plantoir Here'
 $elsewhere = 'C:\Users\t\Plantoir Elsewhere'
 $scheduledDir = 'C:\Users\t\AppData\Local\Plantoir\scheduled'
+# The guard is HANDED the folder id ($WORKDIR_ID), so these stand for the two
+# folders' ids; that the launchers compute the id and the wrapper names the
+# app's way is LauncherRulesContractTests' business, not a copy kept here.
+$hereId = 'a1b2c3d4'
+$elsewhereId = 'e5f6a7b8'
 
+# The course words, as the app and the scheduled wrapper hand them: ONE
+# argument, quoted when it has a space (ScriptRunner, LauncherRunner, the
+# wrapper's build leg). The course is every word before the first all-digit
+# word, which is the section.
+function ConvertTo-QuotedArguments([string]$Rest) {
+    $words = @($Rest.Trim() -split '\s+' | Where-Object { $_ })
+    $at = -1
+    for ($i = 0; $i -lt $words.Count; $i++) { if ($words[$i] -match '^\d+$') { $at = $i; break } }
+    if ($at -lt 2) { if ($words.Count -eq 0) { return '' } else { return ' ' + ($words -join ' ') } }
+    $course = '"' + (($words[0..($at - 1)]) -join ' ') + '"'
+    return ' ' + ((@($course) + $words[$at..($words.Count - 1)]) -join ' ')
+}
+
+# One `ps` row of the mac's case, as the Windows process table shows the same
+# evidence. A deploy set for later is a Task Scheduler task on Windows, so its
+# launchd script becomes the WRAPPER the app writes and runs as
+# powershell.exe -File (TaskScheduling.WrapperRunArguments), its launchd
+# runner line becomes Plantoir.exe --run-scheduled-deploy "<task name>"
+# (TaskScheduling.TaskRunCommand), and its log the wrapper's own. An editor,
+# a pager or `bash -x` on the script becomes notepad, more and a -Command that
+# traces it - none of which runs the wrapper as the program.
 function ConvertTo-WindowsRow([string]$Text, $Cwd, [string]$ProcessId) {
     $Text = $Text.Replace('{here}', $here)
-    # A deploy set for later: the mac's launchd script (or the app's runner
-    # naming it) becomes the Task Scheduler wrapper the app writes.
     $label = [regex]::Match($Text, 'ca\.russellgordon\.Plantoir\.deploy\.(?<code>[^.]+)\.section(?<section>\d+)(?:\.(?<id>\{\w+\}|[0-9a-f]+))?\.(?<ext>sh|log)')
     if ($label.Success) {
-        if ($label.Groups['id'].Value -eq '{elsewhereID}') { return $null }
+        $id = $label.Groups['id'].Value
+        if ($id -eq '{hereID}') { $id = $hereId } elseif ($id -eq '{elsewhereID}') { $id = $elsewhereId }
+        $code = $label.Groups['code'].Value.Replace('-', ' ')
+        $sectionNumber = $label.Groups['section'].Value
+        $taskName = @(Get-ScheduledDeployTaskNames $code $sectionNumber $id)[0]
+        $wrapper = $scheduledDir + '\' + @(Get-ScheduledDeployScriptNames $code $sectionNumber $id)[0]
         if ($label.Groups['ext'].Value -eq 'log') {
-            return "powershell.exe -NoProfile -Command Get-Content -Wait $scheduledDir\" + (Get-ScheduledDeployScriptName $label.Groups['code'].Value $label.Groups['section'].Value).Replace('.ps1', '.log')
+            return "powershell.exe -NoProfile -Command Get-Content -Wait `"" + $wrapper.Replace('.ps1', '.log') + '"'
         }
-        return "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scheduledDir\" + (Get-ScheduledDeployScriptName $label.Groups['code'].Value.Replace('-', ' ') $label.Groups['section'].Value) + '"'
+        if ($Text -match '--run-scheduled-deploy') {
+            return "`"C:\Program Files\Plantoir\Plantoir.exe`" --run-scheduled-deploy `"$taskName`""
+        }
+        if ($Text -match '^/usr/bin/vim ') { return "notepad.exe `"$wrapper`"" }
+        if ($Text -match '^/usr/bin/less ') { return "more.com `"$wrapper`"" }
+        if ($Text -match '^/bin/bash -x ') { return "powershell.exe -NoProfile -Command `"Set-PSDebug -Trace 1; & '$wrapper'`"" }
+        return "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$wrapper`""
     }
-    $program = [regex]::Match($Text, '^(?<shell>/bin/(?:ba|z)sh) (?<c>-c )?(?<path>.*?)deploy\.sh(?<rest>.*)$')
+    $program = [regex]::Match($Text, '^(?<shell>/bin/(?:ba|z)sh) (?<c>-c )?(?<path>.*?)(?<launcher>deploy|preview)\.sh(?<rest>.*)$')
     if ($program.Success -and -not $program.Groups['c'].Success) {
         $path = $program.Groups['path'].Value
         # lsof's working directory is the mac's folder evidence; on Windows
@@ -136,43 +171,64 @@ function ConvertTo-WindowsRow([string]$Text, $Cwd, [string]$ProcessId) {
         if ($path -like "$here*" -or $where -eq 'here') { $folder = "$here\" }
         elseif ($where -eq 'elsewhere') { $folder = "$elsewhere\" }
         elseif ($path -match '^/') { $folder = 'C:' + $path.Replace('/', '\') }
-        return "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"${folder}deploy.ps1`"" + $program.Groups['rest'].Value
+        return "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"${folder}$($program.Groups['launcher'].Value).ps1`"" + (ConvertTo-QuotedArguments $program.Groups['rest'].Value)
     }
     if ($program.Success) {
         # A shell handed a command line: cmd.exe /c on Windows, not the program.
-        return 'cmd.exe /c ' + $program.Groups['path'].Value.Replace('/', '\') + 'deploy.ps1' + $program.Groups['rest'].Value
+        return 'cmd.exe /c ' + $program.Groups['path'].Value.Replace('/', '\') + $program.Groups['launcher'].Value + '.ps1' + $program.Groups['rest'].Value
     }
-    # preview.sh (a build leg or the assistant's rebuild), a prompt that
-    # mentions deploy.sh, a log being read: the same words, Windows spelling.
+    # A prompt that mentions deploy.sh: the same words, Windows spelling.
     return ($Text -replace 'preview\.sh', 'preview.ps1' -replace 'deploy\.sh', 'deploy.ps1')
 }
 
-foreach ($case in @($guard.launcherCases)) {
-    $course = 'ICS4U'; if ($case.PSObject.Properties.Name -contains 'course') { $course = [string]$case.course }
-    $section = '2'; if ($case.PSObject.Properties.Name -contains 'section') { $section = [string]$case.section }
-    $self = [uint32]5000
+# The table one case describes, with this run (pid 5000, parent 4999) in it
+# unless the case says the table omits it, or $null when the table fails.
+function New-CaseTable($Case, [string]$SelfLine) {
     $snapshot = New-Object System.Collections.Generic.List[object]
-    $parentArgs = '-bash'; if ($case.PSObject.Properties.Name -contains 'parentArgs') { $parentArgs = [string]$case.parentArgs }
-    $translatedParent = ConvertTo-WindowsRow $parentArgs $null '4999'
-    $snapshot.Add([PSCustomObject]@{ ProcessId = [uint32]4999; ParentProcessId = [uint32]1; CommandLine = $translatedParent })
-    if (-not ($case.PSObject.Properties.Name -contains 'psOmitsThisRun' -and $case.psOmitsThisRun)) {
-        $snapshot.Add([PSCustomObject]@{ ProcessId = $self; ParentProcessId = [uint32]4999; CommandLine = "powershell.exe -NoProfile -File `"$here\preview.ps1`" $course $section" })
+    $parentArgs = '-bash'; if ($Case.PSObject.Properties.Name -contains 'parentArgs') { $parentArgs = [string]$Case.parentArgs }
+    $snapshot.Add([PSCustomObject]@{ ProcessId = [uint32]4999; ParentProcessId = [uint32]1; CommandLine = (ConvertTo-WindowsRow $parentArgs $null '4999') })
+    if (-not ($Case.PSObject.Properties.Name -contains 'psOmitsThisRun' -and $Case.psOmitsThisRun)) {
+        $snapshot.Add([PSCustomObject]@{ ProcessId = [uint32]5000; ParentProcessId = [uint32]4999; CommandLine = $SelfLine })
     }
-    $untranslatable = $false
-    $cwd = $null; if ($case.PSObject.Properties.Name -contains 'cwd') { $cwd = $case.cwd }
-    foreach ($row in @($case.processes)) {
+    $cwd = $null; if ($Case.PSObject.Properties.Name -contains 'cwd') { $cwd = $Case.cwd }
+    foreach ($row in @($Case.processes)) {
         if ($null -eq $row) { continue }
-        $line = ConvertTo-WindowsRow ([string]$row[2]) $cwd ([string]$row[0])
-        if ($null -eq $line) { $untranslatable = $true; break }
-        $snapshot.Add([PSCustomObject]@{ ProcessId = [uint32]$row[0]; ParentProcessId = [uint32]$row[1]; CommandLine = $line })
+        $snapshot.Add([PSCustomObject]@{ ProcessId = [uint32]$row[0]; ParentProcessId = [uint32]$row[1]; CommandLine = (ConvertTo-WindowsRow ([string]$row[2]) $cwd ([string]$row[0])) })
     }
-    if ($untranslatable) { Skip 'launcherCases' $case.name 'a deploy set for later names its folder on the mac; a Windows task name carries none (the pre-#237 limit, documented)'; continue }
-    $table = $snapshot.ToArray()
-    if ($case.PSObject.Properties.Name -contains 'psFails' -and $case.psFails) { $table = $null }
-    $refused = Test-SectionIsBeingDeployed -Snapshot $table -Course $course -Section $section -Here $here -Self $self
-    $want = [string]$case.expect
+    if ($Case.PSObject.Properties.Name -contains 'psFails' -and $Case.psFails) { return $null }
+    return ,$snapshot.ToArray()
+}
+
+function Get-CaseValue($Case, [string]$Name, [string]$Default) {
+    if ($Case.PSObject.Properties.Name -contains $Name) { return [string]$Case.$Name }
+    return $Default
+}
+
+# Rows the contract cannot carry, in the shapes only Windows has (#467's plan
+# review H1 and M4): the app and the wrapper QUOTE a course with a space, and
+# Windows PowerShell runs a script handed to -f, -fil or as its first plain
+# word just as it runs one handed to -File.
+$psDeploy = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$here\deploy.ps1`""
+$windowsRows = @(
+    [PSCustomObject]@{ name = 'a quoted course with a space, as the app runs it (Windows)'; course = 'AP CALC'; processes = @(,@(700, 600, "$psDeploy `"AP CALC`" 2 --target netlify")); expect = 'refused'; who = 'another' },
+    [PSCustomObject]@{ name = 'a quoted course with a space is still matched whole (Windows)'; course = 'AP CALC'; section = '1'; processes = @(@(700, 600, "$psDeploy `"AP CALC`" 12"), @(701, 600, "$psDeploy `"AP CALCULUS`" 1"), @(702, 600, "$psDeploy AP 1")); expect = 'allowed' },
+    [PSCustomObject]@{ name = 'deploy.ps1 handed to -f (Windows)'; processes = @(,@(700, 1, "powershell.exe -NoProfile -f `"$here\deploy.ps1`" ICS4U 2")); expect = 'refused'; who = 'another' },
+    [PSCustomObject]@{ name = 'deploy.ps1 as pwsh -fil (Windows)'; processes = @(,@(700, 1, "pwsh.exe -fil `"$here\deploy.ps1`" ICS4U 2")); expect = 'refused'; who = 'another' },
+    [PSCustomObject]@{ name = 'deploy.ps1 as powershell.exe''s first plain word (Windows)'; processes = @(,@(700, 1, "powershell.exe -NoProfile -ExecutionPolicy Bypass `"$here\deploy.ps1`" ICS4U 2")); expect = 'refused'; who = 'another' },
+    [PSCustomObject]@{ name = 'deploy.ps1 named after -Command is not the program (Windows)'; processes = @(,@(700, 1, "powershell.exe -NoProfile -Command `"Get-Content '$here\deploy.ps1'`" ICS4U 2")); expect = 'allowed' },
+    [PSCustomObject]@{ name = 'a pre-#309 wrapper for a spaced course counts (Windows)'; course = 'AP CALC'; processes = @(,@(801, 1, "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$scheduledDir\Plantoir-deploy-AP-CALC-section-2.ps1`"")); expect = 'refused'; who = 'later' }
+)
+# A run still waiting for the course, its task's token on the line too.
+$waitingRun = [PSCustomObject]@{ name = 'a scheduled run still waiting for the course, with its token (Windows)'; processes = @(,@(800, 1, "`"C:\Program Files\Plantoir\Plantoir.exe`" --run-scheduled-deploy `"Plantoir deploy ICS4U section 2 $hereId`" --token 0f3c")) }
+
+foreach ($case in @($guard.launcherCases) + @($windowsRows) + @($waitingRun)) {
+    $course = Get-CaseValue $case 'course' 'ICS4U'
+    $section = Get-CaseValue $case 'section' '2'
+    $want = Get-CaseValue $case 'expect' 'refused'
+    $table = New-CaseTable $case "powershell.exe -NoProfile -File `"$here\preview.ps1`" `"$course`" $section"
+    $refused = Test-SectionIsBeingDeployed -Snapshot $table -Course $course -Section $section -Here $here -FolderId $hereId -Self 5000
     $got = if ($refused) { 'refused' } else { 'allowed' }
-    Report 'launcherCases' $case.name ($got -eq $want) "expected $want, got $got"
+    Report 'previewWhileItsSectionDeploys' $case.name ($got -eq $want) "expected $want, got $got"
 }
 
 # ---- 3. A preview's build (#272 / #136 / #291) ----------------------
@@ -225,6 +281,75 @@ foreach ($c in @(
     @{ asked = '   ';                 want = $null })) {
     $got = Resolve-PublishFolder $c.asked $wf
     Report 'publishFolder' ("'" + $c.asked + "'") ("$got" -eq "$($c.want)") "expected '$($c.want)', got '$got'"
+}
+
+# ---- 5. A section still being deployed is not deployed again (#467) ----
+# shared-rules.json -> deployWhileItsSectionDeploys.launcherCases, every one
+# of them, through Get-WhatIsDeployingThisSection as EACH launcher carries it
+# (the two copies are one marked block; LauncherRulesContractTests checks
+# they match, and running both here is what proves each copy works). The
+# rows are translated by section 2's ConvertTo-WindowsRow. Cases marked
+# appliesOn without 'windows' are skipped by that field, never by name.
+$deployGuard = $shared.deployWhileItsSectionDeploys
+foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
+    Import-LauncherFunctions (Join-Path $repo $launcher) @('Split-CommandLine', 'Get-LaunchedScriptIndex', 'Get-ScheduledDeployTaskNames', 'Get-ScheduledDeployScriptNames', 'Get-WhatIsDeployingThisSection', 'Test-SectionIsBeingDeployed')
+    $waitingForDeploy = [PSCustomObject]@{ name = $waitingRun.name; processes = $waitingRun.processes; expect = 'allowed' }
+    foreach ($case in @($deployGuard.launcherCases) + @($windowsRows) + @($waitingForDeploy)) {
+        $list = "deployWhileItsSectionDeploys/$launcher"
+        if ($case.PSObject.Properties.Name -contains 'appliesOn' -and -not (@($case.appliesOn) -contains 'windows')) {
+            Skip $list $case.name ('appliesOn ' + (@($case.appliesOn) -join ', '))
+            continue
+        }
+        $course = Get-CaseValue $case 'course' 'ICS4U'
+        $section = Get-CaseValue $case 'section' '2'
+        $leg = Get-CaseValue $case 'leg' 'deploy'
+        $want = Get-CaseValue $case 'expect' 'refused'
+        $wantWho = Get-CaseValue $case 'who' ''
+        if ($leg -eq 'build') {
+            $selfLine = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$here\preview.ps1`" `"$course`" $section --build-only"
+        } else {
+            $selfLine = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$here\deploy.ps1`" `"$course`" $section"
+        }
+        $table = New-CaseTable $case $selfLine
+        $who = Get-WhatIsDeployingThisSection -Snapshot $table -Course $course -Section $section -Here $here -FolderId $hereId -Self 5000
+        $got = if ($who) { 'refused' } else { 'allowed' }
+        if ($want -eq 'refused' -and $wantWho) {
+            Report $list $case.name (($got -eq $want) -and ("$who" -eq $wantWho)) "expected $want by '$wantWho', got $got by '$who'"
+        } else {
+            Report $list $case.name ($got -eq $want) "expected $want, got $got"
+        }
+    }
+}
+
+# The words, as each launcher prints and records them. Each sentence's first
+# line is a format string whose {0} is the cross, {1} the course and {2} the
+# section; each trail line one whose slots are the course, the section, the
+# dot, the leg and the dash (contract launcherLines, under activityTrail
+# 'build declined, course busy elsewhere').
+$crossText = [char]::ConvertFromUtf32(0x274C)
+$dotText = [string][char]0x00B7
+$dashText = [string][char]0x2014
+$declined = @($shared.activityTrail.mustRecord | Where-Object { $_.event -eq 'build declined, course busy elsewhere' })[0]
+$portEvent = @($shared.activityTrail.mustRecord | Where-Object { $_.event -eq 'preview did not appear' })[0]
+foreach ($launcher in @('deploy.ps1', 'preview.ps1')) {
+    $source = Get-Content -LiteralPath (Join-Path $repo $launcher) -Raw -Encoding UTF8
+    foreach ($sentence in $deployGuard.sentences.launcher.PSObject.Properties) {
+        $lines = @($sentence.Value)
+        $first = $lines[0].Replace($crossText + ' ', '{0} ').Replace('{course}', '{1}').Replace('{section}', '{2}')
+        Report "deployWhileItsSectionDeploys.sentences/$launcher" $sentence.Name ($source.Contains('Write-Host ("' + $first + '" -f $cross, $Course, $Section)')) "does not print '$first' word for word"
+        Report "deployWhileItsSectionDeploys.sentences/$launcher" ($sentence.Name + ' (second line)') ($source.Contains('Write-Host "' + $lines[1] + '"')) "does not print '$($lines[1])'"
+    }
+    foreach ($field in @('launcherLineWhenALaterDeployIsStillWorking', 'launcherLineWhenItsSectionIsAlreadyBeingDeployed')) {
+        $format = ([string]$declined.$field).Replace('{course}', '{0}').Replace('{section}', '{1}').Replace($dotText, '{2}').Replace('{leg}', '{3}').Replace($dashText, '{4}')
+        Report "activityTrail/$launcher" $field ($source.Contains('Write-TrailLine ("' + $format + '" -f $Course, $Section, $dot, $Leg, $dash)')) "does not record '$format'"
+    }
+}
+# #386's line and #286's, which preview.ps1 alone writes, with the dash the
+# contract has (both had the dot in its place until #467).
+$previewSource = Get-Content -LiteralPath (Join-Path $repo 'preview.ps1') -Raw -Encoding UTF8
+foreach ($pair in @(@($declined, 'launcherLineWhenItsSectionIsBeingDeployed'), @($portEvent, 'launcherLineWhenEveryAddressIsTaken'))) {
+    $format = ([string]$pair[0].($pair[1])).Replace('{course}', '{0}').Replace('{section}', '{1}').Replace($dotText, '{2}').Replace($dashText, '{3}')
+    Report 'activityTrail/preview.ps1' $pair[1] ($previewSource.Contains('Write-TrailLine ("' + $format + '" -f $COURSE, $SECTION, [char]0x00B7, [char]0x2014)')) "does not record '$format'"
 }
 
 Write-Host ("{0} passed, {1} failed, {2} skipped" -f $passed, $failed, $skipped)
