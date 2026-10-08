@@ -67,6 +67,16 @@ final class RecentWorkingFolders {
         save()
     }
 
+    #if DEBUG
+    /// Tests only: the list as the menu reads it, without touching any store.
+    /// The app's own list is never read or written under the hosted suite
+    /// (`mayNotTouch`), so without this a test of the menu would only ever
+    /// see an empty Open Recent.
+    func replaceEntriesForTests(_ folders: [RememberedFolder]) {
+        entries = folders
+    }
+    #endif
+
     /// File ▸ Open Recent ▸ Clear Menu.
     func clear() {
         if WindowFolderMemory.mayNotTouch(defaults) {

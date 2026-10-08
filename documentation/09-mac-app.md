@@ -2804,9 +2804,11 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
 - **Open Working Folder… and Open Recent work with no window.** With a
   Plantoir window in front they switch THAT window — Russell's decision, and
   what Open… always did. With a SHEET up on that window they are greyed like
-  every verb (`subjectMenus` → `openWorkingFolder`, `openRecent`): left live,
-  measured by the implementation review, they opened an app-modal panel and a
-  SECOND window behind the sheet. SwiftUI keeps a submenu's own item enabled
+  every verb (`subjectMenus` → `openWorkingFolder`, `openRecent`). Left live
+  — which the implementation review measured — they would have opened an
+  app-modal panel and a SECOND window behind the sheet: that part was found by
+  reading the code (`freeWindowModel` is nil under a sheet, so the no-window
+  branch runs), not measured. SwiftUI keeps a submenu's own item enabled
   whatever `.disabled` says (measured), so it is Open Recent's ENTRIES that
   grey. With none, an app-level
   `NSOpenPanel` (or the recent folder) is set as

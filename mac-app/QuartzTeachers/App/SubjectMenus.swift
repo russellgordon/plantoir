@@ -149,11 +149,13 @@ struct SectionMenu: Commands {
         )
     }
 
-    /// "Cancel Deploy at 6:30 AM…" when one is set — the context menu's own
-    /// title — and "Cancel Deploy at…" greyed when none is (Russell's
-    /// decision 4).
+    /// "Cancel Deploy at 6:30 AM…" when it can be used — the context menu's
+    /// own title — and "Cancel Deploy at…" whenever it is greyed, with no
+    /// time (Russell's decision 4): a course kept for reference, a sheet up,
+    /// or nothing scheduled.
     var cancelTitle: String {
-        if let scheduledFor = sidebar?.scheduledFor, situation.row == .section {
+        let canCancel: Bool = SubjectMenuRules.enabledItems(situation).contains(.cancelScheduledDeploy)
+        if canCancel, let scheduledFor = sidebar?.scheduledFor, situation.row == .section {
             return "Cancel Deploy at \(ScheduledDeploy.timeText(scheduledFor))…"
         }
         return "Cancel Deploy at…"

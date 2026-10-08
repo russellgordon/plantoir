@@ -96,9 +96,15 @@ final class MenuKeysBehindASheetTests: XCTestCase {
         MenuRoute.interceptForTests = { item in
             ran.append(item)
         }
+        // One folder in Open Recent, so the check below sees a real entry
+        // and not only Clear Menu (which an empty list greys anyway).
+        let recents: RecentWorkingFolders = RecentWorkingFolders.shared
+        let recentsBefore: [RememberedFolder] = recents.entries
+        recents.replaceEntriesForTests([RememberedFolder(path: fixtureURL.path, bookmark: nil)])
         defer {
             MenuRoute.interceptForTests = nil
             workspace.selection = nil
+            recents.replaceEntriesForTests(recentsBefore)
         }
 
         // The control: no sheet, so the key reaches Deploy….
@@ -127,7 +133,11 @@ final class MenuKeysBehindASheetTests: XCTestCase {
         // every entry inside it.
         let openRecent: NSMenu = try XCTUnwrap(item(titled: "Open Recent", inMenu: "File")?.submenu)
         let entries: [NSMenuItem] = MenuBarTreeTests.visibleItems(of: openRecent)
-        XCTAssertFalse(entries.isEmpty)
+        var folderEntries: Int = 0
+        for entry in entries where !entry.isSeparatorItem && entry.title != "Clear Menu" {
+            folderEntries += 1
+        }
+        XCTAssertEqual(folderEntries, 1, "the seeded folder is in Open Recent: \(entries)")
         for entry in entries where !entry.isSeparatorItem {
             XCTAssertFalse(entry.isEnabled, "Open Recent ▸ \(entry.title) greys while a sheet is up")
         }
