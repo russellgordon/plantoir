@@ -58,6 +58,7 @@ public sealed partial class AssistWindow : Window
     {
         InitializeComponent();
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
+        WindowTheme.Apply(this);   // the title bar follows dark/light mode
         _folder = workspacePath;
         _course = course;
         _section = section;
@@ -470,7 +471,7 @@ public sealed partial class AssistWindow : Window
             return;
         }
 
-        _tools = await McpClient.Start(server, _folder, _course.Code, _closing.Token);
+        _tools = await McpClient.Start(server, _folder, _course.Code, _section, _closing.Token);
         if (_tools is null)
         {
             ActivityTrail.Note(ActivityTrail.Event.AssistantWouldNotStart,

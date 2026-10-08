@@ -155,7 +155,13 @@ public class AssistScenarioTests : IDisposable
         // course up again on every turn.
         var tools = new RealTools(new AssistWorkspace(_folder, _launcher, undo: new UndoHistory()));
         var model = new ScriptedModel(given?["modelReply"] as JsonObject);
-        var agent = new AssistAgent(model, tools, new JsonArray(), Course, SectionNumber)
+        // The contract's LOCAL schemas, as the window's own narrowed surface
+        // declares them (#440 scenario "an empty add_next_class from the model
+        // runs"): with no schemas the agent's course gate binds nothing to an
+        // EMPTY call, which production never sees, since the window always
+        // hands its agent NarrowToLocal(served).
+        var schemas = ContractLoader.LoadJson("assist-cases.json")["toolSchemas"]!["local"]!.DeepClone().AsArray();
+        var agent = new AssistAgent(model, tools, schemas, Course, SectionNumber)
         {
             PreviewIsShowing = () => previewRunning,
             SectionIsBusy = () => sectionBusy,
@@ -713,7 +719,7 @@ public class AssistScenarioTests : IDisposable
     /// converted throws instead of being dropped, because a runner that quietly
     /// drops one is the failure #141 was about.</para>
     /// </remarks>
-    private sealed class RealTools : IToolServer
+    internal sealed class RealTools : IToolServer
     {
         private readonly PlantoirTools _tools;
         private readonly Dictionary<string, MethodInfo> _served = new(StringComparer.Ordinal);
@@ -772,15 +778,9 @@ public class AssistScenarioTests : IDisposable
                 if (block is TextContentBlock piece) text.AppendLine(piece.Text);
             string detail = text.ToString().TrimEnd();
 
-            var meta = result.Meta;
-            bool isPlan = meta?[AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
-            string? summary = meta?[AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
-            string? backup = meta?[AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
-            bool noPage = meta?[AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
-
-            return string.IsNullOrWhiteSpace(summary)
-                ? AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
-                : new AssistToolAnswer(summary, detail, isPlan, backup, noPage);
+            // The SAME reader McpClient uses, so a _meta key added for the
+            // window (#440's nextClass) cannot be read there and missed here.
+            return AssistToolAnswer.FromResult(detail, result.Meta);
         }
 
         private static object?[] Bind(MethodInfo method, JsonObject arguments, CancellationToken cancellation)

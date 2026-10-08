@@ -563,8 +563,8 @@ public sealed partial class SectionDetailView : UserControl
         bool wrong = ScheduledPublishOutcome.NeedsAttention(outcome.Outcome);
         ScheduledPublishNotice.Severity = wrong ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
         ScheduledPublishNotice.Title = wrong
-            ? "Your scheduled publish did not go out"
-            : "Your scheduled publish went out";
+            ? "Your scheduled deploy did not go out"
+            : "Your scheduled deploy went out";
         ScheduledPublishNotice.Message =
             ScheduledPublishOutcome.Sentence(_course.Code, _sectionNumber, outcome);
         ScheduledPublishNotice.IsOpen = true;
@@ -614,8 +614,11 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // The record AND its notification in Notification Center (#464).
             if (_window.Workspace.WorkspacePath is { } folder)
-                ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber, folder);
+                ScheduledRunAnnouncement.TeacherDismissed(
+                    new ScheduledPublishToast.Target(_course.Code, _sectionNumber, folder),
+                    new Services.ScheduledPublishNotifier.SystemToasts(), diagnostic: App.LogDiagnostic);
             SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
         }
         catch (Exception ex)
@@ -969,7 +972,7 @@ public sealed partial class SectionDetailView : UserControl
             || CourseActivity.IsPublishing(workspacePath, _course.Code))
         {
             return new SiteHealthRepair.Outcome(
-                "Plantoir is publishing this course just now.",
+                "Plantoir is deploying this course just now.",
                 // Deliberately not "press Preview Again": this is the outcome
                 // whose button is withheld, and naming a button that is not on
                 // screen is worse than saying nothing.
@@ -1885,8 +1888,14 @@ public sealed partial class SectionDetailView : UserControl
             // assistant, relaying it) hears — success, all-destinations,
             // partial, or every-destination-failed — from what actually
             // happened, not from having reached this line.
-            outcomeMessage = MultiDestinationDeployRunner.Result(
-                _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
+            // The build first (the mac's deployAndWait): nothing was sent
+            // anywhere, so "did not finish" would name the upload - and a
+            // build refused while the section was still being deployed is
+            // said as itself (#467 / mac #439).
+            outcomeMessage = (MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish(
+                                  _course.Code, _sectionNumber.ToString(), _deployRunner.Legs.FirstOrDefault())
+                              ?? MultiDestinationDeployRunner.Result(
+                                  _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome)).Message;
             // Added to what the assistant says, too (#357): it pressed this button.
             if (savedNotice is not null) outcomeMessage += " " + savedNotice;
             EndPublishActivity();

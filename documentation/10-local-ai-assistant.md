@@ -6239,7 +6239,9 @@ is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-r
 model's `unit` and `days` from EVERY `add_next_class` — the "unless the
 sentence says unit" exception let "Add the next class in this unit" start a
 new unit — and Windows owes taking both out of its model's view. See the
-#440 section below.)*
+#440 section below.)* *(Windows, 2026-10-08: done — `WithoutAnUnaskedNewUnit`
+is now `WithoutCardOnlyArguments`, which drops both whatever the sentence says,
+and `unit`/`days` left the local schema; see "Done on Windows" under #440.)*
 
 ### #440: `add_next_class` keeps two arguments; units and counts answered in code
 
@@ -6343,7 +6345,7 @@ next unit test", "…not the next unit", and "next week" in a course whose
 unit word is Week — each points where the plain call was asked for, which
 costs one sentence and writes nothing.
 
-**Windows owes** (the hand-back is a comment on #440, the one issue; it stays open for Windows to close): hide
+**Windows owed** (the hand-back is a comment on #440, the one issue, closed from Windows when done): hide
 `unit`/`days` from its model via `CardOnlyArguments` — its router is shown
 `unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever
 the sentence says "unit" — measured on its own tier; widen S2; port the
@@ -6354,6 +6356,47 @@ effect: the mac reads `NextClassPlanner.plan` directly rather than the
 runner's plan path, which offers the sheet, so a twin that reads through
 `plan_add_next_class` could offer it twice; read the planner, or suppress
 the offer for S3's probe.
+**Done on Windows (2026-10-08, v1.4.4).** Every item, as follows.
+- **Hidden:** `add_next_class.unit/days` and `plan_add_next_class.unit/days` are
+  in `AssistAgent.CardOnlyArguments` and the mirror (`narrow-tools.py`); the
+  server still declares them for the cards. `OptionalExtras` is kept, inert for
+  the local model (it decides only a schema that still shows the two).
+- **S2 widened:** `AssistAgent.WithoutCardOnlyArguments` (was
+  `WithoutAnUnaskedNewUnit`) drops both from every MODEL `add_next_class`.
+- **Frames:** the two exact new-unit sentences and `DaysToAUnit`, ported from
+  `daysToAUnit` (numbers read as `int`, since the server binds ints; a count
+  past that range falls to the model and S3 points it).
+- **S3:** `AssistNextClassUnits`, a literal port (ASCII words, order a/c/b,
+  numbers read 64-bit and the sentence normalised to Form C, so a C# port
+  cannot disagree with Swift on "unit 3000000000" or a decomposed accent). The
+  reading is the SERVER's: `plan_add_next_class` with course and section only
+  now carries `_meta` `plantoir.app/nextClass` (`AssistWorkspace.NextClassReading`,
+  which uses the plan only to detect a refusal and takes unit and day from
+  `NextClassPlanner.NextUnitAndDay`, the naming word as the unit word — the
+  mac's `nextClassReading`, not a second planner). The probe passes no progress
+  callback, is never rendered or added to the model's messages, and every
+  failure is null; the dates sheet is offered only for a RENDERED line, so a
+  refusal for dates offers nothing and the real call asks once. One reader of
+  every `_meta` key (`AssistToolAnswer.FromResult`) serves `McpClient` and the
+  tests' in-process servers. S3's trail line TAKES THE PLACE of the turn's
+  chose-a-tool line (Windows' S1 convention). Cost: in plan mode a routed
+  `add_next_class` now makes two read-only `plan_add_next_class` calls.
+- **Measured** (`research/ai-assist/next-class-unit-440-windows-*.txt`, smaller
+  assistant only — the larger tier's weights are not on the PC, so it ships
+  this unmeasured; i5-8365U / UHD 620, b10435 Vulkan, arms interleaved): unit
+  "next" 50/50 -> 0/60 and no unit or days key sent at all; zero inversions in
+  every suite; one probe dropped, S1 "card: undo" 10 -> 0 — a sentence answered
+  in code, which flipped the same way on an unchanged surface in #424 — and
+  four ROSE by 9-10 ("next day's lesson", the delete decline, ICS3U's
+  "card: publish by name" and "HIDE - the inversion case").
+- **Pinned:** `NextClassUnitsTests` (every row; each row that reaches the model
+  is also sent through the AGENT, because Windows has interception layers the
+  matcher alone does not see; the real served surface narrowed to course and
+  section; every quoted sentence run as a card in three course kinds; the
+  runner's reading and its `_meta`), and the seven scenarios, whose runner now
+  hands the agent the contract's local schemas as production hands it
+  `NarrowToLocal(served)`.
+
 The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
 record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
 `7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
@@ -6431,8 +6474,9 @@ All three fixes are CODE; no description moved.
     say "Cancel scheduled deploy", with no "the|that|my", so the card was still
     going to the model (the accepted row's `why` called "Cancel that scheduled
     deploy" the shelf's sentence; it never was). The mac added an ACCEPTED row
-    for the bare sentence and accepts it; Windows owes the same one-word
-    widening. The shelves were not reworded.
+    for the bare sentence and accepts it, and Windows made the same one-word
+    widening with #466 (v1.4.4), so the row passes on both apps. The shelves
+    were not reworded.
   - **Not in `cardPhrasings.parsed`, on purpose.** That generated catalogue
     lists card families with an example and a `notThis`; these two are frames
     over sentences whose specification is the authored `scheduleAndCancel` key,
@@ -6557,9 +6601,12 @@ the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
 and the mac is asked what it does — answered by #458, below). Windows' Codex
-door names none and holds none, as before. Russell decided on #458 that BOTH
-doors hold their course, so the mac's Codex door names it too and Windows'
-owes the same (below).
+door named none and held none until v1.4.4. Russell decided on #458 that BOTH
+doors hold their course, so the mac's Codex door names it too, and since #468
+(2026-10-08) Windows' does as well: a fifth override,
+`-c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"`
+(`CodexLauncher.Arguments`), through the same three escaping layers (below,
+"On Windows (#468)").
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6719,15 +6766,102 @@ Russell's comment on #458 (2026-10-07) won: BOTH doors hold, because a Codex
 session that held nothing would lose all three protections — its backup could
 be deleted under it, a second session could open on the course, and the course
 could be renamed under it — while looking to the teacher exactly like a Claude
-one. Windows' Codex door still names no course (it passes four overrides), so
-Windows owes the fifth, and the words "or Codex" in the sentences above
-(`doorCourseHold.whichDoors`). How a Codex session ENDS was not measured; a
-leftover lease holds nothing either way. **Rejected**: naming the door in a
-second variable so each sentence could say "Claude" or "Codex" — the lease
-would have to carry it, a format change on both platforms for one word.
+one. Windows' Codex door has passed the fifth override since #468 (below), and
+says "or Codex" in every one of these sentences (`doorCourseHold.whichDoors`).
+How a Codex session ENDS was not measured; a leftover lease holds nothing
+either way. **Rejected**: naming the door in a second variable so each
+sentence could say "Claude" or "Codex" — the lease would have to carry it, a
+format change on both platforms for one word.
 
 **The in-app window does not hold structural work on the mac**, and never did;
-on Windows its own server takes the lease, so it does there. Not changed here.
+on Windows its own server takes the lease, so it does there — and still does
+after #468, in its own words (below).
+
+### On Windows (#468, 2026-10-08): the Codex door holds its course too, and the window's hold keeps its own words
+
+**The Codex door.** `CodexLauncher.Arguments(server, folder, courseCode,
+greeting)` passes the fifth override after the two timeouts — eleven argv
+elements, the contract's (`app-rules.json` → the codex agent's `arguments` and
+`serverEnvironment`). `plantoir-mcp` already read the variable, so nothing
+changed in the server's hold. `CodexLauncherTests` reads each door's
+`serverEnvironment` back out of what it passes (the Claude config's `env`, the
+Codex `-c …env.` overrides) and sends an awkward course code
+(`-AP CALC- & ^(x)|y`) through a real `cmd.exe` and a stub `codex.cmd`.
+**Codex is not installed on the Windows test PC**, so only that argv round trip
+is tested here; that Codex puts the override into the server's environment
+rests on the mac's `codex mcp get --json` (Codex 0.155.1). Driven by hand
+instead: `plantoir-mcp.exe --mcp-stdio <folder>` with
+`PLANTOIR_DOOR_COURSE=ics3u` took `ICS3U.assist.<pid>.lease` (the folder's
+spelling), wrote the trail line, wrote `ICS3U.held-backup.<pid>` naming the
+conversation's zip after an `add_next_class`, and on stdin closing removed the
+record and then the lease, exit 0.
+
+**The trail.** `plantoir-mcp` writes `outside session held a course`
+(`AssistWorkspace.HoldingTrailLine`) when a DOOR's server takes its lease —
+gated on `!ServesTheLocalWindow` (`AssistWorkspace.NotesAnOutsideHold`, pinned
+both ways by `DoorCourseHoldTests.OnlyADoorsServerWritesTheHoldingLine`), because
+the window's own server holds its course too and must not be written up as "a
+Claude or Codex session". Only the door case was driven by hand.
+
+**Two causes, one hold — the decision Windows had to make.** Windows' assistant
+window runs its own `plantoir-mcp`, locked with `--course`, and that server
+takes the same `assist` lease a door's does. That lease is what greys the
+doors and a second window on the course and holds Rename Course, Add Section
+and restore, and ALL of it stays: Windows has no one-window rule, so two
+conversations on one course would write the same pages, and Rename Course would
+move the folder out from under a server locked to that code. What #468 changes
+is only the SENTENCE. `WindowServers` (Core) is a registry of the
+`plantoir-mcp` processes THIS app started for its windows, by pid, with the
+course and section; `McpClient.Start` registers the server the moment it
+exists and `DisposeAsync` forgets it only once it has exited. A live `assist`
+lease whose pid is registered is the window's
+(`CourseActivity.WindowRevising`); any other is a Claude or Codex session's
+(`CourseActivity.IsRevisedElsewhere`). Each refusal picks its words:
+`ReviseHoldReason` (greyed items: the contract's
+`availableOnceYouFinishRevisingWithClaude`, or "Available once you close the
+assistant for {course} Section {n}"), `AssistHoldRefusal` (Rename, restore,
+Add Section: `claudeIsRevisingTheCourse*`, or "Close the assistant for
+{course} Section {n} first, then …"), and the doors' new click-time re-check
+(`courseIsAlreadyBeingRevised` with `finishTheClaudeSessionFirst`, or the
+window's old "Finish in that window, close it" sentence). The window's
+sentences are Windows' own (`WindowHoldWording`), shaped like the one the app
+already says about an open window, and kept off `AssistWording`, whose every
+member must name a contract key. An outside session's words come first when
+both hold one course. Before #468 Rename and restore said "is previewing or
+deploying right now" for any assistant's hold — the wrong cause either way.
+**Rejected**: lifting the window's hold to match the mac (the mac's window
+takes no lease and is one at a time; Windows' is neither), and
+`AssistActivity` as the detector — it is claimed when the window opens, before
+its server starts, and released while the server can still run for up to three
+seconds, so both ends would misread the window's lease as a session's, and it
+cannot tell the two apart when both hold one course (stack-2 plan review, H1).
+**Known limit**: the registry is in-process, so a SECOND Plantoir's window
+reads here as a Claude or Codex session — the hold is right, the words name the
+wrong cause.
+
+**Backups kept, told by source.** `HeldBackups.ByOtherSessions` is the zips
+recorded by a live assist holder that is NOT one of this app's window servers,
+minus what this app's windows hold; `HeldBackups.PidOfRecord` reads the record
+name as `file-formats.json` → `heldBackupRecord.name` says (pid the last part,
+`held-backup` the second-last). The delete-several keeps the window's
+per-backup sentence and groups a session's per course
+(`backupKeptForAClaudeSession` / `backupsKeptForAClaudeSession`), then says
+`finishTheClaudeSessionToDeleteItsBackup(s)` after the delete; the trail keeps
+the window's clause verbatim and adds "; kept <names>, which a Claude or Codex
+session still open made". **The single Delete Backup honoured no hold until
+#468** — it went straight to `File.Delete`, so it could remove the backup an
+open conversation could restore from — and wrote no trail line. It now says at
+once why a held backup is kept, re-reads the hold at the moment of deleting
+through `BackupDeleter.Delete`, and writes `backups deleted`, as the contract
+says both paths do.
+
+**Tests**: `DoorCourseHoldTests` (courseToHold, whichDoors, the trail line,
+reviseCases — the four mac-only cases carry `onWindows` notes that now STATE what
+Windows does (the three about its own window name
+`WindowHoldWording.AvailableOnceTheAssistantCloses`, and the test checks they do)
+rather than leaving it to Windows — both causes'
+words, heldBackupRecord with real lease files and real processes),
+`CodexLauncherTests`, `BackupsContractTests`.
 
 ### The two timeouts, and why they are passed rather than trusted
 
@@ -7386,7 +7520,7 @@ family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
 3", and three `nearMisses` that a runner walks both without a course and in a
 club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
-on it is matched in code — "Cancel scheduled deploy" too since #449, which
+on it is matched in code — "Cancel scheduled deploy" too since #449 (#466 on Windows), which
 until then went to the model, where it had been measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
 it — a title-bearing publish or hide goes to the model, and no routing
 measurement has been made in a club course.

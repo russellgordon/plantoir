@@ -489,6 +489,6 @@ public class SiteHealthRepairTests : IDisposable
         // for the first time nothing has ever gone out.
         Assert.DoesNotContain("last published", SiteHealthRepair.NotPublishedYet);
         Assert.DoesNotContain("students still see", SiteHealthRepair.NotPublishedYet);
-        Assert.Contains("until you publish again", SiteHealthRepair.NotPublishedYet);
+        Assert.Contains("until you deploy again", SiteHealthRepair.NotPublishedYet);
     }
 }

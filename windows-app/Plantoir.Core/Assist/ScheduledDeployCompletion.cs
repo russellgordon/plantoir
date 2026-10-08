@@ -111,7 +111,7 @@ public static class ScheduledDeployCompletion
 
         string joined = MultiDestinationDeployRunner.JoinedWithAnd(sentinel.DestinationNames);
         string sentence = recorded
-            ? $"marked {sentinel.CourseCode}-S{sentinel.SectionNumber}'s pages as published to {joined} (scheduled deploy)"
+            ? $"recorded {sentinel.CourseCode}-S{sentinel.SectionNumber}'s pages as deployed to {joined} (scheduled deploy)"
             : $"{sentinel.CourseCode}-S{sentinel.SectionNumber}'s scheduled deploy went out to {joined}, but could not be noted down — the window will still say Edited";
         ActivityTrail.Note(ActivityTrail.Event.SectionContentMarkedPublished, sentence, sentinel.CourseCode, sentinel.SectionNumber);
     }

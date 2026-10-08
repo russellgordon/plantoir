@@ -31,17 +31,20 @@ public static class SpecialNames
     /// <summary>
     /// Course Settings, while the coverage map is on.
     ///
-    /// <para><b>This sentence renamed a Windows switch.</b> It names "Publish
-    /// the curriculum coverage map"; the Course Settings toggle here was
+    /// <para><b>This sentence renamed a Windows switch.</b> It named "Publish
+    /// the curriculum coverage map" while the Course Settings toggle here was
     /// called "Include Curriculum Coverage map", so the ⓘ would have sent a
     /// teacher looking for a control that did not exist under that name. The
     /// LABEL was changed to match the contract rather than the sentence
     /// changed to match the label: the contract is generated from the macOS
     /// app, so the mac's wording is the product's wording, and a Windows-only
-    /// paraphrase is drift rather than a decision.</para>
+    /// paraphrase is drift rather than a decision. Since v1.4.4 (#443, #441)
+    /// the sentence and the switch both say "Include the curriculum coverage
+    /// map", the wizard's words: the map is included in the website, and
+    /// "publish" is kept for marking a page.</para>
     /// </summary>
     public const string CurriculumFolderBlockedByCoverageSetting =
-        "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Publish the curriculum coverage map” in Settings first.";
+        "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Include the curriculum coverage map” in Settings first.";
 
     /// <summary>
     /// New Course wizard, while curriculum PAGES are on. The jurisdiction is
@@ -63,7 +66,7 @@ public static class SpecialNames
     /// size a flyout against.
     /// </summary>
     public const string LastGradedFolderBlocked =
-        "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Publish the curriculum coverage map”.";
+        "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”.";
 
     /// <summary>The same floor in the wizard, naming the wizard's own switch.</summary>
     public const string LastGradedFolderBlockedWizard =
@@ -87,7 +90,7 @@ public static class SpecialNames
         "Each section needs at least one folder for its class pages and lessons. Add another per-section folder first before removing this one.";
 
     public const string SectionIndexFileBlocked =
-        "Every section needs an index.md page for its home page. Without it, the section cannot be published.";
+        "Every section needs an index.md page for its home page. Without it, the section cannot be deployed.";
 
     // ---- Consequential: ask first, then do it ---------------------------
 
@@ -119,7 +122,7 @@ public static class SpecialNames
     /// sentence that names it so the two cannot drift apart unnoticed. A test
     /// asserts the sentence contains this string.
     /// </summary>
-    public const string CoverageSwitchLabelInSettings = "Publish the curriculum coverage map";
+    public const string CoverageSwitchLabelInSettings = "Include the curriculum coverage map";
 
     /// <summary>The wizard's coverage switch label, same reasoning.</summary>
     public const string CoverageSwitchLabelInWizard = "Include the curriculum coverage map";

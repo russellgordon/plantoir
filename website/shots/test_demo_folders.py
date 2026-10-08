@@ -372,6 +372,274 @@ class OneHome(unittest.TestCase):
         source = (HERE / "marketing_folder.py").read_text(encoding="utf-8")
         self.assertIsNone(re.search(r"SECOND_SEMESTER_STARTS\s*=\s*date\(", source))
 
+    def test_the_windows_capturer_lists_no_courses_of_its_own(self):
+        # #459: app_scenes_windows.py once carried "ENG2D:1, 2;MCV4U:1, 2;…"
+        # (sections folders.json does not have) and a fixed "ICS3U:2025".
+        source = (HERE / "app_scenes_windows.py").read_text(encoding="utf-8")
+        for name in ("DEMO_COURSES", "MARKETING_COURSES", "MARKETING_REFERENCE"):
+            self.assertNotIn(name, source, f"{name} belongs in folders.json")
+        for course in demo_folders.demo_courses(SPEC) + demo_folders.marketing_courses(SPEC):
+            literal = re.search(r'"[^"\n]*\b' + course["code"] + r'\s*:[^"\n]*"', source)
+            self.assertIsNone(literal, f"app_scenes_windows.py writes {course['code']}'s sections or year: "
+                                       f"{literal.group(0) if literal else ''}")
+
+
+# ---------- What Windows' provision scene is given (#459) ----------
+
+class TheWindowsProvisionArguments(unittest.TestCase):
+    """The strings `Plantoir.exe --stage-scene provision` takes, built from
+    folders.json (MarketingScene.CourseList / ReferenceCopyOf parse them)."""
+
+    @staticmethod
+    def parse_courses(text: str) -> list[tuple[str, list[int]]]:
+        # MarketingScene.CourseList: `;` between courses, `CODE:sections`.
+        parsed: list[tuple[str, list[int]]] = []
+        for entry in text.split(";"):
+            code, sections = entry.split(":", 1)
+            numbers: list[int] = []
+            for part in sections.split(","):
+                numbers.append(int(part.strip()))
+            parsed.append((code.strip(), numbers))
+        return parsed
+
+    def test_the_provision_argument_is_the_specs(self):
+        for courses in (demo_folders.demo_courses(SPEC), demo_folders.marketing_courses(SPEC)):
+            expected: list[tuple[str, list[int]]] = []
+            for course in courses:
+                expected.append((course["code"], list(course["sections"])))
+            self.assertEqual(self.parse_courses(demo_folders.provision_courses_argument(courses)), expected)
+        self.assertEqual(demo_folders.provision_courses_argument(
+            [{"code": "ENG2D", "sections": [1, 2]}, {"code": "MCV4U", "sections": [1]}]), "ENG2D:1, 2;MCV4U:1")
+
+    def test_a_new_reference_copy_is_filed_the_year_before_the_clock(self):
+        of = SPEC["marketing"]["referenceCopy"]["of"]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.assertEqual(demo_folders.reference_copy_argument(folder, date(2026, 9, 15), SPEC), f"{of}:2025")
+            self.assertEqual(demo_folders.reference_copy_argument(folder, date(2026, 10, 8), SPEC), f"{of}:2025")
+            self.assertEqual(demo_folders.reference_copy_argument(folder, date(2027, 9, 15), SPEC), f"{of}:2026")
+
+    def test_a_kept_copys_own_year_wins_at_any_clock(self):
+        of = SPEC["marketing"]["referenceCopy"]["of"]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            copy = folder / "courses" / f"{of}-2025"
+            copy.mkdir(parents=True)
+            (copy / "course_config.json").write_text(json.dumps(
+                {"course_code": of, "kept_for_reference": True, "reference_school_year": 2025}), encoding="utf-8")
+            for today in (date(2026, 9, 15), date(2027, 9, 15), date(2030, 1, 4)):
+                self.assertEqual(demo_folders.reference_copy_argument(folder, today, SPEC), f"{of}:2025")
+
+
+def _windows_scenes():
+    """app_scenes_windows, when this machine can import it (Windows, with
+    Pillow, which capture_windows.py needs anyway); None elsewhere."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import app_scenes_windows
+    except ImportError:
+        return None
+    return app_scenes_windows
+
+
+@unittest.skipUnless(_windows_scenes(), "app_scenes_windows.py imports Windows' own modules")
+class TheWindowsCapturersFolders(unittest.TestCase):
+    """How the Windows capturer judges and prepares its folders, against
+    temporary stand-ins for ~/Teaching, ~/School Web Space and
+    ~/Desktop/Teaching. No app is run."""
+
+    def setUp(self) -> None:
+        self.scenes = _windows_scenes()
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.saved = {name: getattr(self.scenes, name) for name in ("DEMO", "MARKETING", "SHOWN", "COURSES_SET_ASIDE")}
+        self.scenes.DEMO = root / "Teaching"
+        self.scenes.MARKETING = root / "School Web Space"
+        self.scenes.SHOWN = root / "Desktop" / "Teaching"
+        self.scenes.COURSES_SET_ASIDE = self.scenes.SHOWN / ".courses set aside for the pictures"
+
+    def tearDown(self) -> None:
+        for name, value in self.saved.items():
+            setattr(self.scenes, name, value)
+        self.tmp.cleanup()
+
+    @staticmethod
+    def course(folder: Path, code: str, config: dict) -> Path:
+        course_dir = folder / "courses" / code
+        course_dir.mkdir(parents=True, exist_ok=True)
+        (course_dir / "course_config.json").write_text(json.dumps(config), encoding="utf-8")
+        return course_dir
+
+    def make_demo(self, sections_of=lambda course: course["sections"]) -> None:
+        demo = self.scenes.DEMO
+        demo.mkdir(parents=True)
+        (demo / "preview.ps1").write_text("#" * 4000, encoding="utf-8")
+        for course in demo_folders.demo_courses(SPEC):
+            self.course(demo, course["code"], {"course_code": course["code"], "section_numbers": sections_of(course)})
+
+    def test_a_demo_folder_with_the_specs_sections_is_whole(self):
+        self.make_demo()
+        self.assertTrue(self.scenes.demo_is_whole())
+
+    def test_a_demo_folder_with_other_sections_is_made_again(self):
+        # The folder the old constants made: every course with sections 1 and 2.
+        self.make_demo(lambda course: [1, 2])
+        self.assertNotEqual([c["sections"] for c in demo_folders.demo_courses(SPEC)],
+                            [[1, 2]] * len(demo_folders.demo_courses(SPEC)),
+                            "folders.json gives every demo course two sections; this test proves nothing")
+        self.assertFalse(self.scenes.demo_is_whole())
+
+    def test_a_kept_destination_is_left_alone_and_nothing_is_made_beside_it(self):
+        marketing = self.scenes.MARKETING
+        kept: dict[str, Path] = {}
+        for course in demo_folders.marketing_courses(SPEC):
+            kept[course["code"]] = marketing / "Websites" / course["code"]
+            self.course(marketing, course["code"], {"course_code": course["code"], "deploy_target": "local_folder",
+                                                     "deploy_folder_path": str(kept[course["code"]])})
+        import marketing_folder
+        self.scenes.give_marketing_courses_their_destinations(marketing_folder.Report())
+        for course in demo_folders.marketing_courses(SPEC):
+            config = demo_folders.read_config(marketing / "courses" / course["code"])
+            self.assertEqual(config["deploy_folder_path"], str(kept[course["code"]]))
+            self.assertFalse((marketing / course["publishTo"]).exists(),
+                             f"{course['publishTo']} was made inside a folder that deploys elsewhere")
+        self.assertEqual(sorted(self.scenes.publish_folders(marketing)), sorted(kept.values()))
+
+    def test_a_fresh_course_is_given_folders_jsons_destination(self):
+        marketing = self.scenes.MARKETING
+        for course in demo_folders.marketing_courses(SPEC):
+            self.course(marketing, course["code"], {"course_code": course["code"], "deploy_target": "netlify"})
+        import marketing_folder
+        self.scenes.give_marketing_courses_their_destinations(marketing_folder.Report())
+        expected: list[Path] = []
+        for course in demo_folders.marketing_courses(SPEC):
+            expected.append(marketing / course["publishTo"])
+            self.assertTrue((marketing / course["publishTo"]).is_dir())
+        self.assertEqual(sorted(self.scenes.publish_folders(marketing)), sorted(expected))
+
+    def test_the_shown_folder_gets_the_destinations_and_loses_only_what_it_was_given(self):
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS3U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites")})
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        theirs = shown / "Notes"
+        theirs.mkdir(parents=True)
+        self.course(shown, "THEIRS", {"deploy_target": "local_folder", "deploy_folder_path": str(theirs)})
+        with self.scenes.ShownAsTeaching(marketing):
+            self.assertTrue((shown / "Websites" / "ICS4U").is_dir())
+        self.assertFalse((shown / "Websites").exists())
+        self.assertTrue(theirs.is_dir())
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
+                                    .read_text(encoding="utf-8"))["deploy_folder_path"],
+                         str(marketing / "Websites" / "ICS4U"))
+
+    def test_a_failure_after_the_courses_moved_puts_them_back(self):
+        # `with` never calls __exit__ for an __enter__ that raised, so the
+        # courses would be stranded on the Desktop with rewritten paths.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+
+        def broken(*_arguments):
+            raise PermissionError("refused")
+
+        saved = self.scenes.make_publish_folders
+        self.scenes.make_publish_folders = broken
+        try:
+            with self.assertRaises(PermissionError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.make_publish_folders = saved
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+        self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
+                                    .read_text(encoding="utf-8"))["deploy_folder_path"],
+                         str(marketing / "Websites" / "ICS4U"))
+
+    def test_a_config_that_cannot_be_read_strands_nothing(self):
+        # A course_config.json that is not UTF-8 used to raise inside
+        # rewrite() on the way in AND on the way out, so the undo never
+        # renamed anything and the courses stayed on the Desktop.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        broken = marketing / "courses" / "BROKEN"
+        broken.mkdir(parents=True)
+        (broken / "course_config.json").write_bytes(b"\xff\xfe not utf-8")
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+        with self.scenes.ShownAsTeaching(marketing):
+            self.assertTrue((shown / "courses" / "BROKEN").is_dir())
+            self.assertEqual(json.loads((shown / "courses" / "ICS4U" / "course_config.json")
+                                        .read_text(encoding="utf-8"))["deploy_folder_path"],
+                             str(shown / "Websites" / "ICS4U"))
+        self.assertTrue((marketing / "courses" / "BROKEN").is_dir())
+        self.assertEqual((broken / "course_config.json").read_bytes(), b"\xff\xfe not utf-8")
+        self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
+                                    .read_text(encoding="utf-8"))["deploy_folder_path"],
+                         str(marketing / "Websites" / "ICS4U"))
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+
+    def test_a_rewrite_that_fails_both_ways_still_puts_the_courses_back(self):
+        # Whatever rewrite() raises, on the way in and again in the undo,
+        # the renames in __exit__ still run.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "netlify"})
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+
+        def broken(*_arguments):
+            raise OSError("refused")
+
+        saved = self.scenes.ShownAsTeaching.__dict__["rewrite"]
+        self.scenes.ShownAsTeaching.rewrite = staticmethod(broken)
+        try:
+            with self.assertRaises(OSError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.ShownAsTeaching.rewrite = saved
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+
+    def test_folders_made_before_a_failure_are_taken_away(self):
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        shown.mkdir(parents=True)
+        real = self.scenes.make_publish_folders
+
+        def made_one_then_failed(folder, made=None):
+            real(folder, made)
+            raise PermissionError("refused after the first folder")
+
+        self.scenes.make_publish_folders = made_one_then_failed
+        try:
+            with self.assertRaises(PermissionError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.make_publish_folders = real
+        self.assertFalse((shown / "Websites").exists())
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
+
+    def test_a_destination_outside_the_folder_is_never_made(self):
+        marketing = self.scenes.MARKETING
+        elsewhere = Path(self.tmp.name) / "Desktop" / "Teaching" / "Websites"
+        self.course(marketing, "ICS3U", {"deploy_target": "local_folder", "deploy_folder_path": str(elsewhere)})
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        made = self.scenes.make_publish_folders(marketing)
+        self.assertFalse(elsewhere.exists())
+        self.assertTrue((marketing / "Websites" / "ICS4U").is_dir())
+        self.assertEqual(made, [marketing / "Websites"])
+
 
 # ---------- The door's own behaviour, with a stand-in server ----------
 

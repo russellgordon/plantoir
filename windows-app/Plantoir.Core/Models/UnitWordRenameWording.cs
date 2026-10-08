@@ -106,7 +106,7 @@ public static class UnitWordRenameWording
         return string.Join(" ", parts);
     }
 
-    public const string DonePublish = "Publish each section for its website to use the new names.";
+    public const string DonePublish = "Deploy each section for its website to use the new names.";
     public const string DoneBackup = "A backup of the whole course was saved first, and is listed under Backups.";
 
     public static string InterruptedRename(string oldWord, string newWord) =>

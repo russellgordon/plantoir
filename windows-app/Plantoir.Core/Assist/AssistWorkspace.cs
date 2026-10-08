@@ -1596,6 +1596,18 @@ public sealed partial class AssistWorkspace
             return new AssistResult(false,
                 AppendingFindings(course, section, build, 
                     AssistWording.DeployNeedsAnAnswer(course.Code, section.ToString())), null);
+        // Refused because the section was still being deployed (#467 / mac
+        // #439): a refused preview.ps1 --build-only exits 1 like a broken
+        // build, so it is asked for FIRST and said as itself. Only the
+        // refusal is the mac's answerWhenTheBuildDidNotFinish here: an
+        // ordinary build failure keeps its own message, which carries the
+        // launcher's output - couldNotBuildBeforeDeploying points at a window
+        // this process does not have (#467 plan review, L2).
+        if (!build.Succeeded && FailureExplainer.SectionDeployRefusalOf(build.Message) is { } buildRefusal)
+            return new AssistResult(false,
+                AppendingFindings(course, section, build,
+                    MultiDestinationDeployRunner.RefusalAnswer(course.Code, section.ToString(), buildRefusal).Message),
+                null);
         if (!build.Succeeded)
             return new AssistResult(false,
                 // What the build said about the folders belongs HERE most of
@@ -1627,6 +1639,8 @@ public sealed partial class AssistWorkspace
         // again, that is the trade being made.
         var outcomeLegs = new List<(Models.CourseConfiguration.DeployDestination Destination, bool Succeeded)>();
         var askedAt = new List<Models.CourseConfiguration.DeployDestination>();
+        var refusals = new List<FailureExplainer.SectionDeployRefusal>();
+        bool anyFailedOtherwise = false;
         foreach (var destination in destinations)
         {
             // unattended: --non-interactive, so a question refuses with exit 3
@@ -1636,6 +1650,11 @@ public sealed partial class AssistWorkspace
             var deployed = await _launcher.Run("deploy", arguments, _folder, progress, cancellation);
             outcomeLegs.Add((destination, deployed.Succeeded));
             if (deployed.NeededAnAnswer) askedAt.Add(destination);
+            if (!deployed.Succeeded)
+            {
+                if (FailureExplainer.SectionDeployRefusalOf(deployed.Message) is { } refusal) refusals.Add(refusal);
+                else anyFailedOtherwise = true;
+            }
         }
 
         // A destination that stopped at a question is named, and so is where
@@ -1662,7 +1681,10 @@ public sealed partial class AssistWorkspace
 
         bool anySucceeded = outcomeLegs.Any(leg => leg.Succeeded);
         var failedDestinations = outcomeLegs.Where(leg => !leg.Succeeded).Select(leg => leg.Destination).ToList();
-        var outcome = new MultiDestinationDeployRunner.Outcome(anySucceeded, failedDestinations);
+        // The runner's own rule (CurrentOutcome): the refusal is said only
+        // when EVERY leg that ran was refused this way.
+        var everyLegRefused = !anySucceeded && !anyFailedOtherwise && refusals.Count > 0 ? refusals[0] : null;
+        var outcome = new MultiDestinationDeployRunner.Outcome(anySucceeded, failedDestinations, everyLegRefused);
         var result = MultiDestinationDeployRunner.Result(course.Code, section.ToString(), destinations.Count, outcome);
         // Findings come from the BUILD, not from a destination's upload: every
         // destination publishes the same built site, and the checks run inside
@@ -4183,6 +4205,36 @@ public sealed partial class AssistWorkspace
             : NextClassPlanner.NextUnitAndDay(existingTitles, naming);
 
         return PlanAddClasses(courseCode, sectionNumber, next.Unit, next.Day, 1);
+    }
+
+    /// <summary>
+    /// Where a PLAIN "add the next class" would land, for settler S3 (#440) —
+    /// the mac's <c>AssistToolRunner.nextClassReading</c>, ported as it is:
+    /// the plan is made ONLY to learn whether one can be made (no remembered
+    /// dates, or the course gone, is a refusal and gives null, so the real
+    /// call runs and asks for the dates — ruling 7), and the unit and day come
+    /// from <see cref="NextClassPlanner.NextUnitAndDay(IEnumerable{string}, ClassPageNaming)"/>
+    /// over the section's pages, independently of the plan (stack-2 plan
+    /// review, M1: a plan that changes nothing has no day to read). The unit
+    /// word is the NAMING word — "Week" in a numbered course.
+    /// </summary>
+    public AssistNextClassReading? NextClassReading(string courseCode, int sectionNumber)
+    {
+        try
+        {
+            PlanAddNextClass(courseCode, sectionNumber);
+            var course = Course(courseCode);
+            int section = Section(course, sectionNumber);
+            var naming = course.Configuration.Naming;
+            var titles = ClassPages(course, section).Select(p => Path.GetFileNameWithoutExtension(p) ?? "");
+            var next = NextClassPlanner.NextUnitAndDay(titles, naming);
+            return new AssistNextClassReading(naming.Word, naming.IsNumbered, course.Configuration.ClassNoun,
+                                              next.Unit, next.Day);
+        }
+        catch (AssistRefusal)
+        {
+            return null;
+        }
     }
 
     /// <summary>Create the pages the plan describes. Backed up first, and undoable.</summary>

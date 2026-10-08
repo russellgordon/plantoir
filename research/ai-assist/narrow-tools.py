@@ -80,6 +80,11 @@ FOR_THE_LOCAL_MODEL = {
 CARD_ONLY_ARGUMENTS = {
     "add_next_class.duplicate",
     "plan_add_next_class.duplicate",
+    # #440: unit and days leave the router's view (the cards still fill them).
+    "add_next_class.unit",
+    "add_next_class.days",
+    "plan_add_next_class.unit",
+    "plan_add_next_class.days",
     "read_page.answer",
     "read_page.asTyped",
     "read_page.onlyIfFound",

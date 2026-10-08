@@ -20,8 +20,12 @@ namespace Plantoir.Core.Assist;
 /// </summary>
 public interface IUpdatePrompts
 {
-    /// <summary>The offer: Install and Reopen, Not Now, or Skip This Version.</summary>
-    Task<UpdateAnswer> OfferAsync(string version, string? notes);
+    /// <summary>
+    /// The offer: Install and Reopen, Not Now, or Skip This Version — or, when
+    /// <paramref name="important"/> (#453), Install and Reopen alone. Answers
+    /// <see cref="UpdateAnswer.NotShown"/> when no window could show it (#465).
+    /// </summary>
+    Task<UpdateAnswer> OfferAsync(string version, string? notes, bool important);
     Task ShowUpToDateAsync();
     Task ShowCouldNotCheckAsync();
     Task ShowHeldAsync(string work, bool onceInstalling);
@@ -30,7 +34,12 @@ public interface IUpdatePrompts
     void QuitForInstall(string installerPath, string arguments);
 }
 
-public enum UpdateAnswer { Install, NotNow, Skip }
+/// <summary>
+/// The teacher's answer to an offer. <see cref="NotShown"/> is NOT an answer
+/// (#465): no window was there to show it in, or another dialog was in front,
+/// so nothing is written on the trail and the check is tried again soon.
+/// </summary>
+public enum UpdateAnswer { Install, NotNow, Skip, NotShown }
 
 /// <summary>
 /// The update engine (#337): NetSparkleUpdater's CORE — no UI factory, ours
@@ -67,6 +76,18 @@ public sealed class AppUpdater : IDisposable
     private bool _stoppedNotedThisLaunch;
     private string? _skipped;
     private Action<string?>? _rememberSkip;
+    private int _dailyCheckUnderWay;
+    private TimeSpan _retryAfter = FirstRetry;
+
+    /// <summary>How soon an offer nobody saw is tried again; doubled each time, up to the hourly look (#465).</summary>
+    internal static readonly TimeSpan FirstRetry = TimeSpan.FromMinutes(1);
+    internal static readonly TimeSpan HourlyLook = TimeSpan.FromHours(1);
+
+    /// <summary>When the last offer nobody saw asked to be tried again — what the tests read.</summary>
+    internal TimeSpan? LastRetryScheduled { get; private set; }
+
+    /// <summary>The developer's diagnostic log (startup.log): never the trail.</summary>
+    public Action<string>? Diagnostic { get; set; }
 
     /// <summary>How long a held install waits before asking again (the scheduled run's own fifteen seconds).</summary>
     internal TimeSpan LookAgainEvery { get; set; } = ScheduledRun.LookAgainEvery;
@@ -119,16 +140,34 @@ public sealed class AppUpdater : IDisposable
         _feedReader = feedReaderForTests ?? (() => null);
     }
 
-    /// <summary>The daily check. Nothing at all when no feed is set.</summary>
+    /// <summary>
+    /// The daily check. Nothing at all when no feed is set. Called by the app
+    /// once its first window is up (#465), never before: the offer needs a
+    /// window, and the first launch after an update spends about two minutes
+    /// copying its tools before it has one.
+    /// </summary>
     public void Start()
     {
-        if (!IsActive) return;
+        if (!IsActive || _daily is not null) return;
         // On the WALL CLOCK (ruling 10): look every hour whether a day has
         // passed since the last daily check (kept in settings), so a laptop that
         // sleeps at night and is never relaunched still checks once a day.
         // A process-time timer of 86400 s drifted by every hour spent asleep.
-        _daily = new Timer(_ => { if (DailyCheckIsDue(DateTime.UtcNow)) _ = CheckAsync(teacherAsked: false); }, null,
-                           TimeSpan.FromMinutes(1), TimeSpan.FromHours(1));
+        _daily = new Timer(_ => { if (DailyCheckIsDue(DateTime.UtcNow)) _ = DailyCheckAsync(); }, null,
+                           FirstRetry, HourlyLook);
+    }
+
+    /// <summary>
+    /// One daily check at a time (#465). Without this, an offer left open for
+    /// over an hour met the next hourly look, which found the day not yet done,
+    /// found its own offer in front, and asked to be tried again, every minute
+    /// for as long as the offer stayed open.
+    /// </summary>
+    internal async Task DailyCheckAsync()
+    {
+        if (Interlocked.CompareExchange(ref _dailyCheckUnderWay, 1, 0) != 0) return;
+        try { await CheckAsync(teacherAsked: false); }
+        finally { Volatile.Write(ref _dailyCheckUnderWay, 0); }
     }
 
     private Func<DateTime?> _lastDailyCheck = () => null;
@@ -189,18 +228,45 @@ public sealed class AppUpdater : IDisposable
             return;
         }
 
-        if (!teacherAsked && info.Status is UpdateStatus.UpdateAvailable or UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped)
+        // The day is done when the check got an answer (ruling 13) AND, when
+        // there was something to offer, the offer was SHOWN (#465): an offer
+        // nobody saw is not the day's check.
+        if (!teacherAsked && info.Status is UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped)
             _rememberDailyCheck(DateTime.UtcNow);
-        var newest = info.Updates?.OrderByDescending(u => u).FirstOrDefault();
+        // A check that got an answer and found nothing to offer ends any run of
+        // unseen offers: the next one waits a minute again, not an hour (review L5).
+        if (info.Status is UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped) _retryAfter = FirstRetry;
+        var newer = info.Updates?.OrderByDescending(u => u).ToList() ?? new List<AppCastItem>();
+        var newest = newer.FirstOrDefault();
         switch (info.Status)
         {
             case UpdateStatus.UpdateAvailable when newest is not null:
-                if (!teacherAsked && newest.Version == _skipped) return;
+                var offer = AppUpdates.DecideOffer(
+                    newer.Select(u => (u.Version ?? "", u.IsCriticalUpdate)).ToList(), _skipped, teacherAsked);
+                if (!offer.Show)
+                {
+                    if (!teacherAsked) _rememberDailyCheck(DateTime.UtcNow);
+                    return;
+                }
                 if (_foundThisLaunch.Add(newest.Version ?? ""))
                     ActivityTrail.Note(ActivityTrail.Event.UpdateFound,
                         $"found {newest.Version}, running {_running}; {(teacherAsked ? "the teacher asked" : "the daily check")}" +
-                        (newest.IsCriticalUpdate ? "; marked important" : ""));
-                await OfferAsync(newest, info.Updates!.OrderByDescending(u => u).ToList());
+                        (offer.Important ? "; marked important" : ""));
+                var answer = await OfferAsync(newest, newer, offer.Important);
+                if (answer == UpdateAnswer.NotShown)
+                {
+                    if (teacherAsked) Diagnostic?.Invoke($"update offer for {newest.Version} could not be shown (no window, or another dialog in front)");
+                    else TryAgainSoon(newest.Version);
+                }
+                else
+                {
+                    // SHOWN, whoever asked: the day's check is done. A shown
+                    // Check for Updates… counts too, or a daily retry still
+                    // pending from an unseen offer would put the same offer
+                    // back minutes after the teacher answered it (review L1).
+                    _retryAfter = FirstRetry;
+                    _rememberDailyCheck(DateTime.UtcNow);
+                }
                 break;
             case UpdateStatus.UpdateNotAvailable:
             case UpdateStatus.UserSkipped:
@@ -219,11 +285,30 @@ public sealed class AppUpdater : IDisposable
         }
     }
 
-    private async Task OfferAsync(AppCastItem item, IReadOnlyList<AppCastItem> newerNewestFirst)
+    /// <summary>
+    /// An offer nobody saw (#465): no answer is written, the day is not done,
+    /// and the daily check looks again in a minute, then two, four, eight… up
+    /// to the hourly look it keeps anyway. Backing off, because each look
+    /// fetches the feed again, and a dialog can be left open for hours.
+    /// </summary>
+    private void TryAgainSoon(string? version)
+    {
+        var after = _retryAfter;
+        LastRetryScheduled = after;
+        _retryAfter = after + after > HourlyLook ? HourlyLook : after + after;
+        Diagnostic?.Invoke($"update offer for {version} could not be shown; looking again in {after.TotalMinutes:0} min");
+        try { _daily?.Change(after, HourlyLook); } catch (ObjectDisposedException) { }
+    }
+
+    private async Task<UpdateAnswer> OfferAsync(AppCastItem item, IReadOnlyList<AppCastItem> newerNewestFirst, bool important)
     {
         // Every newer release's notes, not only the newest's (appUpdates.notes, #428 item 2).
         string notes = AppUpdates.NotesFor(newerNewestFirst.Select(u => (u.Version, u.Description)));
-        var answer = await _prompts.OfferAsync(item.Version ?? "", notes);
+        var answer = await _prompts.OfferAsync(item.Version ?? "", notes, important);
+        // An important offer has no Skip button, so a Skip cannot come back
+        // from it; read as "not now" if one ever did, never remembered.
+        if (important && answer == UpdateAnswer.Skip) answer = UpdateAnswer.NotNow;
+        if (answer == UpdateAnswer.NotShown) return answer;
         ActivityTrail.Note(ActivityTrail.Event.UpdateAnswered, $"{item.Version}: " + answer switch
         {
             UpdateAnswer.Install => "install",
@@ -241,6 +326,7 @@ public sealed class AppUpdater : IDisposable
                 _rememberSkip?.Invoke(item.Version);
                 break;
         }
+        return answer;
     }
 
     private async Task DownloadedAsync(AppCastItem item, string path)

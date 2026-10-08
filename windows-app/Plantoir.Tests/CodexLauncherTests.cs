@@ -64,17 +64,29 @@ public class CodexLauncherTests : IDisposable
             string key = agent!["key"]!.ToString();
             var expected = agent["arguments"]!.AsArray().Select(a => a!.ToString()
                 .Replace("{folder}", folder.Replace("\\", "\\\\")).Replace("{server}", server.Replace("\\", "\\\\"))
-                .Replace("{config}", config).Replace("{greeting}", greeting)).ToList();
+                .Replace("{config}", config).Replace("{greeting}", greeting).Replace("{course}", "ICS3U")).ToList();
             var actual = key switch
             {
                 "claude" => ClaudeCodeLauncher.Arguments(config, greeting),
-                "codex" => CodexLauncher.Arguments(server, folder, greeting),
+                "codex" => CodexLauncher.Arguments(server, folder, "ICS3U", greeting),
                 _ => throw new InvalidOperationException($"a door this app does not know: {key}"),
             };
             Assert.Equal(expected, actual);
             Assert.Equal(key == "claude" ? "started Claude Code for {course}" : "started Codex for {course}",
                          agent["trailLine"]!.ToString());
+
+            // #468 (mac #458): BOTH doors put the course in their server's
+            // ENVIRONMENT, never its argv — the Claude door as the config's
+            // "env", the Codex door as -c mcp_servers.plantoir.env.<NAME>.
+            var environment = agent["serverEnvironment"]!.AsObject()
+                .ToDictionary(pair => pair.Key, pair => pair.Value!.ToString().Replace("{course}", "ICS3U"));
+            var passed = key == "claude"
+                ? JsonNode.Parse(ClaudeCodeLauncher.ConfigText(folder, server, "ICS3U"))!["mcpServers"]!["plantoir"]!["env"]!
+                    .AsObject().ToDictionary(pair => pair.Key, pair => pair.Value!.ToString())
+                : CodexEnvironment(actual);
+            Assert.Equal(environment.OrderBy(p => p.Key), passed.OrderBy(p => p.Key));
         }
+        Assert.Equal(AssistWorkspace.DoorCourseVariable, section["doorCourseVariable"]!.ToString());
 
         // The SERVER each door starts, by the same substitution (#430): the
         // folder and never a course, for the Claude door's file as for the
@@ -84,7 +96,7 @@ public class CodexLauncherTests : IDisposable
         var written = JsonNode.Parse(ClaudeCodeLauncher.ConfigText(folder, server, "ICS3U"))!["mcpServers"]!["plantoir"]!;
         Assert.Equal(server, written["command"]!.ToString());
         Assert.Equal(serverArguments, written["args"]!.AsArray().Select(a => a!.ToString()));
-        string codexArgs = CodexLauncher.Arguments(server, folder, greeting)[3]["mcp_servers.plantoir.args=".Length..];
+        string codexArgs = CodexLauncher.Arguments(server, folder, "ICS3U", greeting)[3]["mcp_servers.plantoir.args=".Length..];
         Assert.Equal(serverArguments, JsonSerializer.Deserialize<string[]>(codexArgs));
         Assert.Contains("ICS3U", greeting);
         Assert.Contains("Grade 11 Computer Science", greeting);
@@ -103,9 +115,9 @@ public class CodexLauncherTests : IDisposable
         string stub = Path.Combine(_scratch, "codex.cmd");
         File.WriteAllText(stub, "@python \"%~dp0echo_args.py\" %*\r\n");
 
-        var (server, folder, greeting) = Awkward();
-        var sent = CodexLauncher.Arguments(server, folder, greeting);
-        AssertArrived(sent, Run(CodexLauncher.CmdArguments(stub, sent, keepOpen: false)), folder);
+        var (server, folder, course, greeting) = Awkward();
+        var sent = CodexLauncher.Arguments(server, folder, course, greeting);
+        AssertArrived(sent, Run(CodexLauncher.CmdArguments(stub, sent, keepOpen: false)), folder, course);
     }
 
     /// <summary>The same through ONE cmd parse, for a native <c>codex.exe</c>.</summary>
@@ -114,20 +126,44 @@ public class CodexLauncherTests : IDisposable
     {
         string echo = WriteEcho();
         string python = FindPython();
-        var (server, folder, greeting) = Awkward();
-        var sent = CodexLauncher.Arguments(server, folder, greeting);
+        var (server, folder, course, greeting) = Awkward();
+        var sent = CodexLauncher.Arguments(server, folder, course, greeting);
         var received = Run(CodexLauncher.CmdArguments(python, new[] { echo }.Concat(sent), keepOpen: false));
-        AssertArrived(sent, received, folder);
+        AssertArrived(sent, received, folder, course);
     }
 
-    private static (string Server, string Folder, string Greeting) Awkward() => (
+    // The course is awkward too (#468): the mac's "-AP CALC-", with cmd's own
+    // metacharacters added, since the fifth override passes through ForCmd.
+    private static (string Server, string Folder, string Course, string Greeting) Awkward() => (
         @"C:\Program Files\Plan ""toir"" & Co\plantoir-mcp.exe",
         @"C:\Users\r\Russell's Courses (2026) & Français 🎓\a^b|c<d>e\",
+        "-AP CALC- & ^(x)|y",
         ClaudeCodeLauncher.Greeting("ICS3U", "Grade 11 Computer Science & Co. (pilot)"));
 
-    private static void AssertArrived(IReadOnlyList<string> sent, List<string> received, string folder)
+    /// <summary>Every <c>-c mcp_servers.plantoir.env.NAME="value"</c> in a Codex argv, read back as TOML.</summary>
+    private static Dictionary<string, string> CodexEnvironment(IReadOnlyList<string> argv)
+    {
+        const string prefix = "mcp_servers.plantoir.env.";
+        var found = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (int i = 0; i + 1 < argv.Count; i++)
+        {
+            if (argv[i] != "-c" || !argv[i + 1].StartsWith(prefix, StringComparison.Ordinal)) continue;
+            string pair = argv[i + 1][prefix.Length..];
+            int equals = pair.IndexOf('=');
+            // A TOML basic string of what CodexLauncher writes is a JSON string too.
+            found[pair[..equals]] = JsonSerializer.Deserialize<string>(pair[(equals + 1)..])!;
+        }
+        return found;
+    }
+
+    private static void AssertArrived(IReadOnlyList<string> sent, List<string> received, string folder, string course)
     {
         Assert.Equal(sent, received);
+        Assert.Equal(11, received.Count);
+        Assert.Equal("-c", received[8]);
+        Assert.Equal("mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=" + CodexLauncher.TomlBasicString(course),
+                     received[9]);
+        Assert.Equal(course, CodexEnvironment(received)[AssistWorkspace.DoorCourseVariable]);
         // The args value must still be a LIST of two strings — the silent
         // failure is a value that has become one string.
         string args = received[3]["mcp_servers.plantoir.args=".Length..];
