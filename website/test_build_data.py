@@ -180,15 +180,16 @@ class DownloadTests(unittest.TestCase):
         # joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3
         # cut (2026-10-04) until its installer joined v1.4.3 (2026-10-07), and
         # to 1.4.3 for the mac-first v1.4.4 cut until it joined v1.4.4 (2026-10-08).
-        # The Mac card is pinned to 1.4.4 from the Windows-only v1.4.5 cut
-        # (2026-10-08) until Plantoir-macOS.dmg joins a later release.
-        # A release that lacks an installer pins that card again, and this
-        # test changes with it (the downloads_note in site.json says when).
+        # The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut
+        # (2026-10-08) until Plantoir-macOS.dmg joined v1.4.5 the same day.
+        # Both cards are unpinned now. A release that lacks an installer pins
+        # that card again, and this test changes with it (the downloads_note
+        # in site.json says when).
         site = build.read_json(build.WEBSITE / "site.json")
         pins: dict = {}
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
-        self.assertEqual(pins["macOS"], "1.4.4")
+        self.assertIsNone(pins["macOS"])
         self.assertIsNone(pins["Windows"])
 
 
