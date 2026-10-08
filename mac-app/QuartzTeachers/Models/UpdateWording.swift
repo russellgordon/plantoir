@@ -73,11 +73,11 @@ nonisolated enum UpdateWording {
     /// A publish set for later that is running now, named from the run's own
     /// arguments.
     static func scheduledWork(course: String, section: Int) -> String {
-        return "publishing Section \(section) of \(course) on its schedule"
+        return "deploying Section \(section) of \(course) on its schedule"
     }
 
     /// The same, for a job set before v1.2.0, whose run names no course.
-    static let scheduledWorkUnnamed: String = "publishing on its schedule"
+    static let scheduledWorkUnnamed: String = "deploying on its schedule"
 
     /// A build or publish another program holds a lease for. Names the
     /// COURSE and no program, the way

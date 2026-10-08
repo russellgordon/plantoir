@@ -844,8 +844,8 @@ class WorkspaceModel {
         case rememberedWindow = "the window it was open in last time"
         case lastWorkingFolder = "the last working folder"
         /// A window choosing a folder took the one a clicked scheduled
-        /// publish notification named (#306).
-        case scheduledPublishNotification = "the folder a clicked scheduled publish notification named"
+        /// deploy notification named (#306).
+        case scheduledPublishNotification = "the folder a clicked scheduled deploy notification named"
     }
 
     /// Reopens a folder remembered from last time — THE route by which a
