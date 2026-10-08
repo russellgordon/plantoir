@@ -132,8 +132,9 @@ public partial class App : Application
         // removed at every launch, so it can never speak for a later one.
         try
         {
-            string running = Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion;
+            // One spelling, "1.4.3", the feed's (#465); a stored "1.4 (3)" is read in either.
             var runningVersion = (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0);
+            string running = Plantoir.Core.Assist.AppUpdates.Spell(runningVersion);
             bool byItself = Plantoir.Core.Assist.AppUpdates.ConsumeUpdatedByItselfMarker(AppDataRoot.Current, runningVersion);
             if (Plantoir.Core.Assist.AppUpdates.AppUpdatedLine(Settings.LastLaunchedVersion, running, byItsOwnUpdater: byItself) is { } line)
                 Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.AppUpdated, line);
@@ -160,7 +161,8 @@ public partial class App : Application
                 Plantoir.Core.Assist.AppUpdates.ConfiguredFeed, Plantoir.Core.Assist.AppUpdates.PublicKey,
                 new Services.UpdatePrompts(), Services.UpdatePrompts.Snapshot,
                 Plantoir.Core.Assist.MachineWork.RunningAssistantServers,
-                Plantoir.Core.Scripting.ProblemReportEnvironment.AppVersion,
+                Plantoir.Core.Assist.AppUpdates.Spell(
+                    (System.Reflection.Assembly.GetEntryAssembly() ?? typeof(App).Assembly).GetName().Version ?? new Version(0, 0)),
                 Plantoir.Core.Assist.AppUpdates.IsPerUserInstall(AppContext.BaseDirectory,
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)),
                 Settings.SkippedUpdateVersion,
@@ -169,7 +171,8 @@ public partial class App : Application
             Updater.RememberingDailyChecksIn(
                 () => Settings.LastUpdateCheckUtc,
                 when => { Settings.LastUpdateCheckUtc = when; try { Settings.Save(); } catch { } });
-            Updater.Start();
+            Updater.Diagnostic = LogDiagnostic;
+            // Started below, once the first window is up (#465) - not here.
         }
 
         // Name every builds folder this app can name, then sweep the ones
@@ -230,6 +233,17 @@ public partial class App : Application
         else
             foreach (var entry in remembered)
                 OpenWindow(entry.Path, entry);
+
+        // The daily update check starts HERE, once a window exists (#465).
+        // OpenWindow is synchronous, and the first launch after an update
+        // spends about two minutes inside it copying the bundled tools into
+        // the working folder (measured, i5-8365U); a check started in the
+        // block above fired at one minute, found no window to show its offer
+        // in, and wrote "not now" for an offer nobody saw. Here, and not inside
+        // OpenWindow: the marketing captures open windows through OpenWindow
+        // and must never check. The scheduled run (Program.Main) and
+        // plantoir-mcp never construct an updater at all.
+        Updater?.Start();
 
         if (launchedBy is not null)
             dispatcher.TryEnqueue(() => Services.ScheduledPublishNotifier.Route(launchedBy));

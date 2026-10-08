@@ -691,7 +691,7 @@
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
       },
       {
-        "carries": "the version found and the version running, each as version and build ('1.3.2 (3120)'); whether the teacher asked or it was the daily check; whether the release is marked important",
+        "carries": "the version found and the version running, each as version and build ('1.3.2 (3120)') on the mac, and on Windows, which has no separate build number, as the feed spells it ('1.4.3', since #465); whether the teacher asked or it was the daily check; whether the release is marked important",
         "event": "update found",
         "why": "Added with #204. 'Did Plantoir ever tell me there was a new version?' cannot be answered without it. Written ONCE per version per launch, and worded 'found' rather than 'offered': a check that re-finds a version the teacher answered 'Remind Me Later' to would otherwise add a line a day, and the updater may hold its window back until the app is next in front, so 'offered' could claim a window nobody saw."
       },
@@ -3347,7 +3347,7 @@
       "asOf": "2026-10-04",
       "windows": "Records every outcome of a run that HAPPENED \u2014 neededAnAnswer, buildNeededAnAnswer, didNotFinish and succeeded \u2014 and lets the teacher dismiss it, both since 2026-09-09 (GitHub issue #130); ScheduledPublishOutcome, plus the readout in SectionDetailView. Since 2026-09-30 (bundle 3) it records every kind above as well: buildDidNotFinish (#297), courseWasBusy (#289, its scheduled run now takes leases and waits) and couldNotRunAsSetNow (#347, the run reads the settings when it fires) — the run is Plantoir itself, started by Task Scheduler with no window — and tooLateToRun, on a real path: since the bundle 3 fix round its task is registered with StartWhenAvailable (and runs on battery), and a start missed while the PC was off or asleep is documented by Microsoft to run once Windows is available again (not measured here), when the lateness window decides. Measured 2026-09-30 on AC with StartWhenAvailable read back true: a task registered with its start two minutes already past did NOT run within 15 minutes (Last Result 267011) — Task Scheduler does not treat a start that was past before the task existed as missed. A real sleep across the moment was not measured. Before that date a build that failed outright was recorded as didNotFinish with every configured destination joined.",
       "mac": "Every kind above, and dismissible. Russell decided on 2026-09-09 that a teacher should learn their overnight publish did not happen whatever the reason, because the SILENCE is the complaint rather than the cause, and that landed on both platforms the same day. buildDidNotFinish landed here 2026-09-25 (#137). A section scheduled BEFORE that keeps the wrapper it was given, so its one remaining run still records a failed build as didNotFinish and shows the old sentence once; that was accepted, as it was for #132. couldNotRunAsSetNow landed here 2026-09-26 (#323); every job already on disk follows it at its next run, because every plist since v1.2.0 runs the app.",
-      "owed": "By Windows: only the toast items below. Every outcome kind, the run itself and the lines it writes are implemented there since 2026-09-30 (bundle 3). Nothing is owed by the mac. Since 2026-10-04 (#448) Windows plays `notification.announcing` (the `allowed` and `notAllowed` rows, every kind) in ScheduledRunAnnouncementTests, and a real run posts: until #448 the run's own one-shot clearing deleted the job file the toast step read afterwards, so no toast and no trail line was ever written. Still owed by Windows from #212: withdrawn on dismissal (`onShow`'s dismiss case). Owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal, the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is Plantoir itself since bundle 3 (started by Task Scheduler with no window), so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail line for it is written by the run itself, as the mac's is. Owed by Windows since #306 (2026-09-26): `notification.onClick` - a click on the toast shows THAT section by the same rule, every case but the ones marked `appliesOn: [\"mac\"]`. Prerequisite: the toast itself (the #212 obligation above). The toast's launch arguments carry the working folder's path, the course and the section; a click on a toast of an unpackaged app can start a SECOND process, which must hand the arguments to the first."
+      "owed": "By Windows: only the toast items below that are not marked done. Every outcome kind, the run itself and the lines it writes are implemented there since 2026-09-30 (bundle 3). Nothing is owed by the mac. Since 2026-10-04 (#448) Windows plays `notification.announcing` (the `allowed` and `notAllowed` rows, every kind) in ScheduledRunAnnouncementTests, and a real run posts: until #448 the run's own one-shot clearing deleted the job file the toast step read afterwards, so no toast and no trail line was ever written. Since 2026-10-08 (#464) Windows withdraws the toast when the band is dismissed: `ScheduledRunAnnouncement.TeacherDismissed`, with all four `notification.onShow` cases played by `ScheduledRunAnnouncementTests.TheContractsOnShowCases`, and a dismissal in the app proved to remove a toast the scheduled run's separate process posted (`ScheduledToastWithdrawalUiTests`). Owed by Windows since #212 (2026-09-25): the `notification` rules — every kind announced with its own sentence, one per section replaced by the next, withdrawn on dismissal (done, #464), the run never asking, and `scheduled publish notification` on the trail. The rule is theirs to MATCH; the delivery is theirs to design, because their run is Plantoir itself since bundle 3 (started by Task Scheduler with no window), so a toast has to be attributed to Plantoir's own application identity, and a toast needs no permission prompt (so only the `allowed` and `notAllowed` rows apply there). Their trail line for it is written by the run itself, as the mac's is. Owed by Windows since #306 (2026-09-26): `notification.onClick` - a click on the toast shows THAT section by the same rule, every case but the ones marked `appliesOn: [\"mac\"]`. Prerequisite: the toast itself (the #212 obligation above). The toast's launch arguments carry the working folder's path, the course and the section; a click on a toast of an unpackaged app can start a SECOND process, which must hand the arguments to the first."
     },
     "whereTheRecordLives": "Platform-local and deliberately NOT shared: %LOCALAPPDATA%\\Plantoir\\scheduled\\unanswered on Windows, ~/Library/Application Support/Plantoir/scheduled/stopped on the mac. What is shared is the BEHAVIOUR above; a path is not a rule. The mac's folder says `stopped` rather than `unanswered` because that side records more than unanswered questions; Windows records more than that too and KEPT the old name deliberately, because a task scheduled before 2026-09-09 points at a wrapper script already on disk that writes the old path, and nothing rewrites that wrapper until the section is scheduled again — so renaming buys a better name and costs a second directory read for ever, on pain of the first overnight run after an update going silent. The record says what it is on its own first line."
   },
@@ -18682,7 +18682,159 @@
     "notes": {
       "cumulative": true,
       "requiredWarningMarksTheUpdateImportant": true,
-      "why": "The update window shows the notes of the version offered. A teacher who skipped a release must still see the warning written for it, so the notes carry every release newer than theirs, and a release with a REQUIRED warning is marked important (no Skip, no Remind Me Later). The mechanism is platform code - on the mac one section per release in the feed's own notes, hidden once installed; on Windows the app gathers the <description> of every newer feed item itself (AppUpdates.NotesFor, #428), since it draws its own offer and NetSparkle only hands it the newer items. The CUMULATIVE half of the promise is shared; the important mark (no Skip, offered again when skipped) is not yet honoured on Windows, which only notes it on the trail - owed there."
+      "why": "The update window shows the notes of the version offered. A teacher who skipped a release must still see the warning written for it, so the notes carry every release newer than theirs, and a release with a REQUIRED warning is marked important (no Skip, no Remind Me Later). The mechanism is platform code - on the mac one section per release in the feed's own notes, hidden once installed; on Windows the app gathers the <description> of every newer feed item itself (AppUpdates.NotesFor, #428), since it draws its own offer and NetSparkle only hands it the newer items. Both halves are shared. The important mark is honoured on Windows since #453 (2026-10-08): the offer shows Install and Reopen alone, and a version the teacher skipped is offered again when any newer release is marked important (AppUpdates.DecideOffer; offerCases below). Before #453 Windows only noted the mark on the trail."
+    },
+    "offerCases": {
+      "note": "AUTHORED, proposed from Windows with #453 (2026-10-08), appliesOn windows only: the mac's tests do not read this object. Windows draws its own offer, so it decides in its own code whether an offer is shown and whether it carries Skip This Version and Not Now; these cases are that decision (AppUpdates.DecideOffer, played by AppUpdatesContractTests.EveryOfferCaseIsDecidedAsTheContractSays). Input: `newer`, the feed's releases newer than the running version, newest first, each with whether it is marked important; `skipped`, the version the teacher last chose Skip This Version for; `teacherAsked`, Check for Updates... rather than the daily check. Expect: whether an offer is shown, and whether it offers Skip and Not Now.",
+      "appliesOn": [
+        "windows"
+      ],
+      "why": "notes.requiredWarningMarksTheUpdateImportant: a teacher cannot step past a warning written for a release, so ANY newer release marked important makes the offer important (a later release keeps an earlier one important for teachers still below it), and a remembered skip does not hide it. Closing the offer stays possible and is 'not now', offered again at the next daily check: a window the teacher cannot leave was rejected (Russell, 2026-10-08). The mac's Sparkle decides the same question its own way, from the same mark in the feed (`--required-warning` at the cut, RELEASING.md: its update window then has no Skip and no Remind Me Later); it is Sparkle's code rather than Plantoir's, so the mac has nothing to run these against, and whether Sparkle ignores a remembered skip for an important release has not been measured.",
+      "cases": [
+        {
+          "name": "a plain newer release is offered with Skip and Not Now",
+          "newer": [
+            {
+              "version": "1.4.4",
+              "important": false
+            }
+          ],
+          "skipped": null,
+          "teacherAsked": false,
+          "expect": {
+            "show": true,
+            "allowsSkip": true,
+            "allowsLater": true
+          }
+        },
+        {
+          "name": "the daily check says nothing about a version the teacher skipped",
+          "newer": [
+            {
+              "version": "1.4.4",
+              "important": false
+            }
+          ],
+          "skipped": "1.4.4",
+          "teacherAsked": false,
+          "expect": {
+            "show": false,
+            "allowsSkip": false,
+            "allowsLater": false
+          }
+        },
+        {
+          "name": "Check for Updates shows a skipped version",
+          "newer": [
+            {
+              "version": "1.4.4",
+              "important": false
+            }
+          ],
+          "skipped": "1.4.4",
+          "teacherAsked": true,
+          "expect": {
+            "show": true,
+            "allowsSkip": true,
+            "allowsLater": true
+          }
+        },
+        {
+          "name": "a release newer than the skipped one is offered",
+          "newer": [
+            {
+              "version": "1.4.5",
+              "important": false
+            },
+            {
+              "version": "1.4.4",
+              "important": false
+            }
+          ],
+          "skipped": "1.4.4",
+          "teacherAsked": false,
+          "expect": {
+            "show": true,
+            "allowsSkip": true,
+            "allowsLater": true
+          }
+        },
+        {
+          "name": "an important release is offered with Install and Reopen alone",
+          "newer": [
+            {
+              "version": "1.4.4",
+              "important": true
+            }
+          ],
+          "skipped": null,
+          "teacherAsked": false,
+          "expect": {
+            "show": true,
+            "allowsSkip": false,
+            "allowsLater": false
+          }
+        },
+        {
+          "name": "an important release the teacher once skipped is offered again by the daily check",
+          "newer": [
+            {
+              "version": "1.4.4",
+              "important": true
+            }
+          ],
+          "skipped": "1.4.4",
+          "teacherAsked": false,
+          "expect": {
+            "show": true,
+            "allowsSkip": false,
+            "allowsLater": false
+          },
+          "why": "The skip was given before the release was marked, or by a copy that did not honour the mark (Windows before #453)."
+        },
+        {
+          "name": "a skipped important release still binds when a plain newer one is offered",
+          "newer": [
+            {
+              "version": "1.4.5",
+              "important": false
+            },
+            {
+              "version": "1.4.4",
+              "important": true
+            }
+          ],
+          "skipped": "1.4.5",
+          "teacherAsked": false,
+          "expect": {
+            "show": true,
+            "allowsSkip": false,
+            "allowsLater": false
+          },
+          "why": "The issue's own example: the teacher still below 1.4.4 has not read its warning, whichever version is newest."
+        },
+        {
+          "name": "nothing newer offers nothing",
+          "newer": [],
+          "skipped": null,
+          "teacherAsked": true,
+          "expect": {
+            "show": false,
+            "allowsSkip": false,
+            "allowsLater": false
+          },
+          "why": "An important release OLDER than the running version is not in `newer` at all, so it never binds: the teacher already has it."
+        }
+      ]
+    },
+    "anOfferNobodySawIsNotAnAnswer": {
+      "rule": "The daily check is not done for the day until its offer has been SHOWN. An offer that could not be shown - no window yet, or another window in front - is not an answer: nothing is written for it, and the check looks again within minutes.",
+      "why": "GitHub #465, measured 2026-10-07 on Windows (i5-8365U, Windows 11 Pro 26200): the first launch after an update copies its tools for about two minutes before it has a window, the daily check ran at one minute, had nowhere to show its offer, wrote 'not now' for an answer nobody gave, and marked the day done, so a teacher on a slow start was not offered the update until the next day. On Windows the check now starts once the first window is up, an unshown offer writes no `update answered` line, and the look is retried after 1, 2, 4... minutes up to the hourly look (each look fetches the feed again, and a dialog can stay open for hours). `update found` without `update answered` then reads as an offer not yet answered, which is the reading `update found`'s own wording already gives. The mac's Sparkle owns its own window and may hold it back until the app is in front; whether it can ever record an unseen offer as an answer is the mac's to check (a `mac` issue from #465).",
+      "rejected": [
+        "Only starting the check once a window is up: an offer is still lost when another dialog is in front.",
+        "Only not counting an unshown offer: a teacher on a slow start then waits up to an hour for the hourly look.",
+        "A new trail event saying the offer waited (Russell, 2026-10-08): `update found` with no `update answered` already says it, and a new event would have to be added on both platforms for no new fact."
+      ]
     },
     "mayNotInstallWhile": {
       "counts": [
