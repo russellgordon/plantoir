@@ -345,7 +345,7 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
    file, no GitHub in sight.
 
 6. **Deploy plantoir.app deliberately**: `python3 website/build.py --deploy`
-   builds `site/` and publishes it to Netlify (delta upload; the token comes
+   builds `site/` and deploys it to Netlify (delta upload; the token comes
    from the `containerized-quartz-netlify` Keychain item, the site id from
    `website/site.json`). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
@@ -683,7 +683,10 @@ weights it needs are committed in `support/fonts/`.
 **Cutting a release runs this** (step 6), and that is safe because the
 output is **deterministic** — identical inputs give byte-identical PNGs.
 A release that changed nothing about the artwork leaves the working tree
-clean and there is nothing to commit. A diff appears only when the icon,
+clean and there is nothing to commit — on the Pillow the last redraw used.
+A newer Pillow can re-encode a pixel-identical PNG differently or move
+the wordmark by a pixel (seen on 12.2.0, #446): compare the pictures, not
+the bytes, before treating such a diff as a stop. A diff appears only when the icon,
 the palette or the tagline actually moved, which is exactly when you want
 to notice. So: if `git status` is quiet after this step, that is the
 expected result, not a sign it failed.

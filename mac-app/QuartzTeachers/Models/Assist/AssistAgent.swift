@@ -536,17 +536,38 @@ final class AssistAgent {
                     return
                 }
 
-                // Settler S2 (#449, from Windows' #411/#440): the small
-                // router may send unit "next" on add_next_class — 50 of 50 on
-                // Windows — and the mac's runner reads `unit` from ANY call,
-                // so it would start a NEW unit for a teacher who wanted the
-                // next day of the one they are in. Dropped unless the
-                // teacher's own sentence says "unit". The MODEL's calls only:
-                // the "Start a new unit…" card reaches `run(settledCall:)`
-                // without passing through here, and keeps its unit "next".
                 var call: AssistToolCall = first
                 if first.function.name == "add_next_class" {
-                    call = AssistAgent.withoutAnUnaskedNewUnit(first, typed: sentenceThisTurnBeganWith)
+                    // Settler S3 (#440): a sentence asking for a new unit, a
+                    // unit or day other than the next one, or several pages,
+                    // answered with a plain add_next_class — measured 50 of
+                    // 50 on the smaller assistant, each adding ONE page in
+                    // the current unit and reporting success. Stopped, the
+                    // turn wound back, and the teacher given the sentences
+                    // that do it (answered in code). With no remembered
+                    // dates there is no reading, and the call runs so the
+                    // runner can ask for them (ruling 7).
+                    let reading: AssistNextClassReading? = tools.nextClassReading(
+                        forCourse: courseCode, section: sectionNumber
+                    )
+                    if let reading,
+                       let kind = AssistNextClassUnits.kind(of: sentenceThisTurnBeganWith, reading: reading) {
+                        pointAtTheNextClassPhrasings(kind, reading: reading)
+                        return
+                    }
+                    // Settler S2 (#449), widened by #440 (ruling 2): the
+                    // model's `unit` and `days` are taken out of EVERY
+                    // add_next_class it sends. The local tool declares
+                    // neither, but the runner reads both from any call, and
+                    // Windows measured its router sending unit "next" on 50
+                    // of 50 plain "add the next class" phrasings — which
+                    // starts a NEW unit. S2 kept "next" whenever the sentence
+                    // said "unit", so "Add the next class in this unit" could
+                    // still start one; nothing the model sends can now. The
+                    // MODEL's calls only: cards reach `run(settledCall:)`
+                    // without passing through here and keep theirs, and the
+                    // MCP surface never enters `think()`.
+                    call = AssistAgent.withoutCardOnlyArguments(first)
                 }
                 messages.append(reply)
                 // One tool at a time, on purpose: a model that batches has
@@ -933,22 +954,46 @@ final class AssistAgent {
         return folded.range(of: pattern, options: .regularExpression) != nil
     }
 
-    /// Settler S2 (#449): the model's `unit: "next"` on add_next_class taken
-    /// out unless the teacher said "unit" or "units". Everything else in the
-    /// call is kept as sent — `days` included, which the mac's local
-    /// add_next_class does not read on this path anyway.
-    static func withoutAnUnaskedNewUnit(_ call: AssistToolCall, typed: String) -> AssistToolCall {
-        let saidUnit: Bool = typed.range(
-            of: #"\bunits?\b"#, options: [.regularExpression, .caseInsensitive]
-        ) != nil
-        if saidUnit {
-            return call
-        }
+    /// Settler S3's answer (#440): the turn wound back, nothing run, no card,
+    /// and the teacher given the sentences that do what they asked — in the
+    /// transcript only, so the model never sees them.
+    private func pointAtTheNextClassPhrasings(_ kind: AssistNextClassUnits.Kind, reading: AssistNextClassReading) {
+        windTheTurnBack()
+        ActivityTrail.note(
+            .assistantChoseATool,
+            AssistAgent.nextClassPointedLine(kind),
+            course: courseCode,
+            section: sectionNumber
+        )
+        entries.append(Entry(
+            speaker: .assistant,
+            text: AssistWording.nextClassNeedsItsOwnPhrasing(
+                unitWord: reading.unitWord,
+                isNumbered: reading.isNumbered,
+                noun: reading.noun,
+                latestUnit: reading.plainNextUnit
+            )
+        ))
+        activity = .idle
+    }
+
+    /// The keys add_next_class reads that only a CARD may set: `unit` and
+    /// `days` (#440, ruling 2). The local tool declares neither.
+    nonisolated static let cardOnlyNextClassArguments: [String] = ["unit", "days"]
+
+    /// Settler S2 (#449) as widened by #440: the model's `unit` and `days`
+    /// taken out of an add_next_class call, whatever the sentence said.
+    /// Everything else in the call is kept as sent.
+    static func withoutCardOnlyArguments(_ call: AssistToolCall) -> AssistToolCall {
         var arguments: [String: Any] = call.argumentValues
-        guard let unit = arguments["unit"] as? String, unit.lowercased() == "next" else {
+        var removedAny: Bool = false
+        for key in AssistAgent.cardOnlyNextClassArguments where arguments[key] != nil {
+            arguments[key] = nil
+            removedAny = true
+        }
+        if !removedAny {
             return call
         }
-        arguments["unit"] = nil
         guard let data = try? JSONSerialization.data(withJSONObject: arguments),
               let rewritten = String(data: data, encoding: .utf8) else {
             return call
@@ -1349,6 +1394,24 @@ final class AssistAgent {
     static let choseADeployNowForALaterTimeLine: String =
         "chose to deploy now for a request that named a later time — no deploy card was shown, "
         + "nothing ran, and the teacher was asked what time to schedule it for"
+
+    /// The trail's line for settler S3 (#440), after the turn's own
+    /// chose-a-tool line: which of the three things the sentence asked for,
+    /// and that nothing was added. Never the sentence — "assistant asked"
+    /// carries it — and never a page title.
+    static func nextClassPointedLine(_ kind: AssistNextClassUnits.Kind) -> String {
+        var asked: String = ""
+        switch kind {
+        case .newUnit:
+            asked = "asked for a new unit"
+        case .anotherUnitOrDay:
+            asked = "named a unit or day other than the next one"
+        case .several:
+            asked = "asked for more than one page"
+        }
+        return "chose to add the next class for a request that " + asked
+            + " — nothing was added, and the teacher was shown the sentences that do it"
+    }
 
     /// The trail line for a sentence answered in code, naming the tool — and
     /// the MOMENT, when the sentence carried one.

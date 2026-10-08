@@ -211,7 +211,7 @@ it swaps the image. A Mac visitor's words never change.
 The macOS capture harness is driven by Python and Xcode UI tests:
 
 ```bash
-python3 website/shots/capture.py            # captures app + published sites
+python3 website/shots/capture.py            # captures app + deployed sites
 python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
 python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing
@@ -236,6 +236,13 @@ python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir M
   side), by placing them, never by cutting or redrawing them.
   How to run it and what it leaves behind: `website/README.md`, "Regenerating
   every image".
+- **Both working folders are described in the repository** (#445):
+  `website/shots/marketing/folders.json` holds their courses, sections,
+  colours, site names and demo state as rules that follow the school year;
+  `demo_folders.py` applies them (the front pages through the app's own
+  `--mcp-stdio` door), and `test_demo_folders.py`, run by `verify.sh`, proves a
+  clone can make both at two clock years. The UI tests read their course codes
+  and sections from the same file (`MarketingFolderSpec.swift`).
 - **Class Sites**: Photographed in Safari on a real macOS display so native font
   rasterization, scrollbars, and window chrome are preserved. The two colour
   figures are the exception: their parts are the course home pages in a plain
@@ -253,6 +260,7 @@ python website/shots/capture_windows.py                  # every Windows picture
 python website/shots/capture_windows.py --sites [ids]    # the class sites, in Edge windows
 python website/shots/capture_windows.py --figures        # the hero and the colour figures
 python website/shots/capture_windows.py --app [scenes]   # the app's scenes, How I Teach, the schedule
+python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
 ```
 
 Each pass takes the desktop: it switches Windows between light and dark,
@@ -264,6 +272,18 @@ of the tree (`windows-app/Plantoir/bin/x64/Debug/...` after
 `SCENES` in `app_scenes_windows.py`; the working folders are made by the
 app (`--stage-scene provision`). Windows has no text read-back yet, so each
 picture is looked at; every scene refuses the wrong states it can detect.
+
+Every run first runs `test_demo_folders.py` and stops if it is red (no
+`dotnet test` discovers `website/shots` tests). The demo sites it photographs
+come from `website/shots/marketing/folders.json`, the file the mac reads, and
+`--provision-demo <folder>` gives a demo folder its state (colours, the
+teacher's name, site markers, front pages) through `plantoir-mcp.exe` and the
+shared `demo_folders.py`. Still the `windows` issue for #445 (#459): the
+`provision` scene takes its course lists and reference year from constants
+in `app_scenes_windows.py` rather than from `folders.json`, and does not run
+`--provision-demo` afterwards. The College Board scenes are taken with the
+mac's courses copied in by hand, by design (`ced_statements.swift` is
+macOS-only, and their words are never committed).
 
 ---
 
@@ -372,7 +392,7 @@ Windows `--stage-scene` names `map-ontario`, `map-college-board` and
 
 | ID | Subject | Scene(s) |
 |---|---|---|
-| `schedule` | Schedule Deploy sheet with the "published on its own" notification over it | `schedule-sheet`, `notification-banner` |
+| `schedule` | Schedule Deploy sheet with the "deployed on its own" notification over it | `schedule-sheet`, `notification-banner` |
 | `reference` | Reference Courses in the sidebar, and Copy a Page into ICS4U | `reference` |
 | `start-of-year` | Get Ready for the Start of the Year's plan | `start-of-year` |
 | `two-maps` | The Ontario and College Board coverage maps side by side | `two-maps` |

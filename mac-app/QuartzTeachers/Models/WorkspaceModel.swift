@@ -409,6 +409,16 @@ class WorkspaceModel {
     /// Why a rename could not go ahead, shown as an alert.
     var renameProblem: String?
 
+    /// The courses in this folder another program's Claude or Codex session is
+    /// holding right now (#458), upper-cased — the snapshot the sidebar's
+    /// menus are drawn from, because another process's lease file changes
+    /// nothing this window observes. Refreshed when the folder is shown, when
+    /// Plantoir becomes the active app (a session is opened and closed in
+    /// Terminal, so coming back is the moment it matters) and at every click
+    /// that acts on it (`refreshCoursesRevisedElsewhere`). Click-time checks
+    /// read the disk themselves; this is only what a menu shows.
+    var coursesRevisedElsewhere: Set<String> = []
+
     /// A rename waiting on the teacher's answer about Obsidian, because
     /// this course's vault is open in it right now.
     var obsidianRenameRequest: CourseRenamer.ObsidianRequest?
@@ -1812,7 +1822,101 @@ class WorkspaceModel {
         guard let workspaceURL else {
             return nil
         }
-        return CourseActivity.busyDescription(folderPath: workspaceURL.path, courseCode: course.code)
+        return CourseActivity.structuralHoldReason(
+            folderPath: workspaceURL.path,
+            courseCode: course.code,
+            revisedElsewhere: isRevisedElsewhere(course.code)
+        )
+    }
+
+    /// Whether the snapshot says another program's Claude or Codex session holds this
+    /// course (#458).
+    func isRevisedElsewhere(_ courseCode: String) -> Bool {
+        return coursesRevisedElsewhere.contains(courseCode.uppercased())
+    }
+
+    /// Re-reads which courses another program's Claude or Codex session holds (#458).
+    /// Assigned only when the answer changed, so an unchanged folder does not
+    /// redraw every row that reads it.
+    func refreshCoursesRevisedElsewhere() {
+        var held: Set<String> = []
+        if let workspacePath = workspaceURL?.path {
+            for course in courses {
+                if CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: course.code) {
+                    held.insert(course.code.uppercased())
+                }
+            }
+        }
+        if held != coursesRevisedElsewhere {
+            coursesRevisedElsewhere = held
+        }
+    }
+
+    /// The sentence a structural act is refused with at the click (#458):
+    /// a Claude or Codex session open on the course elsewhere is said as itself, and
+    /// anything else this process is doing keeps the sentence it had.
+    func structuralRefusal(courseCode: String, act: String, whenBusy: String) -> String? {
+        guard let workspacePath = workspaceURL?.path else {
+            return nil
+        }
+        if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: courseCode) {
+            return whenBusy
+        }
+        let held: Bool = CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: courseCode)
+        refreshCoursesRevisedElsewhere()
+        if held {
+            return AssistWording.claudeIsRevisingTheCourse(course: courseCode, then: act)
+        }
+        return nil
+    }
+
+    /// An alert a Revise item answers a click with when it may not open.
+    struct ReviseRefusal: Equatable {
+
+        // MARK: - Stored properties
+
+        let title: String
+        let message: String
+    }
+
+    /// Why a Revise item may not open a session on this course NOW, read from
+    /// disk at the click (#458) — the guarantee behind the greyed menu, since
+    /// a session can start between the menu opening and the click. Nil when
+    /// it may.
+    ///
+    /// Each cause is said as itself: a Claude or Codex session open elsewhere (all
+    /// three items), or the in-app assistant open on this course (the two
+    /// doors only).
+    func reviseRefusal(
+        item: CourseActivity.ReviseItem,
+        courseCode: String,
+        sectionNumber: Int?
+    ) -> ReviseRefusal? {
+        guard let workspacePath = workspaceURL?.path else {
+            return nil
+        }
+        let held: Bool = CourseActivity.isRevisedElsewhere(folderPath: workspacePath, courseCode: courseCode)
+        refreshCoursesRevisedElsewhere()
+        let title: String = AssistWording.courseIsAlreadyBeingRevised(course: courseCode)
+        if held {
+            return ReviseRefusal(title: title, message: AssistWording.finishTheClaudeSessionFirst)
+        }
+        // The local item's one-window rule is the menu's alone, as it was
+        // before #458: the window it would open names the one already open.
+        if item == .localAssistant {
+            return nil
+        }
+        guard let reason = CourseActivity.reviseUnavailableReason(
+            item: item,
+            folderPath: workspacePath,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber,
+            revisedElsewhere: false,
+            active: AssistActivity.active
+        ) else {
+            return nil
+        }
+        return ReviseRefusal(title: title, message: reason + ".")
     }
 
     /// Puts the selected course's sidebar row into edit mode.
@@ -1842,12 +1946,16 @@ class WorkspaceModel {
         guard coursesDirectoryURL != nil else {
             return
         }
-        if let workspacePath = workspaceURL?.path {
-            if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: course.code) {
-                renamingCourseCode = nil
-                renameProblem = "\(course.code) is previewing or deploying right now. Stop that first, then rename."
-                return
-            }
+        // A Claude or Codex session open on the course elsewhere holds it too (#458):
+        // the rename moves the folder that session is writing into.
+        if let refusal = structuralRefusal(
+            courseCode: course.code,
+            act: "rename",
+            whenBusy: "\(course.code) is previewing or deploying right now. Stop that first, then rename."
+        ) {
+            renamingCourseCode = nil
+            renameProblem = refusal
+            return
         }
 
         // Only when the folder is actually going to move. Retyping the same
@@ -2012,11 +2120,15 @@ class WorkspaceModel {
         if isBeingCopied(item.courseCode) {
             return
         }
-        if let workspacePath = workspaceURL?.path {
-            if CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: item.courseCode) {
-                backupProblem = "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
-                return
-            }
+        // A Claude or Codex session open on the course elsewhere holds a restore too
+        // (#458): it replaces the pages that session is changing.
+        if let refusal = structuralRefusal(
+            courseCode: item.courseCode,
+            act: "restore",
+            whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
+        ) {
+            backupProblem = refusal
+            return
         }
         do {
             // Archive WITHOUT removing: the restore replaces the course's
@@ -2033,9 +2145,12 @@ class WorkspaceModel {
             // it would have the course replaced under it — the case the check
             // above exists to refuse. The archive stays: it is a copy of the
             // course as it is, and harmless.
-            if let workspacePath = workspaceURL?.path,
-               CourseActivity.courseIsBusy(folderPath: workspacePath, courseCode: item.courseCode) {
-                backupProblem = "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
+            if let refusal = structuralRefusal(
+                courseCode: item.courseCode,
+                act: "restore",
+                whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
+            ) {
+                backupProblem = refusal
                 reloadCourses()
                 return
             }
@@ -2087,6 +2202,11 @@ class WorkspaceModel {
 
         /// The backups that could not be deleted, with why.
         let failed: [(item: BackupItem, reason: String)]
+
+        /// The backups left alone because a Claude or Codex session still open in
+        /// another program made them (#458) — kept apart from
+        /// `keptForTheAssistant` so each is told as what it is.
+        var keptForAClaudeSession: [BackupItem] = []
     }
 
     /// Deletes several backups for good, each permanently, as the single
@@ -2113,13 +2233,19 @@ class WorkspaceModel {
         following otherWindows: [WorkspaceModel] = WorkspaceModel.windowModels
     ) -> BackupDeletion {
         let heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
+        let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
 
         var deleted: [BackupItem] = []
         var kept: [BackupItem] = []
+        var keptForASession: [BackupItem] = []
         var failed: [(item: BackupItem, reason: String)] = []
         for item in items {
             if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
                 kept.append(item)
+                continue
+            }
+            if heldByASession.contains(WorkspaceModel.comparablePath(of: item)) {
+                keptForASession.append(item)
                 continue
             }
             do {
@@ -2131,7 +2257,8 @@ class WorkspaceModel {
         }
 
         let deletion: BackupDeletion = BackupDeletion(
-            deleted: deleted, keptForTheAssistant: kept, failed: failed
+            deleted: deleted, keptForTheAssistant: kept, failed: failed,
+            keptForAClaudeSession: keptForASession
         )
         if !deleted.isEmpty {
             ActivityTrail.note(
@@ -2229,6 +2356,34 @@ class WorkspaceModel {
         return heldPaths
     }
 
+    /// The backups a Claude or Codex session open in ANOTHER program made in this
+    /// working folder, as comparable paths (#458; Windows' `HeldBackups.For`
+    /// since #283): each `<COURSE>.held-backup.<pid>` record whose process
+    /// still holds a live `assist` lease. A killed session's record holds
+    /// nothing, because its lease is ignored.
+    static func backupPathsHeldByOtherSessions(inWorkingFolder workingFolder: URL?) -> Set<String> {
+        var heldPaths: Set<String> = []
+        guard let workingFolder else {
+            return heldPaths
+        }
+        let coursesDirectory: URL = workingFolder.appendingPathComponent("courses", isDirectory: true)
+        for record in WorkLeaseFiles.backupsHeldByOtherSessions(coursesDirectory: coursesDirectory) {
+            let url: URL = URL(fileURLWithPath: record.path)
+            heldPaths.insert(FolderIdentity.canonicalPath(url.standardizedFileURL.path))
+        }
+        return heldPaths
+    }
+
+    /// Every backup a delete in this working folder must keep: the open
+    /// assistant window's, and a Claude or Codex session's elsewhere (#458).
+    static func everyHeldBackupPath(inWorkingFolder workingFolder: URL?) -> Set<String> {
+        var heldPaths: Set<String> = WorkspaceModel.heldBackupPaths()
+        for path in WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workingFolder) {
+            heldPaths.insert(path)
+        }
+        return heldPaths
+    }
+
     /// How many of `items` a delete would actually remove — every one but the
     /// backups an open assistant conversation holds. Zero disables the
     /// delete-several button: a confirmation that deletes nothing, while
@@ -2258,6 +2413,13 @@ class WorkspaceModel {
             ))
             return
         }
+        let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
+        if heldByASession.contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblem = WorkspaceModel.problem(with: BackupDeletion(
+                deleted: [], keptForTheAssistant: [], failed: [], keptForAClaudeSession: [item]
+            ))
+            return
+        }
         backupDeleteRequest = item
     }
 
@@ -2277,13 +2439,24 @@ class WorkspaceModel {
         for items: [BackupItem],
         sizes: [String: Int64],
         heldPaths: Set<String>,
-        active: AssistActivity.Session?
+        active: AssistActivity.Session?,
+        heldByOtherSessions: Set<String> = []
     ) -> String {
         var going: [BackupItem] = []
         var keptCount: Int = 0
+        // Kept for a Claude or Codex session elsewhere (#458), counted per course so
+        // the sentence names the course whose session made them.
+        var keptForASessionByCourse: [String: Int] = [:]
+        var sessionCourses: [String] = []
         for item in items {
-            if heldPaths.contains(WorkspaceModel.comparablePath(of: item)) {
+            let path: String = WorkspaceModel.comparablePath(of: item)
+            if heldPaths.contains(path) {
                 keptCount += 1
+            } else if heldByOtherSessions.contains(path) {
+                if keptForASessionByCourse[item.courseCode] == nil {
+                    sessionCourses.append(item.courseCode)
+                }
+                keptForASessionByCourse[item.courseCode, default: 0] += 1
             } else {
                 going.append(item)
             }
@@ -2311,6 +2484,10 @@ class WorkspaceModel {
                 + "\(active.sectionNumber) is open and can still put the section back from "
                 + (keptCount == 1 ? "it." : "them.")
         }
+        for courseCode in sessionCourses {
+            let count: Int = keptForASessionByCourse[courseCode] ?? 0
+            message += "\n\n" + AssistWording.backupsKeptForAClaudeSession(course: courseCode, count: count)
+        }
         message += "\n\nThe courses themselves are not touched."
         return message
     }
@@ -2327,6 +2504,20 @@ class WorkspaceModel {
                 why += "these backups, so they were kept."
             }
             sentences.append(AssistActivity.closeTheAssistantFirst(active) + why)
+        }
+        // A Claude or Codex session's own backups (#458), one sentence per course.
+        var sessionCourses: [String] = []
+        var sessionCounts: [String: Int] = [:]
+        for item in deletion.keptForAClaudeSession {
+            if sessionCounts[item.courseCode] == nil {
+                sessionCourses.append(item.courseCode)
+            }
+            sessionCounts[item.courseCode, default: 0] += 1
+        }
+        for courseCode in sessionCourses {
+            sentences.append(AssistWording.finishTheClaudeSessionToDeleteItsBackup(
+                course: courseCode, count: sessionCounts[courseCode] ?? 0
+            ))
         }
         if !deletion.failed.isEmpty {
             let count: Int = deletion.failed.count
@@ -2373,6 +2564,14 @@ class WorkspaceModel {
             }
             line += "; kept " + keptNames.joined(separator: ", ")
                 + ", which the open assistant conversation can restore from"
+        }
+        if !deletion.keptForAClaudeSession.isEmpty {
+            var keptNames: [String] = []
+            for item in deletion.keptForAClaudeSession {
+                keptNames.append(item.fileURL.lastPathComponent)
+            }
+            line += "; kept " + keptNames.joined(separator: ", ")
+                + ", which a Claude or Codex session still open made"
         }
         if !deletion.failed.isEmpty {
             line += "; \(deletion.failed.count) could not be deleted"

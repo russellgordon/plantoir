@@ -1710,11 +1710,28 @@ final class AssistToolRunner {
         }
         // Another door (start of the year) may have saved one while this was
         // zipping; the first copy stays the conversation's way back.
-        if conversationBackups[code] == nil {
-            conversationBackups[code] = backupURL
-            conversationBackupURL = backupURL
-        }
+        rememberConversationBackup(backupURL, forCourse: code)
         return true
+    }
+
+    /// Makes a backup this conversation's way back for a course, if it has
+    /// none yet — the first copy stays — and, in the process an assistant
+    /// working from another app talks to, records it beside the session's
+    /// lease (`<COURSE>.held-backup.<pid>`, #283 and #458), so the app keeps
+    /// it while the session that made it is open. In the app no record is
+    /// written: the window's own runner reports its backups in-process
+    /// (`AssistActivity.holdBackups`).
+    private func rememberConversationBackup(_ backupURL: URL, forCourse code: String) {
+        if conversationBackups[code] != nil {
+            return
+        }
+        conversationBackups[code] = backupURL
+        conversationBackupURL = backupURL
+        if AssistMCPServer.isServing, let folderPath = workspace.workspaceURL?.path {
+            WorkLeaseRegistry.recordConversationBackup(
+                folderPath: folderPath, courseCode: code, backupURL: backupURL
+            )
+        }
     }
 
     /// Saves one copy of a course for the assistant, with the window's line
@@ -2633,10 +2650,7 @@ final class AssistToolRunner {
         }
         // The conversation's way back, if it had none yet: the Restore banner
         // offers the copy from before this conversation changed anything.
-        if conversationBackups[course.code] == nil {
-            conversationBackups[course.code] = backupURL
-            conversationBackupURL = backupURL
-        }
+        rememberConversationBackup(backupURL, forCourse: course.code)
 
         // The copy can take a minute, and the teacher can edit in Obsidian
         // meanwhile: held again to the plan the call was given (the rule in
@@ -2762,6 +2776,38 @@ final class AssistToolRunner {
             return naming.word
         }
         return nil
+    }
+
+    /// What settler S3 needs to judge a model's add_next_class (#440): how
+    /// this course names its pages, what it calls one, and the page a plain
+    /// "add the next class" would make — read-only, through the same planner
+    /// the tool calls.
+    ///
+    /// nil when the course cannot be found, or when the plain plan cannot be
+    /// made at all — no remembered class dates is the one that matters. S3
+    /// then falls through and the call runs, so the runner asks for the dates
+    /// exactly as it always has (ruling 7 of the #440 plan review): a sentence
+    /// about units is no reason to skip the question the teacher needs first.
+    func nextClassReading(forCourse code: String, section number: Int) -> AssistNextClassReading? {
+        guard let course = course(withCode: code) else {
+            return nil
+        }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        do {
+            _ = try NextClassPlanner.plan(forSection: number, in: course)
+        } catch {
+            return nil
+        }
+        let next: UnitDay = NextClassPlanner.nextUnitAndDay(
+            after: ClassPages.list(forSection: number, in: course), naming: naming
+        )
+        return AssistNextClassReading(
+            unitWord: naming.word,
+            isNumbered: naming.isNumbered,
+            noun: course.configuration.classNoun,
+            plainNextUnit: next.unit,
+            plainNextDay: next.day
+        )
     }
 
     /// The course with this code, or nil when the working folder no longer has
