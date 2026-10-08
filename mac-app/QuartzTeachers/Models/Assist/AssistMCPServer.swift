@@ -55,8 +55,8 @@ enum AssistMCPServer {
     /// this process takes an `assist` lease on, which keeps the session's
     /// backup (#283), refuses a second session, and holds rename, Add
     /// Section and restore in the app while the conversation is open. Both
-    /// doors name it (Russell, #458, 2026-10-07); Windows' Codex door does not
-    /// yet.
+    /// doors name it (Russell, #458, 2026-10-07), on both platforms: Windows'
+    /// Codex door has passed it as a fifth `-c` override since #468.
     nonisolated static let doorCourseVariable: String = "PLANTOIR_DOOR_COURSE"
 
     // MARK: - Functions

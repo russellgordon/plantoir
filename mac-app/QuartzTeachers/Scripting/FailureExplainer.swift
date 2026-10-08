@@ -101,13 +101,28 @@ struct FailureExplainer {
             guard line.contains(sectionIsBeingDeployedMarker) else {
                 continue
             }
-            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
-            while let first = sentence.first, first == "❌" || first == " " {
-                sentence.removeFirst()
-            }
-            return sentence.trimmingCharacters(in: .whitespaces)
+            return liftedSentence(from: line)
         }
         return nil
+    }
+
+    /// The launcher's line as a sentence: everything before its first ASCII
+    /// letter or digit taken off, then trimmed.
+    ///
+    /// Not "the cross and spaces" (what this did until #471): the cross is
+    /// one character only when the output was read as UTF-8. Read on a
+    /// Western code page it is three characters of mojibake, and on a
+    /// console that cannot show it a `?` — both met on Windows, whose server
+    /// reads the launcher without naming an encoding, and pinned by the
+    /// contract's `crossArrivesAs` cases. Every lifted line starts with a
+    /// course code, so the first letter or digit is where the sentence
+    /// begins whatever arrived in front of it.
+    static func liftedSentence(from line: Substring) -> String {
+        var sentence: Substring = line
+        while let first = sentence.first, !first.isASCII || !(first.isLetter || first.isNumber) {
+            sentence.removeFirst()
+        }
+        return String(sentence).trimmingCharacters(in: .whitespaces)
     }
 
     /// What `deploy.sh`, or `preview.sh --build-only`, refused with while
@@ -155,11 +170,7 @@ struct FailureExplainer {
             if !carriesAMarker {
                 continue
             }
-            var sentence: String = String(line).trimmingCharacters(in: .whitespaces)
-            while let first = sentence.first, first == "❌" || first == " " {
-                sentence.removeFirst()
-            }
-            sentence = sentence.trimmingCharacters(in: .whitespaces)
+            let sentence: String = liftedSentence(from: line)
             return SectionDeployRefusal(
                 byALaterDeploy: sentence.contains(laterDeployMarker),
                 sentence: sentence

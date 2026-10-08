@@ -21499,7 +21499,7 @@
         "assistant": "deployRefusedWhileItsSectionDeploys"
       }
     ],
-    "refusedBuildAnswersShape": "Each case drives an outside assistant's tool once, in a working folder whose ICS4U section 2 has a class page 'Unit 2, Day 3' (unpublished for publish_pages, published for unpublish_pages), with the preview's --build-only failing (exit 1) with failureExplanationCases[failureExplanationCase].output as its output - its cross replaced by crossArrivesAs when that is given. arguments are the tool's own beside course 'ICS4U' and section 2; pages is the contract's semicolon-separated string (a side that takes an array splits it). The answer must contain that case's expect, whole, must not contain the cross in the form it arrived in (or the real cross), and must not contain wording.whereTheOutputIs. Where the next words go is each side's: the page and unit answers say what was already done first. There is no single-page unpublish_pages case because Windows never rebuilds after hiding one page (GitHub #479); the mac does, so that case is the mac's to add.",
+    "refusedBuildAnswersShape": "Each case drives an outside assistant's tool once, in a working folder whose ICS4U section 2 has a class page 'Unit 2, Day 3' (unpublished for publish_pages, published for unpublish_pages), with the preview's --build-only failing (exit 1) with failureExplanationCases[failureExplanationCase].output as its output - its cross replaced by crossArrivesAs when that is given. arguments are the tool's own beside course 'ICS4U' and section 2; pages is the contract's semicolon-separated string (a side that takes an array splits it). The answer must contain that case's expect, whole, must not contain the cross in the form it arrived in (or the real cross), and must not contain wording.whereTheOutputIs. Where the next words go is each side's: the page and unit answers say what was already done first. The single-page unpublish_pages case (added from the mac, 2026-10-08) is one Windows holds open by name in its ledger under GitHub #479, because Windows never rebuilds after hiding one page and the mac does; it is not marked appliesOn, since that would record as chosen a difference Windows still owes.",
     "refusedBuildAnswers": [
       {
         "name": "an outside assistant's rebuild, refused by the deploy set for later",
@@ -21553,6 +21553,16 @@
         "failureExplanationCase": 1,
         "crossArrivesAs": "â\u009dŒ",
         "why": "The whole-unit path's answer, with the same mojibake as the page path's case."
+      },
+      {
+        "name": "unpublishing a page, refused by another deploy, with the cross arriving as '?'",
+        "tool": "unpublish_pages",
+        "arguments": {
+          "pages": "Unit 2, Day 3"
+        },
+        "failureExplanationCase": 3,
+        "crossArrivesAs": "?",
+        "why": "The mac rebuilds after hiding one page, so its answer meets the refusal. Windows never rebuilds after hiding one page (GitHub #479, open), so this case is red there until #479 decides whether a hide rebuilds: a named gap in its ledger against #479, not an appliesOn, because the difference is one Windows still owes rather than one that was chosen (contracts/README.md, 'four ways out')."
       }
     ],
     "theNewRunWaits": {
