@@ -286,7 +286,7 @@ public static partial class AssistWording
     // one started it: the Claude door and the Codex door pass the same
     // variable (AssistWorkspace.DoorCourseVariable). The in-app window's own
     // server holds the course too, and its cause gets the window's own words
-    // (WindowIsRevisingTheCourse below), never these.
+    // (WindowHoldWording, beside WindowServers), never these.
 
     /// <summary>Under a greyed Revise item while an outside session holds the course.</summary>
     public const string AvailableOnceYouFinishRevisingWithClaude = "Available once you finish revising with Claude or Codex";

@@ -21487,7 +21487,7 @@
     "whichDoors": {
       "claude": true,
       "codex": true,
-      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door names no course today and owes the fifth override (the windows issue from #458). Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
+      "why": "Decided by Russell on #458, 2026-10-07: BOTH doors, so a session opened through either keeps #283's backup protection, the second-session refusal and the hold on structural work. A Codex session that held nothing would lose all three while looking exactly like a Claude one to the teacher. The server cannot tell which door started it, so the sentences name both ('Claude or Codex'). The mac since #458; Windows' Codex door since #468 (2026-10-08), the fifth override in CodexLauncher.Arguments. Superseded: the director's ruling 3 for #458, the same day, which had kept the Codex door holding nothing to match Windows."
     },
     "courseToHold": {
       "rule": "Trim the value. Unset, empty or blank holds nothing. Otherwise the course of that code in this folder, matched without regard to case, answered as the folder spells it; a code the folder does not have holds nothing. Never a refusal and never a lock - a session whose value names nothing simply holds nothing, as a server started by hand does.",
