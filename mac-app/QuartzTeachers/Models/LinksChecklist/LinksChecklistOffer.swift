@@ -289,8 +289,8 @@ nonisolated enum LinksChecklistGate {
     /// When the teacher is being offered it — also what the trail line says.
     enum Occasion: String, Sendable {
         case afterAPreview = "after a preview"
-        case afterPublishing = "after publishing"
-        case onOpening = "on opening, after a publish Plantoir did not watch"
+        case afterPublishing = "after deploying"
+        case onOpening = "on opening, after a deploy Plantoir did not watch"
         case fromTheMenu = "from the menu"
     }
 

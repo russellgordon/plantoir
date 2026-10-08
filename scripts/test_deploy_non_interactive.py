@@ -218,7 +218,7 @@ class RefusingRatherThanAsking(unittest.TestCase):
         stopped publish is "it half happened".
         """
         said = self._refusal(lambda: deploy.prompt("Enter Netlify site name", default="x"))
-        self.assertIn("Nothing was published", said)
+        self.assertIn("Nothing was deployed", said)
 
     def test_it_says_what_to_do_about_it(self):
         said = self._refusal(lambda: deploy.prompt("Enter Netlify site name", default="x"))

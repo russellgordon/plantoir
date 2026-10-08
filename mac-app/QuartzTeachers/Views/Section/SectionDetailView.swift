@@ -135,7 +135,7 @@ struct SectionDetailView: View {
     /// say first (the trail has both).
     @State var frontPageNotChanged: String?
 
-    /// A publish that was set to happen on its own and did not get through.
+    /// A deploy that was set to happen on its own and did not get through.
     ///
     /// Read from disk rather than held in memory, because the run that wrote
     /// it happened at half six with this app closed. Nil when the last
@@ -876,7 +876,7 @@ struct SectionDetailView: View {
                 // section number, so publishing section 2 would otherwise be
                 // reported as section 1 publishing.
                 pendingRepairOutcome = SiteHealthRepair.Outcome(
-                    headline: "Plantoir is publishing this course just now.",
+                    headline: "Plantoir is deploying this course just now.",
                     // Deliberately not "press Preview Again": this outcome is
                     // the one whose button is withheld, so naming a button that
                     // is not on screen would be worse than saying nothing.

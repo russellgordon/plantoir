@@ -27,7 +27,7 @@
       },
       {
         "event": "working folder reopened",
-        "carries": "the working folder's path (redacted), which it was — the window's own folder, the last working folder, or (since #306, on the mac) the folder a clicked scheduled publish notification named, taken by a window that was choosing one — and, when a bookmark found it moved, the path it had been at",
+        "carries": "the working folder's path (redacted), which it was — the window's own folder, the last working folder, or (since #306, on the mac) the folder a clicked scheduled deploy notification named, taken by a window that was choosing one — and, when a bookmark found it moved, the path it had been at",
         "why": "\"Plantoir opened the wrong folder\" and \"my courses are gone\" are both answered by knowing the APP reopened a folder rather than the teacher choosing one. Until #311 (2026-09-26) a restore left nothing on the mac trail, and on Windows it wrote \"working folder opened\", indistinguishable from a choice. The moved clause answers \"it's opening my old copy\". Written only by a window's model, once per window that reopens. A window opened BESIDE another (⌘N) inherits the key window's folder and writes nothing on either platform — it is neither a choice nor a reopen."
       },
       {
@@ -45,7 +45,7 @@
         "appliesOnWhy": "PERMANENT: Windows builds natively, so no folder it can read is out of the builder's reach (shared-rules.json → workingFolderReach)."
       },
       {
-        "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a publish of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause)",
+        "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a deploy of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause)",
         "event": "settings saved",
         "why": "'It broke after I changed something' is the commonest report there is, and this is the line that dates the change. Issue #265 (2026-09-24) widened it: two windows on one working folder each held their own copy of a course's settings, a Save in the stale one put back its older sidebar list, and a Save made while a preview was open never reached that preview. Every one of those looks, from the teacher's chair, like switches with 'no correlation' to the site; the line naming what the save hid, what it kept from elsewhere and what was running settles it in one read."
       },
@@ -57,7 +57,7 @@
       {
         "carries": "the course code and WHICH check held Save back: deploy folder, cloudflare account id, or additional destination — never the path or the ID. Written once per visit to the course, on the change into the held-back state, not per keystroke.",
         "event": "settings save held back",
-        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the publishing folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
+        "why": "#373: a teacher reported that Save would not light up for a section's change, and the trail held nothing, because nothing was pressed — the held-back state is the one place where the form changes and no act follows. Since #373 a destination problem holds Save back only when the unsaved edit moves where the course publishes (savingSettings.whatEnablesSave), so this line also says that is what happened. Example: “Save held back for ICS3U (deploy folder) — the deploy folder needs attention”. Worded as a HOLD, not a failure: no Save was pressed, and a reader of the trail must not take it for one that failed (#373 implementation review, N2)."
       },
       {
         "carries": "the course code and the section",
@@ -120,14 +120,14 @@
         "why": "Recorded the moment the teacher's words are ACCEPTED, above every branch below it - not when the message goes to the model, and not when an answer comes back. Two different bugs came from placing it lower: a sentence matching a fixed shape returns early and never reaches the model, so a whole class of input left no trace at all; and an engine that failed, or one still thinking when the teacher gave up, lost the sentence that caused the trouble. It is also what the report's checkbox keys off, so recording it late made the checkbox vanish for somebody who had plainly just used the assistant. The general rule: record what the teacher did where they did it, above every branch, never at a later point that can be skipped."
       },
       {
-        "carries": "course, section, the tool it ran, and - when the phrasing named a time and the app settled it onto a day - the whole moment it settled on; or, for a time with no am or pm ('deploy at 6:30'), that it asked whether the time was morning or evening and set nothing; or, for a time written a way the app can read but does not set ('deploy at 6.30 pm', 'deploy at 6:30 tonight'), that it gave the spelling to use and set nothing",
+        "carries": "course, section, the tool it ran, and - when the phrasing named a time and the app settled it onto a day - the whole moment it settled on; or, for a time with no am or pm ('deploy at 6:30'), that it asked whether the time was morning or evening and set nothing; or, for a time written a way the app can read but does not set ('deploy at 6.30 pm', 'deploy at 6:30 tonight'), that it gave the spelling to use and set nothing; or, for 'schedule a deploy' with no time it can set (#424 on Windows, #449 on the mac), that it asked what time to schedule the deploy for and set nothing",
         "event": "assistant matched a fixed phrase",
-        "why": "Some phrasings are matched in code and never reach the model at all. Without this line, 'why did it not think about what I said?' is unanswerable - the trail would show a tool running with nothing between it and the teacher's sentence. The moment joined it with the deploy-at-a-time family (issue #168): 'deploy at 6:30 am' names no day, so the app chooses one - the next such time, counting today while it is still to come - and a teacher writing in to say 'it went out on Saturday, I meant Friday' would otherwise leave a trail carrying their sentence and the tool but not the day that was chosen. The conversation is not on the trail, so this is the only place that choice is recoverable. A WHOLE moment only, never a half-settled word and never anything a teacher wrote. Since issue #194 the same event also records a time ASKED about rather than scheduled: 'deploy at 6:30' is morning or evening, the app asks which in code and nothing is set, and without a line the trail would show the teacher's sentence followed by nothing - which reads exactly like a model that failed to answer. The line carries no clock, because the clock is something the teacher wrote. Since issue #277 it also records a time answered with the spelling to use (AssistAgent.askedToSayTheTimeAsLine): the same reasoning, the same absence of a clock, and 'nothing was set' because the line sits where a scheduled deploy's would."
+        "why": "Some phrasings are matched in code and never reach the model at all. Without this line, 'why did it not think about what I said?' is unanswerable - the trail would show a tool running with nothing between it and the teacher's sentence. The moment joined it with the deploy-at-a-time family (issue #168): 'deploy at 6:30 am' names no day, so the app chooses one - the next such time, counting today while it is still to come - and a teacher writing in to say 'it went out on Saturday, I meant Friday' would otherwise leave a trail carrying their sentence and the tool but not the day that was chosen. The conversation is not on the trail, so this is the only place that choice is recoverable. A WHOLE moment only, never a half-settled word and never anything a teacher wrote. Since issue #194 the same event also records a time ASKED about rather than scheduled: 'deploy at 6:30' is morning or evening, the app asks which in code and nothing is set, and without a line the trail would show the teacher's sentence followed by nothing - which reads exactly like a model that failed to answer. The line carries no clock, because the clock is something the teacher wrote. Since issue #277 it also records a time answered with the spelling to use (AssistAgent.askedToSayTheTimeAsLine): the same reasoning, the same absence of a clock, and 'nothing was set' because the line sits where a scheduled deploy's would. Since #424 (Windows) and #449 (mac) it also records 'schedule a deploy' with no time the app can set, asked about in code (AssistAgent.askedWhenToScheduleLine on the mac, the same words on Windows): the same reasoning again - no clock, and 'nothing was set'."
       },
       {
-        "carries": "course, section, the tool name, the ARGUMENT NAMES, the seconds, the completion-token count, and whether it waited for the approval button",
+        "carries": "course, section, the tool name, the ARGUMENT NAMES, the seconds, the completion-token count, and whether it waited for the approval button; and, when the model chose deploy_section for a sentence that named a later time (settler S1, #424 on Windows, #449 on the mac), a line saying so: no deploy card was shown, nothing ran, and the teacher was asked what time to schedule it for",
         "event": "assistant chose a tool",
-        "why": "Routing has no automated gate anywhere in this product, so the field is the only place a routing regression shows. Argument NAMES rather than values: which tool with which arguments filled in answers the routing question completely, while the values are the teacher's page titles. The token count is the honest check on thinking having been switched back on - the engine parses the thinking OUT of the content, so a bad reply looks clean and is merely slow."
+        "why": "Routing has no automated gate anywhere in this product, so the field is the only place a routing regression shows. Argument NAMES rather than values: which tool with which arguments filled in answers the routing question completely, while the values are the teacher's page titles. The token count is the honest check on thinking having been switched back on - the engine parses the thinking OUT of the content, so a bad reply looks clean and is merely slow. Settler S1's line (#424/#449) is here because it is the model's choice that was overruled: without it the trail shows deploy_section chosen and then nothing deployed and no card, which reads like a lost button press. On the mac it FOLLOWS the turn's own chose-a-tool line, which for that turn does not say it waited for the button, because no button went up; on Windows the S1 line takes that line's place."
       },
       {
         "carries": "course, section, and the reason",
@@ -241,7 +241,7 @@
         "why": "A teacher who reports 'it stopped showing my curriculum map last month' leaves nothing to look at otherwise: the finding is printed into a build console that is gone by then, and the condition itself is invisible on disk — a renamed folder looks exactly like a folder that was always called that. Recording the check NAME rather than the sentence is deliberate: the sentence is product wording and will be reworded, while the name is what a person searching the trail six months later can match against the contract. A scheduled publish's findings are recorded too, dated to the RUN rather than to when somebody next opened the section - or a problem found at half six is filed under the morning somebody looked, and a teacher who never opens that section gets no line at all (the reasoning of scheduledPublishStopped.trail; #153). Who writes it is platform-local: the mac's scheduled run is Plantoir itself and writes the line at the end of the run, from its own log; Windows writes it when the app reads the run's record, dated to that record's write time. Since #246 it also covers a PAGE whose settings the build could not read (pageSettingsUnreadable), not only a folder: the name is kept because the event is the site-health family and renaming it would cost both platforms, and the line still carries the check's name only - never which pages, which are the teacher's own names."
       },
       {
-        "carries": "which section, and which destinations it was published to",
+        "carries": "which section, and which destinations it was deployed to",
         "event": "section content marked published",
         "why": "Why a section stopped saying \" — Edited\". The marker is DERIVED - its presence and its absence look identical on disk - so a teacher reporting 'it still says Edited after I published' leaves nothing to look at without this line. It is also the only record that a publish succeeded at EVERY destination rather than merely at one."
       },
@@ -325,7 +325,7 @@
         "why": "A rollover that cuts a section loose is the moment its published address changes, and nothing else on the trail records it. The same act turns off any publish that was set to happen on its own — a section with no agreed website and a scheduled run with nobody to ask would otherwise create a website nobody named — so a teacher whose overnight publish stops happening has one line explaining both."
       },
       {
-        "carries": "the course code, the section number, and where it published",
+        "carries": "the course code, the section number, and where it deployed",
         "event": "scheduled publish finished",
         "why": "The positive case, and it is here for the same reason the two failures are, read the other way round: a scheduled publish that leaves NO trace cannot be told from one that never happened. Without this line the trail can answer “why did my site not update?” and cannot answer “did it?” — and a teacher wondering whether last night's publish went out has nowhere to look. Added 2026-09-09 on Russell's instruction, after a real scheduled run showed the failures recorded and the successes silent.",
         "appliesOnWhy": "Owed on both platforms for the same reason as the other two, and RECORDED on both as of 2026-09-09: the mac when Russell asked for it, Windows the same day (GitHub issue #130). This said \"Windows records neither today\" until that landed; nothing reads appliesOnWhy, so only a reader would have been misled, which is the quiet way a contract stops being true. scheduledPublishStopped.platformDifferences is where the two are compared."
@@ -357,7 +357,7 @@
         "appliesOnWhy": "PERMANENT and deliberate, which is what appliesOn is for - the same case as \"built site moved out of the working folder\" above, and NOT the softening that contracts/README.md rejects. Windows ships a native toolchain: no image, no container, no virtual machine, nothing for the app to stop when it quits. Their FolderContainers.StopContainer and .ReleaseEverythingAtQuit both open with `if (Scripting.NativeRuntime.Directory is not null) return;`, and documentation/12-windows-app.md says the WSL2 engine path they guard \"is gone; do not build toward it\". An event cannot be recorded where the moment it describes does not exist. If that ever changes - a Windows build with no native runtime, falling back to WSL - drop the appliesOn rather than adding a windows twin."
       },
       {
-        "carries": "which folder was left alone and WHY - a publish or preview for that folder still going, this folder's own builder still running when the shared setup was asked about - whether it was left alone deliberately or refused to stop, or other software on this Mac sharing the same setup",
+        "carries": "which folder was left alone and WHY - a deploy or preview for that folder still going, this folder's own builder still running when the shared setup was asked about - whether it was left alone deliberately or refused to stop, or other software on this Mac sharing the same setup",
         "event": "website builder left running",
         "why": "The companion line, and the one support will read more often, because 'quitting did not free anything' is the report and this is the only thing that can answer it. Three different deliberate refusals file here. One: a publish or preview for that folder is still running, on the host or inside the builder, so stopping it would break work the teacher cannot see - a scheduled publish, an assistant working over a connection, a second window. Two: the shared setup was asked about and THIS teacher's own builder is the thing still in it, either because it was deliberately left alone or because it REFUSED to stop - both reach this line, because either way our container is in the emptiness check's answer - which must be said in those words, because a builder just left running is itself in the emptiness check's answer, and calling it \"other software\" on a Mac that has no other software in there would be false every time. Three: other software on this Mac genuinely does share the same setup, which is never stopped out from under anybody. Without the line, a deliberate refusal is indistinguishable from the fault it replaced.",
         "appliesOn": [
@@ -798,7 +798,7 @@
       },
       {
         "event": "offered to publish pages that links lead to",
-        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes); how many are listed under another page (#385); and how many would be published as offered - rows SHOWN ticked: rows that GO and, since #398, rows a ticked class brings (none at opening, since no class starts ticked), so a row under a row that is not going does not count although its own tick is on (#385); the occasion: after a preview, after publishing, on opening after a publish Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
+        "carries": "the course and section; how many pages in each group (used by a class students can see, linked from other pages, classes); how many are listed under another page (#385); and how many would be published as offered - rows SHOWN ticked: rows that GO and, since #398, rows a ticked class brings (none at opening, since no class starts ticked), so a row under a row that is not going does not count although its own tick is on (#385); the occasion: after a preview, after deploying, on opening after a deploy Plantoir did not watch (scheduled, the assistant, outside), or from the menu. Never a page's name.",
         "line": "{course}/{section} · offered to publish pages that links lead to {occasion} — {N} used by a class, {N} linked from other pages, {N} classes; {N} listed under another page; {N} ticked",
         "why": "Added with #379. #333's alert was shown and nobody could tell afterwards whether it had been seen; 'why did it ask me to publish 40 pages?' is answered by the occasion and the counts. #385 changed what 'ticked' counts: 'why did it only publish 3 when 5 were ticked?' is answered by the line."
       },
@@ -820,7 +820,7 @@
         "why": "Only the Windows app ever wrote a timetable in the PC's own calendar (#144), but the file lives inside the course folder and travels with it through backups, archives, restores and shared working folders, so either app can meet one. When one is set aside the teacher is asked for class dates they had already given; without this line a problem report would show a remembered timetable on disk and an app that asked anyway, with nothing between the two. Recorded by the reader, which is the one place that knows the date it refused. Windows-only until 2026-10-03, when the mac adopted the window and the line (#377)."
       }
     ],
-    "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty.",
+    "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
     "promptMarker": {
       "prefix": "  asked: ",
       "why": "The teacher's own words go on their own line behind a fixed prefix, so leaving them out of a report is dropping lines by prefix rather than parsing anything. They are kept locally because a routing problem cannot be looked into without the sentence that caused it, and withheld from the report unless the teacher ticks the box, because their words are the one thing here unmistakably theirs to hand over."
@@ -1810,7 +1810,7 @@
           "rule": "The title and the caption below, word for word, on ALL FOUR surfaces that ask this question — Course Settings and the New Course Wizard, on both platforms. The caption goes BELOW its list on every one of them: “a page in one of these” points at the list, and Windows used to put the caption above, where “these” had the section header “Marks” in front of it and nothing to refer to. One string rather than a per-surface variant, because the caption names no switch and no platform.",
           "listTitle": "Folders whose work counts for marks",
           "caption": "Tick the folders holding work that counts for marks. The curriculum coverage map shows an expectation as evaluated when a page in one of these addresses it. Most courses keep “Tasks”; tick “Tests” or anything else you mark.",
-          "why": "Proposed from Windows 2026-09-08, resolving the second Course Settings divergence after specialNames.contentStructureTip: the two apps had worded this title and caption differently since the control was built, and nothing pinned either. The TITLE is the mac's, Russell's choice — it is also the closer match to specialFoldersHelp's already-pinned “Work that counts for marks”, so it cost the mac nothing. The CAPTION is a union of the two apps' and its middle sentence is the specialFoldersHelp marks row’s with ONE word changed — the map’s name. It is not identical to that row, and this why claimed it was until 2026-09-08: the help sheet still says “the curriculum map”, deliberately, as recorded below. Three decisions inside it, each of which was argued the other way first. THE MAP'S NAME: “the curriculum coverage map”, Russell's choice 2026-09-08, because both spellings are already pinned and this is the one shown on THIS control — specialNames.lastGradedFolderBlocked says “while the curriculum coverage map is enabled” in the flyout raised from this very list, and the switch beside it is labelled “Publish the curriculum coverage map”, so the caption now makes three matching names on one screen. specialFoldersHelp's “the curriculum map” is knowingly left as the outlier on a different surface; that is a recorded mixed state, not drift to be tidied up. Windows' capital-C “the Curriculum Coverage map” WAS drift and is gone: that is the built page's title, not a common noun. THE VERBS: “tick”, not the mac's “add … and remove”. This list is a tick list with no Add button, so the mac's caption named two actions the control does not offer, and “remove what you don't” invited the one thing lastGradedFolderBlocked refuses — unticking the last graded folder while the coverage map is on. THE OPENING CLAUSE was kept rather than dropped as a restatement of the title above it: the title is a noun phrase and this is where the teacher is told what to DO, and it is what makes the sentence survive if any surface ever puts the caption back above its list. WHAT THE CAPTION DELIBERATELY DOES NOT SAY: it is a summary, and the full conditions are stricter. _coverage_counts in build_site.py also requires the page to be published rather than a draft, and to be one the course actually TEACHES — reachable from a class page directly or through one hop — and the map itself is absent when include_curriculum_coverage is off, or when the course has no curriculum folder or no expectations, which is the normal state of a from-scratch wizard course. Those conditions are spelled out to the teacher on the coverage page itself (COVERAGE_NOTES) and were left out here on purpose: this sentence has been shown in specialFoldersHelp in exactly this form since that sheet was written, and lengthening a caption to carry three exceptions would bury the one thing it is for. WHAT THE CAPTION GIVES UP, so it is not rediscovered later as a bug: the mac’s “add “Tests”” was wrong about the control but loosely right about something this sentence does not say — that a folder must EXIST before it can be ticked. The pool offered is the declared lists plus a disk walk (gradedFolders.choices), so a teacher who marks tests and has no Tests folder has nothing to tick here and is told nothing about making one. Judged the lesser fault, because naming a button the control has not got is a dead end while a missing folder is visible in the very list they are looking at. One inherited imprecision is flagged rather than fixed: the map's own word is “assessed”, while this sentence says “evaluated”. Changing it means changing the specialFoldersHelp row too, which is a separate piece on both platforms."
+          "why": "Proposed from Windows 2026-09-08, resolving the second Course Settings divergence after specialNames.contentStructureTip: the two apps had worded this title and caption differently since the control was built, and nothing pinned either. The TITLE is the mac's, Russell's choice — it is also the closer match to specialFoldersHelp's already-pinned “Work that counts for marks”, so it cost the mac nothing. The CAPTION is a union of the two apps' and its middle sentence is the specialFoldersHelp marks row’s with ONE word changed — the map’s name. It is not identical to that row, and this why claimed it was until 2026-09-08: the help sheet still says “the curriculum map”, deliberately, as recorded below. Three decisions inside it, each of which was argued the other way first. THE MAP'S NAME: “the curriculum coverage map”, Russell's choice 2026-09-08, because both spellings are already pinned and this is the one shown on THIS control — specialNames.lastGradedFolderBlocked says “while the curriculum coverage map is enabled” in the flyout raised from this very list, and the switch beside it is labelled “Include the curriculum coverage map” (“Publish the curriculum coverage map” until v1.4.4, when #443 gave it the wizard's name so one setting has one name), so the caption now makes three matching names on one screen. specialFoldersHelp's “the curriculum map” is knowingly left as the outlier on a different surface; that is a recorded mixed state, not drift to be tidied up. Windows' capital-C “the Curriculum Coverage map” WAS drift and is gone: that is the built page's title, not a common noun. THE VERBS: “tick”, not the mac's “add … and remove”. This list is a tick list with no Add button, so the mac's caption named two actions the control does not offer, and “remove what you don't” invited the one thing lastGradedFolderBlocked refuses — unticking the last graded folder while the coverage map is on. THE OPENING CLAUSE was kept rather than dropped as a restatement of the title above it: the title is a noun phrase and this is where the teacher is told what to DO, and it is what makes the sentence survive if any surface ever puts the caption back above its list. WHAT THE CAPTION DELIBERATELY DOES NOT SAY: it is a summary, and the full conditions are stricter. _coverage_counts in build_site.py also requires the page to be published rather than a draft, and to be one the course actually TEACHES — reachable from a class page directly or through one hop — and the map itself is absent when include_curriculum_coverage is off, or when the course has no curriculum folder or no expectations, which is the normal state of a from-scratch wizard course. Those conditions are spelled out to the teacher on the coverage page itself (COVERAGE_NOTES) and were left out here on purpose: this sentence has been shown in specialFoldersHelp in exactly this form since that sheet was written, and lengthening a caption to carry three exceptions would bury the one thing it is for. WHAT THE CAPTION GIVES UP, so it is not rediscovered later as a bug: the mac’s “add “Tests”” was wrong about the control but loosely right about something this sentence does not say — that a folder must EXIST before it can be ticked. The pool offered is the declared lists plus a disk walk (gradedFolders.choices), so a teacher who marks tests and has no Tests folder has nothing to tick here and is told nothing about making one. Judged the lesser fault, because naming a button the control has not got is a dead end while a missing folder is visible in the very list they are looking at. One inherited imprecision is flagged rather than fixed: the map's own word is “assessed”, while this sentence says “evaluated”. Changing it means changing the specialFoldersHelp row too, which is a separate piece on both platforms."
     },
     "note": "Which folders hold work that COUNTS FOR MARKS. An expectation is \"assessed\" \u2014 the ring on a cell in the Curriculum Coverage map, and Ontario's requirement that every overall expectation be evaluated at least once \u2014 when a page addressing it lives in one of these. It used to be hardcoded: any folder whose name CONTAINED \"task\". A teacher who called theirs \"Tests\", or renamed \"Tasks\", silently lost every assessed mark on the map with nothing said.",
     "absentIsNotEmpty": {
@@ -2615,11 +2615,11 @@
       "couldNotRunAsSetNow": "The run read the course's settings when it fired (#323; scheduledDeployCancellation.theDestination) and could not deploy the way the course is set NOW: everything scheduledDeployRefusals refuses except a time already passed, or settings that could not be read, or a deploy it could not get ready. So it STOOD DOWN: deployed nothing, cleared the job away, and said why. Its record's second line is the REASON - a clause true at the run, from theDestination.reasonClauses or theDestination.wording - and unlike the other stand-downs it IS shown, as {reason}. One kind rather than one per refusal: seven kinds for one situation a teacher reads the same way, and the folder and account reasons carry varying text anyway. Earns the attention badge for tooLateToRun's reason. Added on the mac 2026-09-26; Windows owes it with theDestination. When the reason is theDestination.reasonClauses.keptForReference the sentence is sentences.couldNotRunAsSetNowForAReferenceCourse instead, which names no reason and gives no 'deploy it yourself' - a course kept for reference is never deployed (the #323 review's L-a). It is a second SENTENCE for the same kind, not a kind of its own; a runner that walks `kinds` finds one kind."
     },
     "sentences": {
-      "neededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped because publishing to {destination} needed an answer nobody was there to give. Publish this section once yourself, answer the question, and it can publish on its own after that.",
-      "buildNeededAnAnswer": "{course} Section {section} was set to publish on its own, and it stopped before it started, because building the pages needed an answer nobody was there to give. Preview this section once yourself, answer the question, and it can publish on its own after that.",
-      "buildDidNotFinish": "{course} Section {section} was set to publish on its own, and it stopped before it started \u2014 the pages could not be built, so nothing went up anywhere. Preview this section once yourself, and the reason will be in that section's window.",
-      "didNotFinish": "{course} Section {section} was set to publish on its own, and it did not finish \u2014 publishing to {destination} stopped, so nothing went up there. Publish it yourself to see what happens.",
-      "succeeded": "{course} Section {section} published on its own to {destination}. Your students have the new pages.",
+      "neededAnAnswer": "{course} Section {section} was set to deploy on its own, and it stopped because deploying to {destination} needed an answer nobody was there to give. Deploy this section once yourself, answer the question, and it can deploy on its own after that.",
+      "buildNeededAnAnswer": "{course} Section {section} was set to deploy on its own, and it stopped before it started, because building the pages needed an answer nobody was there to give. Preview this section once yourself, answer the question, and it can deploy on its own after that.",
+      "buildDidNotFinish": "{course} Section {section} was set to deploy on its own, and it stopped before it started \u2014 the pages could not be built, so nothing went up anywhere. Preview this section once yourself, and the reason will be in that section's window.",
+      "didNotFinish": "{course} Section {section} was set to deploy on its own, and it did not finish \u2014 deploying to {destination} stopped, so nothing went up there. Deploy it yourself to see what happens.",
+      "succeeded": "{course} Section {section} deployed on its own to {destination}. Your website has the new pages.",
       "tooLateToRun": "{course} Section {section} was set to deploy on its own, but this computer wasn’t awake at that time and too long has passed since. Plantoir left the site as it was. Deploy it yourself when you’re ready, or schedule another from the section’s menu.",
       "courseWasBusy": "{course} Section {section} was set to deploy on its own, but the course was still being built somewhere else on this computer after ten minutes of waiting, so Plantoir left the site as it was rather than build it twice at once. Deploy it yourself when that has finished, or schedule another from the section’s menu.",
       "couldNotRunAsSetNow": "{course} Section {section} was set to deploy on its own, but it could not deploy the way the course is set now — {reason} — so Plantoir left the site as it was. Deploy it yourself from the section, or schedule another from the section’s menu.",
@@ -2694,7 +2694,7 @@
             "postFails": false,
             "posts": true,
             "asksForPermission": false,
-            "trailSays": "told the teacher how a scheduled publish went, with a notification",
+            "trailSays": "told the teacher how a scheduled deploy went, with a notification",
             "why": "A success as much as a failure: the silence is the complaint whatever the outcome."
           },
           {
@@ -2704,7 +2704,7 @@
             "postFails": false,
             "posts": false,
             "asksForPermission": false,
-            "trailSays": "did not send a notification about a scheduled publish, because notifications are turned off for Plantoir",
+            "trailSays": "did not send a notification about a scheduled deploy, because notifications are turned off for Plantoir",
             "why": "From the teacher's side a blocked notification and one never sent look the same; the line is what tells them apart."
           },
           {
@@ -2715,7 +2715,7 @@
             "postFails": false,
             "posts": false,
             "asksForPermission": false,
-            "trailSays": "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet",
+            "trailSays": "did not send a notification about a scheduled deploy, because Plantoir has not been given permission to send them yet",
             "why": "A question put by a run at half six is put to nobody, and the process is about to exit."
           },
           {
@@ -2725,7 +2725,7 @@
             "postFails": true,
             "posts": false,
             "asksForPermission": false,
-            "trailSays": "a notification about a scheduled publish could not be sent",
+            "trailSays": "a notification about a scheduled deploy could not be sent",
             "why": "The post was attempted and did not land — including a system that never answered before the run's ceiling. Never silent, and never a reason for the run itself to fail."
           },
           {
@@ -2875,8 +2875,8 @@
             "onlyWhereThereIsAPrompt": true,
             "asks": true,
             "trailSays": [
-              "asked whether Plantoir may send a notification when a scheduled publish finishes",
-              "the teacher allowed notifications about scheduled publishes"
+              "asked whether Plantoir may send a notification when a scheduled deploy finishes",
+              "the teacher allowed notifications about scheduled deploys"
             ],
             "answer": "allowed",
             "why": "The first time a teacher schedules, from the one place they can see why they are being asked. The first line is written before the answer, because a question that is ignored, or arrives under a Focus, may never be answered."
@@ -2887,8 +2887,8 @@
             "onlyWhereThereIsAPrompt": true,
             "asks": true,
             "trailSays": [
-              "asked whether Plantoir may send a notification when a scheduled publish finishes",
-              "the teacher did not allow notifications about scheduled publishes"
+              "asked whether Plantoir may send a notification when a scheduled deploy finishes",
+              "the teacher did not allow notifications about scheduled deploys"
             ],
             "answer": "notAllowed"
           },
@@ -2912,8 +2912,8 @@
             "asks": true,
             "answer": "allowed",
             "trailSays": [
-              "asked whether Plantoir may send a notification when a scheduled publish finishes",
-              "the teacher allowed notifications about scheduled publishes"
+              "asked whether Plantoir may send a notification when a scheduled deploy finishes",
+              "the teacher allowed notifications about scheduled deploys"
             ]
           },
           {
@@ -2930,7 +2930,7 @@
             "onlyWhereThereIsAPrompt": true,
             "asks": false,
             "trailSays": [
-              "did not send a notification about a scheduled publish, because Plantoir has not been given permission to send them yet"
+              "did not send a notification about a scheduled deploy, because Plantoir has not been given permission to send them yet"
             ]
           }
         ]
@@ -2956,7 +2956,7 @@
               "selectsTheSection": true,
               "opensAWindow": false
             },
-            "trailSays": "opened the section from its scheduled publish notification"
+            "trailSays": "opened the section from its scheduled deploy notification"
           },
           {
             "name": "two windows on that folder: the one nearer the front is used",
@@ -2981,7 +2981,7 @@
               "opensAWindow": false,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "opened the section from its scheduled publish notification",
+            "trailSays": "opened the section from its scheduled deploy notification",
             "why": "Windows are listed front to back, the order the teacher sees them in. Not 'the key window': when a notification is clicked Plantoir is not the active app, so no window of it is key."
           },
           {
@@ -3005,7 +3005,7 @@
               "opensAWindow": false,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "opened the section from its scheduled publish notification"
+            "trailSays": "opened the section from its scheduled deploy notification"
           },
           {
             "name": "every window on that folder is busy",
@@ -3024,7 +3024,7 @@
               "selectsTheSection": false,
               "opensAWindow": false
             },
-            "trailSays": "brought the working folder's window forward from a scheduled publish notification, and left it as it was because it was in the middle of something",
+            "trailSays": "brought the working folder's window forward from a scheduled deploy notification, and left it as it was because it was in the middle of something",
             "why": "A selection change moves the keyboard, and a course being renamed in place commits whatever was typed when it loses focus (#293). A dialog in front of the window is the teacher's work too."
           },
           {
@@ -3043,7 +3043,7 @@
               "opensAWindow": true,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "trailSays": "opened the section from its scheduled deploy notification, in a new window",
             "why": "Pointing the teacher's window at another folder would let go of everything it shows (workingFolderSelection) for a click about something else."
           },
           {
@@ -3062,7 +3062,7 @@
               "selectsTheSection": true,
               "opensAWindow": false
             },
-            "trailSays": "opened the section from its scheduled publish notification, in the window that was choosing a working folder",
+            "trailSays": "opened the section from its scheduled deploy notification, in the window that was choosing a working folder",
             "why": "A window showing the folder chooser holds nobody's work. This is a launch with nothing to reopen."
           },
           {
@@ -3082,7 +3082,7 @@
               "opensAWindow": true,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "opened the section from its scheduled publish notification, in a new window",
+            "trailSays": "opened the section from its scheduled deploy notification, in a new window",
             "why": "The new-course wizard is a dialog on a window with no folder yet; the folder is not changed underneath it."
           },
           {
@@ -3096,7 +3096,7 @@
               "selectsTheSection": true,
               "opensAWindow": true
             },
-            "trailSays": "opened the section from its scheduled publish notification, in a new window"
+            "trailSays": "opened the section from its scheduled deploy notification, in a new window"
           },
           {
             "name": "the app is still opening its first window",
@@ -3169,7 +3169,7 @@
               "opensAWindow": false,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "a scheduled publish notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward",
+            "trailSays": "a scheduled deploy notification was clicked, but its working folder is no longer where it was, so Plantoir was only brought forward",
             "why": "The notification already said how the publish went; a window on a folder that is not there would say nothing more. Nothing is said on screen."
           },
           {
@@ -3192,7 +3192,7 @@
               "opensAWindow": false,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "a scheduled publish notification was clicked, but its working folder could not be opened here, so Plantoir was only brought forward",
+            "trailSays": "a scheduled deploy notification was clicked, but its working folder could not be opened here, so Plantoir was only brought forward",
             "why": "A folder outside the home folder is refused by workingFolderReach when chosen or reopened; a new window must not open it by a side door. It is also the likeliest folder to have a failed run to click on (#221). A window already on it is used as it is. The same line is written when a window choosing a folder is refused it, whose picker then says why."
           },
           {
@@ -3211,7 +3211,7 @@
               "selectsTheSection": false,
               "opensAWindow": false
             },
-            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it",
+            "trailSays": "showed the working folder from a scheduled deploy notification; that section is no longer in it",
             "why": "The course was renamed, or the section archived or removed. Not guessed at: selecting the course instead would be a guess (workingFolderSelection)."
           },
           {
@@ -3230,7 +3230,7 @@
               "opensAWindow": true,
               "otherWindowsUnchanged": true
             },
-            "trailSays": "showed the working folder from a scheduled publish notification; that section is no longer in it"
+            "trailSays": "showed the working folder from a scheduled deploy notification; that section is no longer in it"
           },
           {
             "name": "the notification names no section",
@@ -3245,7 +3245,7 @@
               "selectsTheSection": false,
               "opensAWindow": false
             },
-            "trailSays": "a scheduled publish notification was clicked, but it did not say which section it was about",
+            "trailSays": "a scheduled deploy notification was clicked, but it did not say which section it was about",
             "why": "Posted by a build from before #306 - only ever a development build, since #212 had not shipped. The only line with no course and section in front of it."
           },
           {
@@ -3265,7 +3265,7 @@
               "opensAWindow": false,
               "recordStillThere": true
             },
-            "trailSays": "opened the section from its scheduled publish notification",
+            "trailSays": "opened the section from its scheduled deploy notification",
             "why": "Dismiss is the teacher's act on the band; the click is how they get there."
           }
         ],
@@ -3996,8 +3996,8 @@
         }
       ],
       "listCoursesLine": {
-        "rule": "list_courses (both surfaces on the mac — an outside assistant's tool, and what the app's own assistant window shows when a teacher asks what courses they have; Windows' plantoir-mcp and its local window) says, for a course with the case's saved settings, the line '  publishes to: ' + card, compared WHOLE. Run every planOpening case through it, and the cases below as well. Section, first-deploy markers and the Account ID do not matter here: list_courses is a read, not a plan, and names every destination whether or not it could deploy now. A course kept for reference prints no such line (unchanged).",
-        "why": "#403. list_courses named only the PRIMARY destination, so a course publishing to Netlify AND Cloudflare Pages read 'publishes to: Netlify' — the same gap #396 closed for the schedule sheet, on a surface the app's assistant window shows a teacher. It reads the same list the deploy walks, in the card's words (cardNaming) rather than the sheet's, because a folder's PATH is machinery on that surface and is blank for a folder not chosen yet. Rejected: a list_courses-only contract block (#396 put its surfaces as siblings here), and changing the tool's description to say 'every place' (a routing change for no routing gain; the description is pinned by toolDescriptions and the local digest).",
+        "rule": "list_courses (both surfaces on the mac — an outside assistant's tool, and what the app's own assistant window shows when a teacher asks what courses they have; Windows' plantoir-mcp and its local window) says, for a course with the case's saved settings, the line '  deploys to: ' + card, compared WHOLE (it read '  publishes to: ' until v1.4.4, #443: the line names where the course DEPLOYS). Run every planOpening case through it, and the cases below as well. Section, first-deploy markers and the Account ID do not matter here: list_courses is a read, not a plan, and names every destination whether or not it could deploy now. A course kept for reference prints no such line (unchanged).",
+        "why": "#403. list_courses named only the PRIMARY destination, so a course deploying to Netlify AND Cloudflare Pages read 'publishes to: Netlify' (as the line then said) — the same gap #396 closed for the schedule sheet, on a surface the app's assistant window shows a teacher. It reads the same list the deploy walks, in the card's words (cardNaming) rather than the sheet's, because a folder's PATH is machinery on that surface and is blank for a folder not chosen yet. Rejected: a list_courses-only contract block (#396 put its surfaces as siblings here), and changing the tool's description to say 'every place' (a routing change for no routing gain; the description is pinned by toolDescriptions and the local digest).",
         "cases": [
           {
             "name": "a folder not chosen yet",
@@ -4448,14 +4448,14 @@
       {
         "name": "sectionIndexMissing",
         "sentence": "{course} Section {section} has no front page.",
-        "detail": "Every section has a page called index.md that students land on first. This section's is missing. A preview will open on whatever page happens to come first, and publishing cannot go ahead at all until the front page is back.",
+        "detail": "Every section has a page called index.md that students land on first. This section's is missing. A preview will open on whatever page happens to come first, and deploying cannot go ahead at all until the front page is back.",
         "fixable": true,
         "why": "Restorable safely, unlike the curriculum folder — which is why this one may offer to fix itself and that one may not. The detail used to stop at \"whatever page happens to come first\", which is true of a PREVIEW and understates publishing by a mile: Quartz emits no root index.html without an index.md, so the build produces no site to publish and the deploy has nothing to upload. Naming both outcomes is what tells a teacher whether they can carry on for now or must fix it before they publish."
       },
       {
         "name": "handWrittenCoveragePage",
         "sentence": "A page called {page} will be overwritten each time you build.",
-        "detail": "Plantoir writes the {page} page itself, every build. There is a page by that name in your own notes, and it is not the one being published — rename yours to keep it.",
+        "detail": "Plantoir writes the {page} page itself, every build. There is a page by that name in your own notes, and it is not the one that goes on your class website — rename yours to keep it.",
         "fixable": false,
         "why": "The inverse of the other checks: not something missing, something PRESENT that gets clobbered. A name refusal in Settings cannot see this, because a teacher makes this page in Obsidian.",
         "fill": "{page} is the title of the coverage map the teacher's page shares a name with - 'Curriculum Coverage' on a course with one map. When several collide, the first by the maps' order is named: one finding per section build, enough to send a teacher looking (#128)."
@@ -4475,7 +4475,7 @@
         "pageWithLine": "“{page}” (near line {line})",
         "pageWithoutLine": "“{page}”",
         "andMore": "and {count} more",
-        "frontPage": "One of them is the front page of {course} Section {section}, so until it is fixed the website has no front page and cannot be published.",
+        "frontPage": "One of them is the front page of {course} Section {section}, so until it is fixed the website has no front page and cannot be deployed.",
         "fixable": false,
         "fill": "{page} is the page's place in the course folder without .md (section1/index for a section's front page), {line} the line of the PAGE the reader stopped near, counted from the opening --- as line 1, {count} how many. `sentence` when there is one page and `sentenceForSeveral` otherwise; `detail` names at most ten pages, each through `pageWithLine` or `pageWithoutLine`, joined with \", \", then `andMore` with the number left over; `frontPage` is added to the end of the detail, after a space, when the section's front page is one of them. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per page: both apps key a finding on name, course and section, so two per-page findings would collide.",
         "why": "Russell, 2026-09-21 (#246, option B): a page that wrongly DISAPPEARS is noticed and harmless; one that wrongly APPEARS cannot be undone. Before, a page whose settings the build could not read was PUBLISHED whenever Quartz could read what PyYAML could not (a yes/no, number or date used as a key, U+2028, an impossible date) - even one hidden by publishForSection1: false, which is what the app writes - and for 14 of the 18 known shapes it STOPPED the whole build with a developer's error. The build now hides such a page in its own copy only, keeps its body, and names it here; the teacher's file is not touched. Not repairable: rewriting a teacher's settings means guessing what they meant. `contracts/shared-rules.json` -> `unreadablePageSettings` holds the cases, and documentation/05-build-pipeline.md the measurements and what was rejected."
@@ -5990,8 +5990,8 @@
       "publishButton": "Publish {count} {pages}",
       "publishNothingTicked": "Publish",
       "notNow": "Not Now",
-      "deployUnderWay": "{course} is being published just now. Try again when that has finished.",
-      "needsAPreviewFirst": "Pages in {course} have changed since Section {section} was last previewed or published. Preview it again, and this list will be up to date.",
+      "deployUnderWay": "{course} is being deployed just now. Try again when that has finished.",
+      "needsAPreviewFirst": "Pages in {course} have changed since Section {section} was last previewed or deployed. Preview it again, and this list will be up to date.",
       "nothingLeftToPublish": "Those pages have all been published or removed since the website was made.",
       "pageChangedSince": "{name} changed since it was checked, so it was left as it is.",
       "published": "{count} {pages} will be on the website the next time you deploy.",
@@ -9424,13 +9424,13 @@
       "whyThisIsHere": "Two failures, both already met elsewhere in these contracts — app-rules.json → markerOrigins.knownDivergence records exactly this kind of deliberate platform difference, and is READ by MilestoneContractTests on Windows rather than merely written down. Without a record, the next reader compares the two apps, finds a difference, concludes one of them drifted, and 'fixes' it. And a contract-driven test asserting the stored sentence verbatim would put the word Mac in front of a Windows teacher — a test enforcing a bug, which is the one outcome nobody wants. A suite asserting these keys must compare everything EXCEPT the platform word, or assert its own platform's spelling. That is a proven pattern rather than a proposal: SpecialFolderRenamerTests.TheTwoPlatformWordedSentencesSayThisPcRatherThanYourMac and FolderRenameApplyTests both do it on Windows, comparing against this file with .Replace(\"on your Mac\", \"on this PC\"). On the mac, SharedRulesContractTests.testPlatformWordedKeysAreComplete pins the keys list itself: a fourth specialNames sentence containing the mac's platform word cannot be added without this record going red. It pins the RECORD rather than the behaviour. Windows has read the list since 2026-09-09 (SpecialFolderRenamerTests.EverySentenceTheContractCallsPlatformWordedSaysThisPc drives itself off `keys`), so a new key reds BOTH suites: the mac until the list names it, Windows until its substitution map carries it — which is what happened with renameUnitWord.explanation on 2026-09-10, and is the list being load-bearing rather than a fault. ONE SANCTIONED EXCEPTION to 'a new key reds BOTH suites until it is implemented', added 2026-09-18 and changing nothing in this file: when the feature a key belongs to is owned by an OPEN issue milestoned for a LATER release than the one being cut, the side that owes it may hold the key open in a NAMED GAP on its own side. windows-app/Plantoir.Tests/NamedGapLedger.cs does exactly that for renameUnitWord.explanation against GitHub issue #158 (v1.3.0), so the v1.2.0 gate is green with this list untouched and the mac still asserting all of it. It is not a softening: the ledger entry FAILS on Windows the moment the sentence starts existing there, and FAILS if this list stops naming it, so it cannot outlive either the fix or the requirement. What was REJECTED is doing it in this file — dropping the key from the list, or (for the matching activityTrail.mustRecord event) writing appliesOn: [mac] on it. Both would be false, since Windows owes both at v1.3.0, and appliesOn has no mend-check, so the day Windows built them both suites would have stayed green and nothing would have noticed. contracts/README.md, under 'Named gaps', says when a named gap is allowed and when it is not: never for a difference a teacher can see at the current milestone."
     },
     "excludedFolderIndexNote": {
-      "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your published site. To include it again, add it back in Course Settings.",
+      "noteBody": "> [!NOTE]\n> This folder was removed in Course Settings and is excluded from your website. Its pages will not appear in previews or on your class website. To include it again, add it back in Course Settings.",
       "sentinelEnd": "<!-- plantoir:excluded-folder-note:end -->",
       "sentinelStart": "<!-- plantoir:excluded-folder-note:start -->",
       "why": "Explains why the folder is still present in Obsidian after being removed in Course Settings, and that it is ignored during build. Written into existing index.md files by preflight; stripped during merge so it never ships."
     },
     "curriculumFolderBlockedByCoverageSetting": {
-      "reason": "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Publish the curriculum coverage map” in Settings first.",
+      "reason": "The curriculum coverage map needs this folder to show your expectations. To remove it, turn off “Include the curriculum coverage map” in Settings first.",
       "why": "Explains why the curriculum folder cannot be removed while the coverage map is enabled in Course Settings, naming the switch to turn off first."
     },
     "curriculumFolderBlockedByCurriculumPages": {
@@ -9442,7 +9442,7 @@
       "why": "Explains why the curriculum folder cannot be removed in the New Course Wizard while the coverage map is enabled, naming the switch to turn off first."
     },
     "lastGradedFolderBlocked": {
-      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Publish the curriculum coverage map”.",
+      "reason": "At least one folder must count for marks while the curriculum coverage map is enabled. To remove or uncheck this folder, choose another graded folder under Marks first, or turn off “Include the curriculum coverage map”.",
       "why": "Explains why the last graded folder cannot be removed or un-ticked in Course Settings while the coverage map is enabled, preventing an empty marks pool."
     },
     "lastGradedFolderBlockedWizard": {
@@ -9458,7 +9458,7 @@
       "why": "Explains why the last per-section folder cannot be removed, ensuring each section has a folder for its lessons."
     },
     "sectionIndexFileBlocked": {
-      "reason": "Every section needs an index.md page for its home page. Without it, the section cannot be published.",
+      "reason": "Every section needs an index.md page for its home page. Without it, the section cannot be deployed.",
       "why": "Explains why index.md cannot be removed from per-section files."
     },
     "removeGradedFolderConfirmation": {
@@ -10631,7 +10631,7 @@
       "doneLinksNotWrittenOne": "One page could not be written, so its links still use the old names.",
       "doneLinksNotWrittenMany": "{pages} pages could not be written, so their links still use the old names.",
       "doneLinksNotWrittenWhy": "A page whose links could not be written back is skipped rather than stopping the rename — the pages have already moved, so stopping would leave MORE links broken — but the teacher was shown a count and would otherwise be told a smaller one with no explanation. Said after the links sentence, and recorded on the trail.",
-      "donePublish": "Publish each section for its website to use the new names.",
+      "donePublish": "Deploy each section for its website to use the new names.",
       "donePublishWhy": "The fact a teacher would otherwise report as a bug: every section reads as Edited at once and the built site keeps the old names until each section is rebuilt. That is correct — the build copies content/ afresh and the freshness check sees the new timestamps — so it needs saying, not fixing.",
       "doneBackup": "A backup of the whole course was saved first, and is listed under Backups.",
       "doneOrder": "done, then the pages sentence, then — when a page was renamed, any link was touched, or a page could not be written (finishing a rename that stopped during its link pass moves nothing and rewrites plenty) — the links sentence, the not-written sentence when there is one, and the publish sentence, then the backup sentence.",
@@ -10659,7 +10659,7 @@
       "why": "Shown beside the Save confirmation in Course Settings when a preview of the course is open, with a Preview Again button that builds that preview afresh (issue #265, Russell's choice 2026-09-24). A preview bakes every setting in when its build starts - measured: 20 s after a save the served sidebar filter was unchanged - so a Save 'did nothing' to the page the teacher was looking at, and stopping and restarting showed the latest, one or more steps behind, which reads as random. About EVERY setting, not only the sidebar, so it names none. A caption, not a removal-blocked sentence: no `reason` key (Windows' NoBlockedSentenceInTheContractIsUnusedHere sweeps those). Rejected: rebuilding the preview automatically on every Save - it kills a page the teacher may be reading, for a Save that may have changed only the footer, and the preview can belong to another window."
     },
     "settingsSavedWhilePublishing": {
-      "message": "This course is being published right now, and that publish uses the settings from before this save. Publish again once it has finished to send what you just saved.",
+      "message": "This course is being deployed right now, and that deploy uses the settings from before this save. Deploy again once it has finished to send what you just saved.",
       "why": "Shown instead of settingsSavedWhilePreviewing when a publish of the course is running (the plan review's A3). The publish read the settings when its build began, so it sends the earlier ones. 'Publish again' is advice that WORKS only because of app-rules.json -> buildFreshness's rule about something saved after the build started: until that rule (issue #265 fix round, 2026-09-24) the next Publish compared the course with the time the built page was WRITTEN, found this Save older, called the site up to date and sent the same old build while reporting success — the review's H1, a sentence promising the opposite of what happened. Said rather than blocked: the Save is right. No Preview Again button beside it, because a preview is refused while that course publishes."
     },
     "previewUsesSavedSettings": {
@@ -12037,7 +12037,7 @@
       "neverDeployed": "{course} is kept for reference. Preview it to read its pages; it is never deployed.",
       "copyAlreadyBeingMade": "A copy called {folder} is already being made in another window, or in another copy of Plantoir.",
       "copyIsASnapshot": "This records {course} as it is today. You can keep teaching it as usual \u2014 nothing here changes. To take a fresher copy later, delete this one first, then copy again.",
-      "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can publish it. {course} keeps them.",
+      "keepACopyLeavesAddOnsBehind": "The copy is made without {course}'s Obsidian add-ons and their settings, so nothing in them can put it online. {course} keeps them.",
       "codeAlreadyInThatYear": "You already have a {code} kept for reference from {year}. Choose a different school year.",
       "codeAlreadyWithNoYear": "You already have a {code} kept for reference with no school year. Choose a school year for this one.",
       "groupTitle": "Reference Courses",
@@ -12045,8 +12045,8 @@
       "setSchoolYearMenuItem": "Set School Year…",
       "rule": "{course} is the code a TEACHER reads - ICS3U, never the folder name. The register is calm: a teacher who kept a course for reference asked for this, so being told about it reads as a fact rather than a warning. No 'cannot', no 'error', no icon, and never a word about how it is done. Said by the app when an act that would change the course is not available; the sentence does NOT tell the teacher to copy anything. Plantoir DOES copy pages between courses since issue #207 - 'Copy a Page from This Course...', on this course's own row - and the sentence still does not mention it: it is a refusal about changing THIS course, and naming a different feature inside it is a non-sequitur. A page a teacher takes out BY HAND in Finder still arrives locked; the sentence that said so (\"A file you copy out of it stays locked until you untick Locked in Get Info.\") was RETIRED by Russell on 2026-09-22 - a hand copy is unlikely now that the copy feature exists and unlocks what it copies, and 'Get Info' without 'Finder' told a teacher nothing. If a sentence about the Finder ever returns, it names the Finder.",
       "machineryCheck": "No 'lock flag', 'immutable', 'permission', 'chflags', 'script' or 'container' in any sentence here. 'Locked' on its own is allowed: it is the word Finder and Get Info already use, and it is what a teacher sees on the file.",
-      "theCannotTellSentence": "Said by the LAUNCHERS only, as 'cannotTellHeadline - <one of the two reasons>. Nothing was published.' Both launchers carry it as a constant and a test compares them against these keys, the same arrangement refusal.sentence has. app-rules.json -> failureExplanations turns it back into the teacher's sentence when a deploy set to happen on its own hits it, which is the population it exists for: that one runs with the app closed, and the app reads such a course as ORDINARY, so the teacher can schedule it and only the launcher will refuse.",
-      "whyTheLaunchersStillSayPublished": "Russell's rule of 2026-10-03, for v1.4.3: DEPLOY (a site sent to Netlify, Cloudflare or a folder) and PUBLISH (a page marked so a deploy includes it) are each used only in their own sense - in the app, the launchers, code comments, tests and docs alike. That replaces the reason this note used to give (that one launcher run saying both words for the same act would be worse than one old word), which #407 had already contradicted. The launcher lines are being moved to it: since #407 deploy.sh's rebuild-before-a-folder-deploy block says 'Rebuilding it before it is deployed' and 'Nothing was deployed, rather than deploying', and since the v1.4.3 release-hygiene branch 'Cannot create the folder to deploy to', 'Could not rebuild this site before deploying it' (both forms) and 'The rebuilt site has not appeared. Nothing was deployed.' Lines that still say published for a deploy, because a contract, a test, the apps or a Windows twin pins them: ' Nothing was published.' after a scheduled run's unanswerable question (the shared Python tests test_deploy_sh_questions.py and test_deploy_non_interactive.py; deploy.ps1 and deploy.py say it too); the two reference-course refusals ending 'Nothing was published.' (app-rules.json failureExplanations, this file's theCannotTellSentence, Windows ReferenceRefusalTests); 'Publishing <course> section <n> to a folder' and 'Not every page could be copied into the publishing folder' (app-rules.json failureExplanations, read by FailureExplainer on both apps); and '...stops your publishing working...' (app-rules.json credential requests, CredentialRequest.swift, CredentialRequests.cs). Those move together with Windows, in one change across the contract, both apps and both launchers (issue opened from the v1.4.3 release-hygiene branch). Also still old and pinned by nothing but a twin: 'This publish was set to happen on its own', 'so there is nothing to publish' (deploy.py says the same words) and 'Published: N file(s) updated.' (the PUBLISHED_FOLDER= marker after it is parsed by both apps and must never change). The key keeps its name: Windows' ReferenceCourseTests names it as a note, not a sentence."
+      "theCannotTellSentence": "Said by the LAUNCHERS only, as 'cannotTellHeadline - <one of the two reasons>. Nothing was deployed.' (It said 'Nothing was published.' until v1.4.4, #443.) Both launchers carry it as a constant and a test compares them against these keys, the same arrangement refusal.sentence has. app-rules.json -> failureExplanations turns it back into the teacher's sentence when a deploy set to happen on its own hits it, which is the population it exists for: that one runs with the app closed, and the app reads such a course as ORDINARY, so the teacher can schedule it and only the launcher will refuse.",
+      "whyTheLaunchersStillSayPublished": "Russell's rule of 2026-10-03: DEPLOY (a site sent to Netlify, Cloudflare or a folder) and PUBLISH (a page marked so a deploy includes it) are each used only in their own sense in every sentence a teacher reads - in the app, the launchers and the contract's teacher-facing sentences. Developer-only text (case names, the trail's event keys, 'why' fields, code comments, docs quoting old output as history) deliberately still says publish where it did (inventory class D), so a search of the code finds both words. That replaced the reason this note used to give (that one launcher run saying both words for the same act would be worse than one old word). Since v1.4.4 (#443) NO launcher line says published for a deploy. The lines this note used to list as held back by a pin moved in one change across the contract, the mac app, deploy.sh and deploy.py: ' Nothing was deployed.' after a scheduled run's unanswerable question (test_deploy_sh_questions.py, test_deploy_non_interactive.py); the two reference-course refusals ending 'Nothing was deployed.' (app-rules.json failureExplanations, theCannotTellSentence above); 'Deploying <course> section <n> to a folder' and 'Not every page could be copied into the deploy folder' (app-rules.json failureExplanations, read by FailureExplainer); '...stops your deploys working...' (app-rules.json credentialRequests, CredentialRequest.swift); 'This deploy was set to happen on its own', 'so there is nothing to deploy', 'Deploy this section once from Plantoir' and 'Deployed: N file(s) updated.' The PUBLISHED_FOLDER= marker after that last line is parsed by both apps and never changes. deploy.ps1's twins, Windows' FailureExplainer.cs, CredentialRequests.cs and ReferenceRefusalTests move under #441, and Windows is red on these cases until they do - that is the request, not damage. The key keeps its name: Windows' ReferenceCourseTests names it as a note, not a sentence."
     },
     "frozen": {
       "theWalk": "Every content FILE, at every depth. skipDescendants() is for a never-locked FOLDER and must never be called for a never-locked FILE: the enumerator applies the skip to the next directory it has not descended into, so the folder AFTER course_config.json - which every course has at its top level - was never walked and never locked. Measured on a real course: 842 of 934 files walked, 27 real pages left editable, and WHICH folder was lost moved between passes with readdir order, so the course came out mostly locked and never entirely locked. Counting what the pass WALKED against what is locked afterwards does NOT catch this - a walk that skips a folder never counts that folder, so the two numbers agree and the fault reports success (it did: nine pages editable, everything-is-locked true). What catches it is an independent CENSUS taken after the pass: a plain full listing of the course with no skip logic at all, each regular file classified by the never-locked rule alone, and the number that SHOULD be locked compared with the number whose flag says locked. A mismatch is put on the trail with both numbers, and the sentence that says the pages are kept locked is not shown. Measured with the old fault put back: 13 of 16.",
@@ -14963,8 +14963,8 @@
         "alsoTickedForThatYear": "{folder} is also ticked for that school year, and one {course} is kept for each year. Choose Other or a different school year for one of them.",
         "olderLayoutLeftOut": "{count} of its files and folders were not brought across: {names}.",
         "olderLayoutChooseOneCourseAtATime": "{folder} holds courses rather than classes. Choose the Class Website folder inside one of them, or one class folder.",
-        "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can publish these pages.",
-        "addOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across, so nothing in them can publish these pages.",
+        "olderLayoutAddOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across from older class folders, so nothing in them can put these pages online.",
+        "addOnsAreLeftBehind": "Obsidian add-ons and their settings are not brought across, so nothing in them can put these pages online.",
         "checkoutLayoutReadFrom": "Pages and pictures from {place}.",
         "checkoutLayoutReadThroughShortcut": "{shortcut} is a shortcut. Its pages and pictures are read from {place}.",
         "checkoutLayoutOnlyPagesComeAcross": "From a class website folder, only the pages and pictures of its first section come across. The files that built the website, the extra folders kept for editing, and the other sections' pages stay where they are.",
@@ -15112,7 +15112,7 @@
       "whichFolder": "Folder",
       "pagePickerPrompt": "Search",
       "noPagesMatch": "No page of that name in this course.",
-      "copiesStartHidden": "Copies start hidden, so nothing changes on any website until you publish them.",
+      "copiesStartHidden": "Copies start hidden, so nothing changes on any website until you publish them and deploy.",
       "datesAreKept": "The pages keep the dates they had.",
       "nothingIsWrittenOver": "Nothing already in that course is changed or written over.",
       "nothingWasCopied": "Nothing was copied.",
@@ -18189,8 +18189,8 @@
     "partialCopy": {
       "setUp": "A full --to-folder whose section folder already holds a folder of stale pages that cannot be removed (its permissions forbid it), so the copy's --delete fails part way while every new page still lands.",
       "expectExit": 1,
-      "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Published"],
-      "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
+      "expectNoLineStartingWith": ["PUBLISHED_FOLDER=", "✅ Deployed", "✅ Published"],
+      "why": "Before: the copy's own exit status (23, 'finished in part') went into a pipe whose status was thrown away, so the launcher said Published and named the folder. Both success words are listed: \"✅ Deployed\" is what the line says since v1.4.4 (#443), and \"✅ Published\" is kept so a line that goes back to the old word is caught too; with only the old word listed, the check passed whatever the launcher printed. A partial copy is a failure deliberately: the page left behind may be one the teacher took down. Not measured: network shares and iCloud Drive, where a copy can fail to set a file's attributes and report the same 'finished in part' - see documentation/07-deployment.md."
     }
   },
   "reopeningTheLastWorkingFolder": {
@@ -18705,8 +18705,8 @@
       "machineryCheck": "No sentence here may contain: Sparkle, feed, appcast, script, container, toolchain, docker, launchd, lease, process.",
       "menuItem": "Check for Updates…",
       "heldTitle": "Plantoir will finish updating once it is done {work}.",
-      "scheduledWork": "publishing Section {section} of {course} on its schedule",
-      "scheduledWorkUnnamed": "publishing on its schedule",
+      "scheduledWork": "deploying Section {section} of {course} on its schedule",
+      "scheduledWorkUnnamed": "deploying on its schedule",
       "elsewhereWork": "waiting for {course} to finish building somewhere else on this {machine}",
       "heldExplanation": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, the update is set aside and offered again later.",
       "heldExplanationOnceInstalling": "The new version is ready. Plantoir will close and open again by itself as soon as that is finished. If you quit Plantoir before then, it finishes updating as it quits.",

@@ -503,11 +503,17 @@ class ExampleContentIsUnchangedTests(unittest.TestCase):
     which said a link inside a %% comment "still counts as a link". Checked
     by installing against origin/dev 8c5ff37c and diffing: that one file,
     those lines, nothing else.
+
+    And once more: #443 (2026-10-04) stopped the course pages calling the
+    class website "the published page / website / site" — DEPLOY puts a
+    site online, PUBLISH only marks a page. Checked by installing against
+    origin/dev b2726e6b and diffing: eight files (seven `_DUPLICATE ME.md`
+    and `Tutorials/Scavenger Hunt.md`), those four sentences, nothing else.
     """
 
     PAYLOAD_FILE_COUNT = 295
     PAYLOAD_NAMES_HASH = "6de9b151539aeb40eae91152641a3c2870d36b9618af02a49aff30e7b516e612"
-    PAYLOAD_CONTENT_HASH = "8800813083c03bc1f24a2ac58a923e58dd596c9e6fda31d73a5ee5253148cf0a"
+    PAYLOAD_CONTENT_HASH = "1710fc1abb3a53089177524cbf6871811c8d8e7d89fde2fc457e3147f63aeacd"
 
     def test_a_payload_course_is_installed_byte_for_byte_as_it_always_was(self):
         payload = find_example_content_dir("ADA1O")

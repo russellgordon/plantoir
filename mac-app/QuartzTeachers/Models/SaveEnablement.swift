@@ -115,11 +115,11 @@ enum SaveEnablement {
         var what: String = ""
         switch check {
         case .deployFolder:
-            what = "the publishing folder needs attention"
+            what = "the deploy folder needs attention"
         case .cloudflareAccountID:
             what = "the Cloudflare account ID on this Mac needs attention"
         case .additionalDestination:
-            what = "an additional publishing destination needs attention"
+            what = "an additional deploy destination needs attention"
         }
         return "Save held back for " + courseCode + " (" + check.rawValue + ") — " + what
     }

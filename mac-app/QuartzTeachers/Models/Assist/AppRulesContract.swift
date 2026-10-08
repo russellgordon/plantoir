@@ -59,7 +59,7 @@ enum AppRulesContract {
     /// and that is authored, in `credentialPrompts`.
     private static func credentialRequests() -> [String: Any] {
         var written: [String: Any] = [
-            "note": "What a teacher reads when a first publish stops to ask for a Netlify or Cloudflare "
+            "note": "What a teacher reads when a first deploy stops to ask for a Netlify or Cloudflare "
                   + "credential. The launcher's own prompt is one line — \"Paste Netlify token:\" — which "
                   + "names something most teachers have never heard of and does not say where to get "
                   + "one, so both apps answer it with a dialog: what the credential is for, the steps "
