@@ -427,10 +427,14 @@ CASES = PROMISED + [
 #
 # Most of these are answered in code — the interception guard marks which, and
 # it is the guard rather than this list that decides, so a shape moved into or
-# out of AssistCardCommand changes the answer here by itself. The four that
-# reach the model are the ones this list is evidence about; `re_date_classes`
-# and the rest are not even ON the local surface, so a model could not choose
-# them if it were asked.
+# out of AssistCardCommand changes the answer here by itself. Since #449
+# (2026-10-07) the mac app answers EVERY card on its shelf in code — the last,
+# "Cancel scheduled deploy", moved then, and AssistPromptShelfTests'
+# goes-to-the-model list is empty — so a card the guard lets through here is
+# a gap in this mirror, not routing evidence. (This said "the four that reach
+# the model" until then; the count had already fallen as #411 and #432 moved
+# cards into code.) `re_date_classes` and the rest are not even ON the local
+# surface, so a model could not choose them if it were asked.
 MAC_SHELF = [
     (("plan_publish_pages", "publish_pages"), "Publish Unit 2, Day 3",
      "shelf: publish by name", False),
@@ -584,7 +588,7 @@ def intercepted(message, window_course=None, window_section=None):
     # #424 (Windows, v1.4.3 bundle A; contracts/assist-cases.json ->
     # scheduleAndCancel, AUTHORED): "schedule a|the deploy ..." is read as the
     # family above, "for" standing for "at" right after the opening (or after
-    # a day word); with no time at all it is ASKED in code; and three exact
+    # a day word); with no time at all it is ASKED in code; and four exact
     # "cancel ... scheduled deploy" sentences reach cancel_scheduled_deploy.
     # A question mark is never stripped for these.
     if not tidied.endswith("?"):
@@ -611,7 +615,10 @@ def intercepted(message, window_course=None, window_section=None):
                        for w in opened.group(3).split()):
                 return ASKED_IN_CODE
         bare = re.sub(r"^please |( please)$", "", tidied)
-        if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy"):
+        # The mac's #449 review added the prompt shelf's own card, "Cancel
+        # scheduled deploy", with no determiner (an ACCEPTED row since then).
+        if bare in ("cancel the scheduled deploy", "cancel that scheduled deploy", "cancel my scheduled deploy",
+                    "cancel scheduled deploy"):
             return "cancel_scheduled_deploy"
     if deploy_time_asked_about(tidied):
         # Not a tool: the app answers "deploy at 6:30" with a question of its
