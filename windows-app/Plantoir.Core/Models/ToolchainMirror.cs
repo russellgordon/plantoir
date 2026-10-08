@@ -37,15 +37,22 @@ public static class ToolchainMirror
     public static readonly IReadOnlyList<string> RecipeFolders = new[] { "patches", "scripts", "support", "contracts" };
 
     /// <summary>
-    /// What one mirror pass did: files copied or deleted, and files it could
-    /// NOT copy or delete. A pass with any failure leaves the folder not
+    /// What one mirror pass did: files copied or removed, and files it could
+    /// NOT copy or remove — with the FIRST of those and why, which is what
+    /// the trail line names. A pass with any failure leaves the folder not
     /// ready (#473): before, every failure was swallowed and returned 0, so a
     /// half-copied recipe was taken for a fresh one for the rest of the run.
     /// </summary>
-    public readonly record struct CopyResult(int Changed, int Failed)
+    public readonly record struct CopyResult(int Changed, int Failed,
+                                             string? FirstFailedPath = null, string? FirstProblem = null)
     {
         public static CopyResult operator +(CopyResult a, CopyResult b) =>
-            new(a.Changed + b.Changed, a.Failed + b.Failed);
+            new(a.Changed + b.Changed, a.Failed + b.Failed,
+                a.FirstFailedPath ?? b.FirstFailedPath,
+                a.FirstFailedPath is not null ? a.FirstProblem : b.FirstProblem);
+
+        /// <summary>One file that could not be copied or removed, and why.</summary>
+        public static CopyResult OneFailure(string path, Exception error) => new(0, 1, path, error.Message);
     }
 
     /// <summary>
@@ -106,6 +113,13 @@ public static class ToolchainMirror
             result += SyncFile(Path.Combine(bundledRoot, name), Path.Combine(toolchainRoot, name));
         foreach (string folder in RecipeFolders)
             result += SyncDirectory(Path.Combine(bundledRoot, folder), Path.Combine(toolchainRoot, folder));
+        // Named from the working folder down (".toolchain\scripts\x.py"): the
+        // part worth reading, and no user name to redact.
+        if (result.FirstFailedPath is { } failed)
+        {
+            try { result = result with { FirstFailedPath = Path.GetRelativePath(workspacePath, failed) }; }
+            catch { }
+        }
         return result;
     }
 
@@ -151,7 +165,7 @@ public static class ToolchainMirror
             CopyModificationDate(srcInfo, new FileInfo(destination));
             return new CopyResult(1, 0);
         }
-        catch { return new CopyResult(0, 1); }
+        catch (Exception error) { return CopyResult.OneFailure(destination, error); }
     }
 
     private static void CopyModificationDate(FileInfo src, FileInfo dst)
@@ -189,7 +203,7 @@ public static class ToolchainMirror
                 string relative = Path.GetRelativePath(destinationRoot, fileInfo.FullName);
                 if (sourceRelatives.Contains(relative)) continue;
                 try { fileInfo.Delete(); result += new CopyResult(1, 0); }
-                catch { result += new CopyResult(0, 1); }
+                catch (Exception error) { result += CopyResult.OneFailure(fileInfo.FullName, error); }
             }
         }
         return result;

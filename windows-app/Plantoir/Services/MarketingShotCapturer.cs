@@ -83,6 +83,10 @@ public static class MarketingShotCapturer
                 _ => $"refused: no scene {request.Scene}",
             };
         }
+        catch (FolderNotReady notReady)
+        {
+            outcome = $"refused: {notReady.Message}";
+        }
         catch (Exception error)
         {
             outcome = $"refused: {error.GetType().Name}: {error.Message}";
@@ -108,7 +112,24 @@ public static class MarketingShotCapturer
         var window = App.OpenWindow(request.Folder, null);
         Dress(window, Theme(request), MainWidth, MainHeight);
         await Task.Delay(1500);
+        await WaitUntilTheFolderIsReady(request.Folder);
         return window;
+    }
+
+    /// <summary>A scene refused because the folder could not be got ready (#473).</summary>
+    private sealed class FolderNotReady(string sentence) : Exception(sentence);
+
+    /// <summary>
+    /// #473: the window's own launch copies the app's tools into the folder in
+    /// the background, and Preview, Deploy and New Course are refused — with a
+    /// dialog that would be in the picture — until it is done. So a scene
+    /// waits for that copy (joining it, never starting a second) before it
+    /// presses anything, and is refused with the sentence when it failed.
+    /// </summary>
+    private static async Task WaitUntilTheFolderIsReady(string folder)
+    {
+        await ToolchainReadiness.Ensure(folder, BundledToolchain.Root);
+        if (ToolchainReadiness.Refusal(folder) is { } notReady) throw new FolderNotReady(notReady);
     }
 
     [DllImport("user32.dll")]
@@ -168,6 +189,7 @@ public static class MarketingShotCapturer
         }
         if (window.Workspace.State != WorkspaceState.Ready)
             return $"refused: the folder could not be set up ({window.Workspace.WorkspaceProblem})";
+        await WaitUntilTheFolderIsReady(request.Folder);   // #473: the New Course panel waits for it
 
         foreach (var (code, sections) in request.Courses)
         {

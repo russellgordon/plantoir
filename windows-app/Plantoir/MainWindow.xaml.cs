@@ -280,6 +280,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 Workspace.Selection = new SidebarSelection.CourseItem(courseCode);
             });
             return;
@@ -289,6 +290,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 await Sidebar.OpenNewCourseWizard();
             });
             return;
@@ -302,6 +304,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 await Sidebar.OpenNewCourseWizard(createCode, createSections);
             });
             return;
@@ -313,6 +316,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 if (Workspace.Courses.FirstOrDefault(c => c.Code == addCode) is { } course)
                     await Sidebar.OpenAddSectionDialog(course);
             });
@@ -330,6 +334,7 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(async () =>
         {
             await System.Threading.Tasks.Task.Delay(1500);
+            if (!await FolderIsReadyForAutomation()) return;
             Workspace.Selection = new SidebarSelection.SectionItem(code, section);
             if (DetailHost.Content is not SectionDetailView detail) return;
             if (preview) detail.StartPreviewForAutomation();
@@ -340,6 +345,22 @@ public sealed partial class MainWindow : Window
                 detail.ShowDetailsForAutomation();
             }
         });
+    }
+
+    /// <summary>
+    /// #473, for the automation hooks above (smoke tests): wait for this
+    /// launch's own copy of the tools into the folder — joining it, never
+    /// starting another — so a hook's Preview, Deploy or New Course is not
+    /// refused by it. False, with the sentence in startup.log as
+    /// "refused: …", when the copy failed.
+    /// </summary>
+    private async Task<bool> FolderIsReadyForAutomation()
+    {
+        if (Workspace.WorkspacePath is not { } folder) return true;
+        await ToolchainReadiness.Ensure(folder, BundledToolchain.Root);
+        if (ToolchainReadiness.Refusal(folder) is not { } notReady) return true;
+        App.LogDiagnostic($"automation hook refused: {notReady}");
+        return false;
     }
 
     /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
