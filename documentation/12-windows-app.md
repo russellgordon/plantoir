@@ -470,8 +470,7 @@ None of these is for a teacher; each exists so something can drive the app.
 
 | Flag | What it does |
 |---|---|
-| `--capture-marketing-shots <dir> [--theme light\|dark]` | Photographs the app's windows for plantoir.app. One appearance per process, with the OS switched into it first. |
-| `--hero-window <theme>` | Stages a real window for the hero composite and stops, so the Python harness can photograph it beside Obsidian and Edge. |
+| `--stage-scene <scene> --theme light\|dark --folder <dir> --ready-file <file> [--courses …] [--reference-copy …]` | Stages one of plantoir.app's pictures in a REAL window and holds it open, for `website/shots/app_scenes_windows.py` to photograph whole (#380). See "The pictures on plantoir.app" below. Replaced `--capture-marketing-shots` and `--hero-window`. |
 | `--state-dir <dir>` | Keeps this run's ENTIRE Plantoir folder somewhere else. |
 | `--auto-select CODE N`, `--auto-preview CODE N`, `--auto-deploy CODE N`, `--auto-course CODE`, `--auto-wizard`, `--auto-createcourse CODE [SECTIONS]`, `--auto-addsection CODE`, `--details` | Older test hooks that drive the interface from the command line — select a section, press Preview, open the wizard. |
 
@@ -1017,9 +1016,19 @@ carries `AutomationProperties.Name` in the words its tooltip already shows: the
 sidebar's Add and Remove, the section toolbar's back, forward, reload, Obsidian
 and Open in Browser, Course Settings' Obsidian, and a list row's rename
 (`FormBuilders`; the row's ⓘ and the lists' + and − were already named).
-Preview and Deploy show text beside their icon and are left to be named by it
-(not yet measured: the UiFact below is what will say, and it fails by
-AutomationId if either comes back empty). A reference
+Preview and Deploy show text beside their icon and were left to be named by
+it — which was WRONG, measured on the v1.4.3 cut (2026-10-07), the first time
+the UiFact below ran: a Button whose content is a `StackPanel` (icon plus
+`TextBlock`) is not named from that text, so both came back empty. They now
+carry their visible words as `AutomationProperties.Name` — "Deploy", and
+Preview's set in `SectionDetailView.RefreshChrome` from the same line that
+sets its label, so it reads "Stop Preview" while one runs. The same run found
+every `ToggleSwitch` in Course Settings and the wizard with NO Name at all
+(their On/Off content is empty and the label is a separate `TextBlock`), so a
+switch was announced "toggle switch, off" with no word of which setting it
+was: `FormBuilders.LabeledRow` now gives its control the label as Name (unless
+one is already set) and as `LabeledBy`, which names every switch, combo box
+and text box built through it. A reference
 course's row SHOWS its code, which is the live course's code too, so its Name is
 fuller — `ReferenceCourse.SpokenRowName`, "ICS3U, kept for reference, 2025–26"
 (or without the year when none is set) — through `SidebarRow.SpokenName`, which
@@ -1030,8 +1039,21 @@ the sidebar, a course's settings and a section; the reference row's Name) and by
 `ReferenceCourseTests.AReferenceRowIsSpokenWithItsYear`. Rejected (reasoned, not
 measured): a HelpText on the reference row instead of a fuller Name (the Name is
 what is announced first, so the two ICS3U rows would still start identically); naming
-Preview/Deploy explicitly (their label changes to Stop and to "Available in a
-moment", and a static Name would go stale).
+Preview/Deploy explicitly because their label changes (to Stop, and to
+"Available in a moment") and a static Name would go stale — reversed on the
+v1.4.3 cut: only Preview's LABEL changes, and its Name is set beside it; "Available
+in a moment" is a tooltip, and Deploy's label is always "Deploy".
+
+**Two harness traps from the same cut (2026-10-07, this PC).** FlaUI's
+`element.Name` asks UI Automation NOT to fill in a default, so an element that
+nothing names reports the property unsupported and `.Name` THROWS
+(`PropertyNotSupportedException`) — the empty-name UiFact crashed on the very
+switch it exists to report. A check for "is this named?" reads
+`Properties.Name.ValueOrDefault`. And a Ctrl-click sent back to back —
+`Keyboard.Press(CONTROL)` then the click — arrived as a PLAIN click in both
+runs that reached it, so All Backups' second choice replaced the first ("Delete
+1 Backup…"); with 150 ms either side of the click it is a Ctrl-click. Not a
+product fault: a teacher's finger holds Ctrl far longer than that.
 
 Measured for the end-to-end tests on this PC: creating MFM2P in the wizard
 29–32 s; its first preview served 52–61 s after Preview was pressed;
@@ -2631,8 +2653,9 @@ not a detail to leave in the code.
 ## Dates are written in the Gregorian calendar, by one helper (#144)
 
 Added 2026-09-27 for [issue #144](https://github.com/russellgordon/plantoir/issues/144),
-from a cloud session on Linux (see "Working from a cloud session" in
-`WINDOWS-DIRECTOR-PROMPT.md` for what such a session can and cannot build).
+from a cloud session on Linux (see `windows-app/PROGRESS.md` → "Work done
+from a cloud (Linux) session — 2026-09-27" for what such a session can and
+cannot build).
 The mac needs nothing from this and owes nothing back; it is written up here
 because the REASON is what a future reader of the C# needs, and the reason
 cannot be read off the code.
@@ -2754,8 +2777,8 @@ language and carry nothing a calendar can shift. Worth knowing, not fixed:
 a Finnish machine, and whether `schtasks` takes that is unmeasured.
 
 **Five sites were left to `origin/issue/159-settle-the-day-once`**, the
-unmerged Windows branch from 2026-09-19 that `WINDOWS-PARITY.md` Phase 5
-step 1 says to take up as it stands: the model's dateline (`AssistAgent`
+unmerged Windows branch from 2026-09-19 that `WINDOWS-PARITY.md` (deleted
+2026-10-04) Phase 5 step 1 said to take up as it stands: the model's dateline (`AssistAgent`
 :610), the "deploy tomorrow at" card's moment (:704), that card's reader
 (:815), and the two `DateTime.TryParse(when)` readers in `PlantoirTools`
 (`plan_scheduled_deploy`, `schedule_deploy`), which #159 routes through one
@@ -3044,12 +3067,12 @@ asserts **zero** reads of the window's live folder between two marker comments
 — not a list of the five known sites. `ReleaseLease` alone has six callers
 (`AbandonWait` among them, which no earlier inventory named), and a test naming
 today's sites stays green the moment somebody adds a sixth, which is the whole
-failure it exists to prevent. It also pins the four write sites and the single
+failure it exists to prevent. It also pins the three write sites and the single
 registration write, since deleting a capture would otherwise leave every stop a
-silent no-op wearing the shape of the fix working. (Four, not three: the
-marketing-shot harness `StagePreviewForCapture` sets `_previewUrl`, which makes
-`hadPreview` true, and a staged view must not answer the teardown's question
-differently from a real one.)
+silent no-op wearing the shape of the fix working. (There were four until the
+marketing-shot harness's `StagePreviewForCapture`, which set `_previewUrl` and
+so made `hadPreview` true, went with the old `--capture-marketing-shots` mode
+when the pictures moved to `--stage-scene` (#380); the test expects three.)
 
 **That scan is LEXICAL, and one exception is named rather than tidied away.**
 Every teardown path ends in `RefreshChrome()`, which is defined outside the
@@ -3778,8 +3801,53 @@ while running, marshalled to the UI thread) and reads
 `AppInstance.GetActivatedEventArgs()` for a click that started Plantoir.
 Approximations, said plainly: an inactive app has no key window, so "front to
 back" is newest window first; "the section is still in the folder" is
-`courses\<CODE>\section<n>` existing. The announcing cases (`notification.announcing`)
-are still #212's. Unproven on a real click.
+`courses\<CODE>\section<n>` existing. Unproven on a real click.
+
+**Until #448 (2026-10-04) it never posted at all.** `Program.Main` ran
+`ScheduledRun.Execute` and THEN the toast step, which read the job file —
+and a run that deploys, or stands down, ends with `ClearIfStillMine` →
+`TaskScheduling.Cancel`, which deletes the task AND its job file. The toast
+step found no job and returned without a word, so no toast and no trail line,
+on every scheduled run since #324. Measured on two real runs (the installed
+1.4.2 and a Debug build; i5-8365U, UHD 620, Windows 11 Pro 26200): record
+`succeeded`, folder written, task gone, nothing in Notification Center, no
+`scheduled publish notification` line. The unit tests had all passed, because
+none of them ran the clearing before the toast.
+
+The fix: `ScheduledRunAnnouncement.RunAndAnnounce` reads the job BEFORE
+`Execute`, then hands course, section and folder to `Announce`, which reads
+the section's record, posts its sentence through an `IPoster`
+(`ScheduledPublishNotifier.SystemToasts` in the app; a stand-in in tests) and
+writes the contract's `trailSays` line — told, turned off
+(`AppNotificationManager.Default.Setting` disabled for the app, the user or by
+policy), or could not be sent (a post that throws or returns id 0). Which
+endings announce: `Deployed` (the wrapper's record: succeeded, did not finish,
+needed an answer) and `StoodDown`. `NoLongerStands` announces nothing — the
+teacher cancelled or set it again, this run wrote no record, and the record
+lying there is an older run's news — and nor does a record older than the run
+(less two seconds), so a wrapper that wrote nothing never replays last week's
+notice. A deploy set again while the run worked keeps the new task (the
+"not mine any more" path) and still announces THIS run's record: what the
+toast names was read before the run, so it never depends on which job file is
+there afterwards. `ScheduledRunAnnouncementTests` plays
+`notification.announcing` (the `allowed`/`notAllowed` rows, every kind) and
+drives real runs through `FakeScheduler`, asserting the job file is gone
+before it asserts the post; putting the old order back (reading the job after
+`Execute`) turns them red. **Proved for real, 2026-10-04 11:49** (same PC):
+a real Task Scheduler run of the fixed x64 Debug build (task action
+`Plantoir.exe --run-scheduled-deploy "<task name>" --token …`, set through
+the branch's own `plantoir-mcp.exe` with `PLANTOIR_APP_PATH` pointing at
+that build) wrote its record, cleared its task, and posted: an entry with tag
+`ICS4U-section1.<folder id>`, group `scheduled`, under the app identity whose
+display name is "Plantoir" (`HKCU\Software\Classes\AppUserModelId\{GUID}`),
+was in the notification database Notification Center reads
+(`%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db`), carrying
+the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
+a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
+is posted (moving the clearing out of `Execute`) — the clearing is what makes
+the task one-shot and is guarded by the job's token; a second caller in charge
+of it is a deploy that can recur. Still owed from #212: withdrawing the toast
+when the band is dismissed (`onShow`'s dismiss case).
 
 ### Accelerators under a dialog (#191)
 
@@ -3868,3 +3936,89 @@ notice is 157 px of a 737 px window, inside it. The test's own wait for the
 width to reach 520 times out silently; it should say so if the window's
 minimum ever drops (left as it is: the assertion that matters — the notice
 stays inside the window — holds at the narrowest width a teacher can reach).
+
+
+## The pictures on plantoir.app: real windows, staged by the app (#380, #370)
+
+Every Windows picture on plantoir.app is now ONE real window photographed
+whole by Windows.Graphics.Capture (`website/shots/windowshot/`): the window's
+own corners and alpha, nothing cropped, masked or drawn, and no shadow of its
+own on a single-window shot — the page's stylesheet adds one. That is
+Russell's rule for every picture (2026-09-27, repeated 2026-10-04: "Every
+screenshot must be windows"), and it ruled out what this app used to do.
+
+**What was rejected, and why.** `--capture-marketing-shots` rendered each
+window's CONTENT with `RenderTargetBitmap` into a PNG: no title bar, no
+window, square corners, and — for the assistant — the bubbles, the plan text
+and its Approve and Cancel buttons were TextBlocks and Buttons typed by hand
+into the transcript, words the app never says. `StagePreviewForCapture` laid a
+picture of a site (or a hand-built imitation of one) where the preview goes,
+with nothing serving it. Both are gone. Cropping a desktop capture to the
+window's rectangle was rejected for the reason the mask once existed: it keeps
+desktop pixels in the rounded corners.
+
+**How a scene works.** `Plantoir.exe --stage-scene <scene> --theme
+light|dark --folder <working folder> --ready-file <file> --state-dir <temp>`
+(`Services/MarketingShotCapturer.cs`; the arguments are read by
+`Plantoir.Core/Models/MarketingScene.cs`, tested in `MarketingSceneTests`).
+The app opens the window through the same paths a teacher's clicks take —
+`App.OpenWindow`, the sidebar selection, the New Course panel, the Copy a
+Page and Get Ready for the Start of the Year sheets, the section's Schedule
+a Deploy sheet, the Preview button — drives it to the state the caption
+describes, and writes `staged`, or `refused: <why>`, to the ready file. A
+refused scene is never photographed. The Python side photographs the one
+window of that process and ends it, and everything still naming the folder
+(a preview it built, its tools), and deletes any lease file left behind.
+
+- **Real where it can be.** The preview, the progress (a real preview caught
+  14 s in) and the two coverage maps are REAL previews built by the launchers
+  (`SectionDetailView.ShowPreviewPageForCaptureAsync` shows a page of the
+  preview the view is already serving, scrolled to an anchor and checked).
+  The assistant is the real window with Plantoir's real tools: the promise
+  card's "Unpublish Unit 2, Day 3" is matched in code
+  (`AssistAgent.CardCommand`), so the plan and its Go and Cancel buttons are
+  the app's own and no model has to be downloaded or started
+  (`AssistWindow.StageForCapture`; a model that answers nothing stands in,
+  and is never asked). The schedule's notification is NOT taken yet: two
+  real scheduled deploys (the Debug build, then the installed 1.4.2) both
+  succeeded and posted nothing, because `ScheduledRun.Execute`'s one-shot
+  clearing (`TaskScheduling.Cancel`) deletes the job file before
+  `ScheduledPublishNotifier.PostFor` reads it (fixed by #448 on its own
+  branch). With that fix the toast appeared (2026-10-04 12:07), and it is
+  still not a window Windows.Graphics.Capture can be given: EnumWindows found
+  no new, visible or uncloaked window, FindWindowEx by
+  `Windows.UI.Core.CoreWindow` and UI Automation's desktop root found no
+  notification. Russell's ruling (2026-10-04): Windows' `schedule` picture is
+  the sheet alone, with its own alt text (`shots.json` → `windowsAlt`).
+- **Staged in one place only:** the hero's middle card is a deploy in
+  progress, staged with `ScriptRunner.StageAsRunningForCapture`, because a
+  real deploy would put a site online to take a photograph.
+- **`--state-dir` on every run**, so no setting, window list or trail line of
+  a teacher's is touched; and a fresh settings file has "asks before
+  changing" ON, which is what makes the assistant show its plan rather than
+  carry it out. (The scheduled deploy's own run is started by Task Scheduler
+  without `--state-dir`, so its record and trail lines are written to the
+  real state folder of the machine taking the pictures.)
+- **The folders are made by the app.** `--stage-scene provision --courses
+  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` sets a folder up and makes
+  each course through the New Course panel (`AutoCreate`, after the code is
+  filled in as typed, so the course gets the name a teacher is offered — the
+  first folder made without that was called "Course Website"), then keeps a
+  reference copy with Keep a Copy for Reference's own `ReferenceCopier`. The
+  College Board scenes use the mac's ICS3U, ICS4U and ICS3U-2025, copied in
+  (every picture's path bar shows `~/Desktop/Teaching`, as the mac's do: the
+  scene folder's `courses` are swapped into it for the run and back after,
+  `app_scenes_windows.ShownAsTeaching` — the folder itself could not be
+  renamed while a File Explorer window had it open), because
+  their College Board pages come from the Course and Exam Description through
+  a macOS-only PDFKit helper (`website/shots/ced_statements.swift`).
+
+**Traps met.** PowerShell 5.1's `Start-Process -ArgumentList` joins its array
+with spaces and quotes nothing — "School Web Space" arrived as "School" and
+the app set up a folder of that name; each argument now carries its own
+quotes. The app must be started through ShellExecute, never with redirected
+stdio (the leak `DrivenApp.cs` measured, which hangs course creation).
+WinUI's system title bar does NOT follow dark mode on its own: in a dark
+picture the content is dark and the title bar light, which is how the app
+looks to a teacher today, so the pictures show it (a product question, not a
+capture one).

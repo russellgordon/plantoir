@@ -498,6 +498,23 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     carries only its own release's notes.
   - The VERSION is read from the installer's own version resource
     (`ProductVersion`, which `publish.ps1` sets from `<Version>`).
+  - **The item's `pubDate` is the installer FILE's creation time on disk, not
+    its build time.** Met at the 1.4.3 cut (2026-10-07): `publish.ps1`
+    overwrote a `dist\PlantoirSetup.exe` left from the 1.4.2 cut, Windows
+    kept the OLD creation time, and the new item was dated four days
+    earlier than the build. **Delete `windows-app\dist\PlantoirSetup.exe`
+    before `publish.ps1 -Sign`**, or the feed will say the release is older
+    than it is. (Setting the creation time by hand afterwards also works
+    and does not change the bytes, so the signature stays valid.)
+  - **`--reparse-existing` will NOT replace an item of the same version.**
+    If the installer is rebuilt after the feed was generated (it was, at
+    the 1.4.3 cut, for a fix the UI suite found), the generator says "already
+    in the file, not adding it again" and leaves the OLD length and
+    signature in place — a feed that then points at bytes nobody uploaded.
+    Restore the feed to the previous release's committed bytes first
+    (`git checkout <previous release's commit> -- website/updates/windows.xml
+    website/updates/windows.xml.signature`) and generate again; check the
+    item's `length` against the installer's size before committing.
     `--file-version` is NOT used, and was rejected on measurement: given
     `--file-version 1.4.3` with the 1.4.2 installer, it wrote nothing new and
     said "An app cast item with version 1.4.2 is already in the file". (The
