@@ -2680,7 +2680,7 @@ send them. What the router may not send it also may not keep — settler S2
 strips `unit` and `days` from every `add_next_class` the MODEL sends
 (`AssistAgent.WithoutCardOnlyArguments`), and settler S3 points a sentence
 about units or counts at the phrasings that do it (doc 10, "#440"). The local
-`add_next_class` now shows course and section only, the mac's shape (the narrowed `add_next_class` equals the contract's local shape exactly; the four departures already recorded on other local tools (`preview` on `publish_class_on`, `publish_pages` and `unpublish_pages`; `scope` and `revise` on `read_remembered_timetable`) stand, so this is a claim about this tool, not the whole surface);
+`add_next_class` now shows course and section only, the mac's shape (the narrowed `add_next_class` equals the contract's local shape exactly; the departures already recorded on four other local tools (`preview` on `publish_class_on`, `publish_pages` and `unpublish_pages`; `scope` and `revise` on `read_remembered_timetable`) stand, so this is a claim about this tool, not the whole surface);
 `NextClassUnitsTests.TheLocalModelSeesOnlyCourseAndSection` narrows the REAL
 served schema and compares it with the contract's.
 
