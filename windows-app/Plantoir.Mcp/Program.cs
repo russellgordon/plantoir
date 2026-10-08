@@ -46,9 +46,9 @@ try
     // v1.4.3 (#430) both outside doors pass `--mcp-stdio <folder>` and name
     // the course in their greeting only (app-rules.json → outsideAgents.
     // courseIsNamedInTheGreetingOnly), so an outside session can reach every
-    // course in the folder. The Claude door still names its course in
-    // DoorCourseVariable, and the `assist` lease below is taken on that course
-    // without locking to it; the Codex door names none and takes none.
+    // course in the folder. Both doors still name their course in
+    // DoorCourseVariable (the Codex door since #468), and the `assist` lease
+    // below is taken on that course without locking to it.
     // The undo history lives for the life of this process, which is the life
     // of the teacher's conversation — so "undo that" works for as long as they
     // are talking, and nothing accumulates on disk afterwards.
@@ -68,14 +68,22 @@ catch (Exception error)
 // Section decline while the session is open — otherwise both would build into
 // the same output folder. Only when locked to a course: an unrestricted
 // session has no single course to claim.
-// The Claude door names the course it was opened from in DoorCourseVariable
-// (fix round ruling 3): held, never locked, so #283's backup protection, the
-// second-session guard and the hold on structural work survive #430.
-IDisposable? lease = workspace.CourseToHoldForTheConversation(
-        Environment.GetEnvironmentVariable(AssistWorkspace.DoorCourseVariable)) is { } held
+// Both doors name the course they were opened from in DoorCourseVariable
+// (fix round ruling 3; the Codex door since #468): held, never locked, so
+// #283's backup protection, the second-session guard and the hold on
+// structural work survive #430.
+string? held = workspace.CourseToHoldForTheConversation(
+    Environment.GetEnvironmentVariable(AssistWorkspace.DoorCourseVariable));
+IDisposable? lease = held is not null
     ? Plantoir.Core.Assist.WorkLease.Take(workspace.FolderPath, held,
         Plantoir.Core.Assist.WorkLease.Assisting)
     : null;
+// A DOOR's session says so on the trail (#468, "outside session held a
+// course"); this app's own window's server, locked with --course, holds its
+// course too and must not be written up as "a Claude or Codex session".
+if (held is not null && !workspace.ServesTheLocalWindow)
+    Plantoir.Core.Scripting.ActivityTrail.Note(Plantoir.Core.Scripting.ActivityTrail.Event.OutsideSessionHeldACourse,
+        AssistWorkspace.HoldingTrailLine(held));
 // Its own work stops BEFORE any lease goes (#289): a build this server started
 // must not keep writing the section's folder after the course reads as free.
 AppDomain.CurrentDomain.ProcessExit += (_, _) =>

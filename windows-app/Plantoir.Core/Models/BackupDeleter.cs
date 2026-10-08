@@ -51,9 +51,14 @@ public static class BackupDeleter
     /// The trail line for <c>backups deleted</c>: course codes, how many, what
     /// they took together when every size is known, each deleted file's NAME
     /// (a course code, a moment and who made it — never anything on a page),
-    /// and what was kept for the assistant or could not be deleted.
+    /// and what was kept or could not be deleted. What was kept is told by
+    /// SOURCE since #468 (mac #458): the window's clause as it always read,
+    /// and, separately, the ones a Claude or Codex session still open made —
+    /// <paramref name="madeByOtherSessions"/>, from
+    /// <see cref="HeldBackups.ByOtherSessions"/>.
     /// </summary>
-    public static string TrailLine(Outcome outcome, IReadOnlyDictionary<string, long?> sizes)
+    public static string TrailLine(Outcome outcome, IReadOnlyDictionary<string, long?> sizes,
+                                   IReadOnlySet<string>? madeByOtherSessions = null)
     {
         var codes = outcome.Deleted.Concat(outcome.Kept).Concat(outcome.Failed.Select(f => f.Item))
             .Select(b => b.CourseCode).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(c => c, StringComparer.Ordinal);
@@ -64,9 +69,14 @@ public static class BackupDeleter
         string line = $"deleted {outcome.Deleted.Count} backup{(outcome.Deleted.Count == 1 ? "" : "s")} of {string.Join(", ", codes)}{together}";
         if (outcome.Deleted.Count > 0)
             line += ": " + string.Join(", ", outcome.Deleted.Select(b => Path.GetFileName(b.FilePath)));
-        if (outcome.Kept.Count > 0)
+        var bySession = outcome.Kept.Where(b => madeByOtherSessions?.Contains(Path.GetFullPath(b.FilePath)) == true).ToList();
+        var byWindow = outcome.Kept.Except(bySession).ToList();
+        if (byWindow.Count > 0)
             line += "; kept because an open assistant conversation can restore from it: " +
-                    string.Join(", ", outcome.Kept.Select(b => Path.GetFileName(b.FilePath)));
+                    string.Join(", ", byWindow.Select(b => Path.GetFileName(b.FilePath)));
+        if (bySession.Count > 0)
+            line += "; kept " + string.Join(", ", bySession.Select(b => Path.GetFileName(b.FilePath))) +
+                    ", which a Claude or Codex session still open made";
         if (outcome.Failed.Count > 0)
             line += $"; {outcome.Failed.Count} could not be deleted: " +
                     string.Join(", ", outcome.Failed.Select(f => Path.GetFileName(f.Item.FilePath)));
@@ -174,10 +184,54 @@ public static class HeldBackups
         catch (Exception) { return held; }
         foreach (string record in records)
         {
-            if (!int.TryParse(record[(record.LastIndexOf('.') + 1)..], out int pid) || !living.Contains(pid)) continue;
+            if (PidOfRecord(Path.GetFileName(record)) is not { } pid || !living.Contains(pid)) continue;
             try { held.Add(Path.GetFullPath(File.ReadAllText(record).Trim())); } catch (Exception) { }
         }
         return held;
+    }
+
+    /// <summary>
+    /// The backups a CLAUDE OR CODEX session holds (#468): each zip recorded by
+    /// another program with a live assist lease that is NOT one of this app's
+    /// own window servers (<see cref="WindowServers"/>). The window's own
+    /// server writes records too, for the zip its window already holds; those
+    /// keep the window's sentences. The mac's <c>backupsHeldByOtherSessions</c>.
+    /// </summary>
+    public static IReadOnlySet<string> ByOtherSessions(string workspacePath,
+                                                       Func<string, IEnumerable<int>>? livingAssistantPids = null)
+    {
+        var held = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var living = (livingAssistantPids ?? AssistantPids)(workspacePath)
+            .Where(pid => WindowServers.Find(pid) is null).ToHashSet();
+        string dir = Path.Combine(Workspace.CoursesDirectory(workspacePath), ".internal", "activity");
+        IEnumerable<string> records;
+        try { records = Directory.EnumerateFiles(dir, "*.held-backup.*").ToList(); }
+        catch (Exception) { return held; }
+        foreach (string record in records)
+        {
+            if (PidOfRecord(Path.GetFileName(record)) is not { } pid || !living.Contains(pid)) continue;
+            try { held.Add(Path.GetFullPath(File.ReadAllText(record).Trim())); } catch (Exception) { }
+        }
+        held.ExceptWith(InThisApp());
+        return held;
+    }
+
+    /// <summary>
+    /// The writer's process id from a record's NAME, or null when the name is
+    /// not a record (<c>file-formats.json → heldBackupRecord.name</c>): the pid
+    /// is the LAST dot-separated part, in decimal, and <c>held-backup</c> the
+    /// second-last — so a course code with a dot in it still reads, and a lease
+    /// (<c>ICS3U.assist.4321.lease</c>) never does. The mac's
+    /// <c>pidOfHeldBackupRecord(named:)</c>.
+    /// </summary>
+    public static int? PidOfRecord(string fileName)
+    {
+        string[] parts = fileName.Split('.');
+        if (parts.Length < 3 || parts[^2] != "held-backup") return null;
+        string last = parts[^1];
+        if (last.Length == 0 || !last.All(char.IsAsciiDigit)) return null;
+        return int.TryParse(last, System.Globalization.NumberStyles.None,
+                            System.Globalization.CultureInfo.InvariantCulture, out int pid) ? pid : null;
     }
 
     private static IEnumerable<int> AssistantPids(string workspacePath) =>
