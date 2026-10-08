@@ -573,11 +573,13 @@ read back (`PublishToFolderUiTests`). Doc 12 → "A test that runs a launcher".
 
 ## Spec coverage
 
-Tracked in one place only: the **Windows status** section of
+Tracked until 2026-10-08 in the **Windows status** section of
 [`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md) (264 rows as of 2026-08-18,
-entries 1–264 assessed). Nothing here duplicates it, because a second copy is
-a copy that goes stale — that count itself had been reading "179 rows" for
-days after the log passed 250.
+entries 1–264 assessed), frozen with the log when it closed to new entries
+(#480); since then the open `windows` issues are the list, and the closed
+issues by milestone are what shipped. Nothing here duplicates either, because
+a second copy is a copy that goes stale — that count itself had been reading
+"179 rows" for days after the log passed 250.
 
 **What to do with that assessment** is the open `windows` issues, plus
 [`documentation/12-windows-app.md`](../documentation/12-windows-app.md) →

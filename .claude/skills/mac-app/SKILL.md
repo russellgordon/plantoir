@@ -384,16 +384,19 @@ from scratch, usually badly, and usually after shipping the same bug once.
 
 So a macOS change is not finished until BOTH of these are true:
 
-1. **`GUI-IMPROVEMENTS.md` has an entry, and its "Notes for Windows port"
-   column actually says something.** That column is not optional. Every one
-   of the entries so far has one. Useful notes say what Windows must do
+1. **The `windows` issue says what Windows must do, and the closing comment
+   on the piece's own issue says what landed** (every piece has one, with the
+   release milestone on it before it closes — `CLAUDE.md` rules 3 and 4).
+   Useful notes say what Windows must do
    differently, what it can inherit unchanged, and — most valuable — the trap
    that would look correct in review. "Shared Python, nothing to mirror" is a
-   fine note when true; an empty cell never is.
+   fine note when true; an empty one never is. (`GUI-IMPROVEMENTS.md` carried
+   this as a "Notes for Windows port" column until it closed to new entries on
+   2026-10-08, #480 — do not add a row.)
 2. **Anything architectural also gets a section in the `documentation/` page
-   that owns its subject.** A
-   log row records a decision; the deep dive explains it well enough to
-   implement. Rule of thumb: if you needed more than a sentence of reasoning
+   that owns its subject.** The
+   closing comment records a decision; the deep dive explains it well enough
+   to implement. Rule of thumb: if you needed more than a sentence of reasoning
    to get it right, they will too.
 
 **Corrections count as improvements.** When a change makes existing Windows
@@ -453,9 +456,9 @@ The same goes for anything else the assistant surfaces: tokens, context
 windows, quantisation, Metal, GPU layers, inference. If a sentence would only
 make sense to somebody who has read the source, it is not ready to show.
 
-Two exceptions, both non-teacher-facing: `GUI-IMPROVEMENTS.md` and the
-write-ups record what was measured and must name models precisely, and code
-comments should too. The rule is about what appears on screen.
+Two exceptions, both non-teacher-facing: the closing comment on the issue
+and the write-ups record what was measured and must name models precisely,
+and code comments should too. The rule is about what appears on screen.
 
 ## Open investigations — read these before touching the area
 

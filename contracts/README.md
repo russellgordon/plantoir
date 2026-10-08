@@ -1739,8 +1739,9 @@ oversight:
 ## The rule this exists to enforce
 
 A sentence a teacher reads is a specification. Kept in the Swift that says it,
-the Swift test that pins it, `GUI-IMPROVEMENTS.md` where it is specified and
-the documentation page telling Windows to copy it, it is four copies and
+the Swift test that pins it, `GUI-IMPROVEMENTS.md` where it was specified
+(closed since 2026-10-08) and the documentation page telling Windows to copy
+it, it is four copies and
 three of them were already drifting — the same deploy failure was told two ways
 ("that section's console" / "that section's window") depending only on which
 function ran it. Now it is written once in `AssistWording`, and everything else
