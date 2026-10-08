@@ -25,7 +25,7 @@ struct AboutView: View {
     let copyrightNotice: String? = "Copyright 2026 Russell Gordon"
 
     /// What the app is, in one line.
-    let tagline: String = "Turns a folder of Markdown notes into a fast, searchable class website you own."
+    let tagline: String = "Turns a folder of Markdown notes into a fast, searchable class website."
 
     /// Where the name comes from — and what the app promises to do.
     let namesake: String = "A plantoir is a dibber — the simple hand tool that opens a hole at the right depth so a seedling can be set in and take root. This app does the same for teaching materials. Write in Obsidian, preview locally, deploy when you’re ready."

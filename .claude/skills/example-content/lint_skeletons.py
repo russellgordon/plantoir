@@ -10,7 +10,10 @@ sentinel is where the installer expects it, no template token — %PERCENT% or
 noun it does not fit ("a this course course", #328), and the class website is
 never called "the published website" (#443). That last rule also reads the
 Example Course (`support/example_course/`, EXC2O), whose template pages carry
-the same sentences and which no other linter reads.
+the same sentences and which no other linter reads — and so does
+`lint_payload.py`'s heading-mark rule (#444): the template's sentence must
+say "Every `##` (level 2) and `###` (level 3) heading", marks and all. Both
+run when no family is named.
 
     python3 .claude/skills/example-content/lint_skeletons.py [family ...]
 """
@@ -35,6 +38,10 @@ CLASS_SENTINEL = re.compile(r"created: __CREATED_CLASS_(\d+)__")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from generate_skeletons import article_for  # noqa: E402 — one rule for "a"/"an", shared with the generator
+# The heading-mark rule (#444) has ONE home, lint_payload.py, which runs it on
+# every payload page; it is borrowed here only to read the Example Course.
+from lint_payload import heading_marks_missing  # noqa: E402
+from lint_payload import check_the_checks as heading_mark_rule_misbehaves  # noqa: E402
 
 # A {brace} placeholder is never filled — the generator's tokens are
 # %PERCENT% ones, because the pages carry LaTeX and YAML in earnest — so one
@@ -165,6 +172,8 @@ def check_the_checks() -> list:
     for sentence in MUST_BE_REFUSED:
         if not prose_problems(sentence):
             failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    for failure in heading_mark_rule_misbehaves():
+        failures.append(f"heading-mark rule (#444): {failure}")
     return failures
 
 
@@ -362,22 +371,32 @@ def check(family: str) -> list:
 
 
 def example_course_problems() -> list:
-    """The #443 phrase rule over the Example Course (EXC2O).
+    """The #443 phrase rule and the #444 heading-mark rule over the Example
+    Course (EXC2O).
 
-    Only that ONE rule: EXC2O is hand-written course content, not a skeleton,
-    so the skeleton-shape checks (sentinels, manifests, every link) do not
-    apply to it. It copies the skeleton template sentences, though, and was
-    missed once because nothing read it (review of #443, 2026-10-07).
+    Only those TWO rules: EXC2O is hand-written course content, not a
+    skeleton, so the skeleton-shape checks (sentinels, manifests, every link)
+    do not apply to it. It copies the skeleton template sentences, though,
+    and was missed once because nothing read it (review of #443,
+    2026-10-07). The heading-mark rule is read on the RAW page, as
+    lint_payload.py reads it: with the backticked marks removed, the right
+    sentence looks exactly like the broken one.
     """
     problems = []
     for page in sorted(EXAMPLE_COURSE.rglob("*.md")):
         text = page.read_text(encoding="utf-8")
+        where = page.relative_to(EXAMPLE_COURSE)
         published = SITE_CALLED_PUBLISHED.search(text)
         if published:
-            where = page.relative_to(EXAMPLE_COURSE)
             problems.append(
                 f'{where}: the class website called "published" (#443 — say '
                 f'"your class website"): {published.group(0)!r}'
+            )
+        for number in heading_marks_missing(text):
+            problems.append(
+                f"{where}:{number}: the heading sentence names a level with no mark "
+                f"before it (\"Every  (level 2)\") — write Every `##` (level 2) and "
+                f"`###` (level 3) (#444)"
             )
     return problems
 

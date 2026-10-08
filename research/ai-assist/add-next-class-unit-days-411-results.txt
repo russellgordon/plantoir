@@ -1,7 +1,8 @@
 #411 part (1): the mac's add_next_class declaring `unit` and `days`, as
 Windows' does. Measured 2026-10-04, BOTH tiers, before and after, against a
 pass rule written down before anything ran. RESULT: FAILS on both tiers.
-Part (1) is PARKED on branch issue/411-add-next-class-unit-days (7bfab8fc);
+Part (1) is PARKED on branch issue/411-add-next-class-unit-days (7bfab8fc),
+kept as the record of this measurement (Russell, #440, 2026-10-04);
 nothing the local model is shown has changed on dev.
 
 DECISION BEING MEASURED (Russell, 2026-10-03, #411): "the mac's
