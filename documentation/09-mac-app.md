@@ -6633,6 +6633,29 @@ field, not a measurement — the UI tests that drive the wizard
 `testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel`) are what
 was run through the real interface for this piece.
 
+**The chevron had to become a real AppKit button — and even that was not
+enough.** With the real bezel, the course-code field is an `NSTextField`
+spanning the whole width, and AppKit hands a click to the deepest NSView
+under the pointer before SwiftUI's own layer sees it. The chevron drawn as a
+plain `.overlay` was never clicked: the field took the click and placed its
+caret, which `testCourseCodeRevealButtonOpensThePopup` caught the first time
+the real bezel was tried (the drawn chrome never met this, because its
+`.plain` field was inset 34pt from the trailing edge, leaving the chevron
+over nothing but a shape). Measured, one try at a time, through that test:
+a SwiftUI button inside an `NSHostingView` did not fire; an `NSButton`
+(`RevealChevronButton`, drawn to the measured 24 × 19pt pill) did not fire
+either, and re-adding it above its siblings changed nothing, because SwiftUI
+hosts the field and the overlay in containers of its own whose order is not
+ours to set — a coordinate click at the button's own frame still focused the
+field. So the button takes its click from the window: a local monitor for
+`leftMouseDown`, scoped to its window and removed with the button, performs
+the click for a point inside its own frame and swallows the event, and the
+field never sees it. With that, the chevron opens the popup and the field
+takes focus, through the real interface (both wizard UI tests pass; before
+this piece the first of them passed on `dev` and failed on the branch, which
+is how the regression was found and not shipped). The searchable picker's
+chevron is the same button.
+
 **Tests.** `TextFieldStyleScanTests` has no chrome allow-list any more: every
 `TextField` wears `.borderedTextField()` or is one of the three remaining
 named exceptions (the rename card, the assistant's composer, the alert field
