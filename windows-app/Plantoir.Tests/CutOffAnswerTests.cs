@@ -211,7 +211,10 @@ public class CutOffAnswerTests : IDisposable
 
     /// <summary>
     /// An empty add_next_class RUNS, as on the mac: its unit and days only
-    /// extend a write with a default (fix round, ruling 2).
+    /// extend a write with a default (fix round, ruling 2). The schema is
+    /// hand-built WITH unit and days on purpose — since #440 the narrowed
+    /// local surface declares neither, and this is the case
+    /// <c>AssistAgent.OptionalExtras</c> still decides.
     /// </summary>
     [Fact]
     public async Task AnEmptyAddNextClassRunsAsOnTheMac()
@@ -240,7 +243,15 @@ public class CutOffAnswerTests : IDisposable
 
         await agent.Say(Request, CancellationToken.None);
 
-        Assert.Equal("add_next_class", Assert.Single(tools.Calls).Name);
+        // Settler S3's probe (#440) is a read-only plan_add_next_class with
+        // course and section only; the WRITE is what this case is about, and
+        // it happens exactly once.
+        Assert.Single(tools.Calls, call => call.Name == "add_next_class");
+        Assert.All(tools.Calls.Where(call => call.Name != "add_next_class"), probe =>
+        {
+            Assert.Equal("plan_add_next_class", probe.Name);
+            Assert.Equal(new[] { "course", "section" }, probe.Arguments.Select(pair => pair.Key).OrderBy(key => key));
+        });
     }
 
     [Fact]
