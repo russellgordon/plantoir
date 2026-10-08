@@ -1,7 +1,7 @@
 # Bundled Font Licenses
 
 These fonts are bundled solely to preview the site font choices the
-toolchain offers (the published websites load them from Google Fonts).
+toolchain offers (the deployed websites load them from Google Fonts).
 All were obtained from [google/fonts](https://github.com/google/fonts).
 
 Licensed under the **SIL Open Font License 1.1** (see `OFL.txt`; each
