@@ -92,8 +92,8 @@ struct QuartzTeachersApp: App {
         // one WindowGroup" the way an earlier draft of this assumed. Giving
         // the group an id changes nothing about restoration (handled
         // entirely outside SwiftUI's own id-keyed mechanism, per the
-        // comment above) or Cmd+N (SwiftUI's automatic New Window menu
-        // item is generated per-scene regardless of id).
+        // comment above). ⌘N is File ▸ New Window, which `FileCommands`
+        // draws in place of SwiftUI's automatic New submenu (#457).
         WindowGroup("Plantoir", id: "main") {
             WindowRootView()
                 // A bounded IDEAL size matters as much as the minimum:
@@ -122,16 +122,17 @@ struct QuartzTeachersApp: App {
             CommandGroup(after: .appInfo) {
                 CheckForUpdatesButton()
             }
-            PreviewCommands()
-            CommandGroup(after: .newItem) {
-                WorkspaceCommands()
-            }
-            // Renaming a course sits in the Edit menu, under the standard
-            // cut/copy/paste group, because that is the menu a teacher looks
-            // in for "change this thing I have selected".
-            CommandGroup(after: .pasteboard) {
-                EditCommands()
-            }
+            // The menu bar reads Plantoir · File · Edit · View · Course ·
+            // Section · Window · Help (#457). File works with no window open;
+            // View carries the preview's Back, Forward and Reload Page; Course
+            // and Section carry every action on a course or a section, which
+            // the context menus and buttons also reach. Edit is the system's
+            // own again: Rename… moved to Course, where a teacher looks for
+            // "do something to this course".
+            FileCommands(openWindow: openWindow)
+            ViewCommands()
+            CourseMenu()
+            SectionMenu()
             // Beside Plantoir Help, because "something has gone wrong and I
             // need a person" is the same errand as looking for help — and it
             // is the menu somebody opens when they have run out of ideas.
@@ -140,7 +141,11 @@ struct QuartzTeachersApp: App {
             }
         }
 
-        // The assistant, one window per section.
+        // The assistant, one window per section — opened from Revise With ▸
+        // Local AI Assistant… for a section, and never on its own: File
+        // offers no "New Assistant Window" since #457, because an assistant
+        // with no section behind it has nothing to talk about (Russell,
+        // 2026-10-08).
         //
         // Keyed by the section rather than opened as a plain window, so asking
         // for it twice brings the existing one forward. A second window for
@@ -181,5 +186,9 @@ struct QuartzTeachersApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
         .restorationBehavior(.disabled)
+        // Out of the Window menu, which manages windows (#457): without this
+        // the scene is listed there as a second "About Plantoir", beside the
+        // application menu's own (measured, step 0).
+        .commandsRemoved()
     }
 }

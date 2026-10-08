@@ -21,7 +21,7 @@
         "why": "The assistant flags and chat template handling depend on the engine build. The helper versions isolate whether a machine is running what Plantoir expects - but only if they are MEASURED: the launchers use whatever copy is already installed and download only what is missing, so a line naming the pinned versions described a machine that did not exist, and on a Mac with Homebrew's tools it once sent a diagnosis the wrong way (issue #222). On macOS the line is written a moment after the other two launch lines, once the programs have answered."
       },
       {
-        "carries": "the folder path, redacted",
+        "carries": "the folder path, redacted, and — since #457, on the mac — ' from File ▸ Open Recent' when it was chosen from that menu rather than in the Open panel",
         "event": "working folder opened",
         "why": "Almost every question about a course begins with which folder it is in. On the mac, a folder outside the home folder used to bind-mount as an EMPTY folder inside the container, and a container made that old way still does until it is recreated; the launchers refuse such a folder since #221, and since #290 the app refuses it when a window chooses or reopens it, writing \"working folder refused\" or \"working folder not reopened\" instead of this line. This line is the teacher's CHOICE only: a folder the app reopened by itself writes \"working folder reopened\" (#311)."
       },
@@ -32,7 +32,7 @@
       },
       {
         "event": "working folder not reopened",
-        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own or the last working folder) and the remembered path (redacted)",
+        "carries": "the reason (gone, inTrash, driveNotConnected, unreadable, privacyDenied, outsideHome, coursesOutsideHome — reopeningTheLastWorkingFolder.wording's keys), which folder it was (the window's own, the last working folder, or — since #457, on the mac — 'a folder chosen from Open Recent', which cannot be opened for one of the first five reasons; one out of the builder's reach is refused as a chosen folder is) and the remembered path (redacted)",
         "why": "\"Plantoir forgot my folder\" is the report #311 exists to prevent; when it happens anyway, the reason and the path are what can no longer be looked for afterwards — the drive gets plugged back in, the Trash emptied, the permission granted."
       },
       {
@@ -43,6 +43,11 @@
           "mac"
         ],
         "appliesOnWhy": "PERMANENT: Windows builds natively, so no folder it can read is out of the builder's reach (shared-rules.json → workingFolderReach)."
+      },
+      {
+        "event": "recent working folders cleared",
+        "carries": "how many folders the Open Recent list held",
+        "why": "GitHub #457. File ▸ Open Recent lists the working folders a teacher has opened (openRecent), so the folder they want is one choice away even with no window open. 'Open Recent is empty and I never cleared it' — or 'it forgot my folders' — has no answer without this line; the list is otherwise only ever added to."
       },
       {
         "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a deploy of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause)",
@@ -21868,7 +21873,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only — so a key equivalent shared by the two menus (Shift-Command-O) is never enabled in both at once. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,

@@ -30,11 +30,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// can never capture a window the teacher opens later.
     func applicationDidResignActive(_ notification: Notification) {
         SectionFromNotification.forgetPendingRequest()
+        // The same rule for a folder the File menu asked a new window to
+        // open (#457): a window that never appeared must not leave the
+        // choice behind for one the teacher opens later.
+        WorkspaceModel.folderToOpenInNextNewWindow = nil
+    }
+
+    /// Which outside assistants are installed is asked again whenever the
+    /// teacher comes back to Plantoir — they may have installed one meanwhile
+    /// — and never while the menu bar is drawn (#457).
+    func applicationDidBecomeActive(_ notification: Notification) {
+        OutsideAssistantPresence.shared.refresh()
     }
 
     /// Opens the trail for this launch.
     func applicationDidFinishLaunching(_ notification: Notification) {
         ActivityTrail.noteLaunch()
+        OutsideAssistantPresence.shared.refresh()
         if !WorkspaceModel.isRunningTests {
             // "It broke after the update" needs to know WHEN the update was
             // (#204) — written by the first launch of a new version, however
