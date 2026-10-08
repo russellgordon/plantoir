@@ -2025,10 +2025,11 @@ refusal first, for both assistants). An outside assistant's
 `unpublish_pages`, run the same `--build-only` leg; there the answer says what
 was already done and then the launcher's own build line, lifted as the window
 lifts it, and never "the output is in that section's window"
-(`deployWhileItsSectionDeploys.refusedBuildAnswers`, #471). Windows does this
-since 2026-10-08; the mac still answers those paths with `previewDidNotBuild`
-or "couldn't be built" and has #471 to match. The launcher writes its own
-trail line, under "build declined, course busy elsewhere".
+(`deployWhileItsSectionDeploys.refusedBuildAnswers`, #471). Both apps do this
+since 2026-10-08 — Windows first, the mac the same day
+([10](10-local-ai-assistant.md) → "A rebuild the launcher refused is said as
+the refusal, on the mac too"). The launcher writes its own trail line, under
+"build declined, course busy elsewhere".
 
 **Rejected** (`deployWhileItsSectionDeploys.rejected`): leases naming the
 script's process id (misses Terminal, leaves a gap, touches a shared format);

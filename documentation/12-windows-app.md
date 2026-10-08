@@ -1506,7 +1506,7 @@ What replaces the old container concepts:
       couldn't be built" with no reason, and pasting the raw log back is the
       bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
       prevent; the right answer is a headless variant of `previewDidNotBuild`,
-      which is a wording key, so it is the mac's to add (#471). The same
+      which is a wording key, so it was the mac's to add — and it did, the same day: `previewDidNotBuildForACallerWithNoWindow` and `previewDidNotBuildBecause` are in `assist-wording.json` now, and #481 is Windows' issue to declare them (or `ContractTests` stays red) and then say them here. The same
       key would cover a THIRD gap, pre-existing and also left alone:
       `RebuildPreview`'s ordinary failure still appends `build.Message`
       whole, so an outside assistant's `rebuild_preview` hands back the raw
@@ -1516,7 +1516,7 @@ What replaces the old container concepts:
       question) in those two paths is still read as a failed build — a
       separate gap. Unpublishing single PAGES never rebuilds on this side
       (`Apply` returns before the build when the plan hides), so it cannot
-      meet the refusal at all, and the contract has no case for it.
+      meet the refusal at all. The contract HAS that case since the mac's half landed (the seventh `refusedBuildAnswers` case, added from the mac, which rebuilds after hiding one page): it is red here until #479 decides whether a hide rebuilds, and is held open by name in `NamedGapLedger` against #479 in the meantime, not marked `appliesOn`.
     - **No new trail event (rule 5).** The launcher already writes "build
       declined, course busy elsewhere" for the refusal (`launcherLines`).
   - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
