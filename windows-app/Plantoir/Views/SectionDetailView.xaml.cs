@@ -1888,8 +1888,14 @@ public sealed partial class SectionDetailView : UserControl
             // assistant, relaying it) hears — success, all-destinations,
             // partial, or every-destination-failed — from what actually
             // happened, not from having reached this line.
-            outcomeMessage = MultiDestinationDeployRunner.Result(
-                _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome).Message;
+            // The build first (the mac's deployAndWait): nothing was sent
+            // anywhere, so "did not finish" would name the upload - and a
+            // build refused while the section was still being deployed is
+            // said as itself (#467 / mac #439).
+            outcomeMessage = (MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish(
+                                  _course.Code, _sectionNumber.ToString(), _deployRunner.Legs.FirstOrDefault())
+                              ?? MultiDestinationDeployRunner.Result(
+                                  _course.Code, _sectionNumber.ToString(), destinations.Count, _deployRunner.CurrentOutcome)).Message;
             // Added to what the assistant says, too (#357): it pressed this button.
             if (savedNotice is not null) outcomeMessage += " " + savedNotice;
             EndPublishActivity();

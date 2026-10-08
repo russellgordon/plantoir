@@ -116,6 +116,18 @@ public static class ScheduledPublishOutcome
         /// is the reason, and the sentence says it.
         /// </summary>
         CouldNotRunAsSetNow,
+
+        /// <summary>
+        /// The mac's run found its OWN section's earlier deploy still working
+        /// after thirty minutes and stood down (#439, contract
+        /// scheduledPublishStopped.kinds.earlierDeployStillWorking). READ AND
+        /// SHOWN only: Windows' run survives a re-set (ClearIfStillMine), so
+        /// it has no leftover run to wait for and nothing here ever writes
+        /// this kind (#467). It exists so the two kind lists stay equal and a
+        /// record of it, however it came to be on disk, is shown rather than
+        /// dropped.
+        /// </summary>
+        EarlierDeployStillWorking,
     }
 
     /// <summary>
@@ -220,6 +232,7 @@ public static class ScheduledPublishOutcome
         Kind.TooLateToRun => "too-late-to-run",
         Kind.CourseWasBusy => "course-was-busy",
         Kind.CouldNotRunAsSetNow => "could-not-run-as-set-now",
+        Kind.EarlierDeployStillWorking => "earlier-deploy-still-working",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -233,6 +246,7 @@ public static class ScheduledPublishOutcome
         "too-late-to-run" => Kind.TooLateToRun,
         "course-was-busy" => Kind.CourseWasBusy,
         "could-not-run-as-set-now" => Kind.CouldNotRunAsSetNow,
+        "earlier-deploy-still-working" => Kind.EarlierDeployStillWorking,
         _ => null,
     };
 
@@ -612,6 +626,8 @@ public static class ScheduledPublishOutcome
             "turned off: another program on this computer was still building the course after ten minutes, so it stood down",
         Kind.CouldNotRunAsSetNow =>
             $"turned off: it could not deploy the way the course is set now — {result.Destination}",
+        Kind.EarlierDeployStillWorking =>
+            "turned off: this section's earlier deploy was still working after thirty minutes, so it stood down",
         _ => throw new ArgumentOutOfRangeException(nameof(result)),
     };
 
@@ -671,6 +687,12 @@ public static class ScheduledPublishOutcome
                 $"the course is set now — {result.Destination} — so Plantoir left the site as it was. Deploy it " +
                 "yourself from the section, or schedule another from the section’s menu.",
 
+            Kind.EarlierDeployStillWorking =>
+                $"{courseCode} Section {sectionNumber} was set to deploy on its own, but the deploy that was set " +
+                "before it was still working after thirty minutes of waiting, so Plantoir left the site as that " +
+                "deploy leaves it rather than deploy it twice at once. Deploy it yourself when that has finished, " +
+                "or schedule another from the section’s menu.",
+
             _ => throw new ArgumentOutOfRangeException(nameof(result)),
         };
 
@@ -701,6 +723,7 @@ public static class ScheduledPublishOutcome
         Kind.TooLateToRun => "tooLateToRun",
         Kind.CourseWasBusy => "courseWasBusy",
         Kind.CouldNotRunAsSetNow => "couldNotRunAsSetNow",
+        Kind.EarlierDeployStillWorking => "earlierDeployStillWorking",
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -721,7 +744,7 @@ public static class ScheduledPublishOutcome
             ActivityTrail.Event.ScheduledPublishFinished,
         // A run that stood down leaves the same event a removal does: the
         // teacher's alarm is gone, and the reason is what differs (#239).
-        Kind.TooLateToRun or Kind.CourseWasBusy or Kind.CouldNotRunAsSetNow =>
+        Kind.TooLateToRun or Kind.CourseWasBusy or Kind.CouldNotRunAsSetNow or Kind.EarlierDeployStillWorking =>
             ActivityTrail.Event.ScheduledDeployTurnedOff,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };

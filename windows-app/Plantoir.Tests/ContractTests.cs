@@ -213,6 +213,12 @@ public class ContractTests
         Assert.Equal(wording["pagesAChangeCouldNotFinishNamingSeveral"]!.ToString(),
                      AssistWording.PagesAChangeCouldNotFinishNamingSeveral(new[] { "Unit 1, Day 3", "Unit 1, Day 4" }));
 
+        // #467 (mac #439): a deploy refused while its section was still being deployed.
+        Assert.Equal(wording["deployRefusedWhileALaterDeployWorks"]!.ToString(),
+                     AssistWording.DeployRefusedWhileALaterDeployWorks("{course}", "{section}"));
+        Assert.Equal(wording["deployRefusedWhileItsSectionDeploys"]!.ToString(),
+                     AssistWording.DeployRefusedWhileItsSectionDeploys("{course}", "{section}"));
+
         // ---- The walk: the file is the list.
         var keys = wording.Select(pair => pair.Key).ToList();
         var here = keys.Where(key => WordingMember(key) is not null).ToList();
