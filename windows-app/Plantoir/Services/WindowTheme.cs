@@ -17,7 +17,7 @@ namespace Plantoir.Services;
 /// content into the title bar gets a caption drawn by the system, and the
 /// system draws it LIGHT unless told otherwise — whatever Windows' own colour
 /// mode is. So in dark mode the content went dark under a near-white strip
-/// (2026-10-07, Windows v1.4.3; the 2026-10-04 marketing pictures show it).</para>
+/// (ordered 2026-10-07, ships in Windows v1.4.4; the 2026-10-04 marketing pictures show it).</para>
 ///
 /// <para>How: <see cref="AppWindowTitleBar.PreferredTheme"/> (Windows App SDK
 /// 1.7+), set to Dark or Light from the content's <c>ActualTheme</c> — the
