@@ -66,6 +66,8 @@
     "deployNeedsAnAnswerAt" : "{course} Section {section} was not deployed to {destinations}: it needs one answer there that can only be given from its window in Plantoir. Deploy it once from there; after that it can be deployed from here.",
     "deployQuestion" : "Shall I deploy?",
     "deployRefusedForAReferenceCourse" : "{course} is kept for reference, so it is never deployed. Deploy the course you are teaching instead.",
+    "deployRefusedWhileALaterDeployWorks" : "{course} Section {section} is still being deployed by a deploy that was set for later, so it was not deployed again. Try again once that deploy has finished.",
+    "deployRefusedWhileItsSectionDeploys" : "{course} Section {section} is already being deployed, so it was not deployed again. Try again once that deploy has finished.",
     "deployWasCancelled" : "Deploy cancelled.",
     "deployWentOutTo" : "It did go out to {destinations}.",
     "didNotFollowThat" : "I didn't follow that, so I haven't changed anything. Try saying it again in different words.",
