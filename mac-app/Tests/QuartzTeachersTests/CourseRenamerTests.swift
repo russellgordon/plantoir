@@ -164,20 +164,20 @@ final class CourseRenamerTests: XCTestCase {
             newCode: "ICS4U", stoppedScheduledSections: [1], unstoppedScheduledSections: []
         )
         let notice: CourseRenamer.Notice = try! XCTUnwrap(CourseRenamer.noticeAfterRenaming(one))
-        XCTAssertEqual(notice.title, "Scheduled publishing was turned off")
-        XCTAssertTrue(notice.message.hasPrefix("Section 1 of ICS4U was set to publish on its own."), notice.message)
+        XCTAssertEqual(notice.title, "Deploying on a schedule was turned off")
+        XCTAssertTrue(notice.message.hasPrefix("Section 1 of ICS4U was set to deploy on its own."), notice.message)
 
         let several = CourseRenamer.Outcome(
             newCode: "ICS4U", stoppedScheduledSections: [1, 2, 4], unstoppedScheduledSections: []
         )
         let plural: CourseRenamer.Notice = try! XCTUnwrap(CourseRenamer.noticeAfterRenaming(several))
         XCTAssertTrue(
-            plural.message.hasPrefix("Sections 1, 2 and 4 of ICS4U were set to publish on their own."),
+            plural.message.hasPrefix("Sections 1, 2 and 4 of ICS4U were set to deploy on their own."),
             plural.message
         )
     }
 
-    /// A scheduled publish that could NOT be turned off is a warning rather
+    /// A scheduled deploy that could NOT be turned off is a warning rather
     /// than news, and the title says so — an alert headed "Renamed" would be
     /// true of both cases and useful for neither.
     func testAScheduledPublishThatSurvivesIsHeadedAsAWarning() {
@@ -185,8 +185,8 @@ final class CourseRenamerTests: XCTestCase {
             newCode: "ICS4U", stoppedScheduledSections: [], unstoppedScheduledSections: [2]
         )
         let notice: CourseRenamer.Notice = try! XCTUnwrap(CourseRenamer.noticeAfterRenaming(outcome))
-        XCTAssertEqual(notice.title, "A scheduled publish may still run")
-        XCTAssertTrue(notice.message.contains("may still try to publish under the old name"), notice.message)
+        XCTAssertEqual(notice.title, "A scheduled deploy may still run")
+        XCTAssertTrue(notice.message.contains("may still try to deploy under the old name"), notice.message)
     }
 
     func testSectionsAreListedTheWayEnglishListsThem() {

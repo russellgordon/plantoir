@@ -85,13 +85,13 @@ final class QuitConfirmationTests: XCTestCase {
         let one: String = try XCTUnwrap(QuitConfirmation.workUnderWay(publishes: [
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ADA1O", sectionNumber: 2)
         ], previews: []))
-        XCTAssertEqual(one, "publishing Section 2 of ADA1O")
+        XCTAssertEqual(one, "deploying Section 2 of ADA1O")
 
         let several: String = try XCTUnwrap(QuitConfirmation.workUnderWay(publishes: [
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ADA1O", sectionNumber: 1),
             CourseActivity.PublishRecord(folderPath: "/p", courseCode: "ICS3U", sectionNumber: 1)
         ], previews: []))
-        XCTAssertEqual(several, "publishing 2 sections")
+        XCTAssertEqual(several, "deploying 2 sections")
 
         XCTAssertNil(QuitConfirmation.workUnderWay(publishes: [], previews: []))
 
@@ -165,10 +165,10 @@ final class QuitConfirmationTests: XCTestCase {
     /// Both answers reach the trail, and the line says which was chosen.
     func testBothAnswersAreWrittenDown() {
         let kept: String = QuitConfirmation.trailLine(
-            workUnderWay: "publishing Section 1 of ADA1O", choice: .keepWorking
+            workUnderWay: "deploying Section 1 of ADA1O", choice: .keepWorking
         )
         let went: String = QuitConfirmation.trailLine(
-            workUnderWay: "publishing Section 1 of ADA1O", choice: .quitAnyway
+            workUnderWay: "deploying Section 1 of ADA1O", choice: .quitAnyway
         )
         XCTAssertNotEqual(kept, went)
         XCTAssertTrue(kept.contains("keep working"))
@@ -298,7 +298,7 @@ final class QuitConfirmationTests: XCTestCase {
             )
             XCTAssertFalse(QuitConfirmation.shouldAsk(
                 reason: .theMacIsLoggingOutOrShuttingDown,
-                workUnderWay: "publishing Section 1 of ADA1O"
+                workUnderWay: "deploying Section 1 of ADA1O"
             ))
         }
         XCTAssertEqual(QuitConfirmation.reason(forQuitReasonCode: nil), .theTeacherAskedToQuit)
