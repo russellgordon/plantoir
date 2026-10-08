@@ -2778,6 +2778,38 @@ final class AssistToolRunner {
         return nil
     }
 
+    /// What settler S3 needs to judge a model's add_next_class (#440): how
+    /// this course names its pages, what it calls one, and the page a plain
+    /// "add the next class" would make — read-only, through the same planner
+    /// the tool calls.
+    ///
+    /// nil when the course cannot be found, or when the plain plan cannot be
+    /// made at all — no remembered class dates is the one that matters. S3
+    /// then falls through and the call runs, so the runner asks for the dates
+    /// exactly as it always has (ruling 7 of the #440 plan review): a sentence
+    /// about units is no reason to skip the question the teacher needs first.
+    func nextClassReading(forCourse code: String, section number: Int) -> AssistNextClassReading? {
+        guard let course = course(withCode: code) else {
+            return nil
+        }
+        let naming: ClassPageNaming = course.configuration.classPageNaming
+        do {
+            _ = try NextClassPlanner.plan(forSection: number, in: course)
+        } catch {
+            return nil
+        }
+        let next: UnitDay = NextClassPlanner.nextUnitAndDay(
+            after: ClassPages.list(forSection: number, in: course), naming: naming
+        )
+        return AssistNextClassReading(
+            unitWord: naming.word,
+            isNumbered: naming.isNumbered,
+            noun: course.configuration.classNoun,
+            plainNextUnit: next.unit,
+            plainNextDay: next.day
+        )
+    }
+
     /// The course with this code, or nil when the working folder no longer has
     /// one — a course renamed or archived mid-conversation.
     private func course(withCode code: String) -> Course? {
