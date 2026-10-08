@@ -17,10 +17,13 @@ loop retries on 429 the same way ``scripts/deploy.py`` does — Netlify
 rate-limits uploads, and a burst after a large rebuild can trip it.
 
 Credentials: the token is read from ``NETLIFY_AUTH_TOKEN`` if set, and
-otherwise from the macOS login Keychain item ``containerized-quartz-netlify``
-— the same item the course launchers use, so there is exactly one Netlify
-token on the machine. The site id lives in ``website/site.json`` under
-``netlify_site_id``.
+otherwise from the stored credential named ``containerized-quartz-netlify``:
+the login Keychain item of that name on a Mac, the generic Windows
+Credential Manager credential of that name on Windows (#452, read with
+``CredReadW`` and decoded as UTF-8, which is how ``deploy.ps1`` writes it).
+It is the same one the course launchers use, so there is exactly one Netlify
+token on the machine. The token is never printed. The site id lives in
+``website/site.json`` under ``netlify_site_id``.
 
 plantoir.app is itself a free-tier Netlify project, so it is exposed to the
 same "Powered by Netlify" ad badge as every class site — see
@@ -49,7 +52,10 @@ from pathlib import Path
 WEBSITE = Path(__file__).resolve().parent
 REPO = WEBSITE.parent
 SITE_DIR = REPO / "site"
-KEYCHAIN_SERVICE = "containerized-quartz-netlify"
+# The stored credential's name on both platforms: the Keychain service on a
+# Mac, the generic credential's target on Windows (deploy.ps1 $KEY_TARGET).
+CREDENTIAL_NAME = "containerized-quartz-netlify"
+KEYCHAIN_SERVICE = CREDENTIAL_NAME
 
 # How long verify_live() keeps retrying before giving up — mirrors the
 # 2s-interval pattern deploy() already uses to poll Netlify's own deploy
@@ -77,22 +83,133 @@ def read_site_id() -> str:
     return site_id
 
 
+def _windows_credential_blob(target: str) -> bytes | None:
+    """The bytes of the generic Windows credential `target`, or None.
+
+    CredReadW through ctypes, standard library only, laid out as deploy.ps1's
+    own CREDENTIAL struct. None when there is no such credential, when it is
+    empty, or when advapi32 cannot be reached at all: whatever the reason,
+    the caller falls through to its own "no token" message. The bytes are
+    copied out before CredFree, and never printed.
+    """
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return None
+
+    class CREDENTIALW(ctypes.Structure):
+        _fields_ = [
+            ("Flags", wintypes.DWORD),
+            ("Type", wintypes.DWORD),
+            ("TargetName", wintypes.LPWSTR),
+            ("Comment", wintypes.LPWSTR),
+            ("LastWritten", wintypes.FILETIME),
+            ("CredentialBlobSize", wintypes.DWORD),
+            ("CredentialBlob", ctypes.c_void_p),
+            ("Persist", wintypes.DWORD),
+            ("AttributeCount", wintypes.DWORD),
+            ("Attributes", ctypes.c_void_p),
+            ("TargetAlias", wintypes.LPWSTR),
+            ("UserName", wintypes.LPWSTR),
+        ]
+
+    try:
+        advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+        cred_read = advapi32.CredReadW
+        cred_free = advapi32.CredFree
+    except (OSError, AttributeError):
+        return None
+    cred_read.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                          ctypes.POINTER(ctypes.POINTER(CREDENTIALW))]
+    cred_read.restype = wintypes.BOOL
+    cred_free.argtypes = [ctypes.c_void_p]
+    cred_free.restype = None
+
+    CRED_TYPE_GENERIC = 1
+    pointer = ctypes.POINTER(CREDENTIALW)()
+    if not cred_read(target, CRED_TYPE_GENERIC, 0, ctypes.byref(pointer)):
+        return None   # ERROR_NOT_FOUND (1168) or anything else: no token here
+    try:
+        credential = pointer.contents
+        if not credential.CredentialBlob or credential.CredentialBlobSize == 0:
+            return None
+        return ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
+    finally:
+        cred_free(pointer)
+
+
+def _usable_token(text: str) -> str | None:
+    """`text` stripped, or None when it could not be sent as a header.
+
+    A control character inside a token (a NUL from a credential written as
+    UTF-16, a line break) is refused here rather than by http.client, whose
+    "Invalid header value" error quotes the whole Authorization header — the
+    token with it — into the traceback."""
+    token = text.strip()
+    if not token:
+        return None
+    for character in token:
+        if ord(character) < 32 or ord(character) == 127:
+            return None
+    return token
+
+
+def _token_from_blob(blob: bytes | None) -> str | None:
+    """A stored credential's bytes as a token: UTF-8, as deploy.ps1 writes
+    them (WriteSecret is Encoding.UTF8.GetBytes). None for no blob, for bytes
+    that are not UTF-8, and for UTF-16 — which decodes as valid UTF-8 with a
+    NUL after every letter, and is caught by _usable_token."""
+    if not blob:
+        return None
+    try:
+        text = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return _usable_token(text)
+
+
 def read_token() -> str:
-    token = os.environ.get("NETLIFY_AUTH_TOKEN", "").strip()
-    if token:
-        return token
+    environment_token = os.environ.get("NETLIFY_AUTH_TOKEN", "")
+    if environment_token.strip():
+        token = _usable_token(environment_token)
+        if token:
+            return token
+        raise SystemExit("NETLIFY_AUTH_TOKEN is set but holds a character a token cannot "
+                         "(a line break or a control character). Set it again.")
     if sys.platform == "darwin":
         result = subprocess.run(
             ["/usr/bin/security", "find-generic-password",
-             "-s", KEYCHAIN_SERVICE, "-a", os.environ.get("USER", ""), "-w"],
+             "-s", CREDENTIAL_NAME, "-a", os.environ.get("USER", ""), "-w"],
             capture_output=True, text=True,
         )
         token = result.stdout.strip()
         if token:
             return token
+        raise SystemExit(
+            "No Netlify token found. Set NETLIFY_AUTH_TOKEN, or store one in the "
+            f"login Keychain under the service name '{CREDENTIAL_NAME}'."
+        )
+    if sys.platform == "win32":
+        blob = _windows_credential_blob(CREDENTIAL_NAME)
+        token = _token_from_blob(blob)
+        if token:
+            return token
+        if blob:
+            raise SystemExit(
+                f"The Windows credential '{CREDENTIAL_NAME}' is there, but it is not a token "
+                "written as UTF-8 text, the way the course launchers write it. Store it again "
+                "(a course launcher's deploy with --reset-token asks for it afresh), or set "
+                "NETLIFY_AUTH_TOKEN."
+            )
+        raise SystemExit(
+            "No Netlify token found. Set NETLIFY_AUTH_TOKEN, or store one in Windows "
+            f"Credential Manager as the generic credential '{CREDENTIAL_NAME}' (the one "
+            "the course launchers use)."
+        )
     raise SystemExit(
-        "No Netlify token found. Set NETLIFY_AUTH_TOKEN, or store one in the "
-        f"login Keychain under the service name '{KEYCHAIN_SERVICE}'."
+        "No Netlify token found. Set NETLIFY_AUTH_TOKEN (or, on a Mac, the login Keychain "
+        f"item '{CREDENTIAL_NAME}'; on Windows, the Credential Manager credential of that name)."
     )
 
 
