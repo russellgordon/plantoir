@@ -1,13 +1,12 @@
 """Lint an example-content payload before shipping it.
 
 Usage:  python3 .claude/skills/example-content/lint_payload.py ADA1O
-        python3 .claude/skills/example-content/lint_payload.py --example-course
 
 Checks every rule the installer and the site build depend on. Exit code 0
 means clean; 1 means problems were printed; 2 means the linter's own
-self-check failed. `--example-course` reads the Example Course
-(`support/example_course/`, EXC2O), which is not a payload and has no
-manifest, for the one rule that applies to it: the heading marks below.
+self-check failed. The Example Course (`support/example_course/`, EXC2O) is
+not a payload and has no manifest; `lint_skeletons.py`, run with no family
+named, reads it for the heading-mark rule below.
 """
 
 import json
@@ -117,20 +116,6 @@ def heading_mark_problem(rel: str, text: str) -> list:
         )
     return problems
 
-
-def lint_example_course() -> int:
-    """The heading-mark rule over the Example Course, which is not a payload."""
-    root = REPO_ROOT / "support" / "example_course"
-    pages = sorted(root.rglob("*.md"))
-    problems = []
-    for page in pages:
-        rel = str(page.relative_to(root))
-        problems.extend(heading_mark_problem(rel, page.read_text(encoding="utf-8")))
-    print(f"{len(pages)} Example Course pages checked")
-    for problem in problems:
-        print(f"PROBLEM  {problem}")
-    print("clean" if not problems else f"{len(problems)} problem(s)")
-    return 1 if problems else 0
 
 # An Ontario credit is 110 hours of scheduled time. A semestered day school
 # runs 75-minute periods, so a full credit is about 86 periods plus a
@@ -787,6 +772,4 @@ if __name__ == "__main__":
         for line in broken:
             print(f"   {line}")
         sys.exit(2)
-    if sys.argv[1] == "--example-course":
-        sys.exit(lint_example_course())
     sys.exit(lint(sys.argv[1]))
