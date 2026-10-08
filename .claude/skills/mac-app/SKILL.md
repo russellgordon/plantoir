@@ -392,9 +392,9 @@ So a macOS change is not finished until BOTH of these are true:
    this as a "Notes for Windows port" column until it closed to new entries on
    2026-10-08, #480 — do not add a row.)
 2. **Anything architectural also gets a section in the `documentation/` page
-   that owns its subject.** A
-   log row records a decision; the deep dive explains it well enough to
-   implement. Rule of thumb: if you needed more than a sentence of reasoning
+   that owns its subject.** The
+   closing comment records a decision; the deep dive explains it well enough
+   to implement. Rule of thumb: if you needed more than a sentence of reasoning
    to get it right, they will too.
 
 **Corrections count as improvements.** When a change makes existing Windows
