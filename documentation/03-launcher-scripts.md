@@ -2032,6 +2032,17 @@ that section until it ends, and nothing in the app ends it — logging out or
 restarting the Mac does; and a scheduled run does not wait for a deploy typed
 in Terminal (its legs are refused and it is recorded as stopped).
 
+**Windows (#467).** The same guard is in `deploy.ps1` and in `preview.ps1`'s
+build leg, asked at the same points and printing the same lines, from
+`Win32_Process`. All 23 `launcherCases` run there (`test_launcher_rules.ps1`
+section 5). The four cases once marked `appliesOn: ["mac"]` hold on Windows as
+written. Windows' run has the mac's split as well: Task Scheduler starts
+`Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
+course and THEN runs its wrapper as `powershell.exe -File`. And a task set
+since #309 carries its folder's id. Its own limit (a deploy run inside another
+process is not seen) and what was rejected are in the Windows section of this
+page, under "A section still being deployed is not deployed again".
+
 #### Before building, preview.sh makes sure this Mac can reach the builder (#234)
 
 Between finding the address and announcing it, `preview.sh`
@@ -2360,19 +2371,98 @@ and what was measured.
   40 loopback listeners held, exit 1 in 2.0 s.
 - **A section being deployed.** On a serving run, after the arguments are
   checked and before anything changes, `Test-SectionIsBeingDeployed` reads
-  `Win32_Process` once. A deploy is `deploy.ps1` as the PROGRAM (the path after
-  `-File`), its own arguments beginning with the course read whole, then exactly
-  this section, not `--reset-token`/`--logout`/`--help`, in this folder when its
-  path names one (a relative path names none and still counts); or the Task
-  Scheduler wrapper named `SafeName(TaskScheduling.NameFor(C, S)) + ".ps1"` —
-  built the app's way, so `labelCodeCases` (the mac's launchd label) are not run
-  here (#401's note). A task name carries no folder, so a scheduled deploy of
-  the same course and section in ANOTHER folder also refuses (the mac's pre-#237
-  limit; the launcherCase for it is skipped by name). A table that cannot be
-  read, or that does not list `$PID`, lets the preview through. The cross is
-  `[char]::ConvertFromUtf32(0x274C)`: the file has no BOM, so no non-ASCII may
-  appear in its strings. The launcherCases are TRANSLATED row by row into the
-  Windows shape of the same evidence by `windows-app/test_launcher_rules.ps1`.
+  `Win32_Process` once (`Get-ProcessTable`, at most 30 s). A deploy is
+  `deploy.ps1` as the PROGRAM, its own arguments beginning with the course read
+  whole, then exactly this section, not `--reset-token`/`--logout`/`--help`, in
+  this folder when its path names one (a relative path names none and still
+  counts); or a deploy set for later of C/S in this folder: its WRAPPER running
+  as the program, or — for a preview only, as the mac's #381 counts its runner
+  line — `Plantoir.exe --run-scheduled-deploy "<task name>"` still waiting for
+  the course. A table that cannot be read, or that does not list `$PID`, lets
+  the preview through. The cross is `[char]::ConvertFromUtf32(0x274C)`: the
+  file has no BOM, so no non-ASCII may appear in its strings. The launcherCases
+  are TRANSLATED row by row into the Windows shape of the same evidence by
+  `windows-app/test_launcher_rules.ps1`. Since #467 the reader is the shared
+  block in the next bullet, and two bugs it had from #386's first day are
+  fixed there:
+  - **The wrapper's name had no folder id.** #386 built
+    `SafeName("Plantoir deploy <CODE> section <N>") + ".ps1"`, the name before
+    #309 — which landed the same day on a parallel branch and added the
+    folder's id to every task (`TaskScheduling.NameFor`). So no wrapper set
+    since then ever matched, and the "deploy set for later" half of this guard
+    never refused anything. The runner did not notice because it built its
+    expected name with the launcher's own function.
+    `Get-ScheduledDeployTaskNames` now gives both names: this folder's
+    (`NameFor`), and the folder-less one a task set before #309 still runs
+    (`OldNameFor`), which names no folder and so counts in every folder.
+    `LauncherRulesContractTests.TheWrapperNamesAndTheFolderIdAreTheAppsOwn`
+    compares them, and the launcher's own `$WORKDIR_ID`, with the APP's
+    functions, so no third copy of either is kept in a test.
+  - **A course with a space was never matched.** The app, `plantoir-mcp` and
+    the wrapper all QUOTE "AP CALC" as one argument, and #386 compared words,
+    so `"AP CALC" 2` read as one word and never matched. The runner pasted
+    the mac's unquoted `ps` text and so passed. Each argument is now split into
+    words before comparing, and the runner quotes a course the app's way.
+- **A section still being deployed is not deployed again (#467 / mac #439).**
+  `Stop-WhileThisSectionDeploys`, between the `DEPLOY WHILE ITS SECTION DEPLOYS
+  BLOCK` markers. The block is byte-identical in `deploy.ps1` and
+  `preview.ps1`, and #386's reader moved into it rather than being copied.
+  `LauncherRulesContractTests.TheDeployGuardBlockIsTheSameInBothLaunchers`
+  keeps the copies equal, and `test_launcher_rules.ps1` section 5 runs all 23
+  `launcherCases` against EACH copy.
+  - **Where it asks.** `deploy.ps1` asks on every run that deploys (not
+    `--reset-token`/`--logout`), after the Open-code question and the
+    reference-course refusal, which is where deploy.sh asks. `preview.ps1`
+    asks on `--build-only` that is not `--stop`. Both ask before anything
+    changes, and both exit 1.
+  - **What counts.** `Get-WhatIsDeployingThisSection` answers `later`,
+    `another` or nothing, and `later` wins.
+    - `later` is a wrapper of C/S in this folder (either name above) running
+      as the program. The app's `Plantoir.exe --run-scheduled-deploy` line
+      alone does NOT count: that run waits up to ten minutes for the course
+      before it writes and starts its wrapper, possibly for the very window
+      whose deploy would be refused.
+    - `another` is `deploy.ps1 C S` as the program, in this folder.
+    - This run and its ancestors never count. That covers the wrapper's
+      in-process legs (`$PID` is the wrapper), its `Start-Process` build and
+      Cloudflare legs (the wrapper is their parent), and a folder deploy's own
+      rebuild.
+  - **Which processes are "the program".** The word after `-File`, or after
+    `-f`/`-fi`/`-fil` (Windows PowerShell takes any of them). For
+    `powershell.exe` and `pwsh` themselves, also the first `*.ps1` handed over
+    as a plain word. Nothing after `-Command`/`-EncodedCommand` counts. With
+    those rules, all four cases once marked `appliesOn: ["mac"]` hold on
+    Windows as written, and the marks are gone.
+  - **Words.** The sentences and trail lines are written as format strings
+    whose slots are the cross, `·` and `—` code points. The runner compares
+    them, word for word, with `sentences.launcher` and `launcherLines`.
+  - **Known limits.**
+    - A deploy run INSIDE another process is invisible: `.\deploy.ps1 ICS4U 2`
+      typed at an open PowerShell prompt, or `-Command "& …\deploy.ps1 …"`.
+      The table shows only the host's own line, which names no script.
+      Measured in the drive (2026-10-08): a deploy of ICS40 2 held under
+      `-Command`, and a second `-File deploy.ps1 ICS40 2` went past the guard.
+    - A process started ELEVATED shows an ordinary process a null
+      `CommandLine`, so the guard cannot see it either: the Windows form of
+      the contract's "another account's process is not seen". The scheduled
+      wrapper runs `LeastPrivilege`, so it is unaffected.
+    - What the app, `plantoir-mcp`, the wrapper and the `.bat` files start is
+      always `-File "<absolute path>"`, so every deploy a teacher can start
+      from Plantoir is seen.
+  - **Rejected.**
+    - A per-section named mutex held by `deploy.ps1`. A script typed at a
+      prompt that ends without releasing it leaves it owned by that prompt
+      until the window closes, which blocks the section until a restart: the
+      failure the contract rejects.
+    - `deploy.ps1` relaunching itself as a `-File` child when its own line
+      does not name it (plan review M4). It doubles every launcher start. It
+      risks a relaunch loop if the self-detection misfires. It changes the
+      shape of the wrapper's in-process legs and of stdin/`Read-Host`. And
+      typing at a prompt is a developer's path, not a teacher's.
+    - A dot-sourced module for the shared block: the app mirrors NAMED
+      launchers into each working folder, so a module is a mirror-list change,
+      a packaging change, and a launcher that breaks when typed in a folder
+      missing it.
 - **Whose listeners the walk sees (#319), measured on Windows 11 25H2 build
   26200:** `Get-NetTCPConnection` lists every owner's listeners — svchost as
   NETWORK SERVICE on 135 (0.0.0.0 and ::), System on 445 — and a wildcard bind
