@@ -1,0 +1,151 @@
+#440 (Windows half) - add_next_class's `unit` and `days` leave the local model's view
+RESULTS, against next-class-unit-440-windows-preregistration.txt (committed
+1e34dfd5a at 00:16:44 EDT, before the first request at 00:18:30).
+
+Run 2026-10-08 00:18-03:50 EDT on the conditions registered: Intel Core
+i5-8365U (4C/8T), 16 GB, Intel UHD 620, Windows 11 Pro 26200; llama-server
+b10435 (Vulkan) from windows-app\Vendor\llama, the SMALLER assistant
+(qwen2.5-1.5b-instruct q4_k_m), --ctx-size 8192 --threads 4 --reasoning off
+--reasoning-budget 0 --jinja --parallel 1 --n-gpu-layers 999; one server for
+all six runs, stopped after (no llama-server left running). Generation median
+7.0 tokens/s over the run. The arms were INTERLEAVED suite by suite (before
+S1, after S1, before S2, ...) so they shared the machine's load.
+DEVIATIONS: a sibling worktree's `dotnet test` and this session's own builds
+and targeted test runs used CPU during before-S1 and after-S1; they affect
+wall times only, not greedy choices, and no S1 turn ended on 'length'. The
+SERVER surface was dumped once from this branch's plantoir-mcp (42 tools) and
+narrowed twice: BEFORE with origin/dev's narrow-tools.py (add_next_class:
+course, section, unit, days; 9608 chars), AFTER with this branch's (course,
+section; 9315 chars, ~81 tokens shorter). Sanity check passed before any
+request.
+
+THE LARGER ASSISTANT WAS NOT MEASURED: its weights are not on this PC, and
+CardOnlyArguments is tier-blind, so the larger tier ships this change
+unmeasured on Windows.
+
+RESULTS (10 greedy trials per probe)
+  S1 trimmed-surface, EXC2O   BEFORE 260/290, AFTER 250/290. One probe
+       differs: "card: undo" ("Undo that") 10 -> 0, declined. It is a
+       sentence the app answers IN CODE (a fixed phrasing; the suite lists
+       it among the 8 of 29 probes intercepted before the model), so no
+       teacher's "Undo that" ever reaches the model. The same probe flipped
+       10 -> 0 between bundle 10's MIDDLE and #424's run on an UNCHANGED
+       surface (schedule-and-settler-424-results.txt). Polarity inversions 0
+       in both arms; 'length' 0.
+  S2 teachers-say, EXC2O      BEFORE 210/250 (TEST 90/100, CONTROL 120/150),
+       AFTER 230/250 (TEST 100/100, CONTROL 130/150). No probe drops. Two
+       rise: "next: next day's lesson" 0 -> 10 (BEFORE: 10 replies cut off at
+       the 30 s writing limit; AFTER: add_next_class with course and section,
+       12-16 s), and "ctl decline: delete" 0 -> 10.
+  S3 trimmed-surface, ICS3U   BEFORE 220/290, AFTER 239/290. No probe drops.
+       Two rise: "card: publish by name" 0 -> 10 and "HIDE - the inversion
+       case" 0 -> 9 (BEFORE declined 10 of 10; AFTER unpublish_pages 9,
+       declined 1). Polarity inversions 0 in both arms; 'length' 0.
+
+add_next_class's ARGUMENTS IN FULL (S2)
+  BEFORE: 50 calls, every one {"course": "EXC2O", "section": 1, "unit":
+          "next", "days": 0} - unit "next" 50/50, as #424 found.
+  AFTER:  60 calls (the 50 plus "next day's lesson"), every one {"course":
+          "EXC2O", "section": 1} - no unit or days key sent at all, so the
+          model never emitted an argument it was not shown.
+
+AGAINST THE PASS RULE
+  (a) unit "next" 50/50 -> 0/50 (0/60 counting the new probe): HOLDS
+      (near-automatic, as registered).
+  (b) VETO, zero polarity inversions in every suite of both arms: HOLDS.
+  (c) no probe drops AFTER against BEFORE: FAILS on ONE probe, S1 "card:
+      undo" 10 -> 0 (declined). Reported as it is, per the pre-registration,
+      for Russell on #440. What it costs a teacher: nothing the app can show,
+      since "Undo that" is answered in code and never sent; it would matter
+      only for an undo sentence the matcher does not take, and S1's and S3's
+      "undo" probe ("Undo the last change", routed) stayed 10/10 in both arms,
+      as did S2's "ctl undo_last_change". Against it: four probes ROSE by 9
+      or 10 each, one of them the inversion case on ICS3U.
+
+PER PROBE (BEFORE -> AFTER)
+===== S1
+  card: publish by name          10/10 -> 10/10
+  card: publish tomorrow         10/10 -> 10/10
+  card: unpublish by name        10/10 -> 10/10
+  card: unpublish, mistake       10/10 -> 10/10
+  card: plan a publish           10/10 -> 10/10
+  card: check the section        10/10 -> 10/10
+  card: rebuild preview          10/10 -> 10/10
+  card: undo                     10/10 ->  0/10  DROP
+  card: deploy now               10/10 -> 10/10
+  card: schedule a deploy        10/10 -> 10/10
+  card: cancel the deploy        10/10 -> 10/10
+  publish tomorrow, with links   10/10 -> 10/10
+  publish by name, informal       0/10 ->  0/10
+  HIDE - the inversion case      10/10 -> 10/10
+  hide, informal (verbatim cue)  10/10 -> 10/10
+  hide, phrased as a mistake     10/10 -> 10/10
+  list pages                     10/10 -> 10/10
+  read                           10/10 -> 10/10
+  check section                  10/10 -> 10/10
+  rebuild preview                10/10 -> 10/10
+  undo                           10/10 -> 10/10
+  schedule a deploy              10/10 -> 10/10
+  deploy now                      0/10 ->  0/10
+  cancel scheduled deploy        10/10 -> 10/10
+  no course named: publish       10/10 -> 10/10
+  no course named: hide          10/10 -> 10/10
+  deletion - no such tool         0/10 ->  0/10
+  out of scope                   10/10 -> 10/10
+  typos                          10/10 -> 10/10
+===== S2
+  next: an entry                 10/10 -> 10/10
+  next: tomorrow's page          10/10 -> 10/10
+  next: start                    10/10 -> 10/10
+  next: add                      10/10 -> 10/10
+  next: make a page              10/10 -> 10/10
+  next: next day's lesson         0/10 -> 10/10  up
+  dates: when meet               10/10 -> 10/10
+  dates: what dates              10/10 -> 10/10
+  dates: know timetable          10/10 -> 10/10
+  dates: days left               10/10 -> 10/10
+  ctl list_pages                 10/10 -> 10/10
+  ctl read_page                  10/10 -> 10/10
+  ctl check_section              10/10 -> 10/10
+  ctl publish_class_on           10/10 -> 10/10
+  ctl publish_pages              10/10 -> 10/10
+  ctl unpublish_pages            10/10 -> 10/10
+  ctl rebuild_preview            10/10 -> 10/10
+  ctl undo_last_change           10/10 -> 10/10
+  ctl deploy_section              0/10 ->  0/10
+  ctl schedule_deploy            10/10 -> 10/10
+  ctl cancel_scheduled            0/10 ->  0/10
+  ctl residue: not undo          10/10 -> 10/10
+  ctl decline: delete             0/10 -> 10/10  up
+  ctl decline: weather           10/10 -> 10/10
+  ctl vague                      10/10 -> 10/10
+===== S3
+  card: publish by name           0/10 -> 10/10  up
+  card: publish tomorrow         10/10 -> 10/10
+  card: unpublish by name        10/10 -> 10/10
+  card: unpublish, mistake       10/10 -> 10/10
+  card: plan a publish           10/10 -> 10/10
+  card: check the section        10/10 -> 10/10
+  card: rebuild preview          10/10 -> 10/10
+  card: undo                      0/10 ->  0/10
+  card: deploy now               10/10 -> 10/10
+  card: schedule a deploy        10/10 -> 10/10
+  card: cancel the deploy        10/10 -> 10/10
+  publish tomorrow, with links   10/10 -> 10/10
+  publish by name, informal       0/10 ->  0/10
+  HIDE - the inversion case       0/10 ->  9/10  up
+  hide, informal (verbatim cue)  10/10 -> 10/10
+  hide, phrased as a mistake     10/10 -> 10/10
+  list pages                     10/10 -> 10/10
+  read                           10/10 -> 10/10
+  check section                  10/10 -> 10/10
+  rebuild preview                10/10 -> 10/10
+  undo                           10/10 -> 10/10
+  schedule a deploy               0/10 ->  0/10
+  deploy now                      0/10 ->  0/10
+  cancel scheduled deploy        10/10 -> 10/10
+  no course named: publish       10/10 -> 10/10
+  no course named: hide          10/10 -> 10/10
+  deletion - no such tool         0/10 ->  0/10
+  out of scope                   10/10 -> 10/10
+  typos                          10/10 -> 10/10
