@@ -12047,7 +12047,7 @@
         "the Course Settings FORM itself - a reference course's row opens a short read-only summary instead (the real code and name, its school year with the Set School Year... action beside it, its sections, and the two sentences). The form asked a never-deployed course to choose a deploy folder, greyed Save for ever with no explanation, and let every OTHER setting be saved - including the deploying settings whose emptiness is what makes an older Plantoir refuse the course",
         "Course Settings' writes: the folder and unit-word renames, and Restore Section N...",
         "the Site Health REPAIR button. The findings may still be reported; the button may not be drawn, because a repair returns no attempts on a frozen course and the zero-attempt branch reads as 'That is already put right. Nothing needed changing.' - about a folder that is really missing",
-        "Rename from EVERY route, not just the context menu: the Edit menu item and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
+        "Rename from EVERY route, not just the context menu: the Edit menu item (Course ▸ Rename… since v1.5.0, #457) and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
         "Site Health repairs, which CREATE files inside the course - and would succeed, because the folders are deliberately left unlocked so the preview can work",
         "Revise with Claude... and Revise with Codex...",
         "Revise with Local AI Assistant...",

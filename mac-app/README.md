@@ -38,7 +38,11 @@ Mac until 2026-09-19 — the conditions, the measurements and what was
 rejected are in
 [`documentation/09-mac-app.md`](../documentation/09-mac-app.md) →
 "Quitting: what it frees, what it refuses to free, and why".
-Additional actions: Add Section (course context menu), Open in Obsidian
+Every action on a course or a section is in the menu bar's Course and
+Section menus (#457) as well as in the sidebar's context menus and the
+windows' buttons; File works with no window open (Open Working Folder…,
+Open Recent) — `documentation/09-mac-app.md` → "Mac conventions".
+Additional actions: Add Section (Course menu and context menu), Open in Obsidian
 (vault registration included), an Archived sidebar group with restore,
 per-section settings for grade-in-title (with a repetition warning) and a
 custom domain, and a custom About panel with the Icon Composer app icon.
