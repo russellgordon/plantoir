@@ -19,6 +19,7 @@ import unittest
 from pathlib import Path
 
 import deploy
+import netlify_badge
 
 
 def _digest(body: str) -> str:
@@ -136,6 +137,113 @@ class WriteHeadersFileTests(unittest.TestCase):
             second = (public_dir / "_headers").read_text(encoding="utf-8")
 
             self.assertEqual(first, second)
+
+
+class TheBlockIsReplacedNotAppendedTests(unittest.TestCase):
+    """#462: plantoir.app's site/ is never cleaned, so _headers survives from
+    one deploy to the next. The block this writes is marked and replaced; a
+    second one beside it would keep an old script's hash in force, and two
+    `/*` policies are both enforced, so a changed inline script would be
+    blocked the day it changed."""
+
+    OLD_BLOCK = "/*\n  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-OLD=';\n"
+
+    def write(self, public_dir: Path) -> str:
+        deploy.write_netlify_headers_file(public_dir)
+        return (public_dir / "_headers").read_text(encoding="utf-8")
+
+    def test_two_deploys_with_different_scripts_leave_one_block_with_only_the_second_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const a = 1;</script>", encoding="utf-8")
+            self.write(public_dir)
+            (public_dir / "index.html").write_text("<script>const b = 2;</script>", encoding="utf-8")
+            text = self.write(public_dir)
+
+            self.assertEqual(text.count("Content-Security-Policy"), 1)
+            self.assertEqual(text.count("/*"), 1)
+            self.assertIn(_digest("const b = 2;"), text)
+            self.assertNotIn(_digest("const a = 1;"), text)
+
+    def test_a_second_deploy_of_the_same_site_changes_no_byte(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const a = 1;</script>", encoding="utf-8")
+            (public_dir / "_headers").write_text("/*\n  X-Robots-Tag: noindex\n", encoding="utf-8")
+            deploy.write_netlify_headers_file(public_dir)
+            first = (public_dir / "_headers").read_bytes()
+            deploy.write_netlify_headers_file(public_dir)
+            self.assertEqual((public_dir / "_headers").read_bytes(), first)
+
+    def test_it_is_written_with_lf_line_endings_on_every_machine(self):
+        # Path.write_text on Windows writes CR LF; a deploy of the same site
+        # from the PC and from the Mac must give the same bytes.
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>1;</script>", encoding="utf-8")
+            (public_dir / "_headers").write_bytes(b"/*\r\n  X-Robots-Tag: noindex\r\n")
+            deploy.write_netlify_headers_file(public_dir)
+            self.assertNotIn(b"\r", (public_dir / "_headers").read_bytes())
+
+    def test_the_old_appended_blocks_are_cleaned_up(self):
+        # What plantoir.app's site/_headers held after three deploys, with a
+        # block of somebody's own above them.
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const a = 1;</script>", encoding="utf-8")
+            (public_dir / "_headers").write_text(
+                "/*\n  X-Robots-Tag: noindex\n" + self.OLD_BLOCK + self.OLD_BLOCK + "\n" + self.OLD_BLOCK,
+                encoding="utf-8")
+            text = self.write(public_dir)
+
+            self.assertEqual(text.count("Content-Security-Policy"), 1)
+            self.assertEqual(text.count(netlify_badge.MANAGED_MARKER), 1)
+            self.assertNotIn("sha256-OLD=", text)
+            self.assertTrue(text.startswith("/*\n  X-Robots-Tag: noindex\n"))
+            self.assertLess(text.index("X-Robots-Tag"), text.index(netlify_badge.MANAGED_MARKER))
+
+    def test_a_users_own_csp_block_with_other_headers_is_kept(self):
+        theirs = "/*\n  Content-Security-Policy: default-src 'self'\n  X-Frame-Options: DENY\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+            (public_dir / "_headers").write_text(theirs, encoding="utf-8")
+            text = self.write(public_dir)
+            self.assertTrue(text.startswith(theirs))
+            self.assertEqual(text.count("Content-Security-Policy"), 2)
+
+    def test_a_block_shaped_like_ours_but_with_more_headers_is_kept(self):
+        # Our policy line with somebody's header under it is THEIR block.
+        theirs = self.OLD_BLOCK + "  X-Frame-Options: DENY\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+            (public_dir / "_headers").write_text(theirs, encoding="utf-8")
+            text = self.write(public_dir)
+            self.assertTrue(text.startswith(theirs))
+
+    def test_user_lines_after_our_block_survive_the_next_deploy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const a = 1;</script>", encoding="utf-8")
+            self.write(public_dir)
+            with open(public_dir / "_headers", "a", encoding="utf-8") as handle:
+                handle.write("\n/fonts/*\n  Cache-Control: public, max-age=31536000\n")
+            text = self.write(public_dir)
+            self.assertIn("/fonts/*\n  Cache-Control: public, max-age=31536000", text)
+            self.assertEqual(text.count("Content-Security-Policy"), 1)
+
+    def test_a_marker_somebody_edited_round_takes_only_the_marker(self):
+        # The `/*` under our marker was replaced by hand with a block of
+        # their own: only the marker line is ours to remove.
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+            (public_dir / "_headers").write_text(
+                netlify_badge.MANAGED_MARKER + "\n/about/*\n  X-Frame-Options: DENY\n", encoding="utf-8")
+            text = self.write(public_dir)
+            self.assertTrue(text.startswith("/about/*\n  X-Frame-Options: DENY\n"))
+            self.assertEqual(text.count(netlify_badge.MANAGED_MARKER), 1)
 
 
 class CloudflareIsNeverTouchedTests(unittest.TestCase):

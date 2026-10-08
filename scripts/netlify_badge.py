@@ -88,14 +88,79 @@ def _collect_inline_script_policy(public_dir: Path) -> tuple[list[str], list[str
     return sorted(f"'sha256-{h}'" for h in hashes), sorted(hosts)
 
 
+# The comment line above the block this module writes. Netlify's _headers
+# reads a line starting with # as a comment, so the marker changes nothing a
+# browser is sent; it is how the NEXT deploy finds this block and replaces it
+# rather than appending a second one beside it (#462).
+MANAGED_MARKER = (
+    "# Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; "
+    "edit the lines outside this block, not these."
+)
+_OUR_POLICY_PREFIX = "  Content-Security-Policy: script-src 'self' 'unsafe-eval'"
+
+
+def _is_our_policy_pair(lines: list[str], index: int) -> bool:
+    """True when lines[index:index+2] are `/*` and the policy line we write."""
+    return (
+        index + 1 < len(lines)
+        and lines[index].rstrip() == "/*"
+        and lines[index + 1].startswith(_OUR_POLICY_PREFIX)
+    )
+
+
+def _without_our_blocks(text: str) -> str:
+    """`text` with every block this module wrote taken out, the rest kept.
+
+    Two shapes are ours. A MARKED block: the marker line, then `/*` and our
+    policy line (if somebody edited round it, only the marker goes and the
+    lines under it are kept as theirs). And an OLD unmarked block, appended
+    before the marker existed: a `/*` line, our policy line, and nothing
+    else indented under it. A `/*` block with any other header in it is
+    somebody's own and is kept whole. Blank-line runs are collapsed and the
+    end is trimmed, so the result depends only on the lines that are kept.
+    """
+    lines = text.splitlines()
+    kept: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.rstrip() == MANAGED_MARKER:
+            index += 1
+            if _is_our_policy_pair(lines, index):
+                index += 2
+            continue
+        if _is_our_policy_pair(lines, index):
+            after = index + 2
+            if after >= len(lines) or not lines[after].startswith((" ", "\t")):
+                index = after
+                continue
+        kept.append(line)
+        index += 1
+
+    collapsed: list[str] = []
+    for line in kept:
+        if not line.strip() and (not collapsed or not collapsed[-1].strip()):
+            continue
+        collapsed.append(line.rstrip() if not line.strip() else line)
+    return "\n".join(collapsed).rstrip()
+
+
 def write_netlify_headers_file(public_dir: Path) -> int:
     """
-    Write (or extend) public/_headers with a Content-Security-Policy that
-    covers only script-src — never default-src — so nothing else about a
-    page (images, fonts, styles, network requests) is restricted; this only
-    ever narrows which inline JavaScript is allowed to run, which is exactly
-    what suppresses Netlify's own badge script without touching anything a
+    Write public/_headers with a Content-Security-Policy that covers only
+    script-src — never default-src — so nothing else about a page (images,
+    fonts, styles, network requests) is restricted; this only ever narrows
+    which inline JavaScript is allowed to run, which is exactly what
+    suppresses Netlify's own badge script without touching anything a
     student would notice.
+
+    Lines somebody else put in an existing _headers are kept. The block this
+    function writes is MARKED and REPLACED on every call, never appended
+    again (#462): two `/*` policies would both be enforced, so an old block
+    still holding an old script's hash would block that script the day it
+    changed. Old unmarked blocks from before the marker are recognised by
+    their exact shape and replaced too. Written with LF line endings, so the
+    same site gives the same bytes from a Mac and from Windows.
 
     Called on the Netlify path only, right before the delta-deploy manifest
     is built, so _headers rides along in the same SHA-1 manifest as every
@@ -104,18 +169,18 @@ def write_netlify_headers_file(public_dir: Path) -> int:
     """
     hash_sources, host_sources = _collect_inline_script_policy(public_dir)
     policy = "script-src 'self' 'unsafe-eval' " + " ".join(hash_sources + host_sources) + ";"
-    block = f"/*\n  Content-Security-Policy: {policy}\n"
+    block = f"{MANAGED_MARKER}\n/*\n  Content-Security-Policy: {policy}\n"
 
     headers_path = public_dir / "_headers"
     try:
         existing = headers_path.read_text(encoding="utf-8") if headers_path.exists() else ""
-        if existing.strip():
-            headers_path.write_text(existing.rstrip("\n") + "\n" + block, encoding="utf-8")
-        else:
-            headers_path.write_text(block, encoding="utf-8")
+        kept = _without_our_blocks(existing)
+        text = f"{kept}\n\n{block}" if kept else block
+        with open(headers_path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
     except OSError as e:
-        # Never fail a deploy over this — the badge is cosmetic, the class
-        # site (or the marketing site) publishing is not.
+        # Never fail a deploy over this — the badge is cosmetic, deploying
+        # the class site (or plantoir.app) is not.
         print(f"⚠️ Could not write _headers file (badge may still appear): {e}")
         return 0
 
