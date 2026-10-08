@@ -499,9 +499,34 @@ nonisolated enum AssistWording {
              + "here. Build it once from its window in Plantoir, where the question can be answered."
     }
 
+    /// Kept for the contract and for Windows, which still says it in one
+    /// place: nothing on the mac says it since #471 — the two keys below
+    /// replaced it on the only path that said it, which has no window.
+    /// Deleting it would shrink `assist-wording.json` and redden Windows'
+    /// `ContractTests`.
     static func previewDidNotBuild(course: String, section: String) -> String {
         return "The preview for \(course) Section \(section) did not finish building. "
              + AssistWording.whereTheOutputIs
+    }
+
+    /// `previewDidNotBuild` for a caller with NO window (#471): an outside
+    /// assistant over MCP, or the in-app assistant with no section window
+    /// open. `whereTheOutputIs` points at a window that nothing on this path
+    /// has, so it is not said; the window is where the teacher can go to see
+    /// why. Said when nothing in the output was recognised.
+    static func previewDidNotBuildForACallerWithNoWindow(course: String, section: String) -> String {
+        return "The preview for \(course) Section \(section) did not finish building. Build it once from "
+             + "its window in Plantoir to see what stopped it."
+    }
+
+    /// The same, when the output WAS recognised — the launcher's own refusal
+    /// because the section is still being deployed (#471, `shared-rules.json`
+    /// → `deployWhileItsSectionDeploys.refusedBuildAnswers`), or any other
+    /// reason `FailureExplainer` lifts. `reason` is a whole sentence, the way
+    /// the window shows it, so the teacher reads the same words in both
+    /// places.
+    static func previewDidNotBuildBecause(course: String, section: String, reason: String) -> String {
+        return "The preview for \(course) Section \(section) did not finish building: \(reason)"
     }
 
     // MARK: - Taking something back
@@ -1845,7 +1870,7 @@ nonisolated enum AssistWording {
     /// and Add Section…. Menu-length, in the shape of
     /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
     /// with "or Codex" added, so one sentence greys the same items on both
-    /// platforms once Windows' Codex door holds its course too.
+    /// platforms — Windows' Codex door holds its course too, since #468.
     ///
     /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
     /// BOTH doors name their course to the server, which holds it. The

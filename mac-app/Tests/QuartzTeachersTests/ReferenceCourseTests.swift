@@ -445,7 +445,15 @@ final class ReferenceCourseTests: XCTestCase {
             "container", "script", "toolchain", "docker", "launchd", "plist",
         ]
         for (key, value) in wording {
-            guard let sentence = value as? String, key != "machineryCheck", key != "rule" else {
+            // The notes, as Windows' ReferenceCourseTests lists them: the two
+            // that explain the sentences, and the two that are reasoning
+            // rather than wording (theCannotTellSentence names a sentence
+            // held elsewhere; whyTheLaunchersStillSayPublished names the
+            // files that moved, "script" among them since #441 landed from
+            // Windows on 2026-10-07 — red here until this list matched
+            // Windows' on 2026-10-08).
+            let notes: Set<String> = ["machineryCheck", "rule", "theCannotTellSentence", "whyTheLaunchersStillSayPublished"]
+            guard let sentence = value as? String, !notes.contains(key) else {
                 continue
             }
             for word in forbidden {

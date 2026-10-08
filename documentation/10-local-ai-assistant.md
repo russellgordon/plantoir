@@ -4246,6 +4246,91 @@ Windows did the same for `plantoir-mcp.exe` in #391 (2026-09-30:
 `deploy.py`'s header records its twin, a `python.exe` waiting 45 minutes at the
 site-name prompt.
 
+### A rebuild the launcher refused is said as the refusal, on the mac too (#471, 2026-10-08)
+
+**What happened.** An outside assistant's `rebuild_preview`, `publish_pages`
+and `unpublish_pages` rebuild the preview with the same headless build leg a
+deploy builds with (`AssistToolchainWork.rebuildPreview`, `preview.sh C S
+--build-only --non-interactive`), and since #439 that leg REFUSES while the
+same section is still being deployed, with a line a teacher can act on. The
+mac's answer did not lift it: every failed headless build was
+`previewDidNotBuild` — "did not finish building. The output is in that
+section's window in Plantoir." — which reads as a broken build, and points at
+a window the MCP server has not got. Found by the Opus review of Windows #467;
+Windows' half landed first (`12-windows-app.md` → "The other three answers
+that build"), with the contract cases this side now runs.
+
+**What changed.** The headless failure is READ before it is said.
+`AssistSiteWorkResult.previewDidNotBuild(course:section:output:)` takes the
+runner's text (the same `recentText(maximumCharacters: 8000)` the window's
+`failureExplanation` reads) and asks `FailureExplainer.explanation(in:)` — so
+the #439 refusal, and every other reason the window can lift, becomes
+`AssistWording.previewDidNotBuildBecause` ("…did not finish building:
+ICS4U section 2 is already being deployed, so it cannot be built until that
+has finished."), and nothing recognised becomes
+`previewDidNotBuildForACallerWithNoWindow`, which sends the teacher to the
+window to see why instead of claiming the output is there. The old
+`previewDidNotBuild` key stays for the contract and for Windows, which still
+says it in one place; nothing on the mac says it now.
+
+Three paths, one reading. `AssistToolRunner.bringThePreviewUpToDate` already
+returned the rebuild's message on all three — the rebuild tool, the page path
+(`carryOut`, after "Done: …") and the whole-unit path — so the page and unit
+answers say what was already written first and the refusal after it, with no
+tool-runner change. The one tool-runner change is honesty: `carryOut` used to
+end "This changed the teacher's files and their PREVIEW" after a rebuild that
+did not build; a preview that did not build is now one of the "left as it
+was" notes, like #433's.
+
+**The cross.** The launcher's line begins "❌ ". `FailureExplainer`'s two lifts
+(#381's and #439's) used to strip that one character and spaces; they now
+share `liftedSentence(from:)`, which takes off everything before the first
+ASCII letter or digit. Not for the mac's own reading, which is UTF-8, but
+because the contract's `crossArrivesAs` cases carry the cross as `?` and as
+three characters of mojibake — what Windows' server sees — and one stripper
+that handles all three is the one that cannot be right on one platform and
+wrong on the other. Every lifted line starts with a course code, and a course
+code is ASCII (`course-management.json`), so the first letter or digit is where
+the sentence begins whatever arrived in front of it.
+
+**The test runs the contract through the real runner, and the real runner
+through a real launcher.** `RefusedBuildAnswersTests` reads
+`deployWhileItsSectionDeploys.refusedBuildAnswers` and drives each case's tool
+through `AssistToolRunner` (surface `.mcp`, a stub `AssistSiteWork` whose
+rebuild fails with the case's output, cross as it arrived), asserting the
+lifted line whole, no cross, no `whereTheOutputIs`, and the refusal after what
+was done. Because that stub hands the output to the same static reader the
+real path uses, a second test in `HeadlessDeployAnswersTests` runs
+`AssistToolchainWork.rebuildPreview` against a stand-in `preview.sh` that
+echoes the contract's refusal and exits 1 — so the wiring from runner text to
+answer is exercised, not only the reading (the plan review's finding 4).
+
+**The seventh case, and why it is not `appliesOn`.** The mac rebuilds after
+hiding ONE page; Windows does not (#479, open). The single-page
+`unpublish_pages` case was added to the contract from the mac, and it is red on
+Windows until #479 decides whether a hide rebuilds. It is deliberately NOT
+marked `appliesOn: ["mac"]`: `contracts/README.md`'s "four ways out" rejects
+recording as chosen a difference one side still owes, and `appliesOn` has no
+mend-check — the day Windows fixed #479 nobody would be told the case could
+run. Windows holds it open by name in `NamedGapLedger` against #479 instead
+(the plan review's finding 1; a comment on #479 says so).
+
+**Rejected.** Mirroring Windows' "Nothing was changed, and the preview
+couldn't be built: …" word for word: on the page and unit paths that phrase
+would follow "Done: …" and be false, and one key serving all three mac paths
+is worth more than identical text on one of them. The contract pins only
+that the lifted line is said whole, without the cross and without
+`whereTheOutputIs`, which both platforms' sentences meet. A new
+`wasRefusedWhileItsSectionDeploys` flag on `AssistSiteWorkResult` was written
+and taken out again: nothing read it, since `bringThePreviewUpToDate` returns
+only the message.
+
+**What Windows owes (#481):** declare the two new wording keys with identical
+text, or `ContractTests` fails on a key it lacks; then say them where its
+server still composes these answers inline. **Rename:** the mac has no
+unit-rename assistant tool, so the issue's fourth bullet has nothing to meet
+here. **No new trail event:** the launcher's refusal line is already recorded.
+
 ### The model's list is SHORTER than the server's
 
 Two lists, deliberately. `definitions` is what the local model sees;

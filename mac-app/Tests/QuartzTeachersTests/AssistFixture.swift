@@ -458,6 +458,11 @@ final class StubSiteWork: AssistSiteWork {
     /// returns it (`HeadlessDeployAnswersTests` runs that path itself).
     var deployMeetsAQuestion: Bool = false
 
+    /// When set, every rebuild fails and this is the launcher's raw output,
+    /// read exactly as the real path reads it (#471): the test hands in the
+    /// contract's output, cross and all.
+    var rebuildFailsWithOutput: String?
+
     // MARK: - Functions
 
     // The REAL sentences, not a stub's own words. A fixture that answers
@@ -466,6 +471,11 @@ final class StubSiteWork: AssistSiteWork {
     // the scenario suite failed, correctly.
     func rebuildPreview(course: Course, sectionNumber: Int) async -> AssistSiteWorkResult {
         previewRebuilds += 1
+        if let output = rebuildFailsWithOutput {
+            return AssistSiteWorkResult.previewDidNotBuild(
+                course: course.code, section: String(sectionNumber), output: output
+            )
+        }
         return AssistSiteWorkResult(
             succeeded: true,
             message: AssistWording.rebuiltForACallerWithNoWindow(
