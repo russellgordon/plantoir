@@ -488,8 +488,9 @@ stale on a Quartz upgrade or silently break a teacher's own embedded
 built from what is really there:
 
 ```
+# Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; edit the lines outside this block, not these.
 /*
-  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
 ```
 
 Only `script-src` is set, never `default-src` — nothing else about a page
@@ -501,6 +502,35 @@ same SHA-1 manifest as every other file. It is deterministic build to build
 covered under "Why determinism matters" above. Tested in
 `scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
 runs it before the image build).
+
+**The block is marked and REPLACED, never appended again (#462).** Lines
+somebody else put in `_headers` are kept, and until 2026-10-08 the function
+kept them by appending its own block below whatever was there — including
+the block it wrote last time. A class site's `public/` is normally
+regenerated, so it rarely showed there; plantoir.app's `site/` is never
+cleaned and its `_headers` is untracked, so it gained one identical block per
+deploy (three in the main checkout by October 2026). Harmless while every
+block carried the same hashes; the first time an inline script changed, the
+OLD block would still be there allowing only the old hash. Every CSP a
+browser is sent is enforced, so if Netlify sends both `/*` policies (how it
+merges two blocks setting the same header was NOT measured, since that needs
+a deploy), the changed script is blocked silently — the site's theme and
+navigation script, for plantoir.app. Now the block sits under the `#` marker
+line shown above (a comment to Netlify), and every call takes out what it
+wrote before and writes it again. Blocks from before the marker are
+recognised by their exact shape — a `/*` line whose ONLY header is
+`Content-Security-Policy: script-src 'self' 'unsafe-eval'…` — so the next
+deploy cleans an old file by itself and nobody has to delete it by hand. A
+`/*` block with any other header in it is somebody's own and is kept whole,
+and a marker somebody edited round loses only the marker line. The file is
+written with LF on every machine: `Path.write_text` wrote CR LF on Windows,
+so the same site deployed from the PC and from a Mac gave different bytes.
+Rejected: deleting `_headers` before every write (throws away a person's own
+lines, and on a class site the build, not this function, decides what
+`public/` holds), and rewriting the whole file from scratch (the same loss).
+`TheBlockIsReplacedNotAppendedTests` in the same test file pins it; both
+apps inherit it, since this is shared Python and the mac deploys
+plantoir.app through it too.
 
 **Cloudflare Pages and `local_folder` pay nothing for this.** It is a
 problem Netlify created, so only a Netlify deploy should carry the cost —

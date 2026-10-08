@@ -4000,7 +4000,9 @@ window of that process and ends it, and everything still naming the folder
   without `--state-dir`, so its record and trail lines are written to the
   real state folder of the machine taking the pictures.)
 - **The folders are made by the app.** `--stage-scene provision --courses
-  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` sets a folder up and makes
+  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` (both strings built from
+  `website/shots/marketing/folders.json` by `demo_folders.provision_courses_argument`
+  and `reference_copy_argument` since #459, never written in the script) sets a folder up and makes
   each course through the New Course panel (`AutoCreate`, after the code is
   filled in as typed, so the course gets the name a teacher is offered — the
   first folder made without that was called "Course Website"), then keeps a
