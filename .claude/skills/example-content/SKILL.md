@@ -1046,8 +1046,9 @@ the linter.
    or installer changes how a code resolves to a family, change
    `family_for()` to match — the page's job is to tell the truth about
    what a teacher receives, so a guess there is a lie there.
-9. No GUI-IMPROVEMENTS entry for a content-only payload (the spec tracks
-   behaviour); commit with a message naming the course code.
+9. No GUI-IMPROVEMENTS entry — the log is closed to new entries since
+   2026-10-08 (#480), and never took content-only payloads anyway; commit
+   with a message naming the course code.
 
 ## Skeletons: what every OTHER course code starts as
 

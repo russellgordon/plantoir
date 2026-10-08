@@ -28,11 +28,13 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
     private readonly Process _server;
     private readonly StreamWriter _to;
     private readonly StreamReader _from;
+    private readonly IDisposable _registered;
     private int _nextId = 1;
 
-    private McpClient(Process server)
+    private McpClient(Process server, IDisposable registered)
     {
         _server = server;
+        _registered = registered;
         _to = server.StandardInput;
         _from = server.StandardOutput;
     }
@@ -42,7 +44,7 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
     /// Returns null when the server could not be started at all.
     /// </summary>
     public static async Task<McpClient?> Start(string serverPath, string workspacePath, string courseCode,
-                                               CancellationToken cancellation = default)
+                                               int sectionNumber, CancellationToken cancellation = default)
     {
         var info = new ProcessStartInfo
         {
@@ -76,7 +78,13 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
         server.ErrorDataReceived += (_, _) => { };
         server.BeginErrorReadLine();
 
-        var client = new McpClient(server);
+        // This server is the WINDOW's (#468): its assist lease keeps every
+        // hold an outside session's does, and is told apart from one only so
+        // the teacher reads the window's own words, never "a Claude or Codex
+        // session". Registered the moment it exists, since it takes its lease
+        // at start-up; forgotten in DisposeAsync once it has exited.
+        var registered = Plantoir.Core.Assist.WindowServers.Register(server.Id, courseCode, sectionNumber);
+        var client = new McpClient(server, registered);
         try
         {
             await client.Call("initialize", new JsonObject
@@ -160,15 +168,7 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
             if (block?["text"]?.GetValue<string>() is { } piece) text.AppendLine(piece);
         string detail = text.ToString().TrimEnd();
 
-        var meta = result["_meta"];
-        bool isPlan = meta?[Plantoir.Core.Assist.AssistToolAnswer.IsPlanKey]?.GetValue<bool>() == true;
-        string? summary = meta?[Plantoir.Core.Assist.AssistToolAnswer.TeacherSummaryKey]?.GetValue<string>();
-        string? backup = meta?[Plantoir.Core.Assist.AssistToolAnswer.ConversationBackupKey]?.GetValue<string>();
-        bool noPage = meta?[Plantoir.Core.Assist.AssistToolAnswer.NoPageFoundKey]?.GetValue<bool>() == true;
-
-        return string.IsNullOrWhiteSpace(summary)
-            ? Plantoir.Core.Assist.AssistToolAnswer.Same(detail) with { IsPlan = isPlan, ConversationBackupPath = backup, NoPageFound = noPage }
-            : new Plantoir.Core.Assist.AssistToolAnswer(summary, detail, isPlan, backup, noPage);
+        return Plantoir.Core.Assist.AssistToolAnswer.FromResult(detail, result["_meta"]);
     }
 
     // ---- JSON-RPC --------------------------------------------------------
@@ -247,6 +247,9 @@ public sealed class McpClient : Plantoir.Core.Assist.IToolServer, IAsyncDisposab
             if (!_server.WaitForExit(3000)) _server.Kill(entireProcessTree: true);
         }
         catch { }
+        // Forgotten only once it is gone: a server still alive would hold a
+        // lease the app then read as an outside session's.
+        try { if (_server.HasExited || _server.WaitForExit(2000)) _registered.Dispose(); } catch { }
         try { _server.Dispose(); } catch { }
         await Task.CompletedTask;
     }

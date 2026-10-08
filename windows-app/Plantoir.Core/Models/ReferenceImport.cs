@@ -54,7 +54,7 @@ public static class ReferenceImport
         ["alreadyBeingImported"] = "It is already being imported in another window, or in another copy of Plantoir.",
         ["leftoverInTheWay"] = "Something left behind by an earlier attempt that did not finish could not be cleared away.",
         ["alsoTickedForThatYear"] = "{folder} is also ticked for that school year, and one {course} is kept for each year. Choose Other or a different school year for one of them.",
-        ["addOnsAreLeftBehind"] = "Obsidian add-ons and their settings are not brought across, so nothing in them can publish these pages.",
+        ["addOnsAreLeftBehind"] = "Obsidian add-ons and their settings are not brought across, so nothing in them can put these pages online.",
     };
 
     /// <summary>

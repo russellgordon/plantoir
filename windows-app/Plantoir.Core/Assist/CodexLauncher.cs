@@ -11,9 +11,12 @@ namespace Plantoir.Core.Assist;
 /// <summary>
 /// "Revise with Codex…" (#210, mac #205): the second outside door. Finds
 /// <c>codex</c>, and starts it in a terminal in the working folder with
-/// Plantoir's server described ON THE COMMAND LINE — four dotted <c>-c</c>
+/// Plantoir's server described ON THE COMMAND LINE — five dotted <c>-c</c>
 /// overrides and the greeting — so nothing at all is written for the
 /// connection (<c>contracts/app-rules.json</c> → <c>outsideAgents.agents[codex]</c>).
+/// The fifth (#468) names the course to the server's ENVIRONMENT
+/// (<see cref="AssistWorkspace.DoorCourseVariable"/>), so a Codex session
+/// HOLDS its course, never locks it, exactly as a Claude one does.
 /// </summary>
 /// <remarks>
 /// <para><b>The trap is the escaping, and it fails SILENTLY.</b> Each value is
@@ -79,7 +82,8 @@ public static class CodexLauncher
         var info = new ProcessStartInfo
         {
             FileName = "cmd.exe",
-            Arguments = CmdArguments(codex, Arguments(server, workspacePath, ClaudeCodeLauncher.Greeting(courseCode, courseName)), keepOpen: true),
+            Arguments = CmdArguments(codex, Arguments(server, workspacePath, courseCode,
+                                                      ClaudeCodeLauncher.Greeting(courseCode, courseName)), keepOpen: true),
             WorkingDirectory = workspacePath,
             UseShellExecute = true,
         };
@@ -96,17 +100,30 @@ public static class CodexLauncher
     }
 
     /// <summary>
-    /// The argv the contract states, in order: four dotted overrides and the
+    /// The argv the contract states, in order: five dotted overrides and the
     /// greeting as the first message. No sandbox, approval or cd flag — Codex
     /// asks the teacher itself before a change, and a flag would quietly widen
     /// what they set for themselves.
     /// </summary>
-    public static IReadOnlyList<string> Arguments(string server, string folder, string greeting) => new[]
+    /// <remarks>
+    /// The fifth override, <c>mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE</c>,
+    /// is #468 (Russell's decision on mac #458, 2026-10-07: BOTH doors hold
+    /// their course). Until it, a Codex session held nothing — its backup could
+    /// be deleted under it, a second session could start on the course, and
+    /// Rename Course could move the folder out from under it — while looking to
+    /// the teacher exactly like a Claude one. The value goes through the same
+    /// three layers as every other element. Codex 0.155.1 reads this form into
+    /// the server's <c>env</c> (measured on the mac with <c>codex mcp get
+    /// --json</c>); Codex is not installed on the Windows test PC, so here only
+    /// the argv round trip through cmd and a stub shim is tested.
+    /// </remarks>
+    public static IReadOnlyList<string> Arguments(string server, string folder, string courseCode, string greeting) => new[]
     {
         "-c", "mcp_servers.plantoir.command=" + TomlBasicString(server),
         "-c", "mcp_servers.plantoir.args=[" + TomlBasicString("--mcp-stdio") + "," + TomlBasicString(folder) + "]",
         "-c", "mcp_servers.plantoir.startup_timeout_sec=60",
         "-c", "mcp_servers.plantoir.tool_timeout_sec=1800",
+        "-c", "mcp_servers.plantoir.env." + AssistWorkspace.DoorCourseVariable + "=" + TomlBasicString(courseCode),
         greeting.Replace("\"", "'"),
     };
 

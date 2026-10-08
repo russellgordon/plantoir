@@ -66,16 +66,25 @@ Neither app contains toolchain logic of its own: they write the same
    the Swift or watch it being tested, so a change that exists only in Swift is
    one they will re-derive from scratch — usually after shipping the same bug
    once. A change is not finished until:
-   - **`GUI-IMPROVEMENTS.md` has an entry whose "Notes for Windows port" column
-     says something usable** — what to do differently, what is inherited
-     unchanged, or the trap that would pass review. "Shared Python, nothing to
-     mirror" is fine when true; an empty cell never is.
+   - **the closing comment on the piece's OWN issue says what landed, what
+     was measured, and which model did which review.** It is the record of
+     the piece — so every NEW piece has an issue (open one if none exists,
+     before the merge) and that issue carries the release milestone before
+     it closes, or the piece drops out of the changelog below. Going forward
+     only (Russell, 2026-10-08): nothing is opened for the 748 rows already
+     logged. The `windows`
+     issue two bullets down carries what Windows must do, and the
+     `documentation/` section carries why. (Until 2026-10-08 this bullet
+     asked for a `GUI-IMPROVEMENTS.md` row with a usable "Notes for Windows
+     port" cell; the log is closed to new entries since then — #480 — because
+     a row restated the closing comment and the section, and its numbering
+     conflicted on every merge that landed two pieces.)
    - **anything architectural also has a section in the
      [`documentation/`](documentation/README.md) page that owns its subject** —
      the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
-     A log row records a decision; the deep dive explains it well enough to
-     implement. Say what you measured and what you REJECTED: a behaviour can be
-     read off the code, the reason for it cannot.
+     The closing comment records a decision; the deep dive explains it well
+     enough to implement. Say what you measured and what you REJECTED: a
+     behaviour can be read off the code, the reason for it cannot.
    - **a GitHub issue is opened, labelled `windows`, in the same session** —
      one short paragraph naming what the change is, what Windows inherits free,
      what they owe, and a pointer to the section that explains it. Give it a
@@ -129,8 +138,15 @@ Neither app contains toolchain logic of its own: they write the same
      `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
-   - **`GUI-IMPROVEMENTS.md` gets a row for anything a teacher can see**, so
-     the log stays the record of the product rather than of one platform.
+   - **the piece's own issue — opened before the merge if none exists, as
+     rule 3 says — carries the release milestone before it closes.** The
+     closed issues, filtered by milestone, are the record of
+     the product — of what a teacher can see on either platform in a release
+     — and an issue closed without one is a change that release's record
+     does not show. Before the cut, `RELEASING.md`'s "Landed since … ships
+     in the next release" table says which platforms have each piece.
+     (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
+     anything a teacher can see; the log is closed to new entries, #480.)
    - **anything measured is written with its NUMBERS and the hardware they
      came from.** The mac side cannot find out what a Windows teacher's
      machine does; "the Vulkan build was faster" is not usable, "43 tok/s
@@ -206,7 +222,8 @@ Neither app contains toolchain logic of its own: they write the same
      have not looked at.
    - **One issue branch per coherent piece**, branched off `dev`: named
      `issue/<number>-<slug>` when a GitHub issue exists, `issue/<slug>` when
-     not. "A coherent piece" keeps its old meaning — one thing a teacher
+     not YET (rule 3: the piece gets its issue before the merge). "A coherent
+     piece" keeps its old meaning — one thing a teacher
      could notice, with its tests and its write-up; not one file, and not a
      whole afternoon. When Russell approves the merge, merge with `--no-ff`
      so the piece stays one readable unit in history.
@@ -294,7 +311,8 @@ Neither app contains toolchain logic of its own: they write the same
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
-   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
+   and (while the log was open) a `GUI-IMPROVEMENTS.md` row with no commit
+   behind it.
 
 7. **Colima is shared with other projects** on this machine (Supabase local dev,
    among others). Never `colima stop` unless `docker ps -q` comes back empty —
@@ -473,8 +491,10 @@ Neither app contains toolchain logic of its own: they write the same
       **Pass the model EXPLICITLY when spawning an agent** rather than relying
       on the default — the default subagent model is configured outside this
       repository, so a session that omits it cannot tell what it got. Say
-      which model did which review in the write-up, the way row 480 of
-      `GUI-IMPROVEMENTS.md` does.
+      which model did which review in the closing comment on the issue
+      (until 2026-10-08 in the log row, the way row 480 of
+      `GUI-IMPROVEMENTS.md` does; the log is closed to new entries since
+      then, #480).
 
       *(Superseded, kept because a session may meet its consequences. On
       2026-09-09 the order was FABLE for every subagent review, restoring the
@@ -503,9 +523,9 @@ Neither app contains toolchain logic of its own: they write the same
       further build. The last act before "this is ready" is to go looking for
       every place that describes what you changed, and fix the ones the change
       made wrong. Start with `documentation/`, which is the one most easily forgotten
-      because nothing in the daily rhythm points at it: an issue and a
-      `GUI-IMPROVEMENTS.md` row get written because rules 3 to 5 demand them,
-      and the deep dive gets written because somebody remembers. On the session
+      because nothing in the daily rhythm points at it: an issue and its
+      closing comment get written because rules 3 to 5 demand them, and the
+      deep dive gets written because somebody remembers. On the session
       this rule came from, four places in `documentation/` described the rule
       that had just been replaced, three of them wrongly, and one of them did
       not document a launcher flag the app has been calling for weeks.
@@ -952,9 +972,9 @@ through the app bundle — rebuild the app to test it end to end.
 
 The same rule used to be written in four places at once, and three of them
 would drift — a sentence in the Swift that says it, in the test that pins it,
-in the log row that specified it, and in the issue telling Windows to copy
-it. So each kind of truth now has **one** home, and everywhere else points at
-it rather than restating it:
+in the log row that specified it (while `GUI-IMPROVEMENTS.md` was open), and
+in the issue telling Windows to copy it. So each kind of truth now has **one**
+home, and everywhere else points at it rather than restating it:
 
 | The question | The one place that answers it |
 |---|---|
@@ -967,7 +987,7 @@ it rather than restating it:
 | What does a scheduled deploy refuse, what does the sidebar filter show, what is stripped from console output, what counts as a curriculum expectation, what is taken out of (and kept in) a problem report, **which events every feature must record on the trail**, when the report asks about the local AI assistant, **which local assistant a teacher may choose (and when one may be removed)**, **where a section's built website is kept — and what happens to a folder that already has one in the old place**, **when quitting asks the teacher first (and when it must never ask)**, **when the app may install a new version of itself, and what a quit does to one that is ready (#204)**, and **when the links checklist is offered, what it says, and what Publish writes from it (#379)**? | [`contracts/shared-rules.json`](contracts/shared-rules.json). |
 | What keys does `course_config.json` carry, and what decides whether students see a page? | [`contracts/file-formats.json`](contracts/file-formats.json) — a FORMAT rather than a behaviour, and the one both apps write and the Python reads. |
 | WHY is it that way, and what was rejected? | The [`documentation/`](documentation/README.md) page that owns the subject, for anything an implementer needs; a code comment for anything a reader of the code needs. |
-| WHAT changed, WHEN, and what it cost | [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) — a dated log. **Append-only history, not a specification**: a row records what was true that day, and is not edited when the behaviour changes again. Never quote a row as the current wording. |
+| WHAT changed, WHEN, and what it cost | The closed [GitHub issues](https://github.com/russellgordon/plantoir/issues?q=is%3Aissue+is%3Aclosed), filtered by milestone — the milestone is the release, and the closing comment says what landed, what was measured and which model did which review. Before 2026-10-08, [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md), a dated log now **closed to new entries** (#480) and kept as append-only history: a row records what was true that day, is not edited when the behaviour changes again, and is never quoted as the current wording. |
 | How does the whole feature work? | [`documentation/10-local-ai-assistant.md`](documentation/10-local-ai-assistant.md). |
 | What did we MEASURE? | [`research/`](research/README.md) — routing accuracy, model tiers, preview staleness. Never asserted in a test; each file states its own conditions. |
 | Which rules override default behaviour? | This file. |
@@ -1000,10 +1020,12 @@ work already shipped on the Windows port are archived in
 
 The reason they went: each had become three things at once — a to-do list, a
 changelog, and a manual — and only the third was worth keeping. The to-do list
-is now GitHub issues, the changelog is `GUI-IMPROVEMENTS.md`, and the manual is
-`documentation/`, where somebody looking up how a thing works will actually
-find it. **Do not recreate them.** A change written for the other platform goes
-in the documentation page that owns its subject, and the issue points at it.
+is now GitHub issues, the changelog is the closed issues by milestone (it was
+`GUI-IMPROVEMENTS.md` until that log closed on 2026-10-08, #480), and the
+manual is `documentation/`, where somebody looking up how a thing works will
+actually find it. **Do not recreate them.** A change written for the other
+platform goes in the documentation page that owns its subject, and the issue
+points at it.
 
 (The old `AI-ASSIST-HANDOFF.md` went the same way earlier: it was a record of
 how the assistant was built, and it now lives in
@@ -1031,8 +1053,10 @@ agreed. What follows is the same reading order, in short:
    assistant's behaviour is tested rather than eyeballed. **Do not retype the
    sentences or the scenarios into your test files** — deserialise them.
 5. **[`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md)**, newest rows first, for
-   what changed recently and why. Read it as history; where a row and the
-   contract disagree, the contract is what is true now.
+   what changed up to 2026-10-08 and why; it is closed to new entries since
+   then (#480), and the closed issues by milestone carry what changed after.
+   Read it as history; where a row and the contract disagree, the contract is
+   what is true now.
 6. **[`windows-app/PROGRESS.md`](windows-app/PROGRESS.md)** for where that app
    actually stands.
 
@@ -1046,7 +1070,7 @@ implemented and passing on both platforms; see `GUI-IMPROVEMENTS.md` rows
 | Read this | When |
 |---|---|
 | [`documentation/`](documentation/README.md) | How the toolchain works AND why, numbered 01–13: overview, image, launchers, course setup, build pipeline, Quartz customizations, deployment, config reference, mac app, local AI assistant, release strategy, Windows app, and the Windows-port archive. Since 2026-09-08 this is also where the reasoning behind a decision lives — what was chosen, what was rejected, what was measured. |
-| [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change, with a required "Notes for Windows port" column. Append here for any GUI change — and read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
+| [`GUI-IMPROVEMENTS.md`](GUI-IMPROVEMENTS.md) | The dated log of every GUI change up to 2026-10-08, rows 1 to 748 — **closed to new entries** since then (#480; the closing comment on the issue and the `documentation/` section carry what a row did). Read it as HISTORY: it used to be described as "the spec", and `contracts/` is what a test should be written against now. |
 | [`MAC-BOOTSTRAP.md`](MAC-BOOTSTRAP.md) | **The brief for a macOS session**: adding a feature responsibly here, and taking work that arrived from Windows. |
 | [`WINDOWS-BOOTSTRAP.md`](WINDOWS-BOOTSTRAP.md) | **The brief for a Windows session**: what to read, the order of work, the rules while working, and the plan-first rule. Point a Windows agent at this file. |
 | [GitHub issues](https://github.com/russellgordon/plantoir/issues) | **Everything still to do**, on either platform. Labelled `mac`, `windows`, `toolchain`, `assistant`, `decision`; milestones pin an issue to a release. |

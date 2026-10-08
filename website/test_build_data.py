@@ -175,17 +175,20 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
-    def test_neither_card_is_pinned_while_the_newest_release_has_both_installers(self):
+    def test_the_cards_are_pinned_exactly_where_the_newest_release_lacks_an_installer(self):
         # Windows was pinned to 1.1.0 from v1.2.0 until PlantoirSetup.exe
         # joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3
-        # cut (2026-10-04) until its installer joined v1.4.3 (2026-10-07).
+        # cut (2026-10-04) until its installer joined v1.4.3 (2026-10-07), and
+        # to 1.4.3 for the mac-first v1.4.4 cut until it joined v1.4.4 (2026-10-08).
+        # The Mac card is pinned to 1.4.4 from the Windows-only v1.4.5 cut
+        # (2026-10-08) until Plantoir-macOS.dmg joins a later release.
         # A release that lacks an installer pins that card again, and this
         # test changes with it (the downloads_note in site.json says when).
         site = build.read_json(build.WEBSITE / "site.json")
         pins: dict = {}
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
-        self.assertIsNone(pins["macOS"])
+        self.assertEqual(pins["macOS"], "1.4.4")
         self.assertIsNone(pins["Windows"])
 
 

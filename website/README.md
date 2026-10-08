@@ -6,8 +6,10 @@ The marketing site. Sources live here; **finished pages are written into
 Deploying is explicit: the Netlify site is NOT connected to GitHub, so
 pushing this repository deploys nothing. Build, preview `site/` locally,
 and deploy when it is right (delta upload — an unchanged site sends nothing;
-token from the `containerized-quartz-netlify` Keychain item or
-`NETLIFY_AUTH_TOKEN`, site id from `website/site.json`).
+token from `NETLIFY_AUTH_TOKEN`, or else the stored credential named
+`containerized-quartz-netlify`: the Keychain item on a Mac, the generic
+Windows Credential Manager credential of the same name on Windows, the one
+the course launchers use (#452); site id from `website/site.json`).
 
 ```bash
 python3 website/build.py                 # write site/
@@ -28,13 +30,18 @@ a genuine, persistent version mismatch is (`website/netlify_deploy.py`,
 without deploying anything new.
 
 plantoir.app is itself a free-tier Netlify project, so `--deploy` also writes
-`site/_headers` — a Content-Security-Policy that keeps Netlify's own
+`site/_headers` (its own block rewritten, never appended, on every deploy;
+#462) — a Content-Security-Policy that keeps Netlify's own
 "Powered by Netlify" ad badge off the site, the identical fix
 `scripts/deploy.py` applies to every class site (see
 `documentation/07-deployment.md`, "Suppressing Netlify's own ad badge"). The
 scanning logic lives once, in `scripts/netlify_badge.py`, and
 `website/netlify_deploy.py` imports it rather than carrying its own copy;
 `website/test_netlify_deploy_headers.py` covers the wiring.
+`website/test_netlify_token.py` covers where the token is read from,
+including a round trip through the real Credential Manager on Windows with a
+throwaway credential; like its neighbours, no suite runs it
+(`python -I website/test_netlify_token.py`).
 
 ## The update feeds (`updates/`, #204)
 
@@ -228,7 +235,18 @@ mode back, and it ends every process it started.
   the New Course panel for each course, the real installer at the real
   clock): `~/Teaching` (ENG2D, MCV4U, SCH3U — the demo, disposable) and
   `~/School Web Space` (ICS3U, ICS4U and last year's ICS3U — the v1.4.0
-  scenes' folder, kept). The one part a Windows machine cannot make is the
+  scenes' folder, kept). The courses, their sections and the school year the
+  reference copy is filed under come from `shots/marketing/folders.json`
+  (#459): `demo_folders.provision_courses_argument` and
+  `reference_copy_argument`, so a kept copy's own year wins and a new one is
+  filed the year before the clock's. A demo folder with other sections than
+  the file's is deleted and made again (the scene leaves a course that is
+  already there as it is), and on every run that wants it the demo STATE is
+  applied right after (`capture_windows.provision_demo`), so no picture is
+  taken in the New Course panel's colours and front pages. A marketing course
+  with no folder destination yet is given folders.json's `publishTo`; the kept
+  folder's (`Websites`, `Websites\ICS4U`) are left as they are, and every
+  scene makes each course's OWN destination folder before it runs. The one part a Windows machine cannot make is the
   College Board pages, extracted from the Course and Exam Description by a
   macOS-only helper (`ced_statements.swift`) and never committed
   (`folders.json` → `marketing.collegeBoardPages`): for the three scenes that
@@ -254,16 +272,8 @@ the mac's `--provision-demo` gives it — colour schemes, the teacher's last
 name, stand-in site markers, and every front page on the latest class on or
 before January 15 — through `plantoir-mcp.exe` (beside `Plantoir.exe`, or the
 Debug build `app_scenes_windows.py` uses) and the same `demo_folders.py`.
-**What is still Windows' to do** (the `windows` issue for #445, #459): the
-`provision` scene makes the courses through the real installer already, but
-from lists of its own in `app_scenes_windows.py` (`DEMO_COURSES`, which gives
-MCV4U and SCH3U a section 2 that `folders.json` does not; `MARKETING_COURSES`;
-and `MARKETING_REFERENCE`, whose `2025` is a fixed year where `folders.json`
-says "the school year before" and a kept copy's own year wins), and nothing
-applies the demo state afterwards, so a Windows demo folder keeps the colours
-and front pages the New Course panel left. It should read `folders.json` for
-all of it (the marketing courses' `publishTo` destinations included) and run
-`--provision-demo` once the demo folder is made.
+The `--app` pass runs this step itself after the `provision` scene (#459);
+run it by hand only for a folder made some other way.
 
 ### Only macOS's own window capture, kept whole
 
@@ -412,7 +422,9 @@ step existed); no scene shows it. Two dates are never written down: the
 second semester is computed from the section's own dates, and the reference
 year is READ from the folder's copy (`reference_school_year`) — `capture.py`
 passes it to the UI tests as `MARKETING_REFERENCE_YEAR`, and only a folder
-without a copy yet takes the year before the clock's. To check that the kept
+without a copy yet takes the year before the clock's. Windows' capturer reads
+the same file for its courses, sections, reference year and destinations
+(#459). To check that the kept
 folders still match every rule (read-only; never in `verify.sh`):
 `PLANTOIR_DEMO_FOLDERS_COMPARE=1 python3 website/shots/test_demo_folders.py`,
 and add `PLANTOIR_DEMO_FOLDERS_APP=<…/Plantoir.app/Contents/MacOS/Plantoir>` to

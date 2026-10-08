@@ -19,8 +19,9 @@ only), that each asks before anything is changed, and that the look trusts no
 remembered process id and reads the table only through the one reader.
 
 **Windows.** Skipped where there is no bash that can run a program, as the
-launcher tests beside it are: Windows' launchers are .ps1 files, which owe the
-same guard (the contract's appliesOnWhy).
+launcher tests beside it are: Windows' launchers are .ps1 files, which carry
+the same guard since #467 and run every launcherCase through
+windows-app/test_launcher_rules.ps1 (LauncherRulesContractTests).
 
 Pure stdlib. Run with:
 

@@ -32,6 +32,12 @@ public sealed class LauncherRunner : ILauncherRunner
         string script = Path.Combine(workingFolder, launcher + (OperatingSystem.IsWindows() ? ".ps1" : ".sh"));
         if (!File.Exists(script))
             return new LaunchOutcome(false, $"This working folder has no {Path.GetFileName(script)}.");
+        // #473: Plantoir is copying its tools into this folder right now (the
+        // first window after an update does, in the background), so a build
+        // started here would read a half-copied folder. The app's marker file
+        // says so; a marker whose program is gone counts for nothing.
+        if (Plantoir.Core.Models.ToolchainReadiness.AnotherProgramIsGettingReady(workingFolder))
+            return new LaunchOutcome(false, Plantoir.Core.Models.ToolchainReadiness.GettingReadyMessage);
 
         var info = new ProcessStartInfo
         {
@@ -228,7 +234,7 @@ public sealed class LauncherRunner : ILauncherRunner
         catch (OperationCanceledException)
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch { }
-            return new LaunchOutcome(false, "The publish was stopped before it finished.");
+            return new LaunchOutcome(false, "This was stopped before it finished.");
         }
 
         string transcript;
@@ -254,7 +260,7 @@ public sealed class LauncherRunner : ILauncherRunner
         var message = new StringBuilder();
         if (transcript.Contains("token", StringComparison.OrdinalIgnoreCase) ||
             transcript.Contains("log in", StringComparison.OrdinalIgnoreCase))
-            message.Append("This looks like a missing publishing token. Publish this section once from Plantoir " +
+            message.Append("This looks like a missing deploy token. Deploy this section once from Plantoir " +
                            "so the token is stored, then try again. ");
         message.Append($"(The launcher exited with code {exitCode}.)");
         if (transcript.Length > 0) message.Append("\n\nLast output:\n").Append(transcript);

@@ -303,6 +303,12 @@ enum AssistContract {
                 course: course, section: section
             ),
             "previewDidNotBuild": AssistWording.previewDidNotBuild(course: course, section: section),
+            "previewDidNotBuildForACallerWithNoWindow": AssistWording.previewDidNotBuildForACallerWithNoWindow(
+                course: course, section: section
+            ),
+            "previewDidNotBuildBecause": AssistWording.previewDidNotBuildBecause(
+                course: course, section: section, reason: "{reason}"
+            ),
             "whereTheOutputIs": AssistWording.whereTheOutputIs,
             "nothingToDo": AssistWording.nothingToDo,
             // "Already the way you asked" (#174): one key per branch, and the

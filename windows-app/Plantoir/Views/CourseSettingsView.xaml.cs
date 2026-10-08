@@ -592,9 +592,9 @@ public sealed partial class CourseSettingsView : UserControl
     /// <summary>The trail line: the course and WHICH check — never the path or the ID. Worded as a hold, not a failure.</summary>
     internal static string SettingsSaveHeldBackLine(string code, string check) => check switch
     {
-        SettingsSaveState.DeployFolderCheck => $"Save held back for {code} (deploy folder) — the publishing folder needs attention",
+        SettingsSaveState.DeployFolderCheck => $"Save held back for {code} (deploy folder) — the deploy folder needs attention",
         SettingsSaveState.CloudflareAccountCheck => $"Save held back for {code} (cloudflare account id) — the Cloudflare Account ID needs attention",
-        _ => $"Save held back for {code} (additional destination) — an additional destination needs attention",
+        _ => $"Save held back for {code} (additional destination) — an additional deploy destination needs attention",
     };
 
     // ---- Form ------------------------------------------------------------
@@ -710,7 +710,7 @@ public sealed partial class CourseSettingsView : UserControl
             // This switch is what half the blocked sentences tell a teacher to
             // turn off, so the rows have to be rebuilt against the new answer.
             // Protection is computed when a row is DRAWN; without this the info
-            // button says "turn off Publish the curriculum coverage map", the
+            // button says "turn off Include the curriculum coverage map", the
             // teacher does, and the row goes on refusing.
             RebuildProtectedRows();
             if (!coverageToggle.IsOn)
@@ -727,7 +727,9 @@ public sealed partial class CourseSettingsView : UserControl
         // a control that does not exist. It read "Include Curriculum Coverage
         // map" until this piece; the contract's wording won, because the
         // contract is generated from the macOS app and a Windows-only
-        // paraphrase is drift rather than a decision.
+        // paraphrase is drift rather than a decision. Since v1.4.4 (#443
+        // decision 2, #441 here) it reads "Include the curriculum coverage
+        // map", the same words as the wizard's switch.
         var coverageRow = FormBuilders.LabeledRow(SpecialNames.CoverageSwitchLabelInSettings, coverageToggle);
         coverageRow.Children.Add(FormBuilders.ExampleCaption(
             "Generates a page showing which specific and overall expectations are addressed"));
@@ -1237,6 +1239,15 @@ public sealed partial class CourseSettingsView : UserControl
             SaveStatus.Text = SaveStatus.Text.Replace(SavedSettings.SavedWhilePreviewing, SavedSettings.PreviewAgainNothingOpen);
             ActivityTrail.Note(ActivityTrail.Event.PreviewAgainAfterSettingsSaved,
                 "Preview Again pressed in Course Settings for " + _course.Code + ": no preview was still open");
+            return;
+        }
+        // #473: never stop a preview that could not be started again — asked
+        // before anything is said or stopped, so the button and the trail
+        // line below stay true.
+        if (open.Select(lease => lease.FolderPath).FirstOrDefault(folder => ToolchainReadiness.Refusal(folder) is not null)
+                is { } notReadyFolder && App.WindowFor(notReadyFolder) is { } notReadyWindow)
+        {
+            await notReadyWindow.RefusedWhileTheFolderIsGettingReady(notReadyFolder, "Cannot Preview Yet");
             return;
         }
         SaveStatus.Text = SaveStatus.Text.Replace(" " + SavedSettings.SavedWhilePreviewing, "")

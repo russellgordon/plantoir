@@ -42,6 +42,14 @@ class NewCourseCreator {
     /// Writes the config, then starts `setup.sh` and the answer pump.
     func createCourse(configuration: [String: Any], workspaceURL: URL) {
         preparationProblem = nil
+        // BEFORE `course_config.json` and the `course created` line are
+        // written (#476): a folder whose tools are still being copied, or
+        // whose copy failed, makes no course yet — a half-made course blocks
+        // a retry, which is why the setup.sh check below sits where it does.
+        if let reason = ToolchainReadiness.shared.reasonToWait(workspaceURL) {
+            preparationProblem = reason
+            return
+        }
 
         guard let storedCode = configuration["course_code"] as? String else {
             preparationProblem = "The course needs a code."
@@ -93,6 +101,10 @@ class NewCourseCreator {
     func installExampleCourse(workspaceURL: URL) {
         preparationProblem = nil
         installedExampleCode = nil
+        if let reason = ToolchainReadiness.shared.reasonToWait(workspaceURL) {
+            preparationProblem = reason
+            return
+        }
         respondedLength = 0
         responsesSent = 0
         isCreating = true

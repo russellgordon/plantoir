@@ -465,7 +465,8 @@ reminder of:
 - **Lint, verify, ship** — the same `lint_payload.py <CODE>` gate, the same
   installer E2E, the same app test suite, the same `verify.sh`, the same
   catalogue-page refresh, the same commit-message convention (name the
-  course code, no GUI-IMPROVEMENTS entry for a content-only payload).
+  course code, no GUI-IMPROVEMENTS entry — the log is closed since
+  2026-10-08, #480).
 
 ## Assessment: for, as, and of learning
 

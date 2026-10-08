@@ -28,7 +28,7 @@ public static class CourseRenamer
             string sections = Listed(outcome.StoppedScheduledSections);
             bool isOne = outcome.StoppedScheduledSections.Count == 1;
             sentences.Add(
-                $"{sections} of {outcome.NewCode} {(isOne ? "was" : "were")} set to publish on " +
+                $"{sections} of {outcome.NewCode} {(isOne ? "was" : "were")} set to deploy on " +
                 $"{(isOne ? "its" : "their")} own. Renaming turned that off — set " +
                 $"{(isOne ? "it" : "them")} again from the section’s menu if you still want " +
                 $"{(isOne ? "it" : "them")}.");
@@ -38,14 +38,14 @@ public static class CourseRenamer
             string sections = Listed(outcome.UnstoppedScheduledSections);
             bool isOne = outcome.UnstoppedScheduledSections.Count == 1;
             sentences.Add(
-                $"{sections} {(isOne ? "was" : "were")} also set to publish on " +
+                $"{sections} {(isOne ? "was" : "were")} also set to deploy on " +
                 $"{(isOne ? "its" : "their")} own, and Plantoir could not turn that off. " +
-                $"{(isOne ? "It" : "They")} may still try to publish under the old name.");
+                $"{(isOne ? "It" : "They")} may still try to deploy under the old name.");
         }
 
         string title = outcome.UnstoppedScheduledSections.Count == 0
-            ? "Scheduled publishing was turned off"
-            : "A scheduled publish may still run";
+            ? "Deploying on a schedule was turned off"
+            : "A scheduled deploy may still run";
         return new Notice(title, string.Join("\n\n", sentences));
     }
 

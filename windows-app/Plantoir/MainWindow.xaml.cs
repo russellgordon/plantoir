@@ -34,6 +34,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         App.LogDiagnostic("MainWindow ctor: InitializeComponent done");
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
+        WindowTheme.Apply(this);   // the title bar follows dark/light mode
         App.LogDiagnostic("MainWindow ctor: creating WorkspaceViewModel");
         Workspace = new WorkspaceViewModel(App.Settings);
         App.LogDiagnostic("MainWindow ctor: WorkspaceViewModel created");
@@ -142,9 +143,20 @@ public sealed partial class MainWindow : Window
         }
         Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged += ScheduledRecordsChanged;
 
+        // #473: the folder's copy of the tools started or ended — on the
+        // copy's own thread, so carried to this window's. Static like the two
+        // above, and let go of on close for the same reason.
+        void ReadinessChanged(string folder)
+        {
+            if (IsClosed) return;
+            DispatcherQueue.TryEnqueue(() => { if (!IsClosed) RefreshReadiness(); });
+        }
+        ToolchainReadiness.Changed += ReadinessChanged;
+
         Closed += (_, _) =>
         {
             IsClosed = true;
+            ToolchainReadiness.Changed -= ReadinessChanged;
             Views.SectionDetailView.SectionOutcomeDismissed -= OutcomeDismissed;
             // The event is static: a subscription left behind would root this window.
             Plantoir.Core.Assist.ScheduledPublishWatcher.RecordsChanged -= ScheduledRecordsChanged;
@@ -196,7 +208,57 @@ public sealed partial class MainWindow : Window
         RestoreRememberedSelection(frame?.Selection);
         App.LogDiagnostic("MainWindow ctor: RestoreRememberedSelection done; RunAutomationHooks starting");
         RunAutomationHooks();
-        App.LogDiagnostic("MainWindow ctor: complete");
+        // The window is shown by App.OpenWindow the moment this returns, so
+        // the banner's one-second delay counts from here (#473).
+        _shownAt = DateTime.UtcNow;
+        RefreshReadiness();
+        App.LogDiagnostic($"MainWindow ctor: complete (tools copy {ToolchainReadiness.StateOf(Workspace.WorkspacePath)})");
+    }
+
+    // ---- Getting the folder ready (#473) -----------------------------------
+
+    /// <summary>When the window was about to be shown; the banner's delay counts from it.</summary>
+    private DateTime? _shownAt;
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _bannerTimer;
+
+    /// <summary>
+    /// The window's half of #473: the banner, the readiness status UI
+    /// Automation reads, and the New Course entry point, all from
+    /// <see cref="ToolchainReadiness"/> for the folder on screen. Called on
+    /// this window's thread whenever the copy starts or ends, the folder
+    /// changes, or the banner's delay runs out. Preview and Deploy follow it
+    /// in <c>SectionDetailView.RefreshChrome</c>.
+    /// </summary>
+    private void RefreshReadiness()
+    {
+        var state = ToolchainReadiness.StateOf(Workspace.WorkspacePath);
+        AutomationProperties.SetItemStatus(AppMenuBar, ToolchainReadiness.AutomationStatus(state));
+
+        bool pastTheDelay = _shownAt is { } shown && DateTime.UtcNow - shown >= ToolchainReadiness.BannerDelay;
+        var banner = ToolchainReadiness.BannerFor(state, pastTheDelay);
+        GettingReadyNotice.Title = banner.Title ?? "";
+        GettingReadyNotice.Message = banner.Message ?? "";
+        GettingReadyNotice.Severity = banner.IsError ? InfoBarSeverity.Error : InfoBarSeverity.Informational;
+        GettingReadyNotice.IsOpen = banner.IsOpen;
+
+        // Still copying, and the delay not yet run out: look again when it has.
+        if (state == ToolchainReadiness.State.Copying && !pastTheDelay && _shownAt is { } since)
+        {
+            _bannerTimer ??= DispatcherQueue.CreateTimer();
+            _bannerTimer.IsRepeating = false;
+            _bannerTimer.Interval = ToolchainReadiness.BannerDelay - (DateTime.UtcNow - since) + TimeSpan.FromMilliseconds(50);
+            _bannerTimer.Tick -= BannerDelayRanOut;
+            _bannerTimer.Tick += BannerDelayRanOut;
+            _bannerTimer.Start();
+        }
+
+        Sidebar.ShowWhetherCoursesCanBeAdded(ToolchainReadiness.Refusal(Workspace.WorkspacePath));
+    }
+
+    private void BannerDelayRanOut(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        if (!IsClosed) RefreshReadiness();
     }
 
 
@@ -218,6 +280,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 Workspace.Selection = new SidebarSelection.CourseItem(courseCode);
             });
             return;
@@ -227,6 +290,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 await Sidebar.OpenNewCourseWizard();
             });
             return;
@@ -240,6 +304,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 await Sidebar.OpenNewCourseWizard(createCode, createSections);
             });
             return;
@@ -251,6 +316,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(async () =>
             {
                 await System.Threading.Tasks.Task.Delay(1500);
+                if (!await FolderIsReadyForAutomation()) return;
                 if (Workspace.Courses.FirstOrDefault(c => c.Code == addCode) is { } course)
                     await Sidebar.OpenAddSectionDialog(course);
             });
@@ -268,6 +334,7 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(async () =>
         {
             await System.Threading.Tasks.Task.Delay(1500);
+            if (!await FolderIsReadyForAutomation()) return;
             Workspace.Selection = new SidebarSelection.SectionItem(code, section);
             if (DetailHost.Content is not SectionDetailView detail) return;
             if (preview) detail.StartPreviewForAutomation();
@@ -278,6 +345,22 @@ public sealed partial class MainWindow : Window
                 detail.ShowDetailsForAutomation();
             }
         });
+    }
+
+    /// <summary>
+    /// #473, for the automation hooks above (smoke tests): wait for this
+    /// launch's own copy of the tools into the folder — joining it, never
+    /// starting another — so a hook's Preview, Deploy or New Course is not
+    /// refused by it. False, with the sentence in startup.log as
+    /// "refused: …", when the copy failed.
+    /// </summary>
+    private async Task<bool> FolderIsReadyForAutomation()
+    {
+        if (Workspace.WorkspacePath is not { } folder) return true;
+        await ToolchainReadiness.Ensure(folder, BundledToolchain.Root);
+        if (ToolchainReadiness.Refusal(folder) is not { } notReady) return true;
+        App.LogDiagnostic($"automation hook refused: {notReady}");
+        return false;
     }
 
     /// <summary>Set once the teacher chose Quit Anyway, so the close that follows is not asked about again.</summary>
@@ -368,10 +451,13 @@ public sealed partial class MainWindow : Window
     /// </summary>
     public void ShowPreviewFor(string courseCode, int section)
     {
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
+                // #473: before the selection moves, so a refused preview
+                // leaves the window where the teacher had it.
+                if (await RefusedWhileTheFolderIsGettingReady(Workspace.WorkspacePath, "Cannot Preview Yet")) return;
                 if (DetailHost.Content is not SectionDetailView existing ||
                     !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
@@ -395,10 +481,11 @@ public sealed partial class MainWindow : Window
     /// </summary>
     public void DeployFor(string courseCode, int section)
     {
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
+                if (await RefusedWhileTheFolderIsGettingReady(Workspace.WorkspacePath, "Cannot Deploy Yet")) return;   // #473
                 if (DetailHost.Content is not SectionDetailView existing ||
                     !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
@@ -432,6 +519,13 @@ public sealed partial class MainWindow : Window
         {
             try
             {
+                // #473: the assistant is told the same sentence the window shows.
+                if (ToolchainReadiness.Refusal(Workspace.WorkspacePath) is { } notReady)
+                {
+                    await RefusedWhileTheFolderIsGettingReady(Workspace.WorkspacePath, "Cannot Deploy Yet");
+                    tcs.TrySetResult(notReady);
+                    return;
+                }
                 if (DetailHost.Content is not SectionDetailView existing ||
                     !string.Equals(existing.CourseCode, courseCode, StringComparison.OrdinalIgnoreCase) ||
                     existing.SectionNumber != section)
@@ -457,6 +551,38 @@ public sealed partial class MainWindow : Window
         }
 
         return await tcs.Task;
+    }
+
+    /// <summary>
+    /// #473: whether a build must be refused because the app is still copying
+    /// what it needs into <paramref name="folder"/> (or could not finish) —
+    /// and if so, saying why in a dialog titled <paramref name="title"/>.
+    /// Asked at every way into a preview or a deploy, BEFORE any lease is
+    /// taken or question asked; <c>ScriptRunner.Run</c> is only the backstop.
+    /// Returns true when refused.
+    /// </summary>
+    public async Task<bool> RefusedWhileTheFolderIsGettingReady(string? folder, string title)
+    {
+        if (ToolchainReadiness.Refusal(folder) is not { } notReady) return false;
+        App.LogDiagnostic($"{title}: refused, the folder's tools are {ToolchainReadiness.StateOf(folder)}");
+        if (Content?.XamlRoot is { } root)
+        {
+            try
+            {
+                await new ContentDialog
+                {
+                    Title = title,
+                    Content = notReady,
+                    CloseButtonText = "OK",
+                    XamlRoot = root,
+                }.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                App.LogDiagnostic($"RefusedWhileTheFolderIsGettingReady could not say so: {ex.Message}");
+            }
+        }
+        return true;
     }
 
     /// <summary>
@@ -654,6 +780,7 @@ public sealed partial class MainWindow : Window
         RefreshPathBar();
         RestoreFromArchiveItem.IsEnabled = Workspace.SelectedArchivedItem is not null;
         RefreshRenameCourseItem();
+        RefreshReadiness();
         App.RememberOpenWindows();
     }
 
@@ -1082,7 +1209,7 @@ public sealed partial class MainWindow : Window
 
     private void ReloadCourses_Click(object sender, RoutedEventArgs e)
     {
-        Workspace.Reload();
+        Workspace.ReloadTryingAgain();
         ApplyState();
     }
 
@@ -1306,7 +1433,7 @@ public sealed partial class MainWindow : Window
     private void ReloadCoursesAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         if (Services.DialogGate.Holds(Content?.XamlRoot, "Ctrl+Shift+R")) return;   // #191: never under a dialog
-        Workspace.Reload();
+        Workspace.ReloadTryingAgain();
         ApplyState();
         args.Handled = true;
     }

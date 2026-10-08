@@ -46,14 +46,14 @@ final class ToolchainMirrorTests: XCTestCase {
         try write("one", to: source.appendingPathComponent("a.txt"))
         try write("two", to: source.appendingPathComponent("nested/b.txt"))
 
-        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination), 2)
+        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination).changed, 2)
         XCTAssertEqual(
             try String(contentsOf: destination.appendingPathComponent("nested/b.txt"), encoding: .utf8),
             "two"
         )
 
         XCTAssertEqual(
-            WorkspaceModel.syncDirectory(from: source, to: destination), 0,
+            WorkspaceModel.syncDirectory(from: source, to: destination).changed, 0,
             "Nothing changed, so nothing should be written — this is the pass a teacher waits through"
         )
     }
@@ -88,7 +88,7 @@ final class ToolchainMirrorTests: XCTestCase {
             ofItemAtPath: destination.appendingPathComponent("a.txt").path
         )
 
-        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination), 0)
+        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination).changed, 0)
         XCTAssertTrue(
             WorkspaceModel.filesLookIdentical(
                 source.appendingPathComponent("a.txt"),
@@ -107,7 +107,7 @@ final class ToolchainMirrorTests: XCTestCase {
         try write("changed", to: source.appendingPathComponent("a.txt"))
         try write("stray", to: destination.appendingPathComponent("gone.txt"))
 
-        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination), 2)
+        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination).changed, 2)
         XCTAssertEqual(
             try String(contentsOf: destination.appendingPathComponent("a.txt"), encoding: .utf8),
             "changed"
@@ -116,6 +116,81 @@ final class ToolchainMirrorTests: XCTestCase {
             FileManager.default.fileExists(atPath: destination.appendingPathComponent("gone.txt").path),
             "An extraneous file changes the recipe's hash and rebuilds the image for nothing"
         )
+    }
+
+    // MARK: - A copy that fails is not remembered as done (#476)
+
+    /// A destination that will not take a file counts it as failed rather
+    /// than swallowing it, so the mirror can say whether the folder is up
+    /// to date.
+    func testAFileTheFolderWillNotTakeIsCountedAsFailed() throws {
+        let source: URL = root.appendingPathComponent("source")
+        let destination: URL = root.appendingPathComponent("destination")
+        try write("one", to: source.appendingPathComponent("a.txt"))
+        try write("two", to: source.appendingPathComponent("b.txt"))
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: destination.path)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destination.path)
+        }
+
+        let outcome: WorkspaceModel.MirrorOutcome = WorkspaceModel.syncDirectory(from: source, to: destination)
+        XCTAssertEqual(outcome.failed, 2, "both writes were refused")
+        XCTAssertEqual(outcome.changed, 0)
+        // Whichever of the two the enumerator met first: the name and the
+        // error, joined the way a problem report wants them.
+        let firstFailure: String = outcome.firstFailure ?? ""
+        XCTAssertTrue(
+            firstFailure.hasPrefix("a.txt: ") || firstFailure.hasPrefix("b.txt: "),
+            "the first file that failed, with its error: \(firstFailure)"
+        )
+        XCTAssertTrue(firstFailure.contains("permission"), firstFailure)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destination.path)
+        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: destination), WorkspaceModel.MirrorOutcome(changed: 2, failed: 0))
+    }
+
+    /// MUST FAIL before #476: the folder was marked fresh BEFORE the copy,
+    /// so a copy that failed left it marked for the rest of the run and no
+    /// later reload tried again. Now the one record (`ToolchainReadiness`)
+    /// says FAILED, the routine reloads skip it, and File ▸ Reload Courses
+    /// or a newly pointed window forgets the failure so the next pass tries
+    /// again — and only a copy with nothing failed is remembered as ready.
+    func testAFolderWhoseCopyFailedIsNotReadyUntilACopySucceeds() throws {
+        let workspace: URL = root.appendingPathComponent("workspace")
+        try write("#!/bin/bash\n", to: workspace.appendingPathComponent("preview.sh"))
+        let toolchain: URL = workspace.appendingPathComponent(".toolchain")
+        try FileManager.default.createDirectory(at: toolchain, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: toolchain.path)
+        addTeardownBlock {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: toolchain.path)
+            ToolchainReadiness.shared.forgetEverything(about: workspace)
+        }
+        ToolchainReadiness.shared.forgetEverything(about: workspace)
+
+        ToolchainReadiness.shared.ensure(workspace, synchronously: true)
+        XCTAssertEqual(
+            ToolchainReadiness.shared.state(of: workspace),
+            .failed(message: ToolchainReadinessWording.couldNotGetReady),
+            "MUST FAIL before #476: a copy that failed must not be remembered as done"
+        )
+        XCTAssertEqual(ToolchainReadiness.shared.reasonToWait(workspace), ToolchainReadinessWording.couldNotGetReady)
+        XCTAssertFalse(
+            WorkspaceModel.shouldMirrorToolchain(into: workspace),
+            "a routine reload does not retry — that would bring back the pause on every rename"
+        )
+        ToolchainReadiness.shared.forgetFailure(workspace)
+        XCTAssertTrue(WorkspaceModel.shouldMirrorToolchain(into: workspace), "File ▸ Reload Courses, or a newly pointed window, retries")
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: toolchain.path)
+        ToolchainReadiness.shared.ensure(workspace, synchronously: true)
+        XCTAssertEqual(ToolchainReadiness.shared.state(of: workspace), .ready, "a clean copy is remembered")
+        XCTAssertNil(ToolchainReadiness.shared.reasonToWait(workspace))
+        XCTAssertFalse(WorkspaceModel.shouldMirrorToolchain(into: workspace), "and not copied again this run")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: toolchain.appendingPathComponent("Dockerfile").path))
+        // A ready folder whose Dockerfile has gone is copied again.
+        try FileManager.default.removeItem(at: toolchain.appendingPathComponent("Dockerfile"))
+        XCTAssertTrue(WorkspaceModel.shouldMirrorToolchain(into: workspace))
     }
 
     // MARK: - Paths reached through a symlink
@@ -134,9 +209,9 @@ final class ToolchainMirrorTests: XCTestCase {
         let link: URL = root.appendingPathComponent("link")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
 
-        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: link), 1)
+        XCTAssertEqual(WorkspaceModel.syncDirectory(from: source, to: link).changed, 1)
         XCTAssertEqual(
-            WorkspaceModel.syncDirectory(from: source, to: link), 0,
+            WorkspaceModel.syncDirectory(from: source, to: link).changed, 0,
             "and the second pass must find nothing to do, rather than deleting what it just wrote"
         )
         XCTAssertTrue(FileManager.default.fileExists(atPath: real.appendingPathComponent("a.txt").path))

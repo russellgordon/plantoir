@@ -54,6 +54,28 @@ struct AssistSiteWorkResult {
             wasBuiltElsewhere: true
         )
     }
+
+    /// A headless rebuild that did not build, read from the launcher's raw
+    /// output (#471). The refusal for a section still being deployed, or any
+    /// other reason `FailureExplainer` recognises, is said as the launcher's
+    /// own sentence; otherwise the teacher is sent to the window to see
+    /// why. Never `whereTheOutputIs`: nothing on this path has a window.
+    ///
+    /// Static, and taking the OUTPUT rather than a runner, so the test
+    /// fixture's stub can hand it the contract's cases — the cross as it
+    /// arrived included — and exercise exactly what the real path does.
+    static func previewDidNotBuild(course: String, section: String, output: String) -> AssistSiteWorkResult {
+        if let reason = FailureExplainer.explanation(in: output) {
+            return AssistSiteWorkResult(
+                succeeded: false,
+                message: AssistWording.previewDidNotBuildBecause(course: course, section: section, reason: reason)
+            )
+        }
+        return AssistSiteWorkResult(
+            succeeded: false,
+            message: AssistWording.previewDidNotBuildForACallerWithNoWindow(course: course, section: section)
+        )
+    }
 }
 
 /// The two acts that leave Swift and run the toolchain: building a section's
@@ -164,6 +186,9 @@ final class AssistToolchainWork: AssistSiteWork {
             return AssistSiteWorkResult.builtElsewhere(course: course)
         }
 
+        // A copy of the folder's tools the app itself started is waited
+        // for, never refused (#476) — see `ToolchainReadiness.ensure`.
+        await ToolchainReadiness.shared.waitUntilReady(workspaceURL)
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
         // `--non-interactive` (#378): nobody on this path can answer a
@@ -191,11 +216,11 @@ final class AssistToolchainWork: AssistSiteWork {
                     )
                 )
             }
-            return AssistSiteWorkResult(
-                succeeded: false,
-                message: AssistWording.previewDidNotBuild(
-                    course: course.code, section: String(sectionNumber)
-                )
+            // Read as the window reads it (`ScriptRunner.failureExplanation`),
+            // and said without a pointer at a window this path has not got.
+            return AssistSiteWorkResult.previewDidNotBuild(
+                course: course.code, section: String(sectionNumber),
+                output: runner.transcript.recentText(maximumCharacters: 8000)
             )
         }
         return AssistSiteWorkResult(
@@ -251,6 +276,10 @@ final class AssistToolchainWork: AssistSiteWork {
                 message: AssistWording.courseIsBusy(course: course.code)
             )
         }
+
+        // As in `rebuildPreview` (#476): the app's own copy of the folder's
+        // tools is waited for, not refused.
+        await ToolchainReadiness.shared.waitUntilReady(workspaceURL)
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)

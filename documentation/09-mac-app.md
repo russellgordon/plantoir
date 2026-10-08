@@ -2615,10 +2615,9 @@ action; the button says where it is changed, and `renameLockedNumbered` says
 why when it is disabled. Neither needs a border, because neither can be typed
 in.
 
-**Allowed, with the reason, because each draws its own border:**
-`WizardFieldChrome` (the wizard's 24pt fields beside the course-code picker;
-`.roundedBorder` is 26pt — Russell, 2026-08-23; 12, "Metrics"),
-`SearchablePickerChrome` (24pt for the same reason), the sidebar's
+**Allowed, with the reason, because each draws its own border** (the
+wizard's and the searchable picker's 24pt chromes were on this list until
+#456 made every field the real bezel): the sidebar's
 `renameField` (`.plain` inside its own card, because the row sits on the
 selection colour, #293), the assistant's `assistComposerField` (`.plain`
 inside the composer's own rounded stroke), and `taskAnswerField` (inside an
@@ -6372,45 +6371,303 @@ version, reopening its windows, re-mirrors a changed `.toolchain/` into the
 folder a scheduled `preview.sh --build-only` may be building from. That is why
 the install waits.
 
-### What the teacher reads
+### Getting a folder ready after an update, off the main actor (#476, 2026-10-08)
 
-Ours, all in `UpdateWording`, retyped from `appUpdates.wording` and pinned
-both ways: `menuItem`, `heldTitle` with `scheduledWork`,
-`scheduledWorkUnnamed` or `elsewhereWork`, `heldExplanation`, `okButton`,
-`needsAdministratorTitle` and `needsAdministratorExplanation`. Drafts approved
-for the wording pass (Russell, Q5); `heldExplanation` was rewritten after the
-review (H1) because the draft promised "nothing changes until that is
-finished" while a quit installed anyway.
+Raised from the Windows side while #473 was planned: there, the first window
+after an update was absent for 94 to 120 s (Intel i5-8365U) while the tools
+were copied on the UI thread, and Windows moved the copy to a background task
+with a banner. The mac had the same shape — `WorkspaceModel.reloadCourses()`
+→ `refreshLaunchersIfNeeded()` → `refreshToolchain(in:)` →
+`mirrorToolchain(into:)` → `copyToolchainFiles(into:)`, synchronously, and
+`nonisolated` only PERMITS running elsewhere; called from the main actor it
+ran on the main thread — so the first question was how long it blocked.
 
-`elsewhereWork` is written in the contract as "…somewhere else on this
-{machine}" since 2026-10-03 (#418): the machine's name comes from
-`specialNames.platformWording.machine`, so Windows says the same sentence with
-"PC" instead of keeping its own copy. The mac's word is `MachineWord`, and
-`AppUpdatesContractTests` fills the contract's sentence with the contract's own
-word before comparing. `needsAdministratorExplanation` was NOT given the
-placeholder: Windows' sentence for an all-users copy says something else
-entirely (uninstall and install again, `windowsWording`), so there is no one
-sentence for the two to share.
+**Measured**, with a throwaway XCTest timing `copyToolchainFiles(into:)`
+against a folder with `preview.sh` in it (Apple M4 Pro, 48 GB, macOS 26.6,
+warm disk cache; the bundle's `.toolchain` is 12,758 files, about 72 MB,
+`support/` being 12,645 of them). This times the function, not launch to a
+usable window; it is the extra the window waited, not the whole launch.
 
-**Sparkle's own windows are Sparkle's words** — "A new version of Plantoir is
-available!", its buttons, the progress and error windows — localized by it
-into 35 languages, and not changeable without a fork. OURS never use a word on
-the machinery list; Sparkle's own error windows can — "feed" is on that list,
-and two of its failure strings say "update feed" (corrected after the slice-1
-review's L2, which caught the first draft claiming none did). Those, and the
-others that lean technical, appear only on failure ("An error
-occurred while parsing the update feed.", "The update feed is improperly
-signed…", "…extracting the archive…", "…launching the installer…"), and the
-trail's `update stopped` line is what makes each answerable.
+| The folder's `.toolchain/` | Time | Files written |
+|---|---|---|
+| Missing altogether (a folder whose mirror was removed) | 3.81 s | 12,758 |
+| Identical (the stat-only pass every later reload pays) | 0.87 s | 0 |
+| Same bytes, every stamp different (the first launch after a rebuild or update whose recipe did not change) | 1.72 s | 0 |
+| Every file's bytes different (an update that changed the whole recipe — the worst case) | 3.93 s | 12,758 |
 
-**Error 4007 is ours to say.** A teacher on a standard account is asked for an
-administrator's name and password (Sparkle swaps the app in `/Applications`,
-which only an admin can write); cancelling that aborts SILENTLY
-(`SPUUIBasedUpdateDriver.m` :482 — no window at all). `AppUpdates` shows
-`needsAdministratorTitle` / `needsAdministratorExplanation` and writes
-`update stopped` with the admin category. 4008 ("authorize later") never
-reaches `didAbortWithError` (`SPUUpdater.m` :803), so it is written from the
-end of the cycle instead.
+Seconds, on the fastest Mac there is, with a warm cache. **Russell chose the
+Windows design anyway (2026-10-08)** rather than closing on these numbers: a
+cold disk at the first launch after a real install, and an Intel Mac, were
+not measured, and Windows' own warm numbers (15–17 s for the same copy) are
+"a lower bound, not a prediction".
+
+**What the mac does now — Windows' design (`12-windows-app.md` → "Getting a
+folder ready after an update (#473)"), with the mac's differences named:**
+
+- **One record per folder: `ToolchainReadiness.shared`** (`Models/`), keyed
+  by `FolderIdentity.canonicalPath` (#189) — not started, copying (with
+  whether a file has been written yet), ready, failed. It REPLACES the
+  process-wide set of "fresh" paths that used to live in `WorkspaceModel`,
+  and the second set a first draft of this piece added for failures: three
+  records of one folder under two kinds of key was the #189 class of bug
+  waiting to happen (the plan review's finding 4). `shouldMirrorToolchain`
+  reads it: copying or failed → nothing starts; ready → only if the
+  `Dockerfile` has gone; not started → copy.
+- **The copy runs off the main actor** (`ToolchainReadiness.ensure`,
+  `Task.detached`), holds the running task so two windows on one folder share
+  one copy, and settles the state on the main actor when it ends — fresh
+  only when nothing failed, which is the fresh-mark defect from the issue's
+  comment fixed (`copyToolchainFiles`, `syncFile` and `syncDirectory` answer
+  a `MirrorOutcome`: changed, failed, and the first file that failed with its
+  error). A folder being SET UP goes through the same entry, after
+  `setUpFolderOnDisk` has written the launchers and `courses/`, so a reload
+  during set-up cannot start a second copy into the same `.toolchain`
+  (finding 3). Under the test suite the copy runs synchronously, as it
+  always did, so a test can assert what landed on disk.
+- **What waits, with the reason and no dialog.** Section Preview and Deploy
+  are greyed with `ToolchainReadinessWording.gettingReadyMessage` as their
+  help; so is the sidebar's + and the wizard's Create and Add Example
+  Course; and `NewCourseCreator.createCourse` / `installExampleCourse` refuse
+  BEFORE `course_config.json` or the `course created` line is written, for
+  the reason the setup.sh check beside them exists (a half-made course blocks
+  a retry; finding 7). `ScriptRunner.run` is the BACKSTOP for a way in nobody
+  thought of: a folder that is copying or failed sets `launchProblem` to the
+  sentence and starts nothing — and only `launchProblem`, never an exit code,
+  because the mac's callers check that straight after `run` and a -1 would
+  open the empty raw-output panel (finding 6).
+- **The app's own robots wait instead of being refused.** `Plantoir
+  --mcp-stdio` adopts its folder before reading a request, and that reload
+  starts the copy in ITS process. Requests are read AT ONCE — a client's
+  start-up timeout must not wait on a copy that can take a minute on a slow
+  Mac (the implementation review's finding 4) — and the two tools that
+  build, `AssistToolchainWork.rebuildPreview` and `deploy`, wait for the
+  copy themselves (`ToolchainReadiness.waitUntilReady`), so a client that
+  sends a preview straight away is never refused for a copy the server
+  itself started (finding 2). In that process a copy that FAILED is tried
+  again at the next build rather than refused for ever with a sentence
+  naming a File menu it has not got. And, like the quit, the server never
+  leaves mid-copy: at the end of its input it waits for a running copy
+  before exiting (the fixes review's finding 1). **Not done on purpose:** a cross-process marker.
+  Windows wrote `toolchain-copying.<pid>` so one process could see another's
+  copy; the mac does not, because every file is written atomically from the
+  same bundle, so two copies at once write the same bytes and the worse
+  outcome is wasted work, not a broken recipe.
+- **The scheduled run is unchanged**, as on Windows: `ScheduledDeploy`
+  starts its own `Process`, never a `ScriptRunner`, and never mirrors; a
+  `--stop` (`PreviewStopper`) is its own process too, so neither meets the
+  backstop (finding 1).
+- **The banner** (`ToolchainReadinessNoticeView`, above the path bar beside
+  the synced-folder notice) appears only once the copy has actually written
+  or removed its first file (`syncDirectory` says so once, for a write or a
+  removal), and on a failure — not on a timer (Windows' one second
+  against its half-second compare): the ordinary launch compares every file
+  for 0.9 s and writes nothing, and a slower Mac would have flashed a timed
+  banner on every launch (finding 9). The buttons are greyed from the copy's
+  first moment regardless. On a failure it names File ▸ Reload Courses, which
+  — like a window newly pointed at the folder — forgets the failure and
+  tries again; the routine reloads never retry, so a failure that does not go
+  away cannot bring back the pause on every rename.
+- **⌘Q waits for a running copy** (`AppDelegate.applicationShouldTerminate`,
+  `.terminateLater`): the synchronous copy could not be quit through; off
+  the main actor it could, leaving `.toolchain/` half old and half new for a
+  scheduled run or a command-line launcher to build from (finding 8). Bounded
+  by the copy. Windows has this gap and does not wait — a `windows` issue
+  says so.
+- **The trail line** `working folder tools copied` is written on both
+  platforms now (its contract entry lost `appliesOn: ["windows"]`): once per
+  copy that changed or failed something, the counts, the seconds, and the
+  first file that failed. `BuilderWarmUp`, which copies the same recipe into
+  its own folder, builds nothing from a copy that failed, since the image
+  would carry the wrong tag.
+
+**Measured after** (this build, Apple M4 Pro, warm cache, a scratch working
+folder with one course and NO `.toolchain/`, the window polled through
+System Events every quarter second): **first window at 0.34 s** after
+launch; the copy ran behind it and finished **3.8 s** after launch (12,753
+files, the trail line "got the working folder ready: 12753 file(s) brought
+up to date in 3.8 s"). Before this piece the same launch would have shown
+its window at about 4 s. The number that matters, launch to a usable
+window, no longer depends on the copy at all — Windows' sentence, true here
+too.
+
+### An offer nobody saw is brought forward, and looked for again (#472, 2026-10-08)
+
+Windows found (#465) that its daily check could run before the first window
+was up, find a version, have nowhere to show the offer, and write `1.4.3: not
+now` — an answer nobody gave — while also marking the day done. The authored
+rule that came of it is `shared-rules.json` →
+`appUpdates.anOfferNobodySawIsNotAnAnswer`: no answer line for an offer that
+was not shown, and the day's check not done until it has been. #472 asked
+whether the mac has the same gap. Answered from this app's code and from
+Sparkle 2.9.6's source (`SPUStandardUserDriver.m`, `SUUpdateAlert.m`,
+`SPUUpdater.m` at the 2.9.6 tag, read by the Opus plan reviews).
+
+1. **Can a scheduled check reach the offer before the app has a window, or
+   while a sheet is up — and what happens then?** The updater is created and
+   started only in `applicationDidFinishLaunching` (`AppUpdates.start()`),
+   so no check runs before launch has finished. What Sparkle does with a
+   scheduled offer is NOT "show it behind other apps" — that is for
+   background apps only. For a regular app (`SPUStandardUserDriver.m`
+   265-281, 340-346) the standard driver shows the alert at once only when
+   the app is active and the check began within the last 3 s or the system
+   has been idle; otherwise it HOLDS the alert until
+   `NSApplicationDidBecomeActive`, which is what "may hold its window back
+   until the app is in front" in the trail section below has said since
+   #204. A sheet or modal in Plantoir neither blocks nor dismisses it. (Until
+   #476 the mirror's 0.9–3.9 s on the main actor could push a launch-time
+   check past that 3 s; off the main actor it no longer can, and it was a
+   weak cause anyway — the slow copy is the first launch after an update,
+   when there is nothing new to offer. A launch-time offer is now held only
+   when the app is not frontmost, or when the feed answers more than 3 s
+   after `start()` with the system not idle.)
+2. **Can anything the app writes as `update answered` ("not now") come from
+   a window the teacher never saw?** No. The only path that writes that line
+   is the `SPUUpdaterDelegate` callback
+   `updater(_:userDidMake:forUpdate:state:)`, and Sparkle calls it only with
+   what the alert replied: `SUUpdateAlert.m` replies Dismiss from the info
+   link (:148), Remind Me Later (:158) and the close box (:502) and from
+   nothing else, and a held alert has not been shown, so nothing can reply
+   for it. `HoldingUserDriver.showUpdateFound` hands the reply straight to
+   the standard driver except in the installing stage, where the app's own
+   held notice answers (`teacherAnsweredResumedWindow`); `isSettingAside`
+   keeps a quit's stand-down from being written as an answer; and the app's
+   one way into `dismissUpdateInstallation`
+   (`HoldingUserDriver.closeTheUpdatersWindows`) runs only while an install
+   is held. An alert still open when Plantoir quits never replies, so nothing
+   is written. **The first half of the rule holds on its own.**
+3. **Does a held alert use up the day's check?** Yes: `SPUUpdater.m` writes
+   the last-check date when the check STARTS (:789) and again when it ends
+   (:822). So a teacher who kept Plantoir in front all day, or quit before
+   switching back to it, was offered the update by the next day's check
+   rather than today's — no false answer, the trail reading `update found`
+   with no `update answered`, which is exactly "offered, not yet answered",
+   and Check for Updates… bringing the held alert forward at once. **Russell
+   chose to close the gap (2026-10-08) rather than accept it**, so the mac now
+   matches the rule's second half by another route than Windows':
+
+   - **The driver says whether it held the offer, with the offer in hand.**
+     `SPUStandardUserDriver` gets a delegate (`UpdateReminderDelegate`):
+     `standardUserDriverShouldHandleShowingScheduledUpdate(_:
+     andInImmediateFocus:)` answers YES, so Sparkle shows the update exactly
+     as before, and the app only LISTENS — and it is THERE that the app is
+     told the offer was handed over, because the driver asks inside its own
+     `showUpdateFound`, before any window is shown: told before, the flag is
+     the previous offer's; told after, an alert shown at once may already
+     have been seen and cleared (the implementation review's finding 2; it
+     also found the gentle-reminders flag gates only a log line, not the
+     callback). `standardUserDriverDidReceiveUserAttention(forUpdate:)` says
+     the alert was seen.
+   - **A held offer is brought forward later** (`UpdateReminders`,
+     `AppUpdates.scheduledOfferWasHandedToSparkle`): after 1, 2, 4, 8, 16,
+     32 then every 60 minutes, while the offer is still pending and the app
+     is active, `showUpdateInFocus()` — the call Check for Updates… makes —
+     shows the held alert (`SPUStandardUserDriver.m` :466-470, :184-192).
+     Only while ACTIVE, and only after ten quiet seconds of no keyboard or
+     mouse input (`CGEventSource.secondsSinceLastEventType`, the idle test
+     Sparkle itself uses): when the app is inactive Sparkle shows the alert
+     the moment it is activated, and bringing it forward from behind would
+     pull Plantoir in front of whatever the teacher is doing (the plan
+     review's finding 14); and the alert comes up key with Install focused,
+     so brought forward mid-keystroke a Return typed into Plantoir would
+     install the update (the implementation review's finding 3). The retries stop at the first attention or answer
+     — a teacher who leaves the alert open is never made to look at it again
+     (finding 13: a repeated `showUpdateInFocus` makes the alert key with
+     Install focused, and a Return typed into Plantoir would have installed).
+   - **An offer nobody saw is looked for again at the next launch.** The
+     pending version outlives the process (`PlantoirDefaults`,
+     `UpdateReminders.pendingOfferKey`); at `start()`, if it is still newer
+     than the running version, `checkForUpdatesInBackground()` is called in
+     the SAME run-loop turn as `start()` — the turn Sparkle leaves free on
+     purpose; a turn later its own cycle has a session in progress and
+     refuses the call (`SPUUpdater.m` :172-174, :543, :664; finding 11). The
+     record is cleared when the alert is seen or answered, when a check finds
+     nothing newer (1001), and when the running version is the offered one or
+     newer — installed by hand, say — so nothing is re-checked for ever
+     (finding 12).
+   - **No new trail line.** Windows wrote none for its retries (Russell,
+     2026-10-08, `11-release-strategy.md` → #465), the launch-time check
+     writes `update found` as any check does, and the rule says nothing is
+     written for an offer nobody saw. `UpdateRemindersTests` pins the logic;
+     Sparkle's calls are not exercised, because no updater is ever created
+     under tests (`AppUpdates.shouldStart`), and the lines above are what was
+     read instead.
+
+### Every text field is the same height: the 24pt drawn bezels are gone (#456, 2026-10-08)
+
+The course-code picker in the New Course wizard, the two fields sharing its
+chrome (Course name, Timetable section numbers; the club's short name when
+shown) and the searchable picker in Copy a Page were drawn at **24pt** by two
+`ViewModifier`s that imitated AppKit's bezel — because on 2026-08-23 the
+target was `NSComboBox` and `.roundedBezel` `NSTextField`, which report 24,
+and SwiftUI's `.roundedBorder` is 26 and cannot be forced to 24
+(`research/native-control-metrics/`). Every other field in Plantoir wears the
+real `.roundedBorder` bezel since #374, so those four were the odd ones out:
+two bezels differing by 2pt and by drawing code was the inconsistency, not
+the fix. **Decided by Russell (2026-10-07): the standard is the SwiftUI
+field.**
+
+**What changed.** `WizardFieldChrome` and `SearchablePickerChrome` are
+deleted; the four fields wear `.borderedTextField()` like every other, with
+`.multilineTextAlignment(.leading)` and `.frame(maxWidth: .infinity)` kept
+from the chrome on the two picker fields (the explicit `LabeledContent`
+wrappers are what keep the wizard's text reading leading, the UI test
+records — the alignment alone never did — which is why the three wizard
+fields could drop it). The course-code field's chevron stays overlaid on the
+field, now as a real `NSButton` (below); the FIELD's measured numbers (24pt, a 6pt
+radius, the text insets, the baseline nudge) are gone from
+`CourseCodePickerView` — the chevron's own measured numbers remain. The three
+`@FocusState`s the wizard kept only so the chrome could draw a focus ring
+are gone with it; the real bezel draws its own. The searchable picker's tap
+workaround (a `.contentShape` and `.onTapGesture` so an EMPTY `.plain` field
+took a click anywhere in its bezel) is gone too: a real bordered field
+hit-tests its whole bezel, and keeping the gesture on one risked swallowing
+the mouse-down that places the caret.
+
+**The accepted trade.** Text long enough to reach the chevron runs under it
+— a course code may be 12 characters ("AP CALC AB"), and the Copy a Page
+search is free text. The drawn chrome kept a 34pt trailing inset for this;
+`.roundedBorder` offers no way to inset its text. Accepted, because the
+alternative is a third bezel; a code that long is rare and still readable
+by scrolling the field. The searchable picker's old tap workaround went
+with the chrome on the strength of AppKit's own hit-testing for a bordered
+field, not a measurement — the UI tests that drive the wizard
+(`testCourseCodeRevealButtonOpensThePopup`,
+`testCourseCodeFieldMatchesCourseNameFieldsLeadingEdgeAndLabel`) are what
+was run through the real interface for this piece.
+
+**The chevron had to become a real AppKit button — and even that was not
+enough.** With the real bezel, the course-code field is an `NSTextField`
+spanning the whole width, and AppKit hands a click to the deepest NSView
+under the pointer before SwiftUI's own layer sees it. The chevron drawn as a
+plain `.overlay` was never clicked: the field took the click and placed its
+caret, which `testCourseCodeRevealButtonOpensThePopup` caught the first time
+the real bezel was tried (the drawn chrome never met this, because its
+`.plain` field was inset 34pt from the trailing edge, leaving the chevron
+over nothing but a shape). Measured, one try at a time, through that test:
+a SwiftUI button inside an `NSHostingView` did not fire; an `NSButton`
+(`RevealChevronButton`, drawn to the measured 24 × 19pt pill) did not fire
+either, and re-adding it above its siblings changed nothing, because SwiftUI
+hosts the field and the overlay in containers of its own whose order is not
+ours to set — a coordinate click at the button's own frame still focused the
+field. So the button takes its click from the window: a local monitor for
+`leftMouseDown`, scoped to its window and removed with the button, performs
+the click for a point inside its own frame and swallows the event, and the
+field never sees it. With that, the chevron opens the popup and the field
+takes focus, through the real interface (both wizard UI tests pass; before
+this piece the first of them passed on `dev` and failed on the branch, which
+is how the regression was found and not shipped). The searchable picker's
+chevron is the same button.
+
+**Tests.** `TextFieldStyleScanTests` has no chrome allow-list any more: every
+`TextField` wears `.borderedTextField()` or is one of the three remaining
+named exceptions (the rename card, the assistant's composer, the alert field
+— #457's to remove). The UI test's old containment check compared the chevron
+with a background SHAPE whose identifier SwiftUI hoisted onto the whole Form
+row, so it never measured the field; it now compares with the text field's
+own frame, and the two fields' leading edges match to 2pt rather than 8,
+since both carry the same bezel inset. `documentation/12-windows-app.md` →
+"The chrome is shared, and that was a trade" told Windows to match 24pt; it
+now says to keep its own standard text box, all fields the same height.
 
 ### The trail — eight events
 
@@ -7018,9 +7275,11 @@ what each one launches, what it writes, what was measured and what was
 rejected is in
 [chapter 10 → "The other doors"](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has).
 
-The complete behavioural specification — every interface decision, with
-the reasoning and a Windows-porting note per entry — is
-[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
+The behavioural log to 2026-10-08 — every interface decision to that date,
+with the reasoning and a Windows-porting note per entry — is
+[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md), closed to new entries since
+then (#480): what is true now is `contracts/`, and what changed after is the
+closed issues by milestone. Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
 

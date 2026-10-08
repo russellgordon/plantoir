@@ -99,6 +99,17 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// Whether the check now running is one the teacher asked for.
     @ObservationIgnored private var teacherAskedForThisCheck: Bool = false
 
+    /// A held scheduled offer, and the retries that bring it forward (#472).
+    @ObservationIgnored let reminders: UpdateReminders = UpdateReminders(defaults: PlantoirDefaults.shared)
+
+    /// The standard driver's delegate: told, with the offer in hand, whether
+    /// a scheduled offer is shown at once or held, and when the alert gets
+    /// the teacher's attention (#472).
+    @ObservationIgnored private var reminderDelegate: UpdateReminderDelegate?
+
+    /// The retries for the offer now held, if any.
+    @ObservationIgnored private var retryTask: Task<Void, Never>?
+
     /// Whether a failure of the DAILY check has been written this launch.
     @ObservationIgnored private var hasNotedADailyCheckFailure: Bool = false
 
@@ -192,8 +203,11 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         if updater != nil {
             return
         }
-        let driver: HoldingUserDriver = HoldingUserDriver(hostBundle: Bundle.main, owner: self)
+        let delegate: UpdateReminderDelegate = UpdateReminderDelegate(owner: self)
+        reminderDelegate = delegate
+        let driver: HoldingUserDriver = HoldingUserDriver(hostBundle: Bundle.main, owner: self, delegate: delegate)
         adopt(driver)
+        reminders.noteRunning(version: AppUpdates.runningVersion)
         let made: SPUUpdater = SPUUpdater(
             hostBundle: Bundle.main,
             applicationBundle: Bundle.main,
@@ -216,6 +230,15 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         do {
             try made.start()
             isRunning = true
+            // An offer held in an earlier run and never seen (#472): looked
+            // for again NOW — in the same run-loop turn as `start()`, which
+            // Sparkle leaves free on purpose; a turn later its own cycle has
+            // a session in progress and refuses the call (SPUUpdater.m
+            // :172-174, :543, :664). The day's check is still stamped when
+            // this one starts, so the offer returns today, not tomorrow.
+            if reminders.shouldCheckAgainAtLaunch(runningVersion: AppUpdates.runningVersion) {
+                made.checkForUpdatesInBackground()
+            }
         } catch {
             let code: Int = (error as NSError).code
             ActivityTrail.note(.updateStopped, UpdateTrail.stoppedLine(version: nil, code: code))
@@ -226,6 +249,61 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// window. Separate from `start` so a test can hand in one of its own.
     func adopt(_ driver: HoldingUserDriver) {
         userDriver = driver
+    }
+
+    /// Sparkle was handed a scheduled offer (#472). If its driver is holding
+    /// the alert rather than showing it, the retries begin: after 1, 2, 4…
+    /// minutes, while the offer is still pending and the app is active, the
+    /// held alert is brought forward — the same call Check for Updates…
+    /// makes — and they stop the moment the alert is seen or answered.
+    func scheduledOfferWasHandedToSparkle(version: String, shownAtOnce: Bool) {
+        reminders.noteOffered(version: version, shownAtOnce: shownAtOnce)
+        retryTask?.cancel()
+        retryTask = nil
+        if shownAtOnce {
+            return
+        }
+        retryTask = Task { @MainActor [weak self] in
+            var attempt: Int = 0
+            while !Task.isCancelled {
+                let minutes: Int = UpdateReminders.minutesBeforeRetry(attempt)
+                try? await Task.sleep(for: .seconds(minutes * 60))
+                guard let self, !Task.isCancelled else {
+                    return
+                }
+                if self.reminders.pendingVersion == nil {
+                    return
+                }
+                // Only while the app is active AND the teacher has not
+                // touched the keyboard or mouse for a few seconds (the
+                // implementation review's finding 3): a held alert is shown
+                // key with Install focused, and brought forward mid-keystroke
+                // a Return typed into Plantoir would install the update.
+                if self.reminders.shouldBringForward(
+                    appIsActive: NSApp.isActive, secondsSinceInput: AppUpdates.secondsSinceLastInput()
+                ) {
+                    self.userDriver?.showUpdateInFocus()
+                }
+                attempt += 1
+            }
+        }
+    }
+
+    /// How long since the teacher last typed or moved the mouse, as Sparkle
+    /// asks it for its own idle test. Nil when the event source cannot say.
+    nonisolated static func secondsSinceLastInput() -> TimeInterval? {
+        guard let anyInput = CGEventType(rawValue: ~0) else {
+            return nil
+        }
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
+    }
+
+    /// The alert reached the teacher — seen, or answered — so nothing is
+    /// pending and the retries stop (#472).
+    func offerReachedTheTeacher() {
+        reminders.noteSeenOrAnswered()
+        retryTask?.cancel()
+        retryTask = nil
     }
 
     /// Check for Updates…, from the menu.
@@ -629,6 +707,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         if isSettingAside {
             return
         }
+        offerReachedTheTeacher()
         let answer: UpdateTrail.Answer
         switch choice {
         case .install:
@@ -672,6 +751,11 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     ) {
         if let error {
             let code: Int = (error as NSError).code
+            if code == 1001 {
+                // Nothing newer: whatever offer was pending has left the
+                // feed, and must not be looked for at every launch (#472).
+                reminders.noteNothingNew()
+            }
             if code == 1001 && teacherAskedForThisCheck {
                 ActivityTrail.note(
                     .updateCheckFoundNothingNew,
@@ -798,8 +882,8 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
         super.init()
     }
 
-    convenience init(hostBundle: Bundle, owner: AppUpdates) {
-        self.init(standard: SPUStandardUserDriver(hostBundle: hostBundle, delegate: nil), owner: owner)
+    convenience init(hostBundle: Bundle, owner: AppUpdates, delegate: UpdateReminderDelegate? = nil) {
+        self.init(standard: SPUStandardUserDriver(hostBundle: hostBundle, delegate: delegate), owner: owner)
     }
 
     // MARK: - Functions: the two that are not simply passed on
@@ -836,6 +920,13 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
         reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
         guard state.stage == .installing, let owner else {
+            // A SCHEDULED offer (#472) is reported by the standard driver's
+            // DELEGATE, not here: the driver asks it whether it will show
+            // the alert at once or hold it inside this very call, before any
+            // window is shown — reported before, the answer is the previous
+            // offer's; reported after, an alert shown at once may already
+            // have been seen and cleared (the implementation review's
+            // finding 2).
             standard.showUpdateFound(with: appcastItem, state: state, reply: reply)
             return
         }
@@ -901,6 +992,57 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
 
     func showUpdateInFocus() {
         standard.showUpdateInFocus?()
+    }
+}
+
+// MARK: - The standard driver's delegate
+
+/// What Sparkle's standard driver tells the app about a scheduled offer
+/// (#472): whether it will show it at once or hold it, and when the alert
+/// gets the teacher's attention — the signal that stops the retries, so a
+/// teacher who leaves the alert open is never made to look at it again (the
+/// plan review's finding 13: a repeated `showUpdateInFocus` makes the alert
+/// key with Install focused, and a Return typed into Plantoir would install).
+///
+/// `shouldHandleShowingScheduledUpdate` answers YES, so the standard driver
+/// keeps showing the update exactly as before — the app only LISTENS. (The
+/// gentle-reminders flag below is declared for honesty's sake; in Sparkle
+/// 2.9.6 it gates only a log line for background apps, not whether these
+/// callbacks are consulted.)
+final class UpdateReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
+
+    // MARK: - Stored properties
+
+    private weak var owner: AppUpdates?
+
+    // MARK: - Initializer
+
+    init(owner: AppUpdates) {
+        self.owner = owner
+        super.init()
+    }
+
+    // MARK: - Functions
+
+    var supportsGentleScheduledUpdateReminders: Bool {
+        return true
+    }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        // Asked before any window is shown, for scheduled checks only — the
+        // one moment the app can learn whether this offer is shown at once
+        // or held, with the offer in hand.
+        owner?.scheduledOfferWasHandedToSparkle(
+            version: UpdateTrail.versionText(version: update.displayVersionString, build: update.versionString),
+            shownAtOnce: immediateFocus
+        )
+        return true
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        owner?.offerReachedTheTeacher()
     }
 }
 

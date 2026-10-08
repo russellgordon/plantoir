@@ -112,54 +112,16 @@ struct CourseCodePickerView: View {
 
     @FocusState var codeFieldHasFocus: Bool
 
-    /// Every number below was MEASURED off a real `NSComboBox`, not
-    /// chosen by eye — a 260x24pt one rendered offscreen at 2x in both
-    /// appearances and read back pixel by pixel (2026-08-23, after
-    /// Russell put our field beside a real combo box and listed five
-    /// ways it was off). The harness and the full findings table live
-    /// in `research/native-control-metrics/`; re-run it rather than
-    /// re-guessing if any of these ever need to move.
+    /// The chevron button's numbers below were MEASURED off a real
+    /// `NSComboBox` — a 260x24pt one rendered offscreen at 2x in both
+    /// appearances and read back pixel by pixel (2026-08-23; the harness
+    /// and the findings table are in `research/native-control-metrics/`).
+    /// The FIELD's own measured numbers (24pt tall, a 6pt radius, a 6pt
+    /// text inset, a 3pt baseline nudge) lived here too until #456, when
+    /// the drawn imitation of AppKit's bezel they drove was replaced by the
+    /// real `.roundedBorder` bezel every other field wears; they are in
+    /// git history and in `documentation/09-mac-app.md` → "#456".
     ///
-    /// `AppKit` reports the field's own height as 24pt at the regular
-    /// control size — and an `NSTextField` with `.roundedBezel` reports
-    /// exactly the same 24pt with an identical corner profile, which is
-    /// what Course Name below is. So matching the combo box and
-    /// matching our own sibling field are the same target, and the
-    /// earlier 30pt was simply too tall (which is also why the corner
-    /// radius READ wrong at the time even though 6pt was already
-    /// correct — the same radius on a 30pt box looks squarer).
-    static let fieldHeight: CGFloat = 24
-
-    /// 6pt, confirmed by fitting a circle to the bezel's antialiased
-    /// corner: the leading-edge inset per row runs 8,6,4,3,2,2,1,1,0
-    /// device px, which a 12px (= 6pt) radius predicts to within one
-    /// pixel on every row. `NSComboBox` and `.roundedBezel`
-    /// `NSTextField` render byte-identical corners.
-    static let fieldCornerRadius: CGFloat = 6
-
-    /// Where the TEXT starts inside the field: 6pt, which is the
-    /// cell's 4 plus 2.
-    ///
-    /// `NSComboBoxCell.titleRect(forBounds:)` reports x = 4 for a
-    /// 260pt-wide box (and `NSTextFieldCell.drawingRect(forBounds:)`
-    /// agrees), but 4 is where the text CONTAINER starts, not where a
-    /// glyph lands — the text system adds its own line-fragment
-    /// padding inside that. Measuring the rendered glyphs settles it:
-    /// the "B" of "Banana" in a real combo box starts 7.0pt from the
-    /// field's outer edge and the "C" of "Chemistry" in a rounded
-    /// `NSTextField` starts 6.5pt, and those letters' own left side
-    /// bearings at 13pt put the text origin at about 5.7pt either way.
-    /// At a bare 4 our "S" landed at 4.5pt against the native 7.0 —
-    /// close enough to look right alone, wrong side by side, which is
-    /// exactly how Russell spotted it.
-    static let textLeadingInset: CGFloat = 6
-
-    /// The trailing space the text must keep clear. The same
-    /// `titleRect` ends 34pt short of the field's trailing edge (width
-    /// 222 of 260), which is the button's 24pt plus its 4pt inset plus
-    /// a 6pt gap between the text and the button.
-    static let textTrailingInset: CGFloat = 34
-
     /// The chevron button: 24 x 19pt, 4pt in from the field's trailing
     /// edge — read straight off the rendered button's fill bounds
     /// (x 464-511, y 4-41 in 2x device pixels on a 520x48 render).
@@ -167,7 +129,7 @@ struct CourseCodePickerView: View {
     /// field's: inset per row 8,5,3,2,2,1,1,1,0, which a 10px (= 5pt)
     /// radius predicts on every row.
     ///
-    /// Deliberately NOT `fieldHeight - something`: the button's height
+    /// Deliberately NOT derived from the field's height: the button's height
     /// is its own measured number, and tying it to the field height (as
     /// an earlier version did) meant a change to one silently moved the
     /// other away from what AppKit actually draws.
@@ -175,22 +137,6 @@ struct CourseCodePickerView: View {
     static let revealButtonHeight: CGFloat = 19
     static let revealButtonCornerRadius: CGFloat = 5
     static let revealButtonTrailingInset: CGFloat = 4
-
-    /// Nudges the text UP inside the field. A `.plain` `TextField`'s
-    /// glyphs do not sit centred within its own intrinsic box — they
-    /// ride low — so `.frame(height:)` centring the BOX still leaves
-    /// the text low in the field. Measured against Course Name in the
-    /// same screenshot, using the capital "I" both fields' contents
-    /// happen to start with, so the comparison needs no font metrics:
-    /// Course Name puts 17px above the cap and 16px below the baseline
-    /// (centred), while this field put 18 above and 11 below — 3.5px,
-    /// or 1.75pt, too low at 2x (Russell, 2026-08-23).
-    ///
-    /// Applied as BOTTOM padding rather than an `.offset`, so it stays
-    /// part of layout: padding P inside a fixed-height frame moves the
-    /// centred content up by P/2, and hit-testing and the caret follow
-    /// the text rather than being left behind by a visual-only shift.
-    static let textBaselineNudge: CGFloat = 3
 
     /// The chevron glyph, sized to the 7.5 x 4.5pt one AppKit draws.
     /// Found by rendering `chevron.down` across sizes 8-13 at four
@@ -261,14 +207,15 @@ struct CourseCodePickerView: View {
             .onKeyPress(.return) {
                 onCommitHighlight() ? .handled : .ignored
             }
-            // The same chrome Course Name and Timetable Section Numbers
-            // wear, so the three fields cannot drift apart — this one
-            // just reserves more trailing room, for the chevron.
-            .modifier(WizardFieldChrome(
-                isFocused: codeFieldHasFocus,
-                trailingInset: CourseCodePickerView.textTrailingInset,
-                backgroundIdentifier: "wizardCourseCodeFieldBackground"
-            ))
+            // The ONE bezel every field in Plantoir wears (#374), since
+            // #456: the 24pt imitation of an AppKit bezel this used to draw
+            // is gone, so this field, Course name beside it and every other
+            // field are the same height by construction. The chevron is
+            // overlaid on the real field; text long enough to reach it runs
+            // under it, the accepted trade (#456).
+            .borderedTextField()
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity)
             // The visual cue a Mac user already knows: a trailing
             // chevron reads as "this field also has a menu behind it"
             // the way `NSComboBox` itself always shows one (Russell,
@@ -276,46 +223,25 @@ struct CourseCodePickerView: View {
             // illustration). Tapping it opens the popup and puts the
             // cursor in the field, same as clicking the field itself
             // would — it's a second way in, not a different control.
+            // A real AppKit button (`RevealChevronButton`): the real bezel's
+            // `NSTextField` takes a click meant for a SwiftUI overlay (#456).
+            // Untinted, the way a real combo box's button is — see
+            // `revealButtonFillColor`; the history of the tint and the glyph
+            // colour is on those constants.
             .overlay(alignment: .trailing) {
-                Button {
+                RevealChevronButton(
+                    accessibilityIdentifier: "courseCodeRevealButton",
+                    accessibilityLabel: "Browse course codes"
+                ) {
+                    // The wizard's own focus flag as well as the field's:
+                    // the popup follows the former, and a focus write from
+                    // an AppKit button's action is not always mirrored into
+                    // `@FocusState` in the same turn (#456).
+                    isFocused = true
                     codeFieldHasFocus = true
                     onRevealRequested()
-                } label: {
-                    RoundedRectangle(cornerRadius: CourseCodePickerView.revealButtonCornerRadius)
-                        // Filled with the accent colour specifically so
-                        // there's always strong contrast against the
-                        // field's own background, in both light and
-                        // dark appearance — Russell's explicit
-                        // requirement, and the one thing missing from
-                        // the very first attempt at this same day.
-                        // Untinted, the way a real combo box's button
-                        // is — see `revealButtonFillColor`. This was
-                        // `Color.accentColor` for a day, which is what
-                        // made ours read as a blue pill beside the
-                        // native control's near-invisible one.
-                        .fill(CourseCodePickerView.revealButtonFillColor)
-                        .overlay(
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: CourseCodePickerView.revealButtonGlyphSize, weight: .semibold))
-                                // Ordinary label colour. The old
-                                // accent-luminance calculation existed
-                                // only to keep a white-or-black glyph
-                                // legible on a TINTED pill; with no
-                                // tint there is nothing to compensate
-                                // for, and plain label colour is what
-                                // AppKit draws (measured at 222,222,222
-                                // in dark and 36,36,36 in light).
-                                .foregroundStyle(.primary)
-                        )
-                        .frame(
-                            width: CourseCodePickerView.revealButtonWidth,
-                            height: CourseCodePickerView.revealButtonHeight
-                        )
                 }
-                .buttonStyle(.plain)
                 .padding(.trailing, CourseCodePickerView.revealButtonTrailingInset)
-                .accessibilityIdentifier("courseCodeRevealButton")
-                .accessibilityLabel("Browse course codes")
             }
             .onChange(of: codeFieldHasFocus) {
                 isFocused = codeFieldHasFocus
@@ -333,85 +259,6 @@ struct CourseCodePickerView: View {
     }
 }
 
-/// The wizard's field chrome — one definition for all three text fields
-/// in the Basics section, so they cannot drift apart.
-///
-/// It exists because `.textFieldStyle(.roundedBorder)` renders **26pt**
-/// tall, while every AppKit control it stands in for is **24**
-/// (`NSTextField` with `.roundedBezel` and `NSComboBox` both report 24
-/// from `fittingSize` — see `research/native-control-metrics/`). Russell
-/// asked for 24 across the row on 2026-08-23, reasoning that if the
-/// native field is 24 then these should be too.
-///
-/// `.frame(height: 24)` does NOT achieve that, which is worth knowing
-/// before anyone tries it again: SwiftUI draws the `.roundedBorder`
-/// bezel at its own intrinsic height regardless of the frame it is
-/// given, so the field measured 26 anyway and merely overflowed its
-/// box. The only way to get 24 is to stop asking SwiftUI for its bezel
-/// and draw one, which is what the course-code field already had to do
-/// for its chevron — so this is that chrome, extracted rather than
-/// duplicated.
-///
-/// The cost, stated plainly: two fields that used to wear a real
-/// AppKit bezel now wear an imitation of one. The imitation is measured
-/// against the real thing (radius, inset, height, text position) rather
-/// than eyeballed, and the alternative — wrapping a real `NSTextField`
-/// in an `NSViewRepresentable` for all three — buys genuine native
-/// chrome at the price of hand-managing first responder and binding
-/// updates for a field that already works.
-struct WizardFieldChrome: ViewModifier {
-
-    // MARK: - Stored properties
-
-    /// Drawn by the caller's own `@FocusState`. A `ViewModifier` cannot
-    /// own focus for the view it decorates — `@FocusState` only
-    /// projects from the view that declares it — so the accent ring has
-    /// to be told rather than discovered.
-    let isFocused: Bool
-
-    /// How much room to keep clear at the trailing edge. The course-code
-    /// field reserves space for its chevron; the other two reserve the
-    /// same 6pt the text keeps at the leading edge.
-    let trailingInset: CGFloat
-
-    /// Optionally identifies the background SHAPE for UI tests. It has
-    /// to be the shape rather than the `TextField`, because an
-    /// `NSTextField`'s accessibility frame reports the underlying
-    /// CONTROL's bounds — its ~18pt text box — no matter where in the
-    /// modifier chain an identifier is bound, so the field's own
-    /// identifier can never report the 24pt visual height a test needs
-    /// to check the chevron sits inside it (confirmed across two
-    /// orderings, 2026-08-23).
-    var backgroundIdentifier: String? = nil
-
-    // MARK: - Functions
-
-    func body(content: Content) -> some View {
-        content
-            .textFieldStyle(.plain)
-            .multilineTextAlignment(.leading)
-            .padding(.leading, CourseCodePickerView.textLeadingInset)
-            .padding(.trailing, trailingInset)
-            .padding(.bottom, CourseCodePickerView.textBaselineNudge)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: CourseCodePickerView.fieldHeight,
-                maxHeight: CourseCodePickerView.fieldHeight
-            )
-            .background(
-                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
-                    .fill(Color(nsColor: .textBackgroundColor))
-                    .accessibilityIdentifier(backgroundIdentifier ?? "")
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CourseCodePickerView.fieldCornerRadius)
-                    .strokeBorder(
-                        isFocused ? Color.accentColor : Color(nsColor: .separatorColor),
-                        lineWidth: isFocused ? 2 : 1
-                    )
-            )
-    }
-}
 
 /// What the wizard compares, frame to frame, to decide whether the popup
 /// deserves an animated transition: whether it's shown at all, and which

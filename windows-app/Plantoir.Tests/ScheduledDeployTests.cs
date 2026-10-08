@@ -1,4 +1,7 @@
+using System.Globalization;
 using Plantoir.Core.Assist;
+using Plantoir.Core.Models;
+using Plantoir.Mcp;
 
 namespace Plantoir.Tests;
 
@@ -267,6 +270,50 @@ public sealed class ScheduledDeployTests : IDisposable
 
         Assert.Equal(("Unit 2, Day 3", (bool?)true), Assert.Single(plan.ClassesNamed));
         Assert.DoesNotContain("NOT published", plan.Describe());
+    }
+
+    // ---- What an outside assistant passes as `classes` (#469) ---------------
+
+    [Fact]
+    public void ClassesAreSplitOnSemicolonsSoATitleWithACommaSurvives()
+    {
+        // Nearly every class page is called "Unit 2, Day 3". Until #469 this
+        // server split `classes` on commas, so the list below was four titles,
+        // none of which exists, and the plan could not say the second one was
+        // unpublished — the one thing it is there to catch.
+        ClassPage("Unit 2, Day 3", published: true);
+        ClassPage("Unit 2, Day 4", published: false);
+        var tools = new PlantoirTools(Open());
+        string when = Tomorrow.ToString(ScheduledDeploy.WrittenForm, CultureInfo.InvariantCulture);
+
+        string planned = tools.PlanScheduledDeploy("ICS3U", 1, when, classes: "Unit 2, Day 3; Unit 2, Day 4").Detail();
+
+        Assert.Contains("Unit 2, Day 4 — NOT published, so the deploy would ship without it.", planned);
+        Assert.DoesNotContain("Unit 2, Day 3 — NOT", planned);
+        Assert.Equal(new[] { "Unit 2, Day 3", "Unit 2, Day 4" },
+                     PlantoirTools.ClassTitles("Unit 2, Day 3; Unit 2, Day 4"));
+        // A line break separates too, the way the mac's runner reads it.
+        Assert.Equal(new[] { "Unit 2, Day 3", "Unit 2, Day 4" },
+                     PlantoirTools.ClassTitles("Unit 2, Day 3\r\nUnit 2, Day 4\n"));
+    }
+
+    [Fact]
+    public void ClassDatesAreReadAlikeWhicheverSeparatorTheAssistantUses()
+    {
+        // The descriptions say semicolons since #469 (the contract's text), and
+        // an assistant that learned the old "commas or spaces" wording must
+        // not be broken by that: the dates runner stays forgiving.
+        var tools = new PlantoirTools(Open());
+        string first = DateText.Iso(DateOnly.FromDateTime(DateTime.Now.AddDays(7)));
+        string second = DateText.Iso(DateOnly.FromDateTime(DateTime.Now.AddDays(9)));
+
+        string semicolons = tools.PlanRememberTimetable("ICS3U", 1, $"{first}; {second}").Detail();
+        string commas = tools.PlanRememberTimetable("ICS3U", 1, $"{first}, {second}").Detail();
+        string spaces = tools.PlanRememberTimetable("ICS3U", 1, $"{first} {second}").Detail();
+
+        Assert.DoesNotContain("aren't dates I can read", semicolons);
+        Assert.Equal(semicolons, commas);
+        Assert.Equal(semicolons, spaces);
     }
 
     [Fact]

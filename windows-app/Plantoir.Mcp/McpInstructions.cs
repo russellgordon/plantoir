@@ -36,12 +36,13 @@ public static class McpInstructions
         "wait. A deploy takes several minutes, and so does building a preview.\n\n" +
         "Scheduled deploys. Call plan_scheduled_deploy first and read it out, especially that the computer must be ON " +
         "and AWAKE at that moment, plugged in if it is a laptop, with the lid open: Plantoir does not wake it. Pass the " +
-        "class pages the teacher has in mind as `classes` so the plan checks they are actually published. Scheduling " +
+        "class pages the teacher has in mind as `classes`, separated by semicolons, so the plan checks they are actually " +
+        "published. Scheduling " +
         "replaces any deploy already scheduled for that section; cancel_scheduled_deploy calls it off and is safe when " +
         "nothing is scheduled.\n\n" +
         "Dates. Call read_remembered_timetable before asking the teacher for their class dates, and before any tool that " +
         "needs dates. When they tell you when their class meets, call remember_timetable with the WHOLE list every " +
-        "time (it replaces what was recorded), dates as YYYY-MM-DD separated by commas or spaces. For " +
+        "time (it replaces what was recorded), dates as YYYY-MM-DD separated by semicolons, commas or spaces. For " +
         "plan_re_date_classes, give `pages` and `meetings` as matching lists to choose which lesson lands on which " +
         "meeting; leaving both empty spreads them evenly, which is a starting point rather than an answer. Pages can be " +
         "chosen by name, or by date with onOrAfter/before.\n\n" +

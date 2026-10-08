@@ -1086,7 +1086,8 @@ public class AssistWorkspaceTests : IDisposable
         {
             WriteAssistLease("ICS3U", child.Id, child.ProcessName);
 
-            Assert.Equal("Available once you finish revising with Claude",
+            // An outside session (#468): the contract's sentence, both doors named.
+            Assert.Equal(ContractLoader.LoadJson("assist-wording.json")["wording"]!["availableOnceYouFinishRevisingWithClaude"]!.ToString(),
                 Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "ICS3U"));
             Assert.Null(Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "SNC1W"));
             Assert.Null(Plantoir.Core.Models.CourseActivity.BusyReason(_folder, "EXC2O"));
@@ -1492,6 +1493,41 @@ public class AssistWorkspaceTests : IDisposable
         var rebuildAsked = await workspace.RebuildPreview("ICS3U", 1);
         Assert.False(rebuildAsked.Succeeded);
         Assert.Equal(AssistWording.PreviewBuildNeedsAnAnswer("ICS3U", "1"), rebuildAsked.Message);
+    }
+
+    /// <summary>
+    /// #467 (mac #439): a deploy whose legs were refused because the section
+    /// was still being deployed says so - for a refused BUILD leg instead of
+    /// "the build failed", and for refused deploy legs instead of "did not
+    /// finish". The launcher's output is the contract's own case.
+    /// </summary>
+    [Fact]
+    public async Task ADeployRefusedWhileItsSectionDeploysSaysSo()
+    {
+        Page("ICS3U", "section1/All Classes/Unit 2, Day 3.md", draft: false);
+        var cases = ContractLoader.LoadJson("shared-rules.json")["deployWhileItsSectionDeploys"]!["failureExplanationCases"]!.AsArray();
+        string laterBuild = cases[1]!["output"]!.ToString();
+        string anotherDeploy = cases[2]!["output"]!.ToString();
+        var workspace = Open();
+
+        _launcher.FailOn = "preview";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\n" + laterBuild;
+        var build = await workspace.Deploy("ICS3U", 1);
+        Assert.False(build.Succeeded);
+        Assert.Equal(AssistWording.DeployRefusedWhileALaterDeployWorks("ICS3U", "1"), build.Message);
+        Assert.DoesNotContain(_launcher.Runs, run => run.Launcher == "deploy");
+
+        _launcher.Runs.Clear();
+        _launcher.FailOn = "deploy";
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\n" + anotherDeploy;
+        var deploy = await workspace.Deploy("ICS3U", 1);
+        Assert.False(deploy.Succeeded);
+        Assert.Equal(AssistWording.DeployRefusedWhileItsSectionDeploys("ICS3U", "1"), deploy.Message);
+
+        // An ordinary failure is told the ordinary way.
+        _launcher.FailMessage = "It went wrong.";
+        var failed = await workspace.Deploy("ICS3U", 1);
+        Assert.Equal(AssistWording.DeployDidNotFinish("ICS3U", "1"), failed.Message);
     }
 
     [Fact]
@@ -1980,6 +2016,9 @@ internal sealed class FakeLauncher : ILauncherRunner
     /// <summary>Which launcher, if any, should report failure.</summary>
     public string? FailOn { get; set; }
 
+    /// <summary>What a failing launcher says (its output, as plantoir-mcp's LauncherRunner carries it).</summary>
+    public string FailMessage { get; set; } = "It went wrong.";
+
     /// <summary>
     /// Which launcher, if any, stops at a question nobody can answer — exit 3
     /// under --non-interactive (#391).
@@ -1994,7 +2033,7 @@ internal sealed class FakeLauncher : ILauncherRunner
         if (launcher == QuestionOn)
             return Task.FromResult(new LaunchOutcome(false, "It asked a question.", null, LaunchOutcome.NeedsAnAnswerExitCode));
         return Task.FromResult(launcher == FailOn
-            ? new LaunchOutcome(false, "It went wrong.")
+            ? new LaunchOutcome(false, FailMessage)
             : new LaunchOutcome(true, "Done."));
     }
 }

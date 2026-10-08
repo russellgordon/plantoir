@@ -37,7 +37,7 @@
                                 <FontIcon Glyph="{x:Bind BadgeGlyph}" FontSize="12" Opacity="0.75"
                                           Visibility="{x:Bind BadgeVisibility, Mode=OneWay}"
                                           ToolTipService.ToolTip="{x:Bind BadgeTooltip, Mode=OneWay}" />
-                                <!-- A warning, only on a section whose scheduled publish did
+                                <!-- A warning, only on a section whose scheduled deploy did
                                      not get through. A SECOND icon rather than a second
                                      meaning for the clock's: Glyph above is OneTime (it is a
                                      constant, so that is right for it), and rows are
@@ -76,7 +76,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Button x:Name="AddButton" Grid.Column="0" MinWidth="30" MinHeight="28" Padding="0"
+            <Button x:Name="AddCourseButton" Grid.Column="0" MinWidth="30" MinHeight="28" Padding="0"
                     Background="Transparent" BorderThickness="0" Click="Add_Click"
                     ToolTipService.ToolTip="Add a course or club"
                     AutomationProperties.Name="Add a course or club"

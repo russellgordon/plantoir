@@ -119,9 +119,15 @@ public class ScheduleAndCancelFramesTests : IDisposable
     public void TheLaterTimeWordsAreShortAndExact(string typed, bool later) =>
         Assert.Equal(later, AssistAgent.SaysALaterTime(typed));
 
-    /// <summary>Fix round 2, settler S2: a teacher who SAID "unit" keeps the model's unit "next".</summary>
+    /// <summary>
+    /// Settler S2 as widened by #440 (ruling 2): the model's <c>unit</c> and
+    /// <c>days</c> are dropped from EVERY add_next_class it sends, whatever the
+    /// sentence said — the old rule kept unit "next" for a sentence that said
+    /// "unit", so "Add the next class in this unit" could start a new one.
+    /// Course and section are kept as sent.
+    /// </summary>
     [Fact]
-    public void ANewUnitTheTeacherAskedForIsKept()
+    public void TheModelsUnitAndDaysAreAlwaysDropped()
     {
         var call = new JsonObject
         {
@@ -131,10 +137,22 @@ public class ScheduleAndCancelFramesTests : IDisposable
                 ["arguments"] = """{"course":"ICS3U","section":1,"unit":"next","days":0}""",
             },
         };
-        string Kept(string typed) => AssistAgent.WithoutAnUnaskedNewUnit(call, typed)["function"]!["arguments"]!.ToString();
-        Assert.Contains("\"unit\":\"next\"", Kept("start the next unit please"));
-        Assert.DoesNotContain("unit", Kept("Add the next class"));
-        Assert.Contains("\"days\":0", Kept("Add the next class"));
+        var settled = JsonNode.Parse(AssistAgent.WithoutCardOnlyArguments(call)["function"]!["arguments"]!.ToString())!.AsObject();
+        Assert.False(settled.ContainsKey("unit"));
+        Assert.False(settled.ContainsKey("days"));
+        Assert.Equal("ICS3U", settled["course"]!.ToString());
+        Assert.Equal(1, settled["section"]!.GetValue<int>());
+
+        // Nothing to take out: the very same call comes back.
+        var plain = new JsonObject
+        {
+            ["function"] = new JsonObject
+            {
+                ["name"] = "add_next_class",
+                ["arguments"] = """{"course":"ICS3U","section":1}""",
+            },
+        };
+        Assert.Same(plain, AssistAgent.WithoutCardOnlyArguments(plain));
     }
 
     /// <summary>
