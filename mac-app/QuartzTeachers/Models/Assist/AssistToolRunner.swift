@@ -3980,17 +3980,17 @@ final class AssistToolRunner {
                 return AssistToolOutcome.planned(
                     already,
                     plan: websiteAnswer == "new"
-                        ? "Start a new website for this section, so publishing it no longer replaces "
-                        + "last year's. Last year's details are kept, and any publish set to happen "
+                        ? "Start a new website for this section, so deploying it no longer replaces "
+                        + "last year's. Last year's details are kept, and any deploy set to happen "
                         + "on its own is turned off."
-                        : "Keep publishing this section to the same website as last year."
+                        : "Keep deploying this section to the same website as last year."
                 )
             }
             if isRollover, websiteAnswer == "new" {
                 let newWebsite: String =
-                    "\n\nIt would also start a new website for this section, so publishing it "
+                    "\n\nIt would also start a new website for this section, so deploying it "
                     + "no longer replaces last year's. Last year's details are kept, and any "
-                    + "publish set to happen on its own is turned off."
+                    + "deploy set to happen on its own is turned off."
                 return AssistToolOutcome.planned(
                     "Worked out what rolling that section over would do.",
                     plan: asked.plan.describe() + newWebsite,
@@ -4301,7 +4301,7 @@ final class AssistToolRunner {
             }
             ActivityTrail.note(
                 .sectionStartedANewWebsiteOnRollover,
-                "rolled the section over onto a new website — it had not been published anywhere yet",
+                "rolled the section over onto a new website — it had not been deployed anywhere yet",
                 course: course.code, section: sectionNumber
             )
             return AssistWording.rolloverHadNoWebsiteYet
@@ -4744,7 +4744,7 @@ final class AssistToolRunner {
                 // a deploy walks (`allDeployDestinations`) — named by TYPE and
                 // joined "A, B and C", in the scheduled deploy card's words
                 // (`planOpening.cardNaming`, #396). This used to name the primary
-                // alone, so a course publishing to Netlify AND Cloudflare Pages
+                // alone, so a course deploying to Netlify AND Cloudflare Pages
                 // read "Netlify", and one set to a folder not chosen yet read
                 // "Netlify" too. The app's own assistant window shows this line
                 // when a teacher asks what courses they have, so it is a teacher
@@ -4754,7 +4754,7 @@ final class AssistToolRunner {
                 // that has not been chosen yet, a state the product models on
                 // purpose. Pinned by shared-rules.json →
                 // scheduledDeployRefusals.planOpening.listCoursesLine.
-                + "  publishes to: \(AssistToolRunner.everyDestination(of: course))"
+                + "  deploys to: \(AssistToolRunner.everyDestination(of: course))"
                 + howITeachLine(for: course)
             )
         }

@@ -390,7 +390,7 @@ nonisolated enum AssistWording {
     /// `courseIsBusy` instead — it is the one talking to the program that is
     /// busy, so "busy in Plantoir" is the true sentence there.
     static func courseIsBeingBuiltElsewhere(course: String) -> String {
-        return "\(course) is being previewed or published somewhere else on this computer right now — "
+        return "\(course) is being previewed or deployed somewhere else on this computer right now — "
              + "by an assistant working from another app, another copy of Plantoir, or a deploy set "
              + "for later. Both would build the same pages in the same place, so doing it here as "
              + "well would spoil both. Try again once that has finished."
@@ -540,7 +540,7 @@ nonisolated enum AssistWording {
     /// same thing in the same shape, so a shared sentence stays shared.
     static func rolloverStartedANewWebsite(keptAs: String) -> String {
         return rolloverIsOnANewWebsite + " Last year's details are "
-             + "kept at \(keptAs), so you can go back to it. The next time you publish this "
+             + "kept at \(keptAs), so you can go back to it. The next time you deploy this "
              + "section, Plantoir will ask what to call the new website."
     }
 
@@ -554,15 +554,15 @@ nonisolated enum AssistWording {
     static let rolloverIsOnANewWebsite: String =
         "This section is no longer tied to last year's website." 
 
-    /// Confirming a new website for a section that had never been published.
+    /// Confirming a new website for a section that had never been deployed.
     static let rolloverHadNoWebsiteYet: String =
-        "This section had not been published anywhere yet, so there was no website to move away "
-        + "from. The first time you publish it, Plantoir will ask what to call it."
+        "This section had not been deployed anywhere yet, so there was no website to move away "
+        + "from. The first time you deploy it, Plantoir will ask what to call it."
 
     /// Confirming the same website.
     static let rolloverKeptTheSameWebsite: String =
-        "This section still publishes to the same website as last year, so every link anybody "
-        + "saved keeps working. Nothing goes out until you publish."
+        "This section still deploys to the same website as last year, so every link anybody "
+        + "saved keeps working. Nothing goes out until you deploy."
 
     /// What a teacher is told when the question was never answered.
     ///
@@ -574,7 +574,7 @@ nonisolated enum AssistWording {
     /// that it was NOT is what stops this feature quietly recreating the
     /// defect it was built to fix.
     static let rolloverWebsiteNotDecided: String =
-        "I have not changed which website this section publishes to — publishing it will still "
+        "I have not changed which website this section deploys to — deploying it will still "
         + "go to last year's website. Ask me to roll it over again if you would like to choose."
 
     /// A destination that could not be released, so the section is still
@@ -583,38 +583,38 @@ nonisolated enum AssistWording {
     /// **Its own sentence because the alternative said the opposite.** A
     /// marker that exists and cannot be moved used to produce the same empty
     /// result as one that was never there, so a teacher was told "this section
-    /// had not been published anywhere yet" about a section that is still
-    /// publishing over last year's site. That is a lie about the one fact this
+    /// had not been published anywhere yet" (as it then said) about a section that is still
+    /// deploying over last year's site. That is a lie about the one fact this
     /// whole feature turns on.
     static func rolloverCouldNotStartANewWebsite(stillPinned: String) -> String {
-        return "I could not move this section off \(stillPinned), so publishing it will still "
+        return "I could not move this section off \(stillPinned), so deploying it will still "
              + "replace last year's website there. Try again, or check whether that file is "
              + "locked or open somewhere else."
     }
 
-    /// Added when releasing a website turned off a publish that was set to
+    /// Added when releasing a website turned off a deploy that was set to
     /// happen on its own.
     ///
-    /// A section cut loose has nowhere agreed to publish TO, and the scheduled
+    /// A section cut loose has nowhere agreed to deploy TO, and the scheduled
     /// run has no one to ask, so it would silently create a website nobody
     /// named while the address students actually read stopped updating. The
     /// same shape as renaming a course, which turns the schedule off and says
     /// so for the same reason.
     static let rolloverTurnedOffTheScheduledPublish: String =
-        "This section was set to publish on its own. Starting a new website turned that off — "
-        + "set it again from the section's menu once you have published the new website for the "
+        "This section was set to deploy on its own. Starting a new website turned that off — "
+        + "set it again from the section's menu once you have deployed the new website for the "
         + "first time."
 
-    /// When turning that scheduled publish off did NOT work.
+    /// When turning that scheduled deploy off did NOT work.
     ///
     /// The dangerous state, and so the one that must not be described by the
-    /// sentence above. A publish still set to run has nobody to ask what the
+    /// sentence above. A deploy still set to run has nobody to ask what the
     /// new website should be called, so it would go ahead and make one — the
     /// exact outcome turning it off exists to prevent. Renaming a course says
     /// the same thing for the same reason.
     static let rolloverCouldNotTurnOffTheScheduledPublish: String =
-        "This section was also set to publish on its own, and Plantoir could not turn that off. "
-        + "It may still try to publish, and it has no way to ask what the new website should be "
+        "This section was also set to deploy on its own, and Plantoir could not turn that off. "
+        + "It may still try to deploy, and it has no way to ask what the new website should be "
         + "called — turn it off from the section's menu."
 
     // MARK: - Getting a section ready for the start of the year (#96)
@@ -1771,7 +1771,7 @@ nonisolated enum AssistWording {
     /// `otherClassesMoved`. Named rather than typed inline, so that reply
     /// carries no copy of the undo caveat of its own (#185).
     static let lookTheSectionOverBeforePublishing: String =
-        "Look the section over in Plantoir before you publish."
+        "Look the section over in Plantoir before you deploy."
 
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."

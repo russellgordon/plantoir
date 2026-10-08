@@ -154,15 +154,15 @@ public class SectionDetailTeardownSourceTests
         // Three starts decide a folder: the Preview button, the assistant's
         // automated preview (which "Preview Again" after a repair also goes
         // through), and the deploy — the last AFTER its own preview stop, so
-        // that stop still names the preview's folder. The fourth is
-        // StagePreviewForCapture, which is the marketing-shot harness: it sets
-        // _previewUrl, so `hadPreview` is true and a later stop would sweep,
-        // and a staged view must not answer the teardown's question any
-        // differently from a real one.
+        // that stop still names the preview's folder. (A fourth,
+        // StagePreviewForCapture, set it for a staged picture with nothing
+        // serving; it went with #380, when the marketing pictures began to
+        // photograph a REAL preview, which goes through the Preview button's
+        // start like a teacher's.)
         var written = Regex.Matches(code, @"_folderThisSectionWorksIn\s*=\s*[^=]");
-        Assert.True(written.Count == 4,
-            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 4 (the two " +
-            "preview starts, the deploy, and the shot harness). Delete one and every stop it fed " +
+        Assert.True(written.Count == 3,
+            $"_folderThisSectionWorksIn is written {written.Count} time(s), expected 3 (the two " +
+            "preview starts and the deploy). Delete one and every stop it fed " +
             "becomes a silent no-op wearing the shape of this fix working.");
 
         // The registration key is written exactly once, and readonly makes

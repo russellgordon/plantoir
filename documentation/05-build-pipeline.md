@@ -1933,8 +1933,9 @@ telling the teacher to do the thing they had just done.
 
 **The guard is still right** — do not publish half a build. What was wrong is
 that its answer went nowhere. The sync now RETURNS whether it mirrored a site,
-and a `--build-only` run that mirrored nothing prints "Nothing to publish …
-it has no front page, so no website was produced" and **exits non-zero**. That
+and a `--build-only` run that mirrored nothing prints "Nothing to deploy for
+… it has no front page, so no website was produced" ("Nothing to publish …"
+before v1.4.4, #443) and **exits non-zero**. That
 matters more than the sentence: a publish runs `preview.sh --build-only` and
 then `deploy`, so failing the build stops the run at the step that KNOWS the
 reason. The mac already shows the folder-problem dialog on a failed build, so
