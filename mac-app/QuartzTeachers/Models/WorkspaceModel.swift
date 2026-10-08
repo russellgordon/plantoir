@@ -855,7 +855,7 @@ class WorkspaceModel {
         // A window newly pointed at the folder retries a copy that failed (#476).
         ToolchainReadiness.shared.forgetFailure(url)
         if let refusal = WorkingFolderReach.refusal(forFolder: url) {
-            refuseChosenFolder(refusal)
+            refuseChosenFolder(refusal, fromOpenRecent: fromOpenRecent)
             return
         }
         folderNotOpened = nil
@@ -954,8 +954,10 @@ class WorkspaceModel {
     }
 
     /// A chosen folder the builder cannot reach: say so, write it down, and
-    /// change nothing else.
-    private func refuseChosenFolder(_ refusal: WorkingFolderReach.Refusal) {
+    /// change nothing else. The trail says WHERE it was chosen — the Open
+    /// panel (the picker's own, or File's with no window open) or File ▸ Open
+    /// Recent (#457) — because "I never chose that folder" is answered by it.
+    private func refuseChosenFolder(_ refusal: WorkingFolderReach.Refusal, fromOpenRecent: Bool) {
         folderNotOpened = FolderNotOpened(
             how: .chosen,
             reason: refusal.whichPath == .workingFolder ? .outsideHome : .coursesOutsideHome,
@@ -968,7 +970,8 @@ class WorkspaceModel {
             : "its courses lead outside the home folder"
         ActivityTrail.note(
             .workingFolderRefused,
-            "refused the working folder " + LogRedactor.redacting(refusal.folderPath) + " — " + why + " (chosen in the picker)"
+            "refused the working folder " + LogRedactor.redacting(refusal.folderPath) + " — " + why
+                + (fromOpenRecent ? " (chosen from File ▸ Open Recent)" : " (chosen in the picker)")
         )
     }
 

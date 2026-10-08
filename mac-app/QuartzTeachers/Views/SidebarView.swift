@@ -60,6 +60,11 @@ struct SidebarView: View {
     /// the teacher goes into Obsidian.
     @State var lockedPagesNoteCourse: Course?
 
+    /// The folder Obsidian reveals once that note is answered — the section's
+    /// own when it was asked from a section (#457: what the section window's
+    /// toolbar button opens).
+    @State var lockedPagesNoteFolder: URL?
+
     /// The section "Schedule Deploy…" was chosen on, while its sheet is up.
     @State var scheduleRequest: ScheduledDeployRequest?
 
@@ -500,7 +505,7 @@ struct SidebarView: View {
         .sheet(item: $copyPageCourse) { course in
             CopyPageSheet(source: course)
         }
-        .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse))
+        .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse, folder: lockedPagesNoteFolder))
         .sheet(item: $addSectionCourse) { course in
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
@@ -1247,7 +1252,7 @@ struct SidebarView: View {
                     .accessibilityIdentifier("sidebar-\(course.code)-section\(sectionNumber)")
                     .contextMenu {
                         let row: SidebarSelection = SidebarSelection.section(course.code, sectionNumber)
-                        openInObsidianItem(forReferenceCourse: course, row: row)
+                        openInObsidianItem(forReferenceCourse: course, sectionNumber: sectionNumber, row: row)
                         Divider()
                         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
                     }
@@ -1258,7 +1263,7 @@ struct SidebarView: View {
                 .accessibilityIdentifier("sidebar-\(course.code)")
                 .contextMenu {
                     let row: SidebarSelection = SidebarSelection.course(course.code)
-                    openInObsidianItem(forReferenceCourse: course, row: row)
+                    openInObsidianItem(forReferenceCourse: course, sectionNumber: nil, row: row)
                     Divider()
                     Button(ReferenceWording.setSchoolYearMenuItem, systemImage: "calendar") {
                         select(row)
@@ -1365,10 +1370,10 @@ struct SidebarView: View {
     /// worst of both. Once per course is enough; after that the item opens
     /// Obsidian directly, like any other course's.
     @ViewBuilder
-    func openInObsidianItem(forReferenceCourse course: Course, row: SidebarSelection) -> some View {
+    func openInObsidianItem(forReferenceCourse course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         Button("Open in Obsidian", systemImage: "square.and.pencil") {
             select(row)
-            openReferenceCourseInObsidian(course)
+            openReferenceCourseInObsidian(course, sectionNumber: sectionNumber)
         }
         .disabled(!FolderActions.obsidianIsInstalled)
         .accessibilityIdentifier("openInObsidian-\(course.code)")
@@ -1588,7 +1593,7 @@ struct SidebarView: View {
         reviseWithCodexItem(course: course, row: row)
         reviseNotes(course: course, sectionNumber: nil)
         if course.isKeptForReference {
-            openInObsidianItem(forReferenceCourse: course, row: row)
+            openInObsidianItem(forReferenceCourse: course, sectionNumber: nil, row: row)
         } else {
             openInObsidianItem(
                 revealing: course.directoryURL, vaultURL: course.directoryURL, row: row
@@ -1698,16 +1703,23 @@ struct SidebarView: View {
 
     /// Open in Obsidian on a course kept for reference, with the calm note
     /// in front of it the first time.
-    func openReferenceCourseInObsidian(_ course: Course) {
+    ///
+    /// From a SECTION it reveals the section's folder, exactly what the
+    /// section window's toolbar button reveals (`FolderActions.obsidianFolder`);
+    /// until #457's implementation review it revealed the course folder from
+    /// the section's row, and the toolbar beside it did not agree.
+    func openReferenceCourseInObsidian(_ course: Course, sectionNumber: Int?) {
         // Locked again first: this is one of the moments the teacher
         // ACTS on a reference course, and a folder that came back from a
         // second Mac, or from a backup, is not locked until somebody
         // asks.
         ReferenceLock.ensureLockedInBackground(course)
+        let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
         if LockedPagesNote.hasBeenShown(courseCode: course.code) {
-            FolderActions.openInObsidian(revealing: course.directoryURL, vaultURL: course.directoryURL)
+            FolderActions.openInObsidian(revealing: folder, vaultURL: course.directoryURL)
             return
         }
+        lockedPagesNoteFolder = folder
         lockedPagesNoteCourse = course
     }
 
@@ -1850,13 +1862,12 @@ struct SidebarView: View {
         case .courseOpenInObsidian, .sectionOpenInObsidian:
             if let course {
                 if course.isKeptForReference {
-                    openReferenceCourseInObsidian(course)
-                } else if let sectionNumber {
-                    FolderActions.openInObsidian(
-                        revealing: course.sectionDirectoryURL(forSection: sectionNumber), vaultURL: course.directoryURL
-                    )
+                    openReferenceCourseInObsidian(course, sectionNumber: sectionNumber)
                 } else {
-                    FolderActions.openInObsidian(revealing: course.directoryURL, vaultURL: course.directoryURL)
+                    FolderActions.openInObsidian(
+                        revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber),
+                        vaultURL: course.directoryURL
+                    )
                 }
             }
         case .courseShowInFinder:
@@ -1908,7 +1919,7 @@ struct SidebarView: View {
             if let course, let sectionNumber {
                 openTheLinksChecklist(course: course, sectionNumber: sectionNumber)
             }
-        case .newCourse, .importCoursesForReference, .restoreFromArchive, .reloadCourses,
+        case .openWorkingFolder, .openRecent, .newCourse, .importCoursesForReference, .restoreFromArchive, .reloadCourses,
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
              .preview, .deploy, .openInBrowser, .back, .forward, .reloadPage:
             // Not the sidebar's: File, Course Settings and the section
@@ -2358,6 +2369,10 @@ private struct LockedPagesNoteAlert: ViewModifier {
 
     @Binding var course: Course?
 
+    /// What Obsidian reveals once the note is answered: the section's folder
+    /// when it was asked from a section, else the course's.
+    var folder: URL?
+
     // MARK: - Functions
 
     func body(content: Content) -> some View {
@@ -2370,7 +2385,7 @@ private struct LockedPagesNoteAlert: ViewModifier {
                 LockedPagesNote.remember(courseCode: shown.code)
                 course = nil
                 FolderActions.openInObsidian(
-                    revealing: shown.directoryURL, vaultURL: shown.directoryURL
+                    revealing: folder ?? shown.directoryURL, vaultURL: shown.directoryURL
                 )
             }
             Button("Not Now", role: .cancel) {

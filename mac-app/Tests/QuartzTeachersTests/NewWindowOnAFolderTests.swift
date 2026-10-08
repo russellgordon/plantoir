@@ -150,6 +150,28 @@ final class NewWindowOnAFolderTests: XCTestCase {
         XCTAssertEqual(model.folderNotOpened?.detail, OpenRecentWording.gone)
     }
 
+    /// A recent folder now outside the home folder is refused with the
+    /// picker's words — and the trail says it came from Open Recent, not
+    /// from the picker (#457's implementation review, finding 1).
+    func testARecentFolderOutOfReachSaysWhereItWasChosen() throws {
+        let home: URL = scratch.appendingPathComponent("home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        WorkingFolderReach.homeFolderOverride = home
+        let outside: URL = try makeWorkingFolder("outside")
+        let model: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        WorkspaceModel.registerWindowModel(model)
+        defer { WorkspaceModel.unregisterWindowModel(model) }
+
+        model.openRecent(RememberedFolder.make(for: outside))
+        XCTAssertNil(model.workspaceURL)
+        XCTAssertEqual(model.folderNotOpened?.how, .chosen, "the picker's own words (#290)")
+        XCTAssertTrue(trailText().contains("(chosen from File ▸ Open Recent)"), trailText())
+        XCTAssertFalse(trailText().contains("(chosen in the picker)"), trailText())
+
+        model.chooseWorkspace(at: outside)
+        XCTAssertTrue(trailText().contains("(chosen in the picker)"), "the Open panel still says the picker")
+    }
+
     /// Bringing a window to the front does NOT reorder Open Recent (the plan
     /// review: it would reorder on every app switch, each a menu rebuild).
     func testComingToTheFrontDoesNotTouchTheRecents() throws {

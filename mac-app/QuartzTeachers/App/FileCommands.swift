@@ -20,7 +20,8 @@ import SwiftUI
 /// - **Open Working Folder… ⌘O and Open Recent** work with no window: they
 ///   choose a folder first and then open a window on it. With a Plantoir
 ///   window in front they switch THAT window (Russell's decision 3), as
-///   Open Working Folder… always has.
+///   Open Working Folder… always has. With a sheet up on that window they
+///   are greyed, like every verb (they would open a second window behind it).
 /// - **New Course… ⇧⌘N** lives here only, not also in Course: the same
 ///   words twice in the menu bar is what #457 item 4 rules out.
 ///
@@ -65,9 +66,12 @@ struct FileCommands: Commands {
             Divider()
 
             Button("Open Working Folder…") {
-                openWorkingFolder()
+                MenuRoute.run(.openWorkingFolder, in: workspace?.window) {
+                    openWorkingFolder()
+                }
             }
             .keyboardShortcut("o", modifiers: [.command])
+            .disabled(!enabled.contains(.openWorkingFolder))
 
             openRecentMenu
 
@@ -111,8 +115,11 @@ struct FileCommands: Commands {
         return Menu("Open Recent") {
             ForEach(0..<entries.count, id: \.self) { index in
                 Button(titles[index]) {
-                    openRecent(entries[index])
+                    MenuRoute.run(.openRecent, in: workspace?.window) {
+                        openRecent(entries[index])
+                    }
                 }
+                .disabled(!enabled.contains(.openRecent))
             }
             if !entries.isEmpty {
                 Divider()
@@ -120,13 +127,21 @@ struct FileCommands: Commands {
             Button("Clear Menu") {
                 recentFolders.clear()
             }
-            .disabled(entries.isEmpty)
+            .disabled(entries.isEmpty || !enabled.contains(.openRecent))
         }
+        // Greyed under a sheet like every other verb: the folder chosen
+        // would otherwise open a second window behind it. With NO window
+        // there is no sheet, and it opens one. Each ENTRY is greyed too:
+        // measured, SwiftUI leaves a submenu's own item enabled whatever
+        // `.disabled` says, so the entries are what actually grey.
+        .disabled(!enabled.contains(.openRecent))
     }
 
     // MARK: - Functions
 
     /// The window in front, when it is a Plantoir window that may act now.
+    /// (With a sheet up on it the items are greyed and `MenuRoute` refuses,
+    /// so in practice this is nil only when no Plantoir window is in front.)
     var freeWindowModel: WorkspaceModel? {
         guard let workspace, MenuRoute.windowIsFree(workspace.window) else {
             return nil

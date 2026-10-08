@@ -47,6 +47,8 @@ nonisolated enum SubjectMenuRules {
     /// Every item whose enablement is decided here.
     enum Item: String, CaseIterable, Sendable {
         // File
+        case openWorkingFolder
+        case openRecent
         case newCourse
         case importCoursesForReference
         case restoreFromArchive
@@ -155,7 +157,13 @@ nonisolated enum SubjectMenuRules {
         let isSection: Bool = situation.row == .section
         let isCourseOrSection: Bool = isCourse || isSection
 
-        // File
+        // File. Open Working Folder… and Open Recent are live with NO
+        // window (they open one) and in any window without a sheet; they grey
+        // under a sheet like every other verb, because the folder they choose
+        // would otherwise open a SECOND window behind it (the director's
+        // ruling on the implementation review, #457).
+        enabled.insert(.openWorkingFolder)
+        enabled.insert(.openRecent)
         if situation.hasFolder && !situation.folderGettingReady {
             enabled.insert(.newCourse)
         }
@@ -236,13 +244,16 @@ nonisolated enum SubjectMenuRules {
             if situation.previewIsShowing {
                 enabled.insert(.openInBrowser)
             }
-            // Gated by DIRECTION, as the context menu is: a reference course
-            // is never scheduled, but a schedule set before it was kept must
-            // still be cancellable.
+            // Neither on a course kept for reference: nothing deploys from
+            // one, and its section row's context menu offers neither — the
+            // menu bar and the context menu may not disagree (the director's
+            // ruling on the implementation review, #457). Plantoir turns off a
+            // schedule a kept course still has on its own
+            // (`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`).
             if isLive && !situation.hasSchedule {
                 enabled.insert(.scheduleDeploy)
             }
-            if situation.hasSchedule {
+            if isLive && situation.hasSchedule {
                 enabled.insert(.cancelScheduledDeploy)
             }
             if isLive && !situation.deploying {

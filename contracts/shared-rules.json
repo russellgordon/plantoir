@@ -37,8 +37,8 @@
       },
       {
         "event": "working folder refused",
-        "carries": "the chosen folder's path (redacted), and whether the folder itself or its courses lead outside the home folder",
-        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only the picker writes it; a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
+        "carries": "the chosen folder's path (redacted), whether the folder itself or its courses lead outside the home folder, and where it was chosen (the picker, or since #457 File ▸ Open Recent)",
+        "why": "A refused folder leaves nothing else behind — not adopted, not remembered, no \"opened\" line — so without this the trail shows a teacher who never chose anything. Only a CHOSEN folder writes it — in the Open panel (the picker's, or since #457 File ▸ Open Working Folder…'s with no window open; both say 'chosen in the picker') or from File ▸ Open Recent (since #457, saying 'chosen from File ▸ Open Recent'); a remembered folder out of reach writes \"working folder not reopened\" with its reason instead, so one fact is one line (#290 folded into #311).",
         "appliesOn": [
           "mac"
         ],
@@ -21873,7 +21873,7 @@
   },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -21900,7 +21900,7 @@
     "situationKeys": {
       "hasFolder": "A Plantoir window is in front with a working folder open. False with no window, or with the assistant, Settings or About in front.",
       "folderGettingReady": "The folder's tools are still being copied after an update, or the copy failed (#476).",
-      "sheetIsUp": "A sheet or alert is attached to the window in front, or the app is in a modal session.",
+      "sheetIsUp": "A sheet or alert is attached to the window in front, or the app is in a modal session. Greys EVERY item here, Open Working Folder… and Open Recent included: with a sheet up they would open a second window behind it.",
       "row": "What is selected in the sidebar: none, course, section, backup, archived, allBackups.",
       "keptForReference": "The selected course, or the selected section's course, is kept for reference.",
       "structuralHold": "Rename and Add Section must wait: the course is previewing or deploying, or a Claude or Codex session is open on it in another program (#458).",
@@ -21921,6 +21921,8 @@
       "canGoForward": "The preview can go forward a page."
     },
     "items": [
+      "openWorkingFolder",
+      "openRecent",
       "newCourse",
       "importCoursesForReference",
       "restoreFromArchive",
@@ -21964,9 +21966,12 @@
     ],
     "cases": [
       {
-        "why": "No Plantoir window in front (none open, or the assistant, Settings or About is key): every File item that acts on a window, and every Course, Section and View item, is greyed.",
+        "why": "No Plantoir window in front (none open, or the assistant, Settings or About is key): every File item that acts on a window, and every Course, Section and View item, is greyed. Open Working Folder… and Open Recent are not: with no window they choose a folder and open one on it.",
         "situation": {},
-        "enabled": []
+        "enabled": [
+          "openRecent",
+          "openWorkingFolder"
+        ]
       },
       {
         "why": "A working folder open and nothing selected.",
@@ -21976,6 +21981,8 @@
         "enabled": [
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses"
         ]
       },
@@ -21998,6 +22005,8 @@
           "courseShowInFinder",
           "importCoursesForReference",
           "keepACopyForReference",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeCourse",
           "rename"
@@ -22024,6 +22033,8 @@
           "importCoursesForReference",
           "keepACopyForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeCourse",
           "rename",
@@ -22050,6 +22061,8 @@
           "courseShowInFinder",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeCourse"
         ]
@@ -22073,6 +22086,8 @@
           "importCoursesForReference",
           "keepACopyForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "rename"
         ]
@@ -22098,6 +22113,8 @@
           "importCoursesForReference",
           "keepACopyForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeCourse"
         ]
@@ -22120,6 +22137,8 @@
           "importCoursesForReference",
           "keepACopyForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "preview",
           "reloadCourses",
           "removeSection",
@@ -22162,6 +22181,8 @@
           "importCoursesForReference",
           "newCourse",
           "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
           "preview",
           "publishPagesLinksLeadTo",
           "reloadCourses",
@@ -22192,6 +22213,8 @@
           "copyAPage",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeSection",
           "scheduleDeploy",
@@ -22219,13 +22242,15 @@
           "courseShowInFinder",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "removeCourse",
           "setSchoolYear"
         ]
       },
       {
-        "why": "A section of a course kept for reference, with a deploy scheduled before it was kept: Cancel is offered (gate by direction), Deploy is not even though nothing else is running, and Preview is.",
+        "why": "A section of a course kept for reference, with a deploy still recorded as scheduled: neither Schedule nor Cancel — nothing deploys from a kept course, its section row's context menu offers neither, and the menu bar may not disagree with it (the director's ruling on #457's implementation review; Plantoir turns such a schedule off itself, ScheduledDeployCleanup). Deploy is greyed even though nothing else is running; Preview is not.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22237,10 +22262,11 @@
         },
         "enabled": [
           "backUpNow",
-          "cancelScheduledDeploy",
           "copyAPage",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "preview",
           "reloadCourses",
           "removeSection",
@@ -22262,6 +22288,8 @@
           "deleteBackup",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "restoreFromBackup"
         ]
@@ -22279,6 +22307,8 @@
           "deleteBackup",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses"
         ]
       },
@@ -22294,6 +22324,8 @@
           "deleteArchive",
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses",
           "restoreFromArchive"
         ]
@@ -22308,11 +22340,13 @@
         "enabled": [
           "importCoursesForReference",
           "newCourse",
+          "openRecent",
+          "openWorkingFolder",
           "reloadCourses"
         ]
       },
       {
-        "why": "A sheet or alert is up on a live section that could otherwise do everything: EVERYTHING greys, so a key equivalent cannot act behind it (a real ⇧⌘D with a sheet attached ran Deploy until this rule).",
+        "why": "A sheet or alert is up on a live section that could otherwise do everything: EVERYTHING greys — Open Working Folder… and Open Recent too, which would otherwise open a second window behind the sheet — so a key equivalent cannot act behind it (a real ⇧⌘D with a sheet attached ran Deploy until this rule).",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22338,7 +22372,7 @@
     "note": "GitHub #457 (Russell, 2026-10-08: 'Choosing a different working folder should not require opening a window on the existing one first'). File ▸ Open Recent lists the working folders a teacher has OPENED, newest first, so another folder is one choice away even with no window open. Opening one with a Plantoir window in front switches that window, the same as Open Working Folder… does; with none in front it opens a new window on it.",
     "rule": "A folder joins the list, at the TOP, when it is OPENED: chosen with Open Working Folder…, chosen from Open Recent, or reopened by the app at launch. NEVER when a window merely comes to the front — that happens on every app switch, and with two windows on two folders it would reorder the list on every switch, each reorder a menu-bar rebuild (measured by the plan review, #457). Opening the folder already at the top writes nothing. The same folder spelled two ways (case, Unicode form, /private) is one entry, kept at the spelling just opened. At most `cap` entries; the oldest falls off. Clear Menu empties it. A folder that has gone is NOT filtered out of the menu — that would mean asking the disk while the menu is drawn — and choosing it says why it could not be opened (wording), writing 'working folder not reopened' with the occasion 'a folder chosen from Open Recent'. A folder outside the home folder is refused with the same words the picker uses (workingFolderReach).",
     "cap": 10,
-    "titleRule": "Each entry is titled with the folder's own name. When two entries share a name, each of THOSE is titled '<name> — <the folder it is in>', so the two can be told apart.",
+    "titleRule": "Each entry is titled with the folder's own name. When two entries share a name, each of THOSE is titled '<name> — <the folder it is in>', Xcode-style, so the two can be told apart; when that still collides (two folders of one name in two folders of one name), as much more of the path as tells them apart, joined with '/' ('Courses — A/2025').",
     "wording": {
       "title": "“{folder}” could not be opened",
       "gone": "It can’t be found — if you moved it, choose it again with File ▸ Open Working Folder… from its new place.",
@@ -22463,6 +22497,18 @@
         "titles": [
           "Courses — 2025",
           "Courses — 2026",
+          "Clubs"
+        ]
+      },
+      {
+        "folders": [
+          "/A/2025/Courses",
+          "/B/2025/Courses",
+          "/Users/t/Clubs"
+        ],
+        "titles": [
+          "Courses — A/2025",
+          "Courses — B/2025",
           "Clubs"
         ]
       }

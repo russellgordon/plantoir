@@ -155,8 +155,12 @@ final class RecentWorkingFolders {
         return (result, true)
     }
 
-    /// What each entry is called in the menu: its folder's name, and the
-    /// folder it is in as well when two entries share a name.
+    /// What each entry is called in the menu: its folder's name, and — when
+    /// two entries share a name — the folder it is in as well, Xcode-style
+    /// ("Courses — 2025"). When that still collides (`/A/2025/Courses` and
+    /// `/B/2025/Courses`), more of the path is added until the titles differ
+    /// ("Courses — A/2025", "Courses — B/2025"): two items with one title in
+    /// a menu cannot be told apart (#457's implementation review).
     static func titles(for paths: [String]) -> [String] {
         var names: [String] = []
         var counts: [String: Int] = [:]
@@ -170,14 +174,57 @@ final class RecentWorkingFolders {
         while index < paths.count {
             let name: String = names[index]
             if counts[name, default: 0] > 1 {
-                let parent: String = URL(fileURLWithPath: paths[index]).deletingLastPathComponent().lastPathComponent
-                titles.append(name + " — " + parent)
+                var others: [String] = []
+                var otherIndex: Int = 0
+                while otherIndex < paths.count {
+                    if otherIndex != index && names[otherIndex] == name {
+                        others.append(paths[otherIndex])
+                    }
+                    otherIndex += 1
+                }
+                titles.append(name + " — " + distinguishingParent(of: paths[index], from: others))
             } else {
                 titles.append(name)
             }
             index += 1
         }
         return titles
+    }
+
+    /// The fewest trailing folders of `path`'s parent that no path in
+    /// `others` shares, joined with "/".
+    static func distinguishingParent(of path: String, from others: [String]) -> String {
+        let parents: [String] = URL(fileURLWithPath: path).deletingLastPathComponent().pathComponents
+        var depth: Int = 1
+        while depth <= parents.count {
+            let suffix: String = trailing(depth, of: parents)
+            var isShared: Bool = false
+            for other in others {
+                let otherParents: [String] = URL(fileURLWithPath: other).deletingLastPathComponent().pathComponents
+                if trailing(depth, of: otherParents) == suffix {
+                    isShared = true
+                }
+            }
+            if !isShared {
+                return suffix
+            }
+            depth += 1
+        }
+        return URL(fileURLWithPath: path).deletingLastPathComponent().path
+    }
+
+    /// The last `count` names of `components`, joined with "/" ("/" alone
+    /// is dropped).
+    static func trailing(_ count: Int, of components: [String]) -> String {
+        var names: [String] = []
+        var index: Int = max(0, components.count - count)
+        while index < components.count {
+            if components[index] != "/" {
+                names.append(components[index])
+            }
+            index += 1
+        }
+        return names.joined(separator: "/")
     }
 }
 

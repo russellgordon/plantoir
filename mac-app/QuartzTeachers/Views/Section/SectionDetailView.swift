@@ -436,7 +436,7 @@ struct SectionDetailView: View {
             ToolbarItemGroup {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
                     FolderActions.openInObsidian(
-                        revealing: course.sectionDirectoryURL(forSection: sectionNumber),
+                        revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber),
                         vaultURL: course.directoryURL
                     )
                 }
