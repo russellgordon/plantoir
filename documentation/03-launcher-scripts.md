@@ -2446,6 +2446,13 @@ and what was measured.
       `CommandLine`, so the guard cannot see it either: the Windows form of
       the contract's "another account's process is not seen". The scheduled
       wrapper runs `LeastPrivilege`, so it is unaffected.
+    - The ancestor walk trusts `ParentProcessId` with no creation-time check.
+      If a launcher's parent has exited and its pid been reused, the walk
+      follows the new owner and leaves that chain out, so a deploy in it
+      would be let through (failing open). Every real chain has a live
+      parent (the app's console, `plantoir-mcp`, a wrapper waiting on
+      `Start-Process`, `deploy.ps1` waiting on `preview.bat`), so this was
+      written down rather than guarded (#467 implementation review, L2).
     - What the app, `plantoir-mcp`, the wrapper and the `.bat` files start is
       always `-File "<absolute path>"`, so every deploy a teacher can start
       from Plantoir is seen.

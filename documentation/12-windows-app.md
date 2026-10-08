@@ -1489,8 +1489,8 @@ What replaces the old container concepts:
     rather than build.
   - **Measured: a re-set whose moment arrives while the earlier run still
     works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
-    "Set again while the run works (#409)", and the fix is a separate windows
-    issue.
+    "Set again while the run works (#409)", and the fix is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
   - **Known limits.** A deploy run inside another process (typed at a prompt,
     or `-Command`) is not seen, and neither is an elevated one; the
     self-relaunch that would see the first was rejected (03).

@@ -3023,8 +3023,8 @@ them needs anything done on the mac.
     next run.
   - So on Windows, a section set again for a moment that arrives while its
     earlier run still works is silently not deployed, and no outcome record
-    is written. That is a separate fault and is not fixed under #467; it is a
-    windows issue of its own (drafted with #467).
+    is written. That is a separate fault and is not fixed under #467; it is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
 
 ### The window's acts read the saved settings too (#335)
 
