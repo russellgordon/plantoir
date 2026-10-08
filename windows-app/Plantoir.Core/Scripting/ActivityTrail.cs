@@ -556,6 +556,15 @@ public static class ActivityTrail
         UpdateSetAside,
         /// <summary>#337: the update stopped, in a plain category with the detail in brackets; the daily check's at most once per launch.</summary>
         UpdateStopped,
+        /// <summary>
+        /// #473: the app copied its tools into a working folder in the
+        /// background (or could not finish): the folder (redacted), files
+        /// brought up to date, files that failed, seconds, and the outcome in
+        /// the sentence. Only when something changed or failed. Windows only:
+        /// the teacher now SEES a banner for this, and the mac mirrors the
+        /// same files with only an os_log line.
+        /// </summary>
+        WorkingFolderToolsCopied,
     }
 
     public static string KeyFor(Event @event) => @event switch
@@ -668,6 +677,7 @@ public static class ActivityTrail
         Event.UpdateInstalling => "update installing",
         Event.UpdateSetAside => "update set aside",
         Event.UpdateStopped => "update stopped",
+        Event.WorkingFolderToolsCopied => "working folder tools copied",
         _ => throw new ArgumentOutOfRangeException(nameof(@event)),
     };
 

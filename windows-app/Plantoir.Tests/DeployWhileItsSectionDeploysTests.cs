@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
+using Plantoir.Mcp;
 using Xunit;
 
 namespace Plantoir.Tests;
@@ -63,6 +64,9 @@ public class DeployWhileItsSectionDeploysTests
         var refusal = FailureExplainer.SectionDeployRefusalOf("(The launcher exited with code 1.)\n\nLast output:\n\n" + line + "\n   Nothing was changed.");
         Assert.NotNull(refusal);
         Assert.Equal(byALaterDeploy, refusal!.ByALaterDeploy);
+        // Since #471 the server SAYS the lifted sentence, so whatever the
+        // cross arrived as is taken off with it, up to the course code.
+        Assert.StartsWith("ICS4U section 2 ", refusal.Sentence);
     }
 
     /// <summary>
@@ -169,5 +173,117 @@ public class DeployWhileItsSectionDeploysTests
 
         Assert.Null(MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish("ICS4U", "2", Leg(Netlify, false)));
         Assert.Null(MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish("ICS4U", "2", null));
+    }
+}
+
+/// <summary>
+/// #471: an outside assistant's rebuild, publish and unpublish rebuild the
+/// preview with the same <c>--build-only</c> leg a deploy builds with, and
+/// since #467 that leg refuses while the section is being deployed. Their
+/// answers say the launcher's own line, as the window does, rather than "the
+/// preview couldn't be built" and a pointer at a window this process does not
+/// have. Runs <c>shared-rules.json → deployWhileItsSectionDeploys.
+/// refusedBuildAnswers</c> case for case, through the real
+/// <see cref="Plantoir.Mcp.PlantoirTools"/>; nothing is retyped here.
+/// </summary>
+[Collection(SharedActivityState.Name)]
+public sealed class RefusedBuildAnswersTests : IDisposable
+{
+    private const string Course = "ICS4U";
+    private const int Section = 2;
+    private readonly string _folder = Directory.CreateTempSubdirectory("plantoir-refused-build").FullName;
+    private readonly FakeLauncher _launcher = new() { FailOn = "preview" };
+
+    private static JsonNode Rule => ContractLoader.LoadJson("shared-rules.json")["deployWhileItsSectionDeploys"]!;
+
+    public RefusedBuildAnswersTests()
+    {
+        File.WriteAllText(Path.Combine(_folder, "preview.ps1"), "# marker");
+        File.WriteAllText(Path.Combine(_folder, "deploy.ps1"), "# marker");
+        string course = Path.Combine(_folder, "courses", Course);
+        Directory.CreateDirectory(Path.Combine(course, ".netlify_sites"));
+        File.WriteAllText(Path.Combine(course, "course_config.json"), """
+            { "course_code": "ICS4U", "course_name": "Computer Science", "deploy_target": "netlify",
+              "num_sections": 2, "per_section_folders": ["All Classes"], "per_section_files": [],
+              "section_numbers": [1, 2] }
+            """);
+        foreach (int section in new[] { 1, 2 })
+            File.WriteAllText(Path.Combine(course, ".netlify_sites", $"section{section}.json"),
+                              $$"""{"name": "ics4u-s{{section}}"}""");
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_folder, recursive: true); } catch { }
+    }
+
+    public static IEnumerable<object[]> Cases() =>
+        Rule["refusedBuildAnswers"]!.AsArray().Select(c => new object[] { c!["name"]!.ToString(), c.ToJsonString() });
+
+    [Fact]
+    public void EveryPathAndBothCrossFormsAreCovered()
+    {
+        var cases = Rule["refusedBuildAnswers"]!.AsArray();
+        var tools = cases.Select(c => c!["tool"]!.ToString()).ToHashSet();
+        Assert.Equal(new HashSet<string> { "rebuild_preview", "publish_pages", "unpublish_pages" }, tools);
+        Assert.Contains(cases, c => c!["crossArrivesAs"]?.ToString() == "?");
+        Assert.Contains(cases, c => c!["crossArrivesAs"]?.ToString() is { Length: > 1 });
+    }
+
+    [Theory]
+    [MemberData(nameof(Cases))]
+    public async Task EachCaseSaysTheLaunchersOwnLine(string name, string json)
+    {
+        var c = JsonNode.Parse(json)!.AsObject();
+        string tool = c["tool"]!.ToString();
+        var launcherCase = Rule["failureExplanationCases"]!.AsArray()[c["failureExplanationCase"]!.GetValue<int>()]!;
+        string output = launcherCase["output"]!.ToString();
+        string lifted = launcherCase["expect"]!.ToString();
+        string cross = c["crossArrivesAs"]?.ToString() ?? "❌";
+        output = output.Replace("❌", cross);
+
+        // As plantoir-mcp's LauncherRunner carries a failed launcher's output.
+        _launcher.FailMessage = "(The launcher exited with code 1.)\n\nLast output:\n" + output;
+        ClassPage("Unit 2, Day 3", published: tool == "unpublish_pages");
+
+        var server = new PlantoirTools(new AssistWorkspace(_folder, _launcher));
+        string[]? pages = c["arguments"]?["pages"] is { } given
+            ? PlantoirTools.ClassTitles(given.ToString())
+            : null;
+        string[] answers = tool switch
+        {
+            "rebuild_preview" => new[] { await server.RebuildPreview(Course, Section, null!, CancellationToken.None) },
+            "publish_pages" => Halves(await server.PublishPages(Course, Section, null!, CancellationToken.None, pages)),
+            "unpublish_pages" => Halves(await server.UnpublishPages(Course, Section, null!, CancellationToken.None, pages)),
+            _ => throw new InvalidOperationException($"{name}: no tool called {tool} here."),
+        };
+
+        Assert.True(_launcher.Runs.Any(run => run.Launcher == "preview" && run.Arguments.Contains("--build-only")),
+            $"{name}: the preview was never rebuilt, so nothing was refused. The answer was: {string.Join(" | ", answers)}");
+        string whereTheOutputIs = ContractLoader.LoadJson("assist-wording.json")["wording"]!["whereTheOutputIs"]!.ToString();
+        foreach (string answer in answers)
+        {
+            Assert.Contains(lifted, answer);
+            // The cross as it would sit in front of the course code: a bare
+            // "?" could be a fair question later in the answer.
+            Assert.DoesNotContain(cross + " " + Course, answer);
+            Assert.DoesNotContain("❌", answer);
+            Assert.DoesNotContain(whereTheOutputIs, answer);
+            Assert.DoesNotContain("Last output:", answer);
+            // A unit's name must reach the whole-unit path (ApplyWholeUnit),
+            // whose own summary says so, not the page path.
+            if (pages is [var only] && PublishPlan.UnitNamed(only) is not null)
+                Assert.Contains($"{only} was {(tool == "publish_pages" ? "published" : "unpublished")}.", answer);
+        }
+    }
+
+    private static string[] Halves(ModelContextProtocol.Protocol.CallToolResult result) =>
+        new[] { result.Detail(), result.Summary() };
+
+    private void ClassPage(string title, bool published)
+    {
+        string full = Path.Combine(_folder, "courses", Course, $"section{Section}", "All Classes", title + ".md");
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full, $"---\ntitle: {title}\npublish: {(published ? "true" : "false")}\n---\nBody.\n");
     }
 }

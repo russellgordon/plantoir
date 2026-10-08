@@ -88,6 +88,25 @@ public partial class App : Application
 
         Plantoir.Core.Scripting.ActivityTrail.NoteLaunch();
 
+        // The tools copy's start and finish (#473), for whoever measures the
+        // first launch after an update: "tools copy started" and "tools copy
+        // finished" bracket the copy, and "MainWindow.Activate called" is when
+        // the window appeared. Developer-only, never on the trail (the trail
+        // has its own line, written by ToolchainReadiness).
+        Plantoir.Core.Models.ToolchainReadiness.Changed += folder =>
+        {
+            var state = Plantoir.Core.Models.ToolchainReadiness.StateOf(folder);
+            if (state == Plantoir.Core.Models.ToolchainReadiness.State.Copying)
+            {
+                LogDiagnostic($"tools copy started for '{folder}'");
+                return;
+            }
+            var last = Plantoir.Core.Models.ToolchainReadiness.LastCopyOf(folder);
+            LogDiagnostic($"tools copy finished for '{folder}': {state}, {last?.FilesChanged ?? 0} changed, " +
+                          $"{last?.FilesFailed ?? 0} failed, {(last?.Seconds ?? 0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} s" +
+                          (last?.Problem is { Length: > 0 } problem ? $" ({problem})" : ""));
+        };
+
         // Say on the trail how every scheduled publish since the last launch
         // turned out — the ones that stopped, and the ones that went out.
         //
@@ -236,10 +255,12 @@ public partial class App : Application
 
         // The daily update check starts HERE, once a window exists (#465).
         // OpenWindow is synchronous, and the first launch after an update
-        // spends about two minutes inside it copying the bundled tools into
-        // the working folder (measured, i5-8365U); a check started in the
+        // used to spend about two minutes inside it copying the bundled tools
+        // into the working folder (measured, i5-8365U); a check started in the
         // block above fired at one minute, found no window to show its offer
-        // in, and wrote "not now" for an offer nobody saw. Here, and not inside
+        // in, and wrote "not now" for an offer nobody saw. Since #473 that copy
+        // runs in the background after the window appears, but the order
+        // stays: a window first, then the check. Here, and not inside
         // OpenWindow: the marketing captures open windows through OpenWindow
         // and must never check. The scheduled run (Program.Main) and
         // plantoir-mcp never construct an updater at all.

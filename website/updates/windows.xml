@@ -5,6 +5,22 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.4.5</title>
+      <description>New in Plantoir 1.4.5
+
+This update is for Windows only.
+
+The first window after an update used to be missing for about two minutes while Plantoir got your folder ready. Now the window appears at once, with a notice that says the folder is being got ready and that Preview and Deploy wait for it. They come back on their own the moment it finishes: about 15 to 20 seconds on a typical laptop, longer on a slow disk.
+
+When Claude or Codex schedules a deploy and names classes like "Unit 2, Day 3", the title is no longer cut in half. Class titles are separated by semicolons, so a comma inside a title stays where you put it.
+
+When Claude or Codex rebuilds a preview or publishes a page while that section is being deployed, the answer now says the section is being deployed, so the preview cannot be built until that finishes. Before, it only said the preview could not be built.</description>
+      <pubDate>Thu, 08 Oct 2026 13:14:02 -04:00</pubDate>
+      <sparkle:version>1.4.5</sparkle:version>
+      <sparkle:shortVersionString>1.4.5</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.5/PlantoirSetup.exe" sparkle:version="1.4.5" sparkle:shortVersionString="1.4.5" length="237451288" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="8rKioHQ4JTlykbDrle+E6YW8MxYXe9oW3S02Y4IMN3YFJKCcPceC35e/lpKCRcdpEr8QPTNSWeyM/0KNXUMvAQ==" />
+    </item>
+    <item>
       <title>Plantoir 1.4.4</title>
       <description>New in Plantoir 1.4.4
 
@@ -26,7 +42,7 @@ The About window says "Grow a class website."</description>
       <pubDate>Thu, 08 Oct 2026 05:22:05 -04:00</pubDate>
       <sparkle:version>1.4.4</sparkle:version>
       <sparkle:shortVersionString>1.4.4</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.4/PlantoirSetup.exe" sparkle:version="1.4.4" sparkle:shortVersionString="1.4.4" length="237432904" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="J8U/Fc+G7B2F6OhhNdTpakTKsF5/onxA33Ee2Q09TD0oo2WxZFXHG06uEEZeQavw6RoR7qLC0sZH/OL309QHBA==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.4/PlantoirSetup.exe" sparkle:version="1.4.4" sparkle:shortVersionString="1.4.4" length="237432904" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="J8U/Fc+G7B2F6OhhNdTpakTKsF5/onxA33Ee2Q09TD0oo2WxZFXHG06uEEZeQavw6RoR7qLC0sZH/OL309QHBA==" />
     </item>
     <item>
       <title>Plantoir 1.4.3</title>

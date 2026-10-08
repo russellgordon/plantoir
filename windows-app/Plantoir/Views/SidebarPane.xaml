@@ -76,7 +76,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Button x:Name="AddButton" Grid.Column="0" MinWidth="30" MinHeight="28" Padding="0"
+            <Button x:Name="AddCourseButton" Grid.Column="0" MinWidth="30" MinHeight="28" Padding="0"
                     Background="Transparent" BorderThickness="0" Click="Add_Click"
                     ToolTipService.ToolTip="Add a course or club"
                     AutomationProperties.Name="Add a course or club"
