@@ -20,39 +20,76 @@ public sealed class UpdatePrompts : IUpdatePrompts
 {
     private static MainWindow? Host() => App.OpenWindows.LastOrDefault(w => !w.IsClosed);
 
-    private static Task<ContentDialogResult> ShowAsync(Func<ContentDialog> make)
+    /// <summary>
+    /// The dialog's result, or NULL when it was never shown (#465): no window
+    /// yet, another dialog in front, or a failure putting it up. A dialog that
+    /// WAS shown and closed with Esc answers <see cref="ContentDialogResult.None"/>,
+    /// which is a real answer; null is not one.
+    /// </summary>
+    private static Task<ContentDialogResult?> ShowAsync(Func<ContentDialog> make)
     {
-        var done = new TaskCompletionSource<ContentDialogResult>();
-        if (Host() is not { } window) { done.SetResult(ContentDialogResult.None); return done.Task; }
+        var done = new TaskCompletionSource<ContentDialogResult?>();
+        if (Host() is not { } window)
+        {
+            App.LogDiagnostic("update dialog: no window to show it in yet");
+            done.SetResult(null);
+            return done.Task;
+        }
         window.DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                if (DialogGate.IsOpen(window.Content?.XamlRoot)) { done.TrySetResult(ContentDialogResult.None); return; }
+                if (DialogGate.IsOpen(window.Content?.XamlRoot))
+                {
+                    App.LogDiagnostic("update dialog: another dialog is in front, so not shown");
+                    done.TrySetResult(null);
+                    return;
+                }
                 var dialog = make();
                 dialog.XamlRoot = window.Content!.XamlRoot;
                 done.TrySetResult(await dialog.ShowAsync());
             }
-            catch (Exception error) { App.LogDiagnostic("update dialog: " + error.Message); done.TrySetResult(ContentDialogResult.None); }
+            catch (Exception error) { App.LogDiagnostic("update dialog: " + error.Message); done.TrySetResult(null); }
         });
         return done.Task;
     }
 
-    public async Task<UpdateAnswer> OfferAsync(string version, string? notes)
+    public async Task<UpdateAnswer> OfferAsync(string version, string? notes, bool important)
     {
-        var result = await ShowAsync(() => new ContentDialog
+        var result = await ShowAsync(() =>
         {
-            Title = UpdateWording.OfferTitle.Replace("{version}", version),
-            Content = new TextBlock { Text = notes ?? "", TextWrapping = TextWrapping.Wrap },
-            PrimaryButtonText = UpdateWording.OfferInstall,
-            SecondaryButtonText = UpdateWording.OfferSkip,
-            CloseButtonText = UpdateWording.OfferLater,
-            DefaultButton = ContentDialogButton.Primary,
+            var dialog = new ContentDialog
+            {
+                Title = UpdateWording.OfferTitle.Replace("{version}", version),
+                Content = new TextBlock { Text = notes ?? "", TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = UpdateWording.OfferInstall,
+                DefaultButton = ContentDialogButton.Primary,
+            };
+            if (!important)
+            {
+                dialog.SecondaryButtonText = UpdateWording.OfferSkip;
+                dialog.CloseButtonText = UpdateWording.OfferLater;
+            }
+            else
+            {
+                // #453: no Skip and no Not Now, but never a window the teacher
+                // cannot leave. Esc is handled here rather than trusted to a
+                // dialog with no Close button, so it always closes; it answers
+                // "not now", and the next daily check offers it again.
+                dialog.PreviewKeyDown += (_, key) =>
+                {
+                    if (key.Key != Windows.System.VirtualKey.Escape) return;
+                    key.Handled = true;
+                    dialog.Hide();
+                };
+            }
+            return dialog;
         });
         return result switch
         {
+            null => UpdateAnswer.NotShown,
             ContentDialogResult.Primary => UpdateAnswer.Install,
-            ContentDialogResult.Secondary => UpdateAnswer.Skip,
+            ContentDialogResult.Secondary when !important => UpdateAnswer.Skip,
             _ => UpdateAnswer.NotNow,
         };
     }

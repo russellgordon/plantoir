@@ -1555,8 +1555,10 @@ was put.
   says which copy a click started.
 
 **Windows** matches the rule (the contract's `notification` cases), and the
-delivery is theirs: their run is PowerShell under Task Scheduler with no app
-process alive, so a toast must be attributed to Plantoir's own application
+delivery is theirs: their run is `Plantoir.exe --run-scheduled-deploy`,
+started by Task Scheduler with no window, which runs the PowerShell wrapper
+(since bundle 3; before that it was the wrapper alone, with no app process),
+so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
 it; GitHub #212 carries the ask. Windows' toast shipped with #324 and **posted
@@ -1565,7 +1567,9 @@ run, and the run's own one-shot clearing had deleted it. What the toast needs
 is now read before the run; `documentation/12-windows-app.md` → "The
 scheduled-publish toast (#324)" has the measurement and the fix. The mac's
 `announceThenLeave` posts before the job is booted out, so it never had this
-shape.
+shape. Since #464 (v1.4.4) dismissing the section's band in Windows' app
+withdraws the toast, as on the mac, and that was measured across the two
+processes; same section of doc 12.
 
 ### Clicking the notification opens the section (#306)
 

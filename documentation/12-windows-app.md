@@ -1747,7 +1747,11 @@ the same day.)
   warning is not lost; each Windows item carries only its own. (This said
   NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
-  `site/appcast-windows.xml`, and before that one shared appcast.)
+  `site/appcast-windows.xml`, and before that one shared appcast.) Since
+  v1.4.4: an update marked important offers Install and Reopen alone and is
+  offered again even when skipped (#453), and the daily check starts once the
+  first window is up and never counts an offer nobody saw as an answer
+  (#465). Both are in `11-release-strategy.md` → "Updating itself on Windows".
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -3886,8 +3890,35 @@ the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
 a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
 is posted (moving the clearing out of `Execute`) — the clearing is what makes
 the task one-shot and is guarded by the job's token; a second caller in charge
-of it is a deploy that can recur. Still owed from #212: withdrawing the toast
-when the band is dismissed (`onShow`'s dismiss case).
+of it is a deploy that can recur.
+
+**Dismissing the band takes the toast down (#464, v1.4.4).** The last of
+#212's owed items. The band's Dismiss and its X both go through
+`ScheduledRunAnnouncement.TeacherDismissed`: the record first, then
+`IPoster.Withdraw(TagFor(section))`, which `SystemToasts` does with
+`AppNotificationManager.RemoveByTagAndGroupAsync(tag, ToastGroup)`. The group
+is one constant, used by both the post and the withdrawal. A failed withdrawal
+goes to `startup.log` and never stops the dismissal. There is no trail line,
+as on the mac (`teacherDismissed`). `ScheduledRunAnnouncementTests.TheContractsOnShowCases`
+plays all four `notification.onShow` cases, the first Windows reader of them.
+The app's own `Register()` and the poster's now share one process-wide flag,
+so a withdrawal never registers twice in the app.
+
+**Measured, because a stand-in cannot show it:** the toast is posted by a
+DIFFERENT process (the scheduled run) from the one that withdraws it.
+`Plantoir.UiTests/ScheduledToastWithdrawalUiTests` runs a job set thirty days
+ago with the x64 Debug build, exactly as Task Scheduler would, so it stands
+down as too late and posts. It then finds the toast in `wpndatabase.db`,
+checks it is still there once the section is open, presses Dismiss, and finds
+it gone. Passed twice on 2026-10-08 (i5-8365U, Windows 11 Pro 26200), the
+toast filed under `{809579B5-…}`: one `HKCU\Software\Classes\AppUserModelId\{GUID}`
+per executable path, so a run and the app of the same copy share an
+identity. A toast posted by a DIFFERENT copy (the installed app against a
+Debug tree) has another identity, and this copy cannot withdraw it; only a
+developer meets that. **Rejected:** removing by tag alone (it would also take
+a same-tag toast of another group); clearing the record from the toast's own
+click; withdrawing when a later run clears the record (its own post already
+replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
 
@@ -4061,6 +4092,51 @@ the app set up a folder of that name; each argument now carries its own
 quotes. The app must be started through ShellExecute, never with redirected
 stdio (the leak `DrivenApp.cs` measured, which hangs course creation).
 WinUI's system title bar does NOT follow dark mode on its own: in a dark
-picture the content is dark and the title bar light, which is how the app
-looks to a teacher today, so the pictures show it (a product question, not a
-capture one).
+picture taken on 2026-10-04 the content is dark and the title bar light,
+which is how the app looked to a teacher then, so the pictures show it (a
+product question, not a capture one). Fixed on 2026-10-07 — see the next
+section; `Dress` now re-syncs the caption after it sets a scene's theme, so
+pictures taken after that carry a dark bar in the dark scenes.
+
+## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
+
+Russell's order: "The title bar should be in dark mode when the computer is in
+dark mode." Neither window extends its content into the title bar, so the
+caption is drawn by the system — and the system draws it LIGHT unless the
+window says otherwise, whatever Windows' colour mode is. In dark mode the
+content went dark under a near-white strip.
+
+**What was done.** `Services/WindowTheme.cs` is the one place: `Apply(window)`
+sets `AppWindow.TitleBar.PreferredTheme` (Windows App SDK 1.7+; the app
+resolves 1.8) to `Dark` or `Light` from the root element's `ActualTheme`
+(`RequestedTheme` first when it is set, the application's theme when the
+root has not resolved one yet), and re-applies it on the root's
+`ActualThemeChanged` and `Loaded`, with `UISettings.ColorValuesChanged`
+(marshalled to the window's dispatcher, unhooked on `Closed`) as a backstop for
+the live switch. `MainWindow` and `AssistWindow` — the only two `Window`
+subclasses; a section opens inside the main window, not in one of its own —
+call it right after `InitializeComponent`, and `MarketingShotCapturer.Dress`
+calls `WindowTheme.Sync` after setting a scene's theme. `WindowThemeSourceTests`
+fails for any `Window` subclass under `windows-app/Plantoir` that does not call
+`WindowTheme.Apply(this)`, so a window added later cannot keep the white bar.
+
+**Measured** on this PC (Windows 11 Pro 26200, x64 Debug, `--state-dir`), by
+`PrintWindow` captures of the live windows and a pixel read at the caption's
+centre: dark mode, main window caption (31, 32, 34) over content (26, 35, 34);
+the assistant window (30, 33, 34). Switching Settings to light with the app
+open turned the caption to (239, 244, 247) within four seconds, no restart,
+and back again. The caption is drawn on the same Mica as the content, so it
+reads as one surface rather than a stripe in both modes.
+
+**Rejected.** Hand-set `AppWindow.TitleBar` colours (the twelve
+`Background`/`Button*`/`Inactive*` slots): both windows sit on a Mica backdrop
+tinted by the wallpaper, so any fixed colour reads as a band against it, and
+twelve slots are twelve chances to look unlike Windows' own hover, pressed and
+inactive states. `PreferredTheme = UseDefaultAppMode`: it follows the SYSTEM,
+not the content, and the marketing capture themes the content directly, so a
+dark scene taken on a light PC would get a light bar. `DwmSetWindowAttribute`
+with `DWMWA_USE_IMMERSIVE_DARK_MODE`: the same result through P/Invoke, where
+the Windows App SDK property already exists. `ExtendsContentIntoTitleBar` with
+a custom bar: a redesign of both windows' chrome for a colour fix, and nothing
+in the app uses it today. The mac inherits nothing: its title bars already
+follow the system.
