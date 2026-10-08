@@ -520,16 +520,19 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     said "An app cast item with version 1.4.2 is already in the file". (The
     rehearsal put the stand-in in a `1.4.3\` folder and passed `-f` instead,
     which reads the version from the path; a real cut needs neither.)
-  - **The Windows app does NOT yet honour an important ("critical") mark.**
-    `--critical-versions <version>` marks the item
-    `sparkle:criticalUpdate="true"`, but all the app does with it is add
-    "; marked important" to the `update found` trail line: the offer still
-    shows Skip This Version, and a version the teacher skipped is not offered
-    again by the daily check. So a warning that must not be skipped CANNOT be
-    made so on Windows today — `appUpdates.notes.requiredWarningMarksTheUpdateImportant`
-    is owed there (its own `windows` issue, v1.4.4). Do not rely on the mark;
-    put the warning in the notes, which every later offer carries. Not
-    rehearsed, and 1.4.3 is not marked.
+  - **The Windows app honours an important ("critical") mark from 1.4.4
+    (#453).** `--critical-versions <version>` marks the item
+    `sparkle:criticalUpdate="true"`. An app at 1.4.4 or later then offers
+    Install and Reopen alone, with no Skip This Version and no Not Now
+    (closing the offer is "not now", and it is offered again the next day),
+    and offers it even to a teacher who skipped that version. The mark binds
+    every teacher still below the marked version, whichever release is newest,
+    so mark the release whose warning must not be skipped, not the next one.
+    A copy older than 1.4.4 ignores the mark, so for a warning that matters to
+    teachers on 1.4.3 or earlier, also put it in the notes, which every later
+    offer carries. Whether `--reparse-existing` keeps an earlier item's mark
+    when the feed is regenerated has not been checked: read the regenerated
+    feed's `criticalUpdate` attributes before committing it. Not rehearsed.
 
   Check before committing: `python website/build.py --check` runs
   `website/windows_feed.py`'s checker — the feed's signature against
