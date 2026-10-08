@@ -10,6 +10,7 @@ public static class FailureExplainer
     public static string? Explanation(string output) =>
         ReferenceCourseExplanation(output)
         ?? SectionIsBeingDeployedExplanation(output)
+        ?? SectionDeployRefusalOf(output)?.Sentence
         ?? FolderCopyExplanation(output)
         ?? SetupExplanation(output)
         ?? VaultLinkExplanation(output)
@@ -84,6 +85,50 @@ public static class FailureExplainer
             string line = raw.Trim();
             if (!line.EndsWith(sign, StringComparison.Ordinal)) continue;
             return line.TrimStart('❌', ' ');
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// What deploy.ps1, or preview.ps1 --build-only, refused with while the
+    /// same section was still being deployed (#467 / mac #439,
+    /// shared-rules.json -> deployWhileItsSectionDeploys).
+    /// <paramref name="ByALaterDeploy"/> is true when the deploy set for
+    /// later was in the way, false when another deploy of the section was;
+    /// <paramref name="Sentence"/> is the launcher's first line with the
+    /// cross taken off - the sentence the window shows.
+    /// </summary>
+    public sealed record SectionDeployRefusal(bool ByALaterDeploy, string Sentence);
+
+    /// <summary>The words the refusal always carries, one per leg (sentences.launcher; pinned by a test).</summary>
+    public static readonly string[] SectionDeployRefusalMarkers =
+    {
+        "so it cannot be deployed again until that has finished.",
+        "so it cannot be built until that has finished.",
+    };
+
+    /// <summary>The part of the first line that names the deploy set for later.</summary>
+    public const string LaterDeployMarker = "is still being deployed by a deploy that was set for later";
+
+    /// <summary>
+    /// The refusal in a launcher's output, LIFTED as #386's is (the
+    /// launcher's line already is the sentence a teacher can act on), or
+    /// null. Detection reads only the ASCII markers, so a cross that reached
+    /// plantoir-mcp as '?' or as mojibake (it reads the launcher without
+    /// naming an encoding) cannot hide the refusal; there only
+    /// <see cref="SectionDeployRefusal.ByALaterDeploy"/> is used, to choose
+    /// the assistant's sentence. The window reads the console as UTF-8, so
+    /// the lifted sentence it shows has a real cross to take off.
+    /// </summary>
+    public static SectionDeployRefusal? SectionDeployRefusalOf(string? output)
+    {
+        if (string.IsNullOrEmpty(output)) return null;
+        foreach (string raw in output.Replace("\r", "").Split('\n'))
+        {
+            string line = raw.Trim();
+            if (!SectionDeployRefusalMarkers.Any(marker => line.EndsWith(marker, StringComparison.Ordinal))) continue;
+            string sentence = line.TrimStart('❌', '?', ' ');
+            return new SectionDeployRefusal(sentence.Contains(LaterDeployMarker, StringComparison.Ordinal), sentence);
         }
         return null;
     }

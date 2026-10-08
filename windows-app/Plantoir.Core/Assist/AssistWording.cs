@@ -110,6 +110,21 @@ public static partial class AssistWording
         $"The deploy of {course} Section {section} did not finish. {WhereTheOutputIs}";
 
     /// <summary>
+    /// #467 / mac #439: every leg that ran was refused because a deploy that
+    /// was set for later is still deploying this section. Said instead of
+    /// "did not finish" (and, for a refused build leg, instead of "could not
+    /// be built"), by the window's assistant and plantoir-mcp's deploy_section.
+    /// </summary>
+    public static string DeployRefusedWhileALaterDeployWorks(string course, string section) =>
+        $"{course} Section {section} is still being deployed by a deploy that was set for later, " +
+        "so it was not deployed again. Try again once that deploy has finished.";
+
+    /// <summary>The same refusal when another deploy of the section was in the way (#467 / mac #439).</summary>
+    public static string DeployRefusedWhileItsSectionDeploys(string course, string section) =>
+        $"{course} Section {section} is already being deployed, so it was not deployed again. " +
+        "Try again once that deploy has finished.";
+
+    /// <summary>
     /// Said only when a course has MORE THAN ONE deploy destination
     /// configured and every one of them succeeded — a course with exactly
     /// one destination (the overwhelming majority) always uses

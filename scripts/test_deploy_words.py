@@ -26,6 +26,10 @@ WHAT IT CANNOT SEE, said so nobody relies on it for more:
   - code comments (C# `//` and `///` lines, XAML `<!-- -->`, PowerShell and
     shell `#` lines) and the activity trail's event KEYS on both apps, which
     are not text a teacher reads (the keys are frozen: activityTrail.note).
+    Known edges of that reading, none of which bites today: PowerShell `<# #>`
+    and C# `/* */` block comments ARE read (a false failure at worst, never a
+    miss); C# strings that span lines (verbatim and raw literals) are NOT read; and a
+    `// "quoted"` remark after code on the same line is read as a string.
 
 Runs everywhere `scripts/test_*.py` runs: verify.sh, and Windows'
 PythonToolchainTests. It reads BOTH apps' sources on both machines — every

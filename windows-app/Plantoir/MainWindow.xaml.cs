@@ -34,6 +34,7 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         App.LogDiagnostic("MainWindow ctor: InitializeComponent done");
         try { SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop(); } catch { }
+        WindowTheme.Apply(this);   // the title bar follows dark/light mode
         App.LogDiagnostic("MainWindow ctor: creating WorkspaceViewModel");
         Workspace = new WorkspaceViewModel(App.Settings);
         App.LogDiagnostic("MainWindow ctor: WorkspaceViewModel created");
