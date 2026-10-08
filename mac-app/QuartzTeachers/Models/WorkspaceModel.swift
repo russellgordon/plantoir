@@ -1474,6 +1474,10 @@ class WorkspaceModel {
                 }
             }
             for fileURL in toRemove {
+                if !announced {
+                    announced = true
+                    firstChange?()
+                }
                 do {
                     try fileManager.removeItem(at: fileURL)
                     changed.changed += 1
@@ -1610,10 +1614,6 @@ class WorkspaceModel {
         }
     }
 
-    /// Scans `<workspace>/courses/` for course folders containing a
-    /// `course_config.json` and loads each one.
-    /// File ▸ Reload Courses: the one routine reload that retries a
-    /// toolchain copy that failed (#476), because the teacher asked.
     /// Whether this window's folder is still getting ready (#476): its tools
     /// being copied, or a copy that failed and has not been retried. Read
     /// straight off `ToolchainReadiness.shared` so every window and section
@@ -1633,6 +1633,8 @@ class WorkspaceModel {
         return ToolchainReadiness.shared.reasonToWait(workspaceURL)
     }
 
+    /// File ▸ Reload Courses: the one routine reload that retries a
+    /// toolchain copy that failed (#476), because the teacher asked.
     func reloadCoursesFromTheMenu() {
         if let workspaceURL {
             ToolchainReadiness.shared.forgetFailure(workspaceURL)
@@ -1640,6 +1642,8 @@ class WorkspaceModel {
         reloadCourses()
     }
 
+    /// Scans `<workspace>/courses/` for course folders containing a
+    /// `course_config.json` and loads each one.
     func reloadCourses() {
         courses = []
         archivedItems = []
@@ -2901,8 +2905,13 @@ class WorkspaceModel {
         var problem: String? = WorkspaceModel.setUpFolderOnDisk(at: workspaceURL)
         if problem == nil {
             // The recipe, through the one registry (#476), on this thread.
+            // Only a copy that FAILED is the folder's problem; a copy already
+            // running for the folder (unlikely: a folder being set up had no
+            // preview.sh a moment ago) is left to finish on its own.
             ToolchainReadiness.shared.ensure(workspaceURL, synchronously: true)
-            problem = ToolchainReadiness.shared.reasonToWait(workspaceURL)
+            if case .failed(let message) = ToolchainReadiness.shared.state(of: workspaceURL) {
+                problem = message
+            }
         }
         finishInitializing(at: workspaceURL, problem: problem)
     }
@@ -2940,7 +2949,9 @@ class WorkspaceModel {
             if let copy = ToolchainReadiness.shared.ensure(workspaceURL, synchronously: false) {
                 await copy.value
             }
-            problem = ToolchainReadiness.shared.reasonToWait(workspaceURL)
+            if case .failed(let message) = ToolchainReadiness.shared.state(of: workspaceURL) {
+                problem = message
+            }
         }
         AppLog.interface.info(
             "set up \(LogRedactor.redacting(workspaceURL.path), privacy: .public) in \(String(format: "%.2f", Date().timeIntervalSince(startedAt)), privacy: .public)s"

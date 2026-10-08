@@ -102,9 +102,9 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// A held scheduled offer, and the retries that bring it forward (#472).
     @ObservationIgnored let reminders: UpdateReminders = UpdateReminders(defaults: PlantoirDefaults.shared)
 
-    /// The standard driver's delegate: told whether a scheduled offer is
-    /// shown at once or held, and when the alert gets the teacher's
-    /// attention (#472).
+    /// The standard driver's delegate: told, with the offer in hand, whether
+    /// a scheduled offer is shown at once or held, and when the alert gets
+    /// the teacher's attention (#472).
     @ObservationIgnored private var reminderDelegate: UpdateReminderDelegate?
 
     /// The retries for the offer now held, if any.
@@ -256,8 +256,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
     /// minutes, while the offer is still pending and the app is active, the
     /// held alert is brought forward — the same call Check for Updates…
     /// makes — and they stop the moment the alert is seen or answered.
-    func scheduledOfferWasHandedToSparkle(version: String) {
-        let shownAtOnce: Bool = reminderDelegate?.lastOfferWasShownAtOnce ?? true
+    func scheduledOfferWasHandedToSparkle(version: String, shownAtOnce: Bool) {
         reminders.noteOffered(version: version, shownAtOnce: shownAtOnce)
         retryTask?.cancel()
         retryTask = nil
@@ -275,12 +274,28 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
                 if self.reminders.pendingVersion == nil {
                     return
                 }
-                if self.reminders.shouldBringForward(appIsActive: NSApp.isActive) {
+                // Only while the app is active AND the teacher has not
+                // touched the keyboard or mouse for a few seconds (the
+                // implementation review's finding 3): a held alert is shown
+                // key with Install focused, and brought forward mid-keystroke
+                // a Return typed into Plantoir would install the update.
+                if self.reminders.shouldBringForward(
+                    appIsActive: NSApp.isActive, secondsSinceInput: AppUpdates.secondsSinceLastInput()
+                ) {
                     self.userDriver?.showUpdateInFocus()
                 }
                 attempt += 1
             }
         }
+    }
+
+    /// How long since the teacher last typed or moved the mouse, as Sparkle
+    /// asks it for its own idle test. Nil when the event source cannot say.
+    nonisolated static func secondsSinceLastInput() -> TimeInterval? {
+        guard let anyInput = CGEventType(rawValue: ~0) else {
+            return nil
+        }
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: anyInput)
     }
 
     /// The alert reached the teacher — seen, or answered — so nothing is
@@ -905,16 +920,13 @@ final class HoldingUserDriver: NSObject, SPUUserDriver {
         reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
         guard state.stage == .installing, let owner else {
-            // A SCHEDULED offer (#472): the app learns one was handed over,
-            // so a held alert can be brought forward later. A check the
-            // teacher asked for is always shown at once and needs nothing.
-            if !state.userInitiated {
-                self.owner?.scheduledOfferWasHandedToSparkle(
-                    version: UpdateTrail.versionText(
-                        version: appcastItem.displayVersionString, build: appcastItem.versionString
-                    )
-                )
-            }
+            // A SCHEDULED offer (#472) is reported by the standard driver's
+            // DELEGATE, not here: the driver asks it whether it will show
+            // the alert at once or hold it inside this very call, before any
+            // window is shown — reported before, the answer is the previous
+            // offer's; reported after, an alert shown at once may already
+            // have been seen and cleared (the implementation review's
+            // finding 2).
             standard.showUpdateFound(with: appcastItem, state: state, reply: reply)
             return
         }
@@ -1002,9 +1014,6 @@ final class UpdateReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
 
     private weak var owner: AppUpdates?
 
-    /// What the driver said it would do with the last scheduled offer.
-    private(set) var lastOfferWasShownAtOnce: Bool = true
-
     // MARK: - Initializer
 
     init(owner: AppUpdates) {
@@ -1021,7 +1030,13 @@ final class UpdateReminderDelegate: NSObject, SPUStandardUserDriverDelegate {
     func standardUserDriverShouldHandleShowingScheduledUpdate(
         _ update: SUAppcastItem, andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        lastOfferWasShownAtOnce = immediateFocus
+        // Asked before any window is shown, for scheduled checks only — the
+        // one moment the app can learn whether this offer is shown at once
+        // or held, with the offer in hand.
+        owner?.scheduledOfferWasHandedToSparkle(
+            version: UpdateTrail.versionText(version: update.displayVersionString, build: update.versionString),
+            shownAtOnce: immediateFocus
+        )
         return true
     }
 

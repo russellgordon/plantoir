@@ -148,15 +148,15 @@ enum AssistMCPServer {
         holdTheDoorsCourse(in: workspace)
 
         // The folder's tools may still be being copied by the `reloadCourses`
-        // above (#476, off the main actor); the first request is read only
-        // once that copy has finished, so a preview or deploy the client
-        // sends straight away is never refused for a copy this process
-        // itself started. (Another PROCESS copying at the same time is not
-        // seen — `ToolchainReadiness`'s header says why that is accepted.)
-        Task { @MainActor in
-            await ToolchainReadiness.shared.waitUntilReady(workingFolder)
-            AssistMCPServer.readRequests(workspace: workspace, runner: runner)
-        }
+        // above (#476, off the main actor). Requests are read AT ONCE — a
+        // client's start-up timeout must not wait on a copy that can take a
+        // minute on a slow Mac — and the two tools that build
+        // (`AssistToolchainWork.rebuildPreview` and `deploy`) wait for the
+        // copy themselves, so nothing the client sends is refused for a copy
+        // this process itself started. (Another PROCESS copying at the same
+        // time is not seen — `ToolchainReadiness`'s header says why that is
+        // accepted.)
+        AssistMCPServer.readRequests(workspace: workspace, runner: runner)
         dispatchMain()
     }
 

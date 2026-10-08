@@ -152,6 +152,14 @@ final class ToolchainReadiness {
     /// instead of being refused by `ScriptRunner`'s backstop for a copy the
     /// app itself started (Windows' rule under #473).
     func waitUntilReady(_ workspaceURL: URL) async {
+        // A copy that FAILED is tried again here when this process has no
+        // File menu to retry it from — the assistant's server — so a client
+        // is not refused for ever with a sentence that names a menu it
+        // cannot see. A window's robots leave the failure to the menu.
+        if AssistMCPServer.isServing, case .failed = state(of: workspaceURL) {
+            forgetFailure(workspaceURL)
+            ensure(workspaceURL)
+        }
         if let running = tasks[FolderIdentity.canonicalPath(workspaceURL.path)] {
             await running.value
         }

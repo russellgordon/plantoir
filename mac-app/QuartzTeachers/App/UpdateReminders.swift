@@ -98,9 +98,18 @@ final class UpdateReminders {
     /// the app is active (an inactive app's alert is shown by Sparkle itself
     /// the moment the app is activated, and bringing it forward from behind
     /// would pull Plantoir in front of whatever the teacher is doing).
-    func shouldBringForward(appIsActive: Bool) -> Bool {
-        return pendingVersion != nil && pendingOfferWasHeld && appIsActive
+    func shouldBringForward(appIsActive: Bool, secondsSinceInput: TimeInterval?) -> Bool {
+        guard pendingVersion != nil, pendingOfferWasHeld, appIsActive else {
+            return false
+        }
+        // And not mid-keystroke: the alert comes up key with Install
+        // focused. A source that cannot say is taken as idle.
+        return (secondsSinceInput ?? UpdateReminders.quietSeconds) >= UpdateReminders.quietSeconds
     }
+
+    /// How long the keyboard and mouse must have been quiet before a held
+    /// alert is brought forward.
+    nonisolated static let quietSeconds: TimeInterval = 10
 
     /// The wait before try number `attempt` (0-based), in minutes.
     nonisolated static func minutesBeforeRetry(_ attempt: Int) -> Int {

@@ -23,10 +23,12 @@ final class UpdateRemindersTests: XCTestCase {
     func testOnlyAHeldOfferIsBroughtForward() {
         let (reminders, _) = make()
         reminders.noteOffered(version: "1.4.5 (3140)", shownAtOnce: false)
-        XCTAssertTrue(reminders.shouldBringForward(appIsActive: true))
-        XCTAssertFalse(reminders.shouldBringForward(appIsActive: false), "an inactive app's alert is Sparkle's to show on activation")
+        XCTAssertTrue(reminders.shouldBringForward(appIsActive: true, secondsSinceInput: 30))
+        XCTAssertTrue(reminders.shouldBringForward(appIsActive: true, secondsSinceInput: nil), "a source that cannot say is taken as idle")
+        XCTAssertFalse(reminders.shouldBringForward(appIsActive: true, secondsSinceInput: 2), "not mid-keystroke")
+        XCTAssertFalse(reminders.shouldBringForward(appIsActive: false, secondsSinceInput: 30), "an inactive app's alert is Sparkle's to show on activation")
         reminders.noteOffered(version: "1.4.5 (3140)", shownAtOnce: true)
-        XCTAssertFalse(reminders.shouldBringForward(appIsActive: true))
+        XCTAssertFalse(reminders.shouldBringForward(appIsActive: true, secondsSinceInput: 30))
         XCTAssertEqual(reminders.pendingVersion, "1.4.5 (3140)")
     }
 
