@@ -691,7 +691,7 @@
         "why": "Added with #212. 'I never got told' is answerable only if the trail says whether the notification went out, or that notifications were off for the app — from the teacher's side a notification that was blocked and one that was never sent look identical. The question's own line is written BEFORE the answer, because a question that is ignored, or arrives under a Focus, may never be answered. See scheduledPublishStopped.notification."
       },
       {
-        "carries": "the version found and the version running, each as version and build ('1.3.2 (3120)') on the mac, and on Windows, which has no separate build number, as the feed spells it ('1.4.3', since #465); whether the teacher asked or it was the daily check; whether the release is marked important",
+        "carries": "the version found and the version running, each as version and build ('1.3.2 (3120)') on the mac, and on Windows, which has no separate build number, as the feed spells it ('1.4.3', since #465); whether the teacher asked or it was the daily check; whether the release is marked important (on Windows since 1.4.4: whether ANY newer release is marked important, the same rule that makes the offer important, #453)",
         "event": "update found",
         "why": "Added with #204. 'Did Plantoir ever tell me there was a new version?' cannot be answered without it. Written ONCE per version per launch, and worded 'found' rather than 'offered': a check that re-finds a version the teacher answered 'Remind Me Later' to would otherwise add a line a day, and the updater may hold its window back until the app is next in front, so 'offered' could claim a window nobody saw."
       },
