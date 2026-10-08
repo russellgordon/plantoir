@@ -40,6 +40,7 @@
     function swap(el) {
       if (el.hasAttribute('data-win-srcset')) el.setAttribute('srcset', el.getAttribute('data-win-srcset'));
       if (el.hasAttribute('data-win-src')) el.setAttribute('src', el.getAttribute('data-win-src'));
+      if (el.hasAttribute('data-win-alt')) el.setAttribute('alt', el.getAttribute('data-win-alt'));
     }
     function scan(node) {
       if (node.nodeType !== 1) return;
@@ -96,7 +97,7 @@
       <source srcset="./img/hero-dark.webp" data-win-srcset="./img/hero-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
       <source srcset="./img/hero-dark.png" data-win-srcset="./img/hero-windows-dark.png" media="(prefers-color-scheme: dark)">
       <source srcset="./img/hero-light.webp" data-win-srcset="./img/hero-windows-light.webp" type="image/webp">
-      <img src="./img/hero-light.png" data-win-src="./img/hero-windows-light.png" alt="Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right."
+      <img src="./img/hero-light.png" data-win-src="./img/hero-windows-light.png" data-win-alt="Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Edge on the right." alt="Three overlapping windows in a diagonal cascade: Markdown notes in Obsidian on the left, Plantoir deploying the site in the middle, and the finished class website in Safari on the right."
            width="1952" height="1532" loading="lazy" decoding="async">
     </picture>
     <figcaption>From your notes in Obsidian, through Plantoir, to a live class website.</figcaption>
@@ -114,9 +115,9 @@
       <span class="platform">macOS</span>
       <span class="meta">macOS 15 or later, Apple silicon</span>
     </a>
-    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/download/v1.4.2/PlantoirSetup.exe">
+    <a class="dl" href="https://github.com/russellgordon/plantoir/releases/latest/download/PlantoirSetup.exe">
       <span class="platform">Windows</span>
-      <span class="meta">Windows 10 or 11, 64-bit &middot; version 1.4.2</span>
+      <span class="meta">Windows 10 or 11, 64-bit</span>
     </a>
   </div>
   <!-- AUTO-UPDATED when a release is cut: the version and date come from

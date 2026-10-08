@@ -369,6 +369,16 @@ else
   cat /tmp/verify_tool_digest_test.log
 fi
 
+# DEPLOY puts a site online; PUBLISH only marks a page (#443, v1.4.4). The
+# sentences that said publish for a deploy were moved; this keeps them moved,
+# in the mac app's Swift, the launchers and the shared Python. Reads files only.
+if (cd scripts && python3 test_deploy_words.py) >/tmp/verify_deploy_words_test.log 2>&1; then
+  pass "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
+else
+  fail "no sentence a teacher reads says publish for a deploy (scripts/test_deploy_words.py, #443)"
+  cat /tmp/verify_deploy_words_test.log
+fi
+
 # RUNS deploy.sh, where the test above only reads it. That distinction is the
 # reason this exists: the flag was written on a machine with no bash, and
 # starting the script found two things in prompt_for_cf_account that reading it

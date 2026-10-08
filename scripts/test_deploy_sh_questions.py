@@ -217,7 +217,7 @@ class EveryQuestionRefusesUnderTheFlag(unittest.TestCase):
                       "The refusal has to be SAID, not only exited")
         self.assertIn(question, everything,
                       "The refusal names the question it could not ask")
-        self.assertIn("Nothing was published.", everything)
+        self.assertIn("Nothing was deployed.", everything)
 
     def test_the_course_code_question_refuses(self):
         """The 'Open' course-code guard — the one that asks BEFORE the flag

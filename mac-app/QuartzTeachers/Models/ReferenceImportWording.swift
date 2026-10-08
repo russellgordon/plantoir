@@ -274,7 +274,7 @@ nonisolated enum ReferenceImportWording {
     /// settings hold a live credential; none of it comes across.
     static let olderLayoutAddOnsAreLeftBehind: String =
         "Obsidian add-ons and their settings are not brought across from older class folders, "
-        + "so nothing in them can publish these pages."
+        + "so nothing in them can put these pages online."
 
     /// Said under the list and in the summary when a course in the modern
     /// layout has Obsidian add-ons (#255). True of EVERY route, so when this
@@ -283,7 +283,7 @@ nonisolated enum ReferenceImportWording {
     /// add-ons DID come. `ImportCoursesForReferenceSheet.addOnsNote` chooses.
     static let addOnsAreLeftBehind: String =
         "Obsidian add-ons and their settings are not brought across, "
-        + "so nothing in them can publish these pages."
+        + "so nothing in them can put these pages online."
 
     // MARK: - The 2024–25 layout (a website folder per class, #256)
 

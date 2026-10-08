@@ -40,6 +40,7 @@
     function swap(el) {
       if (el.hasAttribute('data-win-srcset')) el.setAttribute('srcset', el.getAttribute('data-win-srcset'));
       if (el.hasAttribute('data-win-src')) el.setAttribute('src', el.getAttribute('data-win-src'));
+      if (el.hasAttribute('data-win-alt')) el.setAttribute('alt', el.getAttribute('data-win-alt'));
     }
     function scan(node) {
       if (node.nodeType !== 1) return;
@@ -97,10 +98,10 @@
   <p>Right-click the section and choose Get Ready for the Start of the Year… from its menu. Plantoir lists what it would put into draft — every class after the first, the pages only those later classes use, and pages nothing students can still see links to — each with its reason. The first class and the pages it links to, your Key Links and the pages they list, and every curriculum page stay where they are.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/start-of-year-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/start-of-year-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/start-of-year-light.webp" type="image/webp">
-      <img src="../img/start-of-year-light.png" alt="The Get Ready for the Start of the Year sheet for ICS3U Section 2, listing the classes and pages it will put into draft, with a reason beside each."
+      <source srcset="../img/start-of-year-dark.webp" data-win-srcset="../img/start-of-year-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/start-of-year-dark.png" data-win-srcset="../img/start-of-year-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/start-of-year-light.webp" data-win-srcset="../img/start-of-year-windows-light.webp" type="image/webp">
+      <img src="../img/start-of-year-light.png" data-win-src="../img/start-of-year-windows-light.png" alt="The Get Ready for the Start of the Year sheet for ICS3U Section 2, listing the classes and pages it will put into draft, with a reason beside each."
            width="1392" height="912" loading="lazy" decoding="async">
     </picture>
     <figcaption>Every class after Day 1 into draft, with the reasons, before you agree.</figcaption>
@@ -121,10 +122,10 @@
   <p>When it has run, a notification says how it went — whether it went up or why it didn't. Click it and Plantoir opens on that section.</p>
   <figure class="shot">
     <picture>
-      <source srcset="../img/schedule-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/schedule-dark.png" media="(prefers-color-scheme: dark)">
-      <source srcset="../img/schedule-light.webp" type="image/webp">
-      <img src="../img/schedule-light.png" alt="The Schedule Deploy sheet for ICS3U Section 1 set for a morning time, with a macOS notification above it saying the section deployed on its own."
+      <source srcset="../img/schedule-dark.webp" data-win-srcset="../img/schedule-windows-dark.webp" type="image/webp" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/schedule-dark.png" data-win-srcset="../img/schedule-windows-dark.png" media="(prefers-color-scheme: dark)">
+      <source srcset="../img/schedule-light.webp" data-win-srcset="../img/schedule-windows-light.webp" type="image/webp">
+      <img src="../img/schedule-light.png" data-win-src="../img/schedule-windows-light.png" data-win-alt="The Plantoir window with the Schedule a deploy sheet for ICS3U Section 1 set for a morning time; when the deploy has run, Windows tells the teacher how it went with a notification." alt="The Schedule Deploy sheet for ICS3U Section 1 set for a morning time, with a macOS notification above it saying the section deployed on its own."
            width="1392" height="938" loading="lazy" decoding="async">
     </picture>
     <figcaption>Set it on Sunday. Hear how it went on Monday.</figcaption>
