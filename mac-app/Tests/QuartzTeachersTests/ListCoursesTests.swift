@@ -66,12 +66,12 @@ final class ListCoursesTests: XCTestCase {
 
     // MARK: - What it answers
 
-    /// The code, the name, the sections and where it publishes.
+    /// The code, the name, the sections and where it deploys.
     ///
     /// **All four, because leaving any out costs a round trip.** A caller with
     /// only codes has to call `check_section` to learn whether section 2
     /// exists, and cannot warn a teacher that the course they just asked to
-    /// publish goes somewhere they did not expect.
+    /// deploy goes somewhere they did not expect.
     @MainActor
     func testItNamesTheCourseItsSectionsAndWhereItPublishes() async throws {
         let made = try AssistFixture.makeRunner()
@@ -81,20 +81,21 @@ final class ListCoursesTests: XCTestCase {
 
         XCTAssertTrue(said.contains("ICS3U"), said)
         XCTAssertTrue(said.contains("sections:"), said)
-        XCTAssertTrue(said.contains("publishes to:"), said)
+        XCTAssertTrue(said.contains("deploys to:"), said)
+        XCTAssertFalse(said.contains("publishes to:"), said)
         XCTAssertTrue(
             said.contains("Netlify"),
             "The fixture course has no destination configured, so it reads as the default: \(said)"
         )
     }
 
-    /// Every place each course publishes to, not only the first (#403).
+    /// Every place each course deploys to, not only the first (#403).
     ///
     /// Runs every `planOpening` case and every `listCoursesLine` case from
     /// shared-rules.json through list_courses on BOTH surfaces — `.local` is
     /// the one a teacher sees, when the app's own assistant window is asked
     /// "what courses do I have?" — and compares the course's line WHOLE with
-    /// "  publishes to: " + the case's `card`. The folder-not-chosen case is
+    /// "  deploys to: " + the case's `card`. The folder-not-chosen case is
     /// the one the old primary-only name got wrong ("Netlify"); the two- and
     /// three-destination cases are the ones it cut short, and "Netlify and
     /// Cloudflare Pages" is the one a sort by name would turn round.
@@ -132,11 +133,11 @@ final class ListCoursesTests: XCTestCase {
                 let said: String = await run(made.runner)
                 var publishesLines: [String] = []
                 for line in said.components(separatedBy: "\n") {
-                    if line.hasPrefix("  publishes to: ") {
+                    if line.hasPrefix("  deploys to: ") {
                         publishesLines.append(line)
                     }
                 }
-                XCTAssertEqual(publishesLines, ["  publishes to: \(card)"], "\(name), \(surface): \(said)")
+                XCTAssertEqual(publishesLines, ["  deploys to: \(card)"], "\(name), \(surface): \(said)")
             }
         }
     }

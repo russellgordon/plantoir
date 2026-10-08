@@ -6049,7 +6049,8 @@ away, and #220's quit path already leaves the builder running while any
 launcher is: `warmUpRunning` matches `…/getting-ready/setup.sh
 --prepare-builder`, and the trail says "left this Mac's website-building setup
 running because this Mac is still being got ready to build websites, in the
-background" — never "a publish or preview", which nobody started (review N5).
+background" — never "a deploy or preview" ("a publish or preview" before v1.4.4,
+#443), which nobody started (review N5).
 The run finishes on its own; its result is then not written down (the app is
 gone), so the next launch runs it again and finds the builder ready in
 seconds.
@@ -8665,7 +8666,7 @@ reads — `shared-rules.json` → `quittingWhileWorkIsUnderWay`, the
 `copiesBeingSaved` case). `WorkspaceModel.restoreBackup` asks `courseIsBusy`
 AGAIN after its zip, and a REMOVAL — which never checked at all — now refuses
 while the course is busy (`removalWaitsWhileBusy`) and asks again after its
-zip, deleting nothing if a publish or preview began meanwhile; the archive
+zip, deleting nothing if a deploy or preview began meanwhile; the archive
 stays.
 A reference course being removed is unlocked after its archive and just before
 the delete (`archiveAndRemoveCourse(beforeRemoving:)`): unlocked before, a

@@ -890,6 +890,13 @@ public sealed partial class SidebarPane : UserControl
     }
 
     /// <summary>
+    /// For the marketing pictures only (<c>--stage-scene schedule-sheet</c>):
+    /// the Schedule a Deploy sheet for a section, exactly as the menu opens it.
+    /// The scene never presses Schedule, so nothing is scheduled.
+    /// </summary>
+    public void OpenScheduleSheetForCapture(Course course, int section) => AskWhenToDeploy(course, section, null);
+
+    /// <summary>
     /// Ask when to deploy, and set it — both for a brand-new schedule and
     /// for changing an existing one, since <see cref="TaskScheduling.Schedule"/>
     /// already replaces by name (there is at most one per section by
