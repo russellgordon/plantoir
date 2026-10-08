@@ -1,0 +1,104 @@
+#440 - add_next_class and units, days and counts, on the mac. Measured
+2026-10-07 (15:20-16:01 EDT), BOTH tiers, three arms, against the rule in
+next-class-unit-440-preregistration.txt (committed 8f3ac581e, before the
+first request). RESULT: the plan's design PASSES on both tiers; A' FAILS on
+both and is NOT adopted.
+
+CONDITIONS (as pre-registered)
+  Mac16,8 (Apple M4 Pro), 48 GiB, macOS 26.6. mac-app/Vendor/llama
+  llama-server (b10435), Metal, port 8457, AssistServerHost.serverArguments
+  verbatim (--reasoning off AND --reasoning-budget 0, --n-gpu-layers 999,
+  --jinja, --parallel 1, --threads 4), --ctx-size 8192 / 16384. One server
+  per tier, own PID, stopped after the tier.
+  SMALLER qwen2.5-1.5b-instruct-q4_k_m.gguf (the app's copy, read-only).
+  LARGER  qwen3-4b-q4_k_m.gguf from AssistModelTier.downloadURL, 2,497,280,256
+          bytes (== downloadBytes), scratch folder, deleted afterwards.
+  10 greedy trials. Dateline "(Today is 2026-10-07, a Wednesday.)".
+  BEFORE = dfa34e51c (origin/dev 4b177c684 + piece S), harness by git
+  archive. AFTER = this branch. Local tool JSON BEFORE vs AFTER: byte-equal
+  (and parsed-equal); scripts/test_tool_surface_digest.py OK (LOCAL_DIGEST
+  46b96562...2cd96cb6 unmoved). A' = AFTER's tools + newUnit (boolean) and
+  unit/days (integer) on add_next_class, descriptions as pre-registered.
+  Raw: next-class-unit-440-raw.txt.
+
+M1 - REGRESSION (trimmed-surface 29 probes; teachers-say 25 probes)
+                                      BEFORE     AFTER      A'
+  smaller  trimmed, all probes        210/290    210/290    200/290
+  smaller  polarity inversions        0          0          0
+  smaller  teachers-say overall       210/250    210/250    210/250
+  smaller  unit "next" sent           never      never      never
+  larger   trimmed, all probes        290/290    290/290    290/290
+  larger   polarity inversions        0          0          0
+  larger   teachers-say overall       240/250    240/250    250/250
+  larger   unit "next" sent           never      never      never
+  BEFORE vs AFTER: every probe IDENTICAL in both suites on both tiers. The
+  AFTER mirror intercepts no probe the BEFORE mirror did not (8 of 29 each);
+  its new guard agrees with 60 nextClassUnits rows.
+  A' vs AFTER, probes that moved:
+    smaller trimmed  "HIDE - the inversion case"  10 -> 0 (declined; model-seen)
+                     "typos"                      10 -> 0 (publish_pages)
+                     "card: undo"                 10 -> 0, "card: deploy now" 0 -> 10,
+                     "read" 0 -> 10   (all three answered in code by the app)
+    smaller teachers "ctl decline: delete"        10 -> 0;  "ctl cancel_scheduled" 0 -> 10
+    larger  teachers "ctl read_page"              0 -> 10
+  A' ARGUMENTS on the six teachers-say add_next_class phrasings (the #411 harm):
+    smaller: 60 of 60 calls carry unit 2 and days 1; "Add the next class"
+             sends newUnit TRUE 10 of 10 (a new unit, success reported).
+    larger:  60 of 60 calls carry newUnit false, unit 2, days 1 (one day
+             added to Unit 2 whatever unit the teacher is in).
+
+M2 - next-class-unit-probes.py (22 pointed + 15 runs rows that reach the model)
+  NOTE (final sweep H4, 2026-10-07): three pointed rows were added by review
+    N-impl F2 AFTER this run - "Add the next class, review day before the
+    next unit test", "Add the next class in the current unit, not the next
+    unit" and "Add the next class for next week" - decided false refusals,
+    not measured. "22 pointed" here and "60 nextClassUnits rows" above
+    describe the run; the contract now holds 25 pointed rows and the guard
+    agrees with 63. No measured number below changed.
+  AFTER, smaller: 37 of 37 sentences pass. Every pointed sentence reaches
+    add_next_class 10/10 with only course and section, except "Start a new
+    unit?" and "Start a new module", DECLINED 10/10 (no write, no S3 needed:
+    the teacher reads the model's own words). No other write tool, no
+    unit/days key anywhere. Every control 10/10.
+  AFTER, larger: 37 of 37 pass. Same, and "Start a new module" reaches
+    add_next_class 10/10 (pointed by S3); "Start a new unit?" declined 10/10.
+  A', smaller: 28 of 37 fail the rule (every pointed and control sentence
+    sends unit/days; pointed-a "new unit" sentences send newUnit true with
+    unit 1, so a model-filled call would start the wrong unit; "Add the next
+    class" newUnit true). "Start a new unit?" and "Start a new module" move
+    from declined to add_next_class.
+  A', larger: 28 of 37 fail (unit/days on every call; "Add the next class"
+    and "Add the next class for period 2" send unit 0; "Add the next class to
+    Module 4" sends unit 0).
+  NOTE (review N-impl F6, 2026-10-07; reworded by review N-fixes G3):
+    "28 of 37" against A' is scored against rule (e), and (e) is a rule
+    for the AFTER arm - it bans SENDING a unit/days key, which A' declares
+    (declaring a key does not force the model to send it) - so it is not
+    evidence against A' on its own. A' is judged by (g)-(j), and it fails
+    (g), (i) and (j): the smaller tier's "HIDE - the inversion case",
+    "typos" and "ctl decline: delete" falling 10 -> 0 (M1, rule g); "Start
+    a new unit?" and "Start a new module" moving from declined to
+    add_next_class on the smaller tier (M2, rule i); and both tiers filling
+    unit/days on every plain "add the next class" phrasing in teachers-say
+    (M1b, rule j), the smaller asking for a NEW unit 10 of 10 on "Add the
+    next class".
+
+THE DETERMINISTIC SWEEP (ruling 5, F7). Every add_next_class sentence on
+record that reaches the model - teachers-say-suite.py's six (= the tool's
+TEACHERS SAY), shelf-phrasings-suite.py's and trimmed-surface-suite.py's
+add_next_class probes (all four are cards, so never S3), the contract's
+add_next_class card rows (cards) - plus nine hand-written neighbours, is in
+nextClassUnits.runs; S3 stops none of them (NextClassUnitsTests.
+testEveryRunsRowRuns, green). Cards were excluded from the sweep on
+purpose: they never pass through think(), and a scenario pins that.
+
+VERDICT
+  Plan's design (AFTER): PASS on both tiers - (a) JSON equal, digest OK;
+  (b) every probe identical; (c) zero inversions; (d) unit "next" never;
+  (e) every pointed sentence reaches add_next_class or is declined with no
+  unit/days and no other write; (f) every control 10/10.
+  A': NOT ADOPTED - (g) fails on both tiers (smaller trimmed and teachers-say,
+  larger teachers-say), (i) fails on both tiers (declined counts move), and
+  (j) fails on both: every plain phrasing carries unit/days, and on the
+  smaller tier "Add the next class" asks for a NEW unit 10 of 10. Zero
+  inversions on every arm - necessary, not sufficient, as in #411.

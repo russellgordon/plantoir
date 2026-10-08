@@ -78,6 +78,9 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
+        if let days = AssistCardCommand.daysToAUnit(tidied) {
+            return days
+        }
         if let room = AssistCardCommand.makeRoom(tidied, numberedPageWord: numberedPageWord) {
             return room
         }
@@ -1760,6 +1763,67 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
+    /// "Add three days to Unit 2", "Add two more classes to Unit 4", "Add
+    /// another day to Unit 4" — the frame `moreDays` reads, said the other
+    /// ways a teacher says it (#440).
+    ///
+    /// **Why these are answered here and never by the model.** Measured
+    /// 2026-10-07 on the smaller assistant (M4 Pro, b10435, the app's own
+    /// flags): "Add three days to Unit 2", "Add another day to Unit 4" and
+    /// "Add two more classes to Unit 4" each reached add_next_class 5 times in
+    /// 5 with only a course and a section — ONE page in the CURRENT unit,
+    /// success reported. The local tool cannot carry a unit or a count (#411
+    /// measured what declaring them costs), so the sentence is read here.
+    ///
+    /// Six or seven words exactly: `add`, a count, an optional `more`, the
+    /// noun, `to unit`, a number. The count is a digit, a word up to twelve,
+    /// or — for one — `a`, `one` or `another`; it must AGREE with the noun
+    /// (`another day`, `three days`), the rule `makeRoom` keeps, because a
+    /// sentence that disagrees with itself is one somebody typed carelessly.
+    /// Term-blind, like every frame in this file: only the word "unit".
+    /// Anything else — a question mark, a "please", a course or section
+    /// named, a negation — falls through to the model, where settler S3
+    /// (`AssistNextClassUnits.kind`) stops it and says
+    /// `AssistWording.nextClassNeedsItsOwnPhrasing`.
+    private static func daysToAUnit(_ tidied: String) -> AssistCardCommand? {
+        let spelled: [String: Int] = [
+            "a": 1, "another": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+            "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        ]
+        var words: [String] = []
+        for piece in tidied.split(separator: " ") {
+            words.append(String(piece))
+        }
+        guard words.count == 6 || words.count == 7, words[0] == "add" else {
+            return nil
+        }
+        let last: Int = words.count - 1
+        guard words[last - 2] == "to", words[last - 1] == "unit",
+              let unit = Int(words[last]), unit > 0 else {
+            return nil
+        }
+        if words.count == 7 {
+            // "a more day" and "another more day" are not sentences.
+            guard words[2] == "more", words[1] != "a", words[1] != "another" else {
+                return nil
+            }
+        }
+        let nouns: [String: Bool] = ["day": true, "class": true, "days": false, "classes": false]
+        guard let isSingular = nouns[words[last - 3]] else {
+            return nil
+        }
+        guard let howMany = spelled[words[1]] ?? Int(words[1]), howMany > 0 else {
+            return nil
+        }
+        guard (howMany == 1) == isSingular else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "add_next_class",
+            arguments: ["unit": "\(unit)", "days": "\(howMany)"]
+        )
+    }
+
     /// "Publish Unit 5", "Unpublish Unit 4", and — since #215 — "Hide Unit 4,
     /// Day 21".
     ///
@@ -2149,6 +2213,24 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 becauseNotThis: "No count, so there is nothing to fill `days` with and guessing one "
                               + "would create a number of pages nobody asked for."
             ),
+            // #440: the other ways of saying the entry above, as a family of
+            // its own so the entry Windows already implements is unchanged.
+            ParsedShape(
+                shape: "add <count> [more] days|classes to unit <number> | "
+                     + "add a|one|another [more] day|class to unit <number>",
+                tool: "add_next_class",
+                fills: ["days": "<count>, as a word up to twelve or a digit; a, one and another "
+                              + "are 1. It must agree with the noun: 'another day', 'three days'",
+                        "unit": "<number>"],
+                example: "add three days to unit 2",
+                notThis: "add three days to unit 2?",
+                becauseNotThis: "A question mark, a 'please', a course or section named, or any other "
+                              + "word falls through to the model, as in every frame here; a matched "
+                              + "card binds this window's course and section. On the model's path "
+                              + "settler S3 stops the sentence and names this one instead, so it never "
+                              + "adds a single page in the current unit. Every accepted and refused "
+                              + "spelling is in nextClassUnits."
+            ),
             ParsedShape(
                 shape: "duplicate <page title> as my next class",
                 tool: "add_next_class",
@@ -2402,6 +2484,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         ("start a new unit for the next class",
          AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
         ("start a new unit",
+         AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
+        // The two ways the smaller assistant was measured hearing as "the
+        // next day of this unit" (#440, 2026-10-07: 5 of 5 each, one page in
+        // the CURRENT unit, success reported). Exact, like every line here.
+        ("add the next class in a new unit",
+         AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
+        ("start a new unit with the next class",
          AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
 
         ("when are my next classes?",
