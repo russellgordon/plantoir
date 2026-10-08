@@ -43,9 +43,10 @@ enum AssistMCPServer {
     /// by code the app and the server share can say which of the two wrote it.
     static var isServing: Bool = false
 
-    /// The environment variable the Claude door names its course in (#458):
-    /// `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}` in the session's
-    /// `mcp-<CODE>.json`, beside `args`. Windows' `AssistWorkspace
+    /// The environment variable both doors name their course in (#458):
+    /// `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}` in the Claude session's
+    /// `mcp-<CODE>.json`, beside `args`, and a fifth `-c
+    /// mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"` for Codex. Windows' `AssistWorkspace
     /// .DoorCourseVariable`, by the same name.
     ///
     /// **It HOLDS the course and never narrows to it.** The server is still
@@ -53,8 +54,9 @@ enum AssistMCPServer {
     /// every course stays reachable (#430); the course named here is the one
     /// this process takes an `assist` lease on, which keeps the session's
     /// backup (#283), refuses a second session, and holds rename, Add
-    /// Section and restore in the app while the conversation is open. The
-    /// Codex door names none and holds none, on both platforms.
+    /// Section and restore in the app while the conversation is open. Both
+    /// doors name it (Russell, #458, 2026-10-07); Windows' Codex door does not
+    /// yet.
     nonisolated static let doorCourseVariable: String = "PLANTOIR_DOOR_COURSE"
 
     // MARK: - Functions
@@ -85,7 +87,7 @@ enum AssistMCPServer {
     /// one of this folder's courses, matched without regard to case, and the
     /// answer is that course's code AS THE FOLDER SPELLS IT. A course the
     /// folder does not have is nil — never a refusal and never a lock: the
-    /// session simply holds nothing, as a Codex session does.
+    /// session simply holds nothing, as a server started by hand does.
     nonisolated static func courseToHoldForTheConversation(
         _ doorCourse: String?,
         among courseCodes: [String]
@@ -131,7 +133,7 @@ enum AssistMCPServer {
 
     /// The trail line for a session that holds its course (#458).
     nonisolated static func holdingTrailLine(courseCode: String) -> String {
-        return "a Claude session started from Plantoir is holding \(courseCode) while it is open"
+        return "a Claude or Codex session started from Plantoir is holding \(courseCode) while it is open"
     }
 
     /// Read requests from stdin, write replies to stdout, until stdin closes.

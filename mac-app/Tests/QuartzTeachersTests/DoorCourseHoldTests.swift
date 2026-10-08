@@ -176,7 +176,7 @@ final class DoorCourseHoldTests: XCTestCase {
         }
         let doors: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["doorCourseHold", "whichDoors"])
         XCTAssertEqual(doors["claude"] as? Bool, true)
-        XCTAssertEqual(doors["codex"] as? Bool, false)
+        XCTAssertEqual(doors["codex"] as? Bool, true, "Russell, #458, 2026-10-07: both doors hold their course.")
     }
 
     /// The server takes the lease on the course the door named, as the folder
@@ -307,7 +307,7 @@ final class DoorCourseHoldTests: XCTestCase {
     }
 
     /// MUST FAIL if a record counts whose process holds no live `assist`
-    /// lease — a killed session's record, or a Codex session's.
+    /// lease — a killed session's record, or a server started by hand.
     func testARecordIsKeptOnlyWhileItsSessionHoldsALiveAssistLease() throws {
         let block: [String: Any] = try FileFormatsContractTests.section("heldBackupRecord")
         let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
@@ -391,7 +391,7 @@ final class DoorCourseHoldTests: XCTestCase {
             problem.contains(AssistWording.finishTheClaudeSessionToDeleteItsBackup(course: "ICS3U", count: 1)), problem
         )
         let trail: String = trailText(in: made.root)
-        XCTAssertTrue(trail.contains("which a Claude session still open made"), trail)
+        XCTAssertTrue(trail.contains("which a Claude or Codex session still open made"), trail)
     }
 
     // MARK: - Protection 2: a second session is refused

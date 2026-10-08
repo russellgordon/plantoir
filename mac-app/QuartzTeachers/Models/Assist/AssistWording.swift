@@ -1761,56 +1761,58 @@ nonisolated enum AssistWording {
     /// The model answered with neither a tool nor anything to say.
     static let nothingToDo: String = "I am not sure what to do with that."
 
-    // MARK: - A Claude session holding its course (#458)
+    // MARK: - A Claude or Codex session holding its course (#458)
 
-    /// Under the greyed items while a Claude session opened from Plantoir is
-    /// open on this course: the three Revise items, Rename Course and Add
-    /// Section…. Menu-length, in the shape of `CourseActivity.busyDescription`'s
-    /// lines, and Windows' words since #430 — word for word, so one sentence
-    /// greys the same items on both platforms.
+    /// Under the greyed items while a Claude or Codex session opened from
+    /// Plantoir is open on this course: the three Revise items, Rename Course
+    /// and Add Section…. Menu-length, in the shape of
+    /// `CourseActivity.busyDescription`'s lines. Windows' words since #430
+    /// with "or Codex" added, so one sentence greys the same items on both
+    /// platforms once Windows' Codex door holds its course too.
     ///
-    /// "Claude" and not "Claude or Codex": only the Claude door names its
-    /// course to the server, so only a Claude session holds one (the Codex
-    /// door names none and holds none, on both platforms).
+    /// "Claude or Codex" since Russell's ruling on #458 (2026-10-07) that
+    /// BOTH doors name their course to the server, which holds it. The
+    /// server cannot tell which door started it, so one sentence names both;
+    /// Windows said "with Claude" while only its Claude door held a course.
     static let availableOnceYouFinishRevisingWithClaude: String =
-        "Available once you finish revising with Claude"
+        "Available once you finish revising with Claude or Codex"
 
     /// The title of the alert a Revise item gives when it is clicked while a
-    /// Claude session is open on the course — the click-time re-check behind
-    /// the greyed menu, since a session can start between the menu opening
-    /// and the click. Windows' title for its own second-session refusal.
+    /// Claude or Codex session is open on the course — the click-time
+    /// re-check behind the greyed menu, since a session can start between the
+    /// menu opening and the click. Windows' title for its own second-session refusal.
     static func courseIsAlreadyBeingRevised(course: String) -> String {
         return "\(course) is already being revised"
     }
 
     /// The message under `courseIsAlreadyBeingRevised`.
     static let finishTheClaudeSessionFirst: String =
-        "A Claude session is working on this course already. Finish that session, then start again here."
+        "A Claude or Codex session is working on this course already. Finish that session, then start again here."
 
     /// What Rename Course, Restore and Add Section say when they are asked
-    /// for while a Claude session is open on the course — the click-time
-    /// check behind the greyed menu item. `then` is the act, in a teacher's
+    /// for while a Claude or Codex session is open on the course — the
+    /// click-time check behind the greyed menu item. `then` is the act, in a teacher's
     /// words: "rename", "restore", "add the section".
     static func claudeIsRevisingTheCourse(course: String, then act: String) -> String {
-        return "A Claude session is working on \(course) right now. Finish that session, then \(act)."
+        return "A Claude or Codex session is working on \(course) right now. Finish that session, then \(act)."
     }
 
-    /// The delete-several confirmation's sentence for backups a Claude
-    /// session still open on a course made — and which are therefore kept.
+    /// The delete-several confirmation's sentence for backups a Claude or
+    /// Codex session still open on a course made — and which are therefore kept.
     /// `count` is how many of the chosen backups that session holds.
     static func backupsKeptForAClaudeSession(course: String, count: Int) -> String {
         if count == 1 {
-            return "One of these is kept: a Claude session still open on \(course) made it."
+            return "One of these is kept: a Claude or Codex session still open on \(course) made it."
         }
-        return "\(count) of these are kept: a Claude session still open on \(course) made them."
+        return "\(count) of these are kept: a Claude or Codex session still open on \(course) made them."
     }
 
-    /// What a delete that kept a Claude session's backup tells the teacher
+    /// What a delete that kept a Claude or Codex session's backup tells the teacher
     /// afterwards, and what the single "Delete Backup…" says at once.
     static func finishTheClaudeSessionToDeleteItsBackup(course: String, count: Int) -> String {
         if count == 1 {
-            return "Finish the Claude session working on \(course) first. It made this backup, so it was kept."
+            return "Finish the Claude or Codex session working on \(course) first. It made this backup, so it was kept."
         }
-        return "Finish the Claude session working on \(course) first. It made these backups, so they were kept."
+        return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
     }
 }

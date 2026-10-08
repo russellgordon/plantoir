@@ -1029,8 +1029,9 @@ final class AppRulesContractTests: XCTestCase {
             XCTAssertEqual(filledServerArguments, ["--mcp-stdio", folder])
 
             // What each door names to its SERVER'S ENVIRONMENT (#458): the
-            // Claude door its course, in the configuration's "env", for the
-            // server to hold; the Codex door nothing, on both platforms.
+            // Claude door its course, in the configuration's "env", and the
+            // Codex door the same, as a `-c mcp_servers.plantoir.env.<VAR>`
+            // override — both for the server to hold (Russell, 2026-10-07).
             let expectedEnvironment: [String: String] = try XCTUnwrap(
                 agent["serverEnvironment"] as? [String: String], key
             )
@@ -1051,9 +1052,24 @@ final class AppRulesContractTests: XCTestCase {
                 XCTAssertEqual(environment, filledEnvironment, "The Claude door's server environment")
                 XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode])
             default:
-                XCTAssertEqual(filledEnvironment, [:], "\(key) names no course to its server")
-                let script: String = try String(contentsOfFile: scriptPath, encoding: .utf8)
-                XCTAssertFalse(script.contains(AssistMCPServer.doorCourseVariable), key)
+                // Read the environment back out of the arguments the tool
+                // RECEIVES: every `-c mcp_servers.plantoir.env.<NAME>="<value>"`.
+                let environmentPrefix: String = "mcp_servers.plantoir.env."
+                var environment: [String: String] = [:]
+                var index: Int = 0
+                while index + 1 < argv.count {
+                    let override: String = argv[index + 1]
+                    if argv[index] == "-c" && override.hasPrefix(environmentPrefix) {
+                        let assignment: String = String(override.dropFirst(environmentPrefix.count))
+                        let parts: [String] = assignment.components(separatedBy: "=")
+                        if parts.count == 2 && parts[1].hasPrefix("\"") && parts[1].hasSuffix("\"") {
+                            environment[parts[0]] = String(parts[1].dropFirst().dropLast())
+                        }
+                    }
+                    index += 1
+                }
+                XCTAssertEqual(environment, filledEnvironment, "The \(key) door's server environment")
+                XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode], key)
             }
 
             // What each door writes for the CONNECTION, and what it therefore
