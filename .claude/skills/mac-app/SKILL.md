@@ -454,8 +454,8 @@ The same goes for anything else the assistant surfaces: tokens, context
 windows, quantisation, Metal, GPU layers, inference. If a sentence would only
 make sense to somebody who has read the source, it is not ready to show.
 
-Two exceptions, both non-teacher-facing: `GUI-IMPROVEMENTS.md` and the
-write-ups record what was measured and must name models precisely, and code
+Two exceptions, both non-teacher-facing: the closing comment on the issue
+and the write-ups record what was measured and must name models precisely, and code
 comments should too. The rule is about what appears on screen.
 
 ## Open investigations — read these before touching the area
