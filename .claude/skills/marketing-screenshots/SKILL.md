@@ -359,13 +359,50 @@ from drafts it writes — it says which, and exits non-zero until they are there
 **The demo folder**, only on a machine that has never done this, or after `~/Desktop/Teaching` is deleted:
 
 ```bash
-python3 website/shots/capture.py --provision-demo   # creates the three courses
+python3 website/shots/capture.py --provision-demo   # creates the three courses and their state
 python3 website/shots/capture.py --publish          # builds and publishes them
 ```
 
 Provisioning drives the app's own new-course panel three times and runs the
-real setup script, so it takes a long while and needs Docker. Publishing needs
-the Netlify token in the Keychain, which `deploy.sh` reads for itself.
+real setup script, so it takes a long while and needs Docker. Then it gives
+the folder the state `website/shots/marketing/folders.json` describes
+(`demo_folders.py`, #445): the three colour schemes, the teacher's last name,
+the sites' markers, and each section's front page on the latest class dated
+on or before January 15, every class after it unpublished — asked of the
+app's own `--mcp-stdio` door, never written by the script. Every step says
+"made" or "already there".
+
+What a door call COSTS, said plainly: on the Mac each change zips the course
+into `courses/_backups` (once per course, since every section goes through one
+server) and rebuilds that section's site headless (`preview.sh --build-only`,
+into the real builds folder, starting the website builder if it is not
+running) — four builds for the four demo sections on a first run, and the
+Mac's tools have no switch to skip it. `capture.py` runs the door with
+`--state-dir` on a temporary folder, so nothing reaches the real activity
+trail. On Windows the same tools take `preview: false`, which
+`capture_windows.py` passes, so nothing is built; `plantoir-mcp.exe` takes no
+`--state-dir`, so its calls DO land on the real trail. A second run, with the
+front pages already right, makes no call at all.
+
+**`--publish` from a folder made this way does NOT reach the live sites.** The
+live sites' Netlify ids are only in the KEPT demo folder's `.netlify_sites/`
+(never committed); a fresh folder gets stand-in markers that name the sites
+but carry no id Netlify knows, and deploying from one makes a NEW site. Publish
+the live sites from the kept folder, and only when Russell says so. Publishing
+needs the Netlify token in the Keychain, which `deploy.sh` reads for itself.
+
+**Everything both folders need is in the repository**, as rules rather than
+copies — `website/shots/marketing/folders.json` — except the College Board
+pages' words (hand-copied by Russell) and those Netlify ids.
+`python3 website/shots/test_demo_folders.py` (in `verify.sh`) proves a clone
+can make both; `PLANTOIR_DEMO_FOLDERS_COMPARE=1` adds a read-only check that
+the kept folders still match every rule, and `PLANTOIR_DEMO_FOLDERS_APP=<binary>`
+runs the front pages through a built app. The course codes, sections and site
+names are written in `folders.json` and read by the scripts and the UI tests
+alike; the one exception is each class-site SHOT, whose address names the page
+it photographs on one course's site (`capture_windows.py`'s
+`site_address("MCV4U") + "/concepts/derivative-rules"`, the shots in
+`shots.json`) — a shot about a different course is a different shot.
 
 The three courses are ENG2D, MCV4U and SCH3U on purpose: between them the
 class sites show prose, typeset mathematics and chemistry notation, which is

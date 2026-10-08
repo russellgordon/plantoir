@@ -16,6 +16,7 @@ import Foundation
 /// | `build` | any preview of the course is being built, or any section of it is publishing |
 /// | `publish` | any section of the course is publishing |
 /// | `preview` | any section of the course has a preview up |
+/// | `assist` | `Plantoir --mcp-stdio` only: the course the Claude door named, for the whole conversation (#458) |
 ///
 /// One file per folder, course and kind: two sections of one course
 /// previewing keep ONE `preview` lease, ending one keeps it, ending both
@@ -72,6 +73,29 @@ enum WorkLeaseRegistry {
     /// the lease exists to cover.
     static var isLeaving: Bool = false
 
+    /// The `assist` lease `Plantoir --mcp-stdio` holds for the whole of its
+    /// conversation on the course the Claude door named (#458) — nil in the
+    /// app, and in a server started with no course or one this folder does
+    /// not have.
+    ///
+    /// Kept HERE, and added to what `reconcile()` wants, because `reconcile`
+    /// removes every written lease that is not wanted: a hold written beside
+    /// the registry would be taken down by the first reconcile after the
+    /// session's own preview or deploy ended — leaving the course unheld
+    /// while the session was still open, which is the fault this exists to
+    /// prevent.
+    private(set) static var heldForTheConversation: Wanted?
+
+    /// The held-backup records this process has written (#283, #458), each
+    /// `<COURSE>.held-backup.<pid>` naming the backup its conversation made.
+    /// Removed at exit by `forgetRecordedBackups()`, BEFORE the leases go.
+    private(set) static var recordedBackups: [URL] = []
+
+    /// For tests only: when not nil, the name of every lease and record this
+    /// process removes is appended, in order — the one way to see that a
+    /// leaving server forgets its records BEFORE its leases go (#458).
+    static var removalsSeenByTests: [String]?
+
     /// The trail line for a preview the window declined because this copy of
     /// the app is deploying that same section (#381) — the contract's
     /// `activityTrail.mustRecord` → "build declined, course busy elsewhere" →
@@ -94,6 +118,9 @@ enum WorkLeaseRegistry {
         }
         for lease in PreviewLeases.active {
             wanted.append(Wanted(folderPath: lease.folderPath, courseCode: lease.courseCode, kind: WorkLeaseFiles.previewKind))
+        }
+        if let heldForTheConversation {
+            wanted.append(heldForTheConversation)
         }
 
         for item in wanted {
@@ -128,8 +155,70 @@ enum WorkLeaseRegistry {
     static func releaseEverything() {
         for (_, lease) in written {
             WorkLeaseFiles.remove(at: lease.url)
+            removalsSeenByTests?.append(lease.url.lastPathComponent)
         }
         written = [:]
+        heldForTheConversation = nil
+    }
+
+    /// Holds an `assist` lease on one course for as long as this process
+    /// serves its conversation (#458) — Windows' `plantoir-mcp` does the same
+    /// for the course `PLANTOIR_DOOR_COURSE` names. Written at once, and kept
+    /// by every reconcile until `releaseEverything()`.
+    static func holdForTheConversation(folderPath: String, courseCode: String) {
+        heldForTheConversation = Wanted(
+            folderPath: folderPath, courseCode: courseCode, kind: WorkLeaseFiles.assistKind
+        )
+        reconcile()
+    }
+
+    /// Whether this process has its conversation's `assist` lease on disk.
+    static var holdsACourseForTheConversation: Bool {
+        guard let heldForTheConversation else {
+            return false
+        }
+        return written[heldForTheConversation] != nil
+    }
+
+    /// Writes (or replaces) this process's held-backup record for a course:
+    /// one line, the backup's full path (Windows' format). Best-effort, as a
+    /// lease is: a record that cannot be written holds nothing, and the
+    /// conversation goes on.
+    ///
+    /// Only when `courses/` already exists, for the reason `WorkLeaseFiles
+    /// .write` gives.
+    static func recordConversationBackup(folderPath: String, courseCode: String, backupURL: URL) {
+        let coursesDirectory: URL = URL(fileURLWithPath: folderPath)
+            .appendingPathComponent("courses", isDirectory: true)
+        var isDirectory: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: coursesDirectory.path, isDirectory: &isDirectory)
+            || !isDirectory.boolValue {
+            return
+        }
+        let directory: URL = WorkLeaseFiles.activityDirectory(coursesDirectory: coursesDirectory)
+        let record: URL = directory.appendingPathComponent(
+            WorkLeaseFiles.heldBackupRecordName(courseCode: courseCode, pid: getpid())
+        )
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data(backupURL.standardizedFileURL.path.utf8).write(to: record, options: .atomic)
+        } catch {
+            return
+        }
+        if !recordedBackups.contains(record) {
+            recordedBackups.append(record)
+        }
+    }
+
+    /// Removes every held-backup record this process wrote — at exit, after
+    /// its own runs have stopped and BEFORE its leases go (Windows' order),
+    /// so no reader ever sees a record outlive the session that made it.
+    static func forgetRecordedBackups() {
+        for record in recordedBackups {
+            try? FileManager.default.removeItem(at: record)
+            removalsSeenByTests?.append(record.lastPathComponent)
+        }
+        recordedBackups = []
     }
 
     /// This process's claim on a course's build — the moment of its own
@@ -258,6 +347,7 @@ enum WorkLeaseRegistry {
     /// Starts from nothing — for tests. Removes whatever was written.
     static func reset() {
         isLeaving = false
+        forgetRecordedBackups()
         releaseEverything()
     }
 }
