@@ -78,11 +78,25 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         if let more = AssistCardCommand.moreDays(tidied) {
             return more
         }
+        if let days = AssistCardCommand.daysToAUnit(tidied) {
+            return days
+        }
         if let room = AssistCardCommand.makeRoom(tidied, numberedPageWord: numberedPageWord) {
             return room
         }
         if let scheduled = AssistCardCommand.deployAtATime(tidied) {
             return scheduled
+        }
+        // "Schedule a deploy at 6:30 am" is read AS "deploy at 6:30 am", so
+        // it accepts exactly the times that family accepts (#449, from
+        // Windows' #424). `deployAtATime`, not `matching`, on the rewrite: a
+        // bare "deploy …" must not reach the fixed shapes by this door.
+        if let asDeploy = AssistCardCommand.scheduleAsDeploy(tidied),
+           let scheduledToo = AssistCardCommand.deployAtATime(asDeploy) {
+            return scheduledToo
+        }
+        if let cancelled = AssistCardCommand.cancelTheScheduledDeploy(tidied) {
+            return cancelled
         }
         let links: AssistLinksQuestion? = AssistCardCommand.linksQuestion(
             message, windowCourse: windowCourse, windowSection: windowSection
@@ -633,6 +647,208 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
+    // MARK: - "Schedule a deploy …" and "cancel the scheduled deploy" (#449)
+
+    /// "[please] schedule a|the deploy …" rewritten as "[please] deploy …",
+    /// or nil when the sentence does not open that way (#449, the mac's port
+    /// of Windows' `ScheduleAsDeploy`, #424).
+    ///
+    /// **Why it exists.** Measured on Windows (bundle 10, Intel UHD 620, the
+    /// small assistant): a sentence asking for a LATER deploy reached
+    /// `deploy_section` 10 of 10, an immediate deploy behind the Deploy
+    /// button. Read in code, the canonical phrasing never reaches the model.
+    ///
+    /// **Nothing new is learned about times.** The opening stands for
+    /// "deploy", "for" before today|tomorrow is dropped (the day first, "for
+    /// tomorrow at 6:30 am"), and "for" stands for "at" directly after the
+    /// opening or after a day word. Everything after that is read by
+    /// `deployFrame`, `timeOfDay` and `respellingFrame` exactly as "deploy at
+    /// …" is read, so the family's accepted, asked and respelled spellings are
+    /// this frame's too.
+    ///
+    /// **A question mark is refused BEFORE the rewrite**, and both apps do it
+    /// for the same reason: `deployFrame` drops a trailing "?" itself, so
+    /// "schedule a deploy at 6:30 am?" rewritten first would come out as an
+    /// accepted "deploy at 6:30 am". A teacher who ends with "?" may be
+    /// ASKING whether one is scheduled, and that sentence is the model's.
+    private static func scheduleAsDeploy(_ tidied: String) -> String? {
+        if tidied.hasSuffix("?") {
+            return nil
+        }
+        var words: [String] = AssistCardCommand.spaceSeparatedWords(of: tidied)
+        let saidPlease: Bool = words.first == "please"
+        if saidPlease {
+            words.removeFirst()
+        }
+        guard AssistCardCommand.opensWithScheduleADeploy(words) else {
+            return nil
+        }
+        words.removeFirst(3)
+        // The day first: "for tomorrow at 6:30 am" is "tomorrow at 6:30 am".
+        if words.count >= 2, words[0] == "for", words[1] == "today" || words[1] == "tomorrow" {
+            words.removeFirst()
+        }
+        var whereForMayStand: Int = 0
+        if let first = words.first, first == "today" || first == "tomorrow" {
+            whereForMayStand = 1
+        }
+        if words.count > whereForMayStand, words[whereForMayStand] == "for" {
+            words[whereForMayStand] = "at"
+        }
+        var rebuilt: [String] = []
+        if saidPlease {
+            rebuilt.append("please")
+        }
+        rebuilt.append("deploy")
+        for word in words {
+            rebuilt.append(word)
+        }
+        return rebuilt.joined(separator: " ")
+    }
+
+    /// Whether the words (with any leading "please" already taken off) open
+    /// "schedule a deploy" or "schedule the deploy".
+    private static func opensWithScheduleADeploy(_ words: [String]) -> Bool {
+        guard words.count >= 3 else {
+            return false
+        }
+        return words[0] == "schedule" && (words[1] == "a" || words[1] == "the") && words[2] == "deploy"
+    }
+
+    /// The words of a tidied sentence, split on spaces, empty pieces dropped.
+    private static func spaceSeparatedWords(of text: String) -> [String] {
+        var words: [String] = []
+        for piece in text.split(separator: " ") {
+            words.append(String(piece))
+        }
+        return words
+    }
+
+    /// "Schedule a deploy" with no time this family can set — answered with a
+    /// QUESTION in code (`AssistWording.scheduleADeployNeedsATime`), never a
+    /// deploy now and never the model (#449, Windows' `AsksWhenToSchedule`).
+    ///
+    /// ANY sentence opening "[please] schedule a|the deploy" that the family
+    /// does not answer is asked about: "… tomorrow morning", "… later today",
+    /// "… for Monday", "… at 7". The model it would otherwise reach sent this
+    /// shape of sentence to an immediate deploy 10 of 10 on Windows.
+    ///
+    /// Three things still fall through to the model, as everywhere in these
+    /// frames: a question mark, a negation, and another course or section
+    /// named — the question, like a card, is about THIS window's section. A
+    /// course is recognised by its SHAPE (three letters, a digit, then letters,
+    /// digits or hyphens), not by the list of codes Ontario uses, so a code
+    /// this Mac has never heard of still falls through rather than being
+    /// answered as if it were this window's.
+    static func asksWhenToSchedule(_ message: String) -> Bool {
+        let tidied: String = AssistCardCommand.tidied(message)
+        if tidied.hasSuffix("?") {
+            return false
+        }
+        var words: [String] = AssistCardCommand.spaceSeparatedWords(of: tidied)
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        guard AssistCardCommand.opensWithScheduleADeploy(words) else {
+            return false
+        }
+        words.removeFirst(3)
+        for raw in words {
+            let word: String = raw.trimmingCharacters(in: CharacterSet(charactersIn: ",;:"))
+            if AssistCardCommand.negations.contains(word) {
+                return false
+            }
+            if word.contains("section") || word == "course" || word == "courses" {
+                return false
+            }
+            if AssistCardCommand.isShapedLikeACourseCode(word) {
+                return false
+            }
+        }
+        // Answered already: set, asked morning-or-evening, or respelled.
+        if AssistCardCommand.matching(message) != nil
+            || AssistCardCommand.morningOrEvening(message) != nil
+            || AssistCardCommand.timeToSayAs(message) != nil {
+            return false
+        }
+        return true
+    }
+
+    /// The words that turn "schedule a deploy …" into a sentence against
+    /// itself, all three apostrophes included.
+    private static let negations: Set<String> = ["don't", "dont", "don\u{2019}t", "not", "never", "no"]
+
+    /// Three ASCII letters, a digit, then any ASCII letters, digits or hyphens
+    /// — Windows' `^[a-z]{3}[0-9][a-z0-9-]*$`, on a word already lower-cased.
+    private static func isShapedLikeACourseCode(_ word: String) -> Bool {
+        var characters: [Character] = []
+        for character in word {
+            characters.append(character)
+        }
+        guard characters.count >= 4 else {
+            return false
+        }
+        for index in 0..<3 {
+            if !AssistCardCommand.isLowercaseASCIILetter(characters[index]) {
+                return false
+            }
+        }
+        if !AssistCardCommand.isASCIIDigit(characters[3]) {
+            return false
+        }
+        for character in characters.dropFirst(4) {
+            let allowed: Bool = AssistCardCommand.isLowercaseASCIILetter(character)
+                || AssistCardCommand.isASCIIDigit(character)
+                || character == "-"
+            if !allowed {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func isLowercaseASCIILetter(_ character: Character) -> Bool {
+        return character >= "a" && character <= "z"
+    }
+
+    private static func isASCIIDigit(_ character: Character) -> Bool {
+        return character >= "0" && character <= "9"
+    }
+
+    /// "[please] cancel the|that|my scheduled deploy [please]" →
+    /// `cancel_scheduled_deploy`, and — since #449's review — the prompt
+    /// shelf's own card, "Cancel scheduled deploy", with no determiner.
+    ///
+    /// Measured on Windows (bundle 10): "Don't send it in the morning after
+    /// all" was declined 10 of 10, so a deploy the teacher wanted stopped
+    /// still went out. The canonical sentence is answered in code; anything
+    /// else — a question mark, "don't", a course or section named, or "cancel
+    /// the deploy" (which may mean a deploy running now) — reaches the model
+    /// as before. Cancelling is the SAFE direction: it stops a deploy and
+    /// starts nothing.
+    private static func cancelTheScheduledDeploy(_ tidied: String) -> AssistCardCommand? {
+        var words: [String] = AssistCardCommand.spaceSeparatedWords(of: tidied)
+        if words.first == "please" {
+            words.removeFirst()
+        }
+        if words.last == "please" {
+            words.removeLast()
+        }
+        let sentence: String = words.joined(separator: " ")
+        guard AssistCardCommand.cancelSentences.contains(sentence) else {
+            return nil
+        }
+        return AssistCardCommand(toolName: "cancel_scheduled_deploy", arguments: [:])
+    }
+
+    /// Every sentence the cancel frame accepts, once "please" is off both ends.
+    private static let cancelSentences: Set<String> = [
+        "cancel the scheduled deploy",
+        "cancel that scheduled deploy",
+        "cancel my scheduled deploy",
+        "cancel scheduled deploy",
+    ]
+
     /// "Deploy at 6:30" — a time that is morning or evening, and nobody can
     /// tell which. Answered with a QUESTION, in code, and never sent to the
     /// model (issue #194).
@@ -671,7 +887,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// "please", "it" or a trailing "tomorrow" are spellings the frame reads
     /// but that a sentence rebuilt around them might not.
     static func morningOrEvening(_ message: String) -> AssistTimeQuestion? {
-        let tidied: String = AssistCardCommand.tidied(message)
+        var tidied: String = AssistCardCommand.tidied(message)
+        // "Schedule a deploy at 6:30" is asked about exactly as "deploy at
+        // 6:30" is (#449).
+        if let asDeploy = AssistCardCommand.scheduleAsDeploy(tidied) {
+            tidied = asDeploy
+        }
         if let frame = AssistCardCommand.deployFrame(tidied),
            let question = AssistCardCommand.askedOutright(frame.timeWords, dayWord: frame.dayWord) {
             return question
@@ -721,7 +942,12 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
     /// teacher's words, and every one is a sentence `matching` accepts —
     /// pinned by `ScheduleDeployCardTests` for every contract row.
     static func timeToSayAs(_ message: String) -> AssistTimeRespelling? {
-        let tidied: String = AssistCardCommand.tidied(message)
+        var tidied: String = AssistCardCommand.tidied(message)
+        // "Schedule a deploy at 6.30 pm" gets the spelling "deploy at 6.30
+        // pm" gets (#449).
+        if let asDeploy = AssistCardCommand.scheduleAsDeploy(tidied) {
+            tidied = asDeploy
+        }
         guard let reading = AssistCardCommand.respellingReading(tidied, original: message) else {
             return nil
         }
@@ -1537,6 +1763,67 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         )
     }
 
+    /// "Add three days to Unit 2", "Add two more classes to Unit 4", "Add
+    /// another day to Unit 4" — the frame `moreDays` reads, said the other
+    /// ways a teacher says it (#440).
+    ///
+    /// **Why these are answered here and never by the model.** Measured
+    /// 2026-10-07 on the smaller assistant (M4 Pro, b10435, the app's own
+    /// flags): "Add three days to Unit 2", "Add another day to Unit 4" and
+    /// "Add two more classes to Unit 4" each reached add_next_class 5 times in
+    /// 5 with only a course and a section — ONE page in the CURRENT unit,
+    /// success reported. The local tool cannot carry a unit or a count (#411
+    /// measured what declaring them costs), so the sentence is read here.
+    ///
+    /// Six or seven words exactly: `add`, a count, an optional `more`, the
+    /// noun, `to unit`, a number. The count is a digit, a word up to twelve,
+    /// or — for one — `a`, `one` or `another`; it must AGREE with the noun
+    /// (`another day`, `three days`), the rule `makeRoom` keeps, because a
+    /// sentence that disagrees with itself is one somebody typed carelessly.
+    /// Term-blind, like every frame in this file: only the word "unit".
+    /// Anything else — a question mark, a "please", a course or section
+    /// named, a negation — falls through to the model, where settler S3
+    /// (`AssistNextClassUnits.kind`) stops it and says
+    /// `AssistWording.nextClassNeedsItsOwnPhrasing`.
+    private static func daysToAUnit(_ tidied: String) -> AssistCardCommand? {
+        let spelled: [String: Int] = [
+            "a": 1, "another": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+            "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        ]
+        var words: [String] = []
+        for piece in tidied.split(separator: " ") {
+            words.append(String(piece))
+        }
+        guard words.count == 6 || words.count == 7, words[0] == "add" else {
+            return nil
+        }
+        let last: Int = words.count - 1
+        guard words[last - 2] == "to", words[last - 1] == "unit",
+              let unit = Int(words[last]), unit > 0 else {
+            return nil
+        }
+        if words.count == 7 {
+            // "a more day" and "another more day" are not sentences.
+            guard words[2] == "more", words[1] != "a", words[1] != "another" else {
+                return nil
+            }
+        }
+        let nouns: [String: Bool] = ["day": true, "class": true, "days": false, "classes": false]
+        guard let isSingular = nouns[words[last - 3]] else {
+            return nil
+        }
+        guard let howMany = spelled[words[1]] ?? Int(words[1]), howMany > 0 else {
+            return nil
+        }
+        guard (howMany == 1) == isSingular else {
+            return nil
+        }
+        return AssistCardCommand(
+            toolName: "add_next_class",
+            arguments: ["unit": "\(unit)", "days": "\(howMany)"]
+        )
+    }
+
     /// "Publish Unit 5", "Unpublish Unit 4", and — since #215 — "Hide Unit 4,
     /// Day 21".
     ///
@@ -1926,6 +2213,24 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
                 becauseNotThis: "No count, so there is nothing to fill `days` with and guessing one "
                               + "would create a number of pages nobody asked for."
             ),
+            // #440: the other ways of saying the entry above, as a family of
+            // its own so the entry Windows already implements is unchanged.
+            ParsedShape(
+                shape: "add <count> [more] days|classes to unit <number> | "
+                     + "add a|one|another [more] day|class to unit <number>",
+                tool: "add_next_class",
+                fills: ["days": "<count>, as a word up to twelve or a digit; a, one and another "
+                              + "are 1. It must agree with the noun: 'another day', 'three days'",
+                        "unit": "<number>"],
+                example: "add three days to unit 2",
+                notThis: "add three days to unit 2?",
+                becauseNotThis: "A question mark, a 'please', a course or section named, or any other "
+                              + "word falls through to the model, as in every frame here; a matched "
+                              + "card binds this window's course and section. On the model's path "
+                              + "settler S3 stops the sentence and names this one instead, so it never "
+                              + "adds a single page in the current unit. Every accepted and refused "
+                              + "spelling is in nextClassUnits."
+            ),
             ParsedShape(
                 shape: "duplicate <page title> as my next class",
                 tool: "add_next_class",
@@ -2179,6 +2484,13 @@ nonisolated struct AssistCardCommand: Sendable, Equatable {
         ("start a new unit for the next class",
          AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
         ("start a new unit",
+         AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
+        // The two ways the smaller assistant was measured hearing as "the
+        // next day of this unit" (#440, 2026-10-07: 5 of 5 each, one page in
+        // the CURRENT unit, success reported). Exact, like every line here.
+        ("add the next class in a new unit",
+         AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
+        ("start a new unit with the next class",
          AssistCardCommand(toolName: "add_next_class", arguments: ["unit": "next"])),
 
         ("when are my next classes?",

@@ -241,6 +241,20 @@
       },
       {
         "arguments" : {
+          "unit" : "next"
+        },
+        "phrasing" : "add the next class in a new unit",
+        "tool" : "add_next_class"
+      },
+      {
+        "arguments" : {
+          "unit" : "next"
+        },
+        "phrasing" : "start a new unit with the next class",
+        "tool" : "add_next_class"
+      },
+      {
+        "arguments" : {
 
         },
         "phrasing" : "when are my next classes?",
@@ -513,6 +527,17 @@
         },
         "notThis" : "add more days to unit 4",
         "shape" : "add <count> more days to unit <number>",
+        "tool" : "add_next_class"
+      },
+      {
+        "becauseNotThis" : "A question mark, a 'please', a course or section named, or any other word falls through to the model, as in every frame here; a matched card binds this window's course and section. On the model's path settler S3 stops the sentence and names this one instead, so it never adds a single page in the current unit. Every accepted and refused spelling is in nextClassUnits.",
+        "example" : "add three days to unit 2",
+        "fills" : {
+          "days" : "<count>, as a word up to twelve or a digit; a, one and another are 1. It must agree with the noun: 'another day', 'three days'",
+          "unit" : "<number>"
+        },
+        "notThis" : "add three days to unit 2?",
+        "shape" : "add <count> [more] days|classes to unit <number> | add a|one|another [more] day|class to unit <number>",
         "tool" : "add_next_class"
       },
       {
@@ -1675,7 +1700,7 @@
       "tools",
       "toolSchemas"
     ],
-    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
+    "note" : "These top-level keys are written by `Plantoir --write-contracts` from the app's own types and will be overwritten: cardPhrasings, tools, toolSchemas. Every other top-level key — nearMisses, scenarios, promptHistory, deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits — is hand-written intent and is PRESERVED by a regeneration, so a case may be proposed from either platform. Listing them rather than naming two: the list was already two short when this was noticed, and a key nobody mentions is a key somebody deletes believing it was generated."
   },
   "hideIsUnpublish" : {
     "accepted" : [
@@ -2564,6 +2589,685 @@
       "make room for one meeting at section 2"
     ]
   },
+  "nextClassUnits" : {
+    "accepted" : [
+      {
+        "expectArguments" : {
+          "unit" : "next"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add the next class in a new unit",
+        "why" : "Measured 5/5 to a plain add_next_class on the smaller assistant (one page in the current unit)."
+      },
+      {
+        "expectArguments" : {
+          "unit" : "next"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Start a new unit with the next class",
+        "why" : "Measured 5/5 to a plain add_next_class on the smaller assistant."
+      },
+      {
+        "expectArguments" : {
+          "unit" : "next"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Start a new unit",
+        "why" : "Shipped; the sentence the pointer quotes."
+      },
+      {
+        "expectArguments" : {
+          "unit" : "next"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Start a new unit for the next class",
+        "why" : "Shipped; the prompt shelf's card."
+      },
+      {
+        "expectArguments" : {
+          "days" : "3",
+          "unit" : "2"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add three days to Unit 2",
+        "why" : "Measured 5/5 to a plain add_next_class on the smaller assistant."
+      },
+      {
+        "expectArguments" : {
+          "days" : "1",
+          "unit" : "4"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add another day to Unit 4",
+        "why" : "Measured 5/5 to a plain add_next_class (and 'Unit 4' read as section 4) on the smaller assistant."
+      },
+      {
+        "expectArguments" : {
+          "days" : "2",
+          "unit" : "4"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add two more classes to Unit 4",
+        "why" : "Measured 5/5 to a plain add_next_class on the smaller assistant."
+      },
+      {
+        "expectArguments" : {
+          "days" : "1",
+          "unit" : "4"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add a day to Unit 4",
+        "why" : "'a' is one."
+      },
+      {
+        "expectArguments" : {
+          "days" : "1",
+          "unit" : "4"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add one more day to Unit 4",
+        "why" : "Singular noun with a count of one."
+      },
+      {
+        "expectArguments" : {
+          "days" : "3",
+          "unit" : "5"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add 3 classes to Unit 5.",
+        "why" : "A digit; the full stop is the shared tidier's."
+      },
+      {
+        "expectArguments" : {
+          "days" : "5",
+          "unit" : "4"
+        },
+        "expectTool" : "add_next_class",
+        "input" : "Add five more days to Unit 4",
+        "why" : "Shipped (moreDays); the sentence the pointer quotes."
+      }
+    ],
+    "note" : "AUTHORED, not generated (#440, mac, 2026-10-07). How the assistant answers a request for a new unit, a unit or day other than the next one, or several class pages, when the local add_next_class carries only a course and a section. WHY: #411 measured add_next_class declaring Windows' `unit` and `days` and it failed on both tiers - both models read the NEXT in 'add the next class' as 'start a new unit' (6 of 6 and 5 of 6 phrasings) - and on the shipped surface the smaller assistant answered ten unit and count sentences with a plain {course, section} 50 times in 50, each adding ONE page in the CURRENT unit and reporting success. So: ACCEPTED sentences are answered in CODE (AssistCardCommand: two exact new-unit sentences beside the shipped 'start a new unit', and 'add <count> [more] days|classes to unit <n>' / 'add a|one|another [more] day|class to unit <n>' beside the shipped 'add <count> more days to unit <n>'; the count agrees with the noun; term-blind - only the word 'unit'). Anything else falls through to the model (NOT THIS). When the MODEL then answers with add_next_class, settler S3 reads the teacher's own sentence (POINTED): (a) 'new|next|another|fresh|different' right before 'unit' or the course's own unit word; (c) a count above one IMMEDIATELY before classes|days|lessons|meetings|pages|periods (or 'class|meeting|lesson pages'), with an optional more|extra|new between, where the count follows an adding verb (add, create, make, plan, set up; 'the', 'next', 'another' allowed between) or the word 'next' - a count anywhere else in the sentence is not read, so 'I teach two classes tomorrow' runs; counts are digits of 2 or more, two to twelve, several, a few, a couple (of); (b) 'unit <n>' (or the course's word) whose n is not the unit the plain next page would land in, or, when a unit is named, 'day <m>' that is not its day. In a numbered course only the literal word 'unit' is read, and any (a), (b) or (c) is pointed: it has no units. Checked in the order a, c, b. POINTED means: no page added, no card, the turn wound back, a trail line ('assistant chose a tool', AssistAgent.nextClassPointedLine), and one sentence naming phrasings the window ACCEPTS in that course (wording.nextClassNeedsItsOwnPhrasing and its Module and numbered forms - see pointerSentences). S3 never converts a sentence into a new-unit call: 'don't start a new unit' would become one. With NO remembered class dates (given.plainNext null) S3 does nothing and the call runs, so the runner asks for the dates (RUNS). The model's `unit` and `days` are removed from every add_next_class it sends, whatever the sentence (ruling 2; settler S2 widened). `given`: the course's unit word, whether it is numbered, its page noun, and the page a plain 'add the next class' would make. `reachesModel` is pinned on the mac: true exactly when no card matches. `measuredAsControl` rows are the plain controls research/ai-assist/next-class-unit-probes.py requires at 10 of 10.",
+    "notThis" : [
+      {
+        "input" : "Start a new unit?",
+        "why" : "A question mark falls through, as in every frame; S3 points it."
+      },
+      {
+        "input" : "Don't start a new unit",
+        "why" : "A negation is never read by a frame; on the model's path S3 points it (it never converts)."
+      },
+      {
+        "input" : "Add the next class in a new unit, please",
+        "why" : "Any extra word falls through."
+      },
+      {
+        "input" : "Add three days to Unit 2?",
+        "why" : "A question mark falls through."
+      },
+      {
+        "input" : "Please add three days to Unit 2",
+        "why" : "A courtesy word falls through (the hide frame's tolerance stays its own)."
+      },
+      {
+        "input" : "Add three days to Unit 2 in ICS3U",
+        "why" : "A matched card binds THIS window's course; a sentence naming one must reach the model, where the other-course guard runs."
+      },
+      {
+        "input" : "Add three days to Unit 2 for section 2",
+        "why" : "Likewise a section."
+      },
+      {
+        "input" : "Add three day to Unit 2",
+        "why" : "The count does not agree with the noun."
+      },
+      {
+        "input" : "Add another days to Unit 2",
+        "why" : "The count does not agree with the noun."
+      },
+      {
+        "input" : "Add another more day to Unit 4",
+        "why" : "Not a sentence."
+      },
+      {
+        "input" : "Add three days to Module 2",
+        "why" : "Term-blind: only the word 'unit' is matched. On the model's path S3 points it at 'Add five more days to Unit <n>', <n> being the course's latest unit."
+      },
+      {
+        "input" : "Add a few days to Unit 4",
+        "why" : "No number to fill `days` with."
+      }
+    ],
+    "pointed" : [
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Make the next class the first day of a new unit",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "Measured 5/5 to a plain add_next_class (smaller)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "We're starting a new unit tomorrow, add the page",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "Measured 5/5 to a plain add_next_class (smaller)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Start the next unit",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "'next unit'."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class for the next unit",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "'next unit'."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Start a new unit?",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "Falls out of the frame on its question mark; pointed rather than guessed."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Don't start a new unit, just add the next class",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "S3 does not read negation, so it points; converting or guessing either way is what it must never do. The teacher types 'Add the next class page' (a card)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Module 2, Day 6",
+          "unitWord" : "Module"
+        },
+        "input" : "Start a new module",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "The course's own word, in a Module course; the pointer then quotes 'Start a new unit', which the frame accepts."
+      },
+      {
+        "given" : {
+          "isNumbered" : true,
+          "noun" : "meeting",
+          "plainNext" : "Week 9",
+          "unitWord" : "Week"
+        },
+        "input" : "Start a new unit for the meetings",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A numbered course has no units."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "The next class begins Unit 3",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "Measured 5/5 to a plain add_next_class (smaller); the next page is Unit 2, Day 6."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class to Unit 3",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "Unit 3 is not where the next page goes."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class as Unit 2, Day 8",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "Ruling 4: the unit agrees and the day does not."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 3, Day 5",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class as Unit 3, Day 7",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "Ruling 4: the plain plan makes Unit 3, Day 5; running would make Day 5 and report success."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class to Unit three",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "A unit number spelled out."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Module 2, Day 6",
+          "unitWord" : "Module"
+        },
+        "input" : "Add the next class to Module 4",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "The course's own word in a Module course."
+      },
+      {
+        "given" : {
+          "isNumbered" : true,
+          "noun" : "meeting",
+          "plainNext" : "Week 9",
+          "unitWord" : "Week"
+        },
+        "input" : "Add the next meeting to Unit 2",
+        "kind" : "b",
+        "reachesModel" : true,
+        "why" : "A numbered course has no units."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next two classes",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "Measured 5/5 to a plain add_next_class (smaller)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add three classes",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "A count right after the verb."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add three days to Unit 2, please",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "Falls out of the frame; the count is read first."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add pages for the next three classes",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "A count right after 'next'."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next 2 classes",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "A digit."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add a couple of class pages",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "'a couple of' and 'class pages'."
+      },
+      {
+        "given" : {
+          "isNumbered" : true,
+          "noun" : "meeting",
+          "plainNext" : "Week 9",
+          "unitWord" : "Week"
+        },
+        "input" : "Add the next two meetings",
+        "kind" : "c",
+        "reachesModel" : true,
+        "why" : "A numbered course: the pointer says to add one at a time."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class, review day before the next unit test",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is a rephrasing the pointer does not supply: its sentence offers the two frames, 'Start a new unit' and 'Add five more days to Unit {n}', and does not name the plain card, so a teacher who wanted the next page must think of 'Add the next class page' (a card) unprompted. 'next unit' is read side by side and S3 does not look past it for test, quiz or review; teaching it to would be reading meaning, and a miss the other way starts a new unit and reports success. Not measured: this row is decided, not observed."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class in the current unit, not the next unit",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is a rephrasing the pointer does not supply: its sentence offers the two frames, 'Start a new unit' and 'Add five more days to Unit {n}', and does not name the plain card, so a teacher who wanted the next page must think of 'Add the next class page' (a card) unprompted. S3 reads no negation (as in 'Don't start a new unit, just add the next class'). Not measured: decided, not observed."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Week 2, Day 3",
+          "unitWord" : "Week"
+        },
+        "input" : "Add the next class for next week",
+        "kind" : "a",
+        "reachesModel" : true,
+        "why" : "A FALSE refusal, decided and accepted (review N-impl F2, 2026-10-07): the teacher asked for the plain next page, S3 points anyway, and nothing is written, so the cost is a rephrasing the pointer does not supply: its sentence offers the two frames, 'Start a new unit' and 'Add five more days to Unit {n}', and does not name the plain card, so a teacher who wanted the next page must think of 'Add the next class page' (a card) unprompted. The course's unit word is free text: in a course whose units are called Week, 'next week' is 'next' + its unit word, so it is a new unit to S3. Not measured: decided, not observed."
+      }
+    ],
+    "pointerSentences" : [
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "why" : "Every sentence it quotes, typed back, matches a card that plans in this course (ruling 1). The days sentence names the latest unit, the one plainNext is in (2 here), so typed back it adds to that unit and never skips one (review N-impl F4).",
+        "wording" : "nextClassNeedsItsOwnPhrasing"
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Module 2, Day 6",
+          "unitWord" : "Module"
+        },
+        "why" : "Term-blind frames: it quotes 'unit' sentences and says the word is read as Module (review F2: quoting 'Start a new module' would loop).",
+        "wording" : "nextClassNeedsItsOwnPhrasingInAModuleCourse"
+      },
+      {
+        "given" : {
+          "isNumbered" : true,
+          "noun" : "meeting",
+          "plainNext" : "Week 9",
+          "unitWord" : "Week"
+        },
+        "why" : "No unit sentence is quoted: a numbered course refuses both (review F1). It quotes 'Add the next meeting page', a card.",
+        "wording" : "nextClassNeedsItsOwnPhrasingInANumberedCourse"
+      }
+    ],
+    "runs" : [
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and the tool's own TEACHERS SAY."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add an entry for the next class",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and TEACHERS SAY."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add tomorrow's class page",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and TEACHERS SAY."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Start the next class",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and TEACHERS SAY."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Make a page for our next class",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and TEACHERS SAY."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Set up next day's lesson",
+        "reachesModel" : true,
+        "why" : "teachers-say-suite.py and TEACHERS SAY ('next day' is not a unit or a count)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class page for this unit",
+        "measuredAsControl" : true,
+        "reachesModel" : true,
+        "why" : "'this unit' is not a new one."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class in this unit",
+        "reachesModel" : true,
+        "why" : "'this unit'. Before ruling 2 a model-sent unit \"next\" survived settler S2 here, because the sentence says 'unit'."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class to Unit 2",
+        "reachesModel" : true,
+        "why" : "Ruling 4: the unit named IS where the next page goes."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class as Unit 2, Day 6",
+        "reachesModel" : true,
+        "why" : "Ruling 4: the unit and the day are the next page's."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add tomorrow's class page, I teach two classes tomorrow",
+        "reachesModel" : true,
+        "why" : "Review F7: the count belongs to no adding verb and follows no 'next'."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class for period 2",
+        "reachesModel" : true,
+        "why" : "Review F7: a number that is not a count of pages."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class, tomorrow is a Day 2",
+        "reachesModel" : true,
+        "why" : "A rotation's day, with no unit named, is never compared."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Set up the next few lessons",
+        "reachesModel" : true,
+        "why" : "'few' without 'a' is not a count S3 reads; one page is added (the plain behaviour, not a new harm)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : null,
+          "unitWord" : "Unit"
+        },
+        "input" : "The next class begins Unit 3",
+        "reachesModel" : true,
+        "why" : "With NO remembered dates there is no reading: the call runs and the runner asks for the dates (ruling 7)."
+      },
+      {
+        "given" : {
+          "isNumbered" : false,
+          "noun" : "class",
+          "plainNext" : "Unit 2, Day 6",
+          "unitWord" : "Unit"
+        },
+        "input" : "Add the next class page",
+        "reachesModel" : false,
+        "why" : "The prompt shelf's card: never reaches the model, so never S3."
+      },
+      {
+        "given" : {
+          "isNumbered" : true,
+          "noun" : "meeting",
+          "plainNext" : "Week 9",
+          "unitWord" : "Week"
+        },
+        "input" : "Add the next meeting page",
+        "reachesModel" : false,
+        "why" : "A card; the numbered pointer quotes it."
+      }
+    ]
+  },
   "note" : "Generated from the macOS app by `Plantoir --assist-contract`. Do not hand-edit; see contracts/README.md.",
   "pagesNamingNoPage" : {
     "cases" : [
@@ -3228,10 +3932,12 @@
   "scenarios" : {
     "cases" : [
       {
-        "expectEvents" : [],
+        "expectEvents" : [
+
+        ],
         "expectModelRequests" : 1,
         "expectTranscriptContains" : [
-          "assistant: What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to."
+          "assistant: wording.scheduleADeployNeedsATime"
         ],
         "given" : {
           "modelReply" : {
@@ -3247,7 +3953,7 @@
         },
         "name" : "a deploy-now answer to a request that named a later time is asked about, never offered",
         "when" : "say",
-        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#424, settler S1). Measured on Windows (Intel i5-8365U, UHD 620, b10435, Qwen2.5-1.5B, 10 greedy trials): \"Deploy ICS3U section 1 at 6:30 tomorrow morning, before school starts.\" reached deploy_section 10 of 10 - a Deploy-NOW card for a teacher who asked for a later deploy. Settled in CODE on what the model sent: when the call is deploy_section and the teacher's own sentence carries a later-time word (schedule, scheduled, later, tonight, tomorrow, morning, afternoon, evening, noon, midnight, a weekday) or 'at' and a clock, no card is shown, nothing runs, and the time is asked for with the sentence 'schedule a deploy' with no time already gets (Windows' AssistWording.ScheduleADeployNeedsATime, proposed as wording.scheduleADeployNeedsATime - matched here as written until the key exists). No window action and no launcher run (expectEvents empty), and the engine is asked once."
+        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#424, settler S1). Measured on Windows (Intel i5-8365U, UHD 620, b10435, Qwen2.5-1.5B, 10 greedy trials): \"Deploy ICS3U section 1 at 6:30 tomorrow morning, before school starts.\" reached deploy_section 10 of 10 - a Deploy-NOW card for a teacher who asked for a later deploy. Settled in CODE on what the model sent: when the call is deploy_section and the teacher's own sentence carries a later-time word (schedule, scheduled, later, tonight, tomorrow, morning, afternoon, evening, noon, midnight, a weekday) or 'at' and a clock, no card is shown, nothing runs, and the time is asked for with the sentence 'schedule a deploy' with no time already gets (wording.scheduleADeployNeedsATime - Windows' AssistWording.ScheduleADeployNeedsATime, generated from the mac since #449, which switched this line from the sentence as written to the name). No window action and no launcher run (expectEvents empty), and the engine is asked once."
       },
       {
         "expectModelRequests" : 1,
@@ -3276,7 +3982,7 @@
         },
         "name" : "a model-sent unit 'next' on add_next_class is ignored unless the teacher said unit",
         "when" : "decline",
-        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#411/#440, settler S2). Measured on Windows (as above): five ordinary 'add the next class' phrasings sent unit \"next\" 50 of 50, and unit \"next\" starts a NEW unit (Unit 2, Day 1) for a teacher who wanted the next day of the unit they are in. The model's unit \"next\" is dropped in code unless the teacher's own sentence says 'unit'; the call then runs as if no unit were given, so the plan names Unit 1, Day 2. days 0 is kept and means nothing (days is read only when > 0 beside a numbered unit). The plan is declined, so nothing is written. given.rememberedDates (new with this case) writes the section's remembered class dates before the turn. On the mac, whose local add_next_class declares no unit, the model cannot send one: the case should already pass there."
+        "why" : "AUTHORED from Windows, v1.4.3 bundle A fix round 2 (#411/#440, settler S2). Measured on Windows (as above): five ordinary 'add the next class' phrasings sent unit \"next\" 50 of 50, and unit \"next\" starts a NEW unit (Unit 2, Day 1) for a teacher who wanted the next day of the unit they are in. The model's unit \"next\" is dropped in code unless the teacher's own sentence says 'unit'; the call then runs as if no unit were given, so the plan names Unit 1, Day 2. days 0 is kept and means nothing (days is read only when > 0 beside a numbered unit). The plan is declined, so nothing is written. given.rememberedDates (new with this case) writes the section's remembered class dates before the turn. On the mac (#449) the case did NOT already pass: the local add_next_class declares no unit, but nothing strips an undeclared key from a model call and the runner reads unit from any call, so a model-sent unit \"next\" started Unit 2 there too; the mac drops it in AssistAgent.think() for the model's calls only, as Windows does. Since #440 (ruling 2) the mac drops the model's unit AND days whatever the sentence says - the case's name describes S2 as it arrived, and it still holds; 'a model-sent unit next is dropped even when the teacher said unit' is the case for the widening."
       },
       {
         "expectTranscriptContains" : [
@@ -3626,6 +4332,203 @@
         "name" : "an answer the engine stopped part way runs nothing",
         "when" : "say",
         "why" : "Proposed by Windows on #411, accepted by Russell 2026-10-03 (#196's shape in the current grammar, with one new given key, modelReply). deploy_section rather than publish_pages: it is the measured 28-token case - arguments complete and PARSING - and a deploy that ran would be visible to the runner as a launcher run, so the case cannot pass vacuously. finishReason 'length' is the engine saying it stopped; a runner scripts the whole reply, toolCall.arguments being the model's own TEXT and {course} the fixture's course."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "assistant: wording.nextClassNeedsItsOwnPhrasing"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Make the next class the first day of a new unit"
+          ],
+          "visibleClasses" : [
+            "Unit 2, Day 5"
+          ]
+        },
+        "name" : "a new unit asked through the model is pointed at the phrasing and nothing is written",
+        "when" : "say",
+        "why" : "AUTHORED on the mac with #440 (settler S3, kind a). Measured 2026-10-07 (M4 Pro, b10435, the smaller assistant): this sentence reached add_next_class 5 of 5 with only a course and a section, which adds Unit 2, Day 6 and reports success. The course's latest unit is 2, so the pointer is the generated key word for word (its days sentence names Unit 2, review N-impl F4). S3 reads the teacher's own sentence ('new unit'), runs nothing, shows no card ('say' fails on a card), winds the turn back and answers with the sentence naming 'Start a new unit' (a card). The engine is asked once."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "assistant: wording.nextClassNeedsItsOwnPhrasing"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Add the next class to Unit 3"
+          ],
+          "visibleClasses" : [
+            "Unit 2, Day 5"
+          ]
+        },
+        "name" : "a unit other than the next page's, asked through the model, is pointed",
+        "when" : "say",
+        "why" : "AUTHORED on the mac with #440 (settler S3, kind b). The plain next page is Unit 2, Day 6 (the latest unit is 2, as in the generated pointer); the sentence names Unit 3, so running would add a page in a unit the teacher did not name and report success. Pointed, nothing written."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "Unit 1, Day 2"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Add the next class to Unit 1"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "the unit the next page goes in, asked through the model, runs",
+        "when" : "decline",
+        "why" : "AUTHORED on the mac with #440 (settler S3, kind b, the EQUAL case). The unit named is where the next page goes, so the call runs and the plan names Unit 1, Day 2; declined, so nothing is written."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "assistant: wording.mayIAskForYourDates"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1}",
+              "name" : "add_next_class"
+            }
+          },
+          "saying" : [
+            "The next class begins Unit 3"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "with no class dates, a unit sentence asked through the model asks for the dates",
+        "when" : "say",
+        "why" : "AUTHORED on the mac with #440 (ruling 7). With no remembered dates S3 has no reading and does nothing: the call runs, the runner refuses it for want of dates and asks for them - a sentence about units is no reason to skip the question the teacher needs first. Nothing is written."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "Unit 1, Day 2"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Add the next class"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "an empty add_next_class from the model runs",
+        "when" : "approve",
+        "why" : "AUTHORED on the mac with #440 (option E, ruling 3). An add_next_class the model sent with NO arguments at all is the request: its default - the next day of the current unit - is what 'add the next class' means, and the window supplies the course and section. It runs; it is NOT answered 'you left out what it was for'. Windows runs it through AssistAgent.OptionalExtras; the mac because the tool declares only what the window supplies. Pinned by a scenario rather than an app-rules row because only a scenario runs the call through the agent (review F3). Approved, so the page is written."
+      },
+      {
+        "expectModelRequests" : 1,
+        "expectTranscriptContains" : [
+          "Unit 1, Day 2"
+        ],
+        "given" : {
+          "modelReply" : {
+            "finishReason" : "tool_calls",
+            "toolCall" : {
+              "arguments" : "{\"course\":\"{course}\",\"section\":1,\"unit\":\"next\",\"days\":1}",
+              "name" : "add_next_class"
+            }
+          },
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Add the next class in this unit"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "a model-sent unit 'next' is dropped even when the teacher said unit",
+        "when" : "decline",
+        "why" : "AUTHORED on the mac with #440 (ruling 2). Settler S2 kept a model-sent unit \"next\" whenever the sentence said 'unit', so this sentence started Unit 2. The model's `unit` and `days` are now removed from EVERY add_next_class it sends: the plan names Unit 1, Day 2. Windows' router is shown `unit` and sent \"next\" on 50 of 50 plain phrasings, so there this is the live gap."
+      },
+      {
+        "expectTranscriptContains" : [
+          "Unit 2, Day 1"
+        ],
+        "given" : {
+          "pending" : "add_next_class",
+          "rememberedDates" : [
+            "2026-09-08",
+            "2026-09-10",
+            "2026-09-14",
+            "2026-09-16"
+          ],
+          "saying" : [
+            "Start a new unit"
+          ],
+          "visibleClasses" : [
+            "Unit 1, Day 1"
+          ]
+        },
+        "name" : "the 'start a new unit' card is not stopped by the settler",
+        "when" : "decline",
+        "why" : "AUTHORED on the mac with #440. A card never passes through the settlers: 'Start a new unit' plans Unit 2, Day 1 although S3 would point the same sentence had the model answered it. It is the sentence S3 tells the teacher to type."
       }
     ],
     "note" : "What must happen, and in what ORDER. The order is the assertion: every wrong ordering still passes a test that only checks all three events occurred. Event names are this contract's own; map them to whatever your app calls them. `given.saying` is a CONVERSATION — what the teacher types, in order, each turn settled before the next — because some behaviour exists only across turns; when it is absent a single turn is run, using whichever fixed phrasing reaches `given.pending`. `when` says what the teacher does on the LAST turn: \"approve\" presses Go on the card that is waiting (and fails if none is), \"decline\" presses Cancel, \"say\" means the last turn is ANSWERED rather than proposed, so nothing is waiting and a card there is the failure the case exists to catch; anything else is a tool name, called directly. `expectTranscriptContains` matches each named line by speaker PREFIX and sentence SUBSTRING, in order but not necessarily adjacent, and a line may satisfy more than one expectation — one reply often composes several named sentences into a single bubble. A literal line that is not a `wording.` name is matched as written, which is how a case anchors later expectations to a particular TURN. `expectModelRequests`, when present, is how many requests the engine must have received over the WHOLE conversation - 0 means the model was never asked. A transcript cannot show an absence, so a turn that must END in code (and not hand its answer back to the model for another lap) is proved by this count; the mac runs such a case against a stub engine that answers whatever it is sent, so a regression fails on the count rather than hanging. `given.visibleClasses`, when present, lays out those class pages, published, in section 1 before the call (the first is the first class); `given.arguments` is merged into the direct call's arguments, which are otherwise just the course and section (#96). `given.modelReply`, when present (#411), is the engine's WHOLE reply to every request: `finishReason` (e.g. \"length\", the engine saying it stopped at the cap) and either `toolCall` - `name`, and `arguments` as the model's own TEXT so a half-written call can be scripted, `{course}` standing for the fixture's course - or `content`. With `saying` and no card meant to match, such a case names no `pending`. A runner that can see launcher runs and window actions asserts none happened for a \"length\" reply, so the case cannot pass vacuously."
@@ -3671,7 +4574,12 @@
       {
         "expectTool" : "cancel_scheduled_deploy",
         "input" : "cancel that scheduled deploy",
-        "why" : "The prompt shelf's own sentence, 'Cancel that scheduled deploy', case-folded."
+        "why" : "'that', the sentence cancel_scheduled_deploy's own description quotes, case-folded. (This row's why used to call it the prompt shelf's sentence; the shelf on both apps says 'Cancel scheduled deploy', the next row.)"
+      },
+      {
+        "expectTool" : "cancel_scheduled_deploy",
+        "input" : "Cancel scheduled deploy",
+        "why" : "The prompt shelf's own card on both apps, exactly as it is written there, with no determiner. Added from the mac with #449 (its plan review found the shelf's card was still going to the model): the card a teacher clicks is the sentence this frame most needs to answer."
       },
       {
         "expectTool" : "cancel_scheduled_deploy",
@@ -3714,7 +4622,7 @@
         "why" : "A bare number deployAtATime refuses to read as a time: asked rather than sent to the model (ruling 1b; it was a refused row before the fix round)."
       }
     ],
-    "note" : "AUTHORED, not generated - proposed from Windows with #424 (v1.4.3 bundle A); the mac suite has no reader for it until it implements it, and a mac issue says so. Two typed frames answered in CODE, never by the model, with the hide frame's discipline: exact openings, 'please' at either end, a trailing . or ! removed by the shared tidier, and NOTHING else - a question mark, a leading word such as \"don't\", a course or section named, or any other words fall through to the model, because a matched card binds THIS window's course and section. WHY: measured on Windows (bundle 10, Intel i5-8365U, 16 GB, Intel UHD 620, Windows 11 Pro 26200, llama-server b10435, Qwen2.5-1.5B Q4_K_M, 10 greedy trials) on the local surface that ships since #420: a sentence asking for a LATER deploy reached deploy_section 10 of 10 (an immediate deploy behind the Deploy button), and a teacher asking to call off a scheduled deploy was declined 10 of 10 (the deploy still went out). SCHEDULE: '[please] schedule a|the deploy' is read AS the deployAtATime family - the opening stands for 'deploy', and 'for' may stand for 'at' directly after it (or after a day word) - so every time it accepts, asks about or refuses is read exactly as 'deploy at ...' reads it; nothing new is learned about times. A schedule phrasing with NO time ('schedule a deploy', with at most today/tomorrow/for today/for tomorrow after it) is NEVER a deploy now: it is answered in code with a question asking for the time - and since the fix round (ruling 1b) so is ANY other sentence opening \"[please] schedule a|the deploy\" that the family does not answer and that names no other course or section, carries no negation and is not a question (\"schedule a deploy tomorrow morning\", \"... for Monday\", \"... at 7\"); \"for today|tomorrow\" before the time is read as the day (ruling 1a) - (Windows' sentence, AssistWording.ScheduleADeployNeedsATime, proposed as a key), transcript only, nothing set. CANCEL: '[please] cancel the|that|my scheduled deploy [please]' reaches cancel_scheduled_deploy; cancelling is the safe direction (it stops a deploy and starts nothing). REJECTED: rewording schedule_deploy's or cancel_scheduled_deploy's description (#424 candidate b) - a description change needs its own pre-registered measurement and a sentence naming another tool is read by a small model as a recommendation (doc 10); widening either frame to 'don't send it ...' or to sentences naming a course - a frame that guesses is what these tables exist to avoid.",
+    "note" : "AUTHORED, not generated - proposed from Windows with #424 (v1.4.3 bundle A); read on the mac by ScheduleAndCancelFramesTests since #449, as on Windows. Two typed frames answered in CODE, never by the model, with the hide frame's discipline: exact openings, 'please' at either end, a trailing . or ! removed by the shared tidier, and NOTHING else - a question mark, a leading word such as \"don't\", a course or section named, or any other words fall through to the model, because a matched card binds THIS window's course and section. WHY: measured on Windows (bundle 10, Intel i5-8365U, 16 GB, Intel UHD 620, Windows 11 Pro 26200, llama-server b10435, Qwen2.5-1.5B Q4_K_M, 10 greedy trials) on the local surface that ships since #420: a sentence asking for a LATER deploy reached deploy_section 10 of 10 (an immediate deploy behind the Deploy button), and a teacher asking to call off a scheduled deploy was declined 10 of 10 (the deploy still went out). SCHEDULE: '[please] schedule a|the deploy' is read AS the deployAtATime family - the opening stands for 'deploy', and 'for' may stand for 'at' directly after it (or after a day word) - so every time it accepts, asks about or refuses is read exactly as 'deploy at ...' reads it; nothing new is learned about times. A schedule phrasing with NO time ('schedule a deploy', with at most today/tomorrow/for today/for tomorrow after it) is NEVER a deploy now: it is answered in code with a question asking for the time - and since the fix round (ruling 1b) so is ANY other sentence opening \"[please] schedule a|the deploy\" that the family does not answer and that names no other course or section, carries no negation and is not a question (\"schedule a deploy tomorrow morning\", \"... for Monday\", \"... at 7\"); \"for today|tomorrow\" before the time is read as the day (ruling 1a) - (Windows' sentence, AssistWording.ScheduleADeployNeedsATime; the mac generates it as wording.scheduleADeployNeedsATime since #449), transcript only, nothing set. CANCEL: '[please] cancel [the|that|my] scheduled deploy [please]' reaches cancel_scheduled_deploy (the bare 'cancel scheduled deploy', the prompt shelf's own card, added from the mac with #449); cancelling is the safe direction (it stops a deploy and starts nothing). REJECTED: rewording schedule_deploy's or cancel_scheduled_deploy's description (#424 candidate b) - a description change needs its own pre-registered measurement and a sentence naming another tool is read by a small model as a recommendation (doc 10); widening either frame to 'don't send it ...' or to sentences naming a course - a frame that guesses is what these tables exist to avoid.",
     "refused" : [
       {
         "input" : "schedule a deploy at 6:30 am?",

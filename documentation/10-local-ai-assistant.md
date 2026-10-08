@@ -6173,8 +6173,8 @@ terminal.
 declare `unit` and `days`, as Windows' does, so that an EMPTY model call is
 refused (`answerLeftOutWhatItWasFor`) on both apps by the schema-reading rule
 in `AssistToolCall.needsMoreThanTheWindowSupplies`. That moves the local tool
-surface, so it was built on a side branch (`issue/411-add-next-class-unit-days`:
-the two properties in Windows' words, the twin likewise, and an
+surface, so it was built on a side branch, kept as the record
+(`issue/411-add-next-class-unit-days`: the two properties in Windows' words, the twin likewise, and an
 `app-rules.json` → `modelTiers.requirements` case for the empty call) and
 measured on BOTH tiers before it could land. The pass rule was written down
 before anything ran: zero polarity inversions, and no probe that was 10/10
@@ -6202,6 +6202,10 @@ more than the window supplies, which leaves the schema alone. That trades the ru
 the schema, never a name" property for the outcome he asked for. Until then
 both apps RUN an empty `add_next_class` call — Windows through
 `AssistAgent.OptionalExtras` — and nothing a model is shown has moved.
+*(Settled 2026-10-07 by #440: the empty call RUNS on both apps, pinned by the
+authored scenario "an empty add_next_class from the model runs"; the schema
+stays at course and section. See "#440: `add_next_class` keeps two arguments;
+units and counts answered in code" below.)*
 
 **For Windows, MEASURED (v1.4.3 bundle A, 2026-10-04):** Windows' local model
 has been shown this exact `unit` line all along, and it does read it that way.
@@ -6224,6 +6228,129 @@ the authored scenario "a model-sent unit 'next' on add_next_class is ignored
 unless the teacher said unit". Rejected: dropping `unit`/`days` from the local
 surface (a routing change to re-measure), and keying on phrasings. The rest
 is for Russell (#440); numbers in `research/ai-assist/schedule-and-settler-424-results.txt`.
+*(#440, 2026-10-07, mac: the rest is decided. S2 is widened to drop the
+model's `unit` and `days` from EVERY `add_next_class` — the "unless the
+sentence says unit" exception let "Add the next class in this unit" start a
+new unit — and Windows owes taking both out of its model's view. See the
+#440 section below.)*
+
+### #440: `add_next_class` keeps two arguments; units and counts answered in code
+
+**The defect, measured on the mac (2026-10-07, M4 Pro, b10435, the smaller
+assistant, the shipped 13-tool surface).** Ten sentences about units and
+counts — "Add the next class in a new unit", "The next class begins Unit 3",
+"Make the next class the first day of a new unit", "Add three days to Unit 2",
+"Add another day to Unit 4", "Add the next two classes" and four more —
+reached `add_next_class` 50 times in 50 with only `{course, section}`. Each
+added ONE page in the CURRENT unit and reported success ("Unit 4" was also read
+as section 4; the window binding takes that back). Less harm than starting a
+unit by mistake, the same shape: silent, and success reported.
+
+**What was decided, and why (rulings on the #440 plan, 2026-10-07).**
+- **The local tool keeps `{course, section}`; nothing the model is shown
+  moves** (13 tools, `LOCAL_DIGEST` unmoved). #411 measured declaring
+  Windows' `unit`/`days` and both models read the NEXT in "add the next class"
+  as "start a new unit" (6 of 6, 5 of 6).
+- **Fixed frames answer the sentences in code** (`AssistCardCommand`): "add
+  the next class in a new unit" and "start a new unit with the next class"
+  beside the shipped "start a new unit"; "add <count> [more] days|classes to
+  unit <n>" and "add a|one|another [more] day|class to unit <n>" beside the
+  shipped "add <count> more days to unit <n>", the count agreeing with the
+  noun. Term-blind (only "unit"), exact, nothing else tolerated.
+- **Settler S3** (`AssistNextClassUnits`, in `think()` after the course gate,
+  MODEL calls only): the teacher's own sentence is read for (a) a new unit,
+  (c) a count above one right before a page noun, after an adding verb or
+  "next", (b) a unit — or, when a unit is named, a day — that is not where the
+  plain next page goes (read-only, `AssistToolRunner.nextClassReading`, the
+  same planner the tool calls). Any of them: nothing runs, no card, the turn
+  is wound back, the trail says which (`nextClassPointedLine`), and the
+  teacher gets `wording.nextClassNeedsItsOwnPhrasing` naming sentences the
+  window accepts in THAT course (Module: the "unit" sentences, said to be
+  read as Module; numbered: "Add the next meeting page", once per page — a
+  numbered course refuses both unit frames). The days sentence names the
+  course's LATEST EXISTING unit — the unit the plain next page lands in
+  (`NextClassPlanner.nextUnitAndDay`) — never a fixed example. Rejected: a
+  fixed "Unit 4", because typed back in a course whose latest unit is 2 it
+  starts Unit 4 at Day 1 and skips Unit 3 — a unit number that may not
+  exist in the course (review N-impl F4). No dates on file: S3 does nothing
+  and the dates are asked for. **It points; it never converts**: "don't start a
+  new unit" must not become one.
+- **The model's `unit` and `days` are dropped from every `add_next_class`**
+  (S2 widened). S2's "unless the sentence says unit" let "Add the next class in
+  this unit" start a unit.
+- **An empty `add_next_class` RUNS on both apps** (option E), pinned by a
+  scenario rather than an app-rules row (only a scenario runs the call through
+  the agent).
+- The mac's MCP `add_next_class` does not gain `unit`/`days`: `add_classes`
+  covers several days and a new unit there.
+
+**Rejected.** A — declare `unit`/`days`, steer in code: the #411 arm, failed.
+**A'** — Russell's `newUnit` boolean and integer `unit`/`days`: measured
+today as a third arm, both tiers, pre-registered (adopt only if it matched
+the design on every count with no inversions); it did not — see the numbers
+below. B — a separate local tool (14 tools; "the next class" vs "a new unit"
+is the near-synonym pair a small router confuses). E — refusing the empty
+call.
+
+**Measured.** `research/ai-assist/next-class-unit-440-preregistration.txt`
+(committed before the first request) and `…-results.txt` / `…-raw.txt`.
+Both tiers, 10 greedy trials, M4 Pro, b10435 Metal, the app's flags. The
+design (AFTER, surface byte-equal to BEFORE): every probe identical BEFORE and
+AFTER in both suites (smaller 210/290 trimmed, 210/250 teachers-say; larger
+290/290, 240/250), zero inversions, unit "next" never; every one of the 22
+pointed sentences then on record (three decided rows were added after the
+measurement) reached `add_next_class` with only course and section, or
+was declined ("Start a new unit?" on both tiers, "Start a new module" on the
+smaller), never another write tool; every control 10/10. **A' was not
+adopted**: on the smaller tier "HIDE - the inversion case", "typos" and the
+"delete" decline each fell 10 → 0, and on BOTH tiers every plain "add the
+next class" phrasing in the teachers-say suite came back with `unit` and
+`days` filled in — unit 2 and days 1 on all 60 calls on each tier, the
+larger with `newUnit: false`, the smaller sending `newUnit: true` for "Add
+the next class" 10 of 10 — the #411 harm again, with numbers in place of the
+word "next". (The unit-and-count probes, a separate suite, saw the larger
+send `unit: 0` for "Add the next class", "…for period 2" and "…to Module 4".
+Their "28 of 37 fail" is scored against rule (e), which is a rule for the
+AFTER arm — it bans SENDING a unit/days key, and declaring a key does not
+force the model to send it — so it is not the evidence. A' is judged by rules (g)–(j), and it fails
+(g), (i) and (j): the two findings above, and (i) because "Start a new
+unit?" and "Start a new module" move from declined to `add_next_class` on
+the smaller tier.) Zero inversions on every arm, which was necessary and not
+enough.
+
+**Pinned.** `contracts/assist-cases.json` → `nextClassUnits` (accepted,
+notThis, pointed, runs — the runs rows are the deterministic sweep of every
+add_next_class sentence on record that reaches the model — and
+pointerSentences) and seven scenarios; `NextClassUnitsTests` (`reachesModel`
+pinned both ways; every quoted sentence typed back as a card and RUN in a
+Unit, a Module and a numbered course); the mirror in
+`trimmed-surface-suite.py`.
+
+**Known limit, left open (review N-impl F3, pre-existing).** In a numbered
+course S3 reads only the word "unit", so "Add the page for Week 12" when the
+next page is Week 10 runs and makes Week 10, reported as success — the shape
+ruling 4 closed for Unit/Day, which a sparse numbering (CODING's Week 2, then
+Week 8) makes real. Not fixed with #440; a decision for a later piece.
+Three false refusals ARE decided rows (`pointed`, review F2): "…before the
+next unit test", "…not the next unit", and "next week" in a course whose
+unit word is Week — each points where the plain call was asked for, which
+costs one sentence and writes nothing.
+
+**Windows owes** (the hand-back is a comment on #440, the one issue; it stays open for Windows to close): hide
+`unit`/`days` from its model via `CardOnlyArguments` — its router is shown
+`unit` and sent "next" on 50 of 50 plain phrasings, and S2 keeps it whenever
+the sentence says "unit" — measured on its own tier; widen S2; port the
+frames and S3, reading the plain next page with `plan_add_next_class` over
+MCP (course and section only; a refusal for dates means S3 does nothing).
+That read must not offer the dates sheet, or any other interface, as a side
+effect: the mac reads `NextClassPlanner.plan` directly rather than the
+runner's plan path, which offers the sheet, so a twin that reads through
+`plan_add_next_class` could offer it twice; read the planner, or suppress
+the offer for S3's probe.
+The parked branch `issue/411-add-next-class-unit-days` is KEPT as the
+record of what #411 measured (Russell, on #440, 2026-10-04); its tip is
+`7bfab8fc314cb0427c7e630caa10e29a59861fd9`, named here so the pointer survives
+a rename. It is not merged and is not to be merged.
 
 ### #424: schedule, cancel, and a reply that runs to the cap
 
@@ -6238,15 +6365,16 @@ All three fixes are CODE; no description moved.
   today|tomorrow at <time>" is the day first). Any OTHER sentence opening that
   way — no time, "tomorrow morning", "for Monday", "at 7" — is ASKED in code
   (`AsksWhenToSchedule`, `AssistWording.ScheduleADeployNeedsATime`, Windows'
-  sentence proposed as a key), never a deploy now and never the model. A
+  sentence, generated by the mac as `wording.scheduleADeployNeedsATime` since
+  #449), never a deploy now and never the model. A
   question mark, a negation, or another course or section named still falls
   through, as in every frame here. The fix round widened the ask (ruling 1)
   after review traced "Schedule a deploy for tomorrow at 6:30 am" past both
   first-cut frames to the model.
-- **"[please] cancel the|that|my scheduled deploy [please]"** reaches
+- **"[please] cancel the|that|my scheduled deploy [please]"**, and since #449 the shelf's bare "Cancel scheduled deploy" (below), reaches
   `cancel_scheduled_deploy` (the safe direction).
 - Rows: `assist-cases.json` → `scheduleAndCancel` (AUTHORED from Windows),
-  run by `ScheduleAndCancelFramesTests`; the mac is asked to implement them.
+  run by `ScheduleAndCancelFramesTests` on both apps since #449 (below).
 - **The settler** is llama-server's own `t_max_predict_ms` = 30000, on the
   SMALLER tier only (`LocalModel.WritingTimeLimitMs`): a reply still being
   written 30 s after its first token ends as "length" and takes the #196
@@ -6278,7 +6406,51 @@ All three fixes are CODE; no description moved.
   alone (a deploy today is plausibly now), and turning the call into a
   `schedule_deploy` card (it would have to guess the moment). Pinned by the
   authored scenario "a deploy-now answer to a request that named a later time
-  is asked about, never offered"; the mac must make it pass.
+  is asked about, never offered"; the mac makes it pass since #449 (below).
+- **On the mac (#449, 2026-10-07).** The same frames, ported function for
+  function into `AssistCardCommand.swift`: `scheduleAsDeploy`,
+  `asksWhenToSchedule` and `cancelTheScheduledDeploy`, with `matching`,
+  `morningOrEvening` and `timeToSayAs` reading the rewrite exactly as Windows'
+  do; the ask sits between the morning-or-evening and say-it-as questions in
+  `AssistAgent.say`, as on Windows. `AssistWording.scheduleADeployNeedsATime`
+  is Windows' sentence byte for byte, generated into `assist-wording.json`, and
+  the S1 scenario names it rather than quoting it. Things a reader should know:
+  - **Both apps refuse a trailing "?" BEFORE the rewrite**, because both
+    apps' deploy frame drops a "?" itself (Windows' `DeployFrame`, the mac's
+    `deployFrame`): rewritten first, "schedule a deploy at 6:30 am?" would be
+    accepted. Not a mac trap; the mac test checks every refused row against
+    all four readers so neither app can lose it quietly.
+  - **The prompt shelf's cancel card is answered in code now.** Both shelves
+    say "Cancel scheduled deploy", with no "the|that|my", so the card was still
+    going to the model (the accepted row's `why` called "Cancel that scheduled
+    deploy" the shelf's sentence; it never was). The mac added an ACCEPTED row
+    for the bare sentence and accepts it; Windows owes the same one-word
+    widening. The shelves were not reworded.
+  - **Not in `cardPhrasings.parsed`, on purpose.** That generated catalogue
+    lists card families with an example and a `notThis`; these two are frames
+    over sentences whose specification is the authored `scheduleAndCancel` key,
+    so listing them twice would be a second copy to keep in step.
+  - **Settler S1 is decided BEFORE the turn is recorded** on the mac. The mac
+    writes the model's chose-a-tool line (`recordTurn`) before its gates, and
+    that line says "waited for the button" for any readable approval tool; S1
+    is decided first so that line says no such thing on a turn that puts no
+    button up, and S1's own line (Windows' words,
+    `AssistAgent.choseADeployNowForALaterTimeLine`) follows it. Windows writes
+    S1's line INSTEAD of its chose-a-tool line; the difference is in how the two
+    apps already wrote that line, not in what they record.
+  - **Settler S2 was NOT already true on the mac**, as the case expected. The
+    mac's local `add_next_class` declares no `unit`, but nothing strips an
+    undeclared key from a model call and `nextClassPlan` reads `unit` from any
+    call, so a model-sent unit "next" started Unit 2 here too (measured: with
+    the settler off the scenario's plan says "Unit 2"). The mac drops it in
+    `AssistAgent.think()`, for the model's calls only (the "Start a new unit…"
+    card keeps its unit "next"), unless the teacher's sentence says unit|units:
+    `AssistAgent.withoutAnUnaskedNewUnit`. REJECTED: stripping every undeclared
+    key from model calls — principled, but it changes other tools beyond this
+    piece and would need its own cases. *(Widened by #440, 2026-10-07: the
+    model's `unit` AND `days` are now taken out of every `add_next_class`
+    whatever the sentence says, as `AssistAgent.withoutCardOnlyArguments`; the
+    function named above is gone. Still this one tool only.)*
 - **#424 stays OPEN**, said plainly: the conversational cancel ("Don't send
   it in the morning after all.") is still declined by the model — the safe
   direction, since nothing is claimed — and the 30 s limit works only for a
@@ -6378,7 +6550,17 @@ the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
 and the mac is asked what it does). The Codex door names none and holds none,
-as before.
+as before. **The mac's answer (#449, 2026-10-07): its `--mcp-stdio` server
+holds NOTHING for the door's course, and never did.** Both mac doors write a
+folder-only argv and no `env` (`ClaudeCodeLauncher.swift`, `CodexLauncher.swift`);
+`AssistMCPServer.serve` takes no lease; the mac writes `build`, `preview` and
+`publish` leases only (`WorkLeaseFiles`); a held backup is in-process only
+(`AssistActivity.heldBackups`, read by `WorkspaceModel.heldBackupPaths`), so an
+MCP session's conversation backup is not held; and `AssistActivity` guards the
+built-in assistant only. So the mac has all three gaps Windows closed, and has
+had them since the doors existed — 1.4.3 lost it nothing. Whether to match is
+[#458](https://github.com/russellgordon/plantoir/issues/458), a `decision` for
+Russell, not part of #449.
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -7069,8 +7251,8 @@ family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
 3", and three `nearMisses` that a runner walks both without a course and in a
 club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
-on it is matched in code except "Cancel scheduled deploy", which was already
-measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
+on it is matched in code — "Cancel scheduled deploy" too since #449, which
+until then went to the model, where it had been measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
 it — a title-bearing publish or hide goes to the model, and no routing
 measurement has been made in a club course.
 
@@ -7596,8 +7778,11 @@ there is no difference left to know. *(#411: Russell decided on 2026-10-03
 that the mac should match Windows' ORIGINAL schema instead — declare both, and
 refuse the empty call. It was built and measured on 2026-10-04 and failed the
 pre-registered routing rule, so it is PARKED on the branch
-`issue/411-add-next-class-unit-days` and nothing changed on either app; see
-"#411: `add_next_class` with `unit` and `days`, measured and parked" above.)* "Add the next class page" is a card and
+`issue/411-add-next-class-unit-days` (kept as the record) and nothing changed on either app; see
+"#411: `add_next_class` with `unit` and `days`, measured and parked" above. #440
+settled it on 2026-10-07: the schema stays at course and section, and an empty
+call runs on both apps — "#440: `add_next_class` keeps two arguments; units and
+counts answered in code".)* "Add the next class page" is a card and
 never meets the rule. "Changes pages" is this app's own list of writes, because the
 schemas the server hands out carry no read-only flag. A call naming no course
 answers `wording.noCourseNamed` from `AssistWorkspace.Course`.

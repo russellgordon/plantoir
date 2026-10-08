@@ -25,7 +25,7 @@ Write an introduction or opening summary for this page here. Introduce the core 
 Explain the key idea, activity, demonstration, or investigation here.
 
 > [!note] Table of contents
-> Every  (level 2) and  (level 3) heading you use on this page automatically becomes an entry in the **Navigate this page** table of contents on the right side of the published page.
+> Every  (level 2) and  (level 3) heading you use on this page automatically becomes an entry in the **Navigate this page** table of contents on the right side of the page on your class website.
 
 ### Supporting Details
 
@@ -58,9 +58,9 @@ ten minutes once.
 
 Name the real day from the arc, not a plausible-sounding one, and
 check that day's agenda actually schedules what you are describing.
-Plain text only in here — no links and no transclusions, because both
-would be counted by the site as though they were on the published
-page.
+Plain text only in here — no links and no transclusions: the site drops
+everything between the markers, so a link here would count for nothing
+on your class website.
 
 OBSERVE — Unit  , Day  , which period and what it is for
   Watch for: something visible only while they work, and invisible in
