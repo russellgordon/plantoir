@@ -200,6 +200,58 @@ public class AppUpdatesContractTests
     }
 
     /// <summary>
+    /// #465's cosmetic half: one spelling. Every launch before #465 stored
+    /// "1.4 (3)"; the first launch after it reads that as 1.4.3, so the same
+    /// version is not taken for an update and a real one is written in one
+    /// spelling ("updated from 1.4.3 to 1.4.4", never "from 1.4 (3) to 1.4.4").
+    /// </summary>
+    [Fact]
+    public void TheVersionIsSpelledOneWayAndTheOldSpellingIsRead()
+    {
+        Assert.Equal("1.4.3", AppUpdates.Spell(new Version(1, 4, 3, 0)));
+        Assert.Equal("1.4.0", AppUpdates.Spell(new Version(1, 4)));
+        Assert.Equal("1.4.3", AppUpdates.Respell("1.4 (3)"));
+        Assert.Equal("1.4.3", AppUpdates.Respell("1.4.3"));
+        Assert.Null(AppUpdates.Respell(null));
+        Assert.Null(AppUpdates.AppUpdatedLine("1.4 (3)", "1.4.3", false));
+        Assert.Equal("updated from 1.4.3 to 1.4.4, by its own updater",
+                     AppUpdates.AppUpdatedLine("1.4 (3)", "1.4.4", true));
+    }
+
+    /// <summary>
+    /// <c>appUpdates.offerCases</c> (#453, appliesOn windows): whether an offer
+    /// is shown, and whether it carries Skip This Version and Not Now, decided by
+    /// <see cref="AppUpdates.DecideOffer"/>. A case that names an expectation
+    /// this test does not know fails rather than being skipped.
+    /// </summary>
+    [Fact]
+    public void EveryOfferCaseIsDecidedAsTheContractSays()
+    {
+        var block = Updates["offerCases"]!;
+        Assert.Contains("windows", block["appliesOn"]!.AsArray().Select(a => a!.ToString()));
+        var cases = block["cases"]!.AsArray();
+        Assert.True(cases.Count >= 7, $"only {cases.Count} offer cases");
+        var failures = new List<string>();
+        foreach (var c in cases)
+        {
+            string name = c!["name"]!.ToString();
+            var newer = c["newer"]!.AsArray()
+                .Select(i => (i!["version"]!.ToString(), i["important"]!.GetValue<bool>())).ToList();
+            string? skipped = c["skipped"]?.ToString();
+            bool asked = c["teacherAsked"]!.GetValue<bool>();
+            var expect = (JsonObject)c["expect"]!;
+            Assert.True(expect.Select(e => e.Key).All(k => k is "show" or "allowsSkip" or "allowsLater"),
+                $"{name}: an expectation this test does not read");
+
+            var offer = AppUpdates.DecideOffer(newer, skipped, asked);
+            string got = $"show {offer.Show}, skip {offer.AllowsSkip}, later {offer.AllowsLater}";
+            string wanted = $"show {expect["show"]!.GetValue<bool>()}, skip {expect["allowsSkip"]!.GetValue<bool>()}, later {expect["allowsLater"]!.GetValue<bool>()}";
+            if (got != wanted) failures.Add($"{name}: {got}; the contract says {wanted}");
+        }
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    /// <summary>
     /// appUpdates.notes.cumulative (#428 item 2): a teacher offered 1.4.4 who
     /// skipped 1.4.3 still reads 1.4.3's notes, newest first.
     /// </summary>
