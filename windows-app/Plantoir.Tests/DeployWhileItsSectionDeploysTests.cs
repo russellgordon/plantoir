@@ -264,10 +264,16 @@ public sealed class RefusedBuildAnswersTests : IDisposable
         foreach (string answer in answers)
         {
             Assert.Contains(lifted, answer);
-            Assert.DoesNotContain(cross, answer);
+            // The cross as it would sit in front of the course code: a bare
+            // "?" could be a fair question later in the answer.
+            Assert.DoesNotContain(cross + " " + Course, answer);
             Assert.DoesNotContain("❌", answer);
             Assert.DoesNotContain(whereTheOutputIs, answer);
             Assert.DoesNotContain("Last output:", answer);
+            // A unit's name must reach the whole-unit path (ApplyWholeUnit),
+            // whose own summary says so, not the page path.
+            if (pages is [var only] && PublishPlan.UnitNamed(only) is not null)
+                Assert.Contains($"{only} was {(tool == "publish_pages" ? "published" : "unpublished")}.", answer);
         }
     }
 

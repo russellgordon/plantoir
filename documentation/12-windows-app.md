@@ -1504,7 +1504,13 @@ What replaces the old container concepts:
       couldn't be built" with no reason, and pasting the raw log back is the
       bug `APublishThatFailsToBuildSaysOneCleanSentenceNotTheRawLog` exists to
       prevent; the right answer is a headless variant of `previewDidNotBuild`,
-      which is a wording key, so it is the mac's to add (#471). An exit 3 (a
+      which is a wording key, so it is the mac's to add (#471). The same
+      key would cover a THIRD gap, pre-existing and also left alone:
+      `RebuildPreview`'s ordinary failure still appends `build.Message`
+      whole, so an outside assistant's `rebuild_preview` hands back the raw
+      launcher output — "(The launcher exited with code 1.)" and "Last
+      output:" included, a machinery word in a teacher's answer. A headless
+      `previewDidNotBuild` should replace that too. An exit 3 (a
       question) in those two paths is still read as a failed build — a
       separate gap. Unpublishing single PAGES never rebuilds on this side
       (`Apply` returns before the build when the plan hides), so it cannot

@@ -5238,7 +5238,12 @@ read — so a client that learned the old wording is not broken. `classes` staye
 a string rather than becoming an array: that would have been a TYPE departure,
 a bigger difference than the one being closed. Windows' agreed separator
 differences are an empty set from that day, and `AssistSurfaceContractTests`
-fails if one reappears.
+fails if one reappears: `SeparatorHere` is hand-kept, so on its own it could
+not see the server drift back to "separated by commas", and
+`EveryListShapedParameterIsDescribedInTheContractsWords` holds every parameter
+in it to `toolSchemas.mcp`'s description byte for byte — which names the
+separator, so a drifted description fails there even while the table still
+says `;`.
 
 **Not a routing change.** `separatedList` renders `"type": "string"`, so the
 emitted schemas are byte-identical: verified by diffing `toolSchemas.local`
