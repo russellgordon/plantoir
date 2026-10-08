@@ -536,6 +536,43 @@ class TheWindowsCapturersFolders(unittest.TestCase):
                                     .read_text(encoding="utf-8"))["deploy_folder_path"],
                          str(marketing / "Websites" / "ICS4U"))
 
+    def test_a_failure_after_the_courses_moved_puts_them_back(self):
+        # `with` never calls __exit__ for an __enter__ that raised, so the
+        # courses would be stranded on the Desktop with rewritten paths.
+        marketing, shown = self.scenes.MARKETING, self.scenes.SHOWN
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        self.course(shown, "THEIRS", {"deploy_target": "netlify"})
+
+        def broken(_folder):
+            raise PermissionError("refused")
+
+        saved = self.scenes.make_publish_folders
+        self.scenes.make_publish_folders = broken
+        try:
+            with self.assertRaises(PermissionError):
+                with self.scenes.ShownAsTeaching(marketing):
+                    self.fail("the scenes must not run")
+        finally:
+            self.scenes.make_publish_folders = saved
+        self.assertTrue((marketing / "courses" / "ICS4U").is_dir())
+        self.assertTrue((shown / "courses" / "THEIRS").is_dir())
+        self.assertFalse(self.scenes.COURSES_SET_ASIDE.exists())
+        self.assertEqual(json.loads((marketing / "courses" / "ICS4U" / "course_config.json")
+                                    .read_text(encoding="utf-8"))["deploy_folder_path"],
+                         str(marketing / "Websites" / "ICS4U"))
+
+    def test_a_destination_outside_the_folder_is_never_made(self):
+        marketing = self.scenes.MARKETING
+        elsewhere = Path(self.tmp.name) / "Desktop" / "Teaching" / "Websites"
+        self.course(marketing, "ICS3U", {"deploy_target": "local_folder", "deploy_folder_path": str(elsewhere)})
+        self.course(marketing, "ICS4U", {"deploy_target": "local_folder",
+                                         "deploy_folder_path": str(marketing / "Websites" / "ICS4U")})
+        made = self.scenes.make_publish_folders(marketing)
+        self.assertFalse(elsewhere.exists())
+        self.assertTrue((marketing / "Websites" / "ICS4U").is_dir())
+        self.assertEqual(made, [marketing / "Websites"])
+
 
 # ---------- The door's own behaviour, with a stand-in server ----------
 
