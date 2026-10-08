@@ -107,7 +107,7 @@
             </Button>
         </Grid>
 
-        <!-- How last night's scheduled publish turned out. An InfoBar rather
+        <!-- How last night's scheduled deploy turned out. An InfoBar rather
              than a dialog on purpose: a dialog can only be acknowledged, and
              this has to be DISMISSABLE — the record now stands until the
              teacher clears it or a run that gets through replaces it

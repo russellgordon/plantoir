@@ -60,19 +60,25 @@ public class LauncherRulesContractTests
     /// it is deployed" and "Nothing was deployed", because publishing marks a
     /// page for the website and this step is the deploy. Read from deploy.sh
     /// rather than retyped. Only the ellipsis character may differ (deploy.ps1
-    /// prints ASCII only, so it says "..."). The other rebuild lines and every
-    /// "published" line in deploy.ps1 are #441, not this.
+    /// prints ASCII only, so it says "..."), and deploy.sh's leading "❌ ",
+    /// which deploy.ps1 leaves off. Since #441 (v1.4.4) the other three
+    /// rebuild lines are pinned the same way; every other line in deploy.ps1
+    /// that meant a deploy moved to "deploy" with them, and
+    /// scripts/test_deploy_words.py now reads deploy.ps1 for the old phrases.
     /// </summary>
     [Theory]
     [InlineData("Rebuilding it before it is deployed")]
     [InlineData("Nothing was deployed, rather than deploying pages")]
+    [InlineData("before deploying it: it needed an answer")]
+    [InlineData("Could not rebuild this site before deploying it.")]
+    [InlineData("The rebuilt site has not appeared")]
     public void TheRebuildLinesAreDeploySHsWordForWord(string anchor)
     {
         string Echoed(string file, string prefix) =>
             File.ReadAllLines(Path.Combine(ContractLoader.RepositoryRoot, file))
                 .Select(line => line.Trim())
                 .Where(line => line.StartsWith(prefix, StringComparison.Ordinal) && line.Contains(anchor, StringComparison.Ordinal))
-                .Select(line => line[(line.IndexOf('"') + 1)..line.LastIndexOf('"')].Trim().Replace("…", "..."))
+                .Select(line => line[(line.IndexOf('"') + 1)..line.LastIndexOf('"')].Trim().TrimStart('❌', ' ').Replace("…", "..."))
                 .Single();
         string shLine = Echoed("deploy.sh", "echo ");
         string psLine = Echoed("deploy.ps1", "Write-Host ");
