@@ -2774,8 +2774,15 @@ same time, and it does not work. Measured with a plain AppKit menu on macOS
 26: a key equivalent on a DISABLED item earlier in the menu bar SWALLOWS the
 key — `performKeyEquivalent` returns true and runs nothing — so with a section
 selected, Course's greyed ⇧⌘O (Course comes first) would have eaten the key.
-So the key is drawn on Course's item unless a section row is selected, and on
-Section's then (`.keyboardShortcut(nil)` on the other).
+And SwiftUI never gets that far: the implementation review measured a SwiftUI
+app with two `CommandMenu`s and ⇧⌘O on both items — SwiftUI DRAWS the key on
+the FIRST item only (the second's `keyEquivalent` is empty even while it is
+enabled), so on a section row ⇧⌘O fired nothing at all. REJECTED for both
+reasons: one key on two items. So the key is drawn on Course's item unless a
+section row is selected, and on Section's then (`.keyboardShortcut(nil)` on
+the other) — measured to fire the live item on course, section and empty
+rows, and to cost no extra rebuilds (20 row flips, 20 body evaluations of each
+menu either way).
 
 Rename… has no key, deliberately: Return renames in the sidebar, as in Finder,
 but a bare Return as a menu key equivalent is matched before the responder
@@ -2795,8 +2802,13 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
   fallback looks for ⌘N one level down and never found it in the submenu
   (the plan review measured it; `MenuBarTreeTests` pins the lookup).
 - **Open Working Folder… and Open Recent work with no window.** With a
-  Plantoir window in front (and no sheet on it) they switch THAT window —
-  Russell's decision, and what Open… always did. With none, an app-level
+  Plantoir window in front they switch THAT window — Russell's decision, and
+  what Open… always did. With a SHEET up on that window they are greyed like
+  every verb (`subjectMenus` → `openWorkingFolder`, `openRecent`): left live,
+  measured by the implementation review, they opened an app-modal panel and a
+  SECOND window behind the sheet. SwiftUI keeps a submenu's own item enabled
+  whatever `.disabled` says (measured), so it is Open Recent's ENTRIES that
+  grey. With none, an app-level
   `NSOpenPanel` (or the recent folder) is set as
   `WorkspaceModel.folderToOpenInNextNewWindow` and a new window opens on it
   through `chooseWorkspace`, as the teacher's choice: the #290 refusal, the
@@ -2822,8 +2834,26 @@ be opened with no course behind it. `FileCommands` replaces `.newItem`:
   picked — on the picker, or in an alert over a window that keeps its folder,
   and writes "working folder not reopened" with the occasion "a folder chosen
   from Open Recent". One outside the home folder is refused with the picker's
-  own words. The first read seeds the list from the last working folder and
-  the remembered windows, so it is not empty after the update.
+  own words, and the trail says "(chosen from File ▸ Open Recent)". Titles
+  that collide get the parent folder's name, Xcode-style ("Courses — 2025"),
+  and more of the path when that still collides ("Courses — A/2025"). The
+  first read seeds the list from the last working folder and the remembered
+  windows, so it is not empty after the update.
+
+### A course kept for reference: the menu bar and its rows agree
+
+Two disagreements the implementation review found, both decided by the
+director: **Section ▸ Cancel Deploy at…** is greyed on a course kept for
+reference — its section row's context menu has no Cancel, nothing deploys from
+a kept course, and Plantoir turns any schedule it still has off itself
+(`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`); the plan's
+"gate by direction" for the menu bar was REJECTED for that reason. And **Open
+in Obsidian on a reference SECTION** reveals the SECTION's folder from every
+route — the toolbar button beside it always did, while the row and the menu
+bar revealed the course — through one rule, `FolderActions.obsidianFolder`;
+the locked-pages note, shown the first time, now opens the folder it was
+asked for. (The toolbar button still opens without that note; noted for the
+HIG sweep.)
 
 ### Context menus select their row first
 
@@ -2862,6 +2892,8 @@ and the field works on an unselected row.
   in a window that keeps its folder, its words say "last time", and it never
   lets go of the folder being left.
 - **One key on two items** — see ⇧⌘O above.
+- **Leaving Open Working Folder… and Open Recent live under a sheet** — see
+  File above.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -8602,11 +8634,13 @@ purpose:
   checks, live, that the frame match finds the window when it is showing — so
   the tree half of the check is not dead code that always says "missing".
 
-**Reading the totals.** A normal full run has **3 skipped** — the three tests
-that want `INTEGRATION_WORKSPACE` — plus a fourth,
+**Reading the totals.** A normal full run has **4 skipped** — the three tests
+that want `INTEGRATION_WORKSPACE`, and `FolderIdentityTests.testCanonicalPathIsWhatBinPwdPrintsInEveryPlace`,
+which wants `PLANTOIR_TEST_EVERY_PLACE=1` (#189; this said 3 until 2026-10-08,
+when #457's review measured 4 on `dev` and on the branch alike) — plus a fifth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, whenever
 any launcher is running on the Mac (a preview in the app, another session's
-`verify.sh`; #243 is fixing that class). More than 3 means read the skip
+`verify.sh`; #243 is fixing that class). More than 4 means read the skip
 reasons: a Space skip says so, and so does that one. **A run made while the
 screen is locked — the overnight gates, with nobody at the Mac — shows 8 more
 skipped and 0 failures** (`AccessibilityInspectorTests` 2 — the two live
