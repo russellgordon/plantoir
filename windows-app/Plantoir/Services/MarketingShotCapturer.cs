@@ -2,667 +2,416 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
+using System.Runtime.InteropServices;
+using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.UI.Text;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Documents;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Media.Imaging;
-using Newtonsoft.Json.Linq;
 using Plantoir.Core.Assist;
 using Plantoir.Core.Models;
 using Plantoir.Core.Scripting;
 using Plantoir.ViewModels;
 using Plantoir.Views;
 using Windows.Graphics;
-using Windows.Graphics.Imaging;
-using Windows.Storage.Streams;
 
 namespace Plantoir.Services;
 
 /// <summary>
-/// Autonomous screenshot capture harness for Windows marketing shots.
-/// Takes pixel-perfect captures for all 5 app-window marketing shots (courses,
-/// new-course, progress, preview, assistant) in both Light and Dark appearance.
+/// The pictures on plantoir.app, staged in REAL windows (#380, #370).
+///
+/// <para><c>Plantoir.exe --stage-scene &lt;scene&gt; --theme light|dark
+/// --folder &lt;working folder&gt; --ready-file &lt;path&gt;</c> opens the
+/// window a scene is about, drives it to the state its caption describes
+/// through the app's own code, writes <c>staged</c> (or why not) to the ready
+/// file, and holds the window open. <c>website/shots/app_scenes_windows.py</c>
+/// then photographs that window whole with Windows.Graphics.Capture — its own
+/// corners and alpha, nothing cropped or drawn — and ends the process.</para>
+///
+/// <para>This replaced <c>--capture-marketing-shots</c>, which rendered each
+/// window's CONTENT with RenderTargetBitmap: no title bar, no window, square
+/// corners, and bubbles and buttons typed by hand into the assistant. Russell's
+/// rule (2026-09-27, again 2026-10-04) is that every picture is a whole window
+/// capture, so a rendering of content cannot be one however it is trimmed.</para>
+///
+/// <para>Every scene is run with <c>--state-dir</c>, so the windows, settings
+/// and trail lines a scene leaves behind are a temporary folder's, never a
+/// teacher's. Nothing here is reachable without these arguments.</para>
 /// </summary>
 public static class MarketingShotCapturer
 {
-    private static readonly string[] DemoCodes = { "ENG2D", "MCV4U", "SCH3U" };
-    private static string LogPath => Path.Combine(Path.GetTempPath(), "marketing_capture.log");
-
     public static void Log(string message)
     {
         try
         {
-            File.AppendAllText(LogPath, $"[{DateTime.UtcNow:HH:mm:ss.fff}] {message}\n");
+            File.AppendAllText(Path.Combine(Path.GetTempPath(), "marketing_capture.log"),
+                               $"[{DateTime.UtcNow:HH:mm:ss.fff}] {message}\n");
         }
         catch { }
     }
 
+    // ---- Staging -----------------------------------------------------------
+
     /// <summary>
-    /// Photograph the app windows, optionally for one appearance only.
-    ///
-    /// One appearance per PROCESS, with the OS switched to it first, is the
-    /// only way these come out right. Setting RequestedTheme on the window's
-    /// content changes what the controls draw, but every brush fetched as
-    /// Application.Current.Resources["..."] still resolves against the theme
-    /// the APP launched in — so a dark capture came back with a white dialog
-    /// card carrying white text, and assistant bubbles in light grey on a
-    /// dark window. Chasing those brush by brush (tried first: hardcoding
-    /// approximate literals in ThemedBrush) works but keeps drifting from the
-    /// real design tokens and needs re-chasing for every new brush anyone
-    /// adds; one process per appearance makes every themed resource resolve
-    /// exactly the way a teacher's copy resolves it, because the situation is
-    /// the same one. capture_windows.py switches Windows into each appearance
-    /// before launching this with --theme, and puts the colour mode back in a
-    /// finally.
+    /// Stage one scene and leave its window open. The ready file says
+    /// <c>staged</c> once the window shows what the caption says, or
+    /// <c>refused: …</c> with the reason — never a picture of something else.
     /// </summary>
-    public static async Task RunAsync(string outputDir, string? onlyTheme = null)
+    public static async Task StageAsync(MarketingScene request)
     {
+        string outcome;
         try
         {
-            outputDir = Path.GetFullPath(outputDir);
-            Directory.CreateDirectory(outputDir);
-            Log($"Starting marketing capture to {outputDir}");
-
-            string workspacePath = @"C:\Users\russellgordon\Teaching";
-            try
+            Log($"Staging {request.Scene} ({Theme(request)}) in {request.Folder}");
+            outcome = request.Scene switch
             {
-                Directory.CreateDirectory(workspacePath);
-                string testFile = Path.Combine(workspacePath, "write_test.tmp");
-                File.WriteAllText(testFile, "test");
-                File.Delete(testFile);
-            }
-            catch
-            {
-                workspacePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Teaching");
-            }
-            ProvisionDemoWorkspace(workspacePath);
-            Log($"Workspace provisioned at {workspacePath}");
-
-            ElementTheme[] wanted = onlyTheme is null
-                ? new[] { ElementTheme.Light, ElementTheme.Dark }
-                : new[] { onlyTheme.Equals("dark", StringComparison.OrdinalIgnoreCase)
-                              ? ElementTheme.Dark : ElementTheme.Light };
-
-            foreach (var theme in wanted)
-            {
-                string themeName = theme == ElementTheme.Dark ? "dark" : "light";
-                Log($"--- Capturing theme: {themeName} ---");
-
-                // ---- 1. Shot: courses ----
-                string coursesPath = Path.Combine(outputDir, $"courses-windows-{themeName}.png");
-                await CaptureCoursesWindow(workspacePath, theme, coursesPath);
-                Log($"Saved {coursesPath}");
-
-                // ---- 2. Shot: new-course ----
-                string newCoursePath = Path.Combine(outputDir, $"new-course-windows-{themeName}.png");
-                await CaptureNewCourseWindow(workspacePath, theme, newCoursePath);
-                Log($"Saved {newCoursePath}");
-
-                // ---- 3. Shot: progress ----
-                string progressPath = Path.Combine(outputDir, $"progress-windows-{themeName}.png");
-                await CaptureProgressWindow(workspacePath, theme, progressPath);
-                Log($"Saved {progressPath}");
-
-                // ---- 4. Shot: preview ----
-                string previewPath = Path.Combine(outputDir, $"preview-windows-{themeName}.png");
-                string siteImagePath = Path.Combine(outputDir, $"site-eng2d-windows-{themeName}.png");
-                await CapturePreviewWindow(workspacePath, theme, previewPath, siteImagePath);
-                Log($"Saved {previewPath}");
-
-                // ---- 5. Shot: assistant ----
-                string assistPath = Path.Combine(outputDir, $"assistant-windows-{themeName}.png");
-                await CaptureAssistantWindow(workspacePath, theme, assistPath);
-                Log($"Saved {assistPath}");
-            }
-
-            Log("Capture finished successfully.");
+                "provision" => await Provision(request),
+                "courses" => await Courses(request),
+                "new-course" => await NewCourse(request, "TEJ3M", "1, 2", club: false),
+                "club" => await NewCourse(request, "CODING", "1", club: true),
+                "progress" => await Progress(request),
+                "preview" => await Preview(request),
+                "assistant" => await Assistant(request),
+                "reference" => await Reference(request),
+                "start-of-year" => await StartOfYear(request),
+                "schedule-sheet" => await ScheduleSheet(request),
+                "curriculum-settings" => await CurriculumSettings(request),
+                "map-ontario" => await PreviewPage(request, "ICS3U", 1, "/Curriculum-Coverage", null),
+                "map-college-board" => await PreviewPage(request, "ICS3U", 1, "/College-Board-Curriculum-Coverage", null),
+                "both-curricula" => await PreviewPage(request, "ICS3U", 1, "/Explorations/The-Unplugged-Algorithm", "curriculum-connection"),
+                "hero" => await Hero(request),
+                _ => $"refused: no scene {request.Scene}",
+            };
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            // Exiting 0 here made a mid-capture crash invisible: capture_windows.py's
-            // subprocess.run(..., check=True) only raises on a NONZERO exit, so a
-            // failure that struck the very first window still printed "Every
-            // screenshot now has an authentic Windows twin" and left every
-            // remaining image as a stale leftover from whatever run last touched
-            // it -- discovered 2026-08-20 when a resource-lookup bug silently
-            // aborted two capture attempts in a row and both were reviewed as if
-            // they were fresh. The failure was always in the log
-            // (%TEMP%\marketing_capture.log); it just never reached the exit code.
-            Log($"Capture failed: {ex}");
-            Environment.Exit(1);
+            outcome = $"refused: {error.GetType().Name}: {error.Message}";
         }
-        Environment.Exit(0);
+        Log($"{request.Scene}: {outcome}");
+        if (request.ReadyFile is { } ready)
+        {
+            try { File.WriteAllText(ready, outcome); } catch (Exception error) { Log($"ready file: {error.Message}"); }
+        }
+    }
+
+    private const string Staged = "staged";
+
+    private static ElementTheme Theme(MarketingScene request) => request.Dark ? ElementTheme.Dark : ElementTheme.Light;
+
+    // A main window is 1280 x 800 effective pixels, the mac's own size in
+    // points, so a picture shows the same amount of the app on both.
+    private const int MainWidth = 1280, MainHeight = 800;
+    private const int AssistWidth = 560, AssistHeight = 760;
+
+    private static async Task<MainWindow> OpenMain(MarketingScene request)
+    {
+        var window = App.OpenWindow(request.Folder, null);
+        Dress(window, Theme(request), MainWidth, MainHeight);
+        await Task.Delay(1500);
+        return window;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr window);
+
+    /// <summary>The scene's appearance on the window's content, and its size in effective pixels at this display's scale.</summary>
+    private static void Dress(Window window, ElementTheme theme, int width, int height)
+    {
+        if (window.Content is FrameworkElement root) root.RequestedTheme = theme;
+        double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window)) / 96.0;
+        if (scale <= 0) scale = 1;
+        window.AppWindow.Resize(new SizeInt32((int)Math.Round(width * scale), (int)Math.Round(height * scale)));
+        window.AppWindow.Move(new PointInt32(20, 20));
+    }
+
+    private static async Task<bool> Until(Func<bool> condition, TimeSpan patience)
+    {
+        var deadline = DateTime.UtcNow + patience;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition()) return true;
+            await Task.Delay(400);
+        }
+        return condition();
+    }
+
+    private static Course? CourseNamed(MainWindow window, string code) =>
+        window.Workspace.Courses.FirstOrDefault(c => !ReferenceCourse.IsKeptForReference(c)
+                                                     && c.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
+
+    private static void ShowOver(MainWindow window, ContentDialog dialog)
+    {
+        dialog.XamlRoot = window.Content.XamlRoot;
+        if (window.Content is FrameworkElement root) dialog.RequestedTheme = root.RequestedTheme;
+        _ = dialog.ShowAsync();
+    }
+
+    // ---- The scenes ----------------------------------------------------------
+
+    /// <summary>
+    /// The folder made the way a teacher makes it: set up, each course through
+    /// the New Course panel (its ready-made content taken), then the reference
+    /// copy through Keep a Copy for Reference's own code. A course already
+    /// there is left as it is, so running this twice changes nothing.
+    /// </summary>
+    private static async Task<string> Provision(MarketingScene request)
+    {
+        Directory.CreateDirectory(request.Folder);
+        var window = App.OpenWindow(request.Folder, null);
+        await Task.Delay(1500);
+        if (window.Workspace.State != WorkspaceState.Ready)
+        {
+            await window.Workspace.InitializeWorkspaceAsync();
+            window.ApplyState();
+            await Task.Delay(1000);
+        }
+        if (window.Workspace.State != WorkspaceState.Ready)
+            return $"refused: the folder could not be set up ({window.Workspace.WorkspaceProblem})";
+
+        foreach (var (code, sections) in request.Courses)
+        {
+            if (CourseNamed(window, code) is not null) continue;
+            var wizard = new NewCourseDialog(window) { XamlRoot = window.Content.XamlRoot };
+            // Filled in as typed FIRST, so the course gets the name a teacher
+            // typing the code is offered ("Intro to Comp Sci"), not the
+            // panel's fallback: AutoCreate alone sets the code before the box
+            // is live, no name is suggested, and the first folder made this
+            // way was called "Course Website".
+            wizard.Opened += (_, _) => wizard.StageForCapture(code, sections);
+            wizard.AutoCreate(code, sections);
+            var showing = wizard.ShowAsync();
+            bool made = await Until(() => wizard.CreatedCourseCode is not null, TimeSpan.FromMinutes(6));
+            wizard.Hide();
+            await showing;
+            window.Workspace.Reload();
+            window.ApplyState();
+            if (!made) return $"refused: {code} was not made by the New Course panel";
+        }
+
+        if (request.ReferenceCopy is { } copy
+            && !window.Workspace.Courses.Any(c => ReferenceCourse.IsKeptForReference(c)
+                                                  && c.Code.StartsWith(copy.Code, StringComparison.OrdinalIgnoreCase)))
+        {
+            if (CourseNamed(window, copy.Code) is not { } course) return $"refused: there is no {copy.Code} to keep a copy of";
+            string coursesDirectory = window.Workspace.CoursesDirectory();
+            await Task.Run(() => ReferenceCopier.KeepACopy(course, MarketingScene.ReferenceFolderName(copy.Code, copy.Year), copy.Year, coursesDirectory));
+            window.Workspace.Reload();
+            window.ApplyState();
+        }
+        return Staged;
+    }
+
+    /// <summary>The first course's settings, beside the others and last year's copy under Reference Courses.</summary>
+    private static async Task<string> Courses(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        if (CourseNamed(window, "ICS3U") is null) return "refused: no ICS3U in the folder";
+        if (!window.Workspace.Courses.Any(ReferenceCourse.IsKeptForReference)) return "refused: no reference course in the folder";
+        window.Workspace.Selection = new SidebarSelection.CourseItem("ICS3U");
+        await Task.Delay(1500);
+        return Staged;
+    }
+
+    /// <summary>The New Course or Club panel with a code entered, as typed, before Create is pressed.</summary>
+    private static async Task<string> NewCourse(MarketingScene request, string code, string sections, bool club)
+    {
+        var window = await OpenMain(request);
+        var wizard = new NewCourseDialog(window);
+        bool opened = false;
+        wizard.Opened += (_, _) => { wizard.StageForCapture(code, sections, club); opened = true; };
+        ShowOver(window, wizard);
+        if (!await Until(() => opened, TimeSpan.FromSeconds(20))) return "refused: the New Course panel did not open";
+        await Task.Delay(1500);
+        if (wizard.IsMakingAClub != club) return $"refused: the panel {(club ? "is not" : "is")} making a club";
+        if (!club)
+        {
+            // The caption promises the suggested names beneath the code; the
+            // panel is taller than the window, so they are brought into view.
+            if (FindById(wizard, "newCourseSuggestions") is not FrameworkElement suggestions
+                || suggestions.Visibility != Visibility.Visible)
+                return $"refused: no names were suggested for {code}";
+            suggestions.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.6, AnimationDesired = false });
+            await Task.Delay(1000);
+        }
+        return Staged;
+    }
+
+    /// <summary>A real preview being built, caught part-way: the words beside the bar are the build's own.</summary>
+    private static async Task<string> Progress(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 2);
+        await Task.Delay(800);
+        if (window.DetailPresenter.Content is not SectionDetailView detail) return "refused: ENG2D section 2 did not open";
+        detail.StartPreviewForAutomation();
+        // Far enough in that the bar has moved, not so far that it is done.
+        await Task.Delay(TimeSpan.FromSeconds(14));
+        if (detail.HasPreview) return "refused: the preview finished before it could be photographed";
+        return Staged;
+    }
+
+    /// <summary>A real preview of the section, built and shown in the window.</summary>
+    private static async Task<string> Preview(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
+        await Task.Delay(800);
+        if (window.DetailPresenter.Content is not SectionDetailView detail) return "refused: ENG2D section 1 did not open";
+        detail.StartPreviewForAutomation();
+        if (!await Until(() => detail.HasPreview, TimeSpan.FromMinutes(15))) return "refused: the preview never appeared";
+        await Task.Delay(TimeSpan.FromSeconds(8));   // the page itself drawing in the window
+        return Staged;
     }
 
     /// <summary>
-    /// Open one Plantoir window, staged mid-deploy, and leave it on screen.
-    ///
-    /// This is the only capture that is NOT a RenderTargetBitmap: the hero
-    /// composite sets Plantoir beside Obsidian and Edge, and a visual-tree
-    /// render has no title bar, so it would be the one card in the cascade
-    /// with no window chrome. The Python harness photographs this window off
-    /// the screen instead, which is also how it takes the other two.
-    ///
-    /// Nothing here writes settings or joins App's window list -- the process
-    /// is killed once the picture is taken, and a remembered-window list that
-    /// grew a marketing window would reopen it on the teacher's next launch.
+    /// The assistant window with the promise card's "Unpublish Unit 2, Day 3"
+    /// sent: the plan and its buttons are the app's own, from Plantoir's real
+    /// tools (<see cref="AssistWindow.StageForCapture"/> says why no model is
+    /// needed for it).
     /// </summary>
-    public static async Task ShowHeroWindowAsync(string themeName)
+    private static async Task<string> Assistant(MarketingScene request)
     {
-        var theme = themeName.Equals("dark", StringComparison.OrdinalIgnoreCase)
-            ? ElementTheme.Dark : ElementTheme.Light;
-
-        string workspacePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Teaching");
-        ProvisionDemoWorkspace(workspacePath);
-
-        var window = new MainWindow(workspacePath, null);
-        if (window.Content is FrameworkElement root) root.RequestedTheme = theme;
+        var course = Workspace.DiscoverCourses(request.Folder)
+            .FirstOrDefault(c => c.Code.Equals("ENG2D", StringComparison.OrdinalIgnoreCase));
+        if (course is null) return "refused: no ENG2D in the folder";
+        var window = new AssistWindow(request.Folder, course, 1);
+        window.StageForCapture(new AnswersNothing(), "Unpublish Unit 2, Day 3");
+        Dress(window, Theme(request), AssistWidth, AssistHeight);
         window.Activate();
+        if (!await Until(() => window.IsWaitingForApproval, TimeSpan.FromSeconds(90)))
+            return "refused: the assistant did not come back with a plan to approve";
+        await Task.Delay(1500);
+        return Staged;
+    }
 
-        await Task.Delay(700);
+    /// <summary>Copy a Page from last year's ICS3U into ICS4U, the questions answered and Copy not pressed.</summary>
+    private static async Task<string> Reference(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        var source = window.Workspace.Courses.FirstOrDefault(c => ReferenceCourse.IsKeptForReference(c)
+                                                                  && ReferenceCourse.ShownCode(c).StartsWith("ICS3U", StringComparison.OrdinalIgnoreCase));
+        if (source is null) return "refused: no reference copy of ICS3U in the folder";
+        var dialog = CopyAPageDialog.StagedForCapture(source, window.Workspace.Courses, request.Folder,
+                                                      "The Unplugged Algorithm", "ICS4U");
+        if (dialog is null) return "refused: the reference ICS3U has no page called The Unplugged Algorithm, or ICS4U is not offered";
+        ShowOver(window, dialog);
+        await Task.Delay(2000);
+        return Staged;
+    }
+
+    /// <summary>Get ICS3U Section 2 Ready for the Start of the Year, its plan shown and nothing done.</summary>
+    private static async Task<string> StartOfYear(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        if (CourseNamed(window, "ICS3U") is not { } course) return "refused: no ICS3U in the folder";
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ICS3U", 2);
+        await Task.Delay(800);
+        ContentDialog? shown = null;
+        _ = StartOfYearDialog.OfferAsync(request.Folder, course, 2, dialog =>
+        {
+            shown = dialog;
+            ShowOver(window, dialog);
+            // Never answered: the scene holds the sheet open until the process ends.
+            return new TaskCompletionSource<ContentDialogResult?>().Task;
+        }, () => true);
+        if (!await Until(() => shown is not null, TimeSpan.FromSeconds(20)))
+            return "refused: there was nothing to put into draft, so no plan was shown";
+        await Task.Delay(1500);
+        return Staged;
+    }
+
+    /// <summary>ICS3U's Course Settings, scrolled to its curriculum folders: Curriculum and College Board Curriculum ticked.</summary>
+    private static async Task<string> CurriculumSettings(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        if (CourseNamed(window, "ICS3U") is not { } course) return "refused: no ICS3U in the folder";
+        if (!course.Configuration.CurriculumFolders.Contains("College Board Curriculum"))
+            return "refused: ICS3U does not declare College Board Curriculum as a curriculum";
+        window.Workspace.Selection = new SidebarSelection.CourseItem("ICS3U");
+        await Task.Delay(1500);
+        if (FindById(window.Content, "curriculumFoldersList") is not FrameworkElement list)
+            return "refused: the settings show no curriculum folders list";
+        list.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.35, AnimationDesired = false });
+        await Task.Delay(1500);
+        return Staged;
+    }
+
+    private static DependencyObject? FindById(DependencyObject? root, string automationId)
+    {
+        if (root is null) return null;
+        if (root is UIElement element
+            && Microsoft.UI.Xaml.Automation.AutomationProperties.GetAutomationId(element) == automationId) return root;
+        int count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+            if (FindById(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i), automationId) is { } found) return found;
+        return null;
+    }
+
+    /// <summary>
+    /// One page of a REAL preview of the section, in the window: the two
+    /// coverage maps, and a lesson whose curriculum connection quotes both
+    /// curricula. Refused when the page does not load, or its heading does not
+    /// land at the top.
+    /// </summary>
+    private static async Task<string> PreviewPage(MarketingScene request, string code, int section, string path, string? anchor)
+    {
+        var window = await OpenMain(request);
+        window.Workspace.Selection = new SidebarSelection.SectionItem(code, section);
+        await Task.Delay(800);
+        if (window.DetailPresenter.Content is not SectionDetailView detail) return $"refused: {code} section {section} did not open";
+        detail.StartPreviewForAutomation();
+        if (!await Until(() => detail.HasPreview, TimeSpan.FromMinutes(15))) return "refused: the preview never appeared";
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        if (await detail.ShowPreviewPageForCaptureAsync(path, anchor) is { } problem)
+            return $"refused: {problem}";
+        return Staged;
+    }
+
+    /// <summary>ICS3U Section 1's Schedule a Deploy sheet, as the section's menu opens it; Schedule never pressed.</summary>
+    private static async Task<string> ScheduleSheet(MarketingScene request)
+    {
+        var window = await OpenMain(request);
+        if (CourseNamed(window, "ICS3U") is not { } course) return "refused: no ICS3U in the folder";
+        window.Workspace.Selection = new SidebarSelection.SectionItem("ICS3U", 1);
+        await Task.Delay(800);
+        window.SidebarPane.OpenScheduleSheetForCapture(course, 1);
+        await Task.Delay(2500);
+        return Staged;
+    }
+
+    /// <summary>
+    /// The hero's middle card: the window staged mid-deploy. The ONE scene
+    /// whose progress is staged rather than real, because a real deploy would
+    /// put a site on the internet to take a photograph.
+    /// </summary>
+    private static async Task<string> Hero(MarketingScene request)
+    {
+        var window = await OpenMain(request);
         window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
         await Task.Delay(500);
-
-        var runner = new ScriptRunner(System.Threading.SynchronizationContext.Current);
-        var progressView = new TaskProgressView();
-        progressView.RequestedTheme = theme;
+        var runner = new ScriptRunner(SynchronizationContext.Current);
+        var progressView = new TaskProgressView { RequestedTheme = Theme(request) };
         progressView.Show(runner, "Deploying ENG2D-S1");
         window.DetailPresenter.Content = progressView;
         runner.StageAsRunningForCapture(TaskMilestones.Deploy, DeployTranscript);
-
-        Log($"Hero window staged in {themeName}; waiting to be photographed.");
-    }
-
-    private static void ProvisionDemoWorkspace(string workspacePath)
-    {
-        if (Directory.Exists(workspacePath))
-        {
-            try { Directory.Delete(workspacePath, recursive: true); } catch { }
-        }
-        Directory.CreateDirectory(workspacePath);
-
-        // Marker launchers required for WorkspaceState.Ready
-        File.WriteAllText(Path.Combine(workspacePath, "preview.ps1"), "# Plantoir Launcher\n");
-        File.WriteAllText(Path.Combine(workspacePath, "preview.sh"), "#!/usr/bin/env bash\n");
-        File.WriteAllText(Path.Combine(workspacePath, "setup.ps1"), "# Plantoir Setup\n");
-        File.WriteAllText(Path.Combine(workspacePath, "deploy.ps1"), "# Plantoir Deploy\n");
-
-        string[] possibleRoots = new[]
-        {
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..")),
-            Directory.GetCurrentDirectory(),
-            @"C:\Users\lenov\Desktop\Developer\containerized-quartz-for-teachers",
-            @"C:\Users\lenov\Desktop\Developer\plantoir"
-        };
-        string? foundRoot = possibleRoots.FirstOrDefault(r => Directory.Exists(Path.Combine(r, "support", "example_content")));
-        string exampleContentDir = foundRoot != null ? Path.Combine(foundRoot, "support", "example_content") : "";
-
-        string coursesDir = Path.Combine(workspacePath, "courses");
-        Directory.CreateDirectory(coursesDir);
-
-        var demoMeta = new (string Code, string Name, string Scheme, string HFont, string BFont)[]
-        {
-            ("ENG2D", "Grade 10 English", "default", "serif", "sans-serif"),
-            ("MCV4U", "Grade 12 Calculus and Vectors", "forest", "sans-serif", "sans-serif"),
-            ("SCH3U", "Grade 11 Chemistry", "ocean", "sans-serif", "sans-serif")
-        };
-
-        foreach (var (code, defaultName, defaultScheme, defaultHFont, defaultBFont) in demoMeta)
-        {
-            string courseTarget = Path.Combine(coursesDir, code);
-            Directory.CreateDirectory(courseTarget);
-            Directory.CreateDirectory(Path.Combine(courseTarget, "shared"));
-            Directory.CreateDirectory(Path.Combine(courseTarget, "section1"));
-            Directory.CreateDirectory(Path.Combine(courseTarget, "section2"));
-
-            string sourceDir = !string.IsNullOrEmpty(exampleContentDir) ? Path.Combine(exampleContentDir, code) : "";
-            string courseName = defaultName;
-            string scheme = defaultScheme;
-            string hFont = defaultHFont;
-            string bFont = defaultBFont;
-
-            if (Directory.Exists(sourceDir))
-            {
-                string manifestPath = Path.Combine(sourceDir, "manifest.json");
-                if (File.Exists(manifestPath))
-                {
-                    try
-                    {
-                        var manifest = JObject.Parse(File.ReadAllText(manifestPath));
-                        courseName = manifest["course_name"]?.ToString() ?? defaultName;
-                        scheme = manifest["colour_scheme"]?.ToString() ?? defaultScheme;
-                        hFont = manifest["header_font"]?.ToString() ?? defaultHFont;
-                        bFont = manifest["body_font"]?.ToString() ?? defaultBFont;
-                    }
-                    catch { }
-                }
-
-                string sharedSrc = Path.Combine(sourceDir, "shared");
-                if (Directory.Exists(sharedSrc))
-                    CopyDirectory(sharedSrc, Path.Combine(courseTarget, "shared"));
-
-                string sectionSrc = Path.Combine(sourceDir, "per_section");
-                if (Directory.Exists(sectionSrc))
-                {
-                    CopyDirectory(sectionSrc, Path.Combine(courseTarget, "section1"));
-                    CopyDirectory(sectionSrc, Path.Combine(courseTarget, "section2"));
-                }
-            }
-
-            var configObj = new JObject
-            {
-                ["course_name"] = courseName,
-                ["course_code"] = code,
-                // NOT "section_count" -- no such key. The two apps and the
-                // Python both read num_sections/section_numbers, so a course
-                // written the other way silently came up with one section.
-                ["num_sections"] = 2,
-                ["section_numbers"] = new JArray(1, 2),
-                ["colour_scheme"] = scheme,
-                ["header_font"] = hFont,
-                ["body_font"] = bFont,
-                ["use_literal_grade_markers"] = false,
-                ["use_lcs_terminology"] = false,
-                ["deploy_target"] = "netlify"
-            };
-            var config = CourseConfiguration.FromDictionary(configObj);
-            config.Write(Path.Combine(courseTarget, "course_config.json"));
-
-            WriteNetlifyMarkers(courseTarget, code);
-        }
+        await Task.Delay(1000);
+        return Staged;
     }
 
     /// <summary>
-    /// Record which site each SECTION is published to, the way a real deploy
-    /// does -- ".netlify_sites/section&lt;n&gt;.json", which is what
-    /// build_site.py's resolve_section_domain and deploy.py's
-    /// load_netlify_marker actually read.
-    ///
-    /// This replaces a "deploy_site_name" key these fixtures used to write.
-    /// website/README.md asked this side to decide what that key should hold
-    /// under the per-section naming adopted on 2026-08-19
-    /// (<c>&lt;code&gt;-s&lt;n&gt;-2026-gordon</c>), on the grounds that the new
-    /// scheme names a section while the key sits in course-level config. The
-    /// answer is that the key was never real: it appears in no launcher, no
-    /// contract (contracts/file-formats.json lists the keys course_config.json
-    /// carries) and nowhere else in either app, so renaming it would have
-    /// looked like settling the question while changing nothing. The per-section
-    /// marker is where a section's address genuinely lives, so that is what
-    /// gets written.
-    /// </summary>
-    private static void WriteNetlifyMarkers(string courseDir, string code)
-    {
-        string markerDir = Path.Combine(courseDir, ".netlify_sites");
-        Directory.CreateDirectory(markerDir);
-        foreach (int section in new[] { 1, 2 })
-        {
-            string name = $"{code.ToLowerInvariant()}-s{section}-2026-gordon";
-            var marker = new JObject
-            {
-                ["name"] = name,
-                ["url"] = $"http://{name}.netlify.app",
-                ["ssl_url"] = $"https://{name}.netlify.app"
-            };
-            File.WriteAllText(Path.Combine(markerDir, $"section{section}.json"),
-                              marker.ToString());
-        }
-    }
-
-    private static void CopyDirectory(string source, string target)
-    {
-        Directory.CreateDirectory(target);
-        foreach (string file in Directory.GetFiles(source))
-        {
-            string dest = Path.Combine(target, Path.GetFileName(file));
-            string content = File.ReadAllText(file);
-            content = content.Replace("__CREATED__", "2026-09-08T07:00:00Z");
-            content = System.Text.RegularExpressions.Regex.Replace(content, @"__CREATED_CLASS_\d+__", "2026-10-14T07:00:00Z");
-            File.WriteAllText(dest, content);
-        }
-        foreach (string dir in Directory.GetDirectories(source))
-        {
-            CopyDirectory(dir, Path.Combine(target, Path.GetFileName(dir)));
-        }
-    }
-
-    private static async Task CaptureCoursesWindow(string workspacePath, ElementTheme theme, string outputPath)
-    {
-        var window = new MainWindow(workspacePath, null);
-        ConfigureWindow(window, 1280, 800, theme);
-        window.Activate();
-
-        await Task.Delay(500);
-        window.Workspace.Selection = new SidebarSelection.CourseItem("ENG2D");
-        await Task.Delay(600);
-
-        await SaveWindowContentToPngAsync(window, outputPath);
-        window.Close();
-    }
-
-    private static async Task CaptureNewCourseWindow(string workspacePath, ElementTheme theme, string outputPath)
-    {
-        var window = new MainWindow(workspacePath, null);
-        ConfigureWindow(window, 1280, 800, theme);
-        window.Activate();
-
-        await Task.Delay(600);
-        window.Workspace.Selection = new SidebarSelection.CourseItem("ENG2D");
-        await Task.Delay(400);
-
-        var dialog = new NewCourseDialog(window);
-        dialog.RequestedTheme = theme;
-        dialog.StageForCapture("SBI3U", "1, 2");
-
-        var isDark = theme == ElementTheme.Dark;
-        var overlay = new Grid
-        {
-            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(isDark ? (byte)140 : (byte)90, 0, 0, 0)),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch
-        };
-        Grid.SetRow(overlay, 0);
-        Grid.SetRowSpan(overlay, 3);
-
-        var dialogCard = new Border
-        {
-            Width = 540,
-            // 680 cut the Language / region row through the middle of its
-            // control, with no scrollbar to explain why -- it read as a
-            // rendering fault rather than as a panel that continues.
-            MaxHeight = 720,
-            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
-            BorderBrush = (Brush)Application.Current.Resources["SurfaceStrokeColorDefaultBrush"],
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(24, 20, 24, 20),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        var dialogLayout = new Grid();
-        dialogLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        dialogLayout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        dialogLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var titleBlock = new TextBlock
-        {
-            // The dialog's own title, not a second copy of it that can
-            // drift: the real one says "New Course or Club".
-            Text = dialog.Title?.ToString() ?? "New Course",
-            FontSize = 20,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 16)
-        };
-        Grid.SetRow(titleBlock, 0);
-        dialogLayout.Children.Add(titleBlock);
-
-        if (dialog.Content is FrameworkElement formContent)
-        {
-            dialog.Content = null;
-            Grid.SetRow(formContent, 1);
-            dialogLayout.Children.Add(formContent);
-            GiveTheFormRoomForCapture(formContent);
-        }
-
-        var buttonRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 8,
-            Margin = new Thickness(0, 16, 0, 0)
-        };
-        var createBtn = new Button
-        {
-            Content = "Create",
-            Style = (Style)Application.Current.Resources["AccentButtonStyle"],
-            MinWidth = 80
-        };
-        var cancelBtn = new Button
-        {
-            Content = "Cancel",
-            MinWidth = 80
-        };
-        buttonRow.Children.Add(createBtn);
-        buttonRow.Children.Add(cancelBtn);
-        Grid.SetRow(buttonRow, 2);
-        dialogLayout.Children.Add(buttonRow);
-
-        dialogCard.Child = dialogLayout;
-        overlay.Children.Add(dialogCard);
-
-        if (window.Content is Grid rootGrid)
-        {
-            rootGrid.Children.Add(overlay);
-        }
-
-        await Task.Delay(800);
-        await SaveWindowContentToPngAsync(window, outputPath);
-        window.Close();
-    }
-
-    /// <summary>
-    /// Enough launcher output to walk the preview milestones as far as
-    /// "Building your site…", which is the step worth photographing: far
-    /// enough in that the bar has moved, not so far that it reads as finished.
-    /// The strings are the MARKERS from <see cref="TaskMilestones.Preview"/> --
-    /// change one there and this stops advancing, which is the intended
-    /// coupling.
-    /// </summary>
-    private const string PreviewTranscript =
-        "Running the website builder on this PC\n"
-        + "Copying shared folders\nUpdated pageTitle\nInstalling dependencies\n";
-
-    /// <summary>
-    /// The deploy equivalent, stopped at "Connecting to Netlify…" -- the step
-    /// the hero composite shows, and the one that makes the picture say
-    /// "publishing" rather than "building".
+    /// Enough launcher output to walk the deploy milestones to "Connecting to
+    /// Netlify…" — the step the hero shows. The strings are the MARKERS from
+    /// <see cref="TaskMilestones.Deploy"/>; change one there and this stops
+    /// advancing, which is the intended coupling.
     /// </summary>
     private const string DeployTranscript =
-        "Host timezone offset: -0400\nDeploying EXC2O S1 from this PC ...\n"
+        "Host timezone offset: -0400\nDeploying ENG2D S1 from this PC ...\n"
         + "Deploying from local build\n";
 
-    /// <summary>
-    /// Give the form enough room that the photograph cuts where the mac's
-    /// twin cuts -- at a section boundary, not through a control.
-    ///
-    /// The form lives in a ScrollViewer capped at 520, which put the card's
-    /// bottom edge straight through the "Language / region" row: a label with
-    /// its dropdown sliced off reads as a rendering fault rather than as a
-    /// panel that continues. Asking for the scrollbar instead was tried first
-    /// and does nothing -- Windows' "automatically hide scroll bars" setting
-    /// wins over VerticalScrollBarVisibility.Visible, so a still frame never
-    /// shows one. 600 completes that row and brings the next heading into
-    /// view, which is what the mac shot shows.
-    /// </summary>
-    private static void GiveTheFormRoomForCapture(FrameworkElement content)
+    /// <summary>A model that is never asked anything in a staged scene, and says nothing if it is.</summary>
+    private sealed class AnswersNothing : IChatModel
     {
-        if (content is ScrollViewer viewer)
-        {
-            viewer.MaxHeight = 600;
-            return;
-        }
-        if (content is Panel panel)
-            foreach (var child in panel.Children)
-                if (child is FrameworkElement element)
-                    GiveTheFormRoomForCapture(element);
-    }
-
-    private static async Task CaptureProgressWindow(string workspacePath, ElementTheme theme, string outputPath)
-    {
-        var window = new MainWindow(workspacePath, null);
-        ConfigureWindow(window, 1280, 800, theme);
-        window.Activate();
-
-        await Task.Delay(500);
-        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 2);
-        await Task.Delay(400);
-
-        // Stage the progress view exactly as a real preview does. The runner
-        // has to LOOK like it is running, or Render() takes neither branch and
-        // the pane shows a bar with no words beside it -- which contradicts
-        // this shot's own caption ("Progress is described in words").
-        var runner = new ScriptRunner(System.Threading.SynchronizationContext.Current);
-        var progressView = new TaskProgressView();
-        progressView.RequestedTheme = theme;
-        progressView.Show(runner, "Preparing the preview of ENG2D-S2");
-        window.DetailPresenter.Content = progressView;
-
-        runner.StageAsRunningForCapture(TaskMilestones.Preview, PreviewTranscript);
-
-        await Task.Delay(600);
-        await SaveWindowContentToPngAsync(window, outputPath);
-        window.Close();
-    }
-
-    private static async Task CapturePreviewWindow(string workspacePath, ElementTheme theme, string outputPath, string? siteImagePath = null)
-    {
-        var window = new MainWindow(workspacePath, null);
-        ConfigureWindow(window, 1280, 800, theme);
-        window.Activate();
-
-        await Task.Delay(500);
-        window.Workspace.Selection = new SidebarSelection.SectionItem("ENG2D", 1);
-        await Task.Delay(400);
-
-        if (window.DetailPresenter.Content is SectionDetailView detail)
-        {
-            detail.StagePreviewForCapture(theme, siteImagePath);
-        }
-
-        await Task.Delay(1200);
-        await SaveWindowContentToPngAsync(window, outputPath);
-        window.Close();
-    }
-
-    private static async Task CaptureAssistantWindow(string workspacePath, ElementTheme theme, string outputPath)
-    {
-        var configObj = new JObject
-        {
-            ["course_name"] = "Grade 10 English",
-            ["course_code"] = "ENG2D",
-            ["num_sections"] = 1,
-            ["section_numbers"] = new JArray(1),
-            ["colour_scheme"] = "default",
-            ["header_font"] = "serif",
-            ["body_font"] = "sans-serif",
-            ["use_literal_grade_markers"] = false,
-            ["use_lcs_terminology"] = false,
-            ["deploy_target"] = "netlify"
-        };
-        var config = CourseConfiguration.FromDictionary(configObj);
-        var course = new Course("ENG2D", Path.Combine(workspacePath, "courses", "ENG2D"), config);
-
-        var window = new AssistWindow(workspacePath, course, 1);
-        ConfigureWindow(window, 560, 760, theme);
-        window.Activate();
-
-        await Task.Delay(500);
-
-        window.ShowPromptShelfForCapture();
-
-        // Stage teacher message bubble matching macOS assistant test
-        var teacherMsg = new TextBlock
-        {
-            Text = "Unpublish Unit 2, Day 3",
-            TextWrapping = TextWrapping.Wrap,
-            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"]
-        };
-        window.AddStagedBubbleForCapture("You", true, teacherMsg);
-
-        // Stage assistant response bubble
-        var assistMsg = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"]
-        };
-        assistMsg.Inlines.Add(new Run { Text = "I will hide " });
-        assistMsg.Inlines.Add(new Run { Text = "Unit 2, Day 3: Character Analysis", FontWeight = FontWeights.SemiBold });
-        assistMsg.Inlines.Add(new Run { Text = " from the website (2026-10-14)." });
-        window.AddStagedBubbleForCapture("Assistant", false, assistMsg);
-
-        // Stage plan approval card
-        var planPanel = new StackPanel { Spacing = 6 };
-        var planHeader = new TextBlock
-        {
-            Text = "Shall I go ahead?",
-            FontWeight = FontWeights.SemiBold,
-            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"]
-        };
-        var planBody = new TextBlock
-        {
-            Text = "This will make 1 page hidden from students:\n• Unit 2, Day 3: Character Analysis",
-            TextWrapping = TextWrapping.Wrap,
-            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"]
-        };
-        var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
-        var btnApprove = new Button { Content = "Approve", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
-        var btnCancel = new Button { Content = "Cancel" };
-        btnRow.Children.Add(btnApprove);
-        btnRow.Children.Add(btnCancel);
-
-        planPanel.Children.Add(planHeader);
-        planPanel.Children.Add(planBody);
-        planPanel.Children.Add(btnRow);
-        window.AddStagedBubbleForCapture("Assistant", false, planPanel);
-
-        await Task.Delay(600);
-        await SaveWindowContentToPngAsync(window, outputPath);
-        window.Close();
-    }
-
-    private static void ConfigureWindow(Window window, int width, int height, ElementTheme theme)
-    {
-        window.AppWindow.Resize(new SizeInt32(width, height));
-        if (window.Content is FrameworkElement root)
-        {
-            root.RequestedTheme = theme;
-            var bgBrush = theme == ElementTheme.Light
-                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 243, 243, 243)) // #F3F3F3 Page Light
-                : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 32, 32, 32));   // #202020 Page Dark
-            if (root is Panel panel)
-            {
-                panel.Background = bgBrush;
-            }
-            else if (root is Control control)
-            {
-                control.Background = bgBrush;
-            }
-            root.Width = width;
-            root.Height = height;
-        }
-    }
-
-    private static async Task SaveWindowContentToPngAsync(Window window, string outputPath)
-    {
-        if (window.Content is not UIElement element) return;
-
-        var rtb = new RenderTargetBitmap();
-        await rtb.RenderAsync(element);
-
-        var buffer = await rtb.GetPixelsAsync();
-        byte[] pixels = buffer.ToArray();
-
-        using var fileStream = File.Create(outputPath);
-        using var randomStream = fileStream.AsRandomAccessStream();
-        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, randomStream);
-        encoder.SetPixelData(
-            BitmapPixelFormat.Bgra8,
-            BitmapAlphaMode.Premultiplied,
-            (uint)rtb.PixelWidth,
-            (uint)rtb.PixelHeight,
-            96,
-            96,
-            pixels);
-        await encoder.FlushAsync();
+        public Task<ModelReply?> Ask(JsonArray messages, JsonArray tools, CancellationToken cancellation) =>
+            Task.FromResult<ModelReply?>(null);
     }
 }

@@ -5,11 +5,39 @@
     <description>Plantoir for Windows</description>
     <language>en</language>
     <item>
+      <title>Plantoir 1.4.3</title>
+      <description>New in Plantoir 1.4.3
+
+Type "publish unit 4, day 3", "schedule a deploy at 6:30 am" or "cancel that scheduled deploy" to the assistant and it is answered straight away. "Schedule a deploy" without a time asks you for the time, and never deploys right away.
+
+Claude and Codex can change a course while its preview is open. They are asked to wait only while Plantoir is actually building that course's website. A change made while a preview is open is saved straight away: press Stop Preview, then Preview, to see it. If a deploy closes a preview, the section says "Closed for a deploy" instead of telling you something went wrong.
+
+"Revise with Claude" can now work on every course in your working folder.
+
+A scheduled deploy now tells you how it went, in a notification, every time.
+
+When two pages have the same name, asking the assistant to publish one asks which you meant, naming each with its folder. When a change to several pages stops part way, the assistant says plainly that only part of it was made. When making room for extra classes cannot finish every page, Plantoir names the pages to look over.
+
+The smaller assistant now stops a long answer sooner, but on some requests it can still take up to about 80 seconds before saying its answer was cut off. Nothing it started is carried out when that happens.
+
+A screen reader now names every button that shows only an icon, and tells a course kept for reference from the course you are teaching.
+
+Course Settings no longer protects a folder from removal just because Plantoir guessed it held your class pages.
+
+Class dates remembered with an impossible year are asked for again instead of being believed.
+
+From this version on, when Plantoir offers an update it shows what is new in every version since yours.</description>
+      <pubDate>Wed, 07 Oct 2026 18:23:35 -04:00</pubDate>
+      <sparkle:version>1.4.3</sparkle:version>
+      <sparkle:shortVersionString>1.4.3</sparkle:shortVersionString>
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.3/PlantoirSetup.exe" sparkle:version="1.4.3" sparkle:shortVersionString="1.4.3" length="237396952" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="2a1daOj8JuEh37kYHFTD2wPFGbptxGVwX+kccf0lCgnRdqmIM01feHdQN0StInTdPPcit9QLVWc5NS4u5OreCA==" />
+    </item>
+    <item>
       <title>Plantoir 1.4.2</title>
       <pubDate>Sat, 03 Oct 2026 18:10:12 -04:00</pubDate>
       <sparkle:version>1.4.2</sparkle:version>
       <sparkle:shortVersionString>1.4.2</sparkle:shortVersionString>
-      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.2/PlantoirSetup.exe" sparkle:version="1.4.2" sparkle:shortVersionString="1.4.2" length="237391016" sparkle:os="windows" type="application/x-msdos-program" sparkle:criticalUpdate="false" sparkle:signature="6JSIKNASw+Oo7yXJfpKQi99fVvcHCLGF6TTFg0inW73MLztRqBaO/cvzA56hFXv50LfawlFOEHlEkgoqUehjCQ==" />
+      <enclosure url="https://github.com/russellgordon/plantoir/releases/download/v1.4.2/PlantoirSetup.exe" sparkle:version="1.4.2" sparkle:shortVersionString="1.4.2" length="237391016" sparkle:os="windows" type="application/octet-stream" sparkle:criticalUpdate="false" sparkle:signature="6JSIKNASw+Oo7yXJfpKQi99fVvcHCLGF6TTFg0inW73MLztRqBaO/cvzA56hFXv50LfawlFOEHlEkgoqUehjCQ==" />
     </item>
   </channel>
 </rss>

@@ -437,7 +437,7 @@ struct SettingsSaveNotice: Equatable {
                 line += "; told the teacher this save replaced a sidebar change made elsewhere"
             }
             if notice.sentences.contains(SpecialNames.settingsSavedWhilePublishing) {
-                line += "; a publish of the course was running, told it uses the earlier settings"
+                line += "; a deploy of the course was running, told it uses the earlier settings"
             } else if !notice.sectionsToPreviewAgain.isEmpty {
                 var sectionWords: [String] = []
                 for section in notice.sectionsToPreviewAgain {

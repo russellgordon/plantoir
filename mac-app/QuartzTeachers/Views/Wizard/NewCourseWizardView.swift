@@ -1105,7 +1105,7 @@ struct NewCourseWizardView: View {
                                       || !includesCurriculumPages
                                       || !includesCurriculumCoverage)
                             .accessibilityIdentifier("coverageNotesToggle")
-                        ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to publish the map on its own.")
+                        ExampleCaption("Two short sections at the foot of the map: what counts as addressing an expectation, and how to read it honestly — red in September is normal, red in May is not. Turn this off to show the map on its own.")
                     }
                 }
                 }

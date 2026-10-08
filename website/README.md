@@ -189,29 +189,81 @@ demo folder could not actually be made from nothing.
 ### Capturing on Windows
 
 ```powershell
-python website/shots/capture_windows.py
+python website/shots/capture_windows.py                  # every Windows picture
+python website/shots/capture_windows.py --sites          # the class-site shots, in Edge windows
+python website/shots/capture_windows.py --figures        # the hero and the two colour figures
+python website/shots/capture_windows.py --app [a,b]      # the app's own scenes, How I Teach and schedule
+python website/shots/capture_windows.py --provision-demo <folder>   # no pictures: a demo folder's state (#445)
 ```
 
-It first runs `shots/test_demo_folders.py` (no `dotnet test` discovers
-website/shots tests, so this is where Windows gates them) and stops if it is
-red. Then it autonomously launches `Plantoir.exe --capture-marketing-shots site/img`,
-provisions demo courses in `%TEMP%`, stages each view (`courses`, `new-course`,
-`progress`, `preview`, `assistant`) across both `ElementTheme.Light` and
-`ElementTheme.Dark`, captures 2x HiDPI `RenderTargetBitmap`s, generates WebP
-companions, and rebuilds the site. Its demo courses and sites come from
-`shots/marketing/folders.json`, the same file the mac reads.
+Every run, whichever pass, first runs `shots/test_demo_folders.py` (no
+`dotnet test` discovers website/shots tests, so this is where Windows gates
+them) and stops if it is red. The demo sites it photographs (`DEMO_COURSES`,
+which `hero_windows.py` reads too) come from `shots/marketing/folders.json`,
+the same file the mac reads.
 
-`python website/shots/capture_windows.py --provision-demo <folder>` gives a
-demo folder whose courses the app's new-course panel has made the same state
-the mac's `--provision-demo` gives it, through `plantoir-mcp.exe` and the same
-`demo_folders.py`. **What is still Windows' to do** (the `windows` issue for
-#445): `MarketingShotCapturer.cs` makes its own demo courses by copying each
-payload's `shared/` into a `shared/` SUBFOLDER, with every class dated
-2026-10-14 and every other page 2026-09-08 and colour keys of its own, so its
-courses match the mac's in neither layout, names, dates nor colours; it should
-make them through the app's own installer and read `folders.json`. The
-College Board pages cannot be made on Windows at all (the document is read
-with PDFKit, `ced_statements.swift`), so the scenes that show them are the mac's.
+Every Windows picture is ONE real window photographed whole by
+`website/shots/windowshot/` (Windows.Graphics.Capture on the window's handle:
+its own corners and alpha, nothing cropped, masked or drawn — #380). It takes
+the desktop: it switches Windows between light and dark and puts the colour
+mode back, and it ends every process it started.
+
+- **The app's scenes** are staged by the app itself:
+  `Plantoir.exe --stage-scene <scene> --theme light|dark --folder <working
+  folder> --ready-file <file>` opens the window, drives it to the state the
+  caption describes through the app's own code, and writes `staged` (or
+  `refused: <why>`) to the ready file; `website/shots/app_scenes_windows.py`
+  then photographs it and ends it. Every run uses `--state-dir`, so no
+  teacher's setting or trail is touched. The preview, the progress and the
+  coverage maps are REAL previews built by the launchers; the assistant's plan
+  is the app's own answer to the promise card's "Unpublish Unit 2, Day 3"
+  (matched in code, so no assistant has to be downloaded). Windows' `schedule`
+  picture is the Schedule a deploy sheet alone, with Windows words of its own
+  (`SCREENSHOTS.md` → "The one rule" says why the notification cannot be
+  photographed whole). The hero's middle card is the one staged
+  state (a deploy would put a site online). This replaced
+  `--capture-marketing-shots`, which rendered window CONTENT with
+  `RenderTargetBitmap` — no window, square corners, bubbles typed by hand.
+- **Two working folders, both made by the app** (`--stage-scene provision`,
+  the New Course panel for each course, the real installer at the real
+  clock): `~/Teaching` (ENG2D, MCV4U, SCH3U — the demo, disposable) and
+  `~/School Web Space` (ICS3U, ICS4U and last year's ICS3U — the v1.4.0
+  scenes' folder, kept). The one part a Windows machine cannot make is the
+  College Board pages, extracted from the Course and Exam Description by a
+  macOS-only helper (`ced_statements.swift`) and never committed
+  (`folders.json` → `marketing.collegeBoardPages`): for the three scenes that
+  show them (two maps, both-curricula, curriculum-settings) the mac's own
+  ICS3U, ICS4U and ICS3U-2025 were copied in by hand, by design. **Every picture shows
+  `~/Desktop/Teaching`**, as the mac's do: for each set of scenes the folder's
+  `courses` are put in `~/Desktop/Teaching` and that folder's own courses set
+  aside beside them, then both put back (`ShownAsTeaching`). The COURSES are
+  swapped rather than the folder because renaming the folder itself was
+  refused ("Access is denied") while a File Explorer window had it open.
+- **The class sites** are Edge `--app` windows, driven over the DevTools
+  protocol in the window photographed: an anchor is scrolled to once the page
+  stops moving and CHECKED near the top of the page column, the search is
+  refused with no result, and the page's own theme is checked against
+  Windows'. `site-phone` is a narrow Edge window.
+- **No OCR read-back yet** (Windows.Media.Ocr is the candidate): every
+  Windows picture is checked by eye, and each scene refuses the states it can
+  detect in code instead.
+
+`python website/shots/capture_windows.py --provision-demo <folder>` takes no
+picture: it gives a demo folder whose courses the app has made the same state
+the mac's `--provision-demo` gives it — colour schemes, the teacher's last
+name, stand-in site markers, and every front page on the latest class on or
+before January 15 — through `plantoir-mcp.exe` (beside `Plantoir.exe`, or the
+Debug build `app_scenes_windows.py` uses) and the same `demo_folders.py`.
+**What is still Windows' to do** (the `windows` issue for #445, #459): the
+`provision` scene makes the courses through the real installer already, but
+from lists of its own in `app_scenes_windows.py` (`DEMO_COURSES`, which gives
+MCV4U and SCH3U a section 2 that `folders.json` does not; `MARKETING_COURSES`;
+and `MARKETING_REFERENCE`, whose `2025` is a fixed year where `folders.json`
+says "the school year before" and a kept copy's own year wins), and nothing
+applies the demo state afterwards, so a Windows demo folder keeps the colours
+and front pages the New Course panel left. It should read `folders.json` for
+all of it (the marketing courses' `publishTo` destinations included) and run
+`--provision-demo` once the demo folder is made.
 
 ### Only macOS's own window capture, kept whole
 
@@ -582,8 +634,9 @@ Windows uses, and check the *count of captured images*, never the exit code.
   *other* appearance's capture with `AssistWording.alreadyHiddenOne`. The harness must
   stage the setting on for the run and restore the teacher's own value after,
   exactly as it stages window frames (`capture.py` does this now). Windows
-  keeps an equivalent setting; `capture_windows.py` photographs the assistant
-  and needs the same staging.
+  keeps an equivalent setting; its scenes run with `--state-dir`, a fresh
+  settings file in which "asks before changing" is on by default, so the
+  staged assistant shows the plan and never carries it out.
 - **Photograph progress when a step is NAMED, never after a fixed sleep —
   and know which steps can actually appear.** The progress shot used to
   wait for the progress view to exist and then sleep six seconds; on a
@@ -620,14 +673,9 @@ The published demo sites now follow a per-SECTION scheme —
 `<code>-s<n>-2026-gordon.netlify.app`, e.g. `eng2d-s1-2026-gordon` — and
 ENG2D has a section 2 site of its own. `shots/marketing/folders.json` (read
 by `capture.py` and `capture_windows.py` since #445) and `website/site.json`
-carry the new names, but
-`windows-app/Plantoir/Services/MarketingShotCapturer.cs` still writes the
-OLD per-course names (`{code}-gordon-2026-27`) into its fixture configs'
-`deploy_site_name`, in two places. Left for the Windows side to update
-rather than edited blind from the mac, because the new scheme names a
-SECTION and `deploy_site_name` is course-level config: the right value for
-those fixtures — probably the section 1 name — is a judgement about how
-that capturer uses them. The authoritative record of what is actually
+carry the new names. (`MarketingShotCapturer.cs` used to write fixture
+configs with the old per-course names; since #380 it writes no fixtures at
+all — the app makes its working folders through the New Course panel.) The authoritative record of what is actually
 deployed is the demo working folder itself:
 `courses/<CODE>/.netlify_sites/section<n>.json`.
 

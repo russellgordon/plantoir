@@ -503,7 +503,8 @@ def mac_server(app_binary: Path, folder: Path, state_dir: Path | None = None) ->
 
 
 def windows_server(mcp_exe: Path, folder: Path) -> list[str]:
-    """Windows' door: plantoir-mcp.exe beside Plantoir.exe. It takes no
+    """Windows' door: plantoir-mcp.exe (beside Plantoir.exe in a published
+    build; capture_windows.provision_demo also finds the Debug one). It takes no
     `--state-dir` (its trail and leases are the real ones), so it is run only
     against a demo folder; pass WINDOWS_ARGUMENTS with every request."""
     return [str(mcp_exe), "--mcp-stdio", str(folder)]
