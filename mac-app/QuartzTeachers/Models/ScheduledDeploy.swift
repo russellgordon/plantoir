@@ -1231,6 +1231,20 @@ enum ScheduledDeploy {
     /// and an empty record reads as no record at all — exactly what a failed
     /// `echo` straight into the record produced before. A failed `mv` leaves no
     /// record, likewise.
+    ///
+    /// **A record already in place is NEVER replaced (#439).** The run clears
+    /// its section's record as its first act and writes at most one of its
+    /// own, so a record standing at this point was written by somebody ELSE
+    /// since this run started — a newer run of the same section. That happens
+    /// when setting the section again ends this run's app while its script
+    /// carries on as a leftover: the newly set run waits for it, and if it
+    /// gives up after thirty minutes it records that it stood down. Without
+    /// this line the leftover finishing later replaced that with its own
+    /// "succeeded", and the section read as deployed while the deploy the
+    /// teacher had just set never ran. The temporary file is removed instead.
+    /// The look and the move are two steps, so a newer record landing in the
+    /// microseconds between them is still replaced; the window it closes is
+    /// the leftover's whole deploy.
     static func recordCompletionLines(
         indentedBy indent: String,
         destination: String,
@@ -1242,7 +1256,8 @@ enum ScheduledDeploy {
             "\(indent)/bin/echo \(shellQuoted(destination)) >> \(shellQuoted(temporaryPath))"
         )
         result.append(
-            "\(indent)/bin/mv \(shellQuoted(temporaryPath)) \(shellQuoted(recordPath))"
+            "\(indent)if [ -f \(shellQuoted(recordPath)) ]; then /bin/rm -f \(shellQuoted(temporaryPath));"
+            + " else /bin/mv \(shellQuoted(temporaryPath)) \(shellQuoted(recordPath)); fi"
         )
         return result
     }
@@ -1394,9 +1409,10 @@ enum ScheduledDeploy {
         // would leave it alive. (The wrapper it started outlives it — a
         // `Process` child has a process group of its own — and finishes the
         // old deploy. It cannot remove the new deploy — its only plist line
-        // is its first and it boots nothing out — but it is NOT harmless: the
-        // ended run's leases read as stale while it works, so a second deploy
-        // of the section can overlap it. See doc 07.) Pinned by
+        // is its first and it boots nothing out. The ended run's leases read
+        // as stale while it works, so since #439 the launchers refuse a second
+        // deploy of the section while its script runs, and the newly set run
+        // waits for it (`waitForTheEarlierDeploy`). See doc 07.) Pinned by
         // `testSettingASectionAgainWhileItsRunWorksBootsTheRunOutFirst`;
         // measured in documentation/07-deployment.md → "Set again while the
         // run works (#409)".
@@ -1404,6 +1420,17 @@ enum ScheduledDeploy {
         for agent in existing where agent.label != label {
             runner.bootOut(label: agent.label)
         }
+        // A run that was WORKING has just been ended, and the deploy its app
+        // started carries on by itself (#439): said on the trail once the new
+        // job is ACCEPTED (below), since nothing else will — that run's app
+        // writes no line of its own now, sends no notification and does not
+        // mark the section deployed. Asked HERE, right after the boot-out, so
+        // only a script that outlived it counts (a run that was still waiting
+        // for the course had started none), and before the new job exists,
+        // so the new run can never be mistaken for it.
+        let anEarlierDeployWasLeftWorking: Bool = anEarlierDeployIsWorking(
+            script: ScheduledDeploy.scriptURL(label: label).path
+        )
 
         do {
             // The script the app will run, written beside nothing else and
@@ -1446,6 +1473,7 @@ enum ScheduledDeploy {
                 alreadySet, plists: plistURLs(of: existing), runner: runner,
                 when: when, course: course, sectionNumber: sectionNumber
             )
+            noteTheEarlierDeployGoesOn(anEarlierDeployWasLeftWorking, course: course, sectionNumber: sectionNumber)
             return "The scheduled deploy could not be written: \(error.localizedDescription)"
         }
 
@@ -1457,6 +1485,7 @@ enum ScheduledDeploy {
                 course: course.code,
                 section: sectionNumber
             )
+            noteTheEarlierDeployGoesOn(anEarlierDeployWasLeftWorking, course: course, sectionNumber: sectionNumber)
             // A job under ANOTHER name — one set before #237 — still has its
             // plist, because nothing is deleted until the new job is accepted.
             // Hand it back rather than lose it. A job under THIS label was
@@ -1501,6 +1530,18 @@ enum ScheduledDeploy {
             try? FileManager.default.removeItem(at: agent.plistURL)
             try? FileManager.default.removeItem(at: ScheduledDeploy.scriptURL(label: agent.label))
         }
+        // Written only now the new job is in, so a re-set macOS refused
+        // ("could not set a scheduled deploy…") never also says it was set
+        // again (#439 review, finding 11).
+        if anEarlierDeployWasLeftWorking {
+            ActivityTrail.note(
+                .scheduledDeploySetAgainWhileItsDeployWorked,
+                "set this section's deploy again while its earlier deploy was still working — "
+                + "that deploy will finish on its own",
+                course: course.code,
+                section: sectionNumber
+            )
+        }
         if let replacing {
             // "It went on Saturday; I set it for Friday" is otherwise a report
             // nothing can answer: the old job leaves no file behind.
@@ -1513,6 +1554,23 @@ enum ScheduledDeploy {
             )
         }
         return nil
+    }
+
+    /// A re-set that FAILED has still ended a working run's app (the boot-out
+    /// comes first), and the deploy that app started still goes out (#439).
+    /// "Set again" would be untrue here, so this says only what is: under
+    /// the could-not-be-set event, beside the line that says the new one
+    /// was not set (#439 fixes review, finding 2).
+    private static func noteTheEarlierDeployGoesOn(_ wasLeftWorking: Bool, course: Course, sectionNumber: Int) {
+        if !wasLeftWorking {
+            return
+        }
+        ActivityTrail.note(
+            .scheduledDeployCouldNotBeSet,
+            "this section's earlier deploy was still working, and will finish on its own",
+            course: course.code,
+            section: sectionNumber
+        )
     }
 
     /// The earliest moment still ahead among some jobs, or nil — the same
@@ -1713,6 +1771,41 @@ enum ScheduledDeploy {
             intendedMoment: moment, now: now, allowedDays: allowedDays
         ) {
             standDown(script: script, section: section, now: now)
+        }
+
+        // IS THIS SECTION'S EARLIER DEPLOY STILL WORKING? (#439) Setting the
+        // section again while its run worked ended that run's app, and the
+        // deploy it started may still be going, under this run's own script
+        // name. Wait for it, up to thirty minutes, before anything else: the
+        // launchers would refuse this run's legs while it works.
+        //
+        // Asked whether or not the plist names a section: the wait needs only
+        // the script, and a pre-v1.2.0 run that skipped it would go straight
+        // to legs the launchers refuse (#439 review, finding 8). Only the
+        // trail line needs the section; `standDown` takes a nil section
+        // already (it then writes no outcome record, as for lateness).
+        switch waitForTheEarlierDeploy(script: script) {
+        case .goAhead(let waited, let didWait):
+            if didWait, let section {
+                ActivityTrail.note(
+                    .scheduledDeployWaitedForItsEarlierDeploy,
+                    "a scheduled deploy waited \(Int(waited.rounded())) seconds for this section's "
+                    + "earlier deploy to finish, then went ahead",
+                    course: section.courseCode,
+                    section: section.sectionNumber
+                )
+            }
+        case .standDown(let waited):
+            if let section {
+                ActivityTrail.note(
+                    .scheduledDeployWaitedForItsEarlierDeploy,
+                    "a scheduled deploy waited \(Int(waited.rounded())) seconds for this section's "
+                    + "earlier deploy to finish, and stood down",
+                    course: section.courseCode,
+                    section: section.sectionNumber
+                )
+            }
+            standDown(script: script, section: section, now: Date(), kind: .earlierDeployStillWorking)
         }
 
         // IS ANOTHER PROGRAM BUILDING THIS COURSE? (#156) An assistant working
@@ -2213,6 +2306,115 @@ enum ScheduledDeploy {
         try? FileManager.default.removeItem(at: ScheduledPublishOutcome.legacyRecordURL(
             inHomeFolder: homeFolder, course: section.courseCode, section: section.sectionNumber
         ))
+    }
+
+    // MARK: - Waiting for this section's earlier deploy (#439)
+
+    /// What `waitForTheEarlierDeploy` decided.
+    enum EarlierDeployWait: Equatable {
+
+        /// Nothing of this section's is working any more. `didWait` is false
+        /// when nothing was working in the first place, which is nearly always.
+        case goAhead(waited: TimeInterval, didWait: Bool)
+
+        /// The earlier deploy was still working after the longest wait.
+        case standDown(waited: TimeInterval)
+    }
+
+    /// How long a newly set run waits for its own section's earlier deploy.
+    ///
+    /// Thirty minutes, three times the course wait (Russell's ruling on #439,
+    /// 2026-10-04): what is waited for is the SAME section's deploy, which
+    /// normally ends, and a large course deploying to two places can take
+    /// longer than ten minutes. Standing down after ten would all but promise
+    /// that the deploy the teacher has just set never happens.
+    nonisolated static let longestWaitForTheEarlierDeploy: TimeInterval = 1800
+
+    /// Stands in for the process table in tests; nil reads the real one.
+    nonisolated(unsafe) static var earlierDeployIsWorkingOverride: ((String) -> Bool)?
+
+    /// Waits while this section's EARLIER deploy is still working, before
+    /// this run starts its own (GitHub #439).
+    ///
+    /// The earlier deploy is a "leftover run". Setting a section again boots
+    /// its job out first — the order #237's "never briefly two agents" rests
+    /// on — and the job is the running app, so a run that was working ends
+    /// there (#409). The script that app started is a process group of its
+    /// own and carries on building and uploading. It runs under this run's
+    /// own name: the same label, so the same script path. The launchers
+    /// refuse a second deploy of a section while that script runs
+    /// (`deployWhileItsSectionDeploys`), so starting this run's script now
+    /// would only have its first leg refused and the run recorded as
+    /// stopped for a reason it did not have. Waiting is what the teacher
+    /// meant: their new deploy goes out once the old one has.
+    ///
+    /// Its own loop rather than one more holder in `waitForTheCourse`: that
+    /// wait reads work leases, and a leftover run's leases name the app that
+    /// was ended, so they read as stale — the whole fault.
+    nonisolated static func waitForTheEarlierDeploy(
+        script: String,
+        now: () -> Date = { return Date() },
+        pause: (TimeInterval) -> Void = { seconds in Thread.sleep(forTimeInterval: seconds) },
+        isWorking: ((String) -> Bool)? = nil,
+        longest: TimeInterval = ScheduledDeploy.longestWaitForTheEarlierDeploy,
+        every: TimeInterval = ScheduledDeploy.lookAgainEvery
+    ) -> EarlierDeployWait {
+        let started: Date = now()
+        var didWait: Bool = false
+        while true {
+            var working: Bool
+            if let isWorking {
+                working = isWorking(script)
+            } else {
+                working = ScheduledDeploy.anEarlierDeployIsWorking(script: script)
+            }
+            let waited: TimeInterval = now().timeIntervalSince(started)
+            if !working {
+                return .goAhead(waited: waited, didWait: didWait)
+            }
+            if waited >= longest {
+                return .standDown(waited: waited)
+            }
+            didWait = true
+            pause(every)
+        }
+    }
+
+    /// Whether some OTHER process is running `script` right now as
+    /// `/bin/bash <script>` — which, asked before this run starts its own,
+    /// can only be a leftover run of the same section in the same folder.
+    /// Read from the kernel's process list (`SameExecutableProcesses`), never
+    /// from a file, so nothing left on disk can make a run wait.
+    nonisolated static func anEarlierDeployIsWorking(script: String) -> Bool {
+        if let override = earlierDeployIsWorkingOverride {
+            return override(script)
+        }
+        let shells: [SameExecutableProcesses.Sighting] = SameExecutableProcesses.sightings(
+            ofExecutableAt: "/bin/bash"
+        )
+        for shell in shells {
+            if isTheRunsScript(arguments: shell.arguments, script: script) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether a process's arguments are a shell running `script` as its
+    /// program — `/bin/bash <script>`, exactly as `runScheduled` starts it.
+    /// Not `bash -x <script>`, and not an editor or a pager holding the
+    /// file: the same rule the launchers' reader applies to a script's name
+    /// (`the_launchers_running`'s `program`). Arguments are whole here, so a
+    /// path with a space ("Application Support") is one argument.
+    nonisolated static func isTheRunsScript(arguments: [String], script: String) -> Bool {
+        if arguments.count < 2 {
+            return false
+        }
+        let program: String = URL(fileURLWithPath: arguments[0]).lastPathComponent
+        if program != "bash" {
+            return false
+        }
+        return SameExecutableProcesses.resolved(arguments[1]) == SameExecutableProcesses.resolved(script)
     }
 
     // MARK: - Waiting for another build of the course (#156)
