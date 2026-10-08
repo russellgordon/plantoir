@@ -245,6 +245,35 @@ class TheBlockIsReplacedNotAppendedTests(unittest.TestCase):
             self.assertTrue(text.startswith("/about/*\n  X-Frame-Options: DENY\n"))
             self.assertEqual(text.count(netlify_badge.MANAGED_MARKER), 1)
 
+    def test_a_header_added_under_our_marked_block_keeps_its_path(self):
+        # The obvious edit: a site-wide header added under our `/*`. It must
+        # stay under `/*`, never fall under the path above (here /fonts/*).
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<script>const a = 1;</script>", encoding="utf-8")
+            (public_dir / "_headers").write_text("/fonts/*\n  Cache-Control: x\n", encoding="utf-8")
+            self.write(public_dir)
+            text = (public_dir / "_headers").read_text(encoding="utf-8")
+            (public_dir / "_headers").write_text(text + "  X-Frame-Options: DENY\n", encoding="utf-8")
+
+            text = self.write(public_dir)
+            self.assertEqual(text.count("Content-Security-Policy"), 1)
+            self.assertEqual(text.count(netlify_badge.MANAGED_MARKER), 1)
+            self.assertIn("/*\n  X-Frame-Options: DENY", text)
+            self.assertIn("/fonts/*\n  Cache-Control: x\n\n/*", text)
+            # A second deploy leaves it exactly where it is.
+            self.assertEqual(self.write(public_dir), text)
+
+    def test_a_marked_block_first_in_the_file_keeps_an_added_header_under_its_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public_dir = Path(tmp)
+            (public_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+            (public_dir / "_headers").write_text(
+                netlify_badge.MANAGED_MARKER + "\n" + self.OLD_BLOCK + "  X-Frame-Options: DENY\n", encoding="utf-8")
+            text = self.write(public_dir)
+            self.assertTrue(text.startswith("/*\n  X-Frame-Options: DENY\n"))
+            self.assertNotIn("sha256-OLD=", text)
+
 
 class CloudflareIsNeverTouchedTests(unittest.TestCase):
     """

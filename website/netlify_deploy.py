@@ -140,12 +140,14 @@ def _windows_credential_blob(target: str) -> bytes | None:
 
 
 def _usable_token(text: str) -> str | None:
-    """`text` stripped, or None when it could not be sent as a header.
+    """`text` stripped, or None when it is not a token that can be sent.
 
-    A control character inside a token (a NUL from a credential written as
-    UTF-16, a line break) is refused here rather than by http.client, whose
-    "Invalid header value" error quotes the whole Authorization header — the
-    token with it — into the traceback."""
+    A control character inside a token is refused here, before anything is
+    sent. A NUL (a credential written as UTF-16) would otherwise be sent as
+    it is — http.client lets it through — and earn a refusal from Netlify
+    that says nothing about why; a line break makes http.client raise
+    "Invalid header value", which quotes the whole Authorization header, the
+    token with it, into the traceback."""
     token = text.strip()
     if not token:
         return None

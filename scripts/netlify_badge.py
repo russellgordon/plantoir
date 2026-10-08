@@ -115,9 +115,12 @@ def _without_our_blocks(text: str) -> str:
     policy line (if somebody edited round it, only the marker goes and the
     lines under it are kept as theirs). And an OLD unmarked block, appended
     before the marker existed: a `/*` line, our policy line, and nothing
-    else indented under it. A `/*` block with any other header in it is
-    somebody's own and is kept whole. Blank-line runs are collapsed and the
-    end is trimmed, so the result depends only on the lines that are kept.
+    else indented under it. Any header somebody else put under a `/*` keeps
+    its `/*`: an unmarked block with one is kept whole, and a marked one
+    loses only the marker and our policy line, so their header is never
+    left under whatever path came before. Blank-line runs are collapsed and
+    the end is trimmed, so the result depends only on the lines that are
+    kept.
     """
     lines = text.splitlines()
     kept: list[str] = []
@@ -127,7 +130,12 @@ def _without_our_blocks(text: str) -> str:
         if line.rstrip() == MANAGED_MARKER:
             index += 1
             if _is_our_policy_pair(lines, index):
-                index += 2
+                after = index + 2
+                if after < len(lines) and lines[after].startswith((" ", "\t")):
+                    # Somebody added a header under our `/*`: it keeps its
+                    # path; only our policy line goes.
+                    kept.append(lines[index])
+                index = after
             continue
         if _is_our_policy_pair(lines, index):
             after = index + 2

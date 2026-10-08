@@ -97,6 +97,24 @@ def publish_folders(folder: Path) -> list[Path]:
     return found
 
 
+def make_publish_folders(folder: Path) -> list[Path]:
+    """Make the folder destinations of `folder`'s courses — only those
+    INSIDE `folder`, so a config still naming some other place (say a
+    Desktop path left by a run that died) never gets folders made there.
+    Returns the top-level folders under `folder` that did not exist before,
+    so a caller that made them for a while can take them away again."""
+    made: list[Path] = []
+    for destination in publish_folders(folder):
+        try:
+            top = folder / destination.relative_to(folder).parts[0]
+        except (ValueError, IndexError):
+            continue
+        if not top.exists() and top not in made:
+            made.append(top)
+        destination.mkdir(parents=True, exist_ok=True)
+    return made
+
+
 class ShownAsTeaching:
     """`folder`'s courses at SHOWN for the scenes, SHOWN's own courses set
     aside beside them, both put back, and every course's absolute paths
@@ -126,23 +144,29 @@ class ShownAsTeaching:
     def __enter__(self) -> Path:
         if COURSES_SET_ASIDE.exists():
             raise SystemExit(f"{COURSES_SET_ASIDE} is still there from an earlier run: put it back first.")
+        self.made_here: list[Path] = []
         if (SHOWN / "courses").exists():
             (SHOWN / "courses").rename(COURSES_SET_ASIDE)
-        (self.folder / "courses").rename(SHOWN / "courses")
-        self.rewrite(SHOWN / "courses", self.folder, SHOWN)
-        # Where these courses deploy while they are shown here (`Websites`
-        # for the kept folder, `School Web Space` for one made from
-        # folders.json): made for the scenes, and only what was not there
-        # already is taken away again on the way out.
-        self.made_here: list[Path] = []
-        for destination in publish_folders(SHOWN):
-            try:
-                top = SHOWN / destination.relative_to(SHOWN).parts[0]
-            except (ValueError, IndexError):
-                continue
-            if not top.exists() and top not in self.made_here:
-                self.made_here.append(top)
-            destination.mkdir(parents=True, exist_ok=True)
+        try:
+            (self.folder / "courses").rename(SHOWN / "courses")
+        except BaseException:
+            if COURSES_SET_ASIDE.exists():
+                COURSES_SET_ASIDE.rename(SHOWN / "courses")
+            raise
+        try:
+            self.rewrite(SHOWN / "courses", self.folder, SHOWN)
+            # Where these courses deploy while they are shown here
+            # (`Websites` for the kept folder, `School Web Space` for one made
+            # from folders.json): made for the scenes, and only what was not
+            # there already is taken away again on the way out.
+            self.made_here = make_publish_folders(SHOWN)
+        except BaseException:
+            # The courses are already here: a failure past this point must
+            # put them back, or they are stranded on the Desktop with their
+            # paths rewritten and the next run refuses (`with` never calls
+            # __exit__ for an __enter__ that raised).
+            self.__exit__()
+            raise
         print(f"   {self.folder.name}'s courses are at {SHOWN} for their pictures")
         return SHOWN
 
@@ -327,8 +351,7 @@ def ensure_folders(exe: Path, folders: set[Path]) -> None:
         # Where each course deploys: a sheet that offers to deploy to a folder
         # that does not exist warns about it instead, and the first
         # schedule-sheet picture showed exactly that warning.
-        for destination in publish_folders(MARKETING):
-            destination.mkdir(parents=True, exist_ok=True)
+        make_publish_folders(MARKETING)
         marketing_folder.add_how_i_teach(MARKETING / "courses" / marketing_folder.CURRICULUM_COURSE, report)
         print(f"   {marketing_folder.summary(report)}")
 
@@ -364,8 +387,7 @@ def photograph_scene(exe: Path, identifier: str, theme: str, parts: Path) -> Pat
         # own destination, made by ShownAsTeaching; again here in case a
         # scene before this one took it away): a sheet that offers to deploy
         # to a folder that does not exist says so instead.
-        for destination in publish_folders(SHOWN):
-            destination.mkdir(parents=True, exist_ok=True)
+        make_publish_folders(SHOWN)
     if scene == "progress":
         # The progress picture is a build caught part-way, and the build is
         # then ended; a scaffold ended part-way refuses the next build ("the
@@ -592,8 +614,7 @@ def capture_notification(exe: Path, theme: str, parts: Path) -> Path:
     schedule is cancelled afterwards whatever happened (cancel_scheduled_deploy
     is safe when nothing is set)."""
     from datetime import datetime, timedelta
-    for destination in publish_folders(MARKETING):
-        destination.mkdir(parents=True, exist_ok=True)
+    make_publish_folders(MARKETING)
     when = (datetime.now() + timedelta(minutes=3)).replace(second=0, microsecond=0)
     before = set(notification_windows())
     reply = ask_over_mcp(exe, "schedule_deploy", {"course": "ICS3U", "section": 1, "when": when.strftime("%Y-%m-%d %H:%M")})

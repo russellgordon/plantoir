@@ -521,8 +521,15 @@ wrote before and writes it again. Blocks from before the marker are
 recognised by their exact shape — a `/*` line whose ONLY header is
 `Content-Security-Policy: script-src 'self' 'unsafe-eval'…` — so the next
 deploy cleans an old file by itself and nobody has to delete it by hand. A
+header somebody else put under a `/*` always keeps its `/*`: an UNMARKED
 `/*` block with any other header in it is somebody's own and is kept whole,
-and a marker somebody edited round loses only the marker line. The file is
+and a MARKED block with a header added under it loses only the marker and
+our policy line, so the added header stays site-wide instead of falling
+under whatever path came before it (Netlify reads an indented line as
+belonging to the last path above it). A marker somebody edited round loses
+only the marker line. Not handled, because it is contrived: an old unmarked
+block followed by a blank or `#` line and then an indented header — the
+check looks one line ahead. The file is
 written with LF on every machine: `Path.write_text` wrote CR LF on Windows,
 so the same site deployed from the PC and from a Mac gave different bytes.
 Rejected: deleting `_headers` before every write (throws away a person's own

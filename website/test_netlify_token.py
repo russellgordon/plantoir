@@ -86,8 +86,9 @@ class ReadTokenTests(unittest.TestCase):
 
     def test_a_credential_written_as_utf16_is_not_taken_for_the_token(self):
         # UTF-16 bytes are VALID UTF-8 (a NUL after every letter), so a plain
-        # decode would hand http.client a header it refuses — quoting the
-        # token in its traceback. It is refused here, and nothing is printed.
+        # decode would send that garbage to Netlify as the token (http.client
+        # lets a NUL through; only a line break makes it quote the header in
+        # a traceback). It is refused here, and nothing is printed.
         self.assertIsNone(netlify_deploy._token_from_blob("tok".encode("utf-16-le")))
         with mock.patch.object(netlify_deploy.sys, "platform", "win32"), \
                 mock.patch.object(netlify_deploy, "_windows_credential_blob",
