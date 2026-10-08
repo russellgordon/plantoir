@@ -3,7 +3,10 @@
 Usage:  python3 .claude/skills/example-content/lint_payload.py ADA1O
 
 Checks every rule the installer and the site build depend on. Exit code 0
-means clean; 1 means problems were printed.
+means clean; 1 means problems were printed; 2 means the linter's own
+self-check failed. The Example Course (`support/example_course/`, EXC2O) is
+not a payload and has no manifest; `lint_skeletons.py`, run with no family
+named, reads it for the heading-mark rule below.
 """
 
 import json
@@ -60,6 +63,59 @@ def fence_lines_that_fall_out(text: str) -> list:
                     fallen.append(index + 1)
             index += 1
     return fallen
+
+# The template pages (`_DUPLICATE ME.md`) tell a teacher that "Every `##`
+# (level 2) and `###` (level 3) heading" becomes an entry in the page's table
+# of contents. In 307 files the marks themselves were missing — "Every  (level
+# 2) and  (level 3) heading" — from the day the template was added
+# (db7e693f1, 2026-08-17), and every payload copied from another inherited it
+# (#444). A level named in brackets must follow the mark it names, in
+# backticks; a space where the mark should be is the shape refused here.
+# Read on the RAW page, not on prose with code removed: removing the
+# backticked marks makes the correct sentence look exactly like the broken one.
+HEADING_MARK_MISSING = re.compile(r"(?:Every|and)  \(level [1-6]\)")
+HEADING_MARK_MUST_BE_ACCEPTED = [
+    "> Every `##` (level 2) and `###` (level 3) heading you use on this page",
+    "> Every heading you use on this page automatically becomes an entry",
+    "a subheading (level 3) sits under its section",
+    "> (level 3) heading you use on this page",
+]
+HEADING_MARK_MUST_BE_REFUSED = [
+    "> Every  (level 2) and  (level 3) heading you use on this page",
+    "> Every `##` (level 2) and  (level 3) heading you use on this page",
+]
+
+
+def heading_marks_missing(text: str) -> list:
+    """The 1-based line numbers carrying the sentence's markless form ("Every  (level N)" / "and  (level N)")."""
+    lines = []
+    for number, line in enumerate(text.split("\n"), start=1):
+        if HEADING_MARK_MISSING.search(line):
+            lines.append(number)
+    return lines
+
+
+def check_the_checks() -> list:
+    """The heading-mark rule against the shapes it must accept and refuse."""
+    failures = []
+    for sentence in HEADING_MARK_MUST_BE_ACCEPTED:
+        if heading_marks_missing(sentence):
+            failures.append(f"refused a sentence it must accept: {sentence!r}")
+    for sentence in HEADING_MARK_MUST_BE_REFUSED:
+        if not heading_marks_missing(sentence):
+            failures.append(f"accepted a sentence it must refuse: {sentence!r}")
+    return failures
+
+
+def heading_mark_problem(rel: str, text: str) -> list:
+    problems = []
+    for number in heading_marks_missing(text):
+        problems.append(
+            f"{rel}:{number}: the heading sentence names a level with no mark before it "
+            f"(\"Every  (level 2)\") — write Every `##` (level 2) and `###` (level 3) (#444)"
+        )
+    return problems
+
 
 # An Ontario credit is 110 hours of scheduled time. A semestered day school
 # runs 75-minute periods, so a full credit is about 86 periods plus a
@@ -171,6 +227,8 @@ def lint(course_code: str) -> int:
         text = page.read_text(encoding="utf-8")
         rel = str(page.relative_to(root))
         is_curriculum = curriculum_folder and rel.startswith(f"shared/{curriculum_folder}/")
+
+        problems.extend(heading_mark_problem(rel, text))
 
         # A filename Windows cannot create is a course Windows teachers
         # cannot have. Git for Windows refuses to check such a path out at
@@ -707,5 +765,11 @@ def lint(course_code: str) -> int:
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(__doc__)
+        sys.exit(2)
+    broken = check_the_checks()
+    if broken:
+        print("the linter's own rules misbehave (a broken LINTER, not a broken page):")
+        for line in broken:
+            print(f"   {line}")
         sys.exit(2)
     sys.exit(lint(sys.argv[1]))
