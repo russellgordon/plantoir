@@ -211,7 +211,7 @@ it swaps the image. A Mac visitor's words never change.
 The macOS capture harness is driven by Python and Xcode UI tests:
 
 ```bash
-python3 website/shots/capture.py            # captures app + published sites
+python3 website/shots/capture.py            # captures app + deployed sites
 python3 website/shots/capture.py --app      # app windows only
 python3 website/shots/capture.py --sites    # class websites only
 python3 website/shots/capture.py --scenes   # the v1.4.0 scenes, in ~/Plantoir Marketing
@@ -392,7 +392,7 @@ Windows `--stage-scene` names `map-ontario`, `map-college-board` and
 
 | ID | Subject | Scene(s) |
 |---|---|---|
-| `schedule` | Schedule Deploy sheet with the "published on its own" notification over it | `schedule-sheet`, `notification-banner` |
+| `schedule` | Schedule Deploy sheet with the "deployed on its own" notification over it | `schedule-sheet`, `notification-banner` |
 | `reference` | Reference Courses in the sidebar, and Copy a Page into ICS4U | `reference` |
 | `start-of-year` | Get Ready for the Start of the Year's plan | `start-of-year` |
 | `two-maps` | The Ontario and College Board coverage maps side by side | `two-maps` |
