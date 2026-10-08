@@ -17,6 +17,8 @@ final class ObsidianFolderTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: fixtureURL) }
         let courses: [Course] = try WorkspaceModel.discoverCourses(in: fixtureURL.appendingPathComponent("courses"))
         let course: Course = try XCTUnwrap(courses.first)
+        course.configuration.keptForReference = true
+        XCTAssertTrue(course.isKeptForReference, "the case is a course kept for reference")
         XCTAssertEqual(
             FolderActions.obsidianFolder(for: course, sectionNumber: 2),
             course.sectionDirectoryURL(forSection: 2)

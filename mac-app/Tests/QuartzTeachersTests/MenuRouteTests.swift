@@ -55,6 +55,12 @@ final class MenuRouteTests: XCTestCase {
 
     /// No window at all (`in: nil`, File with nothing open) is free.
     func testNoWindowIsFree() {
-        XCTAssertTrue(MenuRoute.windowIsFree(nil) || NSApp.modalWindow != nil)
+        XCTAssertNil(NSApp.modalWindow, "the suite runs no modal session")
+        XCTAssertTrue(MenuRoute.windowIsFree(nil))
+        var ran: Int = 0
+        MenuRoute.run(.openWorkingFolder, in: nil) {
+            ran += 1
+        }
+        XCTAssertEqual(ran, 1, "File with no window open still opens a folder")
     }
 }
