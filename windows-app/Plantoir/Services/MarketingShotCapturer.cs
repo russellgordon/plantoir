@@ -118,6 +118,7 @@ public static class MarketingShotCapturer
     private static void Dress(Window window, ElementTheme theme, int width, int height)
     {
         if (window.Content is FrameworkElement root) root.RequestedTheme = theme;
+        WindowTheme.Sync(window);   // the caption too, before the window is shown or shot
         double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window)) / 96.0;
         if (scale <= 0) scale = 1;
         window.AppWindow.Resize(new SizeInt32((int)Math.Round(width * scale), (int)Math.Round(height * scale)));
