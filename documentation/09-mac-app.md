@@ -7018,9 +7018,11 @@ what each one launches, what it writes, what was measured and what was
 rejected is in
 [chapter 10 → "The other doors"](10-local-ai-assistant.md#the-other-doors-handing-a-course-to-an-assistant-the-teacher-already-has).
 
-The complete behavioural specification — every interface decision, with
-the reasoning and a Windows-porting note per entry — is
-[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md). Architecture, build
+The behavioural log to 2026-10-08 — every interface decision to that date,
+with the reasoning and a Windows-porting note per entry — is
+[`GUI-IMPROVEMENTS.md`](../GUI-IMPROVEMENTS.md), closed to new entries since
+then (#480): what is true now is `contracts/`, and what changed after is the
+closed issues by milestone. Architecture, build
 instructions (XcodeGen + Xcode), and the test suite are documented in
 [`mac-app/README.md`](../mac-app/README.md).
 

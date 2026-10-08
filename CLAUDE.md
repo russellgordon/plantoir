@@ -66,9 +66,12 @@ Neither app contains toolchain logic of its own: they write the same
    the Swift or watch it being tested, so a change that exists only in Swift is
    one they will re-derive from scratch — usually after shipping the same bug
    once. A change is not finished until:
-   - **the closing comment on the issue says what landed, what was
-     measured, and which model did which review.** It is the record of the
-     piece: the `windows` issue below carries what Windows must do, and the
+   - **the closing comment on the piece's OWN issue says what landed, what
+     was measured, and which model did which review.** It is the record of
+     the piece — so every piece has an issue (open one if none exists, before
+     the merge) and that issue carries the release milestone before it
+     closes, or the piece drops out of the changelog below. The `windows`
+     issue in the next bullet carries what Windows must do, and the
      `documentation/` section carries why. (Until 2026-10-08 this bullet
      asked for a `GUI-IMPROVEMENTS.md` row with a usable "Notes for Windows
      port" cell; the log is closed to new entries since then — #480 — because
@@ -133,10 +136,13 @@ Neither app contains toolchain logic of its own: they write the same
      `✅ DONE` in place rather than deleted" in a ledger that no longer exists,
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
-   - **The closed issues, filtered by milestone, are the record of the
-     product** — of what a teacher can see on either platform in a release;
-     before the cut, `RELEASING.md`'s "Landed since … ships in the next
-     release" table says which platforms have each piece. (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
+   - **the piece's own issue carries the release milestone before it
+     closes.** The closed issues, filtered by milestone, are the record of
+     the product — of what a teacher can see on either platform in a release
+     — and an issue closed without one is a change that release's record
+     does not show. Before the cut, `RELEASING.md`'s "Landed since … ships
+     in the next release" table says which platforms have each piece.
+     (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
      anything a teacher can see; the log is closed to new entries, #480.)
    - **anything measured is written with its NUMBERS and the hardware they
      came from.** The mac side cannot find out what a Windows teacher's
@@ -481,9 +487,10 @@ Neither app contains toolchain logic of its own: they write the same
       **Pass the model EXPLICITLY when spawning an agent** rather than relying
       on the default — the default subagent model is configured outside this
       repository, so a session that omits it cannot tell what it got. Say
-      which model did which review in the write-up, the way row 480 of
-      `GUI-IMPROVEMENTS.md` does — in the closing comment on the issue since
-      2026-10-08, when the log was closed to new entries (#480).
+      which model did which review in the closing comment on the issue
+      (until 2026-10-08 in the log row, the way row 480 of
+      `GUI-IMPROVEMENTS.md` does; the log is closed to new entries since
+      then, #480).
 
       *(Superseded, kept because a session may meet its consequences. On
       2026-09-09 the order was FABLE for every subagent review, restoring the
