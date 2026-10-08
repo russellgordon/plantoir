@@ -925,6 +925,7 @@ final class AppRulesContractTests: XCTestCase {
         XCTAssertEqual(section["hiddenWhenNotInstalled"] as? Bool, true)
         XCTAssertEqual(section["greetingIsTheSameForEveryAgent"] as? Bool, true)
         XCTAssertEqual(section["serverName"] as? String, "plantoir")
+        XCTAssertEqual(section["doorCourseVariable"] as? String, AssistMCPServer.doorCourseVariable)
         XCTAssertFalse(greeting.contains("\""), "greetingCarriesNoDoubleQuotes")
         // The How I Teach sentence (#209), verbatim, in the one greeting both
         // doors send.
@@ -1026,6 +1027,50 @@ final class AppRulesContractTests: XCTestCase {
                 filledServerArguments.append(AppRulesContractTests.filled(argument, with: tokens))
             }
             XCTAssertEqual(filledServerArguments, ["--mcp-stdio", folder])
+
+            // What each door names to its SERVER'S ENVIRONMENT (#458): the
+            // Claude door its course, in the configuration's "env", and the
+            // Codex door the same, as a `-c mcp_servers.plantoir.env.<VAR>`
+            // override — both for the server to hold (Russell, 2026-10-07).
+            let expectedEnvironment: [String: String] = try XCTUnwrap(
+                agent["serverEnvironment"] as? [String: String], key
+            )
+            var filledEnvironment: [String: String] = [:]
+            for (name, value) in expectedEnvironment {
+                filledEnvironment[name] = AppRulesContractTests.filled(value, with: tokens)
+            }
+            switch key {
+            case "claude":
+                let configPath: String = try XCTUnwrap(tokens["{config}"])
+                let configuration: [String: Any] = try XCTUnwrap(
+                    try JSONSerialization.jsonObject(with: try Data(contentsOf: URL(fileURLWithPath: configPath)))
+                        as? [String: Any]
+                )
+                let servers: [String: Any] = try XCTUnwrap(configuration["mcpServers"] as? [String: Any])
+                let plantoir: [String: Any] = try XCTUnwrap(servers["plantoir"] as? [String: Any])
+                let environment: [String: String] = (plantoir["env"] as? [String: String]) ?? [:]
+                XCTAssertEqual(environment, filledEnvironment, "The Claude door's server environment")
+                XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode])
+            default:
+                // Read the environment back out of the arguments the tool
+                // RECEIVES: every `-c mcp_servers.plantoir.env.<NAME>="<value>"`.
+                let environmentPrefix: String = "mcp_servers.plantoir.env."
+                var environment: [String: String] = [:]
+                var index: Int = 0
+                while index + 1 < argv.count {
+                    let override: String = argv[index + 1]
+                    if argv[index] == "-c" && override.hasPrefix(environmentPrefix) {
+                        let assignment: String = String(override.dropFirst(environmentPrefix.count))
+                        let parts: [String] = assignment.components(separatedBy: "=")
+                        if parts.count == 2 && parts[1].hasPrefix("\"") && parts[1].hasSuffix("\"") {
+                            environment[parts[0]] = String(parts[1].dropFirst().dropLast())
+                        }
+                    }
+                    index += 1
+                }
+                XCTAssertEqual(environment, filledEnvironment, "The \(key) door's server environment")
+                XCTAssertEqual(filledEnvironment, [AssistMCPServer.doorCourseVariable: courseCode], key)
+            }
 
             // What each door writes for the CONNECTION, and what it therefore
             // does not write. The Codex list is deliberately empty: its server

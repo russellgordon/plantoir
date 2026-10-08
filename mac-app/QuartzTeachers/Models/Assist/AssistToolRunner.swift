@@ -1710,11 +1710,28 @@ final class AssistToolRunner {
         }
         // Another door (start of the year) may have saved one while this was
         // zipping; the first copy stays the conversation's way back.
-        if conversationBackups[code] == nil {
-            conversationBackups[code] = backupURL
-            conversationBackupURL = backupURL
-        }
+        rememberConversationBackup(backupURL, forCourse: code)
         return true
+    }
+
+    /// Makes a backup this conversation's way back for a course, if it has
+    /// none yet — the first copy stays — and, in the process an assistant
+    /// working from another app talks to, records it beside the session's
+    /// lease (`<COURSE>.held-backup.<pid>`, #283 and #458), so the app keeps
+    /// it while the session that made it is open. In the app no record is
+    /// written: the window's own runner reports its backups in-process
+    /// (`AssistActivity.holdBackups`).
+    private func rememberConversationBackup(_ backupURL: URL, forCourse code: String) {
+        if conversationBackups[code] != nil {
+            return
+        }
+        conversationBackups[code] = backupURL
+        conversationBackupURL = backupURL
+        if AssistMCPServer.isServing, let folderPath = workspace.workspaceURL?.path {
+            WorkLeaseRegistry.recordConversationBackup(
+                folderPath: folderPath, courseCode: code, backupURL: backupURL
+            )
+        }
     }
 
     /// Saves one copy of a course for the assistant, with the window's line
@@ -2633,10 +2650,7 @@ final class AssistToolRunner {
         }
         // The conversation's way back, if it had none yet: the Restore banner
         // offers the copy from before this conversation changed anything.
-        if conversationBackups[course.code] == nil {
-            conversationBackups[course.code] = backupURL
-            conversationBackupURL = backupURL
-        }
+        rememberConversationBackup(backupURL, forCourse: course.code)
 
         // The copy can take a minute, and the teacher can edit in Obsidian
         // meanwhile: held again to the plan the call was given (the rule in
