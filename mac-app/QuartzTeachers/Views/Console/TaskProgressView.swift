@@ -346,7 +346,11 @@ struct TaskProgressView: View {
         .alert("Input required", isPresented: awaitingInputBinding) {
             TextField("Your answer", text: $answer)
                 // Inside an .alert AppKit draws the field and ignores
-                // SwiftUI's styles — listed in TextFieldStyleScanTests.
+                // SwiftUI's styles, so this changes nothing on screen. It is
+                // here so the rule has no exemptions (#457): a field that
+                // ever moves out of the alert is bordered without anybody
+                // having to remember.
+                .borderedTextField()
                 .accessibilityIdentifier("taskAnswerField")
             Button("Send") {
                 runner.send(line: answer)

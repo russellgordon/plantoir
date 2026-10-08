@@ -9,33 +9,25 @@ import XCTest
 /// read-only values, not fields — so this makes the rule STRUCTURAL: one
 /// modifier, `.borderedTextField()`, and a scan that fails on drift.
 ///
-/// A field passes when its modifier chain carries `.borderedTextField()` or
-/// one of the two chromes that draw their own border. The few fields that
-/// choose another style are listed below by their accessibility identifier,
-/// each with its reason; a field anywhere else that chooses a style — even
-/// alongside `.borderedTextField()`, where the style nearest the view wins and
-/// draws it borderless — fails.
+/// A field passes when its modifier chain carries `.borderedTextField()`,
+/// and there is NO allow-list (#457, Russell: "no exemptions"). Until v1.5.0
+/// three fields were listed here by identifier — the sidebar's rename card,
+/// the assistant's composer and the alert's answer field — each `.plain` or
+/// unstyled with a reason; they wear the bordered style now. A field that
+/// chooses any style of its own — even alongside `.borderedTextField()`,
+/// where the style nearest the view wins and draws it borderless — fails.
 @MainActor
 final class TextFieldStyleScanTests: XCTestCase {
 
     // MARK: - Stored properties
 
-    /// Fields that choose their own style, by identifier, and why each is
-    /// still bordered.
-    static let exceptions: [String: String] = [
-        "renameField": "SidebarView: .plain inside its own bordered card (text-background fill and separator stroke), because the row sits on the selection colour (#293).",
-        "assistComposerField": "AssistWindowView: .plain inside the Messages-shaped rounded border the composer strokes itself.",
-        "taskAnswerField": "TaskProgressView: inside an .alert, where AppKit draws the field and SwiftUI's styles are ignored.",
-    ]
-
-    /// The only files allowed to write `.textFieldStyle(`, and how many times.
+    /// The only file allowed to write `.textFieldStyle(`, and how many times.
     /// (Two drawn chromes, `WizardFieldChrome` and `SearchablePickerChrome`,
     /// were allowed here at 24pt until #456 made every field the real
-    /// `.roundedBorder` bezel; nothing draws its own bezel now.)
+    /// `.roundedBorder` bezel; the sidebar and the composer were allowed
+    /// `.plain` until #457.)
     static let styleChoosers: [String: Int] = [
         "BorderedTextField.swift": 1,
-        "SidebarView.swift": 1,
-        "AssistWindowView.swift": 1,
     ]
 
     // MARK: - Tests
@@ -44,18 +36,7 @@ final class TextFieldStyleScanTests: XCTestCase {
         let fields: [Field] = try TextFieldStyleScanTests.allFields()
         XCTAssertGreaterThanOrEqual(fields.count, 29, "The scan found only \(fields.count) fields; its pattern has stopped matching")
         var problems: [String] = []
-        var exceptionsSeen: Set<String> = []
         for field in fields {
-            var exceptionIdentifier: String? = nil
-            for identifier in TextFieldStyleScanTests.exceptions.keys {
-                if field.chain.contains(".accessibilityIdentifier(\"" + identifier + "\")") {
-                    exceptionIdentifier = identifier
-                }
-            }
-            if let exceptionIdentifier {
-                exceptionsSeen.insert(exceptionIdentifier)
-                continue
-            }
             if field.chain.contains(".textFieldStyle(") {
                 problems.append(field.location + " chooses its own style; the one nearest the field wins, so it is not bordered")
                 continue
@@ -64,9 +45,7 @@ final class TextFieldStyleScanTests: XCTestCase {
                 problems.append(field.location + " has no .borderedTextField()")
             }
         }
-        XCTAssertEqual(problems, [], "Every text field wears .borderedTextField() (#374)")
-        // An exception whose field has gone must leave the list.
-        XCTAssertEqual(exceptionsSeen, Set(TextFieldStyleScanTests.exceptions.keys), "A listed exception no longer matches a field")
+        XCTAssertEqual(problems, [], "Every text field wears .borderedTextField() (#374), with no exemptions (#457)")
     }
 
     func testOnlyTheSharedModifierAndTheChromesChooseAStyle() throws {
@@ -82,7 +61,7 @@ final class TextFieldStyleScanTests: XCTestCase {
                 roundedBorderFiles.append(file.lastPathComponent)
             }
         }
-        XCTAssertEqual(counts, TextFieldStyleScanTests.styleChoosers, "Only the shared modifier and the listed exceptions choose a text field style")
+        XCTAssertEqual(counts, TextFieldStyleScanTests.styleChoosers, "Only the shared modifier chooses a text field style")
         XCTAssertEqual(roundedBorderFiles, ["BorderedTextField.swift"], ".roundedBorder is written in one place")
     }
 

@@ -1940,23 +1940,26 @@ struct CourseCodeField: View {
             Image(systemName: "books.vertical")
 
             // The field and its message share ONE solid card, and that is
-            // what makes them readable.
+            // what makes the MESSAGE readable.
             //
-            // A course renamed from Return or the Edit menu is SELECTED
+            // A course renamed from Return or Course ▸ Rename… is SELECTED
             // while it is being renamed, so this row is drawing on the
             // selection colour — and everything inside a selected sidebar
-            // row is tinted to sit on it. (The context menu can open the
-            // field on a row that is NOT selected — driven for #293, where
-            // the card read the same on a plain row, so it is harmless
-            // there.) Black-on-blue
-            // for the field and red-on-blue for the message were the result.
-            // Painting a card in the system's own text-background colour
-            // takes the content off the selection entirely, and because that
-            // colour is semantic it is white in Light Mode and near-black in
-            // Dark without a second code path.
+            // row is tinted to sit on it. (The context menu selects the row
+            // first, Finder-style, since #457.) Red-on-blue for the message
+            // was the result. Painting a card in the system's own
+            // text-background colour takes it off the selection entirely, and
+            // because that colour is semantic it is white in Light Mode and
+            // near-black in Dark without a second code path.
+            //
+            // The FIELD wears the bordered style every field wears (#457:
+            // no exemptions). It was `.plain` inside this card's own stroke
+            // until then; the bezel draws its own text background, so the
+            // field reads on the selection without the card, and the card
+            // lost its stroke so the two borders do not nest.
             VStack(alignment: .leading, spacing: 2) {
                 TextField("Course code", text: $text)
-                    .textFieldStyle(.plain)
+                    .borderedTextField()
                     .foregroundStyle(Color(nsColor: .textColor))
                     .focused($isFocused)
                     .accessibilityIdentifier("renameField")
@@ -1983,15 +1986,11 @@ struct CourseCodeField: View {
                         .accessibilityIdentifier("renameProblem")
                 }
             }
-            .padding(.horizontal, 5)
+            .padding(.horizontal, 3)
             .padding(.vertical, 3)
             .background(
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: 6)
                     .fill(Color(nsColor: .textBackgroundColor))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(Color(nsColor: .separatorColor))
             )
         }
         .onAppear {
