@@ -185,6 +185,7 @@
     "rolloverWebsiteQuestion" : "Should this be a new website, or the same one students used last year?",
     "sayTheTimeAs" : "To set a deploy for “6.30 pm”, say it as “deploy at 6:30 pm”. Nothing is set yet.",
     "sayTheTimeAsWithoutTheComma" : "To set that deploy, say it as “deploy at 6:30 pm”, without the comma. Nothing is set yet.",
+    "scheduleADeployNeedsATime" : "What time should this section deploy? Say it with the time, for example “deploy tomorrow at 6:30 am”, and I’ll set it up for you to agree to.",
     "scheduleQuestion" : "Shall I schedule the deploy?",
     "scheduleReplaces" : "This replaces the deploy already set for {moment}.",
     "sectionIsBeingDeployed" : "{course} Section {section} is being deployed right now. Preview it once the deploy has finished.",
