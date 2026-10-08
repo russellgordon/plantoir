@@ -123,6 +123,40 @@ final class HeadlessDeployAnswersTests: XCTestCase {
         )
     }
 
+    /// A headless rebuild the launcher REFUSED because the section was still
+    /// being deployed (#471) says the launcher's own line — read off the
+    /// real runner's output, as the window reads it — and never points at a
+    /// window this path has not got. Through the real `AssistToolchainWork`,
+    /// so a stub that reads the output for itself cannot pass this.
+    func testAHeadlessRebuildRefusedWhileItsSectionDeploysSaysTheLaunchersLine() async throws {
+        let rule: [String: Any] = try WorkLeaseLivenessTests.sharedRules(["deployWhileItsSectionDeploys"])
+        let sentences: [String: Any] = try XCTUnwrap(rule["sentences"] as? [String: Any])
+        let launcher: [String: Any] = try XCTUnwrap(sentences["launcher"] as? [String: Any])
+        let lines: [String] = try XCTUnwrap(launcher["anotherBuild"] as? [String])
+        var script: String = "#!/bin/bash\n"
+        for line in lines {
+            let filled: String = line
+                .replacingOccurrences(of: "{course}", with: "ICS3U")
+                .replacingOccurrences(of: "{section}", with: "1")
+            script += "echo \"\(filled)\"\n"
+        }
+        script += "exit 1\n"
+        try script.write(to: root.appendingPathComponent("preview.sh"), atomically: true, encoding: .utf8)
+
+        let work: AssistToolchainWork = AssistToolchainWork(workspace: workspace)
+        let result: AssistSiteWorkResult = await work.rebuildPreview(course: course, sectionNumber: 1)
+        XCTAssertFalse(result.succeeded)
+        let lifted: String = FailureExplainer.liftedSentence(from: Substring(
+            lines[0].replacingOccurrences(of: "{course}", with: "ICS3U").replacingOccurrences(of: "{section}", with: "1")
+        ))
+        XCTAssertEqual(
+            result.message,
+            AssistWording.previewDidNotBuildBecause(course: "ICS3U", section: "1", reason: lifted)
+        )
+        XCTAssertFalse(result.message.contains("❌"), result.message)
+        XCTAssertFalse(result.message.contains(AssistWording.whereTheOutputIs), result.message)
+    }
+
     /// The build leg asking is told apart from the destination asking.
     func testAHeadlessDeployWhoseBuildMeetsAQuestionSaysSo() async throws {
         try stubLaunchers(buildExits: 3, deployExits: 0)

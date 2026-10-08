@@ -2971,6 +2971,11 @@ three parts:**
   spaced path). A record landing in the microseconds between the look and
   the move is still replaced.
 
+The same refusal reaches an assistant's rebuild, publish and unpublish
+through the build leg, and since #471 those answers say it as the launcher's
+line too — [10](10-local-ai-assistant.md) → "A rebuild the launcher refused
+is said as the refusal, on the mac too (#471)".
+
 **What is still lost, and was left.** The leftover's own after-work belongs to
 the app that was ended: the section is not marked deployed (it stays
 " — Edited", the harmless direction), the run writes no trail line of its own,

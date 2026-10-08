@@ -1912,6 +1912,9 @@ final class AssistToolRunner {
         detail += "\n\n" + previewNote
         // Not "and their PREVIEW" when an outside assistant's change left the
         // open preview as it was (#433): that would be false.
+        // Nor when the headless rebuild did not build (#471) — refused while
+        // the section was being deployed, or stopped by anything else: the
+        // preview is as it was, and saying it changed would be false.
         let previewLeftAsItWas: Bool =
             previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
                 course: course.code, section: String(sectionNumber)
@@ -1919,6 +1922,12 @@ final class AssistToolRunner {
             || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
                 course: course.code, section: String(sectionNumber)
             )
+            || previewNote == AssistWording.previewDidNotBuildForACallerWithNoWindow(
+                course: course.code, section: String(sectionNumber)
+            )
+            || previewNote.hasPrefix(AssistWording.previewDidNotBuildBecause(
+                course: course.code, section: String(sectionNumber), reason: ""
+            ))
         if previewLeftAsItWas {
             detail += "\n\nThis changed the teacher's files. It did not put anything in front "
                     + "of students — deploying does that, and only when they ask."

@@ -504,6 +504,26 @@ nonisolated enum AssistWording {
              + AssistWording.whereTheOutputIs
     }
 
+    /// `previewDidNotBuild` for a caller with NO window (#471): an outside
+    /// assistant over MCP, or the in-app assistant with no section window
+    /// open. `whereTheOutputIs` points at a window that nothing on this path
+    /// has, so it is not said; the window is where the teacher can go to see
+    /// why. Said when nothing in the output was recognised.
+    static func previewDidNotBuildForACallerWithNoWindow(course: String, section: String) -> String {
+        return "The preview for \(course) Section \(section) did not finish building. Build it once from "
+             + "its window in Plantoir to see what stopped it."
+    }
+
+    /// The same, when the output WAS recognised — the launcher's own refusal
+    /// because the section is still being deployed (#471, `shared-rules.json`
+    /// → `deployWhileItsSectionDeploys.refusedBuildAnswers`), or any other
+    /// reason `FailureExplainer` lifts. `reason` is a whole sentence, the way
+    /// the window shows it, so the teacher reads the same words in both
+    /// places.
+    static func previewDidNotBuildBecause(course: String, section: String, reason: String) -> String {
+        return "The preview for \(course) Section \(section) did not finish building: \(reason)"
+    }
+
     // MARK: - Taking something back
 
     /// Every one of these is a whole sentence with a subject and a verb, and
