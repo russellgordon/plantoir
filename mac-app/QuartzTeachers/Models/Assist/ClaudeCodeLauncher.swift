@@ -23,7 +23,8 @@ import Foundation
 ///   refused, and rename, Add Section and restore wait — exactly as Windows'
 ///   Claude door has since #430. (Until 2026-09-19 this comment claimed the
 ///   session was "locked to the course", which was never true; it still is
-///   not. The Codex door names no course and holds none, on both platforms.)
+///   not. The Codex door names its course the same way, as a fifth `-c`
+///   override — Russell, #458, 2026-10-07: both doors.)
 ///
 /// The menu item only appears when this returns true from
 /// `isAvailable` — a teacher without Claude Code should not be offered a

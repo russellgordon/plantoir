@@ -4231,7 +4231,7 @@ status line says "Waiting for Revise with Claude to finish deploying MPM2D
 section 2… (59s)"; while it only edits pages, or sits idle, nothing waits. The
 app's own lease check already agreed: `WorkLeaseRegistry.reconcile` derives
 leases from running work, so an idle MCP server holds no `build`, `preview` or
-`publish` lease. (Since #458 a server opened by the Claude door does hold an
+`publish` lease. (Since #458 a server opened by either door does hold an
 `assist` lease on that door's course for the whole session — which declines no
 build and holds back no change; it greys the Revise items and structural work
 only. See "On the mac (#458)".)
@@ -6111,7 +6111,7 @@ connected and an opening message already sent. Nothing is typed by them.
 | | Revise with Claude… | Revise with Codex… |
 |---|---|---|
 | Tool looked for | `claude` | `codex` |
-| Server handed over as | a configuration file, `--mcp-config` | inline configuration, four `-c` overrides |
+| Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) |
 | Written for the connection | `mcp-<CODE>.json` | **nothing** |
 | Script the mac hands to a terminal | `launch-<CODE>.command` | `launch-<CODE>-codex.command` |
 | A teacher's own MCP servers | not loaded (`--strict-mcp-config`) | **loaded beside Plantoir's** |
@@ -6154,7 +6154,7 @@ passed to the server rather than asked for in a prompt" — and it was never
 true; it was corrected with this work, because a reader who believed it would
 have given Codex a narrowing that neither door has. The assistant Plantoir
 carries itself *is* bound (`contracts/assist-cases.json` → `windowBinding`);
-an outside door is not. **Since #458 the Claude door also names its course to
+an outside door is not. **Since #458 both doors also name their course to
 the server, in its environment (`PLANTOIR_DOOR_COURSE`) — to HOLD it, never to
 narrow it**: the server takes an `assist` lease on it, and every course stays
 reachable. See "On the mac (#458)".
@@ -6384,9 +6384,10 @@ door ALSO names its course in the server's ENVIRONMENT
 the server takes an `assist` lease on that course WITHOUT locking to it
 (`AssistWorkspace.CourseToHoldForTheConversation`; director's ruling, chosen
 as the easiest to undo and losing nothing 1.4.2 had — a question for Russell,
-and the mac is asked what it does — answered by #458, below). The Codex door
-names none and holds none, as before — on BOTH platforms since #458: only the
-Claude door names a course to its server.
+and the mac is asked what it does — answered by #458, below). Windows' Codex
+door names none and holds none, as before. Russell decided on #458 that BOTH
+doors hold their course, so the mac's Codex door names it too and Windows'
+owes the same (below).
 
 **The escaping is three layers here, not two, and each is its own function.**
 TOML first (`TomlBasicString`), then the C runtime's argv quoting
@@ -6420,11 +6421,15 @@ codex`: not found; `%USERPROFILE%\.local\bin` holds only `claude.exe`;
 this piece. The 60 s start-up timeout is still the mac's guess; re-measure on a
 Windows machine that has Codex, with its hardware, before trusting it there.
 
-### On the mac (#458, 2026-10-07): the Claude door holds its course, as Windows'
+### On the mac (#458, 2026-10-07): both doors hold their course, as Windows' Claude door does
 
-Russell decided on #458 that the mac MATCHES Windows. The Claude door's
-`mcp-<CODE>.json` now carries `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}` beside
-`args` (`ClaudeCodeLauncher.writeConfig`; the name is written once, as
+Russell decided on #458 that the mac MATCHES Windows, and that BOTH doors,
+Claude and Codex, name their course to the server, which holds it. The Claude
+door's `mcp-<CODE>.json` now carries `"env": {"PLANTOIR_DOOR_COURSE": "<CODE>"}`
+beside `args` (`ClaudeCodeLauncher.writeConfig`); the Codex door passes a fifth
+override, `-c mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"`, escaped
+for TOML and then the shell like the other four
+(`CodexLauncher.configurationOverrides`). The name is written once, as
 `AssistMCPServer.doorCourseVariable`, and pinned against
 `app-rules.json` → `outsideAgents.doorCourseVariable` and each door's
 `serverEnvironment`). The argv stays `--mcp-stdio <folder>`: #430's trap was a
@@ -6440,8 +6445,8 @@ folder does not have is nothing (never a refusal, never a lock).
 lease that is not wanted, so a hold written beside it would vanish at the first
 reconcile after the session's own preview or deploy ended. It survives the
 `isLeaving` window too, and `releaseEverything()` clears it. The trail gets
-`outside session held a course` ("a Claude session started from Plantoir is
-holding ICS3U while it is open").
+`outside session held a course` ("a Claude or Codex session started from
+Plantoir is holding ICS3U while it is open").
 
 **The three protections**, each read from another live process's files, never
 this process's own (`heldElsewhere` skips its own pid and dead owners):
@@ -6456,8 +6461,9 @@ this process's own (`heldElsewhere` skips its own pid and dead owners):
   in-app window's own held backup: the confirmation, the alert afterwards, the
   single Delete Backup and the trail's kept clause each say which (#458 ruling 7).
 - **A second session is refused.** All three Revise items grey on a held course
-  with "Available once you finish revising with Claude" once under them — the
-  sentence Windows' `BusyReason` has said since #430, word for word. The two
+  with "Available once you finish revising with Claude or Codex" once under
+  them — the sentence Windows' `BusyReason` has said since #430, with "or
+  Codex" added because the server cannot tell which door started it. The two
   doors also grey while the in-app window is open on that course, with the
   sentence that names the window (`AssistActivity.closeTheAssistantFirst`), not
   the session's: two causes, two sentences (`CourseActivity
@@ -6521,7 +6527,11 @@ section's menu greyed all three Revise items with one line; Delete Backup on
 the session's zip answered "Finish the Claude session working on EXC2O first.
 It made this backup, so it was kept."; and Restore on another backup of EXC2O,
 confirmed, answered "A Claude session is working on EXC2O right now. Finish that
-session, then restore."
+session, then restore." (Those are the words as they stood that afternoon; every
+one of these sentences now says "Claude or Codex", and the Codex door was not
+put through an acceptance run of its own — `codex mcp get --json` shows Codex
+0.155.1 reads the override into the server's `env`, and the server side is the
+same code.)
 
 **Known platform difference: when Restore asks.** On the mac a restore is
 checked AFTER the teacher confirms "Restore {CODE} from this backup?"
@@ -6531,13 +6541,18 @@ stay open for an hour, the mac's refusal after a confirmation is the likelier
 case now. Left as it is (review of #458, finding 8); greying Restore while the
 course is held is the change if Russell wants one.
 
-**The asymmetry both platforms share.** The Codex door names no course and
-holds nothing — on Windows since #430 and on the mac by ruling 3 of #458, so a
-Codex session keeps none of the three protections. Russell's comment on #458
-said "both doors"; the director matched Windows instead, and that is a question
-put back to him (the undo is one more `-c` override,
-`mcp_servers.plantoir.env.PLANTOIR_DOOR_COURSE="<CODE>"`, which Codex 0.155.1
-was measured to accept with `codex mcp get --json`).
+**Both doors, by Russell's decision — and what Windows owes.** The director's
+ruling 3 for #458 first kept the Codex door holding nothing, to match Windows.
+Russell's comment on #458 (2026-10-07) won: BOTH doors hold, because a Codex
+session that held nothing would lose all three protections — its backup could
+be deleted under it, a second session could open on the course, and the course
+could be renamed under it — while looking to the teacher exactly like a Claude
+one. Windows' Codex door still names no course (it passes four overrides), so
+Windows owes the fifth, and the words "or Codex" in the sentences above
+(`doorCourseHold.whichDoors`). How a Codex session ENDS was not measured; a
+leftover lease holds nothing either way. **Rejected**: naming the door in a
+second variable so each sentence could say "Claude" or "Codex" — the lease
+would have to carry it, a format change on both platforms for one word.
 
 **The in-app window does not hold structural work on the mac**, and never did;
 on Windows its own server takes the lease, so it does there. Not changed here.

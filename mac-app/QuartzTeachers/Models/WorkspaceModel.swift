@@ -2571,7 +2571,7 @@ class WorkspaceModel {
                 keptNames.append(item.fileURL.lastPathComponent)
             }
             line += "; kept " + keptNames.joined(separator: ", ")
-                + ", which a Claude session still open made"
+                + ", which a Claude or Codex session still open made"
         }
         if !deletion.failed.isEmpty {
             line += "; \(deletion.failed.count) could not be deleted"

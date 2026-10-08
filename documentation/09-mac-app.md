@@ -2679,7 +2679,7 @@ is already recording, and `CourseActivity` and `PreviewLeases` call its
 | `build` | any preview of the course is being built (press → first answer), or any section of it is publishing |
 | `publish` | any section of the course is publishing (the whole deploy, its build included — Windows' shape) |
 | `preview` | any section of the course has a preview up in a window |
-| `assist` | `--mcp-stdio` only: the course the Claude door named, for the whole conversation (#458) |
+| `assist` | `--mcp-stdio` only: the course the Claude or Codex door named, for the whole conversation (#458) |
 
 That covers the window, the in-app assistant and the `--mcp-stdio` process
 with no new call site, because every build of theirs already went through
@@ -2690,8 +2690,8 @@ hands these stores pretend folders ("/folder") that must not grow directories
 — atomically, and a failure never stops the work (Windows' rule). The publish
 set for later has no main-actor app and takes its two leases through
 `WorkLeaseFiles` directly. Since #458 the `--mcp-stdio` process also holds an
-`assist` lease, for the whole conversation, on the course the Claude door named
-in `PLANTOIR_DOOR_COURSE` — kept in `reconcile`'s wanted list
+`assist` lease, for the whole conversation, on the course the door (Claude or
+Codex) named in `PLANTOIR_DOOR_COURSE` — kept in `reconcile`'s wanted list
 (`WorkLeaseRegistry.holdForTheConversation`) so no reconcile can take it down.
 It is never a lock and never declines a build; what it does, and what was
 measured about how it is (rarely) released, is in
@@ -5864,7 +5864,7 @@ pruner" above for why.
   first or together.
 
 
-**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude session still open on {CODE} made it", never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
+**On Windows** (#283, bundle 8): the same rules, the same contract cases, with All Backups as a dialog from the Backups group's context menu rather than a sidebar row, the total on the group's tooltip, and a backup an OUTSIDE assistant's conversation made held while its session is open: `plantoir-mcp` writes `<COURSE>.held-backup.<pid>` naming the zip, honoured only while that pid holds a live `assist` lease (the "newest assistant backup of the course" guess this line used to describe is gone there). **The mac matches it since #458**: `--mcp-stdio` writes the same record, and `WorkspaceModel.backupPathsHeldByOtherSessions` keeps what it names — told as "a Claude or Codex session still open on {CODE} made it", never as the in-app window's (`file-formats.json` → `heldBackupRecord`; [`10-local-ai-assistant.md`](10-local-ai-assistant.md) → "On the mac (#458)"). [`12-windows-app.md`](12-windows-app.md) → "Backups: what they take, and deleting several (#283)".
 
 ## Notifications: the one permission, and where it is asked (#212)
 
@@ -6350,7 +6350,7 @@ an application was NOT measured — the dress rehearsal (`RELEASING.md`, V3) che
    one from a shell (plan and review). The scan also names the folder an
    assistant working from another app has open, so step 2 can read its leases.
    An assistant that holds no build or publish lease is not under way — it can
-   stay connected for days. (Since #458 a Claude session's server always holds
+   stay connected for days. (Since #458 a Claude or Codex session's server always holds
    an `assist` lease on its door's course; `UpdateGate.leaseKindsThatHold` is
    build and publish only, so that lease never holds an update.)
 

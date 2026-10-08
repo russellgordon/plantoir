@@ -1417,7 +1417,7 @@
       "build": "Somebody is BUILDING the course - the one thing that cannot happen twice at once. Windows: its window for a preview's build and a whole deploy, its plantoir-mcp while it builds. The mac since #156: while any preview of the course is being built or any section of it is publishing, in the app, the in-app assistant, the --mcp-stdio process and a publish set for later.",
       "preview": "A section of the course has a preview up in a window, for the preview's whole life. Windows and, since #156, the mac. The mac declines a build while ANOTHER program holds one (shared-rules workLeases.declining) - from its window and in-app assistant; an outside assistant is not held back by one since #433 (workLeases.declining.outsideChanges). Windows reads it only to choose a sentence.",
       "publish": "A section of the course is being deployed, for the whole deploy (build included - both apps hold build beside it). Windows' window; the mac since #156 in the app, the in-app assistant, the --mcp-stdio process and a publish set for later. Windows' scheduled publish writes none today.",
-      "assist": "A Claude session opened from Plantoir is revising the course: held for the session's whole life on the course the Claude door named in PLANTOIR_DOOR_COURSE (app-rules outsideAgents.doorCourseVariable), never a lock - Windows' plantoir-mcp since #430 (and its own assistant window's server, on the course it is locked to), the mac's Plantoir --mcp-stdio since #458. Read by the other programs to keep that session's held-backup records, grey the Revise items and hold structural work (shared-rules doorCourseHold). Never declines a build (workLeases.declining).",
+      "assist": "A Claude or Codex session opened from Plantoir is revising the course: held for the session's whole life on the course its door named in PLANTOIR_DOOR_COURSE (app-rules outsideAgents.doorCourseVariable), never a lock - Windows' plantoir-mcp since #430 (and its own assistant window's server, on the course it is locked to), the mac's Plantoir --mcp-stdio since #458 (both doors; Windows' Codex door owes it). Read by the other programs to keep that session's held-backup records, grey the Revise items and hold structural work (shared-rules doorCourseHold). Never declines a build (workLeases.declining).",
       "copy": "Windows only: a copy of the course is being zipped (WorkLease.Copying, held inside plantoir-mcp around every assistant backup). Windows declines a build and holds a deploy set for later while another program holds one (shared-rules workLeases.declining, #413). The mac writes none and reads none: it marks a course being zipped inside the program doing it (CourseActivity.courseIsBeingCopied, #351) - the cases there say so in onTheMac."
     },
     "lines": [
@@ -1443,7 +1443,7 @@
     "directory": "courses/.internal/activity/ - beside the leases.",
     "name": "<COURSE>.held-backup.<pid> - COURSE is the course code the backup is of, upper-cased by the mac (Windows writes the course's code as its folder spells it); pid is the writer's process id in decimal, the LAST dot-separated part, and held-backup the second-last. No .lease suffix, so no lease reader takes one for a lease.",
     "body": "One line: the backup zip's full path. No trailing newline is required; a reader trims whitespace. One record per course the session backed up; a later backup of the same course in the same conversation does not replace it (the conversation's way back is its first copy).",
-    "counts": "Only while the process named in the name holds a LIVE assist lease on any course in the folder (workLeases.liveness decides who is alive). A record whose process holds no assist lease - a Codex session, a server started with no course, or one that has gone - holds nothing. A program never reads its own records as held by another.",
+    "counts": "Only while the process named in the name holds a LIVE assist lease on any course in the folder (workLeases.liveness decides who is alive). A record whose process holds no assist lease - a server started with no course, or one that has gone - holds nothing. A program never reads its own records as held by another.",
     "removed": "By its writer when the session ends cleanly, after its own runs stop and BEFORE its leases go (shared-rules doorCourseHold.release). A session that is killed - measured on the mac as every ordinary way of ending a Claude session - leaves it behind, where it holds nothing.",
     "cases": [
       {
@@ -1458,7 +1458,7 @@
         "expectHeld": true
       },
       {
-        "name": "a live holder with no assist lease (a Codex session, a build) keeps nothing",
+        "name": "a live holder with no assist lease (a server started with no course, a build) keeps nothing",
         "record": "ICS3U.held-backup.4321",
         "holder": {
           "alive": true,
