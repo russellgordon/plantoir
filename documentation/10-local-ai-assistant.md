@@ -6856,7 +6856,10 @@ through `BackupDeleter.Delete`, and writes `backups deleted`, as the contract
 says both paths do.
 
 **Tests**: `DoorCourseHoldTests` (courseToHold, whichDoors, the trail line,
-reviseCases — the four mac-only cases must say what Windows does — both causes'
+reviseCases — the four mac-only cases carry `onWindows` notes that now STATE what
+Windows does (the three about its own window name
+`WindowHoldWording.AvailableOnceTheAssistantCloses`, and the test checks they do)
+rather than leaving it to Windows — both causes'
 words, heldBackupRecord with real lease files and real processes),
 `CodexLauncherTests`, `BackupsContractTests`.
 

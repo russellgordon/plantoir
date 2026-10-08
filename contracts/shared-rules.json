@@ -21731,7 +21731,7 @@
         "expect": "availableOnceYouFinishRevisingWithClaude"
       },
       {
-        "name": "the in-app assistant is open on this course: the Claude door names that window", "appliesOn": ["mac"], "onWindows": "Windows' assistant window runs its own server, which takes the assist lease on its course, so on Windows the doors on that course grey with availableOnceYouFinishRevisingWithClaude instead (CanReviseNow). Whether Windows says the window's own cause is its decision, in the windows issue from #458.",
+        "name": "the in-app assistant is open on this course: the Claude door names that window", "appliesOn": ["mac"], "onWindows": "Windows' assistant window runs its own server, which takes the assist lease on its course, so on Windows the doors on that course are greyed too (CanReviseNow) - and since #468 (1.4.4) they say the window's own cause, not availableOnceYouFinishRevisingWithClaude: WindowHoldWording.AvailableOnceTheAssistantCloses, 'Available once you close the assistant for {course} Section {section}'. Windows tells its window's server from an outside session's by a registry of the server processes it started (WindowServers); decided under #468.",
         "item": "claude",
         "revisedElsewhere": false,
         "active": {
@@ -21741,7 +21741,7 @@
         "expect": "closeTheAssistantFirst"
       },
       {
-        "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door with availableOnceYouFinishRevisingWithClaude.",
+        "name": "the in-app assistant is open on this course: the Codex door names that window", "appliesOn": ["mac"], "onWindows": "As the case above: on Windows the window's own lease greys the Codex door, saying WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}') since #468.",
         "item": "codex",
         "revisedElsewhere": false,
         "active": {
@@ -21761,7 +21761,7 @@
         "expect": null
       },
       {
-        "name": "the in-app assistant open on this very section: the local item brings it forward", "appliesOn": ["mac"], "onWindows": "Windows' window holds the assist lease through its own server process, which the app reads as another program, so the local item on the course the window is open on is greyed there (CanReviseNow) rather than bringing the window forward.",
+        "name": "the in-app assistant open on this very section: the local item brings it forward", "appliesOn": ["mac"], "onWindows": "Windows' window holds the assist lease through its own server process, which the app reads as another program, so the local item on the course the window is open on is greyed there (CanReviseNow) rather than bringing the window forward - since #468 with the window's own words, WindowHoldWording.AvailableOnceTheAssistantCloses ('Available once you close the assistant for {course} Section {section}'), not availableOnceYouFinishRevisingWithClaude.",
         "item": "local",
         "revisedElsewhere": false,
         "active": {
