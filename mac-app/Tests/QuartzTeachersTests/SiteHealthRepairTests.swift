@@ -250,7 +250,7 @@ final class SiteHealthRepairTests: XCTestCase {
 
         // The other half of the same pair, which had no guard at all.
         let published: String = SiteHealthRepair.notPublishedYet
-        XCTAssertTrue(published.lowercased().contains("publish"), published)
+        XCTAssertTrue(published.lowercased().contains("deploy"), published)
         for word in ["container", "script", "toolchain", "quartz", "config", "json"] {
             XCTAssertFalse(published.lowercased().contains(word),
                            "says \"\(word)\" to a teacher")
@@ -344,7 +344,7 @@ final class SiteHealthRepairTests: XCTestCase {
         let said: String = (outcome?.detail ?? "").lowercased()
         XCTAssertTrue(said.contains("students"),
                       "it must say who this does not reach yet")
-        XCTAssertTrue(said.contains("publish again"), "and what changes that")
+        XCTAssertTrue(said.contains("deploy again"), "and what changes that")
         XCTAssertTrue(said.contains("preview"), "and that a preview is available")
 
         // It must NOT assert a publish that may never have happened. This same

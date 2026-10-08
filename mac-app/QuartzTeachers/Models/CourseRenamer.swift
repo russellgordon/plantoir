@@ -283,7 +283,7 @@ enum CourseRenamer {
             let sections: String = listed(outcome.stoppedScheduledSections)
             let isOne: Bool = outcome.stoppedScheduledSections.count == 1
             sentences.append(
-                "\(sections) of \(outcome.newCode) \(isOne ? "was" : "were") set to publish on "
+                "\(sections) of \(outcome.newCode) \(isOne ? "was" : "were") set to deploy on "
                 + "\(isOne ? "its" : "their") own. Renaming turned that off — set "
                 + "\(isOne ? "it" : "them") again from the section's menu if you still want "
                 + "\(isOne ? "it" : "them")."
@@ -293,15 +293,15 @@ enum CourseRenamer {
             let sections: String = listed(outcome.unstoppedScheduledSections)
             let isOne: Bool = outcome.unstoppedScheduledSections.count == 1
             sentences.append(
-                "\(sections) \(isOne ? "was" : "were") also set to publish on "
+                "\(sections) \(isOne ? "was" : "were") also set to deploy on "
                 + "\(isOne ? "its" : "their") own, and Plantoir could not turn that off. "
-                + "\(isOne ? "It" : "They") may still try to publish under the old name."
+                + "\(isOne ? "It" : "They") may still try to deploy under the old name."
             )
         }
 
         let title: String = outcome.unstoppedScheduledSections.isEmpty
-            ? "Scheduled publishing was turned off"
-            : "A scheduled publish may still run"
+            ? "Deploying on a schedule was turned off"
+            : "A scheduled deploy may still run"
         return Notice(title: title, message: sentences.joined(separator: "\n\n"))
     }
 

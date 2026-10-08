@@ -483,7 +483,7 @@ extension AssistToolRunner {
             "when": whenHelp,
             "classes": AssistSchemaProperty(
                 kind: .separatedList(separator: ";"),
-                description: "The class pages this deploy is meant to publish, separated by semicolons. "
+                description: "The class pages this deploy is meant to carry, separated by semicolons. "
                            + "Checked for whether they are published yet."
             ),
         ],
@@ -631,7 +631,7 @@ extension AssistToolRunner {
                    + "Links points at move to the first day of class. Curriculum pages are left alone, "
                    + "because Plantoir dates those itself on every build. Set `website` when the "
                    + "teacher is rolling a section over to a NEW YEAR and has said which website "
-                   + "they want: \"new\" starts a fresh one, so publishing no longer replaces last "
+                   + "they want: \"new\" starts a fresh one, so deploying no longer replaces last "
                    + "year's site, and \"same\" keeps last year's address. Ask them first — never "
                    + "choose for them, and leave it out for an ordinary re-dating.",
         parameters: [
@@ -725,7 +725,7 @@ extension AssistToolRunner {
         name: "list_courses",
         description: "TEACHERS SAY: \"what courses do I have?\", \"list my courses\". List the courses "
                    + "in this working folder: the code, the name, which sections each one has, and where "
-                   + "each publishes to. Call this first when a teacher mentions a course and you are not "
+                   + "each deploys to. Call this first when a teacher mentions a course and you are not "
                    + "certain of its exact code — guessing a code reaches the wrong course silently.",
         parameters: [:],
         required: [],
@@ -829,7 +829,7 @@ extension AssistToolRunner {
                    + "Call plan_make_room_for_classes FIRST and show the teacher what it said. The course "
                    + "is backed up first. Once other classes have moved, \"undo that\" can no longer take "
                    + "this back and the backup is the way out — so tell the teacher to look the section "
-                   + "over in Plantoir before publishing anything.",
+                   + "over in Plantoir before deploying anything.",
         parameters: [
             "course": courseHelp,
             "section": sectionHelp,
