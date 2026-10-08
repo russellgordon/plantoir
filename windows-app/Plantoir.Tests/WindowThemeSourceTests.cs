@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Plantoir.Tests;
 
 /// <summary>
-/// The title bar follows dark and light mode (Windows v1.4.3, 2026-10-07):
+/// The title bar follows dark and light mode (Windows v1.4.4, 2026-10-07):
 /// <c>Services/WindowTheme.cs</c> sets <c>AppWindowTitleBar.PreferredTheme</c>
 /// from the content's theme. The behaviour is visual and was checked by
 /// screenshot (documentation/12-windows-app.md, "The title bar follows dark
