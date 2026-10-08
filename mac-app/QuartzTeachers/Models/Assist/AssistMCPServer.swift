@@ -147,6 +147,22 @@ enum AssistMCPServer {
         let runner: AssistToolRunner = AssistToolRunner(workspace: workspace, surface: .mcp)
         holdTheDoorsCourse(in: workspace)
 
+        // The folder's tools may still be being copied by the `reloadCourses`
+        // above (#476, off the main actor). Requests are read AT ONCE — a
+        // client's start-up timeout must not wait on a copy that can take a
+        // minute on a slow Mac — and the two tools that build
+        // (`AssistToolchainWork.rebuildPreview` and `deploy`) wait for the
+        // copy themselves, so nothing the client sends is refused for a copy
+        // this process itself started. (Another PROCESS copying at the same
+        // time is not seen — `ToolchainReadiness`'s header says why that is
+        // accepted.)
+        AssistMCPServer.readRequests(workspace: workspace, runner: runner)
+        dispatchMain()
+    }
+
+    /// Reads requests from stdin until the client goes away, answering each
+    /// on the main actor.
+    private static func readRequests(workspace: WorkspaceModel, runner: AssistToolRunner) {
         DispatchQueue.global(qos: .userInitiated).async {
             while let line = readLine(strippingNewline: true) {
                 if line.isEmpty {
@@ -166,11 +182,15 @@ enum AssistMCPServer {
             }
             Task { @MainActor in
                 await AssistMCPServer.stopOwnWorkBeforeLeaving()
+                // Never leave in the middle of the folder's tools copy
+                // (#476): a client that closes its input within seconds of
+                // starting the server would otherwise kill the detached copy
+                // part-way and leave `.toolchain/` half old and half new —
+                // the same reason the app's quit waits.
+                await ToolchainReadiness.shared.waitForAllCopies()
                 exit(0)
             }
         }
-
-        dispatchMain()
     }
 
     /// The client has gone: stop what THIS process started, and only then

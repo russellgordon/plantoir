@@ -186,6 +186,9 @@ final class AssistToolchainWork: AssistSiteWork {
             return AssistSiteWorkResult.builtElsewhere(course: course)
         }
 
+        // A copy of the folder's tools the app itself started is waited
+        // for, never refused (#476) — see `ToolchainReadiness.ensure`.
+        await ToolchainReadiness.shared.waitUntilReady(workspaceURL)
         runner = ScriptRunner()
         runner.milestones = TaskMilestones.preview
         // `--non-interactive` (#378): nobody on this path can answer a
@@ -273,6 +276,10 @@ final class AssistToolchainWork: AssistSiteWork {
                 message: AssistWording.courseIsBusy(course: course.code)
             )
         }
+
+        // As in `rebuildPreview` (#476): the app's own copy of the folder's
+        // tools is waited for, not refused.
+        await ToolchainReadiness.shared.waitUntilReady(workspaceURL)
 
         let destinations: [CourseConfiguration.DeployDestination] = course.configuration.allDeployDestinations
         let needsBuild: Bool = BuildFreshness.needsRebuild(course: course, sectionNumber: sectionNumber)

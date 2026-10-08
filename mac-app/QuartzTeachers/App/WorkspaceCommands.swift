@@ -33,7 +33,7 @@ struct WorkspaceCommands: View {
         .disabled(workspace?.selectedArchivedItem == nil)
 
         Button("Reload Courses") {
-            workspace?.reloadCourses()
+            workspace?.reloadCoursesFromTheMenu()
         }
         .keyboardShortcut("r", modifiers: [.command, .shift])
         .disabled(workspace == nil)

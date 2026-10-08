@@ -300,6 +300,17 @@ class ScriptRunner {
             launchProblem = "Plantoir is closing, so nothing new was started."
             return
         }
+        // The BACKSTOP for a way in nobody thought of (#476): while the
+        // folder's tools are still being copied, or that copy failed and
+        // has not been retried, nothing builds from them. The buttons that
+        // can start a run are greyed with this sentence first, and the
+        // app's own robots (the assistant's server, a headless rebuild or
+        // deploy) wait for the copy instead of meeting this. Asked here,
+        // before the transcript is cleared, as the closing check above is.
+        if let reason = ToolchainReadiness.shared.reasonToWait(workingDirectory) {
+            launchProblem = reason
+            return
+        }
 
         if !keepingTranscript {
             transcript = TranscriptBuilder()
