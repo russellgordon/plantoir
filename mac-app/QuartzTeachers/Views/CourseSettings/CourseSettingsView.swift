@@ -88,7 +88,7 @@ struct CourseSettingsView: View {
                     // curriculum pages, and its explanatory sections live on
                     // it — so the second switch is off and unavailable
                     // whenever the first one is off.
-                    Toggle("Publish the curriculum coverage map", isOn: $configuration.includesCurriculumCoverage)
+                    Toggle("Include the curriculum coverage map", isOn: $configuration.includesCurriculumCoverage)
                         .accessibilityIdentifier("coverageToggle")
                     Toggle("Explain the map on the page", isOn: $configuration.includesCoverageNotes)
                         .disabled(!configuration.includesCurriculumCoverage)
