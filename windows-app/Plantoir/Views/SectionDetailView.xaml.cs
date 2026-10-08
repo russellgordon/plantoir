@@ -563,8 +563,8 @@ public sealed partial class SectionDetailView : UserControl
         bool wrong = ScheduledPublishOutcome.NeedsAttention(outcome.Outcome);
         ScheduledPublishNotice.Severity = wrong ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
         ScheduledPublishNotice.Title = wrong
-            ? "Your scheduled publish did not go out"
-            : "Your scheduled publish went out";
+            ? "Your scheduled deploy did not go out"
+            : "Your scheduled deploy went out";
         ScheduledPublishNotice.Message =
             ScheduledPublishOutcome.Sentence(_course.Code, _sectionNumber, outcome);
         ScheduledPublishNotice.IsOpen = true;
@@ -969,7 +969,7 @@ public sealed partial class SectionDetailView : UserControl
             || CourseActivity.IsPublishing(workspacePath, _course.Code))
         {
             return new SiteHealthRepair.Outcome(
-                "Plantoir is publishing this course just now.",
+                "Plantoir is deploying this course just now.",
                 // Deliberately not "press Preview Again": this is the outcome
                 // whose button is withheld, and naming a button that is not on
                 // screen is worse than saying nothing.

@@ -6431,8 +6431,9 @@ All three fixes are CODE; no description moved.
     say "Cancel scheduled deploy", with no "the|that|my", so the card was still
     going to the model (the accepted row's `why` called "Cancel that scheduled
     deploy" the shelf's sentence; it never was). The mac added an ACCEPTED row
-    for the bare sentence and accepts it; Windows owes the same one-word
-    widening. The shelves were not reworded.
+    for the bare sentence and accepts it, and Windows made the same one-word
+    widening with #466 (v1.4.4), so the row passes on both apps. The shelves
+    were not reworded.
   - **Not in `cardPhrasings.parsed`, on purpose.** That generated catalogue
     lists card families with an example and a `notThis`; these two are frames
     over sentences whose specification is the authored `scheduleAndCancel` key,
@@ -7386,7 +7387,7 @@ family with `inANumberedCourseWhosePagesAre: "Week"`, its near miss "at period
 3", and three `nearMisses` that a runner walks both without a course and in a
 club. A numbered course
 gets its OWN shelf (`AssistPromptShelfView.groups(naming:noun:)`): every card
-on it is matched in code — "Cancel scheduled deploy" too since #449, which
+on it is matched in code — "Cancel scheduled deploy" too since #449 (#466 on Windows), which
 until then went to the model, where it had been measured. There is deliberately no "Publish Week 2" or "Unpublish Week 2" on
 it — a title-bearing publish or hide goes to the model, and no routing
 measurement has been made in a club course.

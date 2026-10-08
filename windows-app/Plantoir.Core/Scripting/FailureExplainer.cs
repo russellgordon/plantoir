@@ -134,15 +134,15 @@ public static class FailureExplainer
     }
 
     /// <summary>
-    /// A folder publish whose copy did not finish (#304, mac #227): deploy.sh's
+        /// A folder deploy whose copy did not finish (#304, mac #227): deploy.sh's
     /// cross line, and deploy.ps1's own robocopy-failure line, both mean the
     /// folder is not up to date. Matched on the launcher's words; the copy's
     /// error number means nothing to a teacher.
     /// </summary>
     private static string? FolderCopyExplanation(string output) =>
-        output.Contains("Not every page could be copied into the publishing folder", StringComparison.Ordinal)
-            ? "Plantoir could not copy every page into your publishing folder, so it is not up to date. Try " +
-              "publishing again; if the same thing happens, one of your pages may not open or the folder may " +
+        output.Contains("Not every page could be copied into the deploy folder", StringComparison.Ordinal)
+            ? "Plantoir could not copy every page into your deploy folder, so it is not up to date. Try " +
+              "deploying again; if the same thing happens, one of your pages may not open or the folder may " +
               "not be taking new files."
             : null;
 
@@ -257,12 +257,12 @@ public static class FailureExplainer
 
     private static string? MissingFrontPageExplanation(string output) =>
         output.Contains("no front page, so no website was produced")
-            ? "This section has no front page, so there is no website to publish. Put the front page back, then publish again."
+            ? "This section has no front page, so there is no website to deploy. Put the front page back, then deploy again."
             : null;
 
     /// <summary>
     /// A section whose FRONT PAGE's settings cannot be read (#300, the mac's
-    /// #246): the build hides such a page, so there is no website to publish.
+    /// #246): the build hides such a page, so there is no website to deploy.
     /// Asked before the missing-front-page and missing-build cards — the
     /// build's line deliberately never says "no front page", and it is
     /// followed by "Built site not found" — and the line number is read only
@@ -275,10 +275,10 @@ public static class FailureExplainer
         int at = output.IndexOf(sign, StringComparison.Ordinal);
         if (at < 0) return null;
         const string headline = "The settings at the top of this section's front page could not be read, "
-            + "so there is no website to publish. ";
+            + "so there is no website to deploy. ";
         return LineNumberAfter("(near line ", output[(at + sign.Length)..]) is { } line
-            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then publish again."
-            : headline + "Open the front page in Obsidian, fix its settings, then publish again.";
+            ? headline + $"Open the front page in Obsidian, fix its settings near line {line}, then deploy again."
+            : headline + "Open the front page in Obsidian, fix its settings, then deploy again.";
     }
 
     /// <summary>The number after <paramref name="marker"/>, only when the marker is on the same line.</summary>

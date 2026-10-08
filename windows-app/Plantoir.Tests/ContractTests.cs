@@ -283,9 +283,8 @@ public class ContractTests
             "the same sentence (not generated into the contract); wording.deployWentOutTo follows #391's needs-an-answer sentence",
         ["DeployToMultipleDestinationsDidNotFinish"] =
             "this app's own sentence for a deploy that reached none of several destinations; owed on #400",
-        ["ScheduleADeployNeedsATime"] =
-            "this app's own question for 'schedule a deploy' with no time (#424); proposed to the mac as " +
-            "wording.scheduleADeployNeedsATime in bundle A's (v1.4.3) mac issue",
+        // ScheduleADeployNeedsATime left this list with #466: the mac
+        // implemented #424's frames (#449) and the key is generated now.
     };
 
     /// <summary>The public static member a wording key names, or null.</summary>
