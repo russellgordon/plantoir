@@ -1736,7 +1736,7 @@ enum ScheduledDeploy {
                 if let waitedFor {
                     ActivityTrail.note(
                         .scheduledPublishWaitedForTheCourse,
-                        "a scheduled publish waited \(Int(waited.rounded())) seconds while the course was "
+                        "a scheduled deploy waited \(Int(waited.rounded())) seconds while the course was "
                         + WorkLeaseFiles.describe(waitedFor) + ", then went ahead",
                         course: section.courseCode,
                         section: section.sectionNumber
@@ -1745,7 +1745,7 @@ enum ScheduledDeploy {
             case .standDown(let holding, let waited):
                 ActivityTrail.note(
                     .scheduledPublishWaitedForTheCourse,
-                    "a scheduled publish waited \(Int(waited.rounded())) seconds while the course was "
+                    "a scheduled deploy waited \(Int(waited.rounded())) seconds while the course was "
                     + WorkLeaseFiles.describe(holding) + ", and stood down",
                     course: section.courseCode,
                     section: section.sectionNumber
@@ -2157,11 +2157,11 @@ enum ScheduledDeploy {
                   let scheduledTo, scheduledTo != destinations else {
                 return nil
             }
-            return "a scheduled publish was set to deploy to " + scheduledTo.joined(separator: ", ")
+            return "a scheduled deploy was set to deploy to " + scheduledTo.joined(separator: ", ")
                 + "; the course deploys to " + destinations.joined(separator: ", ")
                 + " now, so it is deploying there"
         case .standDown(let refusal):
-            var line: String = "a scheduled publish could not deploy the way the course is set now ("
+            var line: String = "a scheduled deploy could not go ahead the way the course is set now ("
                 + refusal.reasonClause + ")"
             var now: [String] = []
             var then: [String]?

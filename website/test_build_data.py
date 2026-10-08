@@ -175,18 +175,18 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("PC &middot; version 1.1.0", html)
         self.assertNotIn("Mac &middot; version", html)
 
-    def test_the_windows_card_is_pinned_while_the_newest_release_has_only_the_mac_installer(self):
+    def test_neither_card_is_pinned_while_the_newest_release_has_both_installers(self):
         # Windows was pinned to 1.1.0 from v1.2.0 until PlantoirSetup.exe
-        # joined v1.4.2 (2026-10-03). It is pinned again, to 1.4.2, at the
-        # mac-only v1.4.3 cut (2026-10-04): that release has no
-        # PlantoirSetup.exe yet. Windows UNPINS, and this test changes back to
-        # asserting neither card is pinned, when its installer joins v1.4.3.
+        # joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3
+        # cut (2026-10-04) until its installer joined v1.4.3 (2026-10-07).
+        # A release that lacks an installer pins that card again, and this
+        # test changes with it (the downloads_note in site.json says when).
         site = build.read_json(build.WEBSITE / "site.json")
         pins: dict = {}
         for entry in site["downloads"]:
             pins[entry["platform"]] = entry.get("pinned")
         self.assertIsNone(pins["macOS"])
-        self.assertEqual(pins["Windows"], "1.4.2")
+        self.assertIsNone(pins["Windows"])
 
 
 class NewInTests(unittest.TestCase):
@@ -373,6 +373,14 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
 
 
+# A Windows picture that cannot be taken yet, each with what blocks it. Every
+# other id must be `windows: true` (Russell, 2026-10-04). Empty since that day:
+# `schedule`, the last, is the sheet alone on Windows, because Windows'
+# notification is no window Windows.Graphics.Capture can be given (Russell's
+# ruling, 2026-10-04).
+WINDOWS_PICTURE_OWED: dict = {}
+
+
 class WindowsSwapTests(unittest.TestCase):
 
     def test_windows_false_shows_the_mac_picture_to_everybody(self):
@@ -403,6 +411,34 @@ class WindowsSwapTests(unittest.TestCase):
                 self.assertIn("data-win-src", build.picture_element(shot, [], "", "./"))
             finally:
                 build.IMAGE_DIR = saved
+
+    def test_every_shot_has_its_windows_picture(self):
+        # Russell, 2026-10-04: "Every screenshot must be windows." No id may
+        # show a Windows visitor the Mac picture, so every one is marked
+        # `windows: true` and its files are there (#380, #370).
+        manifest = json.loads((build.WEBSITE / "shots.json").read_text(encoding="utf-8"))
+        for shot in manifest["shots"]:
+            if shot["id"] in WINDOWS_PICTURE_OWED:
+                # Still owed, by name, and only while it is still false.
+                self.assertIs(shot.get("windows"), False, shot["id"] + " has its picture now: take it off WINDOWS_PICTURE_OWED")
+                continue
+            with self.subTest(shot=shot["id"]):
+                self.assertIs(shot.get("windows"), True)
+                html = build.picture_element(shot, [], "", "./")
+                self.assertIn("data-win-src", html)
+
+    def test_a_windows_alt_is_swapped_only_with_a_windows_picture(self):
+        # `windowsAlt`: words for the Windows picture where the shared alt
+        # names something only the Mac picture shows. The Mac's alt is
+        # untouched; base.html swaps data-win-alt as it swaps the image.
+        shot = {"id": "preview", "alt": "the mac words", "caption": "c", "windowsAlt": "the windows words"}
+        html = build.picture_element(shot, [], "", "./")
+        self.assertIn('alt="the mac words"', html)
+        self.assertIn('data-win-alt="the windows words"', html)
+        shot["windows"] = False
+        self.assertNotIn("data-win-alt", build.picture_element(shot, [], "", "./"))
+        layout = (build.WEBSITE / "layout" / "base.html").read_text(encoding="utf-8")
+        self.assertIn("data-win-alt", layout)
 
 
 class DarkStaticFigureTests(unittest.TestCase):

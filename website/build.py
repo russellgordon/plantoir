@@ -268,6 +268,12 @@ def picture_element(shot: dict, problems: list[str], modifier: str, up: str) -> 
 
     joined = "\n".join(sources)
     win_src_attr = f' data-win-src="{up}img/{win_prefix}light.png"' if has_windows else ""
+    # `windowsAlt` in shots.json: the alt text for the Windows picture, where
+    # the shared one names something only the Mac picture shows (schedule's
+    # macOS notification). base.html swaps it exactly as it swaps the image,
+    # so a Mac visitor's words never change.
+    if has_windows and shot.get("windowsAlt"):
+        win_src_attr += f' data-win-alt="{shot["windowsAlt"]}"'
 
     return (
         f'<figure class="{classes_html}">\n'
@@ -306,7 +312,8 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
     taken in Dark Mode (`<id>-dark.png`/`.webp`) for a page in dark mode,
     with `<id>.png` kept as the light one so its name never changes
     (`colour-schemes`, Russell 2026-10-04: "It needs a dark mode version").
-    A Windows visitor still gets `<id>-windows.png` in either scheme."""
+    A Windows visitor gets `<id>-windows.png`, and `<id>-windows-dark.png`
+    for a page in dark mode whenever it exists (#380)."""
     identifier = shot["id"]
     source = IMAGE_DIR / f"{identifier}.png"
     win_source = IMAGE_DIR / f"{identifier}-windows.png"
@@ -334,18 +341,32 @@ def static_element(shot: dict, problems: list[str], modifier: str, up: str) -> s
 
     webp_source = ""
     win_webp_attr = f' data-win-srcset="{up}img/{identifier}-windows.webp"' if (has_windows and win_webp.exists()) else ""
-    if shot.get("dark"):
-        dark_png = IMAGE_DIR / f"{identifier}-dark.png"
-        dark_webp = IMAGE_DIR / f"{identifier}-dark.webp"
-        if not dark_png.exists() or not dark_webp.exists():
-            problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
-                            f"or .webp is missing (capture.py --colour-figures)")
+    # A Dark Mode version of a static figure (colour-schemes, Russell
+    # 2026-10-04). The mac's is `<id>-dark.png`, offered when shots.json says
+    # `"dark": true` (the mac's website branch adds that, with its picture);
+    # Windows' is `<id>-windows-dark.png`, offered to a Windows visitor in dark
+    # mode whenever it exists. `<id>.png` and `<id>-windows.png` stay the light
+    # ones, so neither name ever changes. Until the mac's dark picture lands,
+    # a dark page's Mac visitor is given the light figure, as before.
+    mac_dark = shot.get("dark") and (IMAGE_DIR / f"{identifier}-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-dark.webp").exists()
+    if shot.get("dark") and not mac_dark:
+        problems.append(f"screenshot '{identifier}' is marked dark in shots.json but {identifier}-dark.png "
+                        f"or .webp is missing (capture.py --colour-figures)")
+    win_dark = has_windows and (IMAGE_DIR / f"{identifier}-windows-dark.png").exists() \
+        and (IMAGE_DIR / f"{identifier}-windows-dark.webp").exists()
+    if mac_dark or win_dark:
+        dark_stem = f"{identifier}-dark" if mac_dark else identifier
+        if win_dark:
+            win_dark_webp = f' data-win-srcset="{up}img/{identifier}-windows-dark.webp"'
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows-dark.png"'
         else:
-            win_png_attr = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
-            dark_query = ' media="(prefers-color-scheme: dark)"'
-            webp_source += (f'      <source srcset="{up}img/{identifier}-dark.webp"{win_webp_attr} '
-                            f'type="image/webp"{dark_query}>\n')
-            webp_source += f'      <source srcset="{up}img/{identifier}-dark.png"{win_png_attr}{dark_query}>\n'
+            win_dark_webp = win_webp_attr
+            win_dark_png = f' data-win-srcset="{up}img/{identifier}-windows.png"' if has_windows else ""
+        dark_query = ' media="(prefers-color-scheme: dark)"'
+        webp_source += (f'      <source srcset="{up}img/{dark_stem}.webp"{win_dark_webp} '
+                        f'type="image/webp"{dark_query}>\n')
+        webp_source += f'      <source srcset="{up}img/{dark_stem}.png"{win_dark_png}{dark_query}>\n'
     if webp.exists():
         webp_source += f'      <source srcset="{up}img/{identifier}.webp"{win_webp_attr} type="image/webp">\n'
 
@@ -1187,10 +1208,8 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     question (`shots/corners.py`, about 6 s, Pillow only) and refuses on any
     failing picture, whoever made it.
 
-    Of the `-windows-` pictures, the same scope as the test: the three
-    figures Windows has retaken as whole native captures — hero,
-    colour-schemes and light-and-dark (#380) — are judged; the square
-    single-window shots are still Windows' to retake and are not.
+    Every `-windows-` picture a Windows visitor is shown is judged too, the
+    same scope as the test: since #380 each is a whole native capture.
     """
     sys.path.insert(0, str(website / "shots"))
     try:
@@ -1198,10 +1217,9 @@ def native_corners_refusal(website: Path = WEBSITE, image_dir: Path = IMAGE_DIR)
     except ImportError as error:
         return (f"Not deploying: the corner check needs Pillow ({error}). "
                 f"Install it (python3 -m pip install pillow) and deploy again.")
-    pictures = corners.images_the_pages_show(website, image_dir)
+    pictures = corners.images_the_pages_show(website, image_dir, include_windows=True)
     if not pictures:
         return f"Not deploying: no pictures found in {image_dir} to check."
-    pictures = pictures + corners.windows_figures_retaken(image_dir)
     problems: list[str] = []
     for picture in pictures:
         problems.extend(corners.corner_problems(picture))

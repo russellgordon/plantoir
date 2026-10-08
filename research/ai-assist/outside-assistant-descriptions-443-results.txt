@@ -1,0 +1,83 @@
+#443 (v1.4.4): the four outside-assistant tool descriptions that moved from
+"publish" to "deploy", measured before they ship, as
+contracts/assist-cases.json -> toolDescriptions.rule asks.
+
+PRE-REGISTERED (written before the run, 2026-10-04)
+  Arms: BEFORE = toolSchemas.mcp at origin/dev b2726e6b; AFTER = toolSchemas.mcp
+  on issue/443-deploy-wording. They differ in exactly four tools:
+  list_courses, re_date_classes, make_room_for_classes (descriptions) and
+  plan_scheduled_deploy (its `classes` argument). Checked by comparing the two
+  37-tool lists element by element.
+  Local surface: n=13 46b965622213567d49aae523c70f9bcd2c9fd3d1c21279e167d0da2b2cd96cb6
+  before AND after (research/ai-assist/toolhash.py), so the mac's local model
+  reads no changed byte; scripts/test_tool_surface_digest.py stays green.
+  Windows' local model (AssistAgent.ForTheLocalModel, mirrored in
+  narrow-tools.py) is shown none of the four tools either.
+  MCP digest: 85bc3f80...05aa7639f -> a7c0823d...ad04e1733 (n=37).
+  Criteria (doc 10, "One description per tool", per tool): (a) any polarity
+  inversion AFTER that BEFORE did not have vetoes that tool's new text; (b) a
+  net loss of 3 trials or more summed over a tool's probes keeps its old text;
+  (c) a fall of more than 5 percentage points overall stops and reports.
+  Probes: 11, in outside-assistant-descriptions-443.py (7 whose expected tool
+  is one of the four, 4 controls whose expected tool is publish_pages,
+  unpublish_pages, deploy_section or explain_publishing). A cut-off call counts
+  as a miss.
+
+WHAT THIS CAN AND CANNOT SAY
+  The readers of these four descriptions are outside assistants (Claude Code,
+  Codex) over MCP. Neither can be run as a controlled, repeatable routing suite
+  on this Mac, so this is a PROXY: the smaller assistant's weights shown the
+  whole MCP surface. It can catch a description change that pulls a request
+  to the wrong tool or inverts a publish/hide; it cannot say how a frontier
+  model reads the text. Windows owes its own run only if its server serves
+  different text for these four tools (it serves the contract's text since
+  #114), and its local model reads none of them.
+
+CONDITIONS
+  Mac16,8 (M4 Pro), 48 GiB, macOS 26.6. llama.cpp b10435 (mac-app/Vendor/llama),
+  Metal, the app's flags (--reasoning off --reasoning-budget 0 --n-gpu-layers
+  999 --jinja --parallel 1) EXCEPT --ctx-size 32768, because the 37-tool MCP
+  surface does not fit the app's 8,192. Weights: qwen2.5-1.5b-instruct-q4_k_m
+  (the SMALLER assistant); the larger one is not on this Mac. temperature 0,
+  tool_choice auto, max_tokens 512, the date appended to the user's sentence,
+  a neutral system prompt identical in both arms. 10 trials per probe (greedy,
+  so near-deterministic: a trial count is not a failure rate).
+
+RESULTS
+  BEFORE list_courses: what courses       10/10  inversions 0  cut off 0  {"list_courses": 10}
+  BEFORE list_courses: where online       10/10  inversions 0  cut off 0  {"list_courses": 10}
+  BEFORE list_courses: deploys where      10/10  inversions 0  cut off 0  {"list_courses": 10}
+  BEFORE re_date: new year, new site      10/10  inversions 0  cut off 0  {"re_date_classes": 10}
+  BEFORE re_date: same site               10/10  inversions 0  cut off 0  {"re_date_classes": 10}
+  BEFORE make_room: insert                10/10  inversions 0  cut off 0  {"plan_make_room_for_classes": 10}
+  BEFORE schedule: carry pages             0/10  inversions 0  cut off 0  {"plan_publish_class_on": 10}
+  BEFORE control: publish a page           0/10  inversions 0  cut off 0  {"publish_class_on": 10}
+  BEFORE control: hide a page              0/10  inversions 0  cut off 0  {"null": 10}
+  BEFORE control: deploy now              10/10  inversions 0  cut off 0  {"deploy_section": 10}
+  BEFORE control: what is publishing       0/10  inversions 0  cut off 0  {"null": 10}
+  AFTER  list_courses: what courses       10/10  inversions 0  cut off 0  {"list_courses": 10}
+  AFTER  list_courses: where online       10/10  inversions 0  cut off 0  {"list_courses": 10}
+  AFTER  list_courses: deploys where      10/10  inversions 0  cut off 0  {"list_courses": 10}
+  AFTER  re_date: new year, new site      10/10  inversions 0  cut off 0  {"re_date_classes": 10}
+  AFTER  re_date: same site               10/10  inversions 0  cut off 0  {"re_date_classes": 10}
+  AFTER  make_room: insert                10/10  inversions 0  cut off 0  {"plan_make_room_for_classes": 10}
+  AFTER  schedule: carry pages             0/10  inversions 0  cut off 0  {"plan_publish_class_on": 10}
+  AFTER  control: publish a page           0/10  inversions 0  cut off 0  {"publish_class_on": 10}
+  AFTER  control: hide a page              0/10  inversions 0  cut off 0  {"null": 10}
+  AFTER  control: deploy now              10/10  inversions 0  cut off 0  {"deploy_section": 10}
+  AFTER  control: what is publishing       0/10  inversions 0  cut off 0  {"null": 10}
+  TOTAL  BEFORE 70/110  AFTER 70/110
+
+  Every probe chose the SAME tool in all ten trials in both arms: identical,
+  probe for probe. 0 polarity inversions in either arm, 0 cut-offs.
+  Criteria: (a) no new inversion; (b) no tool lost a trial; (c) no fall.
+  So the four descriptions SHIP with the new words.
+
+  Read honestly: the four misses-by-registration are the same in both arms
+  and none is about the changed text. "schedule: carry pages" went to
+  plan_publish_class_on (a dated class, so the small model read it as
+  publishing that class - a miss, pre-registered as one); "publish a page"
+  went to publish_class_on (the right DIRECTION, a stricter accepted set than
+  needed; no inversion); "hide a page" and "what is publishing" made no call.
+  A proxy reader, the same in both arms; what a frontier client does with
+  the words is not measured here and cannot be on this Mac.

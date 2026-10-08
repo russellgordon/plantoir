@@ -58,45 +58,54 @@ public static class ScheduledPublishNotifier
     }
 
     /// <summary>
-    /// Called by the scheduled run (Program.Main, no window) once it has
-    /// finished: one toast for the section, whatever happened. Writes on the
-    /// trail whether it went out or could not be sent.
+    /// The system's toasts, as the scheduled run (Program.Main, no window)
+    /// posts through <see cref="ScheduledRunAnnouncement.RunAndAnnounce"/>:
+    /// that decides what to say and writes the trail line; this only shows it.
+    /// Until #448 this read the job file itself AFTER the run, which the run's
+    /// own one-shot clearing had already deleted, and returned without a word.
     /// </summary>
-    public static void PostFor(string jobPath)
+    public sealed class SystemToasts : ScheduledRunAnnouncement.IPoster
     {
-        if (ScheduledRun.ReadJob(jobPath) is not { } job) return;
-        if (ScheduledPublishOutcome.Read(job.CourseCode, job.Section, job.WorkingFolder) is not { } outcome) return;
-        string sentence = ScheduledPublishOutcome.Sentence(job.CourseCode, job.Section, outcome);
-        string launch = ScheduledPublishToast.Format(new ScheduledPublishToast.Target(job.CourseCode, job.Section, job.WorkingFolder));
-        try
+        private bool _registered;
+
+        private void EnsureRegistered()
         {
+            if (_registered) return;
             AppNotificationManager.Default.Register();
+            _registered = true;
+        }
+
+        public ScheduledRunAnnouncement.Permission Permission
+        {
+            get
+            {
+                EnsureRegistered();
+                // Only a switch the teacher (or their school) turned off counts
+                // as "turned off"; anything else is tried, and a post that does
+                // not land says so on the trail.
+                return AppNotificationManager.Default.Setting switch
+                {
+                    AppNotificationSetting.DisabledForApplication or AppNotificationSetting.DisabledForUser
+                        or AppNotificationSetting.DisabledByGroupPolicy => ScheduledRunAnnouncement.Permission.NotAllowed,
+                    _ => ScheduledRunAnnouncement.Permission.Allowed,
+                };
+            }
+        }
+
+        public bool Post(string tag, string launchArgument, string sentence)
+        {
+            EnsureRegistered();
             var notification = new AppNotification(
-                $"<toast launch=\"{SecurityElement.Escape(launch)}\"><visual><binding template=\"ToastGeneric\">" +
+                $"<toast launch=\"{SecurityElement.Escape(launchArgument)}\"><visual><binding template=\"ToastGeneric\">" +
                 $"<text>{SecurityElement.Escape(sentence)}</text></binding></visual></toast>")
             {
                 // A later run of the same section REPLACES this one.
-                Tag = TagFor(job.CourseCode, job.Section, job.WorkingFolder),
+                Tag = tag,
                 Group = "scheduled",
             };
             AppNotificationManager.Default.Show(notification);
-            bool sent = notification.Id != 0;
-            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishNotification,
-                sent ? "told with a notification" : "the notification could not be sent", job.CourseCode, job.Section);
+            return notification.Id != 0;
         }
-        catch (Exception error)
-        {
-            App.LogDiagnostic("toast post: " + error.Message);
-            ActivityTrail.Note(ActivityTrail.Event.ScheduledPublishNotification,
-                "the notification could not be sent", job.CourseCode, job.Section);
-        }
-    }
-
-    /// <summary>At most 64 characters, the toast tag's limit; the folder enters as its record name's hash.</summary>
-    private static string TagFor(string course, int section, string folder)
-    {
-        string name = Path.GetFileNameWithoutExtension(TaskScheduling.HealthRecordName(course, section, folder));
-        return name.Length <= 64 ? name : name[..64];
     }
 
     // ---- The click ---------------------------------------------------------
