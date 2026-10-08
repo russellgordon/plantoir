@@ -706,8 +706,8 @@ public sealed class SharedRuleContractTests : IDisposable
                 // list_courses, the whole line, through the real tool.
                 string listed = new Plantoir.Mcp.PlantoirTools(new AssistWorkspace(dir, new FakeLauncher()))
                     .ListCourses().Split('\n').Select(l => l.TrimEnd('\r'))
-                    .Single(l => l.StartsWith("  publishes to: ", StringComparison.Ordinal));
-                Assert.Equal("  publishes to: " + card, listed);
+                    .Single(l => l.StartsWith("  deploys to: ", StringComparison.Ordinal));
+                Assert.Equal("  deploys to: " + card, listed);
                 if (!allSurfaces) continue;
 
                 string sheet = c["sheet"]!.ToString().Replace("{folder}", folder);

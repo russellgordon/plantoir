@@ -249,8 +249,8 @@ public static class UpdateWording
 {
     public const string MenuItem = "Check for Updates…";
     public const string HeldTitle = "Plantoir will finish updating once it is done {work}.";
-    public const string ScheduledWork = "publishing Section {section} of {course} on its schedule";
-    public const string ScheduledWorkUnnamed = "publishing on its schedule";
+    public const string ScheduledWork = "deploying Section {section} of {course} on its schedule";
+    public const string ScheduledWorkUnnamed = "deploying on its schedule";
     /// <summary>
     /// The contract's words, <c>{machine}</c> and all (#438): said with
     /// <see cref="Plantoir.Core.Models.MachineWord"/>'s "PC", which replaced the

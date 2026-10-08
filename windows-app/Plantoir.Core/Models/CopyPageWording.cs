@@ -21,7 +21,7 @@ public static class CopyPageWording
         ["whichFolder"] = "Folder",
         ["pagePickerPrompt"] = "Search",
         ["noPagesMatch"] = "No page of that name in this course.",
-        ["copiesStartHidden"] = "Copies start hidden, so nothing changes on any website until you publish them.",
+        ["copiesStartHidden"] = "Copies start hidden, so nothing changes on any website until you publish them and deploy.",
         ["datesAreKept"] = "The pages keep the dates they had.",
         ["nothingIsWrittenOver"] = "Nothing already in that course is changed or written over.",
         ["nothingWasCopied"] = "Nothing was copied.",
