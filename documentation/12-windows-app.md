@@ -1453,7 +1453,47 @@ What replaces the old container concepts:
   previewed (#381)"); and never a remembered process id. Built in bundle 4
   (#386, 2026-09-30): `preview.ps1`'s `Test-SectionIsBeingDeployed` and the
   window's `CourseActivity.IsPublishingSection` — see "Preview and publish
-  mechanics that match the mac (bundle 4)" above.
+  mechanics that match the mac (bundle 4)" above. #467 (2026-10-08) found two
+  bugs that guard had from its first day. Its scheduled half never matched a
+  wrapper set since #309, because the name had no folder id. And a course with
+  a space never matched, because callers quote it. Both are fixed in the
+  shared block below; see 03 → "A section being deployed".
+- **A deploy refuses while that section is still being deployed (#467 / mac
+  #439).**
+  - **The launcher.** `deploy.ps1`, and `preview.ps1 --build-only`, refuse
+    before anything changes while the section's scheduled wrapper is running
+    in this folder, or another `deploy.ps1` of it is. The block holding this
+    is identical in both launchers, with #386's reader moved into it (03 →
+    "A section still being deployed is not deployed again").
+  - **The app.** The window lifts the launcher's line
+    (`FailureExplainer.SectionDeployRefusalOf`). The window's Deploy asks
+    `MultiDestinationDeployRunner.AnswerWhenTheBuildDidNotFinish` before
+    `Result`. So a refused build leg says `DeployRefusedWhileALaterDeployWorks`
+    or `DeployRefusedWhileItsSectionDeploys`, and an ordinary broken build
+    now says `CouldNotBuildBeforeDeploying` instead of "did not finish" (mac
+    parity: that key existed and was never called). `AssistWorkspace` (in
+    `plantoir-mcp`) says the refusal for a refused build leg or for
+    all-legs-refused, and keeps its own "The build failed…" message for an
+    ordinary failure, because `CouldNotBuildBeforeDeploying` points at a
+    window that process does not have.
+  - **The kind.** `ScheduledPublishOutcome.Kind.EarlierDeployStillWorking` is
+    read and shown, never written.
+  - **What is NOT built: the mac's thirty-minute wait.** A re-set leaves the
+    working run alone (`ClearIfStillMine`), so there is no leftover run.
+  - **The residual.** A run ended mid-deploy by something other than a re-set
+    — Task Manager, or the task's `PT72H` limit — leaves its wrapper
+    `powershell.exe` working, with leases that now read as stale. The guard
+    then refuses other deploys of that section, which is correct. But a later
+    run of the section does not wait: its leases look free, its build leg is
+    refused, and it is recorded as `buildDidNotFinish`. Rare enough to record
+    rather than build.
+  - **Measured: a re-set whose moment arrives while the earlier run still
+    works never runs** (Task Scheduler `IgnoreNew`). The numbers are in 07 →
+    "Set again while the run works (#409)", and the fix is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
+  - **Known limits.** A deploy run inside another process (typed at a prompt,
+    or `-Command`) is not seen, and neither is an elevated one; the
+    self-relaunch that would see the first was rejected (03).
 - **Concurrent previews are still isolated by port, exactly as before.**
   `preview.ps1` probes a free block — since bundle 4 (#286) forty of them,
   8081 … 8471 in steps of 10, as the mac launchers do (`Find-FreePreviewPort`;
@@ -1707,7 +1747,11 @@ the same day.)
   warning is not lost; each Windows item carries only its own. (This said
   NetSparkle gathered them until 2026-10-04; with no UI factory it does not.) The mac's reasoning: [`09-mac-app.md`](09-mac-app.md) →
   "Updating itself". (Earlier drafts of this line said WinSparkle with
-  `site/appcast-windows.xml`, and before that one shared appcast.)
+  `site/appcast-windows.xml`, and before that one shared appcast.) Since
+  v1.4.4: an update marked important offers Install and Reopen alone and is
+  offered again even when skipped (#453), and the daily check starts once the
+  first window is up and never counts an offer nobody saw as an answer
+  (#465). Both are in `11-release-strategy.md` → "Updating itself on Windows".
 - **Stable code signing** (entry from the signing fix): sign dev builds
   with a stable identity or Windows will re-prompt for permissions —
   same class of problem as macOS ad-hoc signing.
@@ -3860,8 +3904,35 @@ the record's own sentence, and the trail read `ICS4U/1 · told the teacher how
 a scheduled publish went, with a notification`. **Rejected:** keeping the job file until the toast
 is posted (moving the clearing out of `Execute`) — the clearing is what makes
 the task one-shot and is guarded by the job's token; a second caller in charge
-of it is a deploy that can recur. Still owed from #212: withdrawing the toast
-when the band is dismissed (`onShow`'s dismiss case).
+of it is a deploy that can recur.
+
+**Dismissing the band takes the toast down (#464, v1.4.4).** The last of
+#212's owed items. The band's Dismiss and its X both go through
+`ScheduledRunAnnouncement.TeacherDismissed`: the record first, then
+`IPoster.Withdraw(TagFor(section))`, which `SystemToasts` does with
+`AppNotificationManager.RemoveByTagAndGroupAsync(tag, ToastGroup)`. The group
+is one constant, used by both the post and the withdrawal. A failed withdrawal
+goes to `startup.log` and never stops the dismissal. There is no trail line,
+as on the mac (`teacherDismissed`). `ScheduledRunAnnouncementTests.TheContractsOnShowCases`
+plays all four `notification.onShow` cases, the first Windows reader of them.
+The app's own `Register()` and the poster's now share one process-wide flag,
+so a withdrawal never registers twice in the app.
+
+**Measured, because a stand-in cannot show it:** the toast is posted by a
+DIFFERENT process (the scheduled run) from the one that withdraws it.
+`Plantoir.UiTests/ScheduledToastWithdrawalUiTests` runs a job set thirty days
+ago with the x64 Debug build, exactly as Task Scheduler would, so it stands
+down as too late and posts. It then finds the toast in `wpndatabase.db`,
+checks it is still there once the section is open, presses Dismiss, and finds
+it gone. Passed twice on 2026-10-08 (i5-8365U, Windows 11 Pro 26200), the
+toast filed under `{809579B5-…}`: one `HKCU\Software\Classes\AppUserModelId\{GUID}`
+per executable path, so a run and the app of the same copy share an
+identity. A toast posted by a DIFFERENT copy (the installed app against a
+Debug tree) has another identity, and this copy cannot withdraw it; only a
+developer meets that. **Rejected:** removing by tag alone (it would also take
+a same-tag toast of another group); clearing the record from the toast's own
+click; withdrawing when a later run clears the record (its own post already
+replaces the toast by tag).
 
 ### Accelerators under a dialog (#191)
 
@@ -4014,7 +4085,9 @@ window of that process and ends it, and everything still naming the folder
   without `--state-dir`, so its record and trail lines are written to the
   real state folder of the machine taking the pictures.)
 - **The folders are made by the app.** `--stage-scene provision --courses
-  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` sets a folder up and makes
+  "ICS3U:1, 2;ICS4U:1" --reference-copy ICS3U:2025` (both strings built from
+  `website/shots/marketing/folders.json` by `demo_folders.provision_courses_argument`
+  and `reference_copy_argument` since #459, never written in the script) sets a folder up and makes
   each course through the New Course panel (`AutoCreate`, after the code is
   filled in as typed, so the course gets the name a teacher is offered — the
   first folder made without that was called "Course Website"), then keeps a
@@ -4033,6 +4106,51 @@ the app set up a folder of that name; each argument now carries its own
 quotes. The app must be started through ShellExecute, never with redirected
 stdio (the leak `DrivenApp.cs` measured, which hangs course creation).
 WinUI's system title bar does NOT follow dark mode on its own: in a dark
-picture the content is dark and the title bar light, which is how the app
-looks to a teacher today, so the pictures show it (a product question, not a
-capture one).
+picture taken on 2026-10-04 the content is dark and the title bar light,
+which is how the app looked to a teacher then, so the pictures show it (a
+product question, not a capture one). Fixed on 2026-10-07 — see the next
+section; `Dress` now re-syncs the caption after it sets a scene's theme, so
+pictures taken after that carry a dark bar in the dark scenes.
+
+## The title bar follows dark and light mode (ordered 2026-10-07, ships in Windows v1.4.4)
+
+Russell's order: "The title bar should be in dark mode when the computer is in
+dark mode." Neither window extends its content into the title bar, so the
+caption is drawn by the system — and the system draws it LIGHT unless the
+window says otherwise, whatever Windows' colour mode is. In dark mode the
+content went dark under a near-white strip.
+
+**What was done.** `Services/WindowTheme.cs` is the one place: `Apply(window)`
+sets `AppWindow.TitleBar.PreferredTheme` (Windows App SDK 1.7+; the app
+resolves 1.8) to `Dark` or `Light` from the root element's `ActualTheme`
+(`RequestedTheme` first when it is set, the application's theme when the
+root has not resolved one yet), and re-applies it on the root's
+`ActualThemeChanged` and `Loaded`, with `UISettings.ColorValuesChanged`
+(marshalled to the window's dispatcher, unhooked on `Closed`) as a backstop for
+the live switch. `MainWindow` and `AssistWindow` — the only two `Window`
+subclasses; a section opens inside the main window, not in one of its own —
+call it right after `InitializeComponent`, and `MarketingShotCapturer.Dress`
+calls `WindowTheme.Sync` after setting a scene's theme. `WindowThemeSourceTests`
+fails for any `Window` subclass under `windows-app/Plantoir` that does not call
+`WindowTheme.Apply(this)`, so a window added later cannot keep the white bar.
+
+**Measured** on this PC (Windows 11 Pro 26200, x64 Debug, `--state-dir`), by
+`PrintWindow` captures of the live windows and a pixel read at the caption's
+centre: dark mode, main window caption (31, 32, 34) over content (26, 35, 34);
+the assistant window (30, 33, 34). Switching Settings to light with the app
+open turned the caption to (239, 244, 247) within four seconds, no restart,
+and back again. The caption is drawn on the same Mica as the content, so it
+reads as one surface rather than a stripe in both modes.
+
+**Rejected.** Hand-set `AppWindow.TitleBar` colours (the twelve
+`Background`/`Button*`/`Inactive*` slots): both windows sit on a Mica backdrop
+tinted by the wallpaper, so any fixed colour reads as a band against it, and
+twelve slots are twelve chances to look unlike Windows' own hover, pressed and
+inactive states. `PreferredTheme = UseDefaultAppMode`: it follows the SYSTEM,
+not the content, and the marketing capture themes the content directly, so a
+dark scene taken on a light PC would get a light bar. `DwmSetWindowAttribute`
+with `DWMWA_USE_IMMERSIVE_DARK_MODE`: the same result through P/Invoke, where
+the Windows App SDK property already exists. `ExtendsContentIntoTitleBar` with
+a custom bar: a redesign of both windows' chrome for a colour fix, and nothing
+in the app uses it today. The mac inherits nothing: its title bars already
+follow the system.

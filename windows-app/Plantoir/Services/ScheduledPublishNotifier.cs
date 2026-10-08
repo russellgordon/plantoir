@@ -29,7 +29,20 @@ namespace Plantoir.Services;
 /// </summary>
 public static class ScheduledPublishNotifier
 {
+    /// <summary>
+    /// Whether THIS PROCESS has called <see cref="AppNotificationManager.Register"/>.
+    /// One flag for the app's own registration and <see cref="SystemToasts"/>'
+    /// (#464): the app registers at launch, and a withdrawal from a band's
+    /// Dismiss must not register a second time in the same process.
+    /// </summary>
     private static bool _registered;
+
+    private static void EnsureRegistered()
+    {
+        if (_registered) return;
+        AppNotificationManager.Default.Register();
+        _registered = true;
+    }
 
     /// <summary>Register once per process. The handler goes on BEFORE Register, as the SDK requires.</summary>
     public static void Register(Action<string?> onClick)
@@ -38,8 +51,7 @@ public static class ScheduledPublishNotifier
         try
         {
             AppNotificationManager.Default.NotificationInvoked += (_, args) => onClick(args.Argument);
-            AppNotificationManager.Default.Register();
-            _registered = true;
+            EnsureRegistered();
         }
         catch (Exception error) { App.LogDiagnostic("toast registration: " + error.Message); }
     }
@@ -66,15 +78,6 @@ public static class ScheduledPublishNotifier
     /// </summary>
     public sealed class SystemToasts : ScheduledRunAnnouncement.IPoster
     {
-        private bool _registered;
-
-        private void EnsureRegistered()
-        {
-            if (_registered) return;
-            AppNotificationManager.Default.Register();
-            _registered = true;
-        }
-
         public ScheduledRunAnnouncement.Permission Permission
         {
             get
@@ -101,10 +104,30 @@ public static class ScheduledPublishNotifier
             {
                 // A later run of the same section REPLACES this one.
                 Tag = tag,
-                Group = "scheduled",
+                Group = ScheduledRunAnnouncement.ToastGroup,
             };
             AppNotificationManager.Default.Show(notification);
             return notification.Id != 0;
+        }
+
+        /// <summary>
+        /// #464: called in the APP's process for a toast the scheduled run (a
+        /// separate Plantoir.exe started by Task Scheduler) posted. Both are the
+        /// same executable, so both register the same unpackaged identity (one
+        /// <c>HKCU\Software\Classes\AppUserModelId\{GUID}</c> per executable
+        /// path), and the removal reaches the other process's toast: measured,
+        /// documentation/12-windows-app.md, "The scheduled-publish toast (#324)".
+        /// By tag AND group: by tag alone would also take a toast of another
+        /// group that happened to share the tag. Fire and forget; a failure is
+        /// written to the diagnostic log.
+        /// </summary>
+        public void Withdraw(string tag)
+        {
+            EnsureRegistered();
+            AppNotificationManager.Default.RemoveByTagAndGroupAsync(tag, ScheduledRunAnnouncement.ToastGroup)
+                .AsTask().ContinueWith(
+                    removal => App.LogDiagnostic("scheduled toast withdraw: " + removal.Exception?.GetBaseException().Message),
+                    System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 

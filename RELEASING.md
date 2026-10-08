@@ -346,8 +346,11 @@ For future-you, mid-school-year, who remembers nothing. The whys are below.
 
 6. **Deploy plantoir.app deliberately**: `python3 website/build.py --deploy`
    builds `site/` and deploys it to Netlify (delta upload; the token comes
-   from the `containerized-quartz-netlify` Keychain item, the site id from
-   `website/site.json`). The Netlify site is NOT connected to GitHub —
+   from `NETLIFY_AUTH_TOKEN`, or else the stored credential
+   `containerized-quartz-netlify` — the Keychain item on a Mac, the generic
+   Windows credential of the same name on Windows (#452) — and the site id
+   from `website/site.json`). `site/_headers` needs no hand-cleaning before
+   it: the deploy replaces its own block (#462). The Netlify site is NOT connected to GitHub —
    pushing this repository deploys nothing, which is why this step exists.
    It first reads every picture the pages show a Mac visitor and refuses if
    any lacks its window's own corners (#375; `website/SCREENSHOTS.md` → "The
@@ -520,16 +523,25 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     said "An app cast item with version 1.4.2 is already in the file". (The
     rehearsal put the stand-in in a `1.4.3\` folder and passed `-f` instead,
     which reads the version from the path; a real cut needs neither.)
-  - **The Windows app does NOT yet honour an important ("critical") mark.**
-    `--critical-versions <version>` marks the item
-    `sparkle:criticalUpdate="true"`, but all the app does with it is add
-    "; marked important" to the `update found` trail line: the offer still
-    shows Skip This Version, and a version the teacher skipped is not offered
-    again by the daily check. So a warning that must not be skipped CANNOT be
-    made so on Windows today — `appUpdates.notes.requiredWarningMarksTheUpdateImportant`
-    is owed there (its own `windows` issue, v1.4.4). Do not rely on the mark;
-    put the warning in the notes, which every later offer carries. Not
-    rehearsed, and 1.4.3 is not marked.
+  - **The Windows app honours an important ("critical") mark from 1.4.4
+    (#453).** `--critical-versions <version>` marks the item
+    `sparkle:criticalUpdate="true"`. An app at 1.4.4 or later then offers
+    Install and Reopen alone, with no Skip This Version and no Not Now
+    (closing the offer is "not now", and it is offered again the next day),
+    and offers it even to a teacher who skipped that version. The mark binds
+    every teacher still below the marked version, whichever release is newest,
+    so mark the release whose warning must not be skipped, not the next one.
+    A copy older than 1.4.4 ignores the mark, so for a warning that matters to
+    teachers on 1.4.3 or earlier, also put it in the notes, which every later
+    offer carries. Whether `--reparse-existing` keeps an earlier item's mark
+    when the feed is regenerated has not been checked: read the regenerated
+    feed's `criticalUpdate` attributes before committing it. Not rehearsed.
+    **The first cut that marks a release also proves the Esc key**, which no
+    Debug build can (it has no feed): on a Windows copy one version below the
+    marked one, wait for the important offer (or use Check for Updates…),
+    press Esc, and check that the offer closes, the trail says
+    `<version>: not now`, and Plantoir stays usable. Write what you saw in the
+    release's notes for the next cut.
 
   Check before committing: `python website/build.py --check` runs
   `website/windows_feed.py`'s checker — the feed's signature against

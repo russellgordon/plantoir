@@ -206,7 +206,8 @@ lines from deploy.sh rather than retyping them. The other three rebuild lines
 ("Could not rebuild this site before deploying it…", "The rebuilt site has not
 appeared. Nothing was deployed.") followed in v1.4.4 (#441) and the same test
 pins them, with deploy.sh's leading "❌ " trimmed; every other deploy.ps1 line
-that said "published" for a deploy moved with them (next section).
+that said "published" for a deploy moved with them ("Deploy and publish: the
+two words (v1.4.4, #443)", below).
 
 #### One rule, six readers (GitHub #136, 2026-09-25)
 
@@ -491,8 +492,9 @@ stale on a Quartz upgrade or silently break a teacher's own embedded
 built from what is really there:
 
 ```
+# Plantoir: keeps Netlify's own ad badge off. Rewritten on every deploy; edit the lines outside this block, not these.
 /*
-  Content-Security-Policy: script-src 'self' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
+  Content-Security-Policy: script-src 'self' 'unsafe-eval' 'sha256-…' 'sha256-…' … https://cdn.jsdelivr.net;
 ```
 
 Only `script-src` is set, never `default-src` — nothing else about a page
@@ -504,6 +506,43 @@ same SHA-1 manifest as every other file. It is deterministic build to build
 covered under "Why determinism matters" above. Tested in
 `scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
 runs it before the image build).
+
+**The block is marked and REPLACED, never appended again (#462).** Lines
+somebody else put in `_headers` are kept, and until 2026-10-08 the function
+kept them by appending its own block below whatever was there — including
+the block it wrote last time. A class site's `public/` is normally
+regenerated, so it rarely showed there; plantoir.app's `site/` is never
+cleaned and its `_headers` is untracked, so it gained one identical block per
+deploy (three in the main checkout by October 2026). Harmless while every
+block carried the same hashes; the first time an inline script changed, the
+OLD block would still be there allowing only the old hash. Every CSP a
+browser is sent is enforced, so if Netlify sends both `/*` policies (how it
+merges two blocks setting the same header was NOT measured, since that needs
+a deploy), the changed script is blocked silently — the site's theme and
+navigation script, for plantoir.app. Now the block sits under the `#` marker
+line shown above (a comment to Netlify), and every call takes out what it
+wrote before and writes it again. Blocks from before the marker are
+recognised by their exact shape — a `/*` line whose ONLY header is
+`Content-Security-Policy: script-src 'self' 'unsafe-eval'…` — so the next
+deploy cleans an old file by itself and nobody has to delete it by hand. A
+header somebody else put under a `/*` always keeps its `/*`: an UNMARKED
+`/*` block with any other header in it is somebody's own and is kept whole,
+and a MARKED block with a header added under it — above our policy line or
+below it — loses only the marker and our policy line, so the added header
+stays site-wide instead of falling under whatever path came before it
+(Netlify reads an indented line as belonging to the last path above it), and
+the old policy never survives beside the new one. A marker no longer
+followed by `/*` loses only the marker line. Not handled, because it is contrived: an old unmarked
+block followed by a blank or `#` line and then an indented header — the
+check looks one line ahead. The file is
+written with LF on every machine: `Path.write_text` wrote CR LF on Windows,
+so the same site deployed from the PC and from a Mac gave different bytes.
+Rejected: deleting `_headers` before every write (throws away a person's own
+lines, and on a class site the build, not this function, decides what
+`public/` holds), and rewriting the whole file from scratch (the same loss).
+`TheBlockIsReplacedNotAppendedTests` in the same test file pins it; both
+apps inherit it, since this is shared Python and the mac deploys
+plantoir.app through it too.
 
 **Cloudflare Pages and `local_folder` pay nothing for this.** It is a
 problem Netlify created, so only a Netlify deploy should carry the cost —
@@ -1516,8 +1555,10 @@ was put.
   says which copy a click started.
 
 **Windows** matches the rule (the contract's `notification` cases), and the
-delivery is theirs: their run is PowerShell under Task Scheduler with no app
-process alive, so a toast must be attributed to Plantoir's own application
+delivery is theirs: their run is `Plantoir.exe --run-scheduled-deploy`,
+started by Task Scheduler with no window, which runs the PowerShell wrapper
+(since bundle 3; before that it was the wrapper alone, with no app process),
+so a toast must be attributed to Plantoir's own application
 identity, and toasts need no permission question — only the contract's
 `allowed` and `notAllowed` rows apply there. `platformDifferences.owed` carries
 it; GitHub #212 carries the ask. Windows' toast shipped with #324 and **posted
@@ -1526,7 +1567,9 @@ run, and the run's own one-shot clearing had deleted it. What the toast needs
 is now read before the run; `documentation/12-windows-app.md` → "The
 scheduled-publish toast (#324)" has the measurement and the fix. The mac's
 `announceThenLeave` posts before the job is booted out, so it never had this
-shape.
+shape. Since #464 (v1.4.4) dismissing the section's band in Windows' app
+withdraws the toast, as on the mac, and that was measured across the two
+processes; same section of doc 12.
 
 ### Clicking the notification opens the section (#306)
 
@@ -2988,6 +3031,42 @@ Pinned by `ScheduledDeployTests.testSettingASectionAgainWhileItsRunWorksBootsThe
 and `DeployWhileItsSectionDeploysTests`. The boot-out order itself has no
 contract case — it is two `launchctl` calls on the mac and Task Scheduler on
 Windows — but the guard and the wait do.
+
+**Windows (#467, 2026-10-08).** These are the facts the mac must KNOW. None of
+them needs anything done on the mac.
+
+- **The launchers' guard is there too.** `deploy.ps1` and `preview.ps1`'s
+  build leg run all 23 `launcherCases` (see [03](03-launcher-scripts.md) →
+  "A section still being deployed is not deployed again").
+- **Windows has the mac's split.** The task runs
+  `Plantoir.exe --run-scheduled-deploy "<task name>"`, which waits for the
+  course and then runs its wrapper as `powershell.exe -File`. A task set since
+  #309 names its folder. So the four cases once marked `appliesOn: ["mac"]`
+  hold there as written and lost the mark. That edit was made to the
+  contract's authored half; no mac test reads the field.
+- **The thirty-minute wait has no Windows counterpart, and none is built.** A
+  re-set leaves the running instance alone (`ClearIfStillMine`), so no
+  leftover run exists. Its leases stay live for the whole run, because its
+  `Plantoir.exe` holds them across the wrapper.
+- **What Task Scheduler does with the new moment was MEASURED, and it is
+  worse than "the new run waits".** The test machine was RUSSELL_WINDOWS, an
+  Intel i5-8365U running Windows 11 Pro build 26200, on 2026-10-08. A
+  throwaway task was registered exactly as `TaskScheduling.TaskXml` registers
+  one: `IgnoreNew`, `InteractiveToken`, `LeastPrivilege`, `PT72H`, set from
+  XML with `schtasks /Create /F`. Its action was a 120-second sleeper.
+  - It fired at 00:29:29. The sleeper's first line landed 16 s later.
+  - At 00:29:53, with that instance still running, the task was set again for
+    00:30:18.
+  - `/Create /F` did NOT end the running instance, which finished its full
+    120 s at 00:31:46.
+  - The new moment fired: Last Run Time moved to 00:30:18. But Last Result
+    was `-2147020576` (`0x800710E0`, the request refused), and the new run
+    NEVER STARTED. Once the first instance ended, the task read Ready with no
+    next run.
+  - So on Windows, a section set again for a moment that arrives while its
+    earlier run still works is silently not deployed, and no outcome record
+    is written. That is a separate fault and is not fixed under #467; it is
+    [#470](https://github.com/russellgordon/plantoir/issues/470).
 
 ### The window's acts read the saved settings too (#335)
 

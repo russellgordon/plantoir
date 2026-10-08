@@ -500,8 +500,15 @@ function Find-FreePreviewPort {
     return $null
 }
 
+# >>> DEPLOY WHILE ITS SECTION DEPLOYS BLOCK >>> - identical in preview.ps1 and
+# deploy.ps1. LauncherRulesContractTests checks that the two copies match, and
+# windows-app/test_launcher_rules.ps1 runs every contract case against EACH
+# copy. Keep the markers. ASCII only: both files are read by Windows
+# PowerShell 5.1 without a BOM, so the cross, the dot and the dash are
+# written as code points.
+
 # One line on the teacher's activity trail, for a refusal made HERE - a
-# preview typed at a command line has no app to read a marker, and a refusal
+# launcher typed at a command line has no app to read a marker, and a refusal
 # a teacher met there is exactly the one nobody else saw. Same file, same
 # stamp, same lock as the app's own writer (ActivityTrail.Append: the named
 # mutex Local\PlantoirActivityTrail, an append opened to share), so two
@@ -527,28 +534,43 @@ function Write-TrailLine {
     } catch {}
 }
 
-# ---- A section being deployed cannot be previewed (#386 / mac #381) ----
-# contracts/shared-rules.json -> previewWhileItsSectionDeploys, the launcher
-# layer: a serving run reads the LIVE process table (Win32_Process - never a
-# remembered process id) for a deploy of this course and section:
-#   * deploy.ps1 run as a PROGRAM (-File <...\deploy.ps1>), whose own
-#     arguments BEGIN with the course, read whole ("AP CALC" is two words;
-#     CALC 2 is not AP CALC 2), then exactly this section (1 is not 12) -
-#     not --reset-token, --logout or --help, which deploy nothing. Its folder
-#     is the script's own directory when the path names one; a relative path
+# ---- Who is deploying this section, from the LIVE process table ----
+# Two guards ask this, and both read Win32_Process - never a remembered
+# process id, a lease file or an outcome record, so nothing left on disk can
+# refuse a deploy for ever:
+#   * preview.ps1 on a SERVING run (#386 / mac #381,
+#     contracts/shared-rules.json -> previewWhileItsSectionDeploys);
+#   * deploy.ps1, and preview.ps1 --build-only (#467 / mac #439,
+#     contracts/shared-rules.json -> deployWhileItsSectionDeploys).
+# What counts, each only as the PROGRAM (Get-LaunchedScriptIndex):
+#   * 'later' - a deploy set for later of C/S whose wrapper is running: the
+#     script Task Scheduler's run hands powershell.exe, named
+#     SafeName(TaskScheduling.NameFor(C, S, folder)) + '.ps1', carrying THIS
+#     folder's id (#309), or the folder-less name a task set before #309
+#     still runs (counted for every folder: it names none). The app's own
+#     `Plantoir.exe --run-scheduled-deploy "<task name>"` line does NOT count
+#     on its own: that run waits up to ten minutes for the course BEFORE it
+#     writes and starts its wrapper, and counting it would refuse the
+#     window's own deploy while the run waits for the window. LauncherRules-
+#     ContractTests pins these names against the app's own.
+#   * 'another' - deploy.ps1 C S, whose own arguments BEGIN with the course,
+#     read whole ("AP CALC" is two words however the caller quoted it; CALC 2
+#     is not AP CALC 2), then exactly this section (1 is not 12) - not
+#     --reset-token, --logout or --help, which deploy nothing. Its folder is
+#     the script's own directory when the path names one; a relative path
 #     names none, and a deploy of this very section whose folder cannot be
 #     told still counts (the safe side for the deploy).
-#   * a deploy set for later of C/S: the wrapper Task Scheduler runs, named
-#     SafeName(TaskScheduling.NameFor(C, S)) + '.ps1' - the name is BUILT the
-#     way the app builds it (#401's note 2: the contract's labelCodeCases
-#     describe the mac's launchd label, not this task name, and are not run
-#     here). The task name carries no folder, so it counts for every folder
-#     holding that course and section (the mac's pre-#237 limit).
-# preview.ps1 --build-only is NOT a deploy: it is also the assistant's
-# "rebuild the preview". A process that merely MENTIONS deploy.ps1, and this
-# run's own ancestors, never count. A table that cannot be read - the query
-# fails, or its answer does not list this run ($PID) - lets the preview
-# THROUGH (#401's note 1): failing closed blocks every preview until it reads.
+# 'later' wins when both are seen: a wrapper's own deploy leg is in the table
+# beside it. This run and its ancestors never count, so a scheduled run's own
+# legs are never refused by its own wrapper, and a folder deploy's own
+# rebuild is never refused by the deploy.ps1 that started it. A table that
+# cannot be read - the query fails or times out, or its answer does not list
+# this run ($PID) - lets the run THROUGH: failing closed would refuse every
+# deploy, and every scheduled run's own legs, for as long as it cannot read.
+# Known limit: a script typed at an interactive prompt (.\deploy.ps1 ICS4U 2)
+# runs INSIDE that prompt's process, whose line names no script, so it is not
+# seen; nor is a process started elevated, whose line an ordinary one cannot
+# read (documentation/03-launcher-scripts.md).
 function Split-CommandLine([string]$Line) {
     $words = New-Object System.Collections.Generic.List[string]
     if (-not $Line) { return ,$words }
@@ -558,19 +580,59 @@ function Split-CommandLine([string]$Line) {
     return ,$words
 }
 
-function Get-ScheduledDeployScriptName([string]$Course, [string]$Section) {
-    # TaskScheduling.NameFor, then SafeName: letters and digits kept, anything
-    # else '-'. Must stay the app's own shape.
-    $taskName = 'Plantoir deploy ' + $Course.ToUpperInvariant() + ' section ' + $Section
-    $safe = -join ($taskName.ToCharArray() | ForEach-Object { if ([char]::IsLetterOrDigit($_)) { $_ } else { '-' } })
-    return $safe + '.ps1'
+# Which word is the script a process is RUNNING, or -1: the word after -File
+# (or -f, -fi, -fil - Windows PowerShell takes any of them), or, for
+# powershell.exe and pwsh themselves, the first *.ps1 handed to them as a
+# plain word. Nothing after -Command or -EncodedCommand is a program: that
+# script is only mentioned, or run by a shell whose own child is the program.
+function Get-LaunchedScriptIndex($Words) {
+    if ($null -eq $Words -or $Words.Count -lt 2) { return -1 }
+    $program = ($Words[0] -split '[\\/]')[-1]
+    $isShell = $program -imatch '^(powershell|pwsh)(\.exe)?$'
+    for ($i = 1; $i -lt $Words.Count; $i++) {
+        $word = [string]$Words[$i]
+        if ($word.Length -gt 1 -and ($word.StartsWith('-') -or $word.StartsWith('/'))) {
+            $option = $word.Substring(1)
+            if ('file'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase)) {
+                if ($i + 1 -lt $Words.Count) { return $i + 1 }
+                return -1
+            }
+            if ('command'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase) -or
+                'encodedcommand'.StartsWith($option, [StringComparison]::OrdinalIgnoreCase) -or
+                $option -ieq 'ec') { return -1 }
+            continue
+        }
+        if ($isShell -and $word -ilike '*.ps1') { return $i }
+    }
+    return -1
 }
 
-function Test-SectionIsBeingDeployed {
-    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [uint32]$Self)
-    if ($null -eq $Snapshot) { return $false }
+# The names a deploy set for later of C/S in THIS folder can carry: the task
+# TaskScheduling.NameFor names (with the folder id, #309) and the one
+# OldNameFor named (none) - a task set before #309 still runs under it, and
+# names no folder, so it counts for every folder. Must stay the app's own
+# shape; LauncherRulesContractTests compares them with the app's.
+function Get-ScheduledDeployTaskNames([string]$Course, [string]$Section, [string]$FolderId) {
+    $old = 'Plantoir deploy ' + $Course.ToUpperInvariant() + ' section ' + $Section
+    if ($FolderId) { return @(($old + ' ' + $FolderId), $old) }
+    return @($old)
+}
+
+# The wrapper each of those tasks runs: TaskScheduling.WrapperScriptPath's
+# leaf, through SafeName (letters and digits kept, anything else '-').
+function Get-ScheduledDeployScriptNames([string]$Course, [string]$Section, [string]$FolderId) {
+    foreach ($name in @(Get-ScheduledDeployTaskNames $Course $Section $FolderId)) {
+        (-join ($name.ToCharArray() | ForEach-Object { if ([char]::IsLetterOrDigit($_)) { $_ } else { '-' } })) + '.ps1'
+    }
+}
+
+# 'later', 'another', or $null (nothing, or a table that cannot be trusted).
+# Pure over its arguments, so test_launcher_rules.ps1 can run the cases.
+function Get-WhatIsDeployingThisSection {
+    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
+    if ($null -eq $Snapshot) { return $null }
     $rows = @($Snapshot)
-    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $false }
+    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $null }
 
     # This run's own ancestors never count.
     $ancestors = New-Object 'System.Collections.Generic.HashSet[uint32]'
@@ -584,23 +646,26 @@ function Test-SectionIsBeingDeployed {
     }
 
     $courseWords = @(($Course.Trim() -split '\s+') | Where-Object { $_ })
-    $scheduledName = Get-ScheduledDeployScriptName (($courseWords -join ' ')) $Section
+    $scheduledNames = @(Get-ScheduledDeployScriptNames ($courseWords -join ' ') $Section $FolderId)
+    $seen = $null
     foreach ($proc in $rows) {
         $processId = [uint32]$proc.ProcessId
         if ($processId -eq $Self -or $ancestors.Contains($processId)) { continue }
         $words = Split-CommandLine ([string]$proc.CommandLine)
-        # The program is the script handed to -File; anything else only
-        # mentions it.
-        $at = -1
-        for ($i = 0; $i -lt $words.Count - 1; $i++) { if ($words[$i] -ieq '-File') { $at = $i + 1; break } }
+        $at = Get-LaunchedScriptIndex $words
         if ($at -lt 0) { continue }
         $script = $words[$at]
         $leaf = ($script -split '[\\/]')[-1]
-        if ($leaf -ieq $scheduledName) { return $true }
+        if ($scheduledNames -icontains $leaf) { return 'later' }
         if ($leaf -ine 'deploy.ps1') { continue }
 
-        $own = @()
-        if ($words.Count -gt $at + 1) { $own = @($words.GetRange($at + 1, $words.Count - $at - 1)) }
+        # Its own arguments, each split into words: the app and the wrapper
+        # QUOTE a course with a space ("AP CALC"), and one quoted word must
+        # read as the two the course is.
+        $own = New-Object System.Collections.Generic.List[string]
+        for ($k = $at + 1; $k -lt $words.Count; $k++) {
+            foreach ($piece in ([string]$words[$k] -split '\s+')) { if ($piece) { $own.Add($piece) } }
+        }
         if ($own.Count -lt $courseWords.Count + 1) { continue }
         $same = $true
         for ($w = 0; $w -lt $courseWords.Count; $w++) { if ($own[$w] -ine $courseWords[$w]) { $same = $false; break } }
@@ -615,10 +680,82 @@ function Test-SectionIsBeingDeployed {
                 if ($folder -and $Here -and ($folder -ine $Here)) { continue }
             } catch {}
         }
-        return $true
+        $seen = 'another'
+    }
+    return $seen
+}
+
+# #386's question: is this section being deployed at all? Everything the
+# deploy guard counts, and one thing more: a deploy set for later whose run is
+# still WAITING for the course - Plantoir.exe --run-scheduled-deploy "<task>"
+# for C/S, before it has started its wrapper. A preview counts that run (mac
+# #381's rule: its runner lives for the whole run) because the preview would
+# be serving from the folder the run is about to build into; a DEPLOY does
+# not, because that run may be waiting for the very deploy it would refuse.
+function Test-SectionIsBeingDeployed {
+    param($Snapshot, [string]$Course, [string]$Section, [string]$Here, [string]$FolderId, [uint32]$Self)
+    if (Get-WhatIsDeployingThisSection -Snapshot $Snapshot -Course $Course -Section $Section -Here $Here -FolderId $FolderId -Self $Self) { return $true }
+    if ($null -eq $Snapshot) { return $false }
+    $rows = @($Snapshot)
+    if (-not ($rows | Where-Object { [uint32]$_.ProcessId -eq $Self })) { return $false }
+    $courseWords = @(($Course.Trim() -split '\s+') | Where-Object { $_ })
+    $taskNames = @(Get-ScheduledDeployTaskNames ($courseWords -join ' ') $Section $FolderId)
+    foreach ($proc in $rows) {
+        if ([uint32]$proc.ProcessId -eq $Self) { continue }
+        $words = Split-CommandLine ([string]$proc.CommandLine)
+        if ($words.Count -lt 1 -or (($words[0] -split '[\\/]')[-1]) -inotmatch '^Plantoir(\.exe)?$') { continue }
+        for ($i = 1; $i -lt $words.Count - 1; $i++) {
+            if ($words[$i] -ieq '--run-scheduled-deploy' -and ($taskNames -icontains $words[$i + 1])) { return $true }
+        }
     }
     return $false
 }
+
+# The live table, or $null when it cannot be read. Thirty seconds at most: a
+# wedged WMI service must not turn "let it through" into a run that hangs
+# with its leases held at six in the morning.
+function Get-ProcessTable {
+    try {
+        return ,@(Get-CimInstance Win32_Process -OperationTimeoutSec 30 -ErrorAction Stop | Select-Object ProcessId, ParentProcessId, CommandLine)
+    } catch {
+        return $null
+    }
+}
+
+# ---- A section still being deployed is not deployed again (#467 / mac #439) ----
+# Asked by deploy.ps1 (not with --reset-token or --logout, which deploy
+# nothing) and by preview.ps1 on a --build-only run only - a serving preview
+# has #386's own guard, which counts every deploy - after the arguments are
+# checked and before anything is changed. LEG is 'deploy' or 'build'. The
+# sentences are contracts/shared-rules.json -> deployWhileItsSectionDeploys.
+# sentences.launcher, and the trail lines that entry's launcherLines; both are
+# checked word for word by test_launcher_rules.ps1. Exit 1, as #386's.
+function Stop-WhileThisSectionDeploys([string]$Course, [string]$Section, [string]$Leg) {
+    $who = Get-WhatIsDeployingThisSection -Snapshot (Get-ProcessTable) -Course $Course -Section $Section -Here $WORKDIR_PHYSICAL -FolderId $WORKDIR_ID -Self ([uint32]$PID)
+    if (-not $who) { return }
+    $cross = [char]::ConvertFromUtf32(0x274C)
+    $dot = [char]0x00B7
+    $dash = [char]0x2014
+    Write-Host ""
+    if ($who -eq 'later' -and $Leg -eq 'build') {
+        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be built until that has finished." -f $cross, $Course, $Section)
+    } elseif ($who -eq 'later') {
+        Write-Host ("{0} {1} section {2} is still being deployed by a deploy that was set for later, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
+    } elseif ($Leg -eq 'build') {
+        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be built until that has finished." -f $cross, $Course, $Section)
+    } else {
+        Write-Host ("{0} {1} section {2} is already being deployed, so it cannot be deployed again until that has finished." -f $cross, $Course, $Section)
+    }
+    Write-Host "   Nothing was changed."
+    Write-Host ""
+    if ($who -eq 'later') {
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was still being deployed by a deploy that was set for later" -f $Course, $Section, $dot, $Leg, $dash)
+    } else {
+        Write-TrailLine ("{0}/{1} {2} the {3} stopped before it started {4} this section was already being deployed" -f $Course, $Section, $dot, $Leg, $dash)
+    }
+    exit 1
+}
+# <<< DEPLOY WHILE ITS SECTION DEPLOYS BLOCK <<<
 
 # ---- Stop mode -------------------------------------------------------
 # .\preview.ps1 CODE N --stop : kill this section's preview processes.
@@ -653,15 +790,22 @@ if ($NATIVE_RUNTIME -and $STOP_MODE) {
 # changed. The cross is written as a code point: this file is read by
 # Windows PowerShell 5.1 without a BOM, so only ASCII may appear in strings.
 if (-not $BUILD_ONLY) {
-    $table = $null
-    try { $table = @(Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object ProcessId, ParentProcessId, CommandLine) } catch { $table = $null }
-    if (Test-SectionIsBeingDeployed -Snapshot $table -Course $COURSE -Section ([string]$SECTION) -Here $WORKDIR_PHYSICAL -Self ([uint32]$PID)) {
+    if (Test-SectionIsBeingDeployed -Snapshot (Get-ProcessTable) -Course $COURSE -Section ([string]$SECTION) -Here $WORKDIR_PHYSICAL -FolderId $WORKDIR_ID -Self ([uint32]$PID)) {
         $cross = [char]::ConvertFromUtf32(0x274C)
         Write-Host ("{0} {1} section {2} is being deployed right now, so it cannot be previewed until that has finished." -f $cross, $COURSE, $SECTION)
         Write-Host "   Nothing was changed."
-        Write-TrailLine ("{0}/{1} {2} the preview stopped before building {2} this section was being deployed" -f $COURSE, $SECTION, [char]0x00B7)
+        Write-TrailLine ("{0}/{1} {2} the preview stopped before building {3} this section was being deployed" -f $COURSE, $SECTION, [char]0x00B7, [char]0x2014)
         exit 1
     }
+}
+
+# ---- Refuse a build while this section is being deployed (#467 / mac #439) ----
+# A --build-only run is the build leg of the window's Deploy, of an
+# assistant's deploy and of a scheduled run - and the assistant's "rebuild
+# the preview" - and it rebuilds the very folder a deploy of this section is
+# uploading from. --stop never builds, so it is not asked.
+if ($BUILD_ONLY -and -not $STOP_MODE) {
+    Stop-WhileThisSectionDeploys $COURSE ([string]$SECTION) 'build'
 }
 
 # ---- Validate SECTION against course_config.json ----
@@ -747,7 +891,7 @@ if (-not $BUILD_ONLY) {
         # and its exit code.
         Write-Host "Every address Plantoir can use for a preview is taken."
         Write-Host "Close Plantoir's windows for your other working folders, or restart this PC, then try again."
-        Write-TrailLine ("{0}/{1} {2} stopped before starting {2} every address Plantoir can use for a preview was taken" -f $COURSE, $SECTION, [char]0x00B7)
+        Write-TrailLine ("{0}/{1} {2} stopped before starting {3} every address Plantoir can use for a preview was taken" -f $COURSE, $SECTION, [char]0x00B7, [char]0x2014)
         exit 1
     }
     $argList = @($argList | Where-Object { $_ -notlike '--port=*' }) + "--port=$HOST_PREVIEW_PORT"

@@ -183,18 +183,91 @@ public static class AppUpdates
         return string.Join("\n\n", withNotes.Select(release => $"{release.Version}\n{release.Notes!.Trim()}"));
     }
 
+    // ---- Whether, and how, a new version is offered (#453) ---------------------
+
+    /// <summary>What the offer does: whether it is shown at all, and whether it is important.</summary>
+    /// <param name="Show">Whether the teacher sees an offer.</param>
+    /// <param name="Important">No Skip This Version and no Not Now: the only button is Install and Reopen.</param>
+    public sealed record Offer(bool Show, bool Important)
+    {
+        public bool AllowsSkip => Show && !Important;
+        public bool AllowsLater => Show && !Important;
+    }
+
+    /// <summary>
+    /// <c>appUpdates.offerCases</c> (#453): an update with a REQUIRED warning is
+    /// marked important (<c>notes.requiredWarningMarksTheUpdateImportant</c>),
+    /// so a teacher cannot step past the warning written for it.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>ANY newer item marked important makes the offer important</b>,
+    /// not only the newest: a teacher who skipped an important 1.4.4 is still
+    /// bound by it when 1.4.5 is offered, as on the mac a later release keeps an
+    /// earlier one important for teachers still below it (RELEASING.md,
+    /// <c>--required-warning</c>).</para>
+    /// <para><b>An important offer is shown even when the newest version was
+    /// skipped</b>: the skip was given to an offer that had a Skip button, and a
+    /// remembered skip must not hide a warning. The daily check otherwise says
+    /// nothing about a version the teacher skipped; Check for Updates… always
+    /// shows what it found.</para>
+    /// <para>Closing the window (Esc) stays possible and is "not now", offered
+    /// again at the next daily check (Russell's ruling on the plan, 2026-10-08):
+    /// a window the teacher cannot leave was rejected.</para>
+    /// </remarks>
+    /// <param name="newerNewestFirst">The feed's items newer than the running
+    /// version, newest first, each with its important mark.</param>
+    /// <param name="skipped">The version the teacher last chose Skip This Version for, if any.</param>
+    /// <param name="teacherAsked">Check for Updates…, rather than the daily check.</param>
+    public static Offer DecideOffer(IReadOnlyList<(string Version, bool Important)> newerNewestFirst,
+                                    string? skipped, bool teacherAsked)
+    {
+        if (newerNewestFirst.Count == 0) return new Offer(false, false);
+        bool important = newerNewestFirst.Any(item => item.Important);
+        bool show = teacherAsked || important || newerNewestFirst[0].Version != skipped;
+        return new Offer(show, important);
+    }
+
+    // ---- One spelling of the version (#465) ------------------------------------
+
+    /// <summary>
+    /// "1.4.3": how the trail spells this app's version, the same way the feed,
+    /// the releases and Skip This Version spell it. Until #465 the updater and
+    /// <c>app updated</c> wrote "1.4 (3)" (the problem report's form) beside the
+    /// feed's "1.4.3", so one trail read "found 1.4.3, running 1.4 (2)".
+    /// </summary>
+    public static string Spell(Version version) =>
+        $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}";
+
+    /// <summary>
+    /// A version as the trail spells it, reading the older "1.4 (3)" form as
+    /// "1.4.3" — what <c>Settings.LastLaunchedVersion</c> holds from every
+    /// launch before #465. Anything else is returned as it is.
+    /// </summary>
+    public static string? Respell(string? stored)
+    {
+        if (string.IsNullOrWhiteSpace(stored)) return stored;
+        var old = System.Text.RegularExpressions.Regex.Match(stored.Trim(), @"^(\d+)\.(\d+) \((\d+)\)$");
+        return old.Success ? $"{old.Groups[1].Value}.{old.Groups[2].Value}.{old.Groups[3].Value}" : stored;
+    }
+
     // ---- "app updated" (activityTrail) ----------------------------------------
 
     /// <summary>
     /// The trail line at the first launch whose version differs from the last
     /// launch's, or null. Covers a copy installed by hand too, which is why it
-    /// is owed from the day it is read, updater or not.
+    /// is owed from the day it is read, updater or not. The stored version is
+    /// read in either spelling (<see cref="Respell"/>), so the first launch of
+    /// the version that changed the spelling is not taken for an update, and
+    /// a real one is written in one spelling.
     /// </summary>
-    public static string? AppUpdatedLine(string? lastLaunched, string running, bool byItsOwnUpdater) =>
-        string.IsNullOrWhiteSpace(lastLaunched) || lastLaunched == running
+    public static string? AppUpdatedLine(string? lastLaunched, string running, bool byItsOwnUpdater)
+    {
+        string? last = Respell(lastLaunched);
+        return string.IsNullOrWhiteSpace(last) || last == Respell(running)
             ? null
-            : $"updated from {lastLaunched} to {running}, " +
+            : $"updated from {last} to {Respell(running)}, " +
               (byItsOwnUpdater ? "by its own updater" : "by hand (a new copy installed some other way)");
+    }
 
     /// <summary>
     /// The file installer.iss leaves in the state folder (<c>{localappdata}\Plantoir</c>)
