@@ -47,7 +47,7 @@ nonisolated enum CopyPageWording {
     /// The promise the whole feature rests on, said where the teacher is
     /// deciding rather than afterwards.
     static let copiesStartHidden: String =
-        "Copies start hidden, so nothing changes on any website until you publish them."
+        "Copies start hidden, so nothing changes on any website until you publish them and deploy."
 
     /// Said once beside the summary, because a page copied from last year
     /// keeps last year's date and a teacher who publishes it without looking
