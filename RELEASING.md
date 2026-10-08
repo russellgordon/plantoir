@@ -110,7 +110,7 @@ whether a teacher will notice, and whether both platforms have it.
 **Clear this list when the tag goes up**, in the same commit that moves the
 version line. A list that survives its own release is worse than no list.
 
-| Landed | What a teacher sees | Platforms | Log |
+| Landed | What a teacher sees | Platforms | Issue |
 |---|---|---|---|
 
 ## Warnings the release notes MUST carry
