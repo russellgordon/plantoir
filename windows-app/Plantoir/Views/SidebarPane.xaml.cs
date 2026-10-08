@@ -1694,6 +1694,7 @@ public sealed partial class SidebarPane : UserControl
     {
         AddCourseButton.IsEnabled = refusal is null;
         ToolTipService.SetToolTip(AddCourseButton, refusal ?? "Add a course or club");
+        AutomationProperties.SetHelpText(AddCourseButton, refusal ?? "");   // read aloud, unlike a tooltip
     }
 
     public async Task OpenNewCourseWizard(string? autoCreateCode = null, string? autoSections = null)

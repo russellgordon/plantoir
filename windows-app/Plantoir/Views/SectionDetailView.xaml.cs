@@ -426,6 +426,9 @@ public sealed partial class SectionDetailView : UserControl
             : "Preview this section's website");
         // Stopping a preview already under way is always allowed.
         PreviewButton.IsEnabled = running || (!IsBusy && !building && notReady is null);
+        // The reason, where a screen reader reads it too (a tooltip is not).
+        AutomationProperties.SetHelpText(PreviewButton, running ? "" : notReady ?? "");
+        AutomationProperties.SetHelpText(DeployButton, notReady ?? "");
 
         // Which task owns the console: the running one, else the most recent.
         // Bind ONCE per runner (in the constructor) and only swap which is
