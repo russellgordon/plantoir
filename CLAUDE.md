@@ -77,9 +77,9 @@ Neither app contains toolchain logic of its own: they write the same
    - **anything architectural also has a section in the
      [`documentation/`](documentation/README.md) page that owns its subject** —
      the build pipeline in 05, publishing in 07, the assistant in 10, and so on.
-     A log row records a decision; the deep dive explains it well enough to
-     implement. Say what you measured and what you REJECTED: a behaviour can be
-     read off the code, the reason for it cannot.
+     The closing comment records a decision; the deep dive explains it well
+     enough to implement. Say what you measured and what you REJECTED: a
+     behaviour can be read off the code, the reason for it cannot.
    - **a GitHub issue is opened, labelled `windows`, in the same session** —
      one short paragraph naming what the change is, what Windows inherits free,
      what they owe, and a pointer to the section that explains it. Give it a
@@ -134,8 +134,9 @@ Neither app contains toolchain logic of its own: they write the same
      and dropping that sentence without saying what took its place would leave
      nobody knowing where a finished piece gets written down.
    - **The closed issues, filtered by milestone, are the record of the
-     product** — of what a teacher can see on either platform in a release.
-     (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
+     product** — of what a teacher can see on either platform in a release;
+     before the cut, `RELEASING.md`'s "Landed since … ships in the next
+     release" table says which platforms have each piece. (Until 2026-10-08 this bullet asked for a `GUI-IMPROVEMENTS.md` row for
      anything a teacher can see; the log is closed to new entries, #480.)
    - **anything measured is written with its NUMBERS and the hardware they
      came from.** The mac side cannot find out what a Windows teacher's
@@ -300,7 +301,8 @@ Neither app contains toolchain logic of its own: they write the same
    the commit-per-piece order prevents is unchanged: one session's worth of
    unrelated work in one working tree — forty files, a dozen decisions
    tangled together, no way to undo one piece without unpicking the rest —
-   and a `GUI-IMPROVEMENTS.md` row with no commit behind it.
+   and (while the log was open) a `GUI-IMPROVEMENTS.md` row with no commit
+   behind it.
 
 7. **Colima is shared with other projects** on this machine (Supabase local dev,
    among others). Never `colima stop` unless `docker ps -q` comes back empty —
@@ -510,9 +512,9 @@ Neither app contains toolchain logic of its own: they write the same
       further build. The last act before "this is ready" is to go looking for
       every place that describes what you changed, and fix the ones the change
       made wrong. Start with `documentation/`, which is the one most easily forgotten
-      because nothing in the daily rhythm points at it: an issue and a
-      `GUI-IMPROVEMENTS.md` row get written because rules 3 to 5 demand them,
-      and the deep dive gets written because somebody remembers. On the session
+      because nothing in the daily rhythm points at it: an issue and its
+      closing comment get written because rules 3 to 5 demand them, and the
+      deep dive gets written because somebody remembers. On the session
       this rule came from, four places in `documentation/` described the rule
       that had just been replaced, three of them wrongly, and one of them did
       not document a launcher flag the app has been calling for weeks.
@@ -959,9 +961,9 @@ through the app bundle — rebuild the app to test it end to end.
 
 The same rule used to be written in four places at once, and three of them
 would drift — a sentence in the Swift that says it, in the test that pins it,
-in the log row that specified it, and in the issue telling Windows to copy
-it. So each kind of truth now has **one** home, and everywhere else points at
-it rather than restating it:
+in the log row that specified it (while `GUI-IMPROVEMENTS.md` was open), and
+in the issue telling Windows to copy it. So each kind of truth now has **one**
+home, and everywhere else points at it rather than restating it:
 
 | The question | The one place that answers it |
 |---|---|

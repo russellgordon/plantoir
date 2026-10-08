@@ -1,4 +1,7 @@
-# GUI Improvement Log
+# GUI Improvement Log — closed to new entries 2026-10-08
+
+*(The two paragraphs below describe the log while it was open, 2026-08-09 to
+2026-10-08; the closing notice further down says what replaced it.)*
 
 A running log of improvement instructions for the graphical interfaces to
 this toolchain. Two purposes:

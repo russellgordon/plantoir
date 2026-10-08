@@ -42,7 +42,9 @@ Additional actions: Add Section (course context menu), Open in Obsidian
 (vault registration included), an Archived sidebar group with restore,
 per-section settings for grade-in-title (with a repetition warning) and a
 custom domain, and a custom About panel with the Icon Composer app icon.
-The complete behavioural log is `../GUI-IMPROVEMENTS.md`.
+The behavioural log to 2026-10-08 is `../GUI-IMPROVEMENTS.md`, closed to new
+entries since then (#480); after that date, the closed GitHub issues by
+milestone.
 
 ## Building
 
