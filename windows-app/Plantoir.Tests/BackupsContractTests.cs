@@ -265,4 +265,23 @@ public class BackupDeleterTests
         Assert.Contains("deleted 1 backup of ICS3U, 11.3 MB together: ICS3U_backup_2026-09-01_120000.zip", line);
         Assert.Contains("kept because an open assistant conversation can restore from it: ICS3U_backup_2026-09-02_120000_assistant-section2.zip", line);
     }
+
+    /// <summary>
+    /// #468 (mac #458, <c>backups deleted.carries</c>): what a Claude or Codex
+    /// session still open made is named APART from what the window holds —
+    /// the window's clause as it always read, the session's beside it.
+    /// </summary>
+    [Fact]
+    public void TheTrailLineTellsASessionsKeptBackupFromTheWindows()
+    {
+        var a = Item("ICS3U_backup_2026-09-01_120000.zip");
+        var window = Item("ICS3U_backup_2026-09-02_120000_assistant-section2.zip");
+        var session = Item("ICS3U_backup_2026-09-03_120000_assistant-section1.zip");
+        var outcome = new BackupDeleter.Outcome(new[] { a }, new[] { window, session }, Array.Empty<BackupDeleter.Failure>());
+        string line = BackupDeleter.TrailLine(outcome, new Dictionary<string, long?>(),
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Path.GetFullPath(session.FilePath) });
+        Assert.Contains("; kept because an open assistant conversation can restore from it: ICS3U_backup_2026-09-02_120000_assistant-section2.zip;", line);
+        Assert.Contains("; kept ICS3U_backup_2026-09-03_120000_assistant-section1.zip, which a Claude or Codex session still open made", line);
+        Assert.DoesNotContain("restore from it: ICS3U_backup_2026-09-02_120000_assistant-section2.zip, ICS3U_backup_2026-09-03", line);
+    }
 }
