@@ -591,6 +591,8 @@ struct NewCourseWizardView: View {
             Button("Add Example Course") {
                 startExampleInstall()
             }
+            .disabled(workspace.folderIsGettingReady)
+            .help(workspace.folderReadinessReason ?? "")
             .accessibilityIdentifier("addExampleCourseButton")
         }
         .padding(12)
@@ -772,6 +774,11 @@ struct NewCourseWizardView: View {
                         startCreation()
                     }
                     .buttonStyle(.borderedProminent)
+                    // Greyed while the folder is getting ready (#476), with
+                    // the reason; `NewCourseCreator` refuses as well, before
+                    // it writes, for a wizard opened before the copy began.
+                    .disabled(workspace.folderIsGettingReady)
+                    .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
                     // Present throughout so the footer never reflows;

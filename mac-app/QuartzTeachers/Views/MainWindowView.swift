@@ -47,6 +47,9 @@ struct MainWindowView: View {
                         // restored, when there is one to show — above the
                         // path bar, which is where the folder it is about
                         // is named.
+                        // And, while the folder's tools are being copied in
+                        // after an update (#476), the notice saying so.
+                        ToolchainReadinessNoticeView()
                         CloudSyncNoticeView()
                         workingFolderPathBar
                     }

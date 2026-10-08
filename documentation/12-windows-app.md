@@ -1959,22 +1959,23 @@ change the radius.
    highlighting existed. It now inverts to a white capsule with accent text.
    A passing test did not catch this — looking at a screenshot did.
 
-### The chrome is shared, and that was a trade
+### The chrome is shared, and that was a trade — reversed by #456
 
-All three fields in the wizard's Basics section (course code, course name,
-timetable section numbers) now wear one `WizardFieldChrome` modifier, so they
-cannot drift apart. The cost, stated rather than buried: two fields that wore a
-real AppKit bezel now wear an imitation of one, because that was the only way to
-get them to the native 24pt. The imitation is measured against the real control
-rather than eyeballed. The alternative — wrapping a real `NSTextField` in an
-`NSViewRepresentable` for all three — buys genuine native chrome at the price of
-hand-managing first responder and binding updates, and remains open if the
-imitation ever starts costing more than it saves.
+Until 2026-10-08 all three fields in the wizard's Basics section (course
+code, course name, timetable section numbers) wore one `WizardFieldChrome`
+modifier: an imitation of AppKit's bezel drawn at the native 24pt, measured
+against the real control rather than eyeballed, because SwiftUI's
+`.roundedBorder` is 26pt and cannot be forced to 24. **#456 reversed that on
+purpose** (Russell, 2026-10-07): every other field in Plantoir wears the real
+`.roundedBorder` bezel since #374, so the standard is the SwiftUI field, and
+the drawn chrome — and the searchable picker's — is deleted; the four fields
+are the same height as every other by construction, and text long enough to
+reach the course-code chevron runs under it, the accepted trade.
 
-**If WinUI's own field is already the right height, none of this applies to you
-— keep the real control.** The mac ended up here because it had already been
-forced off the native control for the flyout's sake; do not inherit that
-position by accident.
+**For this side, the rule is the one this section always gave: keep WinUI's
+own text box.** Match whatever ITS standard height is, with every field in
+the wizard and in Copy a Page the same height — never 24pt, which this
+section used to tell you to match. The `windows` issue from #456 says so.
 
 ## Reading a page's visibility: four .NET defaults that get it wrong
 
@@ -4374,17 +4375,21 @@ sentence>` and a hook log `automation hook refused: …` and do nothing.
 `.toolchain\scripts`, so whether a 06:30 run should wait for a copy the app
 is making is its own question; the director opens it as an issue.
 
-**3. Whether the mac's equivalent blocks the same way.** It does, on reading
-the code — but nobody has MEASURED it, so this is a question to the mac, not a
-claim. `WorkspaceModel.reloadCourses()` calls `refreshLaunchersIfNeeded()`,
-which calls `refreshToolchain(in:)` → `mirrorToolchain(into:)` →
-`copyToolchainFiles(into:)`, and the project builds with
-`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, so the copy runs synchronously on
-the main actor. `copyToolchainFiles` is `nonisolated`, but only the folder
-set-up path and `BuilderWarmUp` actually call it off the main actor. A mac
-issue asks them to time the first launch after an update. The mac also marks
-its folder fresh BEFORE copying (`noteToolchainMirrored` precedes the copy),
-the same defect fixed here, though it re-mirrors when `Dockerfile` is missing.
+**3. Whether the mac's equivalent blocks the same way.** It did, and #476
+(the mac, 2026-10-08) measured and then matched this design: the copy held
+the main actor for 0.9–3.9 s on an M4 Pro with a warm cache (about four
+seconds at worst; cold and Intel not measured), and Russell chose the
+Windows design anyway. The mac's copy now runs off the main actor through
+one `ToolchainReadiness` registry, with Preview, Deploy and New Course greyed
+and a banner once a file is written; it marks a folder fresh only after a
+copy with nothing failed (the same defect, fixed the same way); its MCP
+server and headless rebuilds wait for their own copy; it writes the same
+`working folder tools copied` line; and ⌘Q waits for a running copy, which
+this side does not (a `windows` issue). Two differences, both on purpose: no
+cross-process marker (every file is written atomically from the same bundle,
+so two copies at once write the same bytes), and the banner follows the
+first file WRITTEN rather than a timer. `documentation/09-mac-app.md` →
+"Getting a folder ready after an update, off the main actor (#476)".
 
 ### What was rejected
 
