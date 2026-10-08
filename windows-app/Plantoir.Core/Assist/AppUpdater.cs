@@ -233,6 +233,9 @@ public sealed class AppUpdater : IDisposable
         // nobody saw is not the day's check.
         if (!teacherAsked && info.Status is UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped)
             _rememberDailyCheck(DateTime.UtcNow);
+        // A check that got an answer and found nothing to offer ends any run of
+        // unseen offers: the next one waits a minute again, not an hour (review L5).
+        if (info.Status is UpdateStatus.UpdateNotAvailable or UpdateStatus.UserSkipped) _retryAfter = FirstRetry;
         var newer = info.Updates?.OrderByDescending(u => u).ToList() ?? new List<AppCastItem>();
         var newest = newer.FirstOrDefault();
         switch (info.Status)
@@ -257,8 +260,12 @@ public sealed class AppUpdater : IDisposable
                 }
                 else
                 {
+                    // SHOWN, whoever asked: the day's check is done. A shown
+                    // Check for Updates… counts too, or a daily retry still
+                    // pending from an unseen offer would put the same offer
+                    // back minutes after the teacher answered it (review L1).
                     _retryAfter = FirstRetry;
-                    if (!teacherAsked) _rememberDailyCheck(DateTime.UtcNow);
+                    _rememberDailyCheck(DateTime.UtcNow);
                 }
                 break;
             case UpdateStatus.UpdateNotAvailable:

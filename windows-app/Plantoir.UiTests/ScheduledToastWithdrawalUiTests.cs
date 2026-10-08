@@ -28,7 +28,8 @@ namespace Plantoir.UiTests;
 /// app, presses the band's Dismiss, and reads the database again. Python reads
 /// the database (it is on PATH wherever this suite runs), since the test
 /// project carries no SQLite library. It leaves nothing behind: the toast it
-/// posts is the one it withdraws.</para>
+/// posts is the one it withdraws, the measurement goes to the test output
+/// only, and the run's folders go with <c>DrivenApp</c>.</para>
 /// </remarks>
 [Collection("drives the real app")]
 public class ScheduledToastWithdrawalUiTests
@@ -75,7 +76,6 @@ public class ScheduledToastWithdrawalUiTests
         string measured = $"{started:yyyy-MM-dd HH:mm}: posted by a separate Plantoir.exe process under {postedUnder}, tag {tag}; " +
                           (gone ? "gone from the notification database after Dismiss in the app" : "STILL THERE 20 s after Dismiss in the app");
         _output.WriteLine("#464 measurement, " + measured);
-        File.WriteAllText(Path.Combine(Path.GetTempPath(), "plantoir-464-withdrawal.txt"), measured + Environment.NewLine);
         Assert.True(gone, measured);
     }
 

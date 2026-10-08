@@ -536,6 +536,12 @@ what was measured and what was not is `documentation/11-release-strategy.md`
     offer carries. Whether `--reparse-existing` keeps an earlier item's mark
     when the feed is regenerated has not been checked: read the regenerated
     feed's `criticalUpdate` attributes before committing it. Not rehearsed.
+    **The first cut that marks a release also proves the Esc key**, which no
+    Debug build can (it has no feed): on a Windows copy one version below the
+    marked one, wait for the important offer (or use Check for Updates…),
+    press Esc, and check that the offer closes, the trail says
+    `<version>: not now`, and Plantoir stays usable. Write what you saw in the
+    release's notes for the next cut.
 
   Check before committing: `python website/build.py --check` runs
   `website/windows_feed.py`'s checker — the feed's signature against
