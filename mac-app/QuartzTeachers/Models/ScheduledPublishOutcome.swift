@@ -153,6 +153,17 @@ nonisolated enum ScheduledPublishOutcome {
         /// reasons carry varying text anyway.
         case couldNotRunAsSetNow = "could not run as set now"
 
+        /// The run found its OWN section's earlier deploy still working after
+        /// waiting thirty minutes for it (GitHub #439), so it STOOD DOWN:
+        /// deployed nothing, cleared the job away, and said so. The earlier
+        /// deploy is a leftover: setting the section again ended its run's app,
+        /// and the deploy the app had started carried on by itself. Two
+        /// deploys of one section at once build and upload the same folder,
+        /// which is why the launchers refuse the second. Its own kind, for
+        /// `courseWasBusy`'s reason: nothing was attempted, so no destination
+        /// can be named, and what was in the way is different.
+        case earlierDeployStillWorking = "earlier deploy still working"
+
         /// Whether this is something the teacher should be chased about.
         ///
         /// The test is not "did something break" but "is the site other than
@@ -169,7 +180,7 @@ nonisolated enum ScheduledPublishOutcome {
         var needsAttention: Bool {
             switch self {
             case .neededAnAnswer, .buildNeededAnAnswer, .buildDidNotFinish, .didNotFinish,
-                 .tooLateToRun, .courseWasBusy, .couldNotRunAsSetNow:
+                 .tooLateToRun, .courseWasBusy, .couldNotRunAsSetNow, .earlierDeployStillWorking:
                 return true
             case .succeeded:
                 return false
@@ -541,6 +552,16 @@ nonisolated enum ScheduledPublishOutcome {
                 + ScheduledDeployCleanup.Reason.itCouldNotDeployAsTheCourseIsSetNow.trailPhrase,
                 course: course, section: section, at: stopped.when
             )
+        case .earlierDeployStillWorking:
+            // The same event again, the `courseWasBusy` precedent: the wait
+            // itself is its own line (`scheduledDeployWaitedForItsEarlierDeploy`),
+            // written by the run just before this one.
+            ActivityTrail.note(
+                .scheduledDeployTurnedOff,
+                "turned off a scheduled deploy because this section's earlier deploy was still "
+                + "working after thirty minutes",
+                course: course, section: section, at: stopped.when
+            )
         }
         return true
     }
@@ -631,6 +652,14 @@ nonisolated enum ScheduledPublishOutcome {
                  + "the way the course is set now — \(stopped.destination) — so Plantoir left the site "
                  + "as it was. Deploy it yourself from the section, or schedule another from the "
                  + "section’s menu."
+        case .earlierDeployStillWorking:
+            // No destination, for courseWasBusy's reason. "A deploy that was
+            // set earlier" rather than any word for what is left running: the
+            // teacher set it, and that is all they need to recognise.
+            return "\(course) Section \(section) was set to deploy on its own, but the deploy that was "
+                 + "set before it was still working after thirty minutes of waiting, so Plantoir left the "
+                 + "site as that deploy leaves it rather than deploy it twice at once. Deploy it yourself "
+                 + "when that has finished, or schedule another from the section’s menu."
         }
     }
 }

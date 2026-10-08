@@ -18,11 +18,13 @@ import Foundation
 /// no longer matches, so a changed sentence fails HERE, in the same test run
 /// that changed it — not on a Windows machine three weeks later.
 ///
-/// **What it deliberately does NOT generate.** Ten top-level keys of the
+/// **What it deliberately does NOT generate.** Twelve top-level keys of the
 /// cases file are hand-written and are preserved on every run: `nearMisses`,
 /// `scenarios`, `promptHistory`, `deployAtATime`, `windowBinding`,
 /// `hideIsUnpublish`, `echoedRequest`, `linksQuestion` (#167),
-/// `pagesNamingNoPage` (#197) and `toolDescriptions` (#114). Nothing
+/// `pagesNamingNoPage` (#197), `toolDescriptions` (#114) and
+/// `scheduleAndCancel` (#424, proposed from Windows; read here since #449) and
+/// `nextClassUnits` (#440). Nothing
 /// in the code says which near-miss phrasings are worth guarding, which ORDER
 /// events must happen in, which spellings of a time a teacher actually types,
 /// or which arguments a window takes back from the model and which it refuses
@@ -141,6 +143,21 @@ enum AssistContract {
             // deployAtATime.sayItAs.
             "sayTheTimeAs": AssistContract.sayTheTimeAs(for: "deploy at 6.30 pm"),
             "sayTheTimeAsWithoutTheComma": AssistContract.sayTheTimeAs(for: "deploy at 6:30 pm,"),
+            // "Schedule a deploy" with no time, and a deploy-now answer to a
+            // later time (#449): adopted from Windows byte for byte.
+            "scheduleADeployNeedsATime": AssistWording.scheduleADeployNeedsATime,
+            // Settler S3's answer (#440), in the three course shapes the
+            // contract's nextClassUnits.pointerSentences rows name — each
+            // row's `plainNext` ("Unit 2, Day 6") gives the latest unit, 2.
+            "nextClassNeedsItsOwnPhrasing": AssistWording.nextClassNeedsItsOwnPhrasing(
+                unitWord: "Unit", isNumbered: false, noun: .class, latestUnit: 2
+            ),
+            "nextClassNeedsItsOwnPhrasingInAModuleCourse": AssistWording.nextClassNeedsItsOwnPhrasing(
+                unitWord: "Module", isNumbered: false, noun: .class, latestUnit: 2
+            ),
+            "nextClassNeedsItsOwnPhrasingInANumberedCourse": AssistWording.nextClassNeedsItsOwnPhrasing(
+                unitWord: "Week", isNumbered: true, noun: .meeting, latestUnit: 9
+            ),
             "deployAccepted": AssistWording.deployAccepted,
             "planAccepted": AssistWording.planAccepted,
             "cancelled": AssistWording.cancelled,
@@ -229,6 +246,12 @@ enum AssistContract {
             ),
             "deployDidNotFinish": AssistWording.deployDidNotFinish(course: course, section: section),
             "deployNeedsAnAnswer": AssistWording.deployNeedsAnAnswer(course: course, section: section),
+            "deployRefusedWhileALaterDeployWorks": AssistWording.deployRefusedWhileALaterDeployWorks(
+                course: course, section: section
+            ),
+            "deployRefusedWhileItsSectionDeploys": AssistWording.deployRefusedWhileItsSectionDeploys(
+                course: course, section: section
+            ),
             "deployNeedsAnAnswerAt": AssistWording.deployNeedsAnAnswerAt(
                 course: course, section: section, destinations: "{destinations}"
             ),
@@ -866,7 +889,7 @@ enum AssistContract {
                   + "types and will be overwritten: " + generatedCaseKeys.joined(separator: ", ")
                   + ". Every other top-level key — nearMisses, scenarios, promptHistory, "
                   + "deployAtATime, windowBinding, hideIsUnpublish, echoedRequest, linksQuestion, "
-                  + "pagesNamingNoPage, toolDescriptions — "
+                  + "pagesNamingNoPage, toolDescriptions, scheduleAndCancel, nextClassUnits — "
                   + "is hand-written "
                   + "intent and is PRESERVED by a regeneration, so "
                   + "a case may be proposed from either platform. Listing them rather than naming "
