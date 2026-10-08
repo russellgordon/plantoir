@@ -614,8 +614,11 @@ public sealed partial class SectionDetailView : UserControl
     {
         try
         {
+            // The record AND its notification in Notification Center (#464).
             if (_window.Workspace.WorkspacePath is { } folder)
-                ScheduledPublishOutcome.Dismiss(_course.Code, _sectionNumber, folder);
+                ScheduledRunAnnouncement.TeacherDismissed(
+                    new ScheduledPublishToast.Target(_course.Code, _sectionNumber, folder),
+                    new Services.ScheduledPublishNotifier.SystemToasts(), diagnostic: App.LogDiagnostic);
             SectionOutcomeDismissed?.Invoke(_course.Code, _sectionNumber);
         }
         catch (Exception ex)
