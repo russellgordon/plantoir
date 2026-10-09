@@ -22,6 +22,16 @@ teacher's site. Fonts a site carries for its own look are described in
 | **Inside function-plot.js** — it is one bundled file built from d3-axis, d3-color, d3-format, d3-interpolate, d3-scale, d3-selection, d3-shape and d3-zoom (ISC, © Mike Bostock), built-in-math-eval and interval-arithmetic-eval (MIT, © Mauricio Poppe) and events (MIT, © Joyent) | as bundled in function-plot 1.25.4 | ISC and MIT: each asks that its copyright and permission notice travel with copies | function-plot.js carries no notices of its own; this row is where they are named, and the ISC and MIT texts are the standard ones (the MIT text is the `LICENSE` beside the file) |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
 
+## Carried by plantoir.app itself
+
+The Interactive class notes page (`website/pages/interactive.html`, v1.7.0)
+draws a live graph and a TikZ diagram the way a class site does, so the site
+carries the same files: `website/assets/function-plot.js` (function-plot
+1.25.4, byte for byte the file a class site carries, with the bundled
+packages named in the row above; licence in `function-plot-LICENSE.txt`
+beside it) and the BaKoMa faces `cmmi10.ttf` and `cmr10.ttf` (licence in
+`cm-fonts-LICENCE.txt` beside them).
+
 ## Carried inside the website builder only
 
 | What | Version | Licence | Notes |
