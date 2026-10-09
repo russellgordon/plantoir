@@ -2666,9 +2666,9 @@ local assistant. The macOS Human Interface Guidelines put a window's commands
 in the menu bar — where somebody looks for a command they cannot find, and the
 only place a key equivalent is advertised. The model followed is Canopy's
 correction of 2026-08-30 (`Canopy/Documentation/v2/technical/mac-window-conventions.md`
-§3–4b). Batch A of v1.5.0 landed the menus, keys and fields; the assistant's
-own verbs (#457 item 3) are batch B and go into the Section menu after Open in
-Browser, where a comment marks the place.
+§3–4b). Batch A of v1.5.0 landed the menus, keys and fields; batch B put the
+assistant's own functions (#457 item 3) into the Section menu after Open in
+Browser — see "The assistant's functions in the Section menu" below.
 
 ### The menu bar, measured before and after
 
@@ -2761,6 +2761,7 @@ onto Course ▸ Save Course Settings.
 | ⇧⌘O | Open in Obsidian — Course's, or Section's when a section is selected |
 | ⇧⌘P | Section ▸ Preview / Stop Preview |
 | ⇧⌘D | Section ▸ Deploy… |
+| ⇧⌘B | Section ▸ Rebuild Preview (batch B: free in batch A's census; not a macOS system-wide key; Bold only under a Format menu, which Plantoir has none of; `WKWebView` binds nothing to it) |
 
 Never taken: ⌘Q ⌘H ⌥⌘H ⌘, ⌘W ⌥⌘W ⌘M ⌘` ⌃⌘F ⌃⌘S ⌥⌘T ⌘Z ⇧⌘Z ⌘X ⌘C ⌘V ⌘A ⌘F
 ⌘G ⇧⌘G ⌘E ⌘P ⌘T ⇧⌘/ ⌘. ⌃⌘Space ⌥⌘D (the Dock, system-wide) ⇧⌘Q ⌃⌘Q ⌥⌘Esc
@@ -2856,6 +2857,164 @@ bar revealed the course — through one rule, `FolderActions.obsidianFolder`;
 the locked-pages note, shown the first time, now opens the folder it was
 asked for. Since the HIG sweep (batch C) the toolbar button shows that note too
 — see "The HIG sweep" below.
+
+### The assistant's functions in the Section menu (#457 batch B)
+
+Before batch B a teacher could publish a page by name, hide one, publish the
+class for a date, rebuild the preview, take a change back, add the next
+class, re-date a section or make room for a class ONLY by asking the local
+assistant — and a teacher who declined its download could not do them at
+all. They are Section menu items now, in two groups after Open in Browser:
+
+| Item | What it opens | The tool it runs |
+|---|---|---|
+| Publish Pages… | a searchable checklist of the hidden pages, classes first, then the plan | `plan_publish_pages`, then `publish_pages` |
+| Hide Pages… | the same, of the visible pages | `plan_unpublish_pages`, then `unpublish_pages` |
+| Publish Class for a Date… | a date, the section's next class day from its class dates (tomorrow when it has none), then the plan | `plan_publish_class_on`, then `publish_class_on` |
+| Rebuild Preview ⇧⌘B | nothing: it runs; a refusal is shown in a sheet | `rebuild_preview` |
+| Undo Last Change | nothing: it runs and says what it put back | `undo_last_change` |
+| Add Next Class | nothing: the page arrives hidden and Undo Last Change takes it away (Russell's decision 11) | `add_next_class` |
+| Re-date Classes… | the plan | `plan_re_date_classes`, then `re_date_classes` (never a `website` key: that makes it a rollover) |
+| Make Room for Classes… | the class a new one goes in front of, how many (1–10), then the plan | `plan_make_room_for_classes`, then `make_room_for_classes` |
+| Class Dates… | the class dates sheet (`SectionScheduleSheet`) | — |
+
+Help ▸ Publishing and Deploying… says what the two words mean, in an alert of
+its own, with or without a window (`publishingAndDeployingExplained` — said
+to the teacher; the assistant's `whatPublishingMeans` says "the teacher").
+The section row's context menu carries Publish Pages…, Hide Pages…, Publish
+Class for a Date… and Add Next Class, and selects the row first.
+
+**One entry point, the tool's own.** Each item builds its `AssistToolCall` in
+code (`SectionVerbs`) and runs it through `AssistToolRunner.run(call:)` — the
+function the model, a fixed phrasing and MCP all reach — on a runner whose
+surface is `.menu`. Never through a model. The reference-course gate and the
+outside-change hold sit in `run(call:)` before dispatch, so the menu meets
+them exactly as the assistant does. The ellipsis items show the plan twin's
+own card (`forTheCard`) before anything changes — the assistant's plan card
+in the menu's form — and a twin that refuses ends the sheet with its sentence
+and OK alone. Pages are named by their folder AND name, as a JSON array
+(`section1/All Classes/Unit 2, Day 3`): every shipped course has five to nine
+`_DUPLICATE ME` pages, which a bare name refuses as ambiguous, and a name
+holding a semicolon is split in two by the tool's list reading (the plan
+review's finding 3; `SectionVerbsTests.testPagesAreNamedByTheirFolder`).
+
+**The sheet** wears the title band every sheet does since #457's HIG sweep —
+`.headline`, leading, 52 points, sentence case — and its default button takes
+Return and the accent only while it can be pressed (#364's shape). Both are
+written out in `SectionVerbSheet` until batch C's `.sheetTitle(_:)` and
+`.defaultButton(isEnabled:)` are on the same branch. A request from a row's
+context menu is DROPPED once that row is no longer selected, never run the
+next time the section is shown (the review's note 7).
+
+**One runner per window**, made the first time an item is used
+(`WorkspaceModel.sectionVerbs()`), so Undo Last Change takes back the last
+change made from the menu in THIS window (Russell's decision 4); the
+assistant's window keeps its own list. Opening another folder in the window
+makes a new runner, and the old folder's undo list goes with it.
+
+**Class dates first.** Add Next Class, Re-date Classes… and Make Room for
+Classes… need them. With none on file the SECTION WINDOW shows its own class
+dates sheet with the reason line, and the item runs once they are written —
+never `SectionSchedulePrompt.shared`, whose offer only the assistant's window
+shows: an offer left there asked into nothing and then appeared, stale, the
+next time the assistant opened (the plan review's blocker 1). The menu's
+runner never leaves one (`MenuVoiceTests.testTheMenuNeverLeavesARequestForClassDates`).
+
+**Enablement** is `SubjectMenuRules` (`shared-rules.json` → `subjectMenus`):
+the writing items on a live section that is not deploying, not being zipped,
+and not already being changed by one of them — from this window, another, or
+the in-app assistant (`verbIsRunning`); Undo Last Change only where the last
+menu change was made; Rebuild Preview only while a preview runs (Russell's
+decision 5: otherwise it is Preview under a second name), a reference course
+included, since it writes only the built site. The section window asks again
+at the click, as `MenuRoute` does, and the context menu's items, which do not
+consult the rule, meet the same check.
+
+**Every menu write rebuilds the preview**, as the tool does today (the
+director kept it: the menu must not disagree with the tool; Windows' gap is
+#479). The one exception is the classes hidden at Deploy (#475, below), where
+the deploy builds straight after.
+
+REJECTED: lifting each tool's private function into a shared typed one (the
+gate and the hold would have had to be copied, and a copy drifts); a runner
+per action (no undo at all); sharing the assistant window's runner (a larger
+refactor, and a teacher with no assistant has no window for it); ⌘Z on Undo
+Last Change (it belongs to text editing in Edit, and a key that took back a
+page change from inside a text field would be a surprise nobody could undo);
+hiding the items on a course kept for reference (greyed, as every item is);
+a plan sheet for Add Next Class (it is undoable and the page arrives hidden).
+
+### Classes dated after the next class, at Deploy (#475)
+
+Russell, 2026-10-07: catch a class page published with a date in the future
+and offer to hide it with a checklist. WHICH pages: `class-planning.json` →
+`futureDatedClasses` (`ClassesDatedLater`) — a class page students can see,
+dated after the NEXT class day, which is the earliest class date after today
+over every class page, hidden ones included. Tomorrow's class, published the
+evening before on purpose, is never asked about (Russell's decision 1).
+WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
+
+- **Deploy** (the button, and Section ▸ Deploy…, which presses it): the
+  deploy's own refusals FIRST, read without claiming anything
+  (`deployWillBeRefused`) — a refusal never follows a change, and hiding
+  pages before a refusal would be one; then the question; then the deploy,
+  whose build may offer the links checklist (#379) afterwards. The pure
+  decision is `SectionDetailView.whatDeployDoesFirst`.
+- **The in-app assistant's deploy** asks in the section window through the
+  window's controller (`askAboutClassesDatedLater`), BEFORE the runner stops
+  the preview, so Cancel leaves it up. With no window showing the section,
+  or with something already up on it, it is refused, never waited on
+  (`deployHasClassesDatedLaterAndNoWindow`, `deployWaitsForAnOpenQuestion`).
+- **An outside assistant** is refused before anything runs
+  (`deployHasClassesDatedLater`), until the question has been answered once
+  in the window. **A scheduled deploy** goes out and records the places.
+- **Section ▸ Publish Pages…** asks about the classes ticked, before the
+  plan; the ticked ones are left out. **Publish Class for a Date…** (and the
+  assistants' `publish_class_on`) records the class it published as kept:
+  the teacher named the day. So does **Publish in the links checklist**
+  (#379) for a later class it publishes — otherwise the two questions undid
+  each other: hidden at Deploy, its link dead, offered back, published,
+  flagged again (the review's finding 2). Both spell a page's place the same
+  way (links resolved, precomposed Unicode).
+- **A scheduled deploy** writes "deployed with classes dated after the next
+  class" only once it HAS deployed: the classes are read when it is set to
+  run, and the line is written by `recordTheRun` only when the wrapper left
+  its success sentinel. Not on the wrapper's exit status, which is 0 whether
+  or not the deploy got through — it belongs to `launchctl bootout` — and
+  gating on it was measured to write the line after a failed deploy (the
+  fixes review, A; `ScheduledPublishOutcomeTests.
+  testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
+  wrapper both ways).
+
+The sheet lists the flagged classes, every one ticked, and ALWAYS offers two
+buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
+and Deploy**, which keeps every listed class at its date and hides nothing —
+the director's ruling on the implementation review's finding 1 (Russell may
+overturn it). Every pre-populated course ships its whole term published and
+dated: the review measured 61 classes flagged in 33 of the 39 payloads on
+2026-10-08, every one ticked, with no way to keep them but unticking each.
+Measured on a really installed ICS3U payload the same evening: 61 flagged;
+Keep All and Deploy kept 61 and deployed; the second Deploy asked nothing and
+deployed. Hide Ticked and Deploy records the unticked as kept (`file-formats.json` → `laterClassesKept`,
+`section<N>.later-classes-kept.json` in `.publish_state`, removed on
+rollover) and hides the ticked through Hide Pages…'s own call — a copy of the
+course first, undoable, pages only they link to hidden with them — with no
+preview first (`AssistToolRunner.previewFollowsAChange`). A class still
+visible afterwards stops the deploy, and the sheet says what the hide said.
+The answer acts on the list asked about, never one worked out after midnight.
+
+Measured by driving the built app with `--state-dir` (2026-10-08, twice): a
+class on the 14th was asked about and tomorrow's was not; Hide 1 and Deploy
+(the default's label then; Hide Ticked and Deploy since the fixes round) hid it, deployed to a folder, and the trail read `asked about classes dated
+after the next class at Deploy — 1 flagged, 1 hidden, 0 kept published`;
+Cancel deployed nothing and left the preview running.
+
+REJECTED: detecting it in `build_site.py` as #379 does (the answer would come
+after the build, so hiding would need a second build, and the container's
+clock is not the teacher's); matching the "Unit x, Day y" shape (Russell's
+decision 8: folder membership, so a club's Week 5 counts); asking on a
+scheduled deploy; refusing the outside assistant with nothing remembered;
+asking before the deploy's refusals; asking after the assistant's stop.
 
 ### Context menus select their row first
 

@@ -64,7 +64,12 @@ struct SectionSiteCommands: Equatable {
     var deployButtonEnabled: Bool
     var previewIsShowing: Bool
 
-    /// Presses the button the item names.
+    /// The assistant's functions (#457 batch B): Undo Last Change's target is
+    /// this section, and one of them is running on it.
+    var lastChangeIsHere: Bool = false
+    var verbIsRunning: Bool = false
+
+    /// Presses the button the item names, or runs the function.
     var perform: (SubjectMenuRules.Item) -> Void
 
     // MARK: - Functions
@@ -74,6 +79,8 @@ struct SectionSiteCommands: Equatable {
             && left.previewButtonEnabled == right.previewButtonEnabled
             && left.deployButtonEnabled == right.deployButtonEnabled
             && left.previewIsShowing == right.previewIsShowing
+            && left.lastChangeIsHere == right.lastChangeIsHere
+            && left.verbIsRunning == right.verbIsRunning
     }
 }
 
@@ -133,6 +140,9 @@ enum MenuSituation {
             situation.previewButtonEnabled = site.previewButtonEnabled
             situation.deployButtonEnabled = site.deployButtonEnabled
             situation.previewIsShowing = site.previewIsShowing
+            situation.previewIsRunning = site.previewIsRunning
+            situation.lastChangeIsHere = site.lastChangeIsHere
+            situation.verbIsRunning = site.verbIsRunning
         }
         if let previewController {
             situation.previewIsShowing = true

@@ -17,6 +17,13 @@ enum BackupMaker: Hashable {
     /// conversation about this section.
     case assistant(sectionNumber: Int)
 
+    /// The Section menu made it, before one change it made to this section
+    /// (#457 batch B) — Publish Pages…, Hide Pages… and the rest of the
+    /// assistant's functions, run from the menu. One per change, so the menu
+    /// clears up after itself the way the assistant does: its five most
+    /// recent of a course are kept, counted apart from the assistant's.
+    case menu(sectionNumber: Int)
+
     // MARK: - Computed properties
 
     /// What this adds to a backup's file name. A teacher's backup adds
@@ -28,6 +35,8 @@ enum BackupMaker: Hashable {
             return ""
         case .assistant(let sectionNumber):
             return "_assistant-section\(sectionNumber)"
+        case .menu(let sectionNumber):
+            return "_menu-section\(sectionNumber)"
         }
     }
 
@@ -38,6 +47,8 @@ enum BackupMaker: Hashable {
             return "made by you"
         case .assistant(let sectionNumber):
             return "before an assistant chat about Section \(sectionNumber)"
+        case .menu(let sectionNumber):
+            return "before a change from the Section menu to Section \(sectionNumber)"
         }
     }
 
@@ -51,6 +62,12 @@ enum BackupMaker: Hashable {
         if piece.hasPrefix(assistantPrefix) {
             if let sectionNumber = Int(piece.dropFirst(assistantPrefix.count)) {
                 return .assistant(sectionNumber: sectionNumber)
+            }
+        }
+        let menuPrefix: String = "menu-section"
+        if piece.hasPrefix(menuPrefix) {
+            if let sectionNumber = Int(piece.dropFirst(menuPrefix.count)) {
+                return .menu(sectionNumber: sectionNumber)
             }
         }
         return nil
@@ -128,6 +145,8 @@ struct BackupItem: Identifiable, Hashable {
             return "You made this one, so it is kept until you delete it."
         case .assistant:
             return "The assistant made this one; its five most recent are kept."
+        case .menu:
+            return "The Section menu made this one before a change; its five most recent are kept."
         }
     }
 
@@ -137,6 +156,8 @@ struct BackupItem: Identifiable, Hashable {
             return "clock.arrow.circlepath"
         case .assistant:
             return "sparkles"
+        case .menu:
+            return "filemenu.and.selection"
         }
     }
 
@@ -164,7 +185,18 @@ struct BackupItem: Identifiable, Hashable {
         if pieces.count < 2 || pieces.count > 3 {
             return nil
         }
-        let stamp: String = pieces[0] + "_" + pieces[1]
+        // A second copy saved within the same second carries `-2` after its
+        // time (`CourseArchiver.unusedBackupName`, #457 batch B): read past
+        // it, and nothing else.
+        var timePiece: String = pieces[1]
+        if let dash = timePiece.firstIndex(of: "-") {
+            let counter: String = String(timePiece[timePiece.index(after: dash)...])
+            guard let number = Int(counter), number >= 2 else {
+                return nil
+            }
+            timePiece = String(timePiece[..<dash])
+        }
+        let stamp: String = pieces[0] + "_" + timePiece
         guard let backedUpAt = ArchiveStamp.moment(from: stamp) else {
             return nil
         }

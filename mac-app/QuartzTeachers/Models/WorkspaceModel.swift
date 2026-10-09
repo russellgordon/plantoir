@@ -485,6 +485,11 @@ class WorkspaceModel {
     /// The current sidebar selection.
     var selection: SidebarSelection? {
         didSet {
+            // A function asked for from a section row's context menu belongs
+            // to that row: once the selection has left it, the request is
+            // DROPPED, never run the next time the section is shown (#457
+            // batch B's review, note 7).
+            dropAVerbRequestForAnotherRow()
             // The third of the rulings' re-assertion points: SELECTING a
             // reference course. The other two are the folder being read and
             // the teacher previewing it or opening it in Obsidian.
@@ -512,6 +517,18 @@ class WorkspaceModel {
     /// real ⇧⌘D ran Deploy behind one). `MenuRoute` asks the window again
     /// at the click, which is the guard that counts.
     var sheetIsUp: Bool = false
+
+    /// One of the assistant's functions asked for from a section row's
+    /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
+    /// Class for a Date…, Add Next Class. The row is selected first, so the
+    /// section window that answers it is the one for that section: it takes
+    /// the request only when it names its own course and section
+    /// (`SectionDetailView.takeAVerbRequestIfItIsMine`).
+    var sectionVerbRequest: SectionVerbRequest?
+
+    /// This window's runner for the Section menu's functions, made the first
+    /// time one is used (`sectionVerbs()`), so its undo list is the window's.
+    private(set) var sectionVerbsIfMade: SectionVerbs?
 
     /// A test's own Open Recent list, made on first use.
     @ObservationIgnored var ownRecentFolders: RecentWorkingFolders?
@@ -1281,11 +1298,39 @@ class WorkspaceModel {
         ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
+    /// Drops a context-menu request whose section is no longer selected.
+    func dropAVerbRequestForAnotherRow() {
+        guard let request = sectionVerbRequest else {
+            return
+        }
+        if case .section(let code, let number) = selection,
+           code.lowercased() == request.courseCode.lowercased(), number == request.sectionNumber {
+            return
+        }
+        sectionVerbRequest = nil
+    }
+
+    /// This window's runner for the Section menu (#457 batch B), made on
+    /// first use and made again when the window has moved to another
+    /// folder — which drops the old folder's undo list with it. Nil with no
+    /// folder open.
+    func sectionVerbs() -> SectionVerbs? {
+        guard let folder = workspaceURL else {
+            return nil
+        }
+        if let made = sectionVerbsIfMade, FolderIdentity.isSameFolder(made.folderPath, folder.path) {
+            return made
+        }
+        let made: SectionVerbs = SectionVerbs(folderPath: folder.path)
+        sectionVerbsIfMade = made
+        return made
+    }
+
     /// Adopts a folder that is ALREADY in use — silently, with no check, no
     /// trail line and nothing remembered.
     ///
     /// For a window opened beside one already on the folder, and for the
-    /// assistant's and the MCP server's own models. **A window getting a
+    /// assistant's, the MCP server's and the Section menu's own models. **A window getting a
     /// remembered folder back must NOT come here**: it goes through
     /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
     /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
