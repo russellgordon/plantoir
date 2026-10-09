@@ -45,6 +45,9 @@ final class SubjectMenuRulesTests: XCTestCase {
         situation.previewButtonEnabled = try XCTUnwrap(merged["previewButtonEnabled"] as? Bool)
         situation.deployButtonEnabled = try XCTUnwrap(merged["deployButtonEnabled"] as? Bool)
         situation.previewIsShowing = try XCTUnwrap(merged["previewIsShowing"] as? Bool)
+        situation.previewIsRunning = try XCTUnwrap(merged["previewIsRunning"] as? Bool)
+        situation.lastChangeIsHere = try XCTUnwrap(merged["lastChangeIsHere"] as? Bool)
+        situation.verbIsRunning = try XCTUnwrap(merged["verbIsRunning"] as? Bool)
         situation.canGoBack = try XCTUnwrap(merged["canGoBack"] as? Bool)
         situation.canGoForward = try XCTUnwrap(merged["canGoForward"] as? Bool)
         return situation

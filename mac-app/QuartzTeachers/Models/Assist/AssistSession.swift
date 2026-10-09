@@ -388,6 +388,16 @@ final class AssistSession {
             planMode: AssistPlanMode(tier: tier)
         )
         self.agent = agent
+        // While this conversation works, the Section menu's functions on the
+        // same section wait (#457 batch B): two runners, two undo lists, one
+        // section.
+        AssistActivity.reportWork(
+            folderPath: workingFolder.path,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        ) { [weak agent] in
+            return agent?.isBusy ?? false
+        }
         // Ready enough to TYPE into, deliberately, and not yet ready to send
         // from: the box has to accept the keyboard while the warm-up runs or
         // a teacher spends those seconds unable to start writing.

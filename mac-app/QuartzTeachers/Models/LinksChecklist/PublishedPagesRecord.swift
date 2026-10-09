@@ -77,6 +77,14 @@ nonisolated enum PublishedPagesRecord {
            (try? FileManager.default.removeItem(at: answered)) != nil {
             saved.append(AssistSavedFile(fileURL: answered, before: contents, after: nil))
         }
+        // And the classes the teacher kept published at Deploy (#475,
+        // `laterClassesKept`: removed on rollover) — last year's dates are
+        // not this year's answers.
+        let keptLater: URL = ClassesDatedLater.KeptRecord.fileURL(courseDirectory: courseDirectory, section: section)
+        if let contents = try? String(contentsOf: keptLater, encoding: .utf8),
+           (try? FileManager.default.removeItem(at: keptLater)) != nil {
+            saved.append(AssistSavedFile(fileURL: keptLater, before: contents, after: nil))
+        }
         let folder: URL = folderURL(courseDirectory: courseDirectory, section: section)
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
             return saved

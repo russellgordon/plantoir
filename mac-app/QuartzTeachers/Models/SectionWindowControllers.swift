@@ -107,6 +107,16 @@ final class SectionWindowControllers {
         /// look at a site that is not there yet.
         let deploy: () async -> AssistSiteWorkResult
 
+        /// Ask the teacher, in this window, about classes dated after the
+        /// next class (#475) — before the in-app assistant's deploy stops
+        /// anything (the director's ruling on batch B's plan review). Comes
+        /// back when the teacher has answered; `.cannotAsk` at once when the
+        /// window already has something up, rather than waiting on it.
+        /// Defaults to nothing to ask, for a window that has no question.
+        var askAboutClassesDatedLater: () async -> LaterClassesAnswer = {
+            return .nothingToAsk
+        }
+
         // MARK: - Functions
 
         /// Whether there is a preview to stop — building or showing, both

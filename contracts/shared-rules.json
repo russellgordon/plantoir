@@ -855,6 +855,36 @@
         "event": "working folder tools copied",
         "carries": "the working folder's path (redacted), how many files were brought up to date, how many could not be copied or removed, how many seconds it took, and the outcome in the sentence: got ready, or could not finish - with the first file that could not be copied or removed (from the working folder down) and its error, or the error that stopped the copy. The sentence never says 'update': the same copy fills a folder set up from nothing and refreshes any stale one",
         "why": "GitHub #473 (Windows v1.4.5). The first launch after an update copies the app's tools into the working folder, and that copy measured 119.7 s and 93.7 s on 2026-10-07 (Intel Core i5-8365U, Windows 11 Pro 26200), during which the teacher saw no window at all. It now runs after the window appears, with a banner and with Preview, Deploy and New Course disabled until it is done, so a teacher can now SEE it happen - and 'Plantoir sat there saying it was getting the folder ready' and 'Preview was greyed out for ages after the update' are reports this line answers: when, how long, how many files, and whether it failed. Written ONCE per copy that changed or failed something, never for the ordinary launch that compares every file and finds nothing to do, which would bury the one line that matters. One event for both outcomes, the outcome in the sentence, following the scheduled-run precedent above: somebody reading the trail wants to know the folder was or was not got ready, not which of two keys was chosen. On the mac since #476 (2026-10-08): the same copy runs off the main actor (ToolchainReadiness.ensure), with Preview, Deploy and New Course greyed and a banner once a file is written, the mac's half of the same design (documentation/09-mac-app.md, 'Getting a folder ready after an update'); ToolchainReadiness writes this line with the same counts, seconds and first failure; a copy that failed is remembered and skipped by the routine reloads until File > Reload Courses or a newly pointed window retries it, which is Windows' rule too. Until #476 this entry was appliesOn windows, written as permanent because the mac had no visible moment for it; it has one now."
+      },
+      {
+        "event": "ran from a menu",
+        "carries": "the course and section, where the item is in the menus (Section > Publish Pages..., Hide Pages..., Publish Class for a Date..., Rebuild Preview, Undo Last Change, Add Next Class, Re-date Classes..., Make Room for Classes..., Class Dates..., or Help > Publishing and Deploying...), how it ended - carried out, changed nothing, took the last change back, cancelled at the plan, rebuilt or not rebuilt - and counts (pages ticked), never a page's title.",
+        "line": "{course}/{section} · Section ▸ Publish Pages… — {carried out|changed nothing|cancelled at the plan|…}, {N pages ticked}",
+        "why": "#457 batch B. The assistant's functions now run from the menu bar for a teacher who never opened the assistant, and the assistant's own trail lines are written by its conversation, which the menu does not have. Without this a page published from the menu is a page nobody can say who published. Not 'section menu item ran': Help is not in the Section menu (the plan review's note 11)."
+      },
+      {
+        "event": "section menu backed up a course",
+        "carries": "the course and section, the backup's FILE NAME (<CODE>_backup_<stamp>_menu-section<N>.zip, course-management.json -> zipNames), its size in MB and how many seconds it took; or that it could not, and why.",
+        "line": "{course}/{section} · the Section menu backed up the course as {file} ({MB} MB, {s} s)",
+        "why": "#457 batch B, the director's ruling on the plan review's blocker 2: the menu saves a copy of the course before EVERY change it makes, named for the menu rather than the assistant, so a teacher who declined the assistant never sees a copy said to be 'before an assistant chat'. The line answers 'where did this zip come from' and 'why did Publish take ten seconds' (9.7 s measured for a 487 MB course, #351)."
+      },
+      {
+        "event": "asked about classes dated after the next class",
+        "carries": "the course and section, where it was asked (Deploy - the button or Section > Deploy... -, the in-app assistant's deploy, or Section > Publish Pages...), how many classes were flagged, and the answer: how many were hidden (or left hidden), how many kept published, or Cancel. Counts and places, never a title or anything written on a page.",
+        "line": "{course}/{section} · asked about classes dated after the next class at {route} — {N} flagged, {N} hidden, {N} kept published | cancelled",
+        "why": "#475. The question hides lessons a teacher published early, by default. 'Why did my class disappear from the site?' is answered by this line, and 'why does it keep asking me?' by the kept count (class-planning.json -> futureDatedClasses, file-formats.json -> laterClassesKept)."
+      },
+      {
+        "event": "deployed with classes dated after the next class",
+        "carries": "the course and section, and the PLACES of the classes that went out (course-folder paths without .md, at most ten, then 'and N more') - names, never anything written on them.",
+        "line": "{course}/{section} · deployed with classes dated after the next class: {places}",
+        "why": "#475. A scheduled deploy has nobody to ask (shared-rules.json -> classesDatedLater.neverAskedFrom), so it goes out as it is - holding a 6:30 deploy for a question nobody is awake to answer would fail the teacher worse. This is the record that it went out with them, for the morning a student reads tomorrow's quiz today."
+      },
+      {
+        "event": "a deploy was held back for classes dated after the next class",
+        "carries": "the course and section, and how many classes had no answer on file.",
+        "line": "{course}/{section} · a deploy was held back for classes dated after the next class — {N} with no answer",
+        "why": "#475. An assistant working from another app is refused a deploy until the question has been answered once in the section's window (wording.deployHasClassesDatedLater). Without this line 'why didn't Claude deploy it?' has no answer on the trail."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -21871,9 +21901,27 @@
       "A session's lease appears and disappears while Terminal is in front, and another program's file changes nothing the app observes; the mac re-reads which courses are held when the folder is shown, when Plantoir becomes the active app, and at every click that acts on it. A menu opened without Plantoir ever being left can show the answer from the last of those; the click is still refused."
     ]
   },
+  "classesDatedLater": {
+    "note": "#475 (Russell, 2026-10-07): a class page published with a date in the future is caught at Deploy, and the teacher is offered a checklist to hide it. WHICH pages are flagged is class-planning.json -> futureDatedClasses (the next class day after today is never flagged, so tomorrow's class published the evening before goes out as intended); this key is WHERE the teacher is asked, in what ORDER, what each answer does, and where nobody can be asked. The sentences are wording.laterClasses*, wording.hideTickedAndDeployButton, wording.keepAllAndDeployButton, wording.leaveOutAndContinueButton, wording.publishThemAllButton, wording.deployHasClassesDatedLater (and ...NamingSeveral, ...AndNoWindow) and wording.deployWaitsForAnOpenQuestion in assist-wording.json.",
+    "askedFrom": "The section window's Deploy - its toolbar button and, on the mac, Section > Deploy... (the menu item IS the button). The in-app assistant's deploy_section, in that section's window, BEFORE it stops the preview (the director's ruling on #457 batch B's plan review). Section > Publish Pages..., for the classes the teacher ticked, after the choice and before the plan.",
+    "neverAskedFrom": "A scheduled deploy: it goes out as it is - nobody is awake to answer at half six, and holding it would fail the teacher worse - and the trail records the places (laterClassesWentOut). An assistant working from another app (MCP): refused before anything is stopped, wording.deployHasClassesDatedLater, trail laterClassesHeldADeployBack; once the question has been answered in the window (laterClassesKept, or the classes hidden) it deploys. The in-app assistant with NO window showing the section: the same refusal in the teacher's words, wording.deployHasClassesDatedLaterAndNoWindow. A terminal deploy.sh: as it is. The links checklist (#379): a class the teacher publishes from it is one they chose, so it is recorded as kept at its date, as Publish Class for a Date... records one. Section > Publish Class for a Date... and the assistants' publish_class_on: the teacher NAMED the date, so the class they publish is recorded as kept (file-formats.json -> laterClassesKept) and never asked about at that date. Section > Hide Pages...: hiding is the answer, not the question. A course kept for reference: never deployed.",
+    "order": "At Deploy: deployAndWait's own refusals FIRST (a course kept for reference, a deploy already preparing or running, a copy being zipped, a destination that cannot be deployed to, another program building the course) - read without claiming anything, so a deploy that will be refused is refused with no question and nothing hidden, because a refusal never follows a change; THEN the question; THEN the deploy, whose build may offer the links checklist (#379) afterwards - hiding changes which links exist, so the checklist must see the hidden classes as hidden. In the in-app assistant's deploy: its own refusals (reference course, another program building) and then the question, before the preview is stopped, so Cancel leaves the preview exactly as it was.",
+    "answers": "The rows are the flagged classes by date then title, every one TICKED to hide. Two buttons beside Cancel, ALWAYS both: Hide Ticked and Deploy (wording.hideTickedAndDeployButton, the default, Return): the unticked classes are recorded as kept at their dates (laterClassesKept); the ticked ones are hidden with the SAME call Section > Hide Pages... makes (unpublish_pages: a copy of the course first, Section > Undo Last Change takes it back, and pages only those classes link to are hidden with them), with no preview first - the deploy builds the site straight after; then the deploy. If a ticked class is still visible afterwards, nothing is deployed and the sheet says what the hide said. Keep All and Deploy (wording.keepAllAndDeployButton): every listed class is kept at its date, nothing is hidden, and the deploy goes - so a course that publishes its whole term ahead is asked ONCE, and never again until a date changes. Why it is always offered (the director's ruling on #457 batch B's implementation review, finding 1, Russell may overturn): every pre-populated course ships every class published, dated across the semester, so on 2026-10-08 the rule flagged 61 classes in 33 of the 39 payloads (measured by the implementation review, with the installer's own date function), all ticked - a teacher who took example content met a 61-row sheet whose Return hid half the term, with no way to keep them but unticking each. Hide Ticked and Deploy with nothing ticked hides nothing and keeps every class, as Keep All does. Cancel, Escape, or the window closing under the question: nothing is written, nothing deployed; to the in-app assistant it is wording.deployWasCancelled. At Section > Publish Pages...: the ticked classes are LEFT OUT and stay hidden (wording.leaveOutAndContinueButton; nothing ticked reads wording.publishThemAllButton), the unticked are kept, and the plan is made of what is left; with nothing left, nothing is published.",
+    "theDayAsked": "Decided once, when the question is put, on the teacher's clock: an answer given after midnight hides the classes that were listed, never a list worked out afresh.",
+    "whenTheWindowIsBusy": "The in-app assistant's deploy does not wait on a window that already has a sheet, an alert or another question up: it is refused with wording.deployWaitsForAnOpenQuestion, and nothing is stopped (the director's ruling: do not wait).",
+    "afterwardsInTheLinksChecklist": "A class hidden at Deploy is a hidden class like any other: when a later build offers the links checklist (#379) it may appear among the classes not yet published, UNTICKED, as every class row starts. Publishing it from there is a choice, so the class is recorded as kept at its date (file-formats.json -> laterClassesKept) and the next Deploy does not offer to hide it again - without that, the two questions undid each other: hidden at Deploy, its link dead, offered back by the checklist, published, flagged again (#457 batch B's implementation review, finding 2).",
+    "rejected": [
+      "Asking on a scheduled deploy: there is nobody at half six to answer, and a deploy held for a question fails exactly the teacher who set it up to run unattended.",
+      "Refusing the outside assistant for ever: without the kept record, a teacher who posts a week ahead on purpose could never deploy from Claude or Codex - the same reason wording.deployNeedsAnAnswer ends 'after that it can be deployed from here'.",
+      "Asking before deployAndWait's refusals: a teacher could hide pages - a backup and a write - and then be refused, against the rule that a refusal never follows a change (the plan review's finding 6).",
+      "Asking after the preview is stopped, in the assistant's deploy: a Cancel would leave the teacher's preview gone for nothing.",
+      "Hiding with a quiet write of its own: the ticked classes go through Hide Pages...'s own call, so they are backed up, undoable and hidden by the same rule (pages only they link to go with them) as anywhere else.",
+      "Asking at Publish Class for a Date...: the teacher named the day (Russell's decision 9); the class is recorded as kept instead, so the next Deploy does not undo the publish (the plan review's finding 5)."
+    ]
+  },
   "subjectMenus": {
     "note": "GitHub #457 (Russell, 2026-10-07/08). Every action a teacher can take on a course or a section is in the menu bar, in two subject menus — Course and Section, between View and Window — as well as in the sidebar's context menus and the windows' own buttons, which stay as second routes and call the SAME code. This section is the rule for which items can be USED; it is written in neutral item names so either platform can run it, and the mac runs it in SubjectMenuRulesTests. The mac's titles, order and key equivalents are pinned separately, by a golden of the real menu bar (mac-app/Tests/Goldens/menu-bar.txt), because a menu's shape is platform mechanics and WinUI's menu bar is a different animal (documentation/09-mac-app.md → 'Mac conventions').",
-    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate.",
+    "rule": "PRESENCE FOLLOWS THE MAC, ENABLEMENT FOLLOWS THE SELECTION. An item that cannot be used is GREYED, never hidden: a menu whose items come and go with the selection cannot be learned, and half of each menu greyed when the other kind of row is selected is the accepted cost of a stable menu bar. Only the Revise With items for an outside assistant that is not installed, or for the local assistant on a Mac that cannot run it, are left out — that is a fact about the Mac, not the selection (app-rules.json → outsideAgents.*.hiddenWhenNotInstalledWhy). The context menus keep HIDING what does not apply: they are about one row. A SHEET OR ALERT greys everything (situation.sheetIsUp), Open Working Folder… and Open Recent included, and the action asks the window again when it runs: a menu key equivalent fires while a sheet is attached, measured — a real Shift-Command-D sent with a sheet up ran Deploy. With a SECTION selected the Course items act on its course, except the Revise, Open in Obsidian, Show in Finder and New Terminal group, which is live in the menu of the ROW's kind only, so the two Open in Obsidian items are never enabled at once and their key (Shift-Command-O on the mac) sits on whichever is live. It cannot sit on both: measured on macOS 26, a key equivalent on a DISABLED item earlier in the menu bar swallows the key — AppKit reports it handled and runs nothing — so the same key on both would do nothing on a section row. Preview and Deploy are enabled exactly when the section window's own buttons are, read off the same predicate. THE ASSISTANT'S FUNCTIONS (#457 batch B) - publishPages, hidePages, publishClassForADate, addNextClass, reDateClasses, makeRoomForClasses, classDates and undoLastChange - are live on a live SECTION row when the course is neither deploying nor being copied and none of them is running on it (verbIsRunning); undoLastChange only when lastChangeIsHere. Each writes to the section, so none is live on a course kept for reference, where the tool's own gate refuses anyway. rebuildPreview writes only the built site and is live wherever the section's preview is running and the Preview button is enabled, a reference course included (shared-rules.json -> referenceCourses.refusal.toolsStillAllowed). Every one of them runs the TOOL's own code through the assistant's runner with a call built in code, never through a model, so a teacher who declined the assistant can use them all.",
     "situationDefaults": {
       "hasFolder": false,
       "folderGettingReady": false,
@@ -21894,6 +21942,9 @@
       "previewButtonEnabled": false,
       "deployButtonEnabled": false,
       "previewIsShowing": false,
+      "previewIsRunning": false,
+      "lastChangeIsHere": false,
+      "verbIsRunning": false,
       "canGoBack": false,
       "canGoForward": false
     },
@@ -21917,6 +21968,9 @@
       "previewButtonEnabled": "The section window's Preview (or Stop Preview) button is enabled.",
       "deployButtonEnabled": "The section window's Deploy button would be enabled (it is not drawn on a course kept for reference).",
       "previewIsShowing": "The section window is showing a preview.",
+      "previewIsRunning": "A preview of the selected section is running, building or showing. Rebuild Preview is live only then (Russell's decision 5 on #457 batch B: with no preview it would be Preview under a second name).",
+      "lastChangeIsHere": "The last change the Section menu made in THIS window was made in the selected section, so Undo Last Change would take it back (Russell's decision 4: the assistant's window keeps its own undo list).",
+      "verbIsRunning": "One of the assistant's functions is running on the selected section - from this window's menu, another window's, or the in-app assistant's own window (#457 batch B plan review, note 14). They run one at a time.",
       "canGoBack": "The preview can go back a page.",
       "canGoForward": "The preview can go forward a page."
     },
@@ -21960,6 +22014,15 @@
       "sectionShowInFinder",
       "sectionNewTerminalAtFolder",
       "removeSection",
+      "publishPages",
+      "hidePages",
+      "publishClassForADate",
+      "rebuildPreview",
+      "undoLastChange",
+      "addNextClass",
+      "reDateClasses",
+      "makeRoomForClasses",
+      "classDates",
       "back",
       "forward",
       "reloadPage"
@@ -22120,7 +22183,7 @@
         ]
       },
       {
-        "why": "A live section row, idle: Preview and Deploy are live because the section window's own buttons are, Open in Browser is not because nothing is showing. Course items act on the section's course; the Course menu's Revise and folder group is greyed because the Section menu's copy of it is the live one.",
+        "why": "A live section row, idle: Preview and Deploy are live because the section window's own buttons are, Open in Browser is not because nothing is showing. Course items act on the section's course; the Course menu's Revise and folder group is greyed because the Section menu's copy of it is the live one. The assistant's functions are live (#457 batch B) - all but Rebuild Preview, since no preview is running, and Undo Last Change, since nothing has been changed from the menu here.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22129,17 +22192,24 @@
           "deployButtonEnabled": true
         },
         "enabled": [
+          "addNextClass",
           "addSection",
           "backUpNow",
+          "classDates",
           "copyAPage",
           "deploy",
           "getReadyForTheStartOfTheYear",
+          "hidePages",
           "importCoursesForReference",
           "keepACopyForReference",
+          "makeRoomForClasses",
           "newCourse",
           "openRecent",
           "openWorkingFolder",
           "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
           "reloadCourses",
           "removeSection",
           "rename",
@@ -22153,7 +22223,7 @@
         ]
       },
       {
-        "why": "A live section previewing, with a deploy scheduled, a start-of-the-year undo held and a links checklist waiting; the local assistant is open on another section of the course.",
+        "why": "A live section previewing, with a deploy scheduled, a start-of-the-year undo held and a links checklist waiting; the local assistant is open on another section of the course. Its preview is running, so Rebuild Preview is live; a preview or a scheduled deploy holds none of the assistant's functions back.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22169,22 +22239,31 @@
           "busy": true,
           "reviseBlocked": [
             "localAssistant"
-          ]
+          ],
+          "previewIsRunning": true
         },
         "enabled": [
+          "addNextClass",
           "back",
           "backUpNow",
           "cancelScheduledDeploy",
+          "classDates",
           "copyAPage",
           "deploy",
           "getReadyForTheStartOfTheYear",
+          "hidePages",
           "importCoursesForReference",
+          "makeRoomForClasses",
           "newCourse",
           "openInBrowser",
           "openRecent",
           "openWorkingFolder",
           "preview",
+          "publishClassForADate",
+          "publishPages",
           "publishPagesLinksLeadTo",
+          "reDateClasses",
+          "rebuildPreview",
           "reloadCourses",
           "reloadPage",
           "removeSection",
@@ -22197,7 +22276,7 @@
         ]
       },
       {
-        "why": "A live section while its course deploys: the section window greys Preview and Deploy, and the start-of-the-year group waits.",
+        "why": "A live section while its course deploys: the section window greys Preview and Deploy, and the start-of-the-year group waits. None of the assistant's functions while it deploys: a change made under a running deploy would be in some of what goes out and not the rest.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22346,6 +22425,151 @@
         ]
       },
       {
+        "why": "#457 batch B: a live section whose preview is running, where the last change the Section menu made in this window was made: every one of the assistant's functions is live, Undo Last Change and Rebuild Preview included.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "previewIsShowing": true,
+          "previewIsRunning": true,
+          "lastChangeIsHere": true
+        },
+        "enabled": [
+          "addNextClass",
+          "addSection",
+          "backUpNow",
+          "classDates",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "hidePages",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "makeRoomForClasses",
+          "newCourse",
+          "openInBrowser",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "publishClassForADate",
+          "publishPages",
+          "reDateClasses",
+          "rebuildPreview",
+          "reloadCourses",
+          "reloadPage",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder",
+          "undoLastChange"
+        ]
+      },
+      {
+        "why": "#457 batch B: one of the assistant's functions is running on this section (from this window, another, or the in-app assistant): the others wait, Rebuild Preview and Undo Last Change too - one change at a time, so two undo lists never interleave.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "previewIsRunning": true,
+          "lastChangeIsHere": true,
+          "verbIsRunning": true
+        },
+        "enabled": [
+          "addSection",
+          "backUpNow",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "reloadCourses",
+          "removeSection",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
+        "why": "#457 batch B: a section of a course kept for reference with its preview running. Rebuild Preview is live - it writes only the built site, and reading last year's pages with their images and links is what a kept course is for; nothing that writes to the course is, whatever lastChangeIsHere says.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "keptForReference": true,
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "previewIsRunning": true,
+          "lastChangeIsHere": true
+        },
+        "enabled": [
+          "backUpNow",
+          "copyAPage",
+          "importCoursesForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "rebuildPreview",
+          "reloadCourses",
+          "removeSection",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionShowInFinder",
+          "setSchoolYear"
+        ]
+      },
+      {
+        "why": "#457 batch B: a live section while a copy of its course is being zipped (#351): the assistant's functions wait - each saves its own copy first, and a restore or removal waiting on that zip would otherwise replace pages a change had just written.",
+        "situation": {
+          "hasFolder": true,
+          "obsidianInstalled": true,
+          "row": "section",
+          "previewButtonEnabled": true,
+          "deployButtonEnabled": true,
+          "copying": true,
+          "lastChangeIsHere": true
+        },
+        "enabled": [
+          "addSection",
+          "copyAPage",
+          "deploy",
+          "getReadyForTheStartOfTheYear",
+          "importCoursesForReference",
+          "keepACopyForReference",
+          "newCourse",
+          "openRecent",
+          "openWorkingFolder",
+          "preview",
+          "reloadCourses",
+          "rename",
+          "scheduleDeploy",
+          "sectionNewTerminalAtFolder",
+          "sectionOpenInObsidian",
+          "sectionReviseWithClaude",
+          "sectionReviseWithCodex",
+          "sectionReviseWithLocalAssistant",
+          "sectionShowInFinder"
+        ]
+      },
+      {
         "why": "A sheet or alert is up on a live section that could otherwise do everything: EVERYTHING greys — Open Working Folder… and Open Recent too, which would otherwise open a second window behind the sheet — so a key equivalent cannot act behind it (a real ⇧⌘D with a sheet attached ran Deploy until this rule).",
         "situation": {
           "hasFolder": true,
@@ -22355,7 +22579,9 @@
           "deployButtonEnabled": true,
           "previewIsShowing": true,
           "settingsMaySave": true,
-          "sheetIsUp": true
+          "sheetIsUp": true,
+          "previewIsRunning": true,
+          "lastChangeIsHere": true
         },
         "enabled": []
       }
@@ -22365,7 +22591,9 @@
       "A menu per window kind, swapped in as the window in front changes (rejected as Canopy rejected it, documentation/09-mac-app.md): the menu bar is the app's command memory, and a menu that changes its NAME with focus cannot be learned.",
       "Hiding items that do not apply to the selection, the way the context menus do: the menu bar's items would come and go with every click.",
       "The same verb in both subject menus acting on the same thing (the plan review, #457 item 4 — 'no word appears twice'): New Course is in File only, the backup's restore is 'Restore from Backup…' so it is not File's 'Restore from Archive…', and the Revise and folder group appears in both menus only because the two act on different rows and only one is ever live.",
-      "Leaving the menu items live under a sheet and relying on each action's own refusal: several actions have none (Delete Backup, Copy a Page), and those that do would say it in a second alert behind the first."
+      "Leaving the menu items live under a sheet and relying on each action's own refusal: several actions have none (Delete Backup, Copy a Page), and those that do would say it in a second alert behind the first.",
+      "#457 batch B: hiding the assistant's functions on a course kept for reference or while a deploy runs - the menu bar greys, as every other item does; the section row's context menu hides them, as it hides every item that does not apply.",
+      "#457 batch B: ⌘Z on Undo Last Change - it belongs to text editing in the Edit menu, and a key that takes back a page change from inside a text field is a surprise nobody could undo."
     ]
   },
   "openRecent": {

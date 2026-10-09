@@ -1081,6 +1081,20 @@ window takes it out of the alert only when the checklist will really be shown
 (an offer on disk, fresh, holding a page not yet answered). Mechanics:
 [05 → The links checklist (#379)](05-build-pipeline.md#the-links-checklist-379).
 
+### Classes dated after the next class: asked before the deploy, never at half six (#475)
+
+A class page students can see that is dated after the next class day
+(`class-planning.json` → `futureDatedClasses`) is asked about BEFORE a deploy
+from the section window or the in-app assistant — after the deploy's own
+refusals, before anything is stopped or built — and the ticked ones are hidden
+first. A scheduled deploy goes out as it is and records the places on the
+trail ("deployed with classes dated after the next class"); an assistant
+working from another app is refused before anything runs
+(`wording.deployHasClassesDatedLater`) until the question has been answered
+once in the window. The whole rule — where it is asked, the order, what each
+answer does — is `shared-rules.json` → `classesDatedLater`; the mechanics are
+[09 → Classes dated after the next class, at Deploy (#475)](09-mac-app.md).
+
 ## The published-pages record (#379)
 
 "A page published before, then hidden again, keeps its date" (Russell's
