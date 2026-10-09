@@ -89,6 +89,15 @@
       "dockerfileContains": "Pillow==12.3.0",
       "windowsRuntimeContains": "Pillow==12.3.0",
       "why": "Draws each section's social sharing card. Pinned with the other two rather than for a known break: an unpinned image is not reproducible, and a card that renders differently is a thing teachers notice after the fact."
+    },
+    {
+      "pin": "pagedjs",
+      "value": "0.4.3",
+      "dockerfileContains": "pagedjs/-/pagedjs-0.4.3.tgz",
+      "windowsRuntimeContains": "pagedjs/-/pagedjs-0.4.3.tgz",
+      "sha256": "a79baaa94d15cf952e6327950fa886ba7533bdce92194b677d9d1b4cce6c17c5",
+      "fileSha256": "c4af9ac4a80f15e4abf53e11fdf34659dc4913f61b541652811cfa570f397211",
+      "why": "The print layout for pages whose settings say printable: true (#454): it paginates the handout in the page itself, so the school name, the blanks and 'Page 1 of 3' print in the corners in every browser, Safari included, which prints no margin boxes of its own. Carried at /opt/vendor/pagedjs (Windows: runtime\\vendor\\pagedjs) and copied into a section's site ONLY when a page students can see opts in - dist/paged.min.js is 502,617 bytes (96,934 gzipped), so a course that never prints carries none of it. The UMD global is `PagedModule` (not `Paged`). MIT. A QUIET project, which is the risk to know: 0.4.3 has been npm's latest since 2023-07-06, with only 0.5.0-beta.2 (2024-10-04) since, so a browser change it does not keep up with is ours to work around. `sha256` is the tarball's, which the recipe checks; `fileSha256` is paged.min.js's, which verify.sh checks in the image."
     }
   ],
   "rules": [
