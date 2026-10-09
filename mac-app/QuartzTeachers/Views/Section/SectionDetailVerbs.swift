@@ -546,7 +546,13 @@ extension SectionDetailView {
     /// in-app assistant's deploy — before anything is stopped, claimed or
     /// built. Decided for the day it was ASKED: an answer given after
     /// midnight hides the classes that were on the list.
-    func askAboutClassesDatedLater(route: String) async -> LaterClassesAnswer {
+    ///
+    /// `askedByTheAssistant`: the in-app assistant's deploy is asked from
+    /// the ASSISTANT's window, which is usually in front, so this window is
+    /// brought to the front before the question goes up — otherwise the chat
+    /// waits, "working", on a sheet behind it that nothing points at (#457
+    /// batch B's review, note 8b).
+    func askAboutClassesDatedLater(route: String, askedByTheAssistant: Bool = false) async -> LaterClassesAnswer {
         let today: CalendarDay = CalendarDay.today()
         let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(
             forSection: sectionNumber, in: course, today: today
@@ -565,6 +571,9 @@ extension SectionDetailView {
         let nextDay: CalendarDay? = ClassesDatedLater.nextClassDay(
             after: today, among: ClassesDatedLater.classPages(forSection: sectionNumber, in: course)
         )
+        if SectionDetailView.bringsItsWindowForward(askedByTheAssistant: askedByTheAssistant) {
+            bringThisWindowForward()
+        }
         return await withCheckedContinuation { continuation in
             let once: LaterClassesAnswerOnce = LaterClassesAnswerOnce(continuation)
             let model: SectionVerbSheetModel = SectionVerbSheetModel(
@@ -588,6 +597,19 @@ extension SectionDetailView {
     func keepAllAtDeploy(_ model: SectionVerbSheetModel) {
         model.laterTicked = []
         answerAtDeploy(model)
+    }
+
+    /// Whether the question at Deploy brings its window to the front first:
+    /// only when the in-app assistant asked — a teacher who pressed Deploy is
+    /// already looking at this window.
+    static func bringsItsWindowForward(askedByTheAssistant: Bool) -> Bool {
+        return askedByTheAssistant
+    }
+
+    /// The window this section is showing in, in front and key.
+    func bringThisWindowForward() {
+        NSApp.activate(ignoringOtherApps: true)
+        workspace.window?.makeKeyAndOrderFront(nil)
     }
 
     /// Hide Ticked and Deploy (or, from `keepAllAtDeploy`, nothing ticked). The unticked classes are kept;

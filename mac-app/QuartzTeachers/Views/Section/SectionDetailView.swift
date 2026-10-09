@@ -581,7 +581,9 @@ struct SectionDetailView: View {
                     deploy: { await deployAndWait(pressedByTheAssistant: true) },
                     // #475: the in-app assistant's deploy asks HERE, before
                     // it stops anything, as the Deploy button does.
-                    askAboutClassesDatedLater: { await askAboutClassesDatedLater(route: "the assistant's deploy") }
+                    askAboutClassesDatedLater: {
+                        await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
+                    }
                 )
             )
             // A function asked for from this row's context menu before this

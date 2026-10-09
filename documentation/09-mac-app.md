@@ -2977,8 +2977,14 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
   flagged again (the review's finding 2). Both spell a page's place the same
   way (links resolved, precomposed Unicode).
 - **A scheduled deploy** writes "deployed with classes dated after the next
-  class" only once it HAS deployed; the classes are read when it is set to
-  run, the line written on its exit status (the review's note 9).
+  class" only once it HAS deployed: the classes are read when it is set to
+  run, and the line is written by `recordTheRun` only when the wrapper left
+  its success sentinel. Not on the wrapper's exit status, which is 0 whether
+  or not the deploy got through — it belongs to `launchctl bootout` — and
+  gating on it was measured to write the line after a failed deploy (the
+  fixes review, A; `ScheduledPublishOutcomeTests.
+  testTheClassesDatedLaterLineFollowsADeployThatWentOut` runs the real
+  wrapper both ways).
 
 The sheet lists the flagged classes, every one ticked, and ALWAYS offers two
 buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
@@ -2999,7 +3005,7 @@ The answer acts on the list asked about, never one worked out after midnight.
 
 Measured by driving the built app with `--state-dir` (2026-10-08, twice): a
 class on the 14th was asked about and tomorrow's was not; Hide 1 and Deploy
-hid it, deployed to a folder, and the trail read `asked about classes dated
+(the default's label then; Hide Ticked and Deploy since the fixes round) hid it, deployed to a folder, and the trail read `asked about classes dated
 after the next class at Deploy — 1 flagged, 1 hidden, 0 kept published`;
 Cancel deployed nothing and left the preview running.
 
