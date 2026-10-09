@@ -294,9 +294,7 @@ gh release upload v<version> mac-app/dist/*.delta -R <owner/repo>
    `site.json → availability`**: each v1.4.0-and-later feature section says
    "On the Mac. The Windows version gets this in a later release." while its
    `windows` flag is false. Flip the flags for what the Windows installer being
-   released actually has. **`new_in.version`** names the release the home
-   page's "New this year" list was written for; `--deploy` warns when it is not
-   this version's major.minor — rewrite the list for a new minor version.
+   released actually has.
 
 ```bash
 # Redraw brand images if needed
