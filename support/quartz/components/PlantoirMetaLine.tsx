@@ -54,6 +54,11 @@ function cssString(text: string): string {
   return '"' + escaped.replace(/ /g, "\\0000a0") + '"'
 }
 
+// The same, keeping ordinary spaces so the text can wrap.
+function cssPlainString(text: string): string {
+  return '"' + text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ") + '"'
+}
+
 // "Page {n} of {total}" as a CSS content value counting the whole document:
 // what the browser's own Print (⌘P) can do, where nothing paginates the
 // questions and the answers separately.
@@ -81,10 +86,17 @@ function countedLabel(template: string): string {
 // and the handout passes the same text to the print layout with the bottom
 // right corner replaced by each page's own label.
 export function pageRules(corners: Corners, pageLabelTemplate: string): string {
-  const box = "font-family: var(--bodyFont), sans-serif; font-size: 9pt; color: #333; white-space: nowrap;"
+  const box = "font-family: var(--bodyFont), sans-serif; font-size: 9pt; color: #333; white-space: nowrap; vertical-align: bottom;"
+  // The top left corner may take two lines: a long school name sharing it
+  // with the course code, beside three blanks, printed ON TOP of the blanks
+  // when every corner was one line (implementation review S3, measured).
+  // Its spaces stay ordinary so it can wrap; the blanks and the page label
+  // never do.
+  const wrapping =
+    "font-family: var(--bodyFont), sans-serif; font-size: 9pt; color: #333; white-space: normal; vertical-align: bottom;"
   return (
     "@page { size: letter; margin: 0.9in 0.75in; " +
-    `@top-left { content: ${cssString(corners.topLeft)}; ${box} } ` +
+    `@top-left { content: ${cssPlainString(corners.topLeft)}; ${wrapping} } ` +
     `@top-right { content: ${cssString(corners.topRight)}; ${box} } ` +
     `@bottom-left { content: ${cssString(corners.bottomLeft)}; ${box} } ` +
     `@bottom-right { content: ${countedLabel(pageLabelTemplate)}; ${box} } }`

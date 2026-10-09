@@ -111,7 +111,14 @@ export function label(
     return cleanTitle(title)
   }
   if (listItem !== null && listItem !== undefined) {
-    return fill(words.questionLabel, { n: listItem })
+    // Under a heading, the item's number alone repeats across lists: the
+    // verify fixture's practice list labelled its first answer "Question 1"
+    // beside the heading "Question 1" (implementation review N2).
+    const item: string = fill(words.questionLabel, { n: listItem })
+    if (heading !== null && heading !== undefined && heading.trim() !== "") {
+      return heading.trim() + " · " + item
+    }
+    return item
   }
   if (heading !== null && heading !== undefined && heading.trim() !== "") {
     return heading.trim()

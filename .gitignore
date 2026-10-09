@@ -18,6 +18,12 @@ website/shots/windowshot/obj/
 !.claude/
 .claude/*
 !.claude/skills/
+# ...except the teachers' printing skill, which the app writes into any
+# working folder it opens - and this repository is one (it has preview.sh at
+# its root). Its source is support/agent_guidance; a copy here would load the
+# teachers' skill into this repository's own sessions (#454 review N5).
+.claude/skills/plantoir-printing/
+.agents/
 
 # Release bundles (publish output)
 windows-app/dist/

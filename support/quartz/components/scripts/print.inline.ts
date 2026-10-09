@@ -458,15 +458,20 @@ async function printHandout(mode: Mode, box: HTMLElement, settings: Settings) {
   }
 
   try {
+    // Diagrams are drawn for the theme on screen: draw them light first on a
+    // dark page (never written to the reader's saved preference). And wait
+    // for them on EVERY page: opened from Plantoir's preview, Print starts at
+    // the first page load, before Quartz has drawn anything, and a light page
+    // printed every diagram as its source text (implementation review B1,
+    // measured: 0 of 5 drawn in Chrome, Mermaid source in Safari's PDF).
+    // Returns at once when every diagram is already drawn.
+    const diagrams = Array.from(document.querySelectorAll(".center code.mermaid"))
     if (theme === "dark") {
-      // Diagrams are drawn for the theme on screen; draw them light first.
-      // Never written to the reader's saved preference.
-      const diagrams = Array.from(document.querySelectorAll(".center code.mermaid"))
       html.setAttribute("saved-theme", "light")
       document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: "light" } }))
-      if (diagrams.length > 0) {
-        await diagramsRedrawn(diagrams, 5000)
-      }
+    }
+    if (diagrams.length > 0) {
+      await diagramsRedrawn(diagrams, 8000)
     }
     for (const prepare of hooks.plantoirPrint?.prepare ?? []) {
       await prepare()
@@ -518,6 +523,11 @@ async function printHandout(mode: Mode, box: HTMLElement, settings: Settings) {
     say(status, "")
     frame.contentWindow!.focus()
     frame.contentWindow!.print()
+    // print() returns when the dialog closes in Safari, Chrome and Edge
+    // (measured), and afterprint has normally put things back already. If a
+    // browser never sends afterprint, the page must not be left light with a
+    // dead button until a reload (review N4).
+    restore()
   } catch {
     say(status, words.couldNotPrepare)
     restore()
