@@ -856,7 +856,7 @@ private struct AssistDatesOfferView: View {
 ///
 /// Once, and then never again — in this window or any other. A suggestion
 /// declined is an answer, and asking twice is how a helpful mention becomes
-/// nagging. "Keep checking" is the default button: the teacher who pressed
+/// nagging. "Keep Checking" is the default button: the teacher who pressed
 /// Return without reading keeps the safer arrangement.
 private struct AssistStopAskingOfferView: View {
 
@@ -881,9 +881,9 @@ private struct AssistStopAskingOfferView: View {
             Text(message)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Just do it", action: stopAsking)
+                Button("Just Do It", action: stopAsking)
                     .accessibilityIdentifier("assistStopAskingButton")
-                Button("Keep checking", action: keepAsking)
+                Button("Keep Checking", action: keepAsking)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistKeepAskingButton")
             }

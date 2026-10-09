@@ -449,7 +449,7 @@ struct SidebarView: View {
                     """)
             }
         }
-        .alert("Could not do that", isPresented: backupProblemBinding) {
+        .alert(workspace.backupProblemTitle, isPresented: backupProblemBinding) {
             Button("OK") {
                 workspace.backupProblem = nil
             }
@@ -1176,6 +1176,38 @@ struct SidebarView: View {
         }
     }
 
+    /// Revise With ▸, as the menu bar draws it (#457, the HIG sweep): the
+    /// row's Claude…, Codex… and (on a section) Local AI Assistant… items in
+    /// one submenu, with the reasons any is greyed under them. Until the
+    /// sweep the row's menu called the same commands "Revise with Claude…"
+    /// and so on at the top level — one command, two names. Left out when
+    /// there is nothing to put in it, as the menu bar leaves it out.
+    @ViewBuilder
+    func reviseWithSubmenu(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
+        if reviseWithHasAnItem(course: course, sectionNumber: sectionNumber) {
+            Menu("Revise With") {
+                reviseWithClaudeItem(course: course, row: row)
+                reviseWithCodexItem(course: course, row: row)
+                if let sectionNumber {
+                    reviseWithAIItem(course: course, sectionNumber: sectionNumber)
+                }
+                reviseNotes(course: course, sectionNumber: sectionNumber)
+            }
+        }
+    }
+
+    /// Whether any Revise item would be drawn on this row — the same three
+    /// conditions the items themselves draw on.
+    func reviseWithHasAnItem(course: Course, sectionNumber: Int?) -> Bool {
+        if course.isKeptForReference || workspace.workspaceURL == nil {
+            return false
+        }
+        if ClaudeCodeLauncher.isAvailable || CodexLauncher.isAvailable {
+            return true
+        }
+        return sectionNumber != nil && AssistHardwareBudget.current().canRunAssistant
+    }
+
     /// The distinct reasons behind `reviseNotes`, in the items' order.
     func reviseNoteLines(course: Course, sectionNumber: Int?) -> [String] {
         var lines: [String] = []
@@ -1494,7 +1526,7 @@ struct SidebarView: View {
             // Revise items (`reviseNotes`), so the same reason is not said
             // three times.
             let blocked: String? = reviseReason(.localAssistant, course: course, sectionNumber: sectionNumber)
-            Button("Revise with Local AI Assistant…", systemImage: "sparkles") {
+            Button(ReviseWithMenu.localAssistantTitle, systemImage: "sparkles") {
                 select(SidebarSelection.section(course.code, sectionNumber))
                 reviseWithLocalAssistant(course: course, sectionNumber: sectionNumber, folder: folder)
             }
@@ -1526,10 +1558,7 @@ struct SidebarView: View {
         // editing and folder actions made it
         // read as an afterthought.
         let row: SidebarSelection = SidebarSelection.section(course.code, sectionNumber)
-        reviseWithClaudeItem(course: course, row: row)
-        reviseWithCodexItem(course: course, row: row)
-        reviseWithAIItem(course: course, sectionNumber: sectionNumber)
-        reviseNotes(course: course, sectionNumber: sectionNumber)
+        reviseWithSubmenu(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
         openInObsidianItem(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
@@ -1585,9 +1614,7 @@ struct SidebarView: View {
     @ViewBuilder
     func courseRowMenu(course: Course, busyReason: String?, structuralReason: String?) -> some View {
         let row: SidebarSelection = SidebarSelection.course(course.code)
-        reviseWithClaudeItem(course: course, row: row)
-        reviseWithCodexItem(course: course, row: row)
-        reviseNotes(course: course, sectionNumber: nil)
+        reviseWithSubmenu(course: course, sectionNumber: nil, row: row)
         if course.isKeptForReference {
             openInObsidianItem(forReferenceCourse: course, sectionNumber: nil, row: row)
         } else {
@@ -1628,7 +1655,8 @@ struct SidebarView: View {
             // selection change loses focus to the sidebar and
             // closes (#293, measured — see the selection's
             // onChange). The field works on an unselected row.
-            Button("Rename Course", systemImage: "pencil") {
+            // "Rename", as Course ▸ Rename names it (#457, the HIG sweep).
+            Button("Rename", systemImage: "pencil") {
                 workspace.renamingCourseCode = course.code
             }
             .disabled(structuralReason != nil)
@@ -1915,7 +1943,7 @@ struct SidebarView: View {
     ///
     /// Only a COURSE row answers. A section's row is a different thing to
     /// have selected, and renaming the course it belongs to because Return
-    /// was pressed on Section 2 is not what anybody meant — Course ▸ Rename…
+    /// was pressed on Section 2 is not what anybody meant — Course ▸ Rename
     /// is there for that, in the menu named for what it acts on (#457).
     func beginRenamingFromTheKeyboard() -> Bool {
         if workspace.renamingCourseCode != nil {
@@ -2220,7 +2248,7 @@ struct CourseCodeField: View {
             // The field and its message share ONE solid card, and that is
             // what makes the MESSAGE readable.
             //
-            // A course renamed from Return or Course ▸ Rename… is SELECTED
+            // A course renamed from Return or Course ▸ Rename is SELECTED
             // while it is being renamed, so this row is drawing on the
             // selection colour — and everything inside a selected sidebar
             // row is tinted to sit on it. (The context menu selects the row

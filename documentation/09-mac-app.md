@@ -3373,7 +3373,7 @@ students.
 
 ## Renaming a course in the sidebar: two claims on the keyboard (#293)
 
-Return, Course ▸ Rename… (Edit ▸ Rename Course until v1.5.0, #457) or the
+Return, Course ▸ Rename (Edit ▸ Rename Course until v1.5.0, #457) or the
 row's context menu turns a course's row
 into a field (`CourseCodeField` in `SidebarView.swift`). What it shows under
 itself and what Return refuses are ONE function,

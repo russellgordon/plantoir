@@ -6847,7 +6847,7 @@ the session made its backup and wrote `EXC2O.held-backup.<pid>` naming it. In
 the app: the course menu showed Revise with Claude and Codex greyed with
 "Available once you finish revising with Claude" once under them, and Rename
 Course and Add Section… greyed with the same line (Edit → Rename Course too —
-Course ▸ Rename… since v1.5.0, #457, read the same way); a
+Course ▸ Rename since v1.5.0, #457, read the same way); a
 section's menu greyed all three Revise items with one line; Delete Backup on
 the session's zip answered "Finish the Claude session working on EXC2O first.
 It made this backup, so it was kept."; and Restore on another backup of EXC2O,

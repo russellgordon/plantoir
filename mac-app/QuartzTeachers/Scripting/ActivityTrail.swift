@@ -80,6 +80,9 @@ nonisolated enum ActivityTrail {
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
+        /// Help ▸ Plantoir Help opened plantoir.app's support page (#457,
+        /// the HIG sweep). Carries nothing else: the page is public.
+        case plantoirHelpOpened = "opened Plantoir Help"
         case assistantOpened = "assistant opened"
         /// A Claude or Codex session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when

@@ -224,7 +224,7 @@ struct SectionScheduleSheet: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button("Choose a file…") {
+                    Button("Choose a File…") {
                         isPickingFile = true
                     }
                     .accessibilityIdentifier("sectionScheduleChooseFileButton")
@@ -300,12 +300,12 @@ struct SectionScheduleSheet: View {
                 .accessibilityIdentifier("sectionScheduleOrderingQuestion")
 
             HStack(spacing: 12) {
-                Button("Day first (\(question.dayFirstShort))") {
+                Button("Day First (\(question.dayFirstShort))") {
                     answer(question, with: .dayThenMonth)
                 }
                 .accessibilityIdentifier("sectionScheduleDayFirstButton")
 
-                Button("Month first (\(question.monthFirstShort))") {
+                Button("Month First (\(question.monthFirstShort))") {
                     answer(question, with: .monthThenDay)
                 }
                 .accessibilityIdentifier("sectionScheduleMonthFirstButton")
@@ -358,13 +358,13 @@ struct SectionScheduleSheet: View {
             .accessibilityIdentifier("sectionScheduleCancelButton")
 
             if let plan {
-                Button("Remember these dates") {
+                Button("Remember These Dates") {
                     remember(plan)
                 }
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("sectionScheduleRememberButton")
             } else if question == nil {
-                Button("Read the dates") {
+                Button("Read the Dates") {
                     Task { await read() }
                 }
                 .defaultButton(isEnabled: canRead)

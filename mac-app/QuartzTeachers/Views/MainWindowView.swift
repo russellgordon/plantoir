@@ -192,7 +192,9 @@ struct MainWindowView: View {
                 } description: {
                     Text("Add your first course, or start from the example course to see how everything fits together.")
                 } actions: {
-                    Button("Add a Course…") {
+                    // File ▸ New Course…'s own name (#457, the HIG sweep):
+                    // one command, one name everywhere.
+                    Button("New Course…") {
                         workspace.isShowingNewCourseWizard = true
                     }
                     .buttonStyle(.borderedProminent)

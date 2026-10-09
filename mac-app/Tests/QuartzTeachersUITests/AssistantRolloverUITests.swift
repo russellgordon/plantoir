@@ -307,7 +307,27 @@ final class AssistantRolloverUITests: XCTestCase {
         XCTAssertTrue(sectionRow.waitForExistence(timeout: 20), "Section \(section) should be in the sidebar")
         sectionRow.rightClick()
 
-        let assistantItem: XCUIElement = application.menuItems["Revise with Local AI Assistant…"]
+        // Inside Revise With ▸ since the HIG sweep (#457): the row's menu names
+
+        // the command the way the menu bar does.
+
+        // The context menu's own Revise With — the menu bar's Course and
+
+        // Section menus carry one of the same title, closed and not hittable.
+
+        var reviseWith: XCUIElement = application.menuItems["Revise With"]
+
+        _ = reviseWith.waitForExistence(timeout: 15)
+
+        for candidate in application.menuItems.matching(NSPredicate(format: "title == %@", "Revise With")).allElementsBoundByIndex where candidate.isHittable {
+
+            reviseWith = candidate
+
+        }
+
+        reviseWith.hover()
+
+        let assistantItem: XCUIElement = reviseWith.menuItems["Local AI Assistant…"]
         XCTAssertTrue(assistantItem.waitForExistence(timeout: 20), "The assistant should be offered")
         assistantItem.click()
 
