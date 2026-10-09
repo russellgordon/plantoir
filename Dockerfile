@@ -61,6 +61,22 @@ RUN git clone --depth 1 --branch v4.5.0 https://github.com/jackyzha0/quartz.git 
 # Pre-install dependencies inside the image so npm install does not run over slow 9P mounts
 RUN cd /opt/quartz && npm install --no-audit && npm cache clean --force
 
+# Paged.js, the print layout for pages whose settings say `printable: true`
+# (#454). Into /opt/vendor, NOT into the Quartz scaffold's static/: a site
+# carries it only when one of its pages asks for it (build_site.py copies it
+# into that section's quartz/static then, and takes it out again when no page
+# does), so a course that never prints ships none of its 502,617 bytes.
+# Fetched from the npm registry by exact version and checked against the
+# tarball's SHA-256, so a changed upload fails the image build rather than
+# reaching a teacher; contracts/toolchain.json -> pins carries the why. MIT
+# licensed; the licence travels beside the file.
+RUN curl -fsSL -o /tmp/pagedjs.tgz https://registry.npmjs.org/pagedjs/-/pagedjs-0.4.3.tgz \
+ && echo "a79baaa94d15cf952e6327950fa886ba7533bdce92194b677d9d1b4cce6c17c5  /tmp/pagedjs.tgz" | sha256sum -c - \
+ && mkdir -p /tmp/pagedjs /opt/vendor/pagedjs \
+ && tar -xzf /tmp/pagedjs.tgz -C /tmp/pagedjs package/dist/paged.min.js package/LICENSE.md \
+ && cp /tmp/pagedjs/package/dist/paged.min.js /tmp/pagedjs/package/LICENSE.md /opt/vendor/pagedjs/ \
+ && rm -rf /tmp/pagedjs /tmp/pagedjs.tgz
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx
