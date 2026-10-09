@@ -1428,7 +1428,6 @@ def install_patched_backlinks(output_dir: Path):
 # (this only adds and overwrites). Nothing imports a file nobody wires in, so it
 # is inert; a removal that matters must also be taken out here by name.
 QUARTZ_ADDITIONS_MARKER = "PLANTOIR-ADDITIONS"
-MERMAID_DONE_MARKER = "PLANTOIR-MERMAID-DONE"
 
 
 def install_quartz_additions(output_dir: Path) -> int:
@@ -1493,30 +1492,17 @@ def _wire_content_layout(layout_ts: Path) -> None:
     layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
 
 
-def _wire_mermaid_done(mermaid_ts: Path) -> None:
-    """Say when every diagram has been drawn AND fitted, so the print code can
-    wait for a light re-draw instead of guessing how long one takes."""
-    text = mermaid_ts.read_text(encoding="utf-8")
-    if MERMAID_DONE_MARKER in text:
-        return
-    call = "\n  await renderMermaid()\n"
-    at = text.find(call)
-    close = text.rfind("\n  }\n", 0, at) if at >= 0 else -1
-    if at < 0 or close < 0:
-        print("⚠️ Could not tell printing when diagrams are drawn; it will wait a moment instead.")
-        return
-    line = (f'\n    document.dispatchEvent(new CustomEvent("plantoir-mermaid-done")) '
-            f'// {MERMAID_DONE_MARKER}')
-    mermaid_ts.write_text(text[:close] + line + text[close:], encoding="utf-8")
-
-
 def wire_quartz_additions(output_dir: Path) -> None:
-    """The three edits that connect support/quartz to Quartz. Idempotent, one
-    marker each; an anchor that has moved warns and leaves the file alone."""
+    """The two edits that connect support/quartz to Quartz. Idempotent; an
+    anchor that has moved warns and leaves the file alone.
+
+    Deliberately NOT a third edit to mermaid.inline.ts (an event saying the
+    diagrams are drawn), which an earlier draft made: that script is inlined
+    into EVERY page, so it changed the HTML of pages that never asked to
+    print. The print code watches the diagrams instead (print.inline.ts)."""
     for path, wire in (
         (output_dir / "quartz" / "components" / "index.ts", _wire_components_index),
         (output_dir / "quartz.layout.ts", _wire_content_layout),
-        (output_dir / "quartz" / "components" / "scripts" / "mermaid.inline.ts", _wire_mermaid_done),
     ):
         try:
             wire(path)

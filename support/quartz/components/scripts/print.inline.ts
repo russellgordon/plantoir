@@ -90,15 +90,41 @@ function stampRoles(settings: Settings) {
   }
 }
 
-function waitForEvent(name: string, milliseconds: number): Promise<void> {
+// Every diagram drawn again: Quartz's Mermaid code empties each diagram the
+// moment the theme changes and puts a new drawing in when it is done, so the
+// drawings are back when every diagram holds one again. Watched rather than
+// announced, so nothing in the site's own Mermaid script changes - it is
+// inlined into every page, printable or not. Gives up after `milliseconds`.
+function diagramsRedrawn(diagrams: Element[], milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
-    const done = () => {
-      document.removeEventListener(name, done)
+    let finished = false
+    // The finished drawing is the diagram's own child; while Mermaid is still
+    // drawing, an svg sits inside a temporary box instead (measured: printing
+    // on the first svg found printed a blank space where the diagram goes).
+    const allDrawn = () =>
+      diagrams.every((diagram) => diagram.querySelector(":scope > svg") !== null)
+    const finish = () => {
+      if (finished) {
+        return
+      }
+      finished = true
+      observer.disconnect()
       clearTimeout(timer)
-      resolve()
+      // One more frame, for the pie charts' re-fit that follows the drawing.
+      requestAnimationFrame(() => resolve())
     }
-    const timer = setTimeout(done, milliseconds)
-    document.addEventListener(name, done)
+    const observer = new MutationObserver(() => {
+      if (allDrawn()) {
+        finish()
+      }
+    })
+    for (const diagram of diagrams) {
+      observer.observe(diagram, { childList: true, subtree: true })
+    }
+    const timer = setTimeout(finish, milliseconds)
+    if (allDrawn()) {
+      finish()
+    }
   })
 }
 
@@ -435,12 +461,12 @@ async function printHandout(mode: Mode, box: HTMLElement, settings: Settings) {
     if (theme === "dark") {
       // Diagrams are drawn for the theme on screen; draw them light first.
       // Never written to the reader's saved preference.
-      const drawn = document.querySelector(".center code.mermaid")
-        ? waitForEvent("plantoir-mermaid-done", 5000)
-        : Promise.resolve()
+      const diagrams = Array.from(document.querySelectorAll(".center code.mermaid"))
       html.setAttribute("saved-theme", "light")
       document.dispatchEvent(new CustomEvent("themechange", { detail: { theme: "light" } }))
-      await drawn
+      if (diagrams.length > 0) {
+        await diagramsRedrawn(diagrams, 5000)
+      }
     }
     for (const prepare of hooks.plantoirPrint?.prepare ?? []) {
       await prepare()
