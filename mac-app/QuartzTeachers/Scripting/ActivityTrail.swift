@@ -1194,6 +1194,11 @@ nonisolated enum ActivityTrail {
         /// a class dated after the next class has no answer on file (#475):
         /// the count. The other half of "why didn't Claude deploy it?".
         case laterClassesHeldADeployBack = "a deploy was held back for classes dated after the next class"
+        /// Plantoir's preview handed a page to the teacher's web browser
+        /// (#454): Print on a printable page (with the way of printing
+        /// chosen), or a link that opens in a new window - a page's own PDF
+        /// among them. The page's place in the site, never its words.
+        case previewPageOpenedInBrowser = "preview page opened in the web browser"
     }
 
     // MARK: - Stored properties
