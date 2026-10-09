@@ -471,6 +471,11 @@ class WorkspaceModel {
     /// The current sidebar selection.
     var selection: SidebarSelection? {
         didSet {
+            // A function asked for from a section row's context menu belongs
+            // to that row: once the selection has left it, the request is
+            // DROPPED, never run the next time the section is shown (#457
+            // batch B's review, note 7).
+            dropAVerbRequestForAnotherRow()
             // The third of the rulings' re-assertion points: SELECTING a
             // reference course. The other two are the folder being read and
             // the teacher previewing it or opening it in Obsidian.
@@ -1279,15 +1284,18 @@ class WorkspaceModel {
         ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
-    /// Adopts a folder that is ALREADY in use — silently, with no check, no
-    /// trail line and nothing remembered.
-    ///
-    /// For a window opened beside one already on the folder, and for the
-    /// assistant's and the MCP server's own models. **A window getting a
-    /// remembered folder back must NOT come here**: it goes through
-    /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
-    /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
-    /// holds the callers to a named list, so a new one is a decision.
+    /// Drops a context-menu request whose section is no longer selected.
+    func dropAVerbRequestForAnotherRow() {
+        guard let request = sectionVerbRequest else {
+            return
+        }
+        if case .section(let code, let number) = selection,
+           code.lowercased() == request.courseCode.lowercased(), number == request.sectionNumber {
+            return
+        }
+        sectionVerbRequest = nil
+    }
+
     /// This window's runner for the Section menu (#457 batch B), made on
     /// first use and made again when the window has moved to another
     /// folder — which drops the old folder's undo list with it. Nil with no
@@ -1304,6 +1312,15 @@ class WorkspaceModel {
         return made
     }
 
+    /// Adopts a folder that is ALREADY in use — silently, with no check, no
+    /// trail line and nothing remembered.
+    ///
+    /// For a window opened beside one already on the folder, and for the
+    /// assistant's, the MCP server's and the Section menu's own models. **A window getting a
+    /// remembered folder back must NOT come here**: it goes through
+    /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
+    /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
+    /// holds the callers to a named list, so a new one is a decision.
     func adoptRestoredPath(_ path: String) {
         if path.isEmpty || isUnderUITest {
             return

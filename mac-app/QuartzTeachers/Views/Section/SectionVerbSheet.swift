@@ -196,10 +196,7 @@ final class SectionVerbSheetModel: Identifiable {
             return AssistWording.menuContinueButton
         case .askingAboutLaterClasses:
             if kind == .laterClassesAtDeploy {
-                if laterTicked.isEmpty {
-                    return AssistWording.deployAsItIsButton
-                }
-                return AssistWording.hideAndDeployButton(count: laterTicked.count)
+                return AssistWording.hideTickedAndDeployButton
             }
             if laterTicked.isEmpty {
                 return AssistWording.publishThemAllButton
@@ -448,6 +445,10 @@ struct SectionVerbSheet: View {
     /// Cancel, at every stage it is offered.
     var cancel: () -> Void
 
+    /// Keep All and Deploy, beside the default at #475's question (#475,
+    /// the director's ruling on the implementation review's finding 1).
+    var keepAll: () -> Void = {}
+
     /// The window's runner, read for the copy being saved before a change
     /// while the sheet waits (#351) — read here, in the sheet's own body, so
     /// the line follows it.
@@ -468,14 +469,25 @@ struct SectionVerbSheet: View {
                 }
             )
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(model.stage == .askingAboutLaterClasses
-                     ? AssistWording.laterClassesTitle(noun: model.noun) : model.title)
+            VStack(alignment: .leading, spacing: 0) {
+                // The title band every sheet wears since #457's HIG sweep:
+                // `.headline`, leading, 52 points tall, the sheet's own side
+                // margin — written out here because batch C's `SheetTitle`
+                // (`.sheetTitle(_:)`) is not on this branch; when the two
+                // merge, this becomes `.sheetTitle(title)`.
+                Text(sheetTitle)
                     .font(.headline)
-                content
-                buttons
+                    .accessibilityAddTraits(.isHeader)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .frame(height: 52)
+                VStack(alignment: .leading, spacing: 12) {
+                    content
+                    buttons
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
-            .padding(20)
             .frame(width: 560)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .contain)
@@ -612,6 +624,13 @@ struct SectionVerbSheet: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    var sheetTitle: String {
+        if model.stage == .askingAboutLaterClasses {
+            return AssistWording.laterClassesTitle(noun: model.noun)
+        }
+        return model.title
+    }
+
     var buttons: some View {
         HStack {
             Spacer()
@@ -623,11 +642,35 @@ struct SectionVerbSheet: View {
                 .disabled(model.stage == .working)
                 .accessibilityIdentifier("sectionVerbSheetCancel")
             }
+            if model.kind == .laterClassesAtDeploy && model.stage == .askingAboutLaterClasses {
+                Button(AssistWording.keepAllAndDeployButton) {
+                    keepAll()
+                }
+                .accessibilityIdentifier("sectionVerbSheetKeepAll")
+            }
+            defaultButton
+        }
+    }
+
+    /// The default button takes Return and wears the accent ONLY while it can
+    /// be pressed; otherwise it is a plain grey button with no key — the
+    /// shape #364 gave Course Settings' Save, and batch C's
+    /// `defaultButton(isEnabled:)` makes one modifier (#457's HIG sweep).
+    /// Written out here because that helper is not on this branch; when the
+    /// two merge, this becomes `.defaultButton(isEnabled:)`.
+    @ViewBuilder
+    var defaultButton: some View {
+        if model.defaultButtonIsEnabled {
             Button(model.defaultButtonTitle) {
                 pressDefault()
             }
             .keyboardShortcut(.defaultAction)
-            .disabled(!model.defaultButtonIsEnabled)
+            .accessibilityIdentifier("sectionVerbSheetDefault")
+        } else {
+            Button(model.defaultButtonTitle) {
+                pressDefault()
+            }
+            .disabled(true)
             .accessibilityIdentifier("sectionVerbSheetDefault")
         }
     }

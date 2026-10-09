@@ -304,12 +304,34 @@ enum CourseArchiver {
         coursesDirectoryPath: String,
         nameSuffix: String = ""
     ) async throws -> URL {
+        let backupsPath: String = URL(fileURLWithPath: coursesDirectoryPath)
+            .appendingPathComponent("_backups").appendingPathComponent(code).path
         return try await zipping(
             folderPath: courseDirectoryPath,
-            archiveName: timestampedName(prefix: "\(code)_backup", suffix: nameSuffix),
+            archiveName: unusedBackupName(
+                code: code, stamp: ArchiveStamp.text(for: Date()), suffix: nameSuffix, inFolder: backupsPath
+            ),
             courseCode: code,
             coursesDirectoryPath: coursesDirectoryPath
         )
+    }
+
+    /// A backup's name no other backup of the course already has.
+    ///
+    /// Stamped to the second, so two copies saved within one second — the
+    /// Section menu saves one before EVERY change (#457 batch B), 0.1 s each
+    /// for a small course — would share a name, and `zip -r` UPDATES an
+    /// existing archive in place: "the copy made before any of it" would
+    /// become a mix of two states. The second is `<stamp>-2`, then `-3`
+    /// (`course-management.json` → `zipNames`), before any maker's ending.
+    nonisolated static func unusedBackupName(code: String, stamp: String, suffix: String, inFolder folderPath: String) -> String {
+        var name: String = "\(code)_backup_\(stamp)\(suffix).zip"
+        var attempt: Int = 2
+        while FileManager.default.fileExists(atPath: (folderPath as NSString).appendingPathComponent(name)) {
+            name = "\(code)_backup_\(stamp)-\(attempt)\(suffix).zip"
+            attempt += 1
+        }
+        return name
     }
 
     /// Whether the most recent zip ran on the main thread. Written by

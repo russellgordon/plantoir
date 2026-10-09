@@ -185,7 +185,18 @@ struct BackupItem: Identifiable, Hashable {
         if pieces.count < 2 || pieces.count > 3 {
             return nil
         }
-        let stamp: String = pieces[0] + "_" + pieces[1]
+        // A second copy saved within the same second carries `-2` after its
+        // time (`CourseArchiver.unusedBackupName`, #457 batch B): read past
+        // it, and nothing else.
+        var timePiece: String = pieces[1]
+        if let dash = timePiece.firstIndex(of: "-") {
+            let counter: String = String(timePiece[timePiece.index(after: dash)...])
+            guard let number = Int(counter), number >= 2 else {
+                return nil
+            }
+            timePiece = String(timePiece[..<dash])
+        }
+        let stamp: String = pieces[0] + "_" + timePiece
         guard let backedUpAt = ArchiveStamp.moment(from: stamp) else {
             return nil
         }

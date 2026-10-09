@@ -593,10 +593,14 @@ enum AssistContract {
             // from the menu bar, and the `…FromTheMenu` twins of what they
             // say in the first person. Rendered with the same literals as
             // their conversational originals, so the two can be read side by
-            // side. A sheet's TITLE is in title case, so a club's title twin
-            // is `…ForAClub`, never `…ForAMeeting`: that suffix promises the
-            // lower-case word (ClubNounTests).
+            // side.
             "undidFromTheMenu": AssistWording.undidFromTheMenu(changePlaceholder),
+            "pagesAChangeCouldNotFinishFromTheMenu": AssistWording.pagesAChangeCouldNotFinishFromTheMenu(
+                AssistPublishPlan.listingAFew(["Unit 1, Day 3"]), count: 1
+            ),
+            "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral": AssistWording.pagesAChangeCouldNotFinishFromTheMenu(
+                AssistPublishPlan.listingAFew(["Unit 1, Day 3", "Unit 1, Day 4"]), count: 2
+            ),
             "undidPartlyFromTheMenu": AssistWording.undidPartlyFromTheMenu(changePlaceholder, leftAlone: 2),
             "couldNotUndoFromTheMenu": AssistWording.couldNotUndoFromTheMenu(changePlaceholder, leftAlone: 2),
             "undoIsStillAvailableFromTheMenu": AssistWording.undoIsStillAvailableFromTheMenu,
@@ -643,13 +647,13 @@ enum AssistContract {
             "menuPublishPagesTitle": AssistWording.menuPublishPagesTitle(course: course, section: section),
             "menuHidePagesTitle": AssistWording.menuHidePagesTitle(course: course, section: section),
             "menuPublishClassTitle": AssistWording.menuPublishClassTitle(course: course, section: section),
-            "menuPublishClassTitleForAClub": AssistWording.menuPublishClassTitle(
+            "menuPublishClassTitleForAMeeting": AssistWording.menuPublishClassTitle(
                 course: course, section: section, noun: .meeting
             ),
             "menuReDateTitle": AssistWording.menuReDateTitle(course: course, section: section),
-            "menuReDateTitleForAClub": AssistWording.menuReDateTitle(course: course, section: section, noun: .meeting),
+            "menuReDateTitleForAMeeting": AssistWording.menuReDateTitle(course: course, section: section, noun: .meeting),
             "menuMakeRoomTitle": AssistWording.menuMakeRoomTitle(course: course, section: section),
-            "menuMakeRoomTitleForAClub": AssistWording.menuMakeRoomTitle(
+            "menuMakeRoomTitleForAMeeting": AssistWording.menuMakeRoomTitle(
                 course: course, section: section, noun: .meeting
             ),
             "menuPickPagesToPublish": AssistWording.menuPickPagesToPublish,
@@ -673,7 +677,7 @@ enum AssistContract {
             "menuRebuildPreviewTitle": AssistWording.menuRebuildPreviewTitle,
             "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
-            "menuAddNextClassTitleForAClub": AssistWording.menuAddNextClassTitle(noun: .meeting),
+            "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
@@ -681,7 +685,7 @@ enum AssistContract {
             // at Deploy and at Section ▸ Publish Pages…, and what an
             // assistant is told when it cannot be asked.
             "laterClassesTitle": AssistWording.laterClassesTitle(),
-            "laterClassesTitleForAClub": AssistWording.laterClassesTitle(noun: .meeting),
+            "laterClassesTitleForAMeeting": AssistWording.laterClassesTitle(noun: .meeting),
             "laterClassesAtDeploy": AssistWording.laterClassesAtDeploy(nextDay: "Friday, 2026-10-09"),
             "laterClassesAtDeployForAMeeting": AssistWording.laterClassesAtDeploy(
                 nextDay: "Friday, 2026-10-09", noun: .meeting
@@ -693,8 +697,8 @@ enum AssistContract {
             "laterClassesKeptNote": AssistWording.laterClassesKeptNote(),
             "laterClassesKeptNoteForAMeeting": AssistWording.laterClassesKeptNote(noun: .meeting),
             "laterClassesDay": AssistWording.laterClassesDay(weekday: "Wednesday", date: "2026-10-14"),
-            "hideAndDeployButton": AssistWording.hideAndDeployButton(count: 2),
-            "deployAsItIsButton": AssistWording.deployAsItIsButton,
+            "hideTickedAndDeployButton": AssistWording.hideTickedAndDeployButton,
+            "keepAllAndDeployButton": AssistWording.keepAllAndDeployButton,
             "leaveOutAndContinueButton": AssistWording.leaveOutAndContinueButton(count: 2),
             "publishThemAllButton": AssistWording.publishThemAllButton,
             "deployHasClassesDatedLater": AssistWording.deployHasClassesDatedLater(

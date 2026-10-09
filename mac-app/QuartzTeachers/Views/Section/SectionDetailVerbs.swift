@@ -220,7 +220,25 @@ extension SectionDetailView {
     /// Undo Last Change, Rebuild Preview and Add Next Class: no plan, so they
     /// run at once, and what they said is shown — except a Rebuild Preview
     /// that is rebuilding, which the teacher is watching happen.
+    ///
+    /// Undo Last Change and Add Next Class show their sheet AT ONCE, working
+    /// — a copy of the course is saved first, seconds for a big one (#351) —
+    /// and it turns into the answer. Rebuild Preview shows nothing while it
+    /// rebuilds: the teacher is watching that happen.
+    ///
+    /// An answer is never dropped (#457 batch B's review, note 4): one that
+    /// arrives while something else is on the window waits
+    /// (`pendingVerbResult`) and is shown when that has gone
+    /// (`showAVerbResultIfWaiting`).
     func runAtOnce(_ call: AssistToolCall, item: SubjectMenuRules.Item, verbs: SectionVerbs, title: String) {
+        var working: SectionVerbSheetModel? = nil
+        if item != .rebuildPreview && !somethingIsUpOnThisWindow {
+            let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                kind: .result, course: course, sectionNumber: sectionNumber, title: title, item: item, stage: .working
+            )
+            verbSheet = model
+            working = model
+        }
         Task { @MainActor in
             let outcome: AssistToolOutcome = await verbs.perform(
                 call, item: item, courseCode: course.code, sectionNumber: sectionNumber
@@ -230,18 +248,49 @@ extension SectionDetailView {
                 && outcome.summary == AssistWording.previewIsRebuilding(course: course.code, section: String(sectionNumber)) {
                 return
             }
-            let model: SectionVerbSheetModel = SectionVerbSheetModel(
-                kind: .result, course: course, sectionNumber: sectionNumber, title: title, item: item, stage: .finished
-            )
-            model.body = outcome.summary
-            if somethingIsUpOnThisWindow {
-                // The answer is on the trail; a sheet over another sheet is
-                // not something SwiftUI will show.
-                NSSound.beep()
-                return
+            let ownSheetIsUp: Bool = working != nil && verbSheet?.id == working?.id
+            switch SectionDetailView.whereAnAnswerGoes(ownSheetIsUp: ownSheetIsUp, somethingIsUp: somethingIsUpOnThisWindow) {
+            case .intoItsOwnSheet:
+                working?.body = outcome.summary
+                working?.stage = .finished
+            case .now, .whenTheWindowIsFree:
+                let model: SectionVerbSheetModel = SectionVerbSheetModel(
+                    kind: .result, course: course, sectionNumber: sectionNumber, title: title, item: item, stage: .finished
+                )
+                model.body = outcome.summary
+                if somethingIsUpOnThisWindow {
+                    pendingVerbResult = model
+                } else {
+                    verbSheet = model
+                }
             }
-            verbSheet = model
         }
+    }
+
+    /// Where the answer to a function with no sheet of its own goes.
+    enum AnswerGoes: Equatable {
+        case intoItsOwnSheet
+        case now
+        case whenTheWindowIsFree
+    }
+
+    static func whereAnAnswerGoes(ownSheetIsUp: Bool, somethingIsUp: Bool) -> AnswerGoes {
+        if ownSheetIsUp {
+            return .intoItsOwnSheet
+        }
+        if somethingIsUp {
+            return .whenTheWindowIsFree
+        }
+        return .now
+    }
+
+    /// An answer that waited for the window to be free, shown now that it is.
+    func showAVerbResultIfWaiting() {
+        guard let waiting = pendingVerbResult, !somethingIsUpOnThisWindow else {
+            return
+        }
+        pendingVerbResult = nil
+        verbSheet = waiting
     }
 
     /// The sheet's default button, at whatever stage it is.
@@ -416,6 +465,7 @@ extension SectionDetailView {
             return
         }
         showAnythingWaiting()
+        showAVerbResultIfWaiting()
     }
 
     /// The counts for the trail line — never a title.
@@ -531,7 +581,16 @@ extension SectionDetailView {
         }
     }
 
-    /// Hide N and Deploy, or Deploy As It Is. The unticked classes are kept;
+    /// Keep All and Deploy (#475, the director's ruling on the implementation
+    /// review's finding 1): every listed class kept at its date, nothing
+    /// hidden, and the deploy goes — so a course that publishes its term
+    /// ahead, as every pre-populated one does, is asked once.
+    func keepAllAtDeploy(_ model: SectionVerbSheetModel) {
+        model.laterTicked = []
+        answerAtDeploy(model)
+    }
+
+    /// Hide Ticked and Deploy (or, from `keepAllAtDeploy`, nothing ticked). The unticked classes are kept;
     /// the ticked ones are hidden through Hide Pages…'s own call
     /// (`unpublish_pages` on this window's runner: a copy of the course
     /// first, and Undo Last Change takes it back), without a preview first —

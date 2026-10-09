@@ -1934,6 +1934,14 @@ nonisolated enum AssistWording {
     // were kept as they are and why, is in documentation/10 → "The Section
     // menu, a third client".
 
+    /// Make Room for Classes… could not finish changing some pages.
+    static func pagesAChangeCouldNotFinishFromTheMenu(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "\(listing) could not be finished, so look it over in Obsidian before it goes on your website."
+        }
+        return "\(listing) could not be finished, so look them over in Obsidian before they go on your website."
+    }
+
     /// Undo Last Change worked.
     static func undidFromTheMenu(_ whatHappened: String) -> String {
         return "Undone. Earlier, you \(whatHappened); that is put back now."
@@ -2034,26 +2042,27 @@ nonisolated enum AssistWording {
              + "section meets, so it needs those days first."
     }
 
-    // The sheets' own words.
+    // The sheets' own words. A sheet's title is sentence case, as every
+    // sheet's is since #457's HIG sweep; menu items and buttons are title case.
 
     static func menuPublishPagesTitle(course: String, section: String) -> String {
-        return "Publish Pages in \(course) Section \(section)"
+        return "Publish pages in \(course) Section \(section)"
     }
 
     static func menuHidePagesTitle(course: String, section: String) -> String {
-        return "Hide Pages in \(course) Section \(section)"
+        return "Hide pages in \(course) Section \(section)"
     }
 
     static func menuPublishClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
-        return "Publish a \(noun.singular.capitalized) in \(course) Section \(section)"
+        return "Publish a \(noun.singular) in \(course) Section \(section)"
     }
 
     static func menuReDateTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
-        return "Re-date the \(noun.plural.capitalized) in \(course) Section \(section)"
+        return "Re-date the \(noun.plural) in \(course) Section \(section)"
     }
 
     static func menuMakeRoomTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
-        return "Make Room for \(noun.plural.capitalized) in \(course) Section \(section)"
+        return "Make room for \(noun.plural) in \(course) Section \(section)"
     }
 
     static let menuPickPagesToPublish: String =
@@ -2098,10 +2107,10 @@ nonisolated enum AssistWording {
 
     /// Titles for the answer to Rebuild Preview, Undo Last Change and Add
     /// Next Class, which have no sheet of their own.
-    static let menuRebuildPreviewTitle: String = "Rebuild Preview"
-    static let menuUndoLastChangeTitle: String = "Undo Last Change"
+    static let menuRebuildPreviewTitle: String = "Rebuild preview"
+    static let menuUndoLastChangeTitle: String = "Undo last change"
     static func menuAddNextClassTitle(noun: ClassNoun = .class) -> String {
-        return "Add Next \(noun.singular.capitalized)"
+        return "Add next \(noun.singular)"
     }
 
     /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
@@ -2122,7 +2131,7 @@ nonisolated enum AssistWording {
     // where it never is: `shared-rules.json` → `classesDatedLater`).
 
     static func laterClassesTitle(noun: ClassNoun = .class) -> String {
-        return "Hide \(noun.plural.capitalized) Dated Later?"
+        return "Hide \(noun.plural) dated later?"
     }
 
     /// At Deploy. `nextDay` is the next class day, as the row writes a day.
@@ -2148,11 +2157,16 @@ nonisolated enum AssistWording {
         return "\(weekday), \(date)"
     }
 
-    static func hideAndDeployButton(count: Int) -> String {
-        return "Hide \(count) and Deploy"
-    }
+    /// The question's default button at Deploy: the ticked classes are
+    /// hidden, the unticked kept, and the section deployed. With nothing
+    /// ticked it hides nothing.
+    static let hideTickedAndDeployButton: String = "Hide Ticked and Deploy"
 
-    static let deployAsItIsButton: String = "Deploy As It Is"
+    /// Beside it, always (#475, the director's ruling on batch B's
+    /// implementation review, finding 1): every listed class is kept
+    /// published and remembered at its date, so a course that publishes the
+    /// whole term ahead — every pre-populated course does — is asked ONCE.
+    static let keepAllAndDeployButton: String = "Keep All and Deploy"
 
     static func leaveOutAndContinueButton(count: Int) -> String {
         return "Leave \(count) Hidden and Continue"

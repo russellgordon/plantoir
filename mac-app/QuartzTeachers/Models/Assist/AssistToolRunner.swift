@@ -2243,8 +2243,12 @@ final class AssistToolRunner {
         guard SectionMenuActivity.isChanging(folderPath: folder.path, courseCode: code, sectionNumber: section) else {
             return nil
         }
+        var sectionText: String = "?"
+        if let section {
+            sectionText = String(section)
+        }
         return AssistToolOutcome.refused(AssistWording.sectionIsChangingFromTheMenu(
-            course: code, section: section.map { number in String(number) } ?? "?"
+            course: code, section: sectionText
         ))
     }
 
@@ -4934,13 +4938,17 @@ final class AssistToolRunner {
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
-            return AssistToolOutcome.wrote(
-                AssistWording.madeRoom(
-                    count: asked.count, at: asked.plan.positionTitle,
-                    noun: asked.located.course.configuration.classNoun
-                ),
-                detail: detail
+            var said: String = AssistWording.madeRoom(
+                count: asked.count, at: asked.plan.positionTitle,
+                noun: asked.located.course.configuration.classNoun
             )
+            // The Section menu shows only this line, so the pages that could
+            // not be dated or finished are said in it, in its own voice
+            // (#457 batch B's review, note 6); the model reads them in `detail`.
+            if surface == .menu && !outcome.leftUndoneFromTheMenu.isEmpty {
+                said += " " + outcome.leftUndoneFromTheMenu
+            }
+            return AssistToolOutcome.wrote(said, detail: detail)
         }
     }
 

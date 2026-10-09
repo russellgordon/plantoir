@@ -41,6 +41,8 @@ final class MenuVoiceTests: XCTestCase {
         ("restoreSectionPutsItBack", "restoreFromBackupPutsItBack"),
         ("makingRoomCannotBeUndone", "makingRoomCannotBeUndoneFromTheMenu"),
         ("whatPublishingMeans", "publishingAndDeployingExplained"),
+        ("pagesAChangeCouldNotFinish", "pagesAChangeCouldNotFinishFromTheMenu"),
+        ("pagesAChangeCouldNotFinishNamingSeveral", "pagesAChangeCouldNotFinishFromTheMenuNamingSeveral"),
     ]
 
     // MARK: - Set up and tear down
