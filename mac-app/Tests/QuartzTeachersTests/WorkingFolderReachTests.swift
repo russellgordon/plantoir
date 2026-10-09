@@ -310,6 +310,11 @@ final class AdoptRestoredPathCallersTests: XCTestCase {
             "Models/Assist/AssistMCPServer.swift": 1,
             "Models/Assist/AssistSession.swift": 1,
             "Models/Assist/AssistToolRunner.swift": 1,
+            // The Section menu's runner (#457 batch B): its own model over the
+            // window's folder, as the assistant's session makes one — a runner is
+            // never built over a window's model (#322), and the folder is the
+            // window's own, already checked when the window adopted it.
+            "Models/SectionVerbs.swift": 1,
         ]
         let productURL: URL = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
