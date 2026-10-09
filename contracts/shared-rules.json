@@ -23632,16 +23632,18 @@
       }
     },
     "texErrors": {
-      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence.",
+      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence; `command` is what the reason names ({name} in words.reasons).",
       "cases": [
         {
-          "name": "\\foo",
+          "name": "a command TeX does not know",
+          "command": "\\foo",
           "body": "\\begin{document}\n\n\\begin{tikzpicture}\n\\foo\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
           "reason": "undefinedCommand",
           "blockLine": 4
         },
         {
-          "name": "siunitx",
+          "name": "a package the engine does not carry",
+          "command": "siunitx",
           "body": "\\usepackage{siunitx}\n\\begin{document}\n\\begin{tikzpicture}\\draw (0,0) -- (1,1);\\end{tikzpicture}\n\\end{document}",
           "reason": "missingPackage",
           "blockLine": 2

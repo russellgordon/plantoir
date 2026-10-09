@@ -143,7 +143,7 @@ function draw(figure: HTMLElement): boolean {
   try {
     plot = JSON.parse(figure.dataset.plot ?? "{}") as Plot
   } catch {
-    say(figure, figure.dataset.plantoirFailed)
+    say(figure, figure.dataset.figureFailed)
     return false
   }
   const width = widthFor(figure)
@@ -165,7 +165,7 @@ function draw(figure: HTMLElement): boolean {
   } catch {
     box.replaceChildren()
     figure.classList.remove("pl-plot-drawn")
-    say(figure, figure.dataset.plantoirFailed)
+    say(figure, figure.dataset.figureFailed)
     return false
   }
   const svg = box.querySelector("svg")
@@ -203,7 +203,7 @@ if (!hooks.plantoirFiguresHooked) {
     if (graphs.length === 0) {
       return
     }
-    const root = graphs[0].dataset.plantoirRoot ?? "."
+    const root = graphs[0].dataset.figureRoot ?? "."
     if (await loadEngine(root)) {
       drawEvery()
     }
@@ -215,7 +215,7 @@ document.addEventListener("nav", () => {
   if (graphs.length === 0) {
     return
   }
-  const root = graphs[0].dataset.plantoirRoot ?? "."
+  const root = graphs[0].dataset.figureRoot ?? "."
   let observer: IntersectionObserver | null = null
   let resizeTimer: number | undefined
 
@@ -252,7 +252,7 @@ document.addEventListener("nav", () => {
   loadEngine(root).then((ready) => {
     if (!ready) {
       for (const figure of graphsOnThePage()) {
-        say(figure, figure.dataset.plantoirMissing)
+        say(figure, figure.dataset.figureMissing)
       }
       return
     }
