@@ -631,6 +631,31 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
   }
 }
 
+// ---- ⌘P on every other page (#501) -------------------------------------------
+// Quartz has no print rules, so ⌘P laid out the screen's page: at Chrome's
+// paper width (under 800 px) its phone layout, whose folder list is an opaque
+// panel drawn over the article, and in Safari, which lays out at the window's
+// width, three columns whose right edge ran off the paper. Sidebars go and
+// the column is capped, on every page that is not printable (those have their
+// own rules above) and never in the handout's frame, which has a `.page` too.
+
+@media print {
+  html:not(.plantoir-printable):not(.plantoir-print-frame) {
+    .page > #quartz-body > .sidebar {
+      display: none !important;
+    }
+
+    .page > #quartz-body {
+      display: block !important;
+    }
+
+    .page {
+      max-width: 8.5in !important;
+      margin: 0 !important;
+    }
+  }
+}
+
 // ---- The handout, in its own frame -------------------------------------------
 
 html.plantoir-print-frame {
