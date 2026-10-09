@@ -51,6 +51,21 @@ a.plantoir-print-pdf,
   text-decoration: none;
 }
 
+// The printer glyph before the label (#497), one text line high, in the
+// button's own colour (the SVG strokes currentColor, so hover follows).
+a.plantoir-print-pdf,
+.plantoir-print-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.plantoir-print-glyph {
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
 a.plantoir-print-pdf:hover,
 .plantoir-print-button:hover,
 .plantoir-print-more > summary:hover {

@@ -103,6 +103,33 @@ export function pageRules(corners: Corners, pageLabelTemplate: string): string {
   )
 }
 
+// A printer, drawn inline the way Quartz draws its search and dark-mode icons
+// (#497): no image file to fetch, the button's own colour through
+// currentColor, and hidden from screen readers so the button is still read
+// as its label alone. Hidden on paper with the button itself.
+function PrinterGlyph() {
+  return (
+    <svg
+      class="plantoir-print-glyph"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M7 8V3h10v5" />
+      <path d="M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <path d="M7 13h10v8H7z" />
+    </svg>
+  )
+}
+
 export default ((inner: QuartzComponent) => {
   const Inner = inner
 
@@ -128,6 +155,7 @@ export default ((inner: QuartzComponent) => {
       const href = joinSegments(root, slugifyFilePath(("Media/" + pdf) as FilePath))
       button = (
         <a class="plantoir-print plantoir-print-pdf" href={href} target="_blank" rel="noopener">
+          <PrinterGlyph />
           {words.print}
         </a>
       )
@@ -135,6 +163,7 @@ export default ((inner: QuartzComponent) => {
       button = (
         <div class="plantoir-print" data-root={root + "/"}>
           <button type="button" class="plantoir-print-button" data-mode={settings.defaultMode}>
+            <PrinterGlyph />
             {words.print}
           </button>
           <details class="plantoir-print-more">
