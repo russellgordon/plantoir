@@ -1,0 +1,147 @@
+// Diagrams and graphs from a page's fences (#485 E1). EVERY rule here is
+// under .pl-figure (the #454 B2 lesson): a page with no figure is not touched
+// by a single declaration, on screen or on paper.
+
+.pl-figure {
+  margin: 1.25rem 0;
+  text-align: center;
+
+  // What a screen reader reads; hidden on screen and on paper.
+  .pl-sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  > svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+  }
+
+  // A figure that could not be drawn says so, plainly, in its place
+  // (ruling E1-7), in the page's own quiet grey.
+  .pl-figure-message {
+    margin: 0.5rem 0;
+    color: var(--gray);
+    font-style: italic;
+  }
+}
+
+// TikZ: black and white follow the theme, as the Obsidian plugin's own
+// dark-mode setting does - black becomes the text colour and white the
+// background, by CSS on the drawing's own attributes. No invert() filter, so
+// a teacher's colours stay theirs (figureFences.darkMode).
+.pl-figure.pl-tikz svg {
+  color: var(--dark);
+  fill: currentColor;
+
+  [stroke="#000"],
+  [stroke="black"] {
+    stroke: currentColor;
+  }
+
+  [fill="#000"],
+  [fill="black"] {
+    fill: currentColor;
+  }
+
+  [stroke="#fff"],
+  [stroke="white"] {
+    stroke: var(--light);
+  }
+
+  [fill="#fff"],
+  [fill="white"] {
+    fill: var(--light);
+  }
+}
+
+// A graph: drawn by function-plot into .pl-plot, in the theme's colours. Its
+// own text shows until it is drawn (and stays if it cannot be).
+.pl-figure.pl-functionplot {
+  .pl-plot {
+    width: 100%;
+  }
+
+  .pl-plot-source {
+    text-align: left;
+  }
+
+  &.pl-plot-drawn .pl-plot-source {
+    display: none;
+  }
+
+  .function-plot {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+    color: var(--darkgray);
+    font-family: var(--bodyFont);
+
+    text {
+      fill: var(--darkgray);
+    }
+
+    .title {
+      fill: var(--dark);
+      font-weight: 600;
+    }
+
+    .axis path,
+    .axis line {
+      stroke: var(--gray);
+    }
+
+    .axis .tick line {
+      stroke: var(--lightgray);
+    }
+
+    .origin {
+      stroke: var(--gray);
+      opacity: 1;
+    }
+
+    .zoom-and-drag {
+      cursor: grab;
+    }
+  }
+}
+
+@media print {
+  // On paper every figure is dark on white, whatever the screen showed (review
+  // B1): the theme's colours are set to the light ones for the figure alone,
+  // on EVERY page - #454's light flip covers printable pages only.
+  .pl-figure {
+    --light: #fff;
+    --lightgray: #e5e5e5;
+    --gray: #b8b8b8;
+    --darkgray: #4e4e4e;
+    --dark: #000;
+    break-inside: avoid;
+  }
+
+  // Never split and never taller than a page (review B3: a tall figure was
+  // split over four pages with the text after it printed twice).
+  // figureFences.darkMode.printMaxHeightIn.
+  .pl-figure svg:not(svg svg),
+  .pl-figure img {
+    max-width: 100% !important;
+    max-height: 8in !important;
+    width: auto;
+    height: auto;
+  }
+
+  .pl-figure.pl-functionplot .zoom-and-drag {
+    display: none;
+  }
+}
