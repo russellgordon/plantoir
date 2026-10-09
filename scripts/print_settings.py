@@ -91,7 +91,12 @@ def page_label(part: str, n: int, total: int) -> str:
 
 
 def site_settings(settings: dict, displayed_code: str) -> dict:
-    """Everything the page's print code reads, from the contract and the course."""
+    """
+    Everything the page's print code reads, from the contract and the course.
+
+    No default way of printing since #499: pressing Print opens a menu and
+    nothing prints until one is chosen (decision 29; printablePages.modes.menu).
+    """
     words = {}
     for key, value in _section("words").items():
         if key in ("where", "why"):
@@ -104,7 +109,6 @@ def site_settings(settings: dict, displayed_code: str) -> dict:
         "answerKinds": list(callouts["answerKinds"]),
         "answerTitleWords": list(callouts["answerTitleWords"]),
         "curriculumHeadings": list(_section("curriculumConnection", "headingWords")),
-        "defaultMode": _section("modes", "default"),
     }
 
 

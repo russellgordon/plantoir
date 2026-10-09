@@ -112,8 +112,10 @@ class WrittenSettingsTests(unittest.TestCase):
         self.assertEqual(written["curriculumHeadings"],
                          contracts.section("shared-rules", "printablePages",
                                            "curriculumConnection", "headingWords"))
-        self.assertEqual(written["defaultMode"],
-                         contracts.section("shared-rules", "printablePages", "modes", "default"))
+        # Nothing prints until a way of printing is chosen (#499, decision
+        # 29): there is no default for the page to fall back on.
+        self.assertNotIn("defaultMode", written)
+        self.assertNotIn("default", contracts.section("shared-rules", "printablePages", "modes"))
 
     def test_absent_settings_give_the_defaults(self):
         corners = print_settings.compose({}, "ICS3U")

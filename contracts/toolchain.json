@@ -98,6 +98,20 @@
       "sha256": "a79baaa94d15cf952e6327950fa886ba7533bdce92194b677d9d1b4cce6c17c5",
       "fileSha256": "c4af9ac4a80f15e4abf53e11fdf34659dc4913f61b541652811cfa570f397211",
       "why": "The print layout for pages whose settings say printable: true (#454): it paginates the handout in the page itself, so the school name, the blanks and 'Page 1 of 3' print in the corners in every browser, Safari included, which prints no margin boxes of its own. Carried at /opt/vendor/pagedjs (Windows: runtime\\vendor\\pagedjs) and copied into a section's site ONLY when a page students can see opts in - dist/paged.min.js is 502,617 bytes (96,934 gzipped), so a course that never prints carries none of it. The UMD global is `PagedModule` (not `Paged`). MIT. A QUIET project, which is the risk to know: 0.4.3 has been npm's latest since 2023-07-06, with only 0.5.0-beta.2 (2024-10-04) since, so a browser change it does not keep up with is ours to work around. `sha256` is the tarball's, which the recipe checks; `fileSha256` is paged.min.js's, which verify.sh checks in the image."
+    },
+    {
+      "pin": "latinModern",
+      "value": "fonts-lmodern",
+      "dockerfileContains": "fonts-lmodern",
+      "files": {
+        "lmroman10-regular.otf": "1aa18cfefa58132c52ce5de70db1fd1154201c19cd2b2cdaffba4906a33e6852",
+        "lmroman10-bold.otf": "102fe06c430a8b681b2bf6876b7cd967ae4d47b4b6b41d915eb7913b726d9fb1",
+        "lmroman10-italic.otf": "c1fce25075567bb8dbf2151658c3b442690041db17a2d49fc9e55905ea5b7169",
+        "lmroman10-bolditalic.otf": "c37a28eed7a6e03f792b98b5e5f637b2fcda378bb4855f99284f1a88fe35f124",
+        "lmsans10-bold.otf": "a597b710326c1a8a2c7238d808e5d38711638a72a32383478db4829d63afd687",
+        "lmmono10-regular.otf": "22deb6d3be3ffcb40b33f0e010afb256c677d97c2a2bdee1f5740cdc97751558"
+      },
+      "why": "#499 (v1.6.0), Debian 13's fonts-lmodern 2.005-1 (apt names no version, so a point release cannot fail a build): the faces a printed handout is set in, so it reads like the teacher's LaTeX handouts (11pt article with lmodern): Latin Modern Roman regular, bold, italic and bold italic, Sans bold, Mono. Carried at /opt/vendor/pagedjs/fonts (Windows: runtime\\vendor\\pagedjs\\fonts, owed on #496) beside Paged.js, so a site carries them only when a page students can see opts in to printing, and a browser fetches them only when a page is printed: 631,940 bytes, unmodified OTF. From Debian's fonts-lmodern through apt, not from GUST's download page, because a font host that is down must never fail a teacher's first build; `files` are the SHA-256s verify.sh checks in the image. GUST Font License (an instance of the LPPL 1.3c), which asks that a CHANGED font be renamed - so the files are not converted to woff2 (283,148 bytes for the six, measured with fontTools 4) and keep their own names. REJECTED: KaTeX's Computer Modern from the CDN (no bytes, but it needs the network at the moment of printing and has no sans or mono for headings and code); the GUST zip pinned by hash (lm2.004otf.zip, 3,907,819 bytes - a second network host for every first build)."
     }
   ],
   "rules": [

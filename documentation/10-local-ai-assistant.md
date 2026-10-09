@@ -6371,7 +6371,7 @@ Three properties matter more than the mechanism:
   `.mcp.json` — Codex's `AGENTS.md` convention costs nothing and gains nothing
   here, because there is no such file for either agent to read and the whole
   instruction set is the one-paragraph greeting passed as an argument. **Changed
-  by #454 (v2.0.0), and the doors still write nothing:** the app's toolchain
+  by #454 (v1.6.0), and the doors still write nothing:** the app's toolchain
   app now keeps a managed SECTION in `AGENTS.md` and `CLAUDE.md` at the
   working folder's ROOT — which is in no vault, each course being its own —
   naming the `plantoir-printing` skill it writes under `.claude/skills` and

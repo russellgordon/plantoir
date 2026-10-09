@@ -128,11 +128,20 @@ final class PrintablePagesTests: XCTestCase {
 
     func testOnlyThePreviewsOwnPagesAndTheContractsModesAreOpened() throws {
         let opened: URL? = PreviewBrowserHandoff.printAddress(
-            pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "questionsOnly")
-        XCTAssertEqual(opened?.absoluteString, "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=questionsOnly")
-        XCTAssertNil(PreviewBrowserHandoff.printAddress(pageAddress: "https://example.com/x", mode: "questionsOnly"))
-        XCTAssertNil(PreviewBrowserHandoff.printAddress(pageAddress: "file:///etc/hosts", mode: "questionsOnly"))
-        XCTAssertNil(PreviewBrowserHandoff.printAddress(pageAddress: "http://localhost:8461/x", mode: "everything"))
+            pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "questionsOnly", paper: "landscape")
+        XCTAssertEqual(
+            opened?.absoluteString,
+            "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=questionsOnly&paper=landscape"
+        )
+        XCTAssertNil(PreviewBrowserHandoff.printAddress(
+            pageAddress: "https://example.com/x", mode: "questionsOnly", paper: "portrait"))
+        XCTAssertNil(PreviewBrowserHandoff.printAddress(
+            pageAddress: "file:///etc/hosts", mode: "questionsOnly", paper: "portrait"))
+        XCTAssertNil(PreviewBrowserHandoff.printAddress(
+            pageAddress: "http://localhost:8461/x", mode: "everything", paper: "portrait"))
+        XCTAssertNil(PreviewBrowserHandoff.printAddress(
+            pageAddress: "http://localhost:8461/x", mode: "questionsOnly", paper: "a4"),
+            "only the contract's papers (#499)")
 
         let modes: [String: Any] = try XCTUnwrap(
             try SharedRulesContractTests.section("printablePages")["modes"] as? [String: Any])
@@ -140,7 +149,18 @@ final class PrintablePagesTests: XCTestCase {
         for entry in try XCTUnwrap(modes["list"] as? [[String: Any]]) {
             named.append(try XCTUnwrap(entry["mode"] as? String))
         }
-        XCTAssertEqual(PreviewBrowserHandoff.modes, named, "the app accepts exactly the contract's ways of printing")
+        XCTAssertEqual(PreviewBrowserHandoff.modes, named, "the app accepts exactly the contract's ways of printing, in its order")
+        let paper: [String: Any] = try XCTUnwrap(
+            try SharedRulesContractTests.section("printablePages")["paper"] as? [String: Any])
+        var papers: [String] = []
+        for entry in try XCTUnwrap(paper["cases"] as? [[String: Any]]) {
+            let size: String = try XCTUnwrap(entry["size"] as? String)
+            let name: String = try XCTUnwrap(entry["paper"] as? String)
+            if (name == "portrait" && size == "letter") || (name == "landscape" && size == "letter landscape") {
+                papers.append(name)
+            }
+        }
+        XCTAssertEqual(PreviewBrowserHandoff.papers, papers, "the app accepts exactly the contract's papers")
     }
 
     func testThePrintMessageOpensThePageAndTellsTheTrail() {
@@ -152,12 +172,16 @@ final class PrintablePagesTests: XCTestCase {
             told.append(PreviewBrowserHandoff.trailWords(page: page, target: target, reason: reason))
         }
         let address: URL = PreviewBrowserHandoff.printAddress(
-            pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "withAnswersAtTheEnd")!
+            pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "withAnswersAtTheEnd", paper: "portrait")!
         handoff.open(address)
-        handoff.whenHandedOver?(address, address, .printHandout(mode: "withAnswersAtTheEnd"))
+        handoff.whenHandedOver?(address, address, .printHandout(mode: "withAnswersAtTheEnd", paper: "portrait"))
+        let sideways: URL = PreviewBrowserHandoff.printAddress(
+            pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "answersOnly", paper: "landscape")!
+        handoff.whenHandedOver?(sideways, sideways, .printHandout(mode: "answersOnly", paper: "landscape"))
         XCTAssertEqual(opened, [address])
         XCTAssertEqual(told, [
             "preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
+            "preview page opened in the web browser — to print it answers only, on landscape paper (Unit-1/Worksheet-3)",
         ])
     }
 
@@ -168,9 +192,10 @@ final class PrintablePagesTests: XCTestCase {
         for event in events where event["event"] as? String == ActivityTrail.Event.previewPageOpenedInBrowser.rawValue {
             example = (event["line"] as? String) ?? ""
         }
-        let printed: URL = URL(string: "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd")!
+        let printed: URL = URL(
+            string: "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd&paper=portrait")!
         let words: String = PreviewBrowserHandoff.trailWords(
-            page: printed, target: printed, reason: .printHandout(mode: "withAnswersAtTheEnd")
+            page: printed, target: printed, reason: .printHandout(mode: "withAnswersAtTheEnd", paper: "portrait")
         )
         XCTAssertEqual(example, "{course}/{section} · " + words)
         let page: URL = URL(string: "http://localhost:8461/Unit-1/Worksheet-3")!
@@ -220,13 +245,16 @@ final class PrintablePagesTests: XCTestCase {
         let page: String = """
         <html><body><a id="pdf" href="Media/Key.pdf" target="_blank">Print</a>
         <script>
-        window.webkit.messageHandlers.plantoirPrint.postMessage({mode: "answersOnly", url: location.href});
+        window.webkit.messageHandlers.plantoirPrint.postMessage({mode: "answersOnly", paper: "landscape", url: location.href});
         document.getElementById("pdf").click();
         </script></body></html>
         """
         controller.webView.loadHTMLString(page, baseURL: URL(string: "http://localhost:8461/Unit-1/Worksheet-3"))
         wait(for: [printed, linked], timeout: 10)
-        XCTAssertTrue(opened.contains("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=answersOnly"), "\(opened)")
+        XCTAssertTrue(
+            opened.contains("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=answersOnly&paper=landscape"),
+            "\(opened)"
+        )
         XCTAssertTrue(opened.contains("http://localhost:8461/Unit-1/Media/Key.pdf"), "\(opened)")
     }
 

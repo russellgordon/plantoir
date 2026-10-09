@@ -1310,6 +1310,32 @@ if [[ "$PAGEDJS_BAKED" == "$PAGEDJS_PIN" ]]; then
 else
   fail "The image's /opt/vendor/pagedjs/paged.min.js is '${PAGEDJS_BAKED:-missing}', not the pinned $PAGEDJS_PIN"
 fi
+# The faces a handout is set in (#499), by the hashes the pin carries: the
+# Dockerfile takes them from Debian without a hash, so this is where a
+# changed file is noticed.
+LM_PROBLEMS="$(python3 - "$DEV_TEST_IMAGE" <<'LMPY'
+import json, subprocess, sys
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "latinModern"][0]
+names = sorted(pin["files"])
+out = subprocess.run(["docker", "run", "--rm", sys.argv[1], "sh", "-c",
+                      "cd /opt/vendor/pagedjs/fonts && sha256sum " + " ".join(names) + " && ls LICENSE-Latin-Modern.txt"],
+                     capture_output=True, text=True).stdout
+baked = {}
+for line in out.splitlines():
+    parts = line.split()
+    if len(parts) == 2:
+        baked[parts[1]] = parts[0]
+problems = [f"{name} is {baked.get(name, 'missing')}" for name in names if baked.get(name) != pin["files"][name]]
+if "LICENSE-Latin-Modern.txt" not in out:
+    problems.append("the licence is missing")
+print("; ".join(problems))
+LMPY
+)"
+if [[ -z "$LM_PROBLEMS" ]]; then
+  pass "The image carries the six Latin Modern faces at /opt/vendor/pagedjs/fonts, matching the pin, with their licence (#499)"
+else
+  fail "The image's Latin Modern faces do not match contracts/toolchain.json: $LM_PROBLEMS"
+fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4a. The live-reload client is still the one the rule names --------------------
@@ -1429,7 +1455,10 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
-        "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf"
+        "$HIT_COURSE/Printable Too Tall.md" \
+        "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
+        "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
+        "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -1536,6 +1565,287 @@ def area(width, height):
 
 <figure class="pl-figure pl-test"><svg viewBox="0 0 200 100" width="400" height="200" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="180" height="80" fill="none" stroke="black"/><text x="100" y="55" text-anchor="middle">plantoir figure</text></svg><figcaption>A figure an engine would draw.</figcaption></figure>
 
+## Question 3
+
+Name each part of the expansion of $(x + 3)^2$ (plantoir-qstem-3).
+
+1. The first term.
+   > [!answer]-
+   >
+   > $x^2$ (plantoir-ans-3a)
+2. The last term.
+   > [!answer]-
+   >
+   > $9$ (plantoir-ans-3b)
+3. The middle term.
+
+> [!question] Question 4
+> Explain why a difference of squares has no middle term (plantoir-qstem-4).
+
+> [!example] A perfect square
+> $(x + 3)^2 = x^2 + 6x + 9$ (plantoir-example-sentinel-7f3a).
+
+## Question 5
+
+Read the program below and say what it counts to (plantoir-qstem-5).
+
+```python
+n = 1  # CODE-001
+n = 2  # CODE-002
+n = 3  # CODE-003
+n = 4  # CODE-004
+n = 5  # CODE-005
+n = 6  # CODE-006
+n = 7  # CODE-007
+n = 8  # CODE-008
+n = 9  # CODE-009
+n = 10  # CODE-010
+n = 11  # CODE-011
+n = 12  # CODE-012
+n = 13  # CODE-013
+n = 14  # CODE-014
+n = 15  # CODE-015
+n = 16  # CODE-016
+n = 17  # CODE-017
+n = 18  # CODE-018
+n = 19  # CODE-019
+n = 20  # CODE-020
+n = 21  # CODE-021
+n = 22  # CODE-022
+n = 23  # CODE-023
+n = 24  # CODE-024
+n = 25  # CODE-025
+n = 26  # CODE-026
+n = 27  # CODE-027
+n = 28  # CODE-028
+n = 29  # CODE-029
+n = 30  # CODE-030
+n = 31  # CODE-031
+n = 32  # CODE-032
+n = 33  # CODE-033
+n = 34  # CODE-034
+n = 35  # CODE-035
+n = 36  # CODE-036
+n = 37  # CODE-037
+n = 38  # CODE-038
+n = 39  # CODE-039
+n = 40  # CODE-040
+n = 41  # CODE-041
+n = 42  # CODE-042
+n = 43  # CODE-043
+n = 44  # CODE-044
+n = 45  # CODE-045
+n = 46  # CODE-046
+n = 47  # CODE-047
+n = 48  # CODE-048
+n = 49  # CODE-049
+n = 50  # CODE-050
+n = 51  # CODE-051
+n = 52  # CODE-052
+n = 53  # CODE-053
+n = 54  # CODE-054
+n = 55  # CODE-055
+n = 56  # CODE-056
+n = 57  # CODE-057 and a comment long enough to wrap onto a second line on letter paper in portrait (plantoir-wrap-sentinel)
+n = 58  # CODE-058
+n = 59  # CODE-059
+n = 60  # CODE-060
+n = 61  # CODE-061
+n = 62  # CODE-062
+n = 63  # CODE-063
+n = 64  # CODE-064
+n = 65  # CODE-065
+n = 66  # CODE-066
+n = 67  # CODE-067
+n = 68  # CODE-068
+n = 69  # CODE-069
+n = 70  # CODE-070
+n = 71  # CODE-071
+n = 72  # CODE-072
+n = 73  # CODE-073
+n = 74  # CODE-074
+n = 75  # CODE-075
+n = 76  # CODE-076
+n = 77  # CODE-077
+n = 78  # CODE-078
+n = 79  # CODE-079
+n = 80  # CODE-080
+n = 81  # CODE-081
+n = 82  # CODE-082
+n = 83  # CODE-083
+n = 84  # CODE-084
+n = 85  # CODE-085
+n = 86  # CODE-086
+n = 87  # CODE-087
+n = 88  # CODE-088
+n = 89  # CODE-089
+n = 90  # CODE-090
+n = 91  # CODE-091
+n = 92  # CODE-092
+n = 93  # CODE-093
+n = 94  # CODE-094
+n = 95  # CODE-095
+n = 96  # CODE-096
+n = 97  # CODE-097
+n = 98  # CODE-098
+n = 99  # CODE-099
+n = 100  # CODE-100
+n = 101  # CODE-101
+n = 102  # CODE-102
+n = 103  # CODE-103
+n = 104  # CODE-104
+n = 105  # CODE-105
+n = 106  # CODE-106
+n = 107  # CODE-107
+n = 108  # CODE-108
+n = 109  # CODE-109
+n = 110  # CODE-110
+```
+
+> [!SOLUTION]-
+>
+> It counts to 110 (plantoir-ans-5), and its output looks like this (plantoir-before-answer-picture):
+>
+> ![[plantoir-hazard-wide.png]]
+>
+> The picture is above (plantoir-after-answer-picture).
+
+Before the picture (plantoir-before-tall).
+
+![[plantoir-hazard-tall.png]]
+
+After the picture (plantoir-after-tall). Before the drawing (plantoir-before-viewbox).
+
+![[plantoir-hazard-viewbox.svg]]
+
+After the drawing (plantoir-after-viewbox). Before the diagram (plantoir-before-mermaid).
+
+```mermaid
+flowchart TD
+  N1[MM-01] --> N2[MM-02]
+  N2[MM-02] --> N3[MM-03]
+  N3[MM-03] --> N4[MM-04]
+  N4[MM-04] --> N5[MM-05]
+  N5[MM-05] --> N6[MM-06]
+  N6[MM-06] --> N7[MM-07]
+  N7[MM-07] --> N8[MM-08]
+  N8[MM-08] --> N9[MM-09]
+  N9[MM-09] --> N10[MM-10]
+  N10[MM-10] --> N11[MM-11]
+  N11[MM-11] --> N12[MM-12]
+  N12[MM-12] --> N13[MM-13]
+  N13[MM-13] --> N14[MM-14]
+  N14[MM-14] --> N15[MM-15]
+  N15[MM-15] --> N16[MM-16]
+  N16[MM-16] --> N17[MM-17]
+  N17[MM-17] --> N18[MM-18]
+  N18[MM-18] --> N19[MM-19]
+  N19[MM-19] --> N20[MM-20]
+  N20[MM-20] --> N21[MM-21]
+  N21[MM-21] --> N22[MM-22]
+  N22[MM-22] --> N23[MM-23]
+  N23[MM-23] --> N24[MM-24]
+  N24[MM-24] --> N25[MM-25]
+  N25[MM-25] --> N26[MM-26]
+  N26[MM-26] --> N27[MM-27]
+  N27[MM-27] --> N28[MM-28]
+  N28[MM-28] --> N29[MM-29]
+  N29[MM-29] --> N30[MM-30]
+```
+
+After the diagram (plantoir-after-mermaid). Before the formulas (plantoir-before-katex).
+
+$$
+\begin{aligned}
+y_{1} &= 1x + 1 \\
+y_{2} &= 2x + 2 \\
+y_{3} &= 3x + 3 \\
+y_{4} &= 4x + 4 \\
+y_{5} &= 5x + 5 \\
+y_{6} &= 6x + 6 \\
+y_{7} &= 7x + 7 \\
+y_{8} &= 8x + 8 \\
+y_{9} &= 9x + 9 \\
+y_{10} &= 10x + 10 \\
+y_{11} &= 11x + 11 \\
+y_{12} &= 12x + 12 \\
+y_{13} &= 13x + 13 \\
+y_{14} &= 14x + 14 \\
+y_{15} &= 15x + 15 \\
+y_{16} &= 16x + 16 \\
+y_{17} &= 17x + 17 \\
+y_{18} &= 18x + 18 \\
+y_{19} &= 19x + 19 \\
+y_{20} &= 20x + 20
+\end{aligned}
+$$
+
+After the formulas (plantoir-after-katex). Before the table (plantoir-before-table).
+
+| Row | Square |
+|---|---|
+| TROW-01 | 1 |
+| TROW-02 | 4 |
+| TROW-03 | 9 |
+| TROW-04 | 16 |
+| TROW-05 | 25 |
+| TROW-06 | 36 |
+| TROW-07 | 49 |
+| TROW-08 | 64 |
+| TROW-09 | 81 |
+| TROW-10 | 100 |
+| TROW-11 | 121 |
+| TROW-12 | 144 |
+| TROW-13 | 169 |
+| TROW-14 | 196 |
+| TROW-15 | 225 |
+| TROW-16 | 256 |
+| TROW-17 | 289 |
+| TROW-18 | 324 |
+| TROW-19 | 361 |
+| TROW-20 | 400 |
+| TROW-21 | 441 |
+| TROW-22 | 484 |
+| TROW-23 | 529 |
+| TROW-24 | 576 |
+| TROW-25 | 625 |
+| TROW-26 | 676 |
+| TROW-27 | 729 |
+| TROW-28 | 784 |
+| TROW-29 | 841 |
+| TROW-30 | 900 |
+| TROW-31 | 961 |
+| TROW-32 | 1024 |
+| TROW-33 | 1089 |
+| TROW-34 | 1156 |
+| TROW-35 | 1225 |
+| TROW-36 | 1296 |
+| TROW-37 | 1369 |
+| TROW-38 | 1444 |
+| TROW-39 | 1521 |
+| TROW-40 | 1600 |
+
+After the table (plantoir-after-table). Before the wide formula (plantoir-before-wide).
+
+$$
+y = a_{1} + a_{2} + a_{3} + a_{4} + a_{5} + a_{6} + a_{7} + a_{8} + a_{9} + a_{10} + a_{11} + a_{12} + a_{13} + a_{14} + a_{15} + a_{16} + a_{17} + a_{18} + a_{19} + a_{20} + a_{21} + a_{22} + a_{23} + a_{24} + a_{25} + a_{26} + a_{27} + a_{28} + a_{29} + a_{30} + a_{31} + a_{32} + a_{33} + a_{34} + a_{35} + a_{36} + a_{37} + a_{38} + a_{39} + a_{40} + a_{41} + a_{42} + a_{43} + a_{44} + a_{45} + a_{46} + a_{47} + a_{48} + a_{49} + a_{50} + a_{51} + a_{52} + a_{53} + a_{54} + a_{55} + a_{56} + a_{57} + a_{58} + a_{59} + \text{plantoirwideend}
+$$
+
+After the wide formula (plantoir-after-wide). Before the scaled formula (plantoir-before-scaled).
+
+$$
+y = a_{1}x^{1} + a_{2}x^{2} + a_{3}x^{3} + a_{4}x^{4} + a_{5}x^{5} + a_{6}x^{6} + a_{7}x^{7} + a_{8}x^{8} + a_{9}x^{9} + a_{10}x^{10} + a_{11}x^{11} + a_{12}x^{12} + a_{13}x^{13} + \text{plantoirscaledend}
+$$
+
+After the scaled formula (plantoir-after-scaled). Before the timetable (plantoir-before-timetable).
+
+| Period | Day 1 | Day 2 | Day 3 | Day 4 | Day 5 | Day 6 | Day 7 | Day 8 | Day 9 | Day 10 | Day 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Math | Math | Math | Math | Math | Math | Math | Math | Math | Math | CELLEND1 |
+| 2 | Science | Science | Science | Science | Science | Science | Science | Science | Science | Science | CELLEND2 |
+
+After the timetable (plantoir-after-timetable).
+
 ## Curriculum connections
 
 ![[B1.2]]
@@ -1548,6 +1858,23 @@ sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable 
     -e 's/plantoir-print-sentinel-7f3a/plantoir-notopted-sentinel-7f3a/' \
     "$HIT_COURSE/Printable Fixture.md" > "$HIT_COURSE/Printable Not Opted.md"
 mkdir -p "$HIT_COURSE/Media"
+# Pictures for the worksheet's hazards (#499): a tall portrait one that must be
+# scaled onto a page, a wide one inside a folded answer, and an SVG with only a
+# viewBox. Drawn with the standard library alone (no Pillow on the Mac).
+python3 - "$HIT_COURSE/Media" <<'PY'
+import struct, sys, zlib
+def png(path, width, height):
+    rows = b"".join(b"\x00" + bytes((40 + (y * 7) % 180, 90, 160)) * width for y in range(height))
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff)
+    with open(path, "wb") as out:
+        out.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                  + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
+png(sys.argv[1] + "/plantoir-hazard-tall.png", 400, 1800)
+png(sys.argv[1] + "/plantoir-hazard-wide.png", 900, 300)
+open(sys.argv[1] + "/plantoir-hazard-viewbox.svg", "w").write(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 400"><rect x="5" y="5" width="90" height="390" fill="none" stroke="black"/></svg>\n')
+PY
 python3 - "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" <<'PY'
 import sys
 pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
@@ -1560,6 +1887,17 @@ printf -- '---\nprintable: true\nprintPdf: "[[plantoir-print-fixture & key.pdf]]
   > "$HIT_COURSE/Printable PDF Fixture.md"
 printf -- '---\nprintable: true\nprintPdf: missing-7f3a.pdf\n---\nA page whose PDF is not there (plantoir-badpdf-sentinel-7f3a).\n' \
   > "$HIT_COURSE/Printable Bad PDF.md"
+# A page that cannot print whole (#499 fix review B1): a displayed formula of
+# 60 lines and a table row of 90, each taller than a page and unsplittable
+# without losing lines. The handout must REFUSE it, in every paper - a guard
+# that skips split pieces printed both half-missing and called them complete.
+python3 - "$HIT_COURSE/Printable Too Tall.md" <<'PY'
+import sys
+formula = " \\\\\n".join(f"y_{{{i}}} &= {i}x + {i}" for i in range(1, 61))
+cell = "<br>".join(f"TALLROW-{i:02d}" for i in range(1, 91))
+open(sys.argv[1], "w").write("---\nprintable: true\n---\nBefore the tall formula (plantoir-toolong-sentinel-7f3a).\n\n$$\n\\begin{aligned}\n"
+    + formula + "\n\\end{aligned}\n$$\n\n| Row | Lines |\n|---|---|\n| 1 | " + cell + " |\n\n> [!answer]-\n>\n> Never printed.\n")
+PY
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -1711,6 +2049,7 @@ else:
     if settings["corners"] != expected:
         problems.append(f"the printable page's corners {settings['corners']} are not {expected}")
 for needle in ('class="plantoir-print-button"', 'data-mode="questionsOnly"', 'data-mode="answersOnly"',
+               'data-mode="withAnswersAtTheEnd"', 'value="landscape"', 'Plantoir LM Roman',
                'id="plantoir-print-page"', "@top-left"):
     if needle not in worksheet:
         problems.append(f"the printable page lacks {needle}")
@@ -1797,10 +2136,11 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
   PRINT_SERVER_PID=$!
   if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
-       "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" >/tmp/verify_print_handout.log 2>&1; then
-    pass "printable pages: opened as the preview opens it, in a light page, the handout prints its diagram DRAWN, not as source text (#454); the page's Curriculum connection is on screen but in none of the three handouts and not under ⌘P, the heading after it still printed, and the page that did not opt in still prints its own (#498) (browser-checks/print_handout.mjs)"
+       "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" \
+       "http://127.0.0.1:$PRINT_PORT/Printable-Too-Tall.html" >/tmp/verify_print_handout.log 2>&1; then
+    pass "printable pages: each way of printing on portrait and landscape paper, printed to PDF and read back - the print layout ran and laid out every piece, nothing cut off; every question, answer, table row and the words around every picture, drawing, diagram and formula on paper; 110 lines of code each with its own number in a hairline box; page labels on every page where a printer reaches; Latin Modern; no boxes but the worked example's (#499); the diagram DRAWN (#454); no Curriculum connection in any handout or under ⌘P (#498); the menu prints nothing until a choice and remembers the paper; ⌘P leaves orientation to the browser's dialog (browser-checks/print_handout.mjs)"
   else
-    fail "printable pages: a handout or ⌘P printed a diagram as source text, printed the Curriculum connection, or left out what should print (browser-checks/print_handout.mjs, #454, #498)"
+    fail "printable pages: a handout or ⌘P lost something, printed something it should not, or did not look as it should on paper (browser-checks/print_handout.mjs, #454, #498, #499)"
     cat /tmp/verify_print_handout.log
   fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true

@@ -2687,11 +2687,17 @@ dialog and no `afterprint`, and a `target="_blank"` link did nothing — so the
 teacher's FIRST press of Print, which is almost always in the preview, did
 nothing. `PreviewBrowserHandoff` (the web view's `uiDelegate` and its
 `plantoirPrint` message handler) fixes both: the page's print code posts
-`{mode, url}` and the app opens the page in the default browser with
-`#plantoir-print=<mode>`, which prints at once (measured in Safari 26.6: the
-sheet came up on "All 3 Pages"); a new-window link — a page's own PDF among
-them — opens in the browser too. Only the preview's own `localhost` pages and
-the contract's three modes are acted on. Each hand-over is a trail line,
+`{mode, paper, url}` and the app opens the page in the default browser with
+`#plantoir-print=<mode>&paper=<portrait|landscape>`, which prints at once
+(measured in Safari 26.6: the sheet came up on "All 3 Pages"); a new-window
+link — a page's own PDF among them — opens in the browser too. Only the
+preview's own `localhost` pages, the contract's three modes (in the menu's
+order since #499: questions only, answers only, both) and its two papers are
+acted on; a page built before #499 sends no paper and is printed portrait.
+The paper travels because the page lays its handout out BEFORE any print
+dialog opens, so the menu, not the dialog, is where landscape is chosen
+(documentation/06 → F8). The trail line says `, on landscape paper` when it
+was. Each hand-over is a trail line,
 `preview page opened in the web browser`, with the section, why, and the slug
 of the page the teacher was ON — for a new-window link only its KIND (the
 page's own PDF, another page of the site, another site), never where it led:
