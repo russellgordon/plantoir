@@ -99,6 +99,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends fonts-lmodern \
  && cp /usr/share/doc/fonts-lmodern/copyright /opt/vendor/pagedjs/fonts/LICENSE-Latin-Modern.txt \
  && apt-get purge -y fonts-lmodern && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Graphs drawn from a page's ```functionplot fence (#485 E1): function-plot
+# 1.25.4, the evaluator and drawing code the site's own script calls in the
+# student's browser. Into /opt/vendor beside Paged.js, under the same gate: a
+# section's site carries it (static/function-plot) only while a page students
+# can see has a graph that can be drawn, so a course without graphs ships none
+# of its 202,953 bytes. The build ALSO checks every graph with this very file
+# (support/figures/plantoir-figures.mjs), so a graph the site would refuse is
+# reported before it reaches a student. Fetched by exact version and checked
+# against the tarball's SHA-256, like Paged.js; contracts/toolchain.json ->
+# pins carries the why. MIT; the licence travels beside the file.
+RUN curl -fsSL -o /tmp/function-plot.tgz https://registry.npmjs.org/function-plot/-/function-plot-1.25.4.tgz \
+ && echo "33974ca53165365f585601f3e304e882107b44aa8a360d0b2b089ab9daf24a77  /tmp/function-plot.tgz" | sha256sum -c - \
+ && mkdir -p /tmp/function-plot /opt/vendor/function-plot \
+ && tar -xzf /tmp/function-plot.tgz -C /tmp/function-plot package/dist/function-plot.js package/LICENSE \
+ && cp /tmp/function-plot/package/dist/function-plot.js /tmp/function-plot/package/LICENSE /opt/vendor/function-plot/ \
+ && rm -rf /tmp/function-plot /tmp/function-plot.tgz
+
+# TikZ diagrams drawn at BUILD time from a page's ```tikz fence (#485 E1):
+# node-tikzjax 1.0.5, whose TeX engine (tex.wasm, core.dump and all 212 TeX
+# files) is byte for byte the one the Obsidian TikZJax plugin carries, so a
+# fence draws the same picture in Obsidian and on the site and students
+# download no engine at all. Installed from the LOCKFILE beside its
+# package.json, which pins every one of the 133 packages under it - load-
+# bearing, because node-tikzjax itself floats jsdom ^23, svgo ^3 and memfs
+# ^4, and svgo shapes the drawing. 39 MB, 5,445 files, 14.4 MB compressed.
+# Into its own folder, /opt/vendor/tikz-engine, NOT into Quartz's
+# node_modules (hoisting could move Quartz's own versions) and NOT named
+# `tikz`, which is the name of a site's FONTS folder: this one is never copied
+# into a site. Before the patches and scripts below, so editing a script
+# never downloads it again. LPPL-1.3c; THIRD_PARTY_LICENSES.md.
+COPY support/figures/package.json support/figures/package-lock.json /opt/vendor/tikz-engine/
+RUN cd /opt/vendor/tikz-engine \
+ && npm ci --omit=dev --no-audit --no-fund \
+ && npm ls node-tikzjax@1.0.5 \
+ && npm cache clean --force
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx
@@ -137,6 +173,10 @@ COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
 # printed page. Both imported by build_site.py by bare name.
 COPY scripts/page_features.py /opt/scripts/page_features.py
 COPY scripts/print_settings.py /opt/scripts/print_settings.py
+# Diagrams and graphs (#485 E1): finds the fences, draws and checks them
+# through support/figures/plantoir-figures.mjs, caches, and gates what the site
+# carries. Imported by build_site.py by bare name.
+COPY scripts/figures.py /opt/scripts/figures.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).

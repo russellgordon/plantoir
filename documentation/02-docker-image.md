@@ -227,7 +227,7 @@ teacher's first build; the six SHA-256s are in `contracts/toolchain.json` →
 against them rather than the recipe, so a Debian point release that touched
 them would surface in a check instead of in a teacher's build.
 
-Since v2.0.0 the image fetches **Paged.js 0.4.3** from the npm registry by
+Since v1.6.0 the image fetches **Paged.js 0.4.3** from the npm registry by
 exact version, checks the tarball's SHA-256 (`a79baaa9…6c17c5`), and keeps
 only `dist/paged.min.js` (502,617 bytes, 96,934 gzipped, SHA-256
 `c4af9ac4…397211`) and its MIT licence in `/opt/vendor/pagedjs/`. It is the
@@ -247,6 +247,59 @@ since — so a browser change it does not keep up with is ours to work around.
 from a folder publish), carrying it in every site (half a megabyte per site
 for a feature most pages never use), and committing the file (the repository
 ships recipes, not binaries). #455 adds Pyodide to the same folder.
+
+### `/opt/vendor/function-plot` and `/opt/vendor/tikz-engine` (#485 E1, v1.7.0)
+
+Two more engines for the same folder, both for figures a teacher writes as
+fences (` ```functionplot `, ` ```tikz `; [05 → Diagrams and
+graphs](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170),
+[06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170)):
+
+- **`/opt/vendor/function-plot/`** — function-plot **1.25.4** (MIT),
+  fetched from the npm registry by exact version and checked against the
+  tarball's SHA-256 (`33974ca5…6a77`), keeping only `dist/function-plot.js`
+  (202,953 bytes, 60,012 gzipped, SHA-256 `4e3cc6d8…02d1`) and `LICENSE`.
+  Gated exactly like Paged.js: a section's site carries it
+  (`static/function-plot/`) only while a page students can see has a graph
+  that can be drawn. The build also CHECKS every graph with this file, so a
+  graph the site would refuse is reported first. It evaluates with
+  `new Function`, which Netlify's `'unsafe-eval'` already allows (07), and
+  its bundle names `self` while loading, so the build's helper sets
+  `globalThis.self` first.
+- **`/opt/vendor/tikz-engine/`** — node-tikzjax **1.0.5** (LPPL-1.3c) and
+  everything under it, installed with `npm ci --omit=dev` from
+  `support/figures/package-lock.json` and then asserted with
+  `npm ls node-tikzjax@1.0.5`. Its TeX engine — `tex.wasm`, `core.dump` and
+  all 212 TeX files — is byte-identical to the one the Obsidian TikZJax
+  plugin (obsidian-tikzjax 0.5.2) embeds: measured by SHA-256 of every
+  decompressed file, 213 distinct contents on each side and none on one side
+  only. The JavaScript AROUND the engine differs (`@prinsss/dvi2html` 0.0.1
+  and svgo 3.3.5 here, the plugin's own dvi2html and svgo 2), so "the same
+  picture" also rests on four diagrams compared by `viewBox` (to 3 dp) and
+  text runs. **The lockfile is load-bearing**: node-tikzjax floats
+  `jsdom ^23`, `svgo ^3` and `memfs ^4`, and svgo shapes every drawing, so
+  an unpinned install would change pictures under teachers. Measured:
+  **133 packages, 5,445 files, 39.8 MB of files (57 MB on ext4), 14.4 MB
+  compressed.** It is NEVER copied into a site — the site carries only the
+  Computer Modern faces its drawings use (`static/tikz`, about 30 KB a face)
+  — and it is deliberately not called `tikz`, the name of that fonts folder,
+  so one slip into `GATED_ASSETS` cannot ship 39 MB into a site (review S8).
+
+Both layers sit BESIDE Paged.js, before the first `COPY patches/`, so editing
+a script never downloads them again; `npm ci` reaches the registry only when
+the lockfile changes. `contracts/toolchain.json` → `pins` → `functionPlot`
+and `nodeTikzjax` carry the hashes; verify.sh checks function-plot's file,
+node-tikzjax's version and its three `tex/*.gz` files in the image.
+Licences: `THIRD_PARTY_LICENSES.md` at the repository root.
+
+**Rejected:** TikZJax in the browser, as the Obsidian plugin does it
+(7.0 MB of script, 4.94 MB gzipped, plus 4.8 MB of fonts per student; 615 ms
+for the first diagram and 1,838 ms for four, measured in Chromium);
+installing node-tikzjax into Quartz's own `node_modules` (npm's hoisting
+could move Quartz's versions); bundling it with esbuild (it reads `tex/`
+beside itself by `__dirname`); a fork without jsdom (ours to maintain);
+loading either engine from a CDN (a site must work from a folder publish and
+offline, and the issue asks for no other origin).
 
 ### What the first build downloads (measured for #334)
 

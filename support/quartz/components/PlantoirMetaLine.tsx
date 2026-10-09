@@ -30,6 +30,14 @@ import style from "./styles/print.scss"
 import { codeBoxRules, countedLabel, cssPlainString, cssString, fontFaceRules, footerLeft, pageBoxRules } from "./scripts/printRules"
 // @ts-ignore
 import script from "./scripts/print.inline"
+// Diagrams and graphs (#485 E1) ride along: their styles and the script that
+// draws graphs are needed on every content page that might hold one, and this
+// is the component every content page already carries - so no layout edit is
+// needed for them. Both do nothing on a page without a figure (every rule is
+// under .pl-figure; the script returns at once).
+import figuresStyle from "./styles/figures.scss"
+// @ts-ignore
+import figuresScript from "./scripts/figures.inline"
 
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
 type PrintSettings = {
@@ -198,8 +206,8 @@ export default ((inner: QuartzComponent) => {
   // The inner component's own resources travel with it (review S7), the way
   // DesktopOnly and Flex carry theirs, so the date line keeps its styles even
   // if a layout one day wraps every ContentMeta.
-  PlantoirMetaLine.css = concatenateResources(inner.css, style)
+  PlantoirMetaLine.css = concatenateResources(inner.css, style, figuresStyle)
   PlantoirMetaLine.beforeDOMLoaded = inner.beforeDOMLoaded
-  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script)
+  PlantoirMetaLine.afterDOMLoaded = concatenateResources(inner.afterDOMLoaded, script, figuresScript)
   return PlantoirMetaLine
 }) satisfies QuartzComponentConstructor<QuartzComponent>

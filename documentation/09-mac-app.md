@@ -2658,7 +2658,7 @@ to, did not change — and `scripts/test_colour_scheme_names.py` now holds every
 scheme name against the same `forbidden` list, whole-word. It is pure Python,
 so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 
-## Printing (#454, v2.0.0)
+## Printing (#454, v1.6.0)
 
 Three pieces of the printable-pages feature are the app's; the rest is the
 build and the site ([06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200)).
@@ -2771,6 +2771,50 @@ folder (`courses/ICS3U/Unit 1/Factoring Practice.md`: three questions with
 
 One run each, so "pass" means the guidance was found and followed, not that
 it always will be.
+
+**The graphs skill (#485 E1), measured the same way, 2026-10-09.** Russell
+asked that `plantoir-math-graphs` teach an assistant to build a page with a
+figure productively, not only the fence syntax, so it carries when to use
+which fence, four complete patterns (a parabola beside its parent, two lines
+meeting — interactive and with the point marked, labelled similar triangles,
+a number line), the measured package list, the limits on paper and time,
+how a failure shows up, what to avoid, and what cannot be done (sliders).
+Every pattern in it is drawn by the real engines (the same check as verify's
+payload figures). Scratch working folder with the guidance as the app
+mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
+`y = 3(x - 2)^2 - 4` in prose, no figure), one fresh copy per run:
+
+| Launcher | Started at | Prompt | Result |
+|---|---|---|---|
+| `claude -p` (2.1.296, `--permission-mode acceptEdits`) | working folder root | `Add a graph of y = 3(x - 2)^2 - 4 beside its parent function y = x^2 to the page "courses/MPM2D/Unit 2/Parabolas.md", under the example.` | PASS — a `functionplot` fence, settings first, `alt` naming the vertex, both functions in the grapher's syntax, bounds [-4, 6, -6, 10] around the vertex (2, -4); drawn by the real engines with no problem or note |
+| `claude -p` | `courses/MPM2D` | the same, with `"Unit 2/Parabolas.md"` | PASS — the same fence plus `xLabel`/`yLabel` |
+| `claude -p` | working folder root | `Add a graph of y = a(x - 2)^2 with a slider for a to the page "courses/MPM2D/Unit 2/Parabolas.md".` | PASS — no slider promised: one graph with the parent and a = 0.5, 3, −1, a paragraph saying which curve is which (they are coloured, not labelled), a quoted `alt`; it said separate graphs are the only other option |
+| `codex exec` (0.162.0, model gpt-6-luna, `-s workspace-write --skip-git-repo-check`) | working folder root | the first | PASS — read `.agents/skills/plantoir-math-graphs/SKILL.md` first; the skill's pattern A, bounds [-2, 6, -6, 12], `alt` naming the vertex (two runs, one by the #501 session, one by E1's) |
+| `codex exec` | `courses/MPM2D` | the second | **FAIL** — read no AGENTS.md and no skill; hand-wrote an inline `<svg>` with hard-coded paths (two runs) |
+| `codex exec` | `courses/MPM2D` of the same folder after `git init` at its root | the second | PASS — found the skill, wrote pattern A |
+
+One run per row unless the row says otherwise, as for printing.
+
+**Why Codex fails inside a course, measured.** Codex reads `AGENTS.md`
+files from its PROJECT ROOT down to where it was started, and finds the root
+by `project_root_markers`, which defaults to `[".git"]` (in the 0.162.0
+binary). A teacher's working folder is not a git repository, so started in
+`courses/MPM2D` its project root is that folder and the working folder's
+`AGENTS.md` two levels up is never read. Probed with "quote the first heading
+of the AGENTS.md you were given, or NONE" from `courses/MPM2D`: no `.git` —
+NONE; `.git` at the root — "# Plantoir working folder"; a root
+`.codex/config.toml` setting `project_root_markers = [".codex", ".git"]` —
+NONE (project settings are only read once a root is found). The #454 table's
+Codex PASS from `courses/ICS3U` was on 0.155.1 and is not reproduced on
+0.162.0. **Both apps start an assistant AT the working folder**, which PASSES;
+only a teacher who opens a terminal inside a course and starts Codex there
+meets this. **Not fixed here, deliberately:** the fix would be an
+`AGENTS.md` pointer in every course folder, which is a page in the teacher's
+Obsidian vault and on the class website unless it is kept off it in the
+build's four How I Teach places — the shape Russell's P1 ruling rejected
+("no per-course copy"). Put to Russell as a decision; making the working
+folder a git repository (or adding a `.git` marker) was rejected outright —
+it changes what other tools think the folder is.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

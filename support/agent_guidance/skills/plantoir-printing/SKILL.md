@@ -148,6 +148,11 @@ columns of short words. If anything would still be cut off, the page refuses
 to print and says so plainly rather than printing a handout with something
 missing - the teacher can then try the other orientation.
 
+Graphs (` ```functionplot `) and TikZ diagrams (` ```tikz `) print too, in
+black on white, whole, and each graph at the bounds the page gives it,
+whatever a student zoomed to on screen; how to write them is in the
+`plantoir-math-graphs` skill.
+
 ## 6. The Curriculum connection never prints
 
 Many pages end with a section headed `## Curriculum connection` that

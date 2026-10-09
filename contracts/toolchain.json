@@ -112,6 +112,28 @@
         "lmmono10-regular.otf": "22deb6d3be3ffcb40b33f0e010afb256c677d97c2a2bdee1f5740cdc97751558"
       },
       "why": "#499 (v1.6.0), Debian 13's fonts-lmodern 2.005-1 (apt names no version, so a point release cannot fail a build): the faces a printed handout is set in, so it reads like the teacher's LaTeX handouts (11pt article with lmodern): Latin Modern Roman regular, bold, italic and bold italic, Sans bold, Mono. Carried at /opt/vendor/pagedjs/fonts (Windows: runtime\\vendor\\pagedjs\\fonts, owed on #496) beside Paged.js, so a site carries them only when a page students can see opts in to printing, and a browser fetches them only when a page is printed: 631,940 bytes, unmodified OTF. From Debian's fonts-lmodern through apt, not from GUST's download page, because a font host that is down must never fail a teacher's first build; `files` are the SHA-256s verify.sh checks in the image. GUST Font License (an instance of the LPPL 1.3c), which asks that a CHANGED font be renamed - so the files are not converted to woff2 (283,148 bytes for the six, measured with fontTools 4) and keep their own names. REJECTED: KaTeX's Computer Modern from the CDN (no bytes, but it needs the network at the moment of printing and has no sans or mono for headings and code); the GUST zip pinned by hash (lm2.004otf.zip, 3,907,819 bytes - a second network host for every first build)."
+    },
+    {
+      "pin": "functionPlot",
+      "value": "1.25.4",
+      "dockerfileContains": "function-plot/-/function-plot-1.25.4.tgz",
+      "windowsRuntimeContains": "function-plot/-/function-plot-1.25.4.tgz",
+      "sha256": "33974ca53165365f585601f3e304e882107b44aa8a360d0b2b089ab9daf24a77",
+      "fileSha256": "4e3cc6d8015e517b0356178bc6409405db2b31385ac655b657aaad7120b802d1",
+      "why": "#485 E1: draws a page's ```functionplot graphs in the student's browser, and checks each one at build time with the same file (its evaluator, $eval.builtIn) so a graph the site would refuse is reported to the teacher first. Carried at /opt/vendor/function-plot (Windows: runtime\\vendor\\function-plot) and copied into a section's site ONLY when a page students can see has a graph that can be drawn - dist/function-plot.js is 202,953 bytes (60,012 gzipped), MIT. The Obsidian functionplot plugin 1.2.1 bundles function-plot ^1.22.9; 1.25.4 is the same evaluator family (`log` is natural, `log10`, `PI`, `E`, `2x` work; `ln`, `pi`, `x**2` do not - figureFences.functionplot.expressionCases). It evaluates with `new Function`, which the Netlify header's 'unsafe-eval' already allows. The bundle names `self` as it loads, so the build's helper sets `globalThis.self` first. `sha256` is the tarball's, which the recipe checks; `fileSha256` is function-plot.js's, which verify.sh checks in the image and in a built site."
+    },
+    {
+      "pin": "nodeTikzjax",
+      "value": "1.0.5",
+      "dockerfileContains": "npm ls node-tikzjax@1.0.5",
+      "windowsRuntimeContains": "node-tikzjax@1.0.5",
+      "sha256": "8618a24afb93c70a32a3fbe8051677edfcf11a52aa681b6b7435fba7c8150eb9",
+      "files": {
+        "tex/core.dump.gz": "ae9f69dfe3837606240c5b9cb50f86aa0ee7463bbae4c26f2843b17eb155b91f",
+        "tex/tex.wasm.gz": "f8667f45e90039832df4f62550f10ff0c2f47781dbfdde9510f0ff3f360a61ba",
+        "tex/tex_files.tar.gz": "492271c589ab2d7b64c22a09f927ea09cd5ee3fc696a46067ddea2da4693c86f"
+      },
+      "why": "#485 E1: draws a page's ```tikz diagrams at BUILD time, so students download no engine (the Obsidian plugin's browser engine is 7.0 MB of script plus 4.8 MB of fonts). Its TeX engine - tex.wasm, core.dump and all 212 TeX files - is byte-identical to the one obsidian-tikzjax 0.5.2 embeds (measured by SHA-256 of each decompressed file, 213 distinct contents on each side, none on one side only), so a fence draws the same picture in Obsidian and on the site; the JavaScript AROUND the engine differs (@prinsss/dvi2html 0.0.1 and svgo 3.3.5 against the plugin's own dvi2html and svgo 2), so 'same picture' also rests on four diagrams compared by viewBox and text runs. Installed with `npm ci --omit=dev` from support/figures/package-lock.json, which pins all 133 packages under it - load-bearing, because node-tikzjax floats jsdom ^23, svgo ^3 and memfs ^4 and svgo shapes every drawing; the lockfile is also part of the figure cache's engine id (figureFences.cache), so a moved package draws every diagram afresh. 39 MB of files, 5,445 of them, 14.4 MB compressed; carried at /opt/vendor/tikz-engine (Windows: runtime\\vendor\\tikz-engine) and NEVER copied into a site - a site carries only the Computer Modern faces its diagrams use (static/tikz). LPPL-1.3c (node-tikzjax, TikZJax); the 212 TeX files carry their own LPPL and GPL terms; the BaKoMa faces their own licence - THIRD_PARTY_LICENSES.md. `sha256` is the npm tarball's, for the record (the lockfile's integrity line is what npm checks); `files` are the engine's own three, which verify.sh checks in the image. REJECTED: TikZJax in the browser (4.94 MB gzipped per student, 1.8 s for four diagrams); installing into Quartz's node_modules; bundling it with esbuild (it reads tex/ beside itself); a fork without jsdom."
     }
   ],
   "rules": [

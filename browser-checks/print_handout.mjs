@@ -65,6 +65,7 @@ const QUESTIONS = [
   "The first term", "The last term", "The middle term",
   "plantoir-example-sentinel-7f3a", "plantoir-wrap-sentinel",
   "plantoir-before-tall", "plantoir-after-tall", "plantoir-before-viewbox", "plantoir-after-viewbox",
+  "plantoir-before-figures", "plantoir-after-figures",
   "plantoir-before-mermaid", "plantoir-after-mermaid", "MM-01", "MM-30",
   "plantoir-before-katex", "plantoir-after-katex", "plantoir-before-table", "plantoir-after-table",
   // A 59-term formula broken between its terms, an 11-term one set smaller
@@ -142,6 +143,11 @@ const PROBE = `
             overflowing: Number(at("data-plantoir-overflowing")),
             pages: frame.querySelectorAll(".pagedjs_page").length,
             pageWidth: firstPage ? Math.round(firstPage.getBoundingClientRect().width) : 0,
+            // #485 E1: a TikZ drawing and a graph DRAWN in the handout, in
+            // black on white whichever theme the page was in.
+            tikz: frame.querySelectorAll(".pagedjs_page .pl-tikz svg").length,
+            graphs: frame.querySelectorAll(".pagedjs_page .pl-functionplot svg.function-plot").length,
+            figureInk: Array.from(frame.querySelectorAll(".pagedjs_page .pl-tikz svg text")).map((t) => view.getComputedStyle(t).fill),
             diagrams: frame.querySelectorAll("code.mermaid").length,
             drawn: frame.querySelectorAll("code.mermaid > svg").length,
             sourceText: /-->/.test(frame.body.textContent || ""),
@@ -350,6 +356,8 @@ async function connect(chunk) {
       if (Math.abs(printed.pageWidth - wantedWidth) > 2) here.push(`pages ${printed.pageWidth} px wide, not ${wantedWidth}`)
       if (mode !== "answersOnly") {
         if (!(printed.diagrams > 0 && printed.drawn === printed.diagrams && !printed.sourceText)) here.push("a diagram printed undrawn")
+        if (printed.tikz < 1 || printed.graphs < 1) here.push(`figures missing from the handout: ${printed.tikz} drawing(s), ${printed.graphs} graph(s) (#485)`)
+        if (printed.figureInk.some((ink) => ink !== "rgb(0, 0, 0)")) here.push(`a drawing's lettering printed in ${printed.figureInk.join(", ")}, not black (#485)`)
         if (!printed.example || !printed.boxes.some((box) => box.startsWith("example "))) here.push("the worked example lost its box")
         // The 110-line program splits across pages: at least two pieces, each boxed.
         if (printed.code.length < 3) here.push(`${printed.code.length} pieces of code laid out`)

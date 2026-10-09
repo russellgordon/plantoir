@@ -11,3 +11,10 @@ that matches the task before writing:
   any page "students will print", or a page that should hand out an existing
   PDF: `.agents/skills/plantoir-printing/SKILL.md` (the same file is at
   `.claude/skills/plantoir-printing/SKILL.md`).
+- **Graphs and diagrams** - a graph of a function (a parabola beside its
+  parent, two lines meeting), a geometry or similar-triangles figure, a
+  number line, a probability tree, a circuit, anything to be "plotted" or
+  "drawn": which fence to write, complete patterns to paste, and what
+  cannot be done (no sliders) are in
+  `.agents/skills/plantoir-math-graphs/SKILL.md` (the same file is at
+  `.claude/skills/plantoir-math-graphs/SKILL.md`).
