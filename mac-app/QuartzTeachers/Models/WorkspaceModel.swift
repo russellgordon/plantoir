@@ -420,6 +420,14 @@ class WorkspaceModel {
     /// by the sidebar, which owns every sheet in this window.
     var schoolYearRequestCode: String?
 
+    /// The calm note about a reference course's locked pages, waiting to be
+    /// shown before Obsidian opens — asked for by ANY route (the section
+    /// window's toolbar, a row's menu, Course ▸ / Section ▸ Open in Obsidian)
+    /// through `openInObsidian(course:sectionNumber:)`, and presented by the
+    /// main window rather than the sidebar, so it shows with the sidebar
+    /// collapsed (#457, the HIG sweep).
+    var lockedPagesNoteRequest: LockedPagesNoteRequest?
+
     /// Whether the "Reference Courses" group is folded open. Remembered with
     /// the folder, exactly as Archived and Backups are.
     var isShowingReferenceCourses: Bool = false

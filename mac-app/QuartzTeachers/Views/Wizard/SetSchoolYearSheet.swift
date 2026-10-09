@@ -83,8 +83,7 @@ struct SetSchoolYearSheet: View {
                 Button("Set School Year") {
                     setSchoolYear()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(entryProblem != nil)
+                .defaultButton(isEnabled: entryProblem == nil)
                 .accessibilityIdentifier("setSchoolYearButton")
             }
         }

@@ -141,8 +141,7 @@ struct KeepACopyForReferenceSheet: View {
                 Button("Keep a Copy") {
                     keepACopy()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canCopy)
+                .defaultButton(isEnabled: canCopy)
                 .accessibilityIdentifier("keepACopyButton")
             }
         }

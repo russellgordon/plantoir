@@ -22250,7 +22250,7 @@
         ]
       },
       {
-        "why": "A section of a course kept for reference, with a deploy still recorded as scheduled: neither Schedule nor Cancel — nothing deploys from a kept course, its section row's context menu offers neither, and the menu bar may not disagree with it (the director's ruling on #457's implementation review; Plantoir turns such a schedule off itself, ScheduledDeployCleanup). Deploy is greyed even though nothing else is running; Preview is not.",
+        "why": "A section of a course kept for reference, with a deploy still recorded as scheduled: neither Schedule nor Cancel — nothing deploys from a kept course, its section row's context menu offers neither, and the menu bar may not disagree with it (the director's ruling on #457's implementation review; Plantoir turns such a schedule off itself, ScheduledDeployCleanup). Deploy is greyed even though nothing else is running; Preview is not. Remove Section… is greyed too: interface.whatIsWithheld withholds \"Remove Section N (removing the whole course stays)\", and until the HIG sweep (#457 item 4) this case wrongly listed it; Remove Course… stays live on the course.",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22269,7 +22269,6 @@
           "openWorkingFolder",
           "preview",
           "reloadCourses",
-          "removeSection",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
           "sectionShowInFinder",
@@ -22517,6 +22516,22 @@
       "The system's own Open Recent (NSDocumentController's recent documents): it lists only what the app claims as a DOCUMENT type, and claiming folders would put Plantoir in Finder's Open With menu for every folder on the Mac.",
       "Recording a folder each time its window comes to the front (the plan, before review): the list would reorder on every app switch — see rule.",
       "Leaving gone folders out of the menu: asking the disk while the menu bar is drawn is the trap Canopy recorded (no I/O in the commands tree); choosing one says why instead."
+    ]
+  },
+  "sidebarDeleteKey": {
+    "note": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08: yes). The Delete key on a selected sidebar row asks to remove or delete it, as in Finder and Mail. It RUNS THE MENU ITEM named here: that item's own enablement (subjectMenus) decides whether anything happens, and its own action asks the same question the menu bar, the row's context menu and the − button ask. Nothing is removed without that question. Where the item is greyed — a section of a course kept for reference, anything under a sheet, a course whose copy is being zipped — the key beeps, as a greyed menu item's key does.",
+    "rule": "Delete on the row → the item. Inside a text field the key edits the text, never this: it is not a key equivalent on the menu item, because a menu key equivalent is matched before the field editor and would take ⌫ (and ⌘⌫, delete to the start of the line) from every field in the window.",
+    "cases": [
+      { "row": "course", "item": "removeCourse" },
+      { "row": "section", "item": "removeSection" },
+      { "row": "backup", "item": "deleteBackup" },
+      { "row": "archived", "item": "deleteArchive" },
+      { "row": "allBackups", "item": null },
+      { "row": "none", "item": null }
+    ],
+    "rejected": [
+      "⌘⌫ (or ⌫) as the menu items' key equivalent: matched before the field editor, it would delete a course from inside a text field where the teacher meant to delete a word.",
+      "Removing without the question, Finder-style straight to an undoable place: removal archives and a backup's deletion is real, and neither has an undo in the window — the question IS the safety net."
     ]
   }
 }

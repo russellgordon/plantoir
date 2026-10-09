@@ -38,6 +38,11 @@ struct CourseSettingsView: View {
     /// Whether this window is key, read only to notice it BECOMING key.
     @Environment(\.controlActiveState) var controlActiveState: ControlActiveState
 
+    /// The window's model — for Open in Obsidian, which every route asks
+    /// through `WorkspaceModel.openInObsidian` (#457). Optional, because
+    /// the tests that draw this form give it no window model.
+    @Environment(WorkspaceModel.self) var workspace: WorkspaceModel?
+
     /// Whether `settings save held back` has been written on this visit to
     /// the course, so a teacher typing in a held-back form leaves one line,
     /// not one per keystroke. Starts afresh when the form is rebuilt for a
@@ -433,7 +438,8 @@ struct CourseSettingsView: View {
         .toolbar {
             ToolbarItem {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
-                    FolderActions.openInObsidian(revealing: course.directoryURL, vaultURL: course.directoryURL)
+                    // The one route every Open in Obsidian takes (#457).
+                    workspace?.openInObsidian(course: course, sectionNumber: nil)
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this course's pages in Obsidian")

@@ -395,8 +395,7 @@ struct StartOfYearSheet: View {
                         await model.goAhead()
                     }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(plan.changesNothing)
+                .defaultButton(isEnabled: !plan.changesNothing)
                 .accessibilityIdentifier("startOfYearGo")
             case .undoReady(_, let putBack, _):
                 Button("Cancel", role: .cancel) {
@@ -408,8 +407,7 @@ struct StartOfYearSheet: View {
                         await model.undo()
                     }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(putBack.isEmpty)
+                .defaultButton(isEnabled: !putBack.isEmpty)
                 .accessibilityIdentifier("startOfYearUndo")
             case .reading, .working:
                 Button("Cancel", role: .cancel) {

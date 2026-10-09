@@ -118,8 +118,7 @@ struct AddSectionSheet: View {
                 Button("Add Section") {
                     performAdd()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canAdd)
+                .defaultButton(isEnabled: canAdd)
                 .accessibilityIdentifier("addSectionConfirmButton")
             }
         }

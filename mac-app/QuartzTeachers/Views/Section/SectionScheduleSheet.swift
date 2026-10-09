@@ -359,14 +359,13 @@ struct SectionScheduleSheet: View {
                 Button("Remember these dates") {
                     remember(plan)
                 }
-                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("sectionScheduleRememberButton")
             } else if question == nil {
                 Button("Read the dates") {
                     Task { await read() }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!canRead)
+                .defaultButton(isEnabled: canRead)
                 .accessibilityIdentifier("sectionScheduleReadButton")
             }
         }
@@ -699,7 +698,7 @@ struct SectionScheduleCourseMissingView: View {
                 Button("OK") {
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)

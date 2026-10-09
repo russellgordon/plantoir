@@ -104,8 +104,7 @@ struct CredentialRequestSheet: View {
                 Button(confirmTitle) {
                     sendAnswer()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(tidiedAnswer.isEmpty)
+                .defaultButton(isEnabled: !tidiedAnswer.isEmpty)
                 .accessibilityIdentifier("credentialSendButton")
             }
         }

@@ -160,8 +160,7 @@ struct UnitWordRenameSheet: View {
                 Button("Rename") {
                     Task { await performRename() }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(problem != nil || survey == nil || isRenaming)
+                .defaultButton(isEnabled: problem == nil && survey != nil && !isRenaming)
                 .accessibilityIdentifier("unitWordRenameButton")
             }
         }

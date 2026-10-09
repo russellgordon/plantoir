@@ -26,23 +26,50 @@ final class ObsidianFolderTests: XCTestCase {
         XCTAssertEqual(FolderActions.obsidianFolder(for: course, sectionNumber: nil), course.directoryURL)
     }
 
-    /// Every route asks the one function: the toolbar, and the sidebar's
-    /// reference route (which also serves the menu bar and the context menu).
+    /// Every route asks the one function, `WorkspaceModel.openInObsidian`:
+    /// nothing outside it (and the note's own "Open in Obsidian") calls
+    /// `FolderActions.openInObsidian` directly. Until the HIG sweep (#457)
+    /// the section window's toolbar did, and so skipped the reference
+    /// course's re-lock and its locked-pages note — one command, two
+    /// behaviours.
     func testEveryRouteAsksTheOneFunction() throws {
-        let views: URL = TextFieldStyleScanTests.viewsURL()
+        let source: URL = UserFacingLabelWordsTests.macAppRoot().appendingPathComponent("QuartzTeachers")
+        var callers: [String] = []
+        for file in UserFacingLabelWordsTests.swiftFiles(under: source) {
+            let code: String = TextFieldStyleScanTests.codeWithoutComments(try String(contentsOf: file, encoding: .utf8))
+            let count: Int = SaveEnablesTests.occurrences(of: "FolderActions.openInObsidian(", in: code)
+            if count > 0 {
+                callers.append(file.lastPathComponent + " x" + String(count))
+            }
+        }
+        XCTAssertEqual(callers, ["OpenInObsidianRoute.swift x2"], "Open in Obsidian goes through WorkspaceModel.openInObsidian from every route")
         let detail: String = try String(
-            contentsOf: views.appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8
+            contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("Section/SectionDetailView.swift"), encoding: .utf8
         )
-        let sidebar: String = try String(contentsOf: views.appendingPathComponent("SidebarView.swift"), encoding: .utf8)
-        XCTAssertTrue(detail.contains("revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)"),
+        XCTAssertTrue(detail.contains("workspace.openInObsidian(course: course, sectionNumber: sectionNumber)"),
                       "the section window's toolbar button")
-        let reference: String = try XCTUnwrap(
-            sidebar.components(separatedBy: "func openReferenceCourseInObsidian(").dropFirst().first
-        )
-        XCTAssertTrue(reference.prefix(900).contains("FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)"),
-                      "a reference course's route, from its rows and the menu bar")
-        let perform: String = try XCTUnwrap(sidebar.components(separatedBy: "case .courseOpenInObsidian, .sectionOpenInObsidian:").dropFirst().first)
-        XCTAssertTrue(perform.prefix(700).contains("openReferenceCourseInObsidian(course, sectionNumber: sectionNumber)"))
-        XCTAssertTrue(perform.prefix(700).contains("FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)"))
+    }
+
+    /// The toolbar's route, on a section of a course kept for reference:
+    /// the note is asked for FIRST, with the section's own folder, and
+    /// Obsidian is not opened yet.
+    func testTheToolbarRouteOnAReferenceSectionAsksTheNoteFirst() throws {
+        LockedPagesNote.defaults = TestDefaults.make()
+        defer { LockedPagesNote.defaults = PlantoirDefaults.shared }
+        let fixtureURL: URL = try FixtureWorkspace.materialize()
+        defer { try? FileManager.default.removeItem(at: fixtureURL) }
+        let courses: [Course] = try WorkspaceModel.discoverCourses(in: fixtureURL.appendingPathComponent("courses"))
+        let course: Course = try XCTUnwrap(courses.first)
+        course.configuration.keptForReference = true
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        var lockedAgain: [String] = []
+        let opened: Bool = workspace.openInObsidian(course: course, sectionNumber: 2) { asked in
+            lockedAgain.append(asked.code)
+        }
+        XCTAssertFalse(opened, "Obsidian waits for the note")
+        XCTAssertEqual(lockedAgain, [course.code], "the pages are locked again before Obsidian opens")
+        let request: LockedPagesNoteRequest = try XCTUnwrap(workspace.lockedPagesNoteRequest)
+        XCTAssertEqual(request.course.code, course.code)
+        XCTAssertEqual(request.folder, course.sectionDirectoryURL(forSection: 2), "the section's own folder, as the toolbar reveals")
     }
 }

@@ -58,7 +58,13 @@ struct NewCourseWizardView: View {
     /// closes only when the field loses focus — a selection sets this to
     /// false itself (see `selectCourseCodeSuggestion`), and clicking
     /// elsewhere does the same the ordinary way SwiftUI focus works.
-    @State var courseCodeFieldIsFocused: Bool = false
+    ///
+    /// TRUE at open (#457, the HIG sweep — Russell: yes): the wizard opens
+    /// with the cursor in the code field, the field a teacher came to type
+    /// in, rather than on Add Example Course. The list does not open with
+    /// it — see `courseCodeSuggestionsManuallyDismissed` — so the form is
+    /// not covered before anything has been typed.
+    @State var courseCodeFieldIsFocused: Bool = true
 
     /// True once Escape has closed the popup without moving focus out of
     /// the field — reset the moment the code changes (typing should
@@ -69,7 +75,11 @@ struct NewCourseWizardView: View {
     /// Escape here NOT fall through to dismissing the whole wizard sheet
     /// — see the `.onKeyPress(.escape)` on `CourseCodePickerView`'s field
     /// (Russell, 2026-08-22).
-    @State var courseCodeSuggestionsManuallyDismissed: Bool = false
+    ///
+    /// TRUE at open, so the focus the wizard opens with does not also open
+    /// the list over the form: typing, ↓ or the chevron opens it, as in Copy
+    /// a Page (#457, the HIG sweep).
+    @State var courseCodeSuggestionsManuallyDismissed: Bool = true
 
     /// Which suggestion the arrow keys are sitting on, or `nil` when the
     /// teacher has not walked the list — the state behind Russell's
@@ -773,11 +783,16 @@ struct NewCourseWizardView: View {
                     Button(WizardWording.panelWords(isClub: isClubCourse).createButton) {
                         startCreation()
                     }
-                    .buttonStyle(.borderedProminent)
                     // Greyed while the folder is getting ready (#476), with
                     // the reason; `NewCourseCreator` refuses as well, before
                     // it writes, for a wizard opened before the copy began.
-                    .disabled(workspace.folderIsGettingReady)
+                    // The default button otherwise: Return in a field that
+                    // does not take it (the code field with no row
+                    // highlighted, the course name) creates the course, as
+                    // `CourseCodePickerView`'s Return comment has always
+                    // said — until the HIG sweep (#457) the button LOOKED
+                    // like the default and Return reached nothing.
+                    .defaultButton(isEnabled: !workspace.folderIsGettingReady)
                     .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
@@ -792,9 +807,7 @@ struct NewCourseWizardView: View {
                         }
                         dismiss()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(creator.isCreating)
-                    .keyboardShortcut(.defaultAction)
+                    .defaultButton(isEnabled: !creator.isCreating)
                     .accessibilityIdentifier("wizardCloseActionButton")
                 }
             }
@@ -841,8 +854,10 @@ struct NewCourseWizardView: View {
                             courseCode: $courseCode,
                             isFocused: $courseCodeFieldIsFocused,
                             onEscape: {
+                                let listWasShown: Bool = courseCodeSuggestionsAreShown
                                 courseCodeSuggestionsManuallyDismissed = true
                                 highlightedCourseCode = nil
+                                return listWasShown
                             },
                             // A TOGGLE, not an open: pressing a real
                             // combo box's arrow a second time puts the
