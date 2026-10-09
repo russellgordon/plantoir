@@ -18,6 +18,23 @@ only sometimes — a distinction built for [[Always, Sometimes, Never]].
 
 ## Using similarity to find a missing side
 
+Sketch the pair first, with the corresponding sides in the same
+positions, and label what you know:
+
+```tikz
+% alt: Triangle ABC with AB = 6 and BC = 8, beside the larger similar triangle DEF with DE = 9 and EF unknown.
+\begin{document}
+\begin{tikzpicture}
+  \draw[thick] (0,0) node[below left]{$A$} -- (3,0) node[below right]{$B$} -- (1,2) node[above]{$C$} -- cycle;
+  \node[below] at (1.5,0) {$6$};
+  \node[above right] at (2,1) {$8$};
+  \draw[thick] (5,0) node[below left]{$D$} -- (9.5,0) node[below right]{$E$} -- (6.5,3) node[above]{$F$} -- cycle;
+  \node[below] at (7.25,0) {$9$};
+  \node[above right] at (8,1.5) {$?$};
+\end{tikzpicture}
+\end{document}
+```
+
 If $\triangle ABC \sim \triangle DEF$ with $AB = 6$, $DE = 9$, and
 $BC = 8$, the scale factor from the first triangle to the second is
 $\frac{9}{6} = 1.5$, so

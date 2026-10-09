@@ -1035,6 +1035,36 @@ else
   cat /tmp/verify_figure_rules_site.log
 fi
 
+# Every figure in the example courses draws, with its description, in the
+# real engines (#485 E1): a payload's figure that could not be drawn would
+# put "This diagram couldn't be drawn." on a page a teacher just installed.
+if docker run --rm "$DEV_TEST_IMAGE" python3 -c '
+import sys, tempfile, shutil
+from pathlib import Path
+sys.path.insert(0, "/opt/scripts")
+import figures, toolchain_paths
+root = toolchain_paths.SUPPORT_DIR / "example_content"
+pages = []
+for page in sorted(root.rglob("*.md")):
+    text = page.read_text(encoding="utf-8")
+    if "```tikz" in text or "```functionplot" in text:
+        pages.append({"place": str(page.relative_to(root))[:-3], "text": text, "source": text})
+work = Path(tempfile.mkdtemp())
+rules = work / "quartz" / "plugins" / "transformers"
+rules.mkdir(parents=True)
+shutil.copyfile(toolchain_paths.SUPPORT_DIR / "quartz" / "plugins" / "transformers" / "figureRules.js", rules / "figureRules.js")
+(work / "package.json").write_text("{\"type\": \"module\"}")
+outcome = figures.prepare(pages, work, work / "cache")
+count = outcome["figures"]
+print(str(count) + " figure(s) on " + str(len(pages)) + " page(s)")
+sys.exit(1 if outcome["problems"] or outcome["notes"] or outcome["figures"] == 0 else 0)
+' >/tmp/verify_payload_figures.log 2>&1; then
+  pass "every diagram and graph in the example courses draws, each with its description ($(tail -1 /tmp/verify_payload_figures.log), #485)"
+else
+  fail "a diagram or graph in the example courses cannot be drawn, or has no description (#485)"
+  cat /tmp/verify_payload_figures.log
+fi
+
 # ---- The date and title writers, against what the site reads ----
 # GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
 # says what the built site reads from each page a writer produces; this runs
