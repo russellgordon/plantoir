@@ -38,8 +38,7 @@
 }
 
 a.plantoir-print-pdf,
-.plantoir-print-button,
-.plantoir-print-more > summary {
+.plantoir-print-button {
   border: 1px solid var(--lightgray);
   border-radius: 5px;
   background: var(--light);
@@ -67,25 +66,21 @@ a.plantoir-print-pdf,
 }
 
 a.plantoir-print-pdf:hover,
-.plantoir-print-button:hover,
-.plantoir-print-more > summary:hover {
+.plantoir-print-button:hover {
   border-color: var(--secondary);
   color: var(--secondary);
 }
 
-.plantoir-print-more {
+// The menu Print opens (#499, decision 29): paper, then the three ways of
+// printing. The summary is the button; nothing prints until a choice.
+.plantoir-print-menu-box {
   position: relative;
 
   & > summary {
     list-style: none;
-    padding: 0.2rem 0.45rem;
 
     &::-webkit-details-marker {
       display: none;
-    }
-
-    &::after {
-      content: "▾";
     }
   }
 
@@ -113,10 +108,31 @@ a.plantoir-print-pdf:hover,
       border-radius: 4px;
       cursor: pointer;
 
-      &:hover {
+      &:hover,
+      &:focus-visible {
         background: var(--highlight);
       }
+
+      &[hidden] {
+        display: none;
+      }
     }
+  }
+}
+
+.plantoir-print-paper {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.3rem 0.6rem 0.4rem;
+  margin-bottom: 0.15rem;
+  border-bottom: 1px solid var(--lightgray);
+  color: var(--darkgray);
+
+  & > label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
   }
 }
 
@@ -126,6 +142,10 @@ a.plantoir-print-pdf:hover,
 }
 
 // ---- On paper: shared by ⌘P and the handout ----------------------------------
+
+$plantoir-roman: "Plantoir LM Roman", "Latin Modern Roman", "CMU Serif", Georgia, serif;
+$plantoir-sans: "Plantoir LM Sans", "Latin Modern Sans", "CMU Sans Serif", Helvetica, Arial, sans-serif;
+$plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", Menlo, monospace;
 
 @mixin plantoir-paper {
   h1,
@@ -145,7 +165,7 @@ a.plantoir-print-pdf:hover,
 
   blockquote.callout,
   table,
-  figure,
+  figure:not(.plantoir-splittable),
   img,
   svg:not(.katex svg),
   .katex-display,
@@ -160,6 +180,7 @@ a.plantoir-print-pdf:hover,
   }
 
   .fold-callout-icon,
+  .callout-icon,
   .clipboard-button,
   .expand-button,
   .mermaid-controls,
@@ -186,11 +207,300 @@ a.plantoir-print-pdf:hover,
     height: auto;
   }
 
+  // Quartz lays out nothing off screen (`content-visibility: auto`), and a
+  // picture below the fold measured 0 x 0 on paper (#499 review B1).
+  img {
+    content-visibility: visible !important;
+  }
+
   // A figure an engine draws (#485 E1) prints in light colours: any filter the
   // site applies to it in dark mode is taken off (decision 13).
   .pl-figure svg,
   .pl-figure img {
     filter: none !important;
+  }
+
+  // ---- The look of a handout (#499, decisions 26 and 28: Russell's LaTeX
+  // handouts, 11pt article, lmodern). Black on white, no box behind any text
+  // except a worked example's.
+  --bodyFont: #{$plantoir-roman};
+  --headerFont: #{$plantoir-sans};
+  --codeFont: #{$plantoir-mono};
+
+  body,
+  .page,
+  .center,
+  article,
+  section {
+    background: none !important;
+  }
+
+  .center,
+  article,
+  .plantoir-answers,
+  p,
+  li,
+  td,
+  th,
+  dt,
+  dd,
+  figcaption,
+  blockquote {
+    font-family: $plantoir-roman;
+    font-size: 10.95pt;
+    line-height: 1.25;
+    color: #000;
+    overflow-wrap: break-word;
+  }
+
+  p {
+    margin: 0 0 0.55em;
+    text-indent: 0;
+  }
+
+  h1.article-title,
+  h1.plantoir-answers-title {
+    font: bold 17.28pt/1.2 $plantoir-sans;
+    color: #000;
+    margin: 0 0 0.45em;
+  }
+
+  .plantoir-subtitle {
+    color: #666;
+    margin: -0.15em 0 1.1em;
+  }
+
+  article h1,
+  article h2,
+  .plantoir-answers h2 {
+    font: bold 12pt/1.2 $plantoir-sans;
+    color: #000;
+    margin: 1.2em 0 0.45em;
+  }
+
+  article h3,
+  article h4,
+  article h5,
+  article h6 {
+    font: bold 10.95pt/1.2 $plantoir-sans;
+    color: #000;
+    margin: 1em 0 0.35em;
+  }
+
+  a,
+  a.internal,
+  a.external,
+  a.tag-link {
+    color: #000 !important;
+    background: none !important;
+    text-decoration: none !important;
+    font-weight: inherit;
+    padding: 0 !important;
+  }
+
+  a svg,
+  .external-icon {
+    display: none !important;
+  }
+
+  mark,
+  .text-highlight {
+    background: none !important;
+    color: #000;
+    text-decoration: underline;
+  }
+
+  code {
+    font-family: $plantoir-mono;
+    font-size: 0.92em;
+    background: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    color: #000 !important;
+  }
+
+  pre:not(:has(> code.mermaid)) {
+    // The box itself is printRules.codeBoxRules (DECISIONS 30), written
+    // into the handout's rules and ⌘P's alike.
+    background: none !important;
+    margin: 0.4em 0 0.8em !important;
+    box-shadow: none !important;
+
+    & > code {
+      font-size: 9pt;
+      line-height: 1.25;
+      padding: 0 !important;
+
+      // No syntax colours: code prints black, as in the LaTeX handouts.
+      & span {
+        color: #000 !important;
+        background: none !important;
+      }
+    }
+  }
+
+  figure[data-rehype-pretty-code-figure] {
+    margin: 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    margin: 0.4em 0 0.8em;
+  }
+
+  .table-container {
+    overflow: visible !important;
+  }
+
+  th,
+  td {
+    border: 0.4pt solid #999 !important;
+    padding: 2pt 5pt !important;
+    background: none !important;
+    overflow-wrap: anywhere;
+  }
+
+  tr {
+    background: none !important;
+  }
+
+  hr {
+    border: 0;
+    border-top: 0.4pt solid #999;
+  }
+
+  blockquote:not(.callout) {
+    border-left: 0.6pt solid #999;
+    margin-left: 0;
+    padding-left: 8pt;
+    background: none !important;
+  }
+
+  // Every callout prints as its title in bold sans and its words as plain
+  // text: no box, border, tint or icon (paperLook).
+  blockquote.callout {
+    --color: #000;
+    --border: transparent;
+    --bg: transparent;
+    background: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0 0.8em !important;
+
+    & > .callout-title {
+      padding: 0 !important;
+      margin: 0 0 0.25em !important;
+      background: none !important;
+      color: #000 !important;
+      gap: 0 !important;
+    }
+
+    & .callout-title-inner,
+    & .callout-title-inner p {
+      font: bold 10.95pt/1.25 $plantoir-sans !important;
+      color: #000 !important;
+      margin: 0 !important;
+    }
+
+    & > .callout-content {
+      padding: 0 !important;
+      background: none !important;
+      overflow: visible !important;
+    }
+  }
+
+  // The one box: a worked example, as the LaTeX handouts' peach tcolorbox.
+  blockquote.callout[data-callout="example"] {
+    background: rgb(253, 244, 233) !important;
+    border: 0.8pt solid rgb(226, 160, 96) !important;
+    border-radius: 3mm !important;
+    padding: 2mm 3mm !important;
+    margin: 0.9em 0 0.6em !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+
+    & .callout-title-inner,
+    & .callout-title-inner p {
+      font: bold 12pt/1.2 $plantoir-sans !important;
+      color: rgb(176, 38, 30) !important;
+    }
+  }
+
+  .katex-display {
+    overflow: visible !important;
+  }
+}
+
+// The numbered questions, lettered parts and answer key the handout builds
+// (#499; questionItems). Only the handout has them: ⌘P is the page as it is.
+@mixin plantoir-handout {
+  .plantoir-question {
+    padding-left: 2.2em;
+    margin: 0 0 0.7em;
+  }
+
+  // In the first line of the question's words, pulled into the margin, so it
+  // sits on that line's baseline whatever else is in the line (absolutely
+  // placed, it rode up to the top of a line holding a footnote mark).
+  .plantoir-number {
+    display: inline-block;
+    width: 1.8em;
+    margin-left: -2.2em;
+    margin-right: 0.4em;
+    text-indent: 0;
+    text-align: right;
+    font-weight: bold;
+    font-family: $plantoir-roman;
+  }
+
+  .plantoir-stem > :last-child {
+    margin-bottom: 0;
+  }
+
+  .plantoir-parts {
+    display: grid;
+    grid-template-columns: repeat(var(--plantoir-columns, 1), minmax(0, 1fr));
+    column-gap: 1.2em;
+    row-gap: 0.35em;
+    margin: 0.35em 0 0.2em;
+  }
+
+  .plantoir-parts.plantoir-columns-1 {
+    display: block;
+
+    & > .plantoir-part {
+      margin-bottom: 0.35em;
+    }
+  }
+
+  .plantoir-part {
+    display: flex;
+    align-items: baseline;
+  }
+
+  .plantoir-part-mark {
+    flex: none;
+    width: 1.8em;
+  }
+
+  .plantoir-part-body {
+    flex: 1;
+    min-width: 0;
+
+    & > p:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  .plantoir-titled {
+    margin: 0 0 0.7em;
+  }
+
+  .plantoir-label {
+    font: bold 10.95pt/1.25 $plantoir-sans;
+    margin: 0 0 0.25em;
   }
 }
 
@@ -265,6 +575,7 @@ a.plantoir-print-pdf:hover,
 
 html.plantoir-print-frame {
   @include plantoir-paper;
+  @include plantoir-handout;
 
   background: white;
 
@@ -288,8 +599,32 @@ html.plantoir-print-frame {
     break-before: page;
   }
 
+  // Code flows onto the next page rather than scrolling (#499 fault 6), and
+  // a diagram is one picture, scaled whole (review B2).
+  pre.plantoir-flowing,
+  pre.plantoir-flowing > code {
+    overflow: visible !important;
+  }
+
+  // Line numbers as the handout writes them (Quartz's counter does not cross
+  // pages), in a box as wide as the block's longest number, never wrapped:
+  // "100" in Quartz's 1rem box printed as 1 / 0 / 0 (#499 fault 2).
+  // A long line wraps under the code, not under its number.
+  pre > code > [data-plantoir-line] {
+    display: block;
+    padding-left: calc((var(--plantoir-digits, 2) + 1.2) * 1ch);
+    text-indent: calc((var(--plantoir-digits, 2) + 1.2) * -1ch);
+  }
+
   pre > code > [data-plantoir-line]::before {
     content: attr(data-plantoir-line) !important;
+    text-indent: 0;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    width: calc(var(--plantoir-digits, 2) * 1ch) !important;
+    text-align: right !important;
+    margin-right: 1.2ch !important;
+    color: #777 !important;
   }
 
   .plantoir-answers-only {

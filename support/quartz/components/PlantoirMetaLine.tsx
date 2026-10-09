@@ -11,8 +11,10 @@
 // * `printPdf:` (resolved by the build against the course's Media folder) -> a
 //   plain link to the PDF. No menu, no script, no print engine. It wins over
 //   `printable` (decision 14).
-// * `printable: true` -> a Print button that makes a handout in the page itself
-//   (print.inline.ts), with a small menu for questions only and answers only.
+// * `printable: true` -> a Print button that opens a menu (#499, decision 29):
+//   portrait or landscape, then Questions only, Answers only, Both. Nothing
+//   prints until one is chosen; the handout is made in the page itself
+//   (print.inline.ts).
 //
 // The words and the corners come from quartz/plantoir_print.json, which the
 // build writes from the contract and the course's settings on every build. It
@@ -25,6 +27,7 @@ import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } fro
 import { concatenateResources } from "../util/resources"
 import { FilePath, FullSlug, joinSegments, pathToRoot, slugifyFilePath } from "../util/path"
 import style from "./styles/print.scss"
+import { codeBoxRules, countedLabel, cssPlainString, cssString, fontFaceRules, footerLeft, pageBoxRules } from "./scripts/printRules"
 // @ts-ignore
 import script from "./scripts/print.inline"
 
@@ -35,7 +38,6 @@ type PrintSettings = {
   answerKinds: string[]
   answerTitleWords: string[]
   curriculumHeadings: string[]
-  defaultMode: string
 }
 
 function readPrintSettings(): PrintSettings | null {
@@ -47,60 +49,25 @@ function readPrintSettings(): PrintSettings | null {
   }
 }
 
-// A CSS string, quoted and escaped, for a margin box's `content`. Spaces
-// become non-breaking: a corner is ONE line, and a narrow margin box would
-// otherwise wrap "Page 1 of 3" onto three (measured in Safari).
-function cssString(text: string): string {
-  const escaped = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ")
-  return '"' + escaped.replace(/ /g, "\\0000a0") + '"'
-}
-
-// The same, keeping ordinary spaces so the text can wrap.
-function cssPlainString(text: string): string {
-  return '"' + text.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, " ") + '"'
-}
-
-// "Page {n} of {total}" as a CSS content value counting the whole document:
-// what the browser's own Print (⌘P) can do, where nothing paginates the
-// questions and the answers separately.
-function countedLabel(template: string): string {
-  const pieces: string[] = []
-  const pattern = /\{(n|total)\}/g
-  let last = 0
-  let match: RegExpExecArray | null = pattern.exec(template)
-  while (match !== null) {
-    if (match.index > last) {
-      pieces.push(cssString(template.slice(last, match.index)))
-    }
-    pieces.push(match[1] === "n" ? "counter(page)" : "counter(pages)")
-    last = match.index + match[0].length
-    match = pattern.exec(template)
-  }
-  if (last < template.length) {
-    pieces.push(cssString(template.slice(last)))
-  }
-  return pieces.join(" ")
-}
-
-// The page box and its four corners. The browser's own Print reads this from
-// the page (Chrome and Edge print margin boxes; Safari and Firefox do not),
-// and the handout passes the same text to the print layout with the bottom
-// right corner replaced by each page's own label.
-export function pageRules(corners: Corners, pageLabelTemplate: string): string {
-  const box = "font-family: var(--bodyFont), sans-serif; font-size: 9pt; color: #333; white-space: nowrap; vertical-align: bottom;"
-  // The top left corner may take two lines: a long school name sharing it
-  // with the course code, beside three blanks, printed ON TOP of the blanks
-  // when every corner was one line (implementation review S3, measured).
-  // Its spaces stay ordinary so it can wrap; the blanks and the page label
-  // never do.
-  const wrapping =
-    "font-family: var(--bodyFont), sans-serif; font-size: 9pt; color: #333; white-space: normal; vertical-align: bottom;"
+// The page box and its four corners for ⌘P, and the faces the page prints in
+// (#499). The browser's own Print reads this from the page (Chrome and Edge
+// print margin boxes; Safari and Firefox do not); the handout writes its own
+// from the same rules (printRules.pageBoxRules) with the paper's size and
+// each page's labels. No size here: ⌘P's own dialog decides portrait or
+// landscape (printablePages.paper).
+export function pageRules(corners: Corners, words: Record<string, string>, title: string, root: string): string {
   return (
-    "@page { size: letter; margin: 0.9in 0.75in; " +
-    `@top-left { content: ${cssPlainString(corners.topLeft)}; ${wrapping} } ` +
-    `@top-right { content: ${cssString(corners.topRight)}; ${box} } ` +
-    `@bottom-left { content: ${cssString(corners.bottomLeft)}; ${box} } ` +
-    `@bottom-right { content: ${countedLabel(pageLabelTemplate)}; ${box} } }`
+    fontFaceRules(root) +
+    "\n" +
+    pageBoxRules(null, {
+      topLeft: cssPlainString(corners.topLeft),
+      topRight: cssString(corners.topRight),
+      bottomLeft: cssString(footerLeft(title, corners.bottomLeft, "questions", words)),
+      bottomRight: countedLabel(words.pageLabel),
+    }) +
+    "\n@media print { " +
+    codeBoxRules("html.plantoir-printable") +
+    " }"
   )
 }
 
@@ -161,20 +128,35 @@ export default ((inner: QuartzComponent) => {
         </a>
       )
     } else {
+      // The menu (#499, decision 29): paper first, so a teacher sees it before
+      // choosing (plan review N2), then the three ways of printing in the
+      // contract's order. Each choice prints; the summary only opens it.
       button = (
         <div class="plantoir-print" data-root={root + "/"}>
-          <button type="button" class="plantoir-print-button" data-mode={settings.defaultMode}>
-            <PrinterGlyph />
-            {words.print}
-          </button>
-          <details class="plantoir-print-more">
-            <summary aria-label={words.moreWaysToPrint} title={words.moreWaysToPrint}></summary>
+          <details class="plantoir-print-menu-box">
+            <summary class="plantoir-print-button">
+              <PrinterGlyph />
+              {words.print}
+            </summary>
             <div class="plantoir-print-menu">
+              <div class="plantoir-print-paper" role="radiogroup" aria-label={words.paper}>
+                <label>
+                  <input type="radio" name="plantoir-print-paper" value="portrait" checked />
+                  {words.portrait}
+                </label>
+                <label>
+                  <input type="radio" name="plantoir-print-paper" value="landscape" />
+                  {words.landscape}
+                </label>
+              </div>
               <button type="button" data-mode="questionsOnly">
                 {words.questionsOnly}
               </button>
               <button type="button" data-mode="answersOnly">
                 {words.answersOnly}
+              </button>
+              <button type="button" data-mode="withAnswersAtTheEnd">
+                {words.both}
               </button>
             </div>
           </details>
@@ -183,18 +165,25 @@ export default ((inner: QuartzComponent) => {
       )
     }
 
+    // The page's own title and description travel with the settings: the
+    // footer names the page (printablePages.footer), and a description prints
+    // under the title in grey, as the LaTeX handouts' instructions do.
+    const title = typeof frontmatter.title === "string" ? frontmatter.title.trim() : ""
+    const subtitle = typeof frontmatter.description === "string" ? frontmatter.description.trim() : ""
+    const pageSettings = printable ? JSON.stringify({ ...settings, page: { title, subtitle } }) : undefined
+
     return (
       <div
         class="plantoir-meta-line"
         data-plantoir-printable={printable ? "true" : undefined}
-        data-settings={printable ? JSON.stringify(settings) : undefined}
+        data-settings={pageSettings}
       >
         <Inner {...props} />
         {button}
         {printable && (
           <style
             id="plantoir-print-page"
-            dangerouslySetInnerHTML={{ __html: pageRules(settings.corners, words.pageLabel) }}
+            dangerouslySetInnerHTML={{ __html: pageRules(settings.corners, words, title, root + "/") }}
           />
         )}
       </div>

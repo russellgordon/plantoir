@@ -898,7 +898,7 @@
       },
       {
         "event": "preview page opened in the web browser",
-        "carries": "the course and section, the slug of the page the teacher was on (its address below the preview's root), and why: to print the handout - with the way of printing chosen (with the answers at the end, questions only, answers only) - or a link that opens in a new window, by its KIND only: the page's own PDF, another page of the site, or another site. NEVER where a link led: a link's destination is something the teacher wrote on a page, and a shared-document address is a key to that document (implementation review S2 - the first version recorded the path of any link, a Drive document id included) (printablePages.previewPane).",
+        "carries": "the course and section, the slug of the page the teacher was on (its address below the preview's root), and why: to print the handout - with the way of printing chosen (questions only, answers only, with the answers at the end - the menu's Both) and, since #499, `, on landscape paper` when landscape was chosen - or a link that opens in a new window, by its KIND only: the page's own PDF, another page of the site, or another site. NEVER where a link led: a link's destination is something the teacher wrote on a page, and a shared-document address is a key to that document (implementation review S2 - the first version recorded the path of any link, a Drive document id included) (printablePages.previewPane).",
         "line": "{course}/{section} · preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
         "why": "#454 review B1. Plantoir's preview cannot print and opened nothing in a new window, so Print and a page's PDF link now hand the page to the teacher's web browser. That is the app acting on a teacher's press in a window the app does not own: 'I pressed Print and nothing happened' or 'a browser window opened by itself' is answered here."
       },
@@ -17293,6 +17293,7 @@
     "printingBottomLeft": "Bottom left",
     "printingNotPrinted": "Not printed",
     "printingCaption": "Used on pages whose settings say printable: true, when a student or you press Print.",
+    "printingSampleTitle": "Page title",
     "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave). The printing* keys are Course Settings' Printing section (#454), between Footer and Content Structure: printingHeader heads it; printingSchoolName labels the school name field (file-formats.json → print_school_name); printingBlanks heads three switches labelled printingBlankName, printingBlankDate and printingBlankClassNumber (print_blanks); printingSchoolNameGoes and printingCourseCodeGoes label two pickers offering printingTopLeft, printingBottomLeft and printingNotPrinted (print_school_name_at, print_course_code_at: header_left, footer_left, none); printingCaption sits under the section, beside a sketch of a page's corners.",
     "why": "#369 (2026-09-27): Course Settings' first settings row read “Language / region (Quartz locale)” from v1.1.0 to v1.4.0, naming the site builder in a label a teacher reads (CLAUDE.md rule 1), and it was the first row in plantoir.app's headline picture. The label scan that found it (userFacingLabelWords) found one more: “Quartz default (none chosen)” in the colour-scheme picker. The wizard said “Language / region”; both now say the same thing. REJECTED: keeping “locale” in brackets (a word only a developer uses); putting these in AssistWording (they are not the assistant's words)."
   },
@@ -22826,25 +22827,32 @@
     ]
   },
   "printablePages": {
-    "note": "#454 (v2.0.0): a page whose settings say `printable: true` prints as a worksheet - its answers lifted out and gathered at the end on a fresh page, its folded hints opened in place, the school name, the blanks a student fills in and the course code in the page's corners on EVERY page, the questions and the answers numbered separately. The page itself (pageOptIns in file-formats.json) opts in; the course's settings (print_* in courseConfigKeys) decide the corners. Everything here is run by more than one reader: the rules about callouts, labels, titles and the Curriculum connection by support/quartz/components/scripts/printRules.ts in the site (scripts/check_print_rules_against_the_site.py, in the image, from verify.sh), the corners and page labels by scripts/print_settings.py (scripts/test_print_settings.py), and the words both apps show by their own tests. The deep dive - what was measured, in which browsers, and what was rejected - is documentation/06-quartz-customizations.md, section F.",
+    "note": "#454 (v2.0.0), and since #499 (v1.6.0) with the look of a typical handout - Russell's LaTeX handouts, scratchpad reference `Get Ready for Linear Systems` (paperLook): a page whose settings say `printable: true` prints as a worksheet - its answers lifted out and gathered on a fresh page, its folded hints opened in place, the school name, the blanks a student fills in and the course code in the page's corners on EVERY page, the questions and the answers numbered separately. The page itself (pageOptIns in file-formats.json) opts in; the course's settings (print_* in courseConfigKeys) decide the corners. Everything here is run by more than one reader: the rules about callouts, labels, titles and the Curriculum connection by support/quartz/components/scripts/printRules.ts in the site (scripts/check_print_rules_against_the_site.py, in the image, from verify.sh), the corners and page labels by scripts/print_settings.py (scripts/test_print_settings.py), and the words both apps show by their own tests. The deep dive - what was measured, in which browsers, and what was rejected - is documentation/06-quartz-customizations.md, section F.",
     "words": {
       "print": "Print",
-      "moreWaysToPrint": "More ways to print",
       "questionsOnly": "Questions only",
       "answersOnly": "Answers only",
+      "both": "Both",
+      "paper": "Paper",
+      "portrait": "Portrait",
+      "landscape": "Landscape",
       "preparing": "Preparing to print…",
       "openingInBrowser": "Opening this page in your web browser to print it…",
       "couldNotPrepare": "This page could not be prepared for printing. Use your browser’s own Print command instead.",
+      "incomplete": "Part of this page would have been cut off on paper, so nothing was printed. Try printing it the other way round, or use your browser’s own Print command instead.",
       "answersHeading": "Answers",
+      "answersTitle": "{title} — Answers",
       "answerLabel": "Answer {n}",
       "questionLabel": "Question {n}",
-      "partLabel": "{question}, part {n}",
+      "numberLabel": "{n}.",
+      "partLabel": "{n}. {part})",
+      "partMark": "{part})",
       "blankName": "Name",
       "blankDate": "Date",
       "blankClassNumber": "Class #",
       "pageLabel": "Page {n} of {total}",
       "answersPageLabel": "Answers {n} of {total}",
-      "where": "print is the button on a printable page's date line, at its trailing edge; moreWaysToPrint names the small menu beside it (for a screen reader), which holds questionsOnly and answersOnly - the button itself prints with the answers at the end. preparing is said beside the button while the handout is made; openingInBrowser instead, in Plantoir's own preview, which hands the page to the teacher's web browser to print (previewPane); couldNotPrepare when nothing could be printed. answersHeading heads the answers; answerLabel and questionLabel label an answer that has no title of its own (labels). The blanks and the two page labels print in the corners (corners, pageLabels).",
+      "where": "print is the button on a printable page's date line, at its trailing edge, and it opens a menu (modes.menu): paper names the choice of portrait or landscape at its top, then questionsOnly, answersOnly and both, the three ways of printing, in that order - nothing prints until one is chosen (decision 29). preparing is said beside the button while the handout is made; openingInBrowser instead, in Plantoir's own preview, which hands the page to the teacher's web browser to print (previewPane); couldNotPrepare when nothing could be printed; incomplete when the handout was laid out but something in it would have been cut off or left out, so it was not printed (completeness). answersTitle heads the answers, the page's title filled in, and ends the bottom-left corner of every answer page (footer); answersHeading heads them on a page with no title. questionLabel is how a question is RECOGNISED (a heading or a callout title reading `Question 3`); numberLabel is how it is numbered on paper, partMark a lettered part, partLabel an answer to a part, answerLabel an answer that sits under no question at all (labels, questionItems). The blanks and the two page labels print in the corners (corners, pageLabels).",
       "why": "English whatever the course's locale (P5, the director's ruling 2026-10-09): the site's own words come from Quartz's locale files, which have no words for any of this, and a translation can be added here as data later. REJECTED: borrowing the course's locale for some words and not others, which would print a half-translated worksheet."
     },
     "answerCallouts": {
@@ -22868,15 +22876,16 @@
       ]
     },
     "labels": {
-      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start), after the nearest heading above it and \" · \" when there is one - or, when that heading is itself a question label (questionLabel with any number, in any capitals), partLabel with the heading and the item's number (the item's number alone repeated across lists: the verify fixture's practice list gave \"Question 1\" beside a heading \"Question 1\", implementation review N2); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
+      "rule": "What an answer is called in the answers, and where it belongs (#499: the labels of the LaTeX handouts' answer keys). A title of its OWN is kept, cleaned (titleCleaning), and printed bold on a line of its own. A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list (counting from the list's own start) under a heading that is itself a question label (questionLabel with any number, in any capitals), partLabel - the question's number and the item's letter, `3. a)`, because those items are the question's lettered parts (questionItems); inside the n-th item of a list under any other heading, that heading, \" · \" and numberLabel (the item's number alone repeated across lists: the verify fixture's practice list gave `1.` beside the question `1.`, #454 implementation review N2); inside the n-th item of a list with no heading above it, numberLabel; under a question heading, numberLabel with the heading's number; otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1. A label that is a number prints in the left margin as the question's does, and the answers to one question's parts are gathered under its number, lettered, in columns (questionItems.columns), as the LaTeX answer key prints `1. a) 6  b) -8  c) -11`. Until #499 a question's answer read `Question 7` and a part's `Question 3, part 1`.",
       "cases": [
         { "title": "Answer 3", "kind": "success", "listItem": null, "heading": "Question 1", "answerNumber": 1, "label": "Answer 3" },
-        { "title": "SOLUTION", "kind": "solution", "listItem": null, "heading": "Question 7", "answerNumber": 2, "label": "Question 7" },
-        { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Practice · Question 3", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item - under its heading, since review N2." },
-        { "title": "Check", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "Question 2", "why": "A list with no heading above it: the item alone." },
-        { "title": "SOLUTION", "kind": "solution", "listItem": 1, "heading": "Question 3", "answerNumber": 1, "label": "Question 3, part 1", "why": "A multi-part question: the heading already names the question, so the item is a part of it (partLabel). It read \"Question 3 · Question 1\" before the fix review." },
+        { "title": "SOLUTION", "kind": "solution", "listItem": null, "heading": "Question 7", "answerNumber": 2, "label": "7." },
+        { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Practice · 3.", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item - under its heading, since review N2." },
+        { "title": "Check", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "2.", "why": "A list with no heading above it: the item alone." },
+        { "title": "SOLUTION", "kind": "solution", "listItem": 1, "heading": "Question 3", "answerNumber": 1, "label": "3. a)", "why": "A multi-part question: the heading already names the question, so the item is its first lettered part (partLabel). It read \"Question 3, part 1\" until #499 and \"Question 3 · Question 1\" before the #454 fix review." },
+        { "title": "Answer", "kind": "answer", "listItem": 6, "heading": "QUESTION 12", "answerNumber": 9, "label": "12. f)", "why": "Any capitals; the sixth part is f." },
         { "title": "Success", "kind": "success", "listItem": null, "heading": null, "answerNumber": 4, "label": "Answer 4" },
-        { "title": "Solution (click to expand)", "kind": "note", "listItem": null, "heading": "Question 2", "answerNumber": 1, "label": "Question 2" },
+        { "title": "Solution (click to expand)", "kind": "note", "listItem": null, "heading": "Question 2", "answerNumber": 1, "label": "2." },
         { "title": "Answers", "kind": "success", "listItem": null, "heading": null, "answerNumber": 2, "label": "Answer 2" },
         { "title": "Done", "kind": "success", "listItem": null, "heading": "Part B", "answerNumber": 1, "label": "Part B" },
         { "title": "Why the loop stops (click to reveal)", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "Why the loop stops" }
@@ -22917,13 +22926,13 @@
       ]
     },
     "modes": {
-      "default": "withAnswersAtTheEnd",
       "list": [
-        { "mode": "withAnswersAtTheEnd", "keeps": "The page with its answers lifted out, then the answers, headed answersHeading, starting on a fresh page.", "pageLabels": "pageLabel on the questions, answersPageLabel on the answers, each counted on its own (decision 3)." },
-        { "mode": "questionsOnly", "keeps": "The page with its answers lifted out, and no answers.", "pageLabels": "pageLabel." },
-        { "mode": "answersOnly", "keeps": "The page's title and the answers only.", "pageLabels": "answersPageLabel." }
+        { "mode": "questionsOnly", "word": "questionsOnly", "keeps": "The page with its answers lifted out, and no answers.", "pageLabels": "pageLabel." },
+        { "mode": "answersOnly", "word": "answersOnly", "keeps": "The page's title with answersTitle's words, and the answers only - the LaTeX answer key, final answers only, as the teacher wrote them.", "pageLabels": "answersPageLabel." },
+        { "mode": "withAnswersAtTheEnd", "word": "both", "keeps": "The page with its answers lifted out, then the answers under answersTitle, starting on a fresh page.", "pageLabels": "pageLabel on the questions, answersPageLabel on the answers, each counted on its own (decision 3)." }
       ],
-      "commandP": "⌘P (the browser's own Print) on a printable page prints questionsOnly, laid out by the browser rather than paginated by the page: no answers, question bodies left out, the Curriculum connection left out (curriculumConnection), everything else unfolded, the site's sidebars hidden, in light colours (decision 7). Its corners are printed where the browser supports them (Chrome and Edge do; Safari and Firefox print none), and its page label counts the whole document. A page that is not printable prints exactly as it did before #454: every print rule is scoped to printable pages, and the class that marks one is set on each page load and taken off on the next (review B2)."
+      "menu": "#499, decision 29 (Russell 2026-10-09): pressing Print opens a menu and prints NOTHING until a way of printing is chosen. At its top, paper: portrait then landscape (paper), the one chosen remembered by that browser; then the three ways of printing in the order of `list` - questionsOnly, answersOnly, both. A page with no answers (no callout whose role is answer or question) hides answersOnly and both, which would print a title alone (#499 plan review N5). Escape, or a click outside it, closes the menu. The `mode` names are frozen: they travel in Plantoir's preview handoff (previewPane) and on the trail. Until #499 the button itself printed with the answers at the end and a small menu beside it held the other two (#454 comment 2026-10-05).",
+      "commandP": "⌘P (the browser's own Print) on a printable page prints questionsOnly, laid out by the browser rather than paginated by the page: no answers, question bodies left out, the Curriculum connection left out (curriculumConnection), everything else unfolded, the site's sidebars hidden, in light colours and in the handout's look (paperLook) (decision 7). Its page box writes margins and NO size, so the browser's own dialog decides portrait or landscape in every browser (paper). Its corners are printed where the browser supports them (Chrome and Edge do; Safari and Firefox print none), its bottom-left corner is the page's title then the settings' text (footer), and its page label counts the whole document. A page that is not printable prints exactly as it did before #454: every print rule is scoped to printable pages, and the class that marks one is set on each page load and taken off on the next (review B2)."
     },
     "corners": {
       "rule": "One piece of text per corner, identical on every page (decision 4). topLeft holds what is placed at header_left and bottomLeft what is placed at footer_left (print_school_name_at, print_course_code_at); two in one corner read \"School · CODE\", school first, joined by \" · \". topRight is the blanks, in the order Name, Date, Class #, each its word and a line of underscores (blankLines gives each line's length), joined by blankJoin. bottomRight is always the page label (pageLabels). The course code is the one a teacher reads (`course_code` for a course kept for reference, the folder otherwise), in capitals. An empty school name is no school name.",
@@ -22952,12 +22961,85 @@
         { "part": "answers", "n": 1, "total": 2, "label": "Answers 1 of 2" }
       ]
     },
+    "questionItems": {
+      "rule": "#499 (Russell 2026-10-09, decisions 26 and 28, the director's rulings 499-5 and 499-6): on paper a question is a NUMBERED ITEM, as in the LaTeX handouts - its number (numberLabel) bold in a 2.2em left margin, its words beside it. A question is a heading that is a question label (`### Question 3`; the heading's own words are not printed, the number is), or a `question` callout: a FOLDED one prints its title as the question and sends its body to the answers (decision 1), an UNFOLDED one prints its title and then its body as the question (499-6). Numbering (`numbering`): a question label keeps its own number; anything else takes the number after the question before it, in page order. An ordered list directly inside a question is its PARTS, lettered with partMark (`partLetters`), side by side in columns (`columns`): three when every part is at most 24 characters of text, two when every part is at most 48, otherwise one (a formula's characters count one and a half: set with the spacing around its signs, a formula is wider than the same number of letters - measured on Get Ready for Linear Systems, question 4, which wrapped in three columns counted plainly) - and always one when a part holds more than a line of text (a picture, code, a table, a second paragraph, a list) or there is only one part. The same rule lays out an answer key's lettered answers. ⌘P does none of this: it is the page as the browser lays it out, in the handout's look.",
+      "numbering": [
+        { "titles": ["Question 1", "Question 2", "Self-check: which expansions gave a perfect square?"], "numbers": [1, 2, 3] },
+        { "titles": ["Think about it", "Question 5", "Why does the loop stop?"], "numbers": [1, 5, 6], "why": "A label keeps its own number, whatever came before it." },
+        { "titles": ["QUESTION 2", "question 10"], "numbers": [2, 10] },
+        { "titles": ["Question 3a", "Questions"], "numbers": [1, 2], "why": "Not a question label: the teacher's own words, numbered in order." }
+      ],
+      "partLetters": [
+        { "n": 1, "letter": "a" },
+        { "n": 6, "letter": "f" },
+        { "n": 26, "letter": "z" },
+        { "n": 27, "letter": "aa" }
+      ],
+      "columns": [
+        { "lengths": [6, 11, 6, 6, 9, 14], "anyBlock": false, "columns": 3, "why": "Get Ready for Linear Systems, question 1: tasks(3)." },
+        { "lengths": [24, 24], "anyBlock": false, "columns": 2, "why": "Two parts never make three columns." },
+        { "lengths": [23, 37, 30], "anyBlock": false, "columns": 2 },
+        { "lengths": [23, 49, 30], "anyBlock": false, "columns": 1, "why": "Get Ready for Linear Systems, question 4: one part is a line on its own." },
+        { "lengths": [5, 5, 5], "anyBlock": true, "columns": 1, "why": "A part with a picture, code or a second paragraph is never squeezed into a column." },
+        { "lengths": [5], "anyBlock": false, "columns": 1 }
+      ]
+    },
+    "paper": {
+      "rule": "#499 (decision 26, the director's ruling 499-1): a handout is laid out on US letter, PORTRAIT or LANDSCAPE as chosen in the Print menu (modes.menu), with the LaTeX handouts' margins - 0.75 in at the top and sides, 0.9 in at the bottom - and the page box written with the chosen `size`, which makes Chrome's and Edge's print dialogs follow it. Every picture, diagram and figure is kept within the content box (contentWidthIn by contentHeightIn), scaled down whole, never cut. Anything unknown is portrait. ⌘P (modes.commandP) writes the margins and no size, so the browser's own dialog decides.",
+      "margins": { "topIn": 0.75, "sideIn": 0.75, "bottomIn": 0.9 },
+      "cases": [
+        { "paper": "portrait", "size": "letter", "contentWidthIn": 7, "contentHeightIn": 9.35 },
+        { "paper": "landscape", "size": "letter landscape", "contentWidthIn": 9.5, "contentHeightIn": 6.85 },
+        { "paper": "a4", "size": "letter", "contentWidthIn": 7, "contentHeightIn": 9.35, "why": "Not a paper this offers: portrait." }
+      ],
+      "why": "Measured on Russell's own print (scratchpad smoke/mvvm-review-printed.pdf, 18 pages of 792×612): the print layout had made 8.5×11 pages, the Safari dialog let him pick landscape, and every page was printed clipped onto the shorter sheet - footers, page numbers, 18 lines of code and three questions lost. The layout runs BEFORE the dialog opens and cannot learn its choice. REJECTED: laying out both orientations and showing one by `@media print and (orientation: ...)` - Chrome picked the right one, but Safari evaluated the orientation against the WINDOW and printed the landscape pages on portrait paper (measured); and dropping the print layout so the browser honours its own dialog - Safari then prints no corners at all, so no page numbers and no separate counts (decision 3)."
+    },
+    "footer": {
+      "rule": "#499 (the director's ruling 499-3, the LaTeX footer): the bottom-left corner of every printed page is the page's title - on an answer page, answersTitle with the title filled in - then \" · \" and what the course's settings place at footer_left (corners.bottomLeft: the course code by default). No title: the settings' text alone. Printed small and grey, like the bottom-right page label and the top corners, about 0.4 in above the paper's edge, where a printer can reach (#499 plan review S5).",
+      "cases": [
+        { "title": "MVVM Review", "settingsText": "ICS3U", "part": "questions", "footer": "MVVM Review · ICS3U" },
+        { "title": "MVVM Review", "settingsText": "ICS3U", "part": "answers", "footer": "MVVM Review — Answers · ICS3U" },
+        { "title": "MVVM Review", "settingsText": "", "part": "questions", "footer": "MVVM Review" },
+        { "title": "", "settingsText": "Lakefield College School · ICS3U", "part": "answers", "footer": "Lakefield College School · ICS3U" },
+        { "title": "  ", "settingsText": "", "part": "questions", "footer": "" }
+      ]
+    },
+    "paperLook": {
+      "rule": "#499 (decisions 26 and 28: the look of Russell's LaTeX handouts, 11pt article class with lmodern): no coloured box behind any text - a callout prints as its title in bold sans and its body as plain text, with no icon, border or tint; code prints black in Latin Modern Mono with a thin grey rule at its left and grey line numbers; links, tags, highlights, tables and quotations print with no background. The ONE exception is a worked example: an `example` callout keeps the LaTeX handouts' peach box (fill rgb(253,244,233), a 0.8pt rgb(226,160,96) frame, a dark red rgb(176,38,30) bold sans title) - `boxed`. Type (from the .tex and `pdffonts`): Latin Modern Roman 10.95pt for the text, Latin Modern Sans bold 17.28pt for the title and 12pt for a section heading, Latin Modern Mono for code; the page's `description`, when it has one, prints under the title in grey. The fonts are carried in the site with the print layout, so a site that prints nothing carries none of them.",
+      "cases": [
+        { "kind": "example", "boxed": true },
+        { "kind": "Example", "boxed": true },
+        { "kind": "note", "boxed": false },
+        { "kind": "tip", "boxed": false, "why": "A hint prints in place, opened (decision 2), as plain text." },
+        { "kind": "success", "boxed": false },
+        { "kind": "question", "boxed": false },
+        { "kind": "warning", "boxed": false },
+        { "kind": "quote", "boxed": false }
+      ],
+      "code": {
+        "rule": "DECISIONS 30 (Russell 2026-10-09): fenced code on paper keeps a monospaced face (Latin Modern Mono), its line numbers, and a BOX - a thin neutral border with no fill, the second exception to \"no boxes\" beside a worked example. Russell's LaTeX handouts carry no code, so the box is a plain hairline: `border` all round, `paddingPt` inside it, no fill, square corners. The numbers count on across a page break (1 to 110 in the verify fixture, wherever the page falls) and the box is drawn round each piece of a block that splits. A Mermaid diagram is a picture, not code, and has no box. Written by printRules.CODE_BOX into the handout's rules and ⌘P's page rules alike, so the two cannot differ.",
+        "border": "0.5pt solid #999999",
+        "paddingPt": 4,
+        "fill": "none",
+        "lineNumbers": true
+      },
+      "why": "Russell's print of MVVM Review (2026-10-09) carried every answer in a tinted box under a coloured icon. REJECTED: stripping every box, the worked examples included - the LaTeX handouts this matches keep their peach example boxes, and a worked example set apart is what a student looks back at (the director's ruling 499-2)."
+    },
+    "completeness": {
+      "rule": "#499 (review B2, the director's ruling: the handout never prints with anything missing). Before printing, every element of the handout that carries words or a picture - each paragraph, list item, heading, table row, line of code, picture, diagram and displayed formula - is counted, and after the layout the same elements are looked for on the pages: printing goes ahead only when every one was laid out and none runs off the page it is on (mayPrint). Otherwise NOTHING is printed and the button says words.incomplete. Measured before the fix: a 125-line program printed on two pages with 6,250 px of each cut off, and a tall diagram stopped the layout so that the rest of the handout, the answers included, never printed.",
+      "cases": [
+        { "expected": 120, "found": 120, "overflowing": 0, "print": true },
+        { "expected": 120, "found": 119, "overflowing": 0, "print": false, "why": "One element never reached a page." },
+        { "expected": 120, "found": 120, "overflowing": 2, "print": false, "why": "Two run off the page they are on." },
+        { "expected": 0, "found": 0, "overflowing": 0, "print": false, "why": "Nothing to print is not a handout." }
+      ]
+    },
     "pdfLink": {
       "rule": "When a page names its own PDF (pageOptIns → printPdf) and it resolves, the Print button is a plain link to `Media/` plus the site's own slug of the file name as the Media folder spells it, relative to the site's root, opening in a new window: no menu, no script, no print engine. ⌘P on that page is unchanged: it prints questions only when the page is also printable, and as before #454 otherwise.",
       "why": "Quartz already copies every Media file to the site at that address, so the build copies nothing; the link is made with Quartz's own path functions so the two cannot disagree (measured: a real course's Media PDFs, `&` and spaces included, reach the site at exactly that slug)."
     },
     "previewPane": {
-      "rule": "Plantoir's own preview cannot print (a web view inside an app shows no print dialog) and opened nothing in a new window. So in the preview, Print says words.openingInBrowser and asks the app to open the page in the teacher's web browser, with the chosen way of printing, where the handout is made and printed at once; and a link that opens in a new window - the PDF link among them - opens in the web browser. Each is recorded on the trail (activityTrail → `preview page opened in the web browser`).",
+      "rule": "Plantoir's own preview cannot print (a web view inside an app shows no print dialog) and opened nothing in a new window. So in the preview, Print says words.openingInBrowser and asks the app to open the page in the teacher's web browser, with the chosen way of printing and paper - `#plantoir-print=<mode>&paper=<portrait|landscape>`, a mode from modes.list and a paper from paper.cases, anything else refused (#499) - where the handout is made and printed at once; and a link that opens in a new window - the PDF link among them - opens in the web browser. Each is recorded on the trail (activityTrail → `preview page opened in the web browser`).",
       "why": "#454 plan review B1: measured on macOS 26.6 with a bare WKWebView set up as the preview's is - `print()` returned at once with no dialog and no afterprint, and a target=_blank link did nothing. The teacher's first press of Print is almost always in the preview, right after adding printable: true, so Print had to work there. REJECTED: WKWebView's own printOperation, which prints the frame on screen rather than the handout."
     },
     "figures": {
