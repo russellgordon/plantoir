@@ -178,6 +178,36 @@ final class PrintablePagesTests: XCTestCase {
         XCTAssertEqual(pdf, "preview page opened in the web browser — a page's own PDF (Media/Key.pdf)")
     }
 
+    /// The real web view, as the preview builds it: the page's own print
+    /// code posting to `plantoirPrint`, and a link that asks for a new
+    /// window, both reach the browser. Before #454 both did nothing at all
+    /// (plan review B1, measured on a bare WKWebView).
+    func testThePreviewsWebViewHandsBothToTheBrowser() throws {
+        let controller: WebPreviewController = WebPreviewController()
+        var opened: [String] = []
+        let printed: XCTestExpectation = expectation(description: "print request opened")
+        let linked: XCTestExpectation = expectation(description: "new-window link opened")
+        controller.browserHandoff.open = { url in
+            opened.append(url.absoluteString)
+            if url.absoluteString.contains("plantoir-print=") {
+                printed.fulfill()
+            } else {
+                linked.fulfill()
+            }
+        }
+        let page: String = """
+        <html><body><a id="pdf" href="Media/Key.pdf" target="_blank">Print</a>
+        <script>
+        window.webkit.messageHandlers.plantoirPrint.postMessage({mode: "answersOnly", url: location.href});
+        document.getElementById("pdf").click();
+        </script></body></html>
+        """
+        controller.webView.loadHTMLString(page, baseURL: URL(string: "http://localhost:8461/Unit-1/Worksheet-3"))
+        wait(for: [printed, linked], timeout: 10)
+        XCTAssertTrue(opened.contains("http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=answersOnly"), "\(opened)")
+        XCTAssertTrue(opened.contains("http://localhost:8461/Unit-1/Media/Key.pdf"), "\(opened)")
+    }
+
     // MARK: - The guidance written into a working folder
 
     private var guidanceSource: URL {
