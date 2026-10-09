@@ -793,22 +793,33 @@ on both papers while Chrome printed it — three shapes, each a WebKit
 difference in how Paged.js's page-as-a-column measuring leaves things:
 (1) a line of code Paged.js split before its words leaves an empty piece
 whose box reaches into the column the layout throws away (the rest prints on
-the next page) — such a `data-split-to` piece is not a loss and is no longer
-counted; (2) a blank code line holds only a space, which Paged.js does not
+the next page) — such an EMPTY split piece (no words, no picture) is not a loss
+and is not counted, while every other split piece is measured and what it
+loses is lost (the first version of this fix skipped EVERY split piece, and
+the fix review measured a 60-line formula and a 90-line table row printing
+half-missing while the check said nothing was lost; the verify fixture's
+"Printable Too Tall" page now has to be refused on both papers, proven
+against that version, which printed it "5/5"); (2) a blank code line holds only a space, which Paged.js does not
 break before, so it straddled the page's foot with its number cut off —
 blank lines now hold a zero-width space and break like any other; (3)
 WebKit honours `table { break-inside: avoid }` itself and moved a 40-row
 table's first rows into the thrown-away column, a real loss — in the
 handout tables may now split (⌘P keeps them whole). The check also counts an
-element cut off only if NO copy of it sits whole on a page, measures each
-piece rather than the union box, and allows a line 3 px of hanging leading.
+UNSPLIT element cut off only if no unsplit copy of it sits whole on a page,
+measures each piece rather than the union box, and allows a line 3 px of
+hanging leading. Over-wide formulas are measured only after KaTeX's own
+faces have loaded (`document.fonts.ready`): measured before, a 13-term
+formula read 799 px for 896, was not shrunk enough and was refused.
 After: all six prints of MVVM Review and of the verify fixture lay out every
 piece in Safari (`scratchpad/i499/safari-sweep.txt`). **Safari does NOT take
 its orientation from the page:** asked for landscape, its print window opened
 on Portrait and showed the 11 in pages shrunk onto portrait sheets; choosing
-Landscape there printed them right, footers included. So a landscape print
-says `printablePages.words.landscapeInDialog` beside the button while the
-print window is open (review S6's fallback; Chrome and Edge follow the page).
+Landscape there printed them right, footers included. A first version
+said `printablePages.words.landscapeInDialog` beside the button while the
+print window was open, but that window covers the page and the sentence was
+never seen (fix review S2), so it shows in the Print MENU, under the papers,
+while Landscape is chosen (review S6's fallback; Chrome and Edge follow the
+page, and the sentence is conditional, so it is true there too).
 
 **Not done / open:**
 the answer key has no strand headings; a displayed formula taller than the

@@ -887,6 +887,11 @@ async function fitWideFormulas(doc: Document, handout: HTMLElement, paper: Paper
   measure.style.cssText = `position:absolute;left:0;top:0;width:${paperBox(paper).contentWidthIn}in;visibility:hidden;`
   measure.appendChild(doc.importNode(handout, true))
   doc.body.appendChild(measure)
+  // KaTeX's own faces load only once a formula is laid out; measured in a
+  // fallback face, a 13-term formula read 799 px for 896 and was not shrunk
+  // enough (fix review S1).
+  void measure.offsetWidth
+  await doc.fonts.ready
   for (const display of measure.querySelectorAll(".katex-display")) {
     const formula = display.querySelector(":scope > .katex") as HTMLElement | null
     const stamp = display.getAttribute("data-plantoir-c")
@@ -954,13 +959,20 @@ function pagedRules(paper: Paper, settings: Settings): string {
 // Was everything laid out, and does all of it fit on its page
 // (printablePages.completeness)? Counted against the stamps put on the
 // handout before it was laid out.
+// A piece with no words and no picture in it.
+function emptyPiece(element: Element): boolean {
+  const words = (element.textContent ?? "").replace(/[\s\u200b]/g, "")
+  return words === "" && element.querySelector("img, svg") === null
+}
+
 function checkComplete(doc: Document, expected: number): { found: number; overflowing: string[] } {
   const found: Set<string> = new Set()
   const overflowing: string[] = []
-  // An element counts as cut off only when NO copy of it sits whole on a
-  // page: Safari leaves copies of table rows in the column the layout throws
-  // away while the same rows print whole on the next page (measured, Safari
-  // 26.6: the fixture's first two rows at x = 1,920 px beside a 672 px page).
+  // An UNSPLIT element counts as cut off only when no unsplit copy of it
+  // sits whole on a page: Safari leaves copies of table rows in the column
+  // the layout throws away while the same rows print whole on the next page
+  // (measured, Safari 26.6: the fixture's first two rows at x = 1,920 px
+  // beside a 672 px page). Split pieces are judged on their own, above.
   const whole: Set<string> = new Set()
   const cutOff: Map<string, string> = new Map()
   for (const page of doc.querySelectorAll(".pagedjs_page")) {
@@ -978,15 +990,17 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
       if (!shown) {
         continue
       }
-      // The first piece of an element the layout split between pages: its
-      // rest is on the next page, stamped the same and checked there. In
-      // Safari that piece's box reaches into the column the layout throws
-      // away (a line of code split before its words: an empty 4 px piece
-      // here, "import SwiftUI" on the next page), which is not a loss -
-      // counted as one, Safari refused MVVM Review on both papers (measured,
-      // Safari 26.6).
-      if (element.hasAttribute("data-split-to")) {
-        whole.add(id)
+      // A piece of an element the layout split between pages. An EMPTY one
+      // is no loss: Safari splits a line of code before its words, leaving an
+      // empty 4 px piece whose box reaches into the column the layout throws
+      // away while "import SwiftUI" prints on the next page (counted, it
+      // refused MVVM Review on both papers; measured, Safari 26.6). Any other
+      // piece is measured, and what it loses is lost - never excused by a
+      // whole copy elsewhere, because its other pieces hold OTHER words.
+      // Skipping every split piece printed a 60-line formula and a 90-line
+      // table row half-missing while saying nothing was lost (fix review B1).
+      const split = element.hasAttribute("data-split-to") || element.hasAttribute("data-split-from")
+      if (split && emptyPiece(element)) {
         continue
       }
       if (element instanceof (view as unknown as typeof window).HTMLImageElement) {
@@ -998,7 +1012,9 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
         }
       }
       if (rect.width <= 0 && rect.height <= 0) {
-        whole.add(id)
+        if (!split) {
+          whole.add(id)
+        }
         continue
       }
       // A displayed formula's box is always the column's width; the formula
@@ -1031,8 +1047,13 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
       if (lostHeight > LEADING_TOLERANCE || lostWidth > OVERFLOW_TOLERANCE) {
         const past = Math.max(lostHeight, lostWidth)
         const what = element.className && typeof element.className === "string" ? "." + element.className.split(" ")[0] : ""
-        cutOff.set(id, `${id} ${element.tagName.toLowerCase()}${what} ${Math.round(past)}px`)
-      } else {
+        const reason = `${id} ${element.tagName.toLowerCase()}${what} ${Math.round(past)}px`
+        if (split) {
+          overflowing.push(reason)
+        } else {
+          cutOff.set(id, reason)
+        }
+      } else if (!split) {
         whole.add(id)
       }
     }
@@ -1196,11 +1217,7 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     }
 
     frame.contentWindow!.addEventListener("afterprint", () => restore(), { once: true })
-    // Safari's print window does not take its orientation from the page: it
-    // opens on Portrait and shrinks a landscape handout onto portrait sheets
-    // until Landscape is chosen there too (measured, Safari 26.6). Said while
-    // that window is open; Chrome and Edge follow the page.
-    say(status, paper === "landscape" ? words.landscapeInDialog : "")
+    say(status, "")
     frame.contentWindow!.focus()
     frame.contentWindow!.print()
     // print() returns when the dialog closes in Safari, Chrome and Edge
@@ -1208,7 +1225,6 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     // browser never sends afterprint, the page must not be left light with a
     // dead button until a reload (review N4).
     restore()
-    say(status, "")
   } catch {
     say(status, words.couldNotPrepare)
     restore()

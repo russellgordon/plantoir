@@ -136,6 +136,21 @@ a.plantoir-print-pdf:hover,
   }
 }
 
+// Shown under the papers while Landscape is chosen (modes.menu).
+.plantoir-print-paper-note {
+  display: none;
+  margin: 0 0 0.2rem;
+  padding: 0 0.6rem 0.3rem;
+  max-width: 16rem;
+  color: var(--gray);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.plantoir-print-menu:has(input[value="landscape"]:checked) > .plantoir-print-paper-note {
+  display: block;
+}
+
 .plantoir-print-status:not(:empty) {
   color: var(--gray);
   font-size: 0.85rem;

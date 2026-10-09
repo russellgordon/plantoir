@@ -1455,6 +1455,7 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
+        "$HIT_COURSE/Printable Too Tall.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
         "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
         "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
@@ -1833,7 +1834,7 @@ $$
 After the wide formula (plantoir-after-wide). Before the scaled formula (plantoir-before-scaled).
 
 $$
-y = a_{1}x^{1} + a_{2}x^{2} + a_{3}x^{3} + a_{4}x^{4} + a_{5}x^{5} + a_{6}x^{6} + a_{7}x^{7} + a_{8}x^{8} + a_{9}x^{9} + a_{10}x^{10} + a_{11}x^{11} + \text{plantoirscaledend}
+y = a_{1}x^{1} + a_{2}x^{2} + a_{3}x^{3} + a_{4}x^{4} + a_{5}x^{5} + a_{6}x^{6} + a_{7}x^{7} + a_{8}x^{8} + a_{9}x^{9} + a_{10}x^{10} + a_{11}x^{11} + a_{12}x^{12} + a_{13}x^{13} + \text{plantoirscaledend}
 $$
 
 After the scaled formula (plantoir-after-scaled). Before the timetable (plantoir-before-timetable).
@@ -1886,6 +1887,17 @@ printf -- '---\nprintable: true\nprintPdf: "[[plantoir-print-fixture & key.pdf]]
   > "$HIT_COURSE/Printable PDF Fixture.md"
 printf -- '---\nprintable: true\nprintPdf: missing-7f3a.pdf\n---\nA page whose PDF is not there (plantoir-badpdf-sentinel-7f3a).\n' \
   > "$HIT_COURSE/Printable Bad PDF.md"
+# A page that cannot print whole (#499 fix review B1): a displayed formula of
+# 60 lines and a table row of 90, each taller than a page and unsplittable
+# without losing lines. The handout must REFUSE it, in every paper - a guard
+# that skips split pieces printed both half-missing and called them complete.
+python3 - "$HIT_COURSE/Printable Too Tall.md" <<'PY'
+import sys
+formula = " \\\\\n".join(f"y_{{{i}}} &= {i}x + {i}" for i in range(1, 61))
+cell = "<br>".join(f"TALLROW-{i:02d}" for i in range(1, 91))
+open(sys.argv[1], "w").write("---\nprintable: true\n---\nBefore the tall formula (plantoir-toolong-sentinel-7f3a).\n\n$$\n\\begin{aligned}\n"
+    + formula + "\n\\end{aligned}\n$$\n\n| Row | Lines |\n|---|---|\n| 1 | " + cell + " |\n\n> [!answer]-\n>\n> Never printed.\n")
+PY
 
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
@@ -2124,7 +2136,8 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
   PRINT_SERVER_PID=$!
   if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
-       "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" >/tmp/verify_print_handout.log 2>&1; then
+       "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" \
+       "http://127.0.0.1:$PRINT_PORT/Printable-Too-Tall.html" >/tmp/verify_print_handout.log 2>&1; then
     pass "printable pages: each way of printing on portrait and landscape paper, printed to PDF and read back - the print layout ran and laid out every piece, nothing cut off; every question, answer, table row and the words around every picture, drawing, diagram and formula on paper; 110 lines of code each with its own number in a hairline box; page labels on every page where a printer reaches; Latin Modern; no boxes but the worked example's (#499); the diagram DRAWN (#454); no Curriculum connection in any handout or under ⌘P (#498); the menu prints nothing until a choice and remembers the paper; ⌘P leaves orientation to the browser's dialog (browser-checks/print_handout.mjs)"
   else
     fail "printable pages: a handout or ⌘P lost something, printed something it should not, or did not look as it should on paper (browser-checks/print_handout.mjs, #454, #498, #499)"

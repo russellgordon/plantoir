@@ -34,16 +34,20 @@
 // verify.sh runs it when a Chrome for Testing is found and says SKIPPED when
 // not. No packages: Node 22's own WebSocket speaks to Chrome directly.
 //
-//   node browser-checks/print_handout.mjs <chrome binary> <page url> [<not-opted page url>]
+//   node browser-checks/print_handout.mjs <chrome binary> <page url> [<not-opted page url>] [<too-tall page url>]
+//
+// The too-tall page holds a 60-line formula and a 90-line table row, which
+// cannot print whole: every way of printing it, on both papers, must be
+// REFUSED with printablePages.words.incomplete (#499 fix review B1).
 //
 // PLANTOIR_PRINT_CHECK_KEEP=<folder> keeps the PDFs there.
 
 import { execFileSync, spawn } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const [chromePath, pageUrl, plainUrl] = process.argv.slice(2)
+const [chromePath, pageUrl, plainUrl, tooTallUrl] = process.argv.slice(2)
 if (!chromePath || !pageUrl) {
   console.error("usage: node print_handout.mjs <chrome> <url> [<not-opted url>]")
   process.exit(2)
@@ -79,6 +83,8 @@ const ANSWERS = [
 // Words only the questions carry, and only the answers: neither may leak.
 const ONLY_QUESTIONS = ["plantoir-qstem-3", "plantoir-qstem-5", "plantoir-example-sentinel-7f3a", "CODE-001"]
 const ONLY_ANSWERS = ["plantoir-ans-3a", "plantoir-ans-5", "Questions 1 and 2 of the practice list"]
+const INCOMPLETE = JSON.parse(readFileSync(new URL("../contracts/shared-rules.json", import.meta.url), "utf-8"))
+  .printablePages.words.incomplete
 const CODE_LINES = 110
 const TABLE_ROWS = 40
 const RUNS = [
@@ -379,6 +385,12 @@ async function connect(chunk) {
     })()`))
     await pause(1500)
     const printedOnOpen = await evaluate("!!window.__plantoirPrinted")
+    // The sentence for Safari's print window shows under the papers only
+    // while Landscape is chosen, before that window opens (fix review S2).
+    const noteShown = async () => evaluate("(() => { const n = document.querySelector('.plantoir-print-paper-note'); return !!n && n.getBoundingClientRect().height > 0 })()")
+    const noteWithPortrait = await noteShown()
+    await evaluate("(() => { const l = document.querySelector('.plantoir-print input[value=\"landscape\"]'); l.checked = true; l.dispatchEvent(new Event('change', { bubbles: true })); return true })()")
+    const noteWithLandscape = await noteShown()
     await evaluate(`(() => {
       const box = document.querySelector(".plantoir-print")
       const landscape = box.querySelector('input[value="landscape"]')
@@ -392,12 +404,28 @@ async function connect(chunk) {
     await pause(2500)
     const remembered = await evaluate("document.querySelector('.plantoir-print input[value=\"landscape\"]')?.checked === true")
     await evaluate("localStorage.removeItem('plantoir-print-paper'); true")
-    report.menu = { order: menu.order, printedOnOpen, chosenPageWidth: chosen?.pageWidth ?? null, remembered }
+    report.menu = { order: menu.order, printedOnOpen, chosenPageWidth: chosen?.pageWidth ?? null, remembered, noteWithPortrait, noteWithLandscape }
+    if (noteWithPortrait || !noteWithLandscape) problems.push("the sentence about Safari's print window does not show under Landscape alone")
     if (menu.order.join(",") !== "portrait,landscape,questionsOnly,answersOnly,withAnswersAtTheEnd") problems.push(`menu order ${menu.order.join(",")}`)
     if (menu.shownBefore || !menu.shownAfter) problems.push("Print did not open the menu")
     if (printedOnOpen) problems.push("opening the menu printed")
     if (!chosen || Math.abs(chosen.pageWidth - 1056) > 2) problems.push("choosing Landscape then Questions only did not print landscape")
     if (!remembered) problems.push("the paper chosen was not remembered")
+
+    // A page that cannot print whole must be refused, never printed short.
+    if (tooTallUrl) {
+      report.tooTall = {}
+      for (const paper of ["portrait", "landscape"]) {
+        for (const mode of ["questionsOnly", "withAnswersAtTheEnd"]) {
+          await open(`${tooTallUrl}#plantoir-print=${mode}&paper=${paper}`)
+          const printed = await waitForPrint()
+          const said = (await evaluate("document.querySelector('.plantoir-print-status')?.textContent || ''")) ?? ""
+          const refused = printed === null && said === INCOMPLETE
+          report.tooTall[`${mode}/${paper}`] = refused ? "refused" : printed ? `PRINTED ${printed.found}/${printed.expected}` : `said: ${said}`
+          if (!refused) problems.push(`the too-tall page was not refused (${mode}/${paper}): ${report.tooTall[`${mode}/${paper}`]}`)
+        }
+      }
+    }
 
     // ⌘P: the browser lays the page out itself, by the print stylesheet.
     const printedText = async (url) => {
