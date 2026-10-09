@@ -360,12 +360,11 @@ struct LinksChecklistSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(model.title)
-                .font(.headline)
             content
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(model.title)
         .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)

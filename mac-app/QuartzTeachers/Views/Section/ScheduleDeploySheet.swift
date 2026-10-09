@@ -48,10 +48,6 @@ struct ScheduleDeploySheet: View {
     var body: some View {
         let shown: (plan: ScheduledDeployPlan?, unreadable: String?, notice: String?) = self.shown
         VStack(alignment: .leading, spacing: 12) {
-            Text("Schedule a deploy")
-                .font(.title2)
-                .accessibilityIdentifier("scheduleDeployTitle")
-
             if let notice = shown.notice {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "info.circle")
@@ -108,7 +104,8 @@ struct ScheduleDeploySheet: View {
                 .accessibilityIdentifier("scheduleDeployConfirmButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle("Schedule a deploy", identifier: "scheduleDeployTitle")
         .frame(width: 520)
     }
 

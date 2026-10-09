@@ -42,13 +42,6 @@ struct CredentialRequestSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(request.title)
-                .font(.title2.bold())
-
-            Text(request.explanation)
-                .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.secondary)
-
             if !request.steps.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(Array(request.steps.enumerated()), id: \.offset) { pair in
@@ -108,7 +101,12 @@ struct CredentialRequestSheet: View {
                 .accessibilityIdentifier("credentialSendButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(request.title, explanation: {
+            Text(request.explanation)
+                .fixedSize(horizontal: false, vertical: true)
+                .foregroundStyle(.secondary)
+        })
         .frame(width: 460)
         // A CONTAINER element with its own identifier (#353). Without
         // `.contain` SwiftUI applies an identifier on a stack to every element

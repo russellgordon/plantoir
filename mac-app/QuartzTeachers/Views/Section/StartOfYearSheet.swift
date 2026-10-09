@@ -203,8 +203,6 @@ struct StartOfYearSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(model.title)
-                .font(.headline)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     content
@@ -214,7 +212,8 @@ struct StartOfYearSheet: View {
             .frame(minHeight: 200, maxHeight: 460)
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(model.title)
         .frame(width: 560)
         .onAppear {
             model.load()

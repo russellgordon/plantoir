@@ -277,9 +277,6 @@ struct ImportCoursesForReferenceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(ReferenceImportWording.title)
-                .font(.headline)
-
             switch stage {
             case .reading:
                 readingView
@@ -293,7 +290,8 @@ struct ImportCoursesForReferenceSheet: View {
                 doneView
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(ReferenceImportWording.title)
         .frame(width: 560)
         .task {
             await readTheFolder()
