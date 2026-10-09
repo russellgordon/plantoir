@@ -1776,6 +1776,21 @@ fence (review S1 found exactly that for a fence opened on a list marker's
 line, which the build now reads). `words.site.graphNeedsPreview` is only for
 a site whose graph engine is missing in the reader's browser.
 
+**Known limit, deliberately not reported as a folder problem.** The build
+finds fences with the toolchain's own fence rule, not a full Markdown parser,
+so a few shapes the site's parser reads differently still slip past it
+(measured by the fix review): a nested list marker (`- - ```tikz`), a fence
+whose content is less indented than the marker's text (lazy lines), a
+numbered fence straight after a paragraph line, a closing fence at column 0
+under a bullet. Each shows students "couldn't be drawn" (or turns the next
+figure into plain code), and Obsidian shows the same shapes broken too. Not
+raised as a finding because the only place that knows is Quartz's own
+parse, after the folder checks have been said; a post-build scan for a
+failed figure with no manifest failure would do it and is the way to add it
+if a teacher ever meets one. Fences in a list item opened on the marker's
+line and indented with tabs (Obsidian's default) ARE read, since the E1
+reviews.
+
 **Rejected:** rendering inside Quartz (no way to stop a build-long wait or
 reach the folder checks); raw `<svg>` in the processed Markdown (`ofm.ts`
 rewrites raw text, and the drawing's single glyphs flooded the page's

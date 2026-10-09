@@ -2789,9 +2789,32 @@ mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
 | `claude -p` (2.1.296, `--permission-mode acceptEdits`) | working folder root | `Add a graph of y = 3(x - 2)^2 - 4 beside its parent function y = x^2 to the page "courses/MPM2D/Unit 2/Parabolas.md", under the example.` | PASS — a `functionplot` fence, settings first, `alt` naming the vertex, both functions in the grapher's syntax, bounds [-4, 6, -6, 10] around the vertex (2, -4); drawn by the real engines with no problem or note |
 | `claude -p` | `courses/MPM2D` | the same, with `"Unit 2/Parabolas.md"` | PASS — the same fence plus `xLabel`/`yLabel` |
 | `claude -p` | working folder root | `Add a graph of y = a(x - 2)^2 with a slider for a to the page "courses/MPM2D/Unit 2/Parabolas.md".` | PASS — no slider promised: one graph with the parent and a = 0.5, 3, −1, a paragraph saying which curve is which (they are coloured, not labelled), a quoted `alt`; it said separate graphs are the only other option |
-| `codex exec` (0.155.1, `-s workspace-write`) | root and `courses/MPM2D` | the first two | NOT RUN — Codex's sign-in on this Mac has expired (HTTP 401 `token_expired`; every model then answers "not supported when using Codex with a ChatGPT account"). Signing in is Russell's; re-run both when it is renewed |
+| `codex exec` (0.162.0, model gpt-6-luna, `-s workspace-write --skip-git-repo-check`) | working folder root | the first | PASS — read `.agents/skills/plantoir-math-graphs/SKILL.md` first; the skill's pattern A, bounds [-2, 6, -6, 12], `alt` naming the vertex (two runs, one by the #501 session, one by E1's) |
+| `codex exec` | `courses/MPM2D` | the second | **FAIL** — read no AGENTS.md and no skill; hand-wrote an inline `<svg>` with hard-coded paths (two runs) |
+| `codex exec` | `courses/MPM2D` of the same folder after `git init` at its root | the second | PASS — found the skill, wrote pattern A |
 
-One run each, as for printing.
+One run each per row, as for printing.
+
+**Why Codex fails inside a course, measured.** Codex reads `AGENTS.md`
+files from its PROJECT ROOT down to where it was started, and finds the root
+by `project_root_markers`, which defaults to `[".git"]` (in the 0.162.0
+binary). A teacher's working folder is not a git repository, so started in
+`courses/MPM2D` its project root is that folder and the working folder's
+`AGENTS.md` two levels up is never read. Probed with "quote the first heading
+of the AGENTS.md you were given, or NONE" from `courses/MPM2D`: no `.git` —
+NONE; `.git` at the root — "# Plantoir working folder"; a root
+`.codex/config.toml` setting `project_root_markers = [".codex", ".git"]` —
+NONE (project settings are only read once a root is found). The #454 table's
+Codex PASS from `courses/ICS3U` was on 0.155.1 and is not reproduced on
+0.162.0. **Both apps start an assistant AT the working folder**, which PASSES;
+only a teacher who opens a terminal inside a course and starts Codex there
+meets this. **Not fixed here, deliberately:** the fix would be an
+`AGENTS.md` pointer in every course folder, which is a page in the teacher's
+Obsidian vault and on the class website unless it is kept off it in the
+build's four How I Teach places — the shape Russell's P1 ruling rejected
+("no per-course copy"). Put to Russell as a decision; making the working
+folder a git repository (or adding a `.git` marker) was rejected outright —
+it changes what other tools think the folder is.
 
 ## Mac conventions: the menu bar, keys and text fields (#457)
 

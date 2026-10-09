@@ -164,6 +164,8 @@ class FenceTests(unittest.TestCase):
             for figure in figures.figures_on_page(case["page"]):
                 found.append({"engine": figure["engine"], "block": figure["block"], "line": figure["line"]})
             self.assertEqual(found, case["found"], case["name"])
+            if "body" in case:
+                self.assertEqual(figures.figures_on_page(case["page"])[0]["body"], case["body"], case["name"])
 
     def test_every_tidy_case(self):
         cases = rules("tidy", "cases")

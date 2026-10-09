@@ -23200,7 +23200,7 @@
   "figureFences": {
     "rule": "#485 E1. A ```tikz fence (a LaTeX TikZ picture, written as the Obsidian TikZJax plugin reads it) is DRAWN when the site is built, by the same TeX engine that plugin carries (node-tikzjax 1.0.5: its tex.wasm, core.dump and all 212 TeX files are byte-identical to obsidian-tikzjax 0.5.2's, measured by SHA-256), and placed in the page as an SVG: students download no engine. A ```functionplot fence (a graph of y = f(x), in obsidian-functionplot 1.2.1's syntax) is CHECKED when the site is built, with the evaluator the site draws it with (function-plot 1.25.4), and drawn in the student's browser from function-plot served by the site itself - never from another address. Both are emitted as printablePages.figures says (`<figure class=\"pl-figure pl-tikz\">` / `pl-functionplot`) with a figcaption holding the description a screen reader reads. A figure that cannot be drawn shows words.site.diagramCouldNotBeDrawn or graphCouldNotBeDrawn to students and is reported to the teacher (siteHealth.checks -> figuresCouldNotBeDrawn, one finding per section build) and to an assistant (a `plantoir: error:` line per figure, issue #485 section 7.5). Only pages students can see count; the fence IS the opt-in, so there is no page setting and no course switch.",
     "fences": {
-      "rule": "The fence's language is the info string's FIRST WORD, exactly `tikz` or `functionplot` - the names the two plugins register; the rest of the info string is ignored. Found with readingALink.whatIsCode's fence rule, after every `%%` comment is removed as Quartz removes it: at any quote depth (a callout, folded or not), in a list item's indented content or on the list marker's own line (`- ```tikz`, review S1), with backticks or tildes. `block` counts each engine's fences on the page from 1; `line` is the opening fence's line. Whether Obsidian also reads another capitalisation was not measured (review N6); the guidance always writes lowercase.",
+      "rule": "The fence's language is the info string's FIRST WORD, exactly `tikz` or `functionplot` - the names the two plugins register; the rest of the info string is ignored. Found with readingALink.whatIsCode's fence rule, after every `%%` comment is removed as Quartz removes it: at any quote depth (a callout, folded or not), in a list item's indented content or on the list marker's own line (`- ```tikz`, review S1), with backticks or tildes. `block` counts each engine's fences on the page from 1; `line` is the opening fence's line; `body`, where a case gives one, is the content the engines are handed. Whether Obsidian also reads another capitalisation was not measured (review N6); the guidance always writes lowercase.",
       "cases": [
         {
           "name": "a tikz fence",
@@ -23289,6 +23289,19 @@
               "line": 3
             }
           ]
+        },
+        {
+          "name": "indented with tabs under a numbered item, as Obsidian writes by default",
+          "page": "1. Sketch the graph.\n\t```functionplot\n\t---\n\talt: The parabola y = x^2\n\t---\n\ty = x^2\n\t```\n",
+          "found": [
+            {
+              "engine": "functionplot",
+              "block": 1,
+              "line": 2
+            }
+          ],
+          "body": "---\nalt: The parabola y = x^2\n---\ny = x^2",
+          "why": "E1 fix review F1: tabs are taken off by column (a tab to the next multiple of 4), as CommonMark does; keeping them made the settings YAML no reader accepts, and the graph was refused with advice about quotes."
         },
         {
           "name": "with tildes",
@@ -23853,7 +23866,7 @@
       }
     },
     "agentGuidance": {
-      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): which fence to use, the syntax, the measured list of packages, the gotchas, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one line each.",
+      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): when to use which fence, the syntax, four complete patterns, the measured list of packages, the limits, what to avoid, what cannot be done, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one bullet each. Measured (doc 09): Codex reads the root AGENTS.md only when started at the working folder or below a `.git`; started inside a course of a folder that is not a git repository it reads none.",
       "skill": "plantoir-math-graphs"
     },
     "knownLimits": [
