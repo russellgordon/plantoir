@@ -1704,6 +1704,8 @@ engine = public / "static" / "pagedjs" / "paged.min.js"
 if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pin["fileSha256"]:
     problems.append("the site does not carry the pinned print engine at static/pagedjs/paged.min.js")
 for path in public.rglob("*"):
+    if "pagedjs" in path.parts:
+        continue  # the engine's own text names its home page; it is never fetched from there
     if path.suffix in (".html", ".js", ".css") and re.search(r"https?://[^\"' ]*pagedjs", path.read_text(encoding="utf-8", errors="ignore")):
         problems.append(f"{path.name} loads the print engine from the network")
 
