@@ -2854,15 +2854,15 @@ in Obsidian on a reference SECTION** reveals the SECTION's folder from every
 route — the toolbar button beside it always did, while the row and the menu
 bar revealed the course — through one rule, `FolderActions.obsidianFolder`;
 the locked-pages note, shown the first time, now opens the folder it was
-asked for. (The toolbar button still opens without that note; noted for the
-HIG sweep.)
+asked for. Since the HIG sweep (batch C) the toolbar button shows that note too
+— see "The HIG sweep" below.
 
 ### Context menus select their row first
 
 A context-menu item acts on the row under the pointer and SELECTS it first,
 Finder-style (#457 item 4), so what is selected afterwards is what the item
 acted on and the Course and Section menus name the same thing. The exception
-is Rename Course: a rename field opened in the same turn as a selection change
+is Rename: a rename field opened in the same turn as a selection change
 loses focus to the sidebar's deferred focus and closes (#293, the table above),
 and the field works on an unselected row.
 
@@ -2896,6 +2896,147 @@ and the field works on an unselected row.
 - **One key on two items** — see ⇧⌘O above.
 - **Leaving Open Working Folder… and Open Recent live under a sheet** — see
   File above.
+
+### The HIG sweep, screen by screen (#457 item 4, batch C)
+
+Judged per screen against the HIG rather than mechanically: a planner drove the
+Debug app on a scratch copy of EXC2O (29 findings), a plan review drove it again,
+Russell ruled on seven questions, the director on the review, and the
+implementer drove every changed sheet in Light and Dark (captures in the
+session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
+
+- **Escape is never trapped.** A combo-box field (Copy a Page's Page field, the
+  wizard's Course code field) takes Escape ONLY while its list is drawn —
+  `PickerEscape.result(listWasOpen:)` — so the first press closes the list
+  and the next reaches the sheet, which closes as Cancel would. Measured
+  before: Copy a Page opens with focus in that field and no number of Escapes
+  closed it, because both fields answered `.handled` whether or not a list was
+  open. Russell's 2026-08-22 "close the list, not the form" stays true for the
+  press that closes the list. With the list closed, Escape now dismisses the
+  wizard and discards what was typed — the HIG's answer for a Cancel with no
+  question. `.keyboardShortcut(.cancelAction)` was NOT added to either picker
+  sheet's Cancel: a key equivalent may be matched before `onKeyPress` and take
+  the list-closing Escape. `SheetConventionScanTests` holds every Escape
+  handler under `Views/` to `PickerEscape`.
+- **A button that cannot be pressed is grey — and one drawn as the default
+  takes Return.** macOS draws a `.keyboardShortcut(.defaultAction)` button in
+  the accent even while disabled (measured: Copy a Page's Copy, dim blue under
+  "There is no other course to copy into yet"), and `.borderedProminent` does
+  the same; Schedule a Deploy's Schedule wore the accent while disabled AND
+  ignored Return. #364 fixed this for Save by swapping the style on the
+  enabling predicate; `.defaultButton(isEnabled:)` makes that one modifier
+  for every sheet (thirteen buttons) — while disabled the button has no key
+  equivalent and is a grey push button. `.prominentButton(isEnabled:)` does
+  the same for an accent button that takes no Return (an empty state's
+  Restore…). The scan: no button under `Views/` writes the default look beside
+  `.disabled(`, except Save, which swaps on its own predicate. The wizard's
+  Create Course now takes Return — `CourseCodePickerView`'s Return comment
+  always said a Return the field does not use "reaches the sheet's default
+  button", and there was none; the plan's "Return is left alone because fields
+  take it" was the wrong half. **Class Dates' Read the Dates does NOT take
+  Return while the dates are being typed**: the box needs Return for a new
+  line, a default button can take Return before a text box does, and a probe
+  app could not put focus in its box to settle which wins — so the risk was
+  not taken (`isTheDefault: route != .typed`).
+- **Open in Obsidian is one route** — `WorkspaceModel.openInObsidian(course:
+  sectionNumber:)`, called by the section window's toolbar, Course Settings'
+  toolbar, every row's menu and Course ▸ / Section ▸ Open in Obsidian. On a
+  course kept for reference it locks the pages again and, the first time,
+  asks for the locked-pages note before Obsidian opens. The note is presented
+  by the MAIN WINDOW (`MainWindowView`'s `LockedPagesNoteAlert`), not the
+  sidebar: the toolbar button is reachable with the sidebar collapsed, and the
+  note was driven that way (sidebar hidden, toolbar button, note shown).
+  `ObsidianFolderTests` holds `FolderActions.openInObsidian` to that one file.
+- **Delete removes the selected sidebar row — by asking.** The key runs the
+  menu item `contracts/shared-rules.json` → `sidebarDeleteKey` names (Remove
+  Course…, Remove Section…, Delete Backup…, Delete Archive…) through
+  `performMenuItem`, so its enablement is the menu's and its question is the
+  menu's; where the item is greyed (a section of a course kept for reference,
+  anything under a sheet) it beeps. Driven: Delete on Section 2 asked "Remove
+  Section 2 of EXC2O?"; on a reference section, nothing. REJECTED: ⌘⌫ or ⌫ as
+  the menu items' key equivalent — matched before the field editor, it would
+  take delete-a-word away from every text field in the window.
+- **Every removal is the last item of its context menu, behind a divider.**
+  Course and section rows gained Remove Course… / Remove Section… (a reference
+  course's row keeps Remove Course…, which the contract allows; a reference
+  section has none), and Course Settings lists' Remove became destructive and
+  divided. `SheetConventionScanTests` reads `sectionRowMenu`, `courseRowMenu`
+  and `backupsMenu` through their functions (the review found the first scan
+  saw only the call) and counts seven menus that remove.
+- **Remove Section… on a reference section was a bug against the contract**
+  (`interface.whatIsWithheld`: "Remove Section N (removing the whole course
+  stays)") — `SubjectMenuRules` enabled it and a `subjectMenus` case listed it.
+  Both fixed; the case says why.
+- **All Backups** gained a context menu (Restore… for one, Show in Finder,
+  Delete… last), the Delete key (the Delete button's own question), and
+  sorting by Course, Made and Size (`BackupRow`; newest first until a header
+  is clicked — Size is measured off the main thread, so the row carries it).
+- **One sheet title shape**: `SheetTitle` — `.headline`, leading, in a
+  52-point band (Canopy §3a), or the two-line shape with matching top and
+  bottom padding for the five sheets with an explanation under the title (Add
+  Section, Keep a Copy for Reference, Class Dates, Special Folders, a
+  credential request). Fifteen sheets; five were `.title2` (three bold).
+  `SheetTitleScanTests` lists them and censuses every `.sheet(` in the app
+  against the list, so a new sheet arrives looked at. Titles stay in
+  sentence case (Russell: no).
+- **One name per command.** The rows' Revise items sit in a **Revise With ▸**
+  submenu titled as the menu bar's (Claude…, Codex…, Local AI Assistant…;
+  Russell: yes, at the cost of one level); **Rename** (no ellipsis — it edits
+  in place and asks nothing more, as Finder's does) in the row's menu and in
+  Course ▸; the empty state's Add a Course… is **New Course…**.
+- **Words**: buttons in title case (Choose a File…, Day First / Month First,
+  Remember These Dates, Read the Dates, Use This ID, Just Do It, Keep
+  Checking); the site-health alert says **Not Now** beside a repair and
+  **Close** beside Preview Again, OK only when it is the only answer; a backup,
+  restore or deletion problem names its act ("Could not back up EXC2O",
+  `BackupProblemTitle`) instead of "Could not do that"; nothing below 10 pt
+  (the Example content badge was 9).
+- **Help ▸ Plantoir Help** opens https://plantoir.app/support/ (it said "Help
+  isn't available for Plantoir"); no ⌘? — macOS keeps it for the Help menu's
+  search, and SwiftUI drew none when asked (the menu-bar golden).
+- **The wizard opens with the cursor in Course code** (Russell: yes), with
+  its list closed until something is typed, ↓ is pressed or the chevron is
+  clicked — the way Copy a Page opens.
+- **The Cloudflare Account ID moved to Plantoir ▸ Settings ▸ Deploying**
+  (Russell: yes), making Settings two panes in a `TabView`. A course's
+  Deploying section and the wizard SHOW it read-only with **Open Settings…**,
+  which selects the Deploying pane first (`SettingsPane`). With no ID the
+  wizard still refuses Create with the contract's existing sentence (unchanged,
+  so nothing goes red on Windows), now beside that button. Driven: typing an ID
+  in Settings updated an open course's Deploying section at once. No data
+  moved — the value was always app-wide (`AppSettings.cloudflareAccountID`) —
+  so nothing was migrated. The one-tab objection recorded in
+  `PlantoirSettingsView` was about a SINGLE tab titling the window
+  "Assistant"; with two panes a window titled after the chosen pane is how
+  every multi-pane Mac settings window reads. Trail: "Cloudflare account ID
+  changed in Settings" (never the ID). **Not changed, and now stale on the
+  mac:** the launchers' non-interactive refusal still says "Add the Account ID
+  in this course's settings in Plantoir, under Deploying" (`deploy.sh`,
+  `deploy.ps1`) — the publishing path, left for a change that runs
+  `verify-deploy.sh`.
+- **Assistant window**: "May I ask for your class dates?" puts its buttons on
+  the trailing end with Yes last, as every other card and sheet does.
+
+**Skipped, with the reason** (so they are not proposed again):
+Preview/Deploy on a section row's menu (selecting the row shows both one click
+away, and running them from the row needs the section window to exist first —
+the selection-then-act race #293 measured); labels on the icon-only Obsidian
+and Safari toolbar items and a customisable toolbar (four items; on macOS 26 a
+mixed toolbar is normal and labels crowd the title); moving Course Settings'
+sheets off the toolbar item (not a HIG rule); the assistant bubble's fixed
+selection colour (measured against Messages); the Settings radio rows drawn
+by hand (each option carries 2–3 lines, which `Picker(.radioGroup)` cannot);
+title case for sheet titles (Russell: no); the fixed 56/34/15 pt sizes (icons
+and a fixed panel).
+
+**Verified by driving, not by a test** (`C-impl/shots/`, Light and Dark):
+Escape on Copy a Page and the wizard; the grey disabled Schedule, Add Section
+and Copy; the toolbar note with the sidebar collapsed; Delete on a section row;
+the two-pane Settings and the read-only course field; All Backups' menu and
+sort indicator. **Not captured**: Import Courses for Reference (behind a
+folder chooser), the links checklist (needs a build's offer), Class Dates
+(opened only by the assistant), Special Folders help and the folder-rename
+sheet — the title scan holds their shape.
 
 ## Two programs, one course: the build, preview and publish leases (#156)
 
@@ -3413,7 +3554,7 @@ field survived a wait. Measured after: 3/3 class runs with the host activated
 by pid and 3/3 with iTerm in front.
 
 **The one teacher path that opens the field on an UNSELECTED row, driven
-once (2026-09-25).** The context menu's Rename Course sets
+once (2026-09-25).** The context menu's Rename (Rename Course until v1.5.0) sets
 `renamingCourseCode` without touching the selection. With EXC2O selected,
 right-click EXC3O ▸ Rename Course opened the field on EXC3O; clicking INTO
 the field left the selection on EXC2O and the field focused, and two typed
@@ -7514,8 +7655,9 @@ the path a typed sentence takes to become a Swift function call — is
 [chapter 10](10-local-ai-assistant.md).
 
 **There are two OTHER doors beside this one**, and they are a different thing
-entirely: "Revise with Claude…" and "Revise with Codex…" in a course's or a
-section's context menu hand the whole course to a command-line assistant the
+entirely: Revise With ▸ Claude… and Codex… ("Revise with Claude…" at the top
+of the menu until the HIG sweep, #457) in a course's or a section's context menu
+and the Course and Section menus hand the whole course to a command-line assistant the
 teacher already has on their Mac, in a real terminal, with Plantoir's MCP
 server already connected. Nothing runs on the machine that Plantoir put there,
 nothing is installed for them, and each item is hidden when its tool is not

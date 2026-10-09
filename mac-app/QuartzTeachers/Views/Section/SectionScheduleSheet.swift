@@ -367,7 +367,14 @@ struct SectionScheduleSheet: View {
                 Button("Read the Dates") {
                     Task { await read() }
                 }
-                .defaultButton(isEnabled: canRead)
+                // Return reads the dates — except while the dates are being
+                // TYPED, when Return must be a new line in the box. A
+                // default button can take Return before a text box does
+                // (AppKit offers key equivalents first); a probe app could
+                // not put focus in its box to settle it, so the sheet does
+                // not risk dates that cannot be typed one per line. Grey
+                // then, as a button Return does not press is drawn (#457).
+                .defaultButton(isEnabled: canRead, isTheDefault: route != .typed)
                 .accessibilityIdentifier("sectionScheduleReadButton")
             }
         }
