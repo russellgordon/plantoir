@@ -25,6 +25,8 @@ import class_pages
 import markdown_code
 import how_i_teach
 import page_visibility
+import page_features
+import print_settings
 import reference_course
 import stop_preview
 import toolchain_paths
@@ -1406,6 +1408,183 @@ def install_patched_backlinks(output_dir: Path):
         print(f"✅ Installed patched Backlinks.tsx → {rel}")
     except Exception as e:
         print(f"❌ Failed to install patched Backlinks.tsx: {e}")
+
+
+# ---- Plantoir's own additions to Quartz (#454; #455 adds to the same tree) ---
+#
+# NEW files, as opposed to patched ones, live in support/quartz/ at the path
+# they take inside a section's Quartz copy, and are copied in on EVERY build
+# (the ALWAYS section), so a section built before they existed picks them up on
+# its next build - a file added to the scaffold would reach new sections only.
+# support/ already reaches the image (COPY support/) and the Windows runtime
+# (PLANTOIR_SUPPORT_DIR), so neither needs a line per file, and no row is added
+# to toolchain.json's patches: nothing of Quartz's is replaced.
+#
+# Read ONLY from SUPPORT_DIR, never from the working directory the way the
+# Backlinks copier tries first, so verify.sh's check_baked lines prove what the
+# IMAGE carries rather than comparing the working tree with itself.
+#
+# A file later REMOVED from support/quartz stays in every section that has it
+# (this only adds and overwrites). Nothing imports a file nobody wires in, so it
+# is inert; a removal that matters must also be taken out here by name.
+QUARTZ_ADDITIONS_MARKER = "PLANTOIR-ADDITIONS"
+MERMAID_DONE_MARKER = "PLANTOIR-MERMAID-DONE"
+
+
+def install_quartz_additions(output_dir: Path) -> int:
+    """Copy support/quartz/** into the section's quartz/, where the bytes differ."""
+    source = toolchain_paths.SUPPORT_DIR / "quartz"
+    if not source.is_dir():
+        print("ℹ️ Plantoir's additions to the site were not found — printing is unavailable.")
+        return 0
+    copied = 0
+    for item in sorted(source.rglob("*")):
+        if not item.is_file() or item.name.startswith("."):
+            continue
+        target = output_dir / "quartz" / item.relative_to(source)
+        try:
+            if target.is_file() and target.read_bytes() == item.read_bytes():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(item, target)
+            copied += 1
+        except OSError as error:
+            print(f"⚠️ Could not install {item.name}: {error}")
+    if copied:
+        print(f"✅ Installed {copied} of Plantoir's additions to the site.")
+    return copied
+
+
+def _wire_components_index(index_ts: Path) -> None:
+    text = index_ts.read_text(encoding="utf-8")
+    if "PlantoirMetaLine" in text:
+        return
+    if "\nexport {\n" not in text:
+        print("⚠️ Could not add the Print button: the components list has changed shape.")
+        return
+    text = text.replace(
+        "\nexport {\n",
+        f'\nimport PlantoirMetaLine from "./PlantoirMetaLine" // {QUARTZ_ADDITIONS_MARKER}\n'
+        "\nexport {\n  PlantoirMetaLine,\n",
+        1,
+    )
+    index_ts.write_text(text, encoding="utf-8")
+
+
+def _wire_content_layout(layout_ts: Path) -> None:
+    """Wrap the content layout's date line - and ONLY the content layout's, so
+    folder and tag pages never get a Print button."""
+    text = layout_ts.read_text(encoding="utf-8")
+    start = text.find("export const defaultContentPageLayout")
+    if start < 0:
+        print("⚠️ Could not add the Print button: the page layout has changed shape.")
+        return
+    end = text.find("export const", start + 1)
+    if end < 0:
+        end = len(text)
+    block = text[start:end]
+    if "Component.PlantoirMetaLine(" in block:
+        return
+    if "Component.ContentMeta()" not in block:
+        print("⚠️ Could not add the Print button: the page layout has no date line.")
+        return
+    block = block.replace("Component.ContentMeta()",
+                          "Component.PlantoirMetaLine(Component.ContentMeta())", 1)
+    layout_ts.write_text(text[:start] + block + text[end:], encoding="utf-8")
+
+
+def _wire_mermaid_done(mermaid_ts: Path) -> None:
+    """Say when every diagram has been drawn AND fitted, so the print code can
+    wait for a light re-draw instead of guessing how long one takes."""
+    text = mermaid_ts.read_text(encoding="utf-8")
+    if MERMAID_DONE_MARKER in text:
+        return
+    call = "\n  await renderMermaid()\n"
+    at = text.find(call)
+    close = text.rfind("\n  }\n", 0, at) if at >= 0 else -1
+    if at < 0 or close < 0:
+        print("⚠️ Could not tell printing when diagrams are drawn; it will wait a moment instead.")
+        return
+    line = (f'\n    document.dispatchEvent(new CustomEvent("plantoir-mermaid-done")) '
+            f'// {MERMAID_DONE_MARKER}')
+    mermaid_ts.write_text(text[:close] + line + text[close:], encoding="utf-8")
+
+
+def wire_quartz_additions(output_dir: Path) -> None:
+    """The three edits that connect support/quartz to Quartz. Idempotent, one
+    marker each; an anchor that has moved warns and leaves the file alone."""
+    for path, wire in (
+        (output_dir / "quartz" / "components" / "index.ts", _wire_components_index),
+        (output_dir / "quartz.layout.ts", _wire_content_layout),
+        (output_dir / "quartz" / "components" / "scripts" / "mermaid.inline.ts", _wire_mermaid_done),
+    ):
+        try:
+            wire(path)
+        except OSError as error:
+            print(f"⚠️ Could not update {path.name}: {error}")
+
+
+def _resolve_print_settings_of_pages(content_root: Path, course_dir: Path) -> dict:
+    """
+    Every page's `printable:` and `printPdf:` (#454, file-formats.json ->
+    pageOptIns), read from the BUILD's copies after they have been processed.
+
+    A `printPdf:` that resolves is rewritten to the Media folder's spelling of
+    the name; one that does not is taken off the build's copy, so the page
+    falls back to the generated handout (or to no button), and is reported as
+    a folder problem. The teacher's own files are never touched.
+
+    Answers {"problems": [...], "counts": {engine: pages}}.
+    """
+    problems = []
+    counts = {engine: 0 for engine in page_features.GATED_ASSETS}
+    if frontmatter is None:
+        return {"problems": problems, "counts": counts}
+    media_dir = course_dir / "Media"
+    for page in sorted(content_root.rglob("*.md")):
+        try:
+            relative_parts = page.relative_to(content_root).parts
+        except ValueError:
+            continue
+        if relative_parts and _is_media_name(relative_parts[0]):
+            continue
+        try:
+            text = page.read_text(encoding="utf-8")
+            if "printable" not in text and "printPdf" not in text:
+                continue
+            post = frontmatter.loads(text)
+        except Exception:
+            continue
+        if "printable" not in post and "printPdf" not in post:
+            continue
+        visible = not _is_draft(text)
+        printable = page_features.opts_in(post.get("printable"))
+        resolution = page_features.resolve_print_pdf(post.get("printPdf"), printable, visible, media_dir)
+        if page_features.carries_the_print_layout(post.get("printable"), visible, resolution["button"]):
+            counts["pagedjs"] += 1
+        if "printPdf" not in post:
+            continue
+        changed = False
+        if resolution["button"] == "pdf":
+            if post.get("printPdf") != resolution["file"]:
+                post["printPdf"] = resolution["file"]
+                changed = True
+        else:
+            del post["printPdf"]
+            changed = True
+        if resolution["problem"] is not None:
+            problems.append({
+                "page": _place_in_the_course(page, content_root),
+                "file": resolution["typed"] or "",
+                "problem": resolution["problem"],
+            })
+        if changed:
+            _writable(page)
+            try:
+                page.write_text(frontmatter.dumps(post), encoding="utf-8")
+            except OSError as error:
+                print(f"⚠️ Could not update the print settings of {page.name}: {error}")
+    return {"problems": problems, "counts": counts}
 
 
 LOCALES_SRC_CANDIDATES = [
@@ -7282,6 +7461,7 @@ def build_section_site(
     patch_explorer_inline_expand_on_navigate(explorer_inline)
 
     install_patched_backlinks(output_dir)
+    install_quartz_additions(output_dir)
     patch_quartz_build_clean(output_dir / "quartz" / "build.ts")
 
     content_root = output_dir / "content"
@@ -7417,6 +7597,11 @@ def build_section_site(
     # and running it twice per build was pure waste.
     taught_here = _pages_the_course_teaches(content_root, class_folders_here)
 
+    # Pages that print (#454): a page's own PDF resolved against Media, and
+    # how many pages ask for the print layout. Before the checks, so a PDF
+    # that could not be used is said where every folder problem is said.
+    print_pages_here = _resolve_print_settings_of_pages(content_root, course_dir)
+
     health_facts = {
         "coverage_wanted": coverage_wanted,
         "curriculum_found": bool(coverage_plan),
@@ -7448,6 +7633,8 @@ def build_section_site(
         # (#333). After the How I Teach sweep above, so a link to that page
         # resolves to nothing rather than to a hidden page.
         "links_into_hidden_pages": _links_into_hidden_pages(content_root),
+        # Pages whose own PDF could not be used (#454, review S3).
+        "print_pdf_problems": print_pages_here["problems"],
     }
     if health_facts["front_page_unreadable"]:
         front_line = _front_page_line(content_root)
@@ -7588,6 +7775,19 @@ def build_section_site(
     section_domain = resolve_section_domain(course_dir, config, section_number)
     patch_quartz_base_url(config_path, section_domain)
     # --------------------------------------------------------------------------
+
+    # Printing (#454), ALWAYS: the print engine only when a page students can
+    # see asks for it, the corners and words from this course's settings, and
+    # the three edits that put the Print button on the page. After every other
+    # edit to quartz.layout.ts above, so nothing rewrites the wrapped line.
+    page_features.install_gated_assets(output_dir, print_pages_here["counts"])
+    try:
+        print_settings.write(output_dir, config, displayed_course_code(config, course_code))
+    except Exception as error:
+        # A stale contract (an older image, a native run pointed at an old
+        # copy) must not stop a build over the corners of a handout.
+        print(f"⚠️ Could not set up the printed page's corners: {error}")
+    wire_quartz_additions(output_dir)
 
     # Ensure patched Head.tsx is present in output_dir so social cards never point to quartz.jzhao.xyz
     head_src = toolchain_paths.QUARTZ_DIR / "quartz" / "components" / "Head.tsx"

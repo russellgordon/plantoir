@@ -94,6 +94,11 @@ COPY scripts/markdown_code.py /opt/scripts/markdown_code.py
 # One home for "does the built site show this page?" — read by build_site.py
 # and setup_course.py, and pinned by contracts/file-formats.json.
 COPY scripts/page_visibility.py /opt/scripts/page_visibility.py
+# Pages that print (#454): which pages opt in, a teacher's own PDF, the gate
+# that puts the print engine only into sites that use it, and the corners of a
+# printed page. Both imported by build_site.py by bare name.
+COPY scripts/page_features.py /opt/scripts/page_features.py
+COPY scripts/print_settings.py /opt/scripts/print_settings.py
 # The teacher's How I Teach page is never on the website (#209): build_site.py
 # asks this at discovery, preflight, the copy lists and a final sweep. Imported
 # by bare name, so it must be baked beside it (test_baked_modules.py).

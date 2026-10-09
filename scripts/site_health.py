@@ -192,6 +192,33 @@ def links_into_hidden_pages_finding(facts: dict, course: str, section, table: di
     )
 
 
+def print_pdf_problems_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every page whose `printPdf:` could not be used (#454,
+    review S3), never one per page. Each page is named through the sentence
+    for its own problem; every value is filled in one pass.
+    """
+    entry = table["printPdfNotFound"]
+    problems = facts.get("print_pdf_problems") or []
+    piece_for = {"missing": "pageMissing", "notAPdf": "pageNotAPdf", "hasAPath": "pageHasAPath"}
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        piece = entry[piece_for.get(problem.get("problem"), "pageMissing")]
+        named.append(filled(piece, {"page": problem.get("page", ""), "file": problem.get("file", "")}))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        "pages": ", ".join(named),
+    }
+    return finding(
+        "printPdfNotFound", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -218,6 +245,10 @@ def findings(facts: dict, course: str, section) -> list:
     * `links_into_hidden_pages` — [{"from": page, "to": page}], each a link on
                                a page students can see to one they cannot,
                                by place in the course folder (#333)
+    * `print_pdf_problems`   — [{"page": place, "file": name as given,
+                               "problem": missing | notAPdf | hasAPath}],
+                               each a page whose `printPdf:` could not be used
+                               (#454)
     """
     table = _checks_by_name()
     found = []
@@ -272,6 +303,10 @@ def findings(facts: dict, course: str, section) -> list:
     # their order (#333).
     if facts.get("links_into_hidden_pages"):
         found.append(links_into_hidden_pages_finding(facts, course, section, table))
+
+    # After everything above, so the existing examples keep their order (#454).
+    if facts.get("print_pdf_problems"):
+        found.append(print_pdf_problems_finding(facts, course, section, table))
 
     return found
 
