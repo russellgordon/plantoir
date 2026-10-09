@@ -16,7 +16,8 @@ Two halves:
 1. `support/quartz/components/scripts/printRules.ts` - the file the page's
    own print code imports - is bundled with the scaffold's esbuild and every
    case in `contracts/shared-rules.json` -> `printablePages` (answerCallouts,
-   labels, titleCleaning, pageLabels, curriculumConnection) is run through it
+   labels, titleCleaning, pageLabels, curriculumConnection, and since #499
+   questionItems, paper, footer, paperLook, completeness) is run through it
    in Node. The Python
    tests cannot reach these: the rule lives in the browser.
 2. Every typed line in `contracts/file-formats.json` -> `pageOptIns` is put
@@ -78,9 +79,53 @@ for (const c of curriculum.sections) {
   const printed = c.blocks.filter((text, index) => !leftOff[index])
   if (JSON.stringify(printed) !== JSON.stringify(c.printed)) failures.push(`curriculumConnection.sections ${c.name}: prints ${JSON.stringify(printed)}`)
 }
+// #499: question numbers, part letters and columns, the paper, the footer,
+// which callouts keep a box, and when a laid-out handout may print.
+const items = pages.questionItems
+for (const c of items.numbering) {
+  const got = rules.numberQuestions(c.titles, words.questionLabel)
+  if (JSON.stringify(got) !== JSON.stringify(c.numbers)) failures.push(`questionItems.numbering ${JSON.stringify(c.titles)}: ${JSON.stringify(got)}`)
+}
+for (const c of items.partLetters) {
+  const got = rules.partLetter(c.n)
+  if (got !== c.letter) failures.push(`questionItems.partLetters ${c.n}: ${got}`)
+}
+for (const c of items.columns) {
+  const got = rules.partColumns(c.lengths, c.anyBlock)
+  if (got !== c.columns) failures.push(`questionItems.columns ${JSON.stringify(c.lengths)} ${c.anyBlock}: ${got}`)
+}
+const margins = pages.paper.margins
+if (rules.MARGINS_IN.top !== margins.topIn || rules.MARGINS_IN.side !== margins.sideIn || rules.MARGINS_IN.bottom !== margins.bottomIn) {
+  failures.push(`paper.margins: the site uses ${JSON.stringify(rules.MARGINS_IN)}`)
+}
+for (const c of pages.paper.cases) {
+  const got = rules.paperBox(c.paper)
+  if (got.size !== c.size || got.contentWidthIn !== c.contentWidthIn || got.contentHeightIn !== c.contentHeightIn) {
+    failures.push(`paper ${c.paper}: ${JSON.stringify(got)}`)
+  }
+}
+for (const c of pages.footer.cases) {
+  const got = rules.footerLeft(c.title, c.settingsText, c.part, words)
+  if (got !== c.footer) failures.push(`footer ${JSON.stringify(c)}: ${JSON.stringify(got)}`)
+}
+for (const c of pages.paperLook.cases) {
+  const got = rules.boxedOnPaper(c.kind)
+  if (got !== c.boxed) failures.push(`paperLook ${c.kind}: ${got}`)
+}
+const code = pages.paperLook.code
+if (rules.CODE_BOX.border !== code.border || rules.CODE_BOX.paddingPt !== code.paddingPt) {
+  failures.push(`paperLook.code: the site draws ${JSON.stringify(rules.CODE_BOX)}`)
+}
+for (const c of pages.completeness.cases) {
+  const got = rules.mayPrint(c.expected, c.found, c.overflowing)
+  if (got !== c.print) failures.push(`completeness ${JSON.stringify(c)}: ${got}`)
+}
 const count = pages.answerCallouts.cases.length + pages.labels.cases.length +
   pages.titleCleaning.cases.length + pages.pageLabels.cases.length +
-  curriculum.headings.length + curriculum.sections.length
+  curriculum.headings.length + curriculum.sections.length +
+  items.numbering.length + items.partLetters.length + items.columns.length +
+  1 + pages.paper.cases.length + pages.footer.cases.length + pages.paperLook.cases.length +
+  pages.completeness.cases.length
 console.log(JSON.stringify({ count, failures }))
 """
 
