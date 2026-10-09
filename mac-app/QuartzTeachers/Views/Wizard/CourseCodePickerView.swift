@@ -199,9 +199,11 @@ struct CourseCodePickerView: View {
             // 2026-08-23). Each handler asks the wizard first and
             // reports `.ignored` when the wizard declines, so with no
             // popup open the arrows still move the insertion point and
-            // Return still triggers the sheet's default button — the
-            // keys keep their ordinary meanings rather than being
-            // swallowed whenever this field happens to have focus.
+            // Return goes on to the sheet — the keys keep their ordinary
+            // meanings rather than being swallowed whenever this field
+            // happens to have focus. (The wizard has NO default button,
+            // since the HIG sweep's review measured a Return here creating
+            // the course with the form unread — `NewCourseWizardView`.)
             .onKeyPress(.upArrow) {
                 onMoveHighlight(-1) ? .handled : .ignored
             }

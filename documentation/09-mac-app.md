@@ -2930,10 +2930,12 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   the same for an accent button that takes no Return (an empty state's
   Restore…). The scan: no button under `Views/` writes the default look beside
   `.disabled(`, except Save, which swaps on its own predicate. The wizard's
-  Create Course now takes Return — `CourseCodePickerView`'s Return comment
-  always said a Return the field does not use "reaches the sheet's default
-  button", and there was none; the plan's "Return is left alone because fields
-  take it" was the wrong half. **Class Dates' Read the Dates does NOT take
+  **Create Course does NOT take Return** — measured in the real app on
+  2026-10-08 (the implementation review asked for it): as the default button,
+  a Return typed in the Course code field with no row highlighted created a
+  club named by the code, with its name empty and the rest of the form unread.
+  It wears the accent through `.prominentButton(isEnabled:)` instead, grey
+  while the folder is getting ready; a long form is finished with a click. **Class Dates' Read the Dates does NOT take
   Return while the dates are being typed**: the box needs Return for a new
   line, a default button can take Return before a text box does, and a probe
   app could not put focus in its box to settle which wins — so the risk was

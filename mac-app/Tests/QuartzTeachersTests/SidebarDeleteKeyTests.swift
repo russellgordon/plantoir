@@ -61,3 +61,46 @@ final class SidebarDeleteKeyTests: XCTestCase {
         XCTAssertTrue(body.contains("performMenuItem(item)"), "through the item's own enablement check and closure")
     }
 }
+
+/// The sidebar's − button runs the same Remove item as the Delete key and
+/// the menu bar, and is enabled exactly when that item is (#457, the HIG
+/// sweep's implementation review: it still removed a reference section).
+@MainActor
+final class SidebarMinusButtonTests: XCTestCase {
+
+    // MARK: - Tests
+
+    func testTheMinusButtonIsGreyOnAReferenceSection() {
+        var situation: SubjectMenuRules.Situation = SubjectMenuRules.Situation()
+        situation.hasFolder = true
+        situation.row = .section
+        situation.keptForReference = true
+        XCTAssertFalse(SubjectMenuRules.minusButtonIsEnabled(situation), "Remove Section N is withheld on a reference course")
+        situation.row = .course
+        XCTAssertTrue(SubjectMenuRules.minusButtonIsEnabled(situation), "removing the whole course stays")
+        situation.keptForReference = false
+        situation.row = .section
+        XCTAssertTrue(SubjectMenuRules.minusButtonIsEnabled(situation))
+        situation.copying = true
+        XCTAssertFalse(SubjectMenuRules.minusButtonIsEnabled(situation), "not while the course is being copied")
+        situation.copying = false
+        situation.sheetIsUp = true
+        XCTAssertFalse(SubjectMenuRules.minusButtonIsEnabled(situation), "not under a sheet")
+        for row in [SubjectMenuRules.Row.backup, .archived, .allBackups, .none] {
+            situation.sheetIsUp = false
+            situation.row = row
+            XCTAssertNil(SubjectMenuRules.minusButtonItem(for: row))
+            XCTAssertFalse(SubjectMenuRules.minusButtonIsEnabled(situation), "row \(row.rawValue)")
+        }
+    }
+
+    /// The button asks the rule and runs the item; it does not call
+    /// `prepareRemoval` itself.
+    func testTheButtonGoesThroughTheRule() throws {
+        let sidebar: String = try String(
+            contentsOf: TextFieldStyleScanTests.viewsURL().appendingPathComponent("SidebarView.swift"), encoding: .utf8
+        )
+        XCTAssertTrue(sidebar.contains(".disabled(!SubjectMenuRules.minusButtonIsEnabled(menuCommands.situation))"))
+        XCTAssertTrue(sidebar.contains("if let item = SubjectMenuRules.minusButtonItem(for: menuCommands.situation.row) {"))
+    }
+}
