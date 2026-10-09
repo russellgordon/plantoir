@@ -1453,6 +1453,7 @@ fi
 restore_hit_fixture() {
   [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+  rm -f "$HIT_COURSE/Plain Long Page.md"
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Printable Too Tall.md" \
@@ -1857,6 +1858,22 @@ PRINTFIXTURE
 sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable Not Opted/' \
     -e 's/plantoir-print-sentinel-7f3a/plantoir-notopted-sentinel-7f3a/' \
     "$HIT_COURSE/Printable Fixture.md" > "$HIT_COURSE/Printable Not Opted.md"
+# #501: a long page that is NOT printable, for ⌘P (browser-checks/
+# print_plain_page.mjs): 40 paragraphs, each starting with its own sentinel,
+# under headings and with lists, long enough to run under the folder list
+# that used to be drawn over the article on paper.
+{
+  printf -- '---\ntitle: Plain Long Page\n---\n'
+  for number in $(seq 0 39); do
+    para="$(printf 'plantoir-plain-para-%02d' "$number")"
+    (( number % 10 == 0 )) && printf '\n## Part %d\n' $(( number / 10 + 1 ))
+    if (( number % 10 == 8 )); then
+      printf '\n- %s a list item about the slope of a line\n' "$para"
+    else
+      printf '\n%s The class works out the slope of a line through two given points, then checks it against a graph drawn on the board and writes down what the number means.\n' "$para"
+    fi
+  done
+} > "$HIT_COURSE/Plain Long Page.md"
 mkdir -p "$HIT_COURSE/Media"
 # Pictures for the worksheet's hazards (#499): a tall portrait one that must be
 # scaled onto a page, a wide one inside a folded answer, and an SVG with only a
@@ -2022,6 +2039,9 @@ done
 # Opted" page is the worksheet with only `printable: true` taken out, and it
 # must carry none of the print markup - its date line exactly the plain one
 # every page had before #454, no meta-line wrapper, no print style, no button.
+# Its PRINT is not unchanged since #501: the shared index.css carries one
+# print block for every page that is not printable, checked here by its text
+# and on paper by browser-checks/print_plain_page.mjs below.
 if python3 - "$SITE_PUBLIC" "$HIT_COURSE" /tmp/verify_main_build.log <<'PY'
 import hashlib, html, json, re, sys
 from pathlib import Path
@@ -2069,6 +2089,15 @@ for needle in ("plantoir-meta-line", "plantoir-print", "data-plantoir", "@page")
 if plain and not re.search(r'</h1><p show-comma="[a-z]+" class="content-meta">', plain):
     problems.append("the page that did not opt in does not have the plain date line straight after its title")
 
+# #501: its print changes only through the shared stylesheet - the one block
+# (printablePages.everyOtherPage) that takes the sidebars away under ⌘P on
+# every page that is not printable, as the site's minifier writes it.
+every_other = contracts.section("shared-rules", "printablePages", "everyOtherPage")
+minified = every_other["scope"] + " " + every_other["hidden"][0].replace(" > ", ">") + "{display:none!important"
+stylesheet = public / "index.css"
+if not stylesheet.is_file() or minified not in stylesheet.read_text(encoding="utf-8"):
+    problems.append(f"index.css lacks the print block for pages that are not printable ({minified}, #501)")
+
 pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0]
 engine = public / "static" / "pagedjs" / "paged.min.js"
 if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pin["fileSha256"]:
@@ -2107,7 +2136,7 @@ for problem in problems:
 sys.exit(1 if problems else 0)
 PY
 then
-  pass "printable pages: the worksheet carries its corners and menu, a page that did not opt in carries no print markup at all, the engine is the pinned one served locally, a page's own PDF is linked byte for byte, and a missing PDF falls back and is reported (#454)"
+  pass "printable pages: the worksheet carries its corners and menu, a page that did not opt in carries no print markup at all (its print changes only through the shared stylesheet, #501), the engine is the pinned one served locally, a page's own PDF is linked byte for byte, and a missing PDF falls back and is reported (#454)"
 else
   fail "printable pages: one of the checks above failed (#454)"
 fi
@@ -2143,10 +2172,18 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
     fail "printable pages: a handout or ⌘P lost something, printed something it should not, or did not look as it should on paper (browser-checks/print_handout.mjs, #454, #498, #499)"
     cat /tmp/verify_print_handout.log
   fi
+  # #501: ⌘P on a long page that is NOT printable, read back by its ink.
+  if node browser-checks/print_plain_page.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Plain-Long-Page.html" \
+       >/tmp/verify_print_plain_page.log 2>&1; then
+    pass "⌘P on a page that is not printable: a 40-paragraph page loaded in a laptop-sized window, printed on portrait and landscape letter paper - no sidebar's words on paper, every paragraph whole in the text, ink under every paragraph's first word, nothing past the paper's edge (#501, browser-checks/print_plain_page.mjs)"
+  else
+    fail "⌘P on a page that is not printable lost words under the sidebars or ran off the paper (browser-checks/print_plain_page.mjs, #501)"
+    cat /tmp/verify_print_plain_page.log
+  fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true
 else
-  RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
-  echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac"
+  RESULTS+=("⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout, and ⌘P on a page that is not printable, as a browser prints them: no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
 restore_hit_fixture
 trap release_verify_lock EXIT
