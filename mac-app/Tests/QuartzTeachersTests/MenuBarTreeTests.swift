@@ -202,7 +202,7 @@ final class MenuBarTreeTests: XCTestCase {
 
     /// Russell, 2026-10-08: no "New Assistant Window" (the assistant is
     /// always for a section), no File ▸ New submenu of window kinds, no
-    /// Rename in Edit (Course ▸ Rename… now), and the Window menu manages
+    /// Rename in Edit (Course ▸ Rename now), and the Window menu manages
     /// windows only — no second "About Plantoir" in it.
     func testNoAssistantWindowNoNewSubmenuAndNothingMisplaced() throws {
         let mainMenu: NSMenu = try XCTUnwrap(NSApp.mainMenu)

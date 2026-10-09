@@ -36,7 +36,9 @@ nonisolated enum CodexLauncher {
     /// The sentences this door shows a teacher, in one place, because
     /// `contracts/app-rules.json` → `outsideAgents` carries them and a test
     /// compares the two.
-    static let menuItemTitle: String = "Revise with Codex…"
+    /// The item's title inside Revise With ▸ (#457, the HIG sweep) — see
+    /// `ClaudeCodeLauncher.menuItemTitle`.
+    static let menuItemTitle: String = "Codex…"
 
     static let didNotOpenTitle: String = "Codex didn’t open"
 

@@ -469,25 +469,13 @@ struct SectionVerbSheet: View {
                 }
             )
         } else {
-            VStack(alignment: .leading, spacing: 0) {
-                // The title band every sheet wears since #457's HIG sweep:
-                // `.headline`, leading, 52 points tall, the sheet's own side
-                // margin — written out here because batch C's `SheetTitle`
-                // (`.sheetTitle(_:)`) is not on this branch; when the two
-                // merge, this becomes `.sheetTitle(title)`.
-                Text(sheetTitle)
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .frame(height: 52)
-                VStack(alignment: .leading, spacing: 12) {
-                    content
-                    buttons
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+            // The one sheet title shape (#457's HIG sweep, `SheetTitle`).
+            VStack(alignment: .leading, spacing: 12) {
+                content
+                buttons
             }
+            .padding([.horizontal, .bottom], 20)
+            .sheetTitle(sheetTitle)
             .frame(width: 560)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .contain)
@@ -653,26 +641,14 @@ struct SectionVerbSheet: View {
     }
 
     /// The default button takes Return and wears the accent ONLY while it can
-    /// be pressed; otherwise it is a plain grey button with no key — the
-    /// shape #364 gave Course Settings' Save, and batch C's
-    /// `defaultButton(isEnabled:)` makes one modifier (#457's HIG sweep).
-    /// Written out here because that helper is not on this branch; when the
-    /// two merge, this becomes `.defaultButton(isEnabled:)`.
-    @ViewBuilder
+    /// be pressed; otherwise it is a plain grey button with no key
+    /// (`defaultButton(isEnabled:)`, #457's HIG sweep).
     var defaultButton: some View {
-        if model.defaultButtonIsEnabled {
-            Button(model.defaultButtonTitle) {
-                pressDefault()
-            }
-            .keyboardShortcut(.defaultAction)
-            .accessibilityIdentifier("sectionVerbSheetDefault")
-        } else {
-            Button(model.defaultButtonTitle) {
-                pressDefault()
-            }
-            .disabled(true)
-            .accessibilityIdentifier("sectionVerbSheetDefault")
+        Button(model.defaultButtonTitle) {
+            pressDefault()
         }
+        .defaultButton(isEnabled: model.defaultButtonIsEnabled)
+        .accessibilityIdentifier("sectionVerbSheetDefault")
     }
 
     // MARK: - Functions

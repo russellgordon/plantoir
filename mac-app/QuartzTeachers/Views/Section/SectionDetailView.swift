@@ -450,10 +450,10 @@ struct SectionDetailView: View {
             }
             ToolbarItemGroup {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
-                    FolderActions.openInObsidian(
-                        revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber),
-                        vaultURL: course.directoryURL
-                    )
+                    // The one route (#457, the HIG sweep): on a course kept
+                    // for reference it re-locks the pages and shows the note
+                    // the first time, as the row and the menu bar do.
+                    workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this section's pages in Obsidian")
@@ -715,14 +715,22 @@ struct SectionDetailView: View {
                         )
                     }
                 }
-                Button("OK") { }
+                // "OK" only when it is the only answer: beside a verb it
+                // reads as "yes, do it" (#457, the HIG sweep).
+                Button(SiteHealthRepair.dismissTitle(
+                    besideAnAction: !course.isKeptForReference && SiteHealthRepair.buttonTitle(for: healthFindings) != nil,
+                    afterARepair: false
+                ), role: .cancel) { }
             case .outcome:
                 if repairOutcome?.canRebuild == true {
                     Button("Preview Again") {
                         rebuildAfterRepair()
                     }
                 }
-                Button("OK") { }
+                Button(SiteHealthRepair.dismissTitle(
+                    besideAnAction: repairOutcome?.canRebuild == true,
+                    afterARepair: true
+                ), role: .cancel) { }
             case .none:
                 Button("OK") { }
             }

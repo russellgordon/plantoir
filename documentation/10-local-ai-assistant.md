@@ -6340,7 +6340,7 @@ own, bound to one section. These are different. A teacher who already has
 course to it — a real terminal session, with Plantoir's tools already
 connected and an opening message already sent. Nothing is typed by them.
 
-| | Revise with Claude… | Revise with Codex… |
+| | Revise With ▸ Claude… | Revise With ▸ Codex… |
 |---|---|---|
 | Tool looked for | `claude` | `codex` |
 | Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) |
@@ -6974,7 +6974,7 @@ the session made its backup and wrote `EXC2O.held-backup.<pid>` naming it. In
 the app: the course menu showed Revise with Claude and Codex greyed with
 "Available once you finish revising with Claude" once under them, and Rename
 Course and Add Section… greyed with the same line (Edit → Rename Course too —
-Course ▸ Rename… since v1.5.0, #457, read the same way); a
+Course ▸ Rename since v1.5.0, #457, read the same way); a
 section's menu greyed all three Revise items with one line; Delete Backup on
 the session's zip answered "Finish the Claude session working on EXC2O first.
 It made this backup, so it was kept."; and Restore on another backup of EXC2O,

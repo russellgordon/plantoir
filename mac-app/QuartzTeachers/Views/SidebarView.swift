@@ -56,15 +56,6 @@ struct SidebarView: View {
     @State var copyPageCourse: Course?
 
 
-    /// The reference course whose calm locked-pages note is showing, before
-    /// the teacher goes into Obsidian.
-    @State var lockedPagesNoteCourse: Course?
-
-    /// The folder Obsidian reveals once that note is answered — the section's
-    /// own when it was asked from a section (#457: what the section window's
-    /// toolbar button opens).
-    @State var lockedPagesNoteFolder: URL?
-
     /// The section "Schedule Deploy…" was chosen on, while its sheet is up.
     @State var scheduleRequest: ScheduledDeployRequest?
 
@@ -278,6 +269,9 @@ struct SidebarView: View {
             }
             .listStyle(.sidebar)
             .accessibilityIdentifier(SidebarView.listIdentifier)
+            // Delete asks to remove the selected row, through the menu
+            // item's own rule and closure (#457, the HIG sweep).
+            .onDeleteCommand(perform: deleteKeyPressed)
             // Return renames the selected course, as it does in Finder.
             // `.onKeyPress(.return)` was tried here first and is never
             // called — see `SidebarReturnKey` for what actually happens to
@@ -455,7 +449,7 @@ struct SidebarView: View {
                     """)
             }
         }
-        .alert("Could not do that", isPresented: backupProblemBinding) {
+        .alert(workspace.backupProblemTitle, isPresented: backupProblemBinding) {
             Button("OK") {
                 workspace.backupProblem = nil
             }
@@ -505,7 +499,6 @@ struct SidebarView: View {
         .sheet(item: $copyPageCourse) { course in
             CopyPageSheet(source: course)
         }
-        .modifier(LockedPagesNoteAlert(course: $lockedPagesNoteCourse, folder: lockedPagesNoteFolder))
         .sheet(item: $addSectionCourse) { course in
             AddSectionSheet(course: course) { sectionNumber in
                 workspace.reloadCourses()
@@ -744,7 +737,12 @@ struct SidebarView: View {
             .accessibilityIdentifier("addCourseButton")
 
             Button {
-                prepareRemoval()
+                // Through the menu item's own rule and closure (#457, the
+                // HIG sweep's review): the − button, the Delete key and
+                // Course ▸ / Section ▸ Remove… are one command.
+                if let item = SubjectMenuRules.minusButtonItem(for: menuCommands.situation.row) {
+                    performMenuItem(item)
+                }
             } label: {
                 Label("Remove Selected", systemImage: "minus")
                     .labelStyle(.iconOnly)
@@ -753,12 +751,11 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            // An archived item is already put away, so there is nothing
-            // for this button to do while one is selected.
-            // Nor while the course is being copied (#351): a second archive of
-            // a folder already being put away.
-            .disabled(workspace.selectedCourse == nil
-                      || workspace.isBeingCopied(workspace.selectedCourse?.code ?? ""))
+            // Enabled exactly when the Remove item it runs is: not on an
+            // archived item (already put away), a backup, a section of a
+            // course kept for reference (`interface.whatIsWithheld`), under a
+            // sheet, or while the course is being copied (#351).
+            .disabled(!SubjectMenuRules.minusButtonIsEnabled(menuCommands.situation))
             .help("Remove the selected course or section")
             .accessibilityIdentifier("removeSelectedButton")
             .padding(.trailing, 5)
@@ -1183,6 +1180,38 @@ struct SidebarView: View {
         }
     }
 
+    /// Revise With ▸, as the menu bar draws it (#457, the HIG sweep): the
+    /// row's Claude…, Codex… and (on a section) Local AI Assistant… items in
+    /// one submenu, with the reasons any is greyed under them. Until the
+    /// sweep the row's menu called the same commands "Revise with Claude…"
+    /// and so on at the top level — one command, two names. Left out when
+    /// there is nothing to put in it, as the menu bar leaves it out.
+    @ViewBuilder
+    func reviseWithSubmenu(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
+        if reviseWithHasAnItem(course: course, sectionNumber: sectionNumber) {
+            Menu("Revise With") {
+                reviseWithClaudeItem(course: course, row: row)
+                reviseWithCodexItem(course: course, row: row)
+                if let sectionNumber {
+                    reviseWithAIItem(course: course, sectionNumber: sectionNumber)
+                }
+                reviseNotes(course: course, sectionNumber: sectionNumber)
+            }
+        }
+    }
+
+    /// Whether any Revise item would be drawn on this row — the same three
+    /// conditions the items themselves draw on.
+    func reviseWithHasAnItem(course: Course, sectionNumber: Int?) -> Bool {
+        if course.isKeptForReference || workspace.workspaceURL == nil {
+            return false
+        }
+        if ClaudeCodeLauncher.isAvailable || CodexLauncher.isAvailable {
+            return true
+        }
+        return sectionNumber != nil && AssistHardwareBudget.current().canRunAssistant
+    }
+
     /// The distinct reasons behind `reviseNotes`, in the items' order.
     func reviseNoteLines(course: Course, sectionNumber: Int?) -> [String] {
         var lines: [String] = []
@@ -1284,6 +1313,8 @@ struct SidebarView: View {
                     .disabled(workspace.isBeingCopied(course.code))
                     Divider()
                     folderMenuItems(for: course.directoryURL, row: row)
+                    Divider()
+                    removeItem("Remove Course…", course: course, row: row)
                 }
         }
     }
@@ -1350,12 +1381,13 @@ struct SidebarView: View {
 
     /// The editing action, set apart in its own menu section. The Obsidian
     /// vault is the COURSE folder even for a section row — the section is a
-    /// subfolder within it, and Obsidian lands there.
+    /// subfolder within it, and Obsidian lands there. Through the one route
+    /// every Open in Obsidian takes (`WorkspaceModel.openInObsidian`).
     @ViewBuilder
-    func openInObsidianItem(revealing folderURL: URL, vaultURL: URL, row: SidebarSelection) -> some View {
+    func openInObsidianItem(course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         Button("Open in Obsidian", systemImage: "square.and.pencil") {
             select(row)
-            FolderActions.openInObsidian(revealing: folderURL, vaultURL: vaultURL)
+            workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
         }
         .disabled(!FolderActions.obsidianIsInstalled)
     }
@@ -1373,7 +1405,9 @@ struct SidebarView: View {
     func openInObsidianItem(forReferenceCourse course: Course, sectionNumber: Int?, row: SidebarSelection) -> some View {
         Button("Open in Obsidian", systemImage: "square.and.pencil") {
             select(row)
-            openReferenceCourseInObsidian(course, sectionNumber: sectionNumber)
+            // The one route (`WorkspaceModel.openInObsidian`), which locks
+            // the pages again and asks for the note the first time.
+            workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
         }
         .disabled(!FolderActions.obsidianIsInstalled)
         .accessibilityIdentifier("openInObsidian-\(course.code)")
@@ -1496,7 +1530,7 @@ struct SidebarView: View {
             // Revise items (`reviseNotes`), so the same reason is not said
             // three times.
             let blocked: String? = reviseReason(.localAssistant, course: course, sectionNumber: sectionNumber)
-            Button("Revise with Local AI Assistant…", systemImage: "sparkles") {
+            Button(ReviseWithMenu.localAssistantTitle, systemImage: "sparkles") {
                 select(SidebarSelection.section(course.code, sectionNumber))
                 reviseWithLocalAssistant(course: course, sectionNumber: sectionNumber, folder: folder)
             }
@@ -1528,16 +1562,9 @@ struct SidebarView: View {
         // editing and folder actions made it
         // read as an afterthought.
         let row: SidebarSelection = SidebarSelection.section(course.code, sectionNumber)
-        reviseWithClaudeItem(course: course, row: row)
-        reviseWithCodexItem(course: course, row: row)
-        reviseWithAIItem(course: course, sectionNumber: sectionNumber)
-        reviseNotes(course: course, sectionNumber: sectionNumber)
+        reviseWithSubmenu(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
-        openInObsidianItem(
-            revealing: course.sectionDirectoryURL(forSection: sectionNumber),
-            vaultURL: course.directoryURL,
-            row: row
-        )
+        openInObsidianItem(course: course, sectionNumber: sectionNumber, row: row)
         Divider()
         // The assistant's four everyday functions (#457 batch B; Russell's
         // decision 10 on the plan), run by the section window through the
@@ -1595,6 +1622,8 @@ struct SidebarView: View {
         }
         Divider()
         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
+        Divider()
+        removeItem("Remove Section…", course: course, row: row)
     }
 
     /// One of the assistant's functions on a section row's context menu: the
@@ -1616,15 +1645,11 @@ struct SidebarView: View {
     @ViewBuilder
     func courseRowMenu(course: Course, busyReason: String?, structuralReason: String?) -> some View {
         let row: SidebarSelection = SidebarSelection.course(course.code)
-        reviseWithClaudeItem(course: course, row: row)
-        reviseWithCodexItem(course: course, row: row)
-        reviseNotes(course: course, sectionNumber: nil)
+        reviseWithSubmenu(course: course, sectionNumber: nil, row: row)
         if course.isKeptForReference {
             openInObsidianItem(forReferenceCourse: course, sectionNumber: nil, row: row)
         } else {
-            openInObsidianItem(
-                revealing: course.directoryURL, vaultURL: course.directoryURL, row: row
-            )
+            openInObsidianItem(course: course, sectionNumber: nil, row: row)
         }
         Divider()
         // Renaming moves the folder a preview is
@@ -1661,7 +1686,8 @@ struct SidebarView: View {
             // selection change loses focus to the sidebar and
             // closes (#293, measured — see the selection's
             // onChange). The field works on an unselected row.
-            Button("Rename Course", systemImage: "pencil") {
+            // "Rename", as Course ▸ Rename names it (#457, the HIG sweep).
+            Button("Rename", systemImage: "pencil") {
                 workspace.renamingCourseCode = course.code
             }
             .disabled(structuralReason != nil)
@@ -1697,6 +1723,23 @@ struct SidebarView: View {
         .disabled(workspace.isBeingCopied(course.code))
         Divider()
         folderMenuItems(for: course.directoryURL, row: row)
+        Divider()
+        removeItem("Remove Course…", course: course, row: row)
+    }
+
+    /// The row's Remove item: LAST, behind a divider, destructive (#457, the
+    /// HIG sweep; Backups and Archived already ended this way). It selects
+    /// its row and asks the question the − button and the menu bar ask —
+    /// archiving, never deleting. Greyed while a copy of the course is being
+    /// zipped, as the menu item is. A section of a course kept for reference
+    /// has no Remove Section… (`interface.whatIsWithheld`); its course keeps
+    /// Remove Course….
+    func removeItem(_ title: String, course: Course, row: SidebarSelection) -> some View {
+        return Button(title, systemImage: "archivebox", role: .destructive) {
+            select(row)
+            prepareRemoval()
+        }
+        .disabled(workspace.isBeingCopied(course.code))
     }
 
     // MARK: - The menu bar's Course and Section menus (#457)
@@ -1726,28 +1769,6 @@ struct SidebarView: View {
             return
         }
         addSectionCourse = course
-    }
-
-    /// Open in Obsidian on a course kept for reference, with the calm note
-    /// in front of it the first time.
-    ///
-    /// From a SECTION it reveals the section's folder, exactly what the
-    /// section window's toolbar button reveals (`FolderActions.obsidianFolder`);
-    /// until #457's implementation review it revealed the course folder from
-    /// the section's row, and the toolbar beside it did not agree.
-    func openReferenceCourseInObsidian(_ course: Course, sectionNumber: Int?) {
-        // Locked again first: this is one of the moments the teacher
-        // ACTS on a reference course, and a folder that came back from a
-        // second Mac, or from a backup, is not locked until somebody
-        // asks.
-        ReferenceLock.ensureLockedInBackground(course)
-        let folder: URL = FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber)
-        if LockedPagesNote.hasBeenShown(courseCode: course.code) {
-            FolderActions.openInObsidian(revealing: folder, vaultURL: course.directoryURL)
-            return
-        }
-        lockedPagesNoteFolder = folder
-        lockedPagesNoteCourse = course
     }
 
     /// Opens the local assistant for one section — the ONLY way it opens
@@ -1888,14 +1909,7 @@ struct SidebarView: View {
             }
         case .courseOpenInObsidian, .sectionOpenInObsidian:
             if let course {
-                if course.isKeptForReference {
-                    openReferenceCourseInObsidian(course, sectionNumber: sectionNumber)
-                } else {
-                    FolderActions.openInObsidian(
-                        revealing: FolderActions.obsidianFolder(for: course, sectionNumber: sectionNumber),
-                        vaultURL: course.directoryURL
-                    )
-                }
+                workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
             }
         case .courseShowInFinder:
             if let backup = workspace.selectedBackupItem {
@@ -1964,7 +1978,7 @@ struct SidebarView: View {
     ///
     /// Only a COURSE row answers. A section's row is a different thing to
     /// have selected, and renaming the course it belongs to because Return
-    /// was pressed on Section 2 is not what anybody meant — Course ▸ Rename…
+    /// was pressed on Section 2 is not what anybody meant — Course ▸ Rename
     /// is there for that, in the menu named for what it acts on (#457).
     func beginRenamingFromTheKeyboard() -> Bool {
         if workspace.renamingCourseCode != nil {
@@ -1984,6 +1998,18 @@ struct SidebarView: View {
         }
         workspace.beginRenamingSelectedCourse()
         return true
+    }
+
+    /// Delete, pressed with a sidebar row selected: runs the item the menu
+    /// bar would — Remove Course…, Remove Section…, Delete Backup… or Delete
+    /// Archive… — through `performMenuItem`, which asks the same rule the
+    /// menu greys by (so nothing on a reference section, nothing under a
+    /// sheet: a beep, as for any greyed item) and then asks the same question.
+    func deleteKeyPressed() {
+        guard let item = SubjectMenuRules.deleteKeyItem(for: menuCommands.situation.row) else {
+            return
+        }
+        performMenuItem(item)
     }
 
     /// Works out what the remove button would do and asks first.
@@ -2014,6 +2040,8 @@ struct SidebarView: View {
         case .backup, .allBackups:
             // Deleting a backup is a real deletion, so it happens only
             // through its own explicit menu item, never the minus button.
+            // The Delete key asks through that item (Course ▸ Delete
+            // Backup…), not through here (#457, the HIG sweep).
             return
         case .section(_, let sectionNumber):
             if course.sectionNumbers.count <= 1 {
@@ -2255,7 +2283,7 @@ struct CourseCodeField: View {
             // The field and its message share ONE solid card, and that is
             // what makes the MESSAGE readable.
             //
-            // A course renamed from Return or Course ▸ Rename… is SELECTED
+            // A course renamed from Return or Course ▸ Rename is SELECTED
             // while it is being renamed, so this row is drawing on the
             // selection colour — and everything inside a selected sidebar
             // row is tinted to sit on it. (The context menu selects the row
@@ -2386,61 +2414,6 @@ struct CourseCodeField: View {
 /// chain, whose own body is type-checked on its own, is the smallest cut that
 /// puts it back — and it keeps the two doors' failure paths side by side,
 /// which is where they belong.
-/// The calm note about a reference course's pages, shown once per course
-/// BEFORE the teacher goes into Obsidian.
-///
-/// A modifier rather than three more lines on the sidebar's body, for a
-/// reason worth writing down: the body reached the point where the Swift
-/// compiler gave up type-checking it ("unable to type-check this expression
-/// in reasonable time"), which is what every other alert here was eventually
-/// pulled out for.
-private struct LockedPagesNoteAlert: ViewModifier {
-
-    // MARK: - Stored properties
-
-    @Binding var course: Course?
-
-    /// What Obsidian reveals once the note is answered: the section's folder
-    /// when it was asked from a section, else the course's.
-    var folder: URL?
-
-    // MARK: - Functions
-
-    func body(content: Content) -> some View {
-        content.alert(
-            ReferenceWording.pagesAreLockedTitle,
-            isPresented: isPresented,
-            presenting: course
-        ) { shown in
-            Button("Open in Obsidian") {
-                LockedPagesNote.remember(courseCode: shown.code)
-                course = nil
-                FolderActions.openInObsidian(
-                    revealing: folder ?? shown.directoryURL, vaultURL: shown.directoryURL
-                )
-            }
-            Button("Not Now", role: .cancel) {
-                course = nil
-            }
-        } message: { _ in
-            // No warning icon and no "cannot": a teacher who kept this course
-            // for reference asked for it, so it reads as a fact.
-            Text(ReferenceWording.pagesAreLocked + "\n\n" + ReferenceWording.obsidianOpensThemForReading)
-        }
-    }
-
-    private var isPresented: Binding<Bool> {
-        return Binding(
-            get: { return course != nil },
-            set: { showing in
-                if !showing {
-                    course = nil
-                }
-            }
-        )
-    }
-}
-
 private struct OutsideAgentAlerts: ViewModifier {
 
     // MARK: - Stored properties

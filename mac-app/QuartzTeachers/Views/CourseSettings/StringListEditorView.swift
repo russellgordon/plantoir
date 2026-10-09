@@ -320,7 +320,10 @@ struct StringListEditorView: View {
                         beginRename(of: item)
                     }
                 }
-                Button("Remove") {
+                // Last, behind a divider, destructive — every context menu's
+                // removal is drawn the same way (#457, the HIG sweep).
+                Divider()
+                Button("Remove", role: .destructive) {
                     requestRemoval(of: item)
                 }
             }
@@ -413,8 +416,7 @@ struct StringListEditorView: View {
                     addNewItem()
                     isAddingItem = false
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canAdd)
+                .defaultButton(isEnabled: canAdd)
                 .accessibilityIdentifier("addConfirm-\(title)")
             }
         }
@@ -437,8 +439,6 @@ struct StringListEditorView: View {
         ) == .orderedSame
         let problem: String? = renameProblem?(item, proposedName, finishing)
         VStack(alignment: .leading, spacing: 12) {
-            Text(SpecialNames.renameFolderTitle(for: item))
-                .font(.headline)
             TextField("New name", text: $proposedName)
                 .borderedTextField()
                 .accessibilityIdentifier("renameField")
@@ -470,11 +470,11 @@ struct StringListEditorView: View {
                 Button("Rename") {
                     Task { await performRename(of: item, finishing: finishing) }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(problem != nil || isRenaming)
+                .defaultButton(isEnabled: problem == nil && !isRenaming)
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(SpecialNames.renameFolderTitle(for: item))
         .frame(width: 420)
     }
 
