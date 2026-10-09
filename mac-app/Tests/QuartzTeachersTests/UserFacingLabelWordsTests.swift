@@ -58,6 +58,7 @@ final class UserFacingLabelWordsTests: XCTestCase {
         XCTAssertEqual(CourseSettingsWording.printingBlankName, words["blankName"] as? String)
         XCTAssertEqual(CourseSettingsWording.printingBlankDate, words["blankDate"] as? String)
         XCTAssertEqual(CourseSettingsWording.printingBlankClassNumber, words["blankClassNumber"] as? String)
+        XCTAssertEqual(CourseSettingsWording.printedPageLabel, words["pageLabel"] as? String)
     }
 
     /// And none of them names the machinery.

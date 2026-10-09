@@ -36,7 +36,9 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
     nonisolated static let modes: [String] = ["withAnswersAtTheEnd", "questionsOnly", "answersOnly"]
 
     /// Told after a page has been handed over, for the trail.
-    var whenHandedOver: ((URL, Reason) -> Void)?
+    /// The page the teacher was on (nil when the web view has none), then
+    /// what was opened.
+    var whenHandedOver: ((URL?, URL, Reason) -> Void)?
 
     /// Opens a URL; replaceable so a test can watch instead of opening one.
     var open: (URL) -> Void = { url in
@@ -67,23 +69,43 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
     }
 
     /// The trail's words (activityTrail → `preview page opened in the web
-    /// browser`): why, and the page's place in the site - its address below
-    /// the preview's root, never anything written on it.
-    nonisolated static func trailWords(for url: URL, reason: Reason) -> String {
-        var place: String = url.path
-        while place.hasPrefix("/") {
-            place.removeFirst()
+    /// browser`): why, and the slug of the PAGE the teacher was on - never
+    /// where a link led. A link's destination is something the teacher wrote
+    /// on a page, and a shared-document address is a key to that document
+    /// (implementation review S2: the first version recorded the path of any
+    /// link, a Drive document id included). So a new-window link says only
+    /// whether it was the page's own PDF, a page of the site, or another site.
+    nonisolated static func trailWords(page: URL?, target: URL, reason: Reason) -> String {
+        var place: String = "an unknown page"
+        if let page, isThePreviews(page) {
+            place = page.path
+            while place.hasPrefix("/") {
+                place.removeFirst()
+            }
+            if place.isEmpty {
+                place = "the front page"
+            }
         }
-        if place.isEmpty {
-            place = "the front page"
-        }
-        var why: String = "a link that opens in a new window"
+        var why: String = "a link to another site"
         if case .printHandout(let mode) = reason {
             why = "to print it " + modeWords(mode)
-        } else if url.pathExtension.lowercased() == "pdf" {
-            why = "a page's own PDF"
+        } else if isThePreviews(target) {
+            if target.pathExtension.lowercased() == "pdf" {
+                why = "the page's own PDF"
+            } else {
+                why = "a link to another page of the site"
+            }
         }
         return "preview page opened in the web browser — " + why + " (" + place + ")"
+    }
+
+    /// Whether an address is one of the preview's own pages, served from this Mac.
+    nonisolated static func isThePreviews(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = url.host?.lowercased() else {
+            return false
+        }
+        return host == "localhost" || host == "127.0.0.1"
     }
 
     nonisolated private static func modeWords(_ mode: String) -> String {
@@ -105,7 +127,7 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
             return
         }
         open(address)
-        whenHandedOver?(address, .printHandout(mode: mode))
+        whenHandedOver?(address, address, .printHandout(mode: mode))
     }
 
     func webView(
@@ -118,7 +140,7 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
            let scheme = url.scheme?.lowercased(),
            scheme == "http" || scheme == "https" || scheme == "mailto" {
             open(url)
-            whenHandedOver?(url, .newWindow)
+            whenHandedOver?(webView.url, url, .newWindow)
         }
         return nil
     }

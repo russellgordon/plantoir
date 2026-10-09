@@ -1,4 +1,3 @@
-<!-- Managed by Plantoir: this file is replaced whenever Plantoir updates this working folder. Edits here will be lost. -->
 # Plantoir working folder
 
 This folder holds class websites made with Plantoir. Each course is a folder

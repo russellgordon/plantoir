@@ -41,6 +41,9 @@ enum CourseSettingsWording {
     nonisolated static let printingTopLeft: String = "Top left"
     nonisolated static let printingBottomLeft: String = "Bottom left"
     nonisolated static let printingNotPrinted: String = "Not printed"
+    /// How a handout labels its question pages, for the corner sketch -
+    /// `printablePages.words.pageLabel`, the words the page itself prints.
+    nonisolated static let printedPageLabel: String = "Page {n} of {total}"
     nonisolated static let printingCaption: String =
         "Used on pages whose settings say printable: true, when a student or you press Print."
 

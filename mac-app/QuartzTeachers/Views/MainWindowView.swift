@@ -50,6 +50,7 @@ struct MainWindowView: View {
                         // And, while the folder's tools are being copied in
                         // after an update (#476), the notice saying so.
                         ToolchainReadinessNoticeView()
+                        AgentGuidanceNoticeView()
                         CloudSyncNoticeView()
                         workingFolderPathBar
                     }
@@ -60,6 +61,13 @@ struct MainWindowView: View {
         // macOS list interfaces conventionally put it.
         .sheet(isPresented: $workspace.isShowingNewCourseWizard) {
             NewCourseWizardView()
+        }
+        // A teacher's own AGENTS.md or CLAUDE.md: asked before Plantoir adds
+        // its section (#454). One file at a time; answering moves to the next.
+        .sheet(item: pendingGuidanceAppend) { pending in
+            if let workspaceURL = workspace.workspaceURL {
+                AgentGuidanceSheet(pending: pending, workspaceURL: workspaceURL)
+            }
         }
         // A chosen folder the website builder cannot reach, refused while
         // this window goes on showing its own folder (#290): said over the
@@ -84,6 +92,21 @@ struct MainWindowView: View {
     }
 
     // MARK: - Computed properties
+
+    /// The teacher's own root file waiting for a yes in this window's folder
+    /// (#454). Setting it to nil (a sheet closed some other way) answers
+    /// nothing: the file is asked about again on the next pass.
+    private var pendingGuidanceAppend: Binding<AgentGuidance.PendingAppend?> {
+        return Binding<AgentGuidance.PendingAppend?>(
+            get: {
+                guard let workspaceURL = workspace.workspaceURL else {
+                    return nil
+                }
+                return ToolchainReadiness.shared.nextPendingAppend(in: workspaceURL)
+            },
+            set: { _ in }
+        )
+    }
 
     /// A footer showing which folder this window is working in, in the
     /// same form Finder's Path Bar uses.

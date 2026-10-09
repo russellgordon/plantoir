@@ -54,6 +54,13 @@ final class ToolchainReadiness {
     /// The running copy per folder, for whoever must wait for it.
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
 
+    /// A quiet notice per folder whose guidance for assistants could not be
+    /// written (#454 review S1) - shown, never in the way.
+    private(set) var guidanceNotices: [String: String] = [:]
+
+    /// The teacher's own AGENTS.md / CLAUDE.md waiting for a yes, per folder.
+    private(set) var pendingAppends: [String: [AgentGuidance.PendingAppend]] = [:]
+
     // MARK: - Computed properties
 
     /// Whether any folder's copy is running — asked at quit, which waits.
@@ -128,6 +135,7 @@ final class ToolchainReadiness {
         if synchronously {
             let outcome: WorkspaceModel.MirrorOutcome = WorkspaceModel.copyToolchainFiles(into: workspaceURL)
             apply(outcome, to: workspaceURL, startedAt: startedAt)
+            applyGuidance(ToolchainReadiness.writeGuidance(into: workspaceURL), to: workspaceURL)
             return nil
         }
         let task: Task<Void, Never> = Task.detached(priority: .userInitiated) {
@@ -141,6 +149,12 @@ final class ToolchainReadiness {
             )
             await MainActor.run {
                 ToolchainReadiness.shared.apply(outcome, to: workspaceURL, startedAt: startedAt)
+            }
+            // After the copy has settled the folder's readiness, so nothing
+            // here can hold Preview or Deploy back (#454 review S1).
+            let guidance: AgentGuidance.Outcome = ToolchainReadiness.writeGuidance(into: workspaceURL)
+            await MainActor.run {
+                ToolchainReadiness.shared.applyGuidance(guidance, to: workspaceURL)
             }
         }
         tasks[key] = task
@@ -209,6 +223,76 @@ final class ToolchainReadiness {
 
     func noteFailedForTests(_ workspaceURL: URL) {
         states[FolderIdentity.canonicalPath(workspaceURL.path)] = .failed(message: ToolchainReadinessWording.couldNotGetReady)
+    }
+
+    // MARK: - Functions: the guidance for assistants (#454)
+
+    /// The guidance pass, from the app's own bundle.
+    nonisolated static func writeGuidance(into workspaceURL: URL) -> AgentGuidance.Outcome {
+        guard let supportURL = Bundle.main.url(forResource: "support", withExtension: nil) else {
+            return AgentGuidance.Outcome()
+        }
+        return AgentGuidance.write(
+            from: supportURL.appendingPathComponent("agent_guidance"),
+            into: workspaceURL,
+            declined: { path in AgentGuidance.declinedSignature(forPath: path) },
+            forgetDeclined: { path in AgentGuidance.forgetDeclined(forPath: path) }
+        )
+    }
+
+    /// Records what the guidance pass found: a failure as a log line, a trail
+    /// line and a quiet notice; files waiting for a yes for the window's sheet.
+    func applyGuidance(_ outcome: AgentGuidance.Outcome, to workspaceURL: URL) {
+        let key: String = FolderIdentity.canonicalPath(workspaceURL.path)
+        if outcome.failures.isEmpty {
+            guidanceNotices.removeValue(forKey: key)
+        } else {
+            AppLog.interface.error("could not write the guidance for assistants in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.failures.count) problem(s)")
+            ActivityTrail.note(.guidanceCouldNotBeWritten, AgentGuidance.couldNotWriteLine(outcome.failures))
+            guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(reason: outcome.failures[0])
+        }
+        if outcome.pending.isEmpty {
+            pendingAppends.removeValue(forKey: key)
+        } else {
+            pendingAppends[key] = outcome.pending
+        }
+    }
+
+    /// The first file waiting for a yes in this folder, for the window's sheet.
+    func nextPendingAppend(in workspaceURL: URL) -> AgentGuidance.PendingAppend? {
+        return pendingAppends[FolderIdentity.canonicalPath(workspaceURL.path)]?.first
+    }
+
+    /// The teacher's answer: Add appends below their text; Not Now is
+    /// remembered for this file until the section's words change. Either way
+    /// a trail line, and the file is not asked about again in this run.
+    func answer(_ pending: AgentGuidance.PendingAppend, add: Bool, in workspaceURL: URL) {
+        let key: String = FolderIdentity.canonicalPath(workspaceURL.path)
+        var waiting: [AgentGuidance.PendingAppend] = []
+        for entry in pendingAppends[key] ?? [] {
+            if entry != pending {
+                waiting.append(entry)
+            }
+        }
+        pendingAppends[key] = waiting.isEmpty ? nil : waiting
+        if add {
+            if AgentGuidance.appendAfterYes(pending) {
+                AgentGuidance.forgetDeclined(forPath: pending.fileURL.path)
+                ActivityTrail.note(.guidanceFileAskedAbout, AgentGuidance.askedLine(fileName: pending.fileName, added: true))
+            } else {
+                let failure: String = pending.fileName + ": could not be written"
+                ActivityTrail.note(.guidanceCouldNotBeWritten, AgentGuidance.couldNotWriteLine([failure]))
+                guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(reason: failure)
+            }
+        } else {
+            AgentGuidance.rememberDeclined(pending)
+            ActivityTrail.note(.guidanceFileAskedAbout, AgentGuidance.askedLine(fileName: pending.fileName, added: false))
+        }
+    }
+
+    /// The quiet notice, put away by the teacher.
+    func dismissGuidanceNotice(for workspaceURL: URL) {
+        guidanceNotices.removeValue(forKey: FolderIdentity.canonicalPath(workspaceURL.path))
     }
 
     // MARK: - Functions: what the copy reports back

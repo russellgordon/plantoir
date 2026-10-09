@@ -898,9 +898,21 @@
       },
       {
         "event": "preview page opened in the web browser",
-        "carries": "the course and section, the page's place in the site (its web address below the preview's root, never anything written on it), and why: to print the handout - with the way of printing chosen (with the answers at the end, questions only, answers only) - or a link that opens in a new window, which is how a page's own PDF opens (printablePages.previewPane).",
+        "carries": "the course and section, the slug of the page the teacher was on (its address below the preview's root), and why: to print the handout - with the way of printing chosen (with the answers at the end, questions only, answers only) - or a link that opens in a new window, by its KIND only: the page's own PDF, another page of the site, or another site. NEVER where a link led: a link's destination is something the teacher wrote on a page, and a shared-document address is a key to that document (implementation review S2 - the first version recorded the path of any link, a Drive document id included) (printablePages.previewPane).",
         "line": "{course}/{section} · preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
         "why": "#454 review B1. Plantoir's preview cannot print and opened nothing in a new window, so Print and a page's PDF link now hand the page to the teacher's web browser. That is the app acting on a teacher's press in a window the app does not own: 'I pressed Print and nothing happened' or 'a browser window opened by itself' is answered here."
+      },
+      {
+        "event": "asked before adding guidance to a file",
+        "carries": "the file's NAME (AGENTS.md or CLAUDE.md) and the answer, added or not now. Never the file's words.",
+        "line": "asked before adding Plantoir's section to CLAUDE.md in the working folder — not now",
+        "why": "#454, Russell's P1 addendum 2: Plantoir asks before adding its section to a teacher's own file at the working folder's root. 'Why doesn't Claude know about printable pages?' and 'what is this section in my CLAUDE.md?' are both answered here."
+      },
+      {
+        "event": "guidance for assistants could not be written",
+        "carries": "how many problems, and the first: a file (or a skill's folder) and the system's reason. Never anything a teacher wrote.",
+        "line": "could not write the guidance for assistants into the working folder: 1 problem(s) — first: .agents/skills/plantoir-printing: You don’t have permission to save the file.",
+        "why": "#454 implementation review S1: a failure here used to mark the whole folder not ready, refusing Preview and Deploy; now it holds nothing back, so this line and a quiet notice are the only record that an assistant started there will find no guidance."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -22855,11 +22867,12 @@
       ]
     },
     "labels": {
-      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
+      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start), after the nearest heading above it and \" · \" when there is one (the item's number alone repeated across lists: the verify fixture's practice list gave \"Question 1\" beside a heading \"Question 1\", implementation review N2); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
       "cases": [
         { "title": "Answer 3", "kind": "success", "listItem": null, "heading": "Question 1", "answerNumber": 1, "label": "Answer 3" },
         { "title": "SOLUTION", "kind": "solution", "listItem": null, "heading": "Question 7", "answerNumber": 2, "label": "Question 7" },
-        { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Question 3", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item." },
+        { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Practice · Question 3", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item - under its heading, since review N2." },
+        { "title": "Check", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "Question 2", "why": "A list with no heading above it: the item alone." },
         { "title": "Success", "kind": "success", "listItem": null, "heading": null, "answerNumber": 4, "label": "Answer 4" },
         { "title": "Solution (click to expand)", "kind": "note", "listItem": null, "heading": "Question 2", "answerNumber": 1, "label": "Question 2" },
         { "title": "Answers", "kind": "success", "listItem": null, "heading": null, "answerNumber": 2, "label": "Answer 2" },
@@ -22928,14 +22941,103 @@
       "engineClassPrefix": "pl-"
     },
     "agentGuidance": {
-      "rule": "Guidance for an assistant writing a page meant to print (decision 12): one skill, written ONCE per working folder at its root - `.claude/skills/plantoir-printing/` for Claude Code and `.agents/skills/plantoir-printing/` for Codex - by the app's own copy of the toolchain into the working folder, from support/agent_guidance/skills/. The app owns each skill's folder whole and leaves every other skill, and everything else in .claude and .agents, alone. Hidden names, so neither Obsidian nor the website ever shows them. Beside them, at the working folder's root, the same step writes AGENTS.md (read by Codex) and CLAUDE.md (read by Claude Code) from support/agent_guidance/, naming each skill and when to use it, so an assistant started at the working folder is pointed at the guidance from its first prompt (the P1 addendum, 2026-10-09). Those two files say on their first line that Plantoir manages them (managedMarker) and are rewritten on every pass - EXCEPT a file of that name that does not carry the marker, which is a teacher's own and is left exactly as it is. Every course is its own vault, so the root is in no vault and neither file is ever shown in Obsidian or published.",
+      "rule": "Guidance for an assistant writing a page meant to print (decision 12): the skill `plantoir-printing`, written ONCE per working folder at its root - `.claude/skills/plantoir-printing/` for Claude Code and `.agents/skills/plantoir-printing/` for Codex - from support/agent_guidance/skills/, by the app, after its copy of the toolchain into the folder. Each skill's folder is the app's whole; nothing else under .claude or .agents is touched. Beside them, at the root, AGENTS.md (Codex) and CLAUDE.md (Claude Code) carry a MANAGED SECTION from support/agent_guidance/ naming the skill, so an assistant started there is pointed at it from its first prompt (Russell's P1 addendum, and P1 REVISED AGAIN, 2026-10-09). The section is the file's words wrapped in sectionStart and sectionEnd. rootFileCases is the rule: no file - write it holding the section alone; the markers present - replace what is between them and nothing else; no markers (the teacher's own file) - ASK first, in a sheet that names the file, shows what would be added (words) and says their own text stays above it, then append below their text with one blank line between; a Not Now is remembered for that file until the section's words change or the file goes, and is recorded on the trail with the answer (`asked before adding guidance to a file`). A file is never appended to without a yes. The skills are written either way. A failure to write any of it is logged, recorded (`guidance for assistants could not be written`) and shown as words.couldNotWrite, and NEVER holds Preview, Deploy or New Course back (implementation review S1). Every course is its own vault, so the root is in none: neither file shows in Obsidian or on a site.",
       "skill": "plantoir-printing",
-      "folders": [".claude/skills", ".agents/skills"],
-      "rootFiles": ["AGENTS.md", "CLAUDE.md"],
-      "managedMarker": "<!-- Managed by Plantoir:",
+      "folders": [
+        ".claude/skills",
+        ".agents/skills"
+      ],
+      "rootFiles": [
+        "AGENTS.md",
+        "CLAUDE.md"
+      ],
+      "sectionStart": "<!-- BEGIN PLANTOIR: Plantoir writes and replaces everything between this line and END PLANTOIR. Your own text goes above or below. -->",
+      "sectionEnd": "<!-- END PLANTOIR -->",
       "source": "support/agent_guidance",
-      "why": "Measured (#454 plan review S1, Claude Code 2.1.295 and Codex 0.155.1, each started at the working folder as both apps start them): Codex never found a skill under courses/<CODE>/.agents/skills, and found the same skill at once at the working folder's root; Claude Code found a per-course skill only after it had read a file in that course - after the first worksheet was written. REJECTED: a copy in every course (invisible to Codex, late for Claude Code), and an AGENTS.md or CLAUDE.md in the course (a note in Obsidian's tree, needing publishing exclusions in four places like How I Teach)."
+      "rootFileCases": {
+        "rule": "`existing` is the file as found (null: no file), with {start} and {end} standing for sectionStart and sectionEnd; the section's words are \"NEW\". `declined` is the Not Now on record for this file: \"thisSection\" (for these very words), \"earlierSection\" (for words that have since changed) or null. `expect` is write, replace, unchanged, ask or leave; `result` is the file afterwards - for ask, the file after the teacher says Add.",
+        "cases": [
+          {
+            "name": "no file",
+            "existing": null,
+            "declined": null,
+            "expect": "write",
+            "result": "{start}\nNEW\n{end}\n"
+          },
+          {
+            "name": "no file, a Not Now on record for an earlier one",
+            "existing": null,
+            "declined": "thisSection",
+            "expect": "write",
+            "result": "{start}\nNEW\n{end}\n",
+            "why": "The file the teacher answered for has gone."
+          },
+          {
+            "name": "the section, out of date, between the teacher's own text",
+            "existing": "My notes.\n\n{start}\nOLD\n{end}\n\nMore of mine.\n",
+            "declined": null,
+            "expect": "replace",
+            "result": "My notes.\n\n{start}\nNEW\n{end}\n\nMore of mine.\n"
+          },
+          {
+            "name": "the section, current",
+            "existing": "My notes.\n\n{start}\nNEW\n{end}\n",
+            "declined": null,
+            "expect": "unchanged",
+            "result": "My notes.\n\n{start}\nNEW\n{end}\n"
+          },
+          {
+            "name": "the teacher's own file",
+            "existing": "# My notes for Claude\n\nAlways use British spelling.\n",
+            "declined": null,
+            "expect": "ask",
+            "result": "# My notes for Claude\n\nAlways use British spelling.\n\n{start}\nNEW\n{end}\n"
+          },
+          {
+            "name": "the teacher's own file, no newline at the end",
+            "existing": "My notes.",
+            "declined": null,
+            "expect": "ask",
+            "result": "My notes.\n\n{start}\nNEW\n{end}\n"
+          },
+          {
+            "name": "the teacher said Not Now to these words",
+            "existing": "My notes.\n",
+            "declined": "thisSection",
+            "expect": "leave",
+            "result": "My notes.\n"
+          },
+          {
+            "name": "the teacher said Not Now to earlier words",
+            "existing": "My notes.\n",
+            "declined": "earlierSection",
+            "expect": "ask",
+            "result": "My notes.\n\n{start}\nNEW\n{end}\n",
+            "why": "The section has changed since, so the teacher is asked about what it says now."
+          },
+          {
+            "name": "a start line with no end line",
+            "existing": "My notes.\n{start}\nhalf\n",
+            "declined": null,
+            "expect": "ask",
+            "result": "My notes.\n{start}\nhalf\n\n{start}\nNEW\n{end}\n",
+            "why": "Not a section: never replace from a start line to the end of a teacher's file."
+          }
+        ]
+      },
+      "words": {
+        "askTitle": "Add a section to {file}?",
+        "askFound": "This working folder already has {file}, a file that assistants such as Claude Code and Codex read before they start.",
+        "askWhat": "Plantoir would like to add a short section at the end of it that points them to its guidance for writing pages — for example, how to make a page printable.",
+        "askYoursStays": "Your own text stays exactly as it is, above the new section.",
+        "showWhatIsAdded": "Show what would be added",
+        "add": "Add",
+        "notNow": "Not Now",
+        "couldNotWrite": "Plantoir could not put its guidance for assistants into this folder ({reason}). Everything else works as usual.",
+        "dismiss": "Dismiss",
+        "where": "askTitle heads the sheet, askFound under it; askWhat and askYoursStays are its body; showWhatIsAdded is a disclosure over the section's text; add (Return) and notNow (Escape) its buttons. couldNotWrite is a quiet notice above the window's path bar, with dismiss. {file} is AGENTS.md or CLAUDE.md; {reason} the first problem, a file and the system's words."
+      },
+      "why": "Measured (#454 plan review S1, Claude Code 2.1.295 and Codex 0.155.1, each started at the working folder as both apps start them): Codex never found a skill under courses/<CODE>/.agents/skills, and found the same skill at the root at once; Claude Code found a per-course skill only after it had read a file in that course - after the first worksheet was written. With the root files in place, all four runs (each launcher, from the root and from a course) found and followed the guidance (documentation/09-mac-app.md). REJECTED: a copy in every course (invisible to Codex, late for Claude Code); an AGENTS.md or CLAUDE.md in the course (a note in Obsidian's tree, needing publishing exclusions in four places like How I Teach); overwriting a teacher's own root file (the first implementation left it alone; Russell ruled for a managed section, appended only after a yes)."
     }
-
   }
 }
