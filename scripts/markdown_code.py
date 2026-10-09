@@ -353,6 +353,28 @@ def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 
 _LIST_MARKER = re.compile(r"^[ \t]*(?:[-*+]|[0-9]{1,9}[.)])[ \t]+")
 
 
+def _column(prefix: str) -> int:
+    """The column `prefix` ends at, a tab moving to the next multiple of 4 -
+    CommonMark's tab stop. Obsidian indents list items with TABS by default
+    (E1 fix review F1)."""
+    column = 0
+    for character in prefix:
+        column = column + 4 - column % 4 if character == "\t" else column + 1
+    return column
+
+
+def _without_indent(line: str, columns: int) -> str:
+    """`line` with leading spaces and tabs taken off up to `columns` columns
+    (tabs counted to the next multiple of 4), as a fence's content loses its
+    opener's indent. A tab reaching past the column is taken off whole."""
+    column = 0
+    position = 0
+    while position < len(line) and column < columns and line[position] in " \t":
+        column = column + 4 - column % 4 if line[position] == "\t" else column + 1
+        position += 1
+    return line[position:]
+
+
 def _strip_quote_markers(line: str, depth: int) -> str:
     """`line` with its first `depth` blockquote markers (and the one space
     after each) taken off, the way CommonMark reads a line inside a fence
@@ -442,10 +464,7 @@ def fenced_blocks(text: str) -> list:
                     and _is_blank(fence.group(2)):
                 close()
             else:
-                indent = 0
-                while indent < open_block["indent"] and indent < len(content) and content[indent] == " ":
-                    indent += 1
-                open_block["lines"].append(content[indent:])
+                open_block["lines"].append(_without_indent(content, open_block["indent"]))
         else:
             fence = _FENCE.match(body)
             marker = 0
@@ -462,7 +481,7 @@ def fenced_blocks(text: str) -> list:
                     "char": fence.group(1)[0],
                     "length": len(fence.group(1)),
                     "depth": depth,
-                    "indent": marker + len(body[marker:]) - len(body[marker:].lstrip(" \t")),
+                    "indent": _column(body[:marker + len(body[marker:]) - len(body[marker:].lstrip(" \t"))]),
                     "lang": words[0] if words else "",
                     "meta": words[1] if len(words) > 1 else "",
                     "line": text.count("\n", 0, where) + 1,
