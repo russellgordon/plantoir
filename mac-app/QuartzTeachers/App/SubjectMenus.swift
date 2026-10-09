@@ -58,7 +58,9 @@ struct CourseMenu: Commands {
             // reaches the responder chain — it would be taken from every
             // text field and default button in the window. Finder's own
             // Rename has none for the same reason.
-            item("Rename…", .rename, enabled)
+            // No ellipsis: it edits the name in place and asks nothing
+            // more, as Finder's Rename does (#457, the HIG sweep).
+            item("Rename", .rename, enabled)
             // Dimmed alone says "no"; the line under it says what to do
             // about it — the shape the course's own menu already used.
             if current.row == .course || current.row == .section, current.keptForReference == false,
@@ -285,25 +287,29 @@ struct ReviseWithMenu: View {
     var notes: [String]
     var run: (SubjectMenuRules.Item) -> Void
 
+    /// The local assistant's title inside Revise With ▸, shared with the
+    /// rows' context menus (#457, the HIG sweep: one name everywhere).
+    static let localAssistantTitle: String = "Local AI Assistant…"
+
     // MARK: - Body
 
     var body: some View {
         if presence.anyReviseTargetExists {
             Menu("Revise With") {
                 if presence.claudeIsInstalled {
-                    Button("Claude…") {
+                    Button(ClaudeCodeLauncher.menuItemTitle) {
                         run(claude)
                     }
                     .disabled(!enabled.contains(claude))
                 }
                 if presence.codexIsInstalled {
-                    Button("Codex…") {
+                    Button(CodexLauncher.menuItemTitle) {
                         run(codex)
                     }
                     .disabled(!enabled.contains(codex))
                 }
                 if presence.localAssistantCanRun {
-                    Button("Local AI Assistant…") {
+                    Button(ReviseWithMenu.localAssistantTitle) {
                         run(localAssistant)
                     }
                     .disabled(!enabled.contains(localAssistant))

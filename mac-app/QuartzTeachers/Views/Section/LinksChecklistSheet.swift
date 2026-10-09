@@ -360,12 +360,11 @@ struct LinksChecklistSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(model.title)
-                .font(.headline)
             content
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(model.title)
         .frame(width: 560)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)
@@ -458,8 +457,7 @@ struct LinksChecklistSheet: View {
                     model.publish()
                     onPublished()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.shownTicked.isEmpty)
+                .defaultButton(isEnabled: !model.shownTicked.isEmpty)
                 .accessibilityIdentifier("linksChecklistPublish")
             case .done, .problem:
                 Button("Done") {

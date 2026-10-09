@@ -21,14 +21,14 @@ struct PublishingChoiceView: View {
     /// in this course's settings — it identifies the person, not the class
     /// — so it is entered once and every Cloudflare course uses it,
     /// whether Cloudflare is the primary destination or an additional one.
-    @Binding var cloudflareAccountID: String
+    /// SHOWN here, never edited: it is edited in Plantoir ▸ Settings ▸
+    /// Deploying since the HIG sweep (#457), so changing it can no longer
+    /// look like a change to this one course.
+    let cloudflareAccountID: String
 
     /// Every OTHER destination this course also publishes to, beyond the
     /// primary above — see `CourseConfiguration.additionalDeployTargets`.
     @Binding var additionalDeployTargets: [CourseConfiguration.AdditionalDeployTarget]
-
-    /// True while the "Where do I find this?" instructions are open.
-    @State var isShowingAccountHelp: Bool = false
 
     // MARK: - Computed properties
 
@@ -146,8 +146,7 @@ struct PublishingChoiceView: View {
 
         if deployTarget == "cloudflare_pages" {
             CloudflareDetailFields(
-                cloudflareAccountID: $cloudflareAccountID,
-                isShowingAccountHelp: $isShowingAccountHelp,
+                cloudflareAccountID: cloudflareAccountID,
                 accountProblem: accountProblem
             )
         }
@@ -189,8 +188,7 @@ struct PublishingChoiceView: View {
 
         if type == "cloudflare_pages" && hasAdditionalCloudflare {
             CloudflareDetailFields(
-                cloudflareAccountID: $cloudflareAccountID,
-                isShowingAccountHelp: $isShowingAccountHelp,
+                cloudflareAccountID: cloudflareAccountID,
                 accountProblem: accountProblem
             )
             .padding(.leading, 20)
@@ -250,43 +248,67 @@ struct PublishingChoiceView: View {
     }
 }
 
-/// The Cloudflare Account ID field, its help button, its own validation
-/// message, and the fixed 25 MB caption — shared between the primary
-/// destination's detail block and an additional Cloudflare target's,
-/// which are never both on screen at once (a type is either primary or
-/// additional, never both).
+/// The Cloudflare Account ID as this Mac has it, read-only, with Open
+/// Settings… beside it; its validation message; and the fixed 25 MB caption
+/// — shared between the primary destination's detail block and an
+/// additional Cloudflare target's, which are never both on screen at once
+/// (a type is either primary or additional, never both), and with the
+/// new-course wizard.
+///
+/// **Read-only since the HIG sweep (#457, Russell 2026-10-08).** The field,
+/// "Where do I find this?" and its instructions moved to Plantoir ▸ Settings
+/// ▸ Deploying (`DeployingSettingsView`), because the ID is the teacher's,
+/// not the course's: editing it here changed it for every course. With no
+/// ID the wizard still refuses Create with the same sentence as before
+/// (`CourseConfiguration.cloudflareAccountProblem`, pinned in the contract),
+/// now beside the button that fixes it. `AppSettings` is observable, so a
+/// change made in the Settings window shows here, and re-validates, at once.
 private struct CloudflareDetailFields: View {
 
     // MARK: - Stored properties
 
-    @Binding var cloudflareAccountID: String
-    @Binding var isShowingAccountHelp: Bool
+    let cloudflareAccountID: String
     let accountProblem: String?
 
-    // MARK: - Body
+    @Environment(\.openSettings) var openSettings
+
+    // MARK: - Computed properties
+
+    /// The ID, or "Not set yet" in its place.
+    var shownID: String {
+        let trimmed: String = cloudflareAccountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "Not set yet"
+        }
+        return trimmed
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            TextField("Cloudflare Account ID", text: $cloudflareAccountID)
-                .borderedTextField()
-                .accessibilityIdentifier("cloudflareAccountField")
-
-            // The grey caption that used to sit here repeated the
-            // dashboard directions in four lines of small text under a
-            // field that wants one code, whether or not anybody had a
-            // question. It is a dialog now, on request. The Safari mark
-            // matches the dialogs, so a link that leaves the app looks
-            // the same everywhere.
-            Button {
-                showAccountHelp()
-            } label: {
-                Label("Where do I find this?", systemImage: "safari")
+            // Said FIRST, where the row is read from: the value below is
+            // shown, not edited, and this is where it is edited.
+            Text("Kept in Plantoir ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare Pages.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            // The value and its button together on the trailing side, the
+            // way the unit word's row draws "Unit" beside Rename… — so "Not
+            // set yet" sits where a value sits.
+            LabeledContent("Cloudflare Account ID") {
+                HStack {
+                    Text(shownID)
+                        .foregroundStyle(cloudflareAccountID.isEmpty ? .secondary : .primary)
+                        .textSelection(.enabled)
+                        .accessibilityIdentifier("cloudflareAccountValue")
+                    Button("Open Settings…") {
+                        SettingsPane.select(.deploying)
+                        openSettings()
+                    }
+                    .accessibilityIdentifier("cloudflareAccountOpenSettings")
+                }
             }
-            .buttonStyle(.link)
-            .accessibilityIdentifier("cloudflareAccountHelpButton")
 
-            // What is WRONG with what was typed. Not commentary: this
-            // is why the course will not save.
+            // What is wrong with the ID this Mac has. Not commentary: this
+            // is why the course will not save, or the wizard will not create.
             if let accountProblem {
                 Text(accountProblem)
                     .font(.caption)
@@ -304,38 +326,6 @@ private struct CloudflareDetailFields: View {
                 .foregroundStyle(.orange)
                 .accessibilityIdentifier("cloudflareSizeNote")
         }
-        // The same dialog the launcher shows when it has to ask for an
-        // Account ID mid-publish, opened here on purpose instead. What
-        // is typed into it lands in the field above, so a teacher who
-        // has just fetched the code does not have to close this and
-        // find the field again.
-        .sheet(isPresented: $isShowingAccountHelp) {
-            CredentialRequestSheet(
-                request: CredentialRequest.cloudflareAccountIDHelp,
-                initialAnswer: cloudflareAccountID,
-                confirmTitle: "Use this ID",
-                onSend: { typed in
-                    cloudflareAccountID = typed
-                    isShowingAccountHelp = false
-                },
-                onCancel: {
-                    isShowingAccountHelp = false
-                }
-            )
-        }
-    }
-
-    // MARK: - Functions
-
-    /// Opens the instructions for finding an Account ID.
-    ///
-    /// Recorded on the trail: a teacher who had to go looking for this is
-    /// the same teacher whose first publish is about to fail on it, and the
-    /// line says which credential they were looking for. What they type is
-    /// never recorded.
-    func showAccountHelp() {
-        ActivityTrail.note(.askedForACredential, "opened the instructions for finding a Cloudflare Account ID")
-        isShowingAccountHelp = true
     }
 }
 

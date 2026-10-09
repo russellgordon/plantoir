@@ -83,9 +83,6 @@ struct UnitWordRenameSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(UnitWordRenameWording.sheetTitle(for: currentWord))
-                .font(.headline)
-
             if let interruptedTarget {
                 Text(UnitWordRenameWording.interruptedRename(from: currentWord, to: interruptedTarget))
                     .font(.callout)
@@ -160,12 +157,12 @@ struct UnitWordRenameSheet: View {
                 Button("Rename") {
                     Task { await performRename() }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(problem != nil || survey == nil || isRenaming)
+                .defaultButton(isEnabled: problem == nil && survey != nil && !isRenaming)
                 .accessibilityIdentifier("unitWordRenameButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(UnitWordRenameWording.sheetTitle(for: currentWord))
         .frame(width: 460)
         .interactiveDismissDisabled(isRenaming)
         .task {

@@ -127,12 +127,17 @@ struct QuartzTeachersApp: App {
             // View carries the preview's Back, Forward and Reload Page; Course
             // and Section carry every action on a course or a section, which
             // the context menus and buttons also reach. Edit is the system's
-            // own again: Rename… moved to Course, where a teacher looks for
+            // own again: Rename moved to Course, where a teacher looks for
             // "do something to this course".
             FileCommands(openWindow: openWindow)
             ViewCommands()
             CourseMenu()
             SectionMenu()
+            // Plantoir Help opens plantoir.app's support page, in place of
+            // the system's "Help isn't available" (#457, the HIG sweep).
+            CommandGroup(replacing: .help) {
+                PlantoirHelpCommand()
+            }
             // Beside Plantoir Help, because "something has gone wrong and I
             // need a person" is the same errand as looking for help — and it
             // is the menu somebody opens when they have run out of ideas.

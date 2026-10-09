@@ -196,14 +196,11 @@ struct SpecialFoldersHelpView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(SpecialFoldersHelpView.title)
-                    .font(.title2).bold()
+            SheetTitle(SpecialFoldersHelpView.title, explanation: {
                 Text(SpecialFoldersHelpView.intro)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-            }
-            .padding(20)
+            })
 
             Divider()
 

@@ -823,12 +823,15 @@ private struct AssistDatesOfferView: View {
             Text("They can be typed in, chosen from a file, or read from a shared sheet.")
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.secondary)
+            // The default button on the TRAILING end, as the plan card's
+            // above and every sheet's (#457, the HIG sweep).
             HStack {
+                Spacer(minLength: 0)
+                Button(AssistWording.cancelled, action: decline)
+                    .accessibilityIdentifier("assistNoDatesButton")
                 Button("Yes", action: accept)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistGiveDatesButton")
-                Button(AssistWording.cancelled, action: decline)
-                    .accessibilityIdentifier("assistNoDatesButton")
             }
         }
         .padding(12)
@@ -853,7 +856,7 @@ private struct AssistDatesOfferView: View {
 ///
 /// Once, and then never again — in this window or any other. A suggestion
 /// declined is an answer, and asking twice is how a helpful mention becomes
-/// nagging. "Keep checking" is the default button: the teacher who pressed
+/// nagging. "Keep Checking" is the default button: the teacher who pressed
 /// Return without reading keeps the safer arrangement.
 private struct AssistStopAskingOfferView: View {
 
@@ -878,9 +881,9 @@ private struct AssistStopAskingOfferView: View {
             Text(message)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Just do it", action: stopAsking)
+                Button("Just Do It", action: stopAsking)
                     .accessibilityIdentifier("assistStopAskingButton")
-                Button("Keep checking", action: keepAsking)
+                Button("Keep Checking", action: keepAsking)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistKeepAskingButton")
             }

@@ -326,7 +326,11 @@ nonisolated enum SubjectMenuRules {
             }
             enabled.insert(.sectionShowInFinder)
             enabled.insert(.sectionNewTerminalAtFolder)
-            if !situation.copying {
+            // Not on a course kept for reference: `interface.whatIsWithheld`
+            // withholds "Remove Section N (removing the whole course
+            // stays)". Until the HIG sweep (#457) this item was live there,
+            // against that contract; Remove Course stays live on one.
+            if isLive && !situation.copying {
                 enabled.insert(.removeSection)
             }
         }
@@ -342,5 +346,56 @@ nonisolated enum SubjectMenuRules {
             }
         }
         return enabled
+    }
+
+    /// The menu item the Delete key asks for on the selected sidebar row,
+    /// or nil for a row it means nothing on (#457, the HIG sweep: Delete
+    /// removes the selected item, as in Finder and Mail).
+    ///
+    /// The key runs the MENU ITEM — its own enablement and its own closure —
+    /// so it asks the same "Remove…?" or "Delete…?" question the menu does,
+    /// and can never do what the greyed item would not (`sidebarDeleteKey`
+    /// in `contracts/shared-rules.json`). It is not a key equivalent on the
+    /// item: a menu key equivalent is matched before the field editor, so ⌫
+    /// or ⌘⌫ there would be taken from every text field in the window.
+    static func deleteKeyItem(for row: Row) -> Item? {
+        switch row {
+        case .course:
+            return .removeCourse
+        case .section:
+            return .removeSection
+        case .backup:
+            return .deleteBackup
+        case .archived:
+            return .deleteArchive
+        case .allBackups, .none:
+            return nil
+        }
+    }
+
+    /// The menu item the sidebar's − button runs for the selected row, or
+    /// nil where it does nothing (a backup or an archive is deleted only
+    /// through its own item). The button is enabled exactly when that item
+    /// is (`minusButtonIsEnabled`), so the − button, the Delete key and the
+    /// menu bar cannot disagree — until the HIG sweep's review the − button
+    /// still asked to remove a section of a course kept for reference, which
+    /// the menu and the key withhold (#457).
+    static func minusButtonItem(for row: Row) -> Item? {
+        switch row {
+        case .course:
+            return .removeCourse
+        case .section:
+            return .removeSection
+        case .backup, .archived, .allBackups, .none:
+            return nil
+        }
+    }
+
+    /// Whether the − button can be pressed in `situation`.
+    static func minusButtonIsEnabled(_ situation: Situation) -> Bool {
+        guard let item = minusButtonItem(for: situation.row) else {
+            return false
+        }
+        return enabledItems(situation).contains(item)
     }
 }

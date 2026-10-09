@@ -30,7 +30,7 @@ struct SidebarMenuCommands: Equatable {
     /// true of it.
     var situation: SubjectMenuRules.Situation
 
-    /// Why Rename and Add Section wait, said under Course ▸ Rename….
+    /// Why Rename and Add Section wait, said under Course ▸ Rename.
     var structuralReason: String?
 
     /// Why the Revise items are greyed, each reason once (#458).
