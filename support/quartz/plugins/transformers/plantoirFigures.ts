@@ -104,6 +104,30 @@ function withOwnIds(svg: string, copy: number): string {
   return result
 }
 
+// Quartz colours EVERY svg <text> with the page's grey (base.scss: `text {
+// color; fill: var(--darkgray) }`), which beats an SVG's own fill attribute -
+// so a TikZ label drawn red came out grey, and on paper black lettering came
+// out #4e4e4e (measured in the handout). Each label's own colour, worked out
+// from its ancestors as SVG inherits it, is therefore written as an inline
+// style; black (and none) is left to figures.scss, which follows the theme,
+// and white becomes the page's background colour, as for shapes.
+const BLACK = new Set(["#000", "#000000", "black"])
+const WHITE = new Set(["#fff", "#ffffff", "white"])
+
+function colourLabels(node: Element, inherited: string | null) {
+  const own = node.properties?.fill
+  const fill = typeof own === "string" ? own.toLowerCase() : inherited
+  if (node.tagName === "text" && fill !== null && fill !== "none" && !BLACK.has(fill)) {
+    const colour = WHITE.has(fill) ? "var(--light)" : fill
+    node.properties = { ...node.properties, style: `fill:${colour}` }
+  }
+  for (const child of node.children) {
+    if (child.type === "element") {
+      colourLabels(child, fill)
+    }
+  }
+}
+
 function readSvg(name: string, copy: number): Element | null {
   try {
     const source = readFileSync(join(process.cwd(), WORKSPACE, name), "utf-8")
@@ -195,6 +219,7 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
               return
             }
             drawing.properties = { ...drawing.properties, ariaHidden: "true", focusable: "false" }
+            colourLabels(drawing, null)
             const children: ElementContent[] = []
             if (!fontsLinked) {
               // The faces the drawings name, served by the site itself
