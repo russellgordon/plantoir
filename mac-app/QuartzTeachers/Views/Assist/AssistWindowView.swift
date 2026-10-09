@@ -823,12 +823,15 @@ private struct AssistDatesOfferView: View {
             Text("They can be typed in, chosen from a file, or read from a shared sheet.")
                 .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(.secondary)
+            // The default button on the TRAILING end, as the plan card's
+            // above and every sheet's (#457, the HIG sweep).
             HStack {
+                Spacer(minLength: 0)
+                Button(AssistWording.cancelled, action: decline)
+                    .accessibilityIdentifier("assistNoDatesButton")
                 Button("Yes", action: accept)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("assistGiveDatesButton")
-                Button(AssistWording.cancelled, action: decline)
-                    .accessibilityIdentifier("assistNoDatesButton")
             }
         }
         .padding(12)

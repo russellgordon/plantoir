@@ -406,8 +406,7 @@ struct ImportCoursesForReferenceSheet: View {
                 Button(ReferenceImportWording.importButton) {
                     startImporting()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canImport)
+                .defaultButton(isEnabled: canImport)
                 .accessibilityIdentifier("importButton")
             }
         }

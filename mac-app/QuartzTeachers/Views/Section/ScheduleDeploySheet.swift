@@ -101,8 +101,10 @@ struct ScheduleDeploySheet: View {
                 Button("Schedule") {
                     schedule()
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(shown.plan?.isSchedulable != true)
+                // Return presses it, and it is grey while it cannot be
+                // pressed (#457, the HIG sweep: it was dim blue, and Return
+                // did nothing).
+                .defaultButton(isEnabled: shown.plan?.isSchedulable == true)
                 .accessibilityIdentifier("scheduleDeployConfirmButton")
             }
         }

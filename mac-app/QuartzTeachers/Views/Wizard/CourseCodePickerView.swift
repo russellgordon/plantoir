@@ -85,8 +85,10 @@ struct CourseCodePickerView: View {
     /// `courseCodeSuggestionsManuallyDismissed`). Escape isn't wired to
     /// blur the field itself here; only the wizard's popup-visibility
     /// bookkeeping reacts to it, so a teacher can keep typing right after
-    /// dismissing the list, same as a native combo box's popup.
-    var onEscape: () -> Void = {}
+    /// dismissing the list, same as a native combo box's popup. Returns
+    /// whether the popup WAS shown: with none, Escape reaches the sheet and
+    /// closes the wizard as Cancel would (`PickerEscape`, #457).
+    var onEscape: () -> Bool = { false }
 
     /// The trailing chevron button, pressed. The wizard TOGGLES on
     /// this: a real `NSComboBox`'s arrow closes the popup as readily as
@@ -181,14 +183,16 @@ struct CourseCodePickerView: View {
             .anchorPreference(key: CourseCodeFieldAnchorKey.self, value: .bounds) { anchor in
                 anchor
             }
-            // Consumes Escape whenever this field has focus, so it
+            // Consumes Escape while the popup is shown, so that press
             // closes the popup rather than falling through to the
             // sheet's own Escape-dismisses-the-wizard handling
             // (Russell, 2026-08-22: "hitting the escape key … should
-            // close the list below, not dismiss the form").
+            // close the list below, not dismiss the form"). With no
+            // popup, Escape reaches the sheet and closes the wizard as
+            // Cancel would — until v1.5.0 it was consumed regardless,
+            // a keyboard trap (#457, `PickerEscape`).
             .onKeyPress(.escape) {
-                onEscape()
-                return .handled
+                return PickerEscape.result(listWasOpen: onEscape())
             }
             // Up/down walk the popup and Return takes the highlighted
             // row, the way a real `NSComboBox` does (Russell,
@@ -254,6 +258,14 @@ struct CourseCodePickerView: View {
                 // bookkeeping.
                 if codeFieldHasFocus != isFocused {
                     codeFieldHasFocus = isFocused
+                }
+            }
+            // A wizard that opens with focus here (#457, the HIG sweep)
+            // asked for it before this view existed, so `onChange` never
+            // fires for it — the same seam `SearchablePickerField` has.
+            .onAppear {
+                if isFocused {
+                    codeFieldHasFocus = true
                 }
             }
     }

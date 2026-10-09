@@ -458,8 +458,7 @@ struct LinksChecklistSheet: View {
                     model.publish()
                     onPublished()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(model.shownTicked.isEmpty)
+                .defaultButton(isEnabled: !model.shownTicked.isEmpty)
                 .accessibilityIdentifier("linksChecklistPublish")
             case .done, .problem:
                 Button("Done") {

@@ -245,7 +245,11 @@ struct CopyPageSheet: View {
                 prompt: CopyPageWording.pagePickerPrompt,
                 fieldIdentifier: "copyPagePicker",
                 onEscape: {
+                    // Exactly what is drawn (the overlay's own condition),
+                    // so Escape is consumed only while a list is on screen.
+                    let listWasOpen: Bool = picker.isShowingSuggestions && stage == .choosing
                     picker.dismissSuggestions()
+                    return listWasOpen
                 },
                 onRevealRequested: {
                     // A toggle, not an open: a real combo box's arrow closes
@@ -383,8 +387,7 @@ struct CopyPageSheet: View {
                         lookAtWhatItWouldDo()
                     }
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canCopy && stage != .checking)
+                .defaultButton(isEnabled: canCopy || stage == .checking)
                 .accessibilityIdentifier("copyPageButton")
             }
         }

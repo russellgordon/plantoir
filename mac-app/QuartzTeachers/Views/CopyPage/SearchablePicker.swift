@@ -53,6 +53,33 @@ struct PickerSection<Item: Identifiable>: Identifiable {
     }
 }
 
+// MARK: - What Escape does in a picker field
+
+/// What Escape does in a combo-box field: close the list if one is drawn,
+/// and otherwise let the key reach the sheet, so Escape cancels it as the
+/// Cancel button would.
+///
+/// One rule for both pickers (Copy a Page's page field and the new-course
+/// wizard's code field), and a pure one, so a unit test pins it. Until
+/// v1.5.0 both fields answered `.handled` whether or not a list was open,
+/// which trapped the sheet: with focus in Copy a Page's field (where it
+/// starts), no number of Escapes closed it (#457, the HIG sweep, measured).
+/// Russell's 2026-08-22 rule — "Escape should close the list below, not
+/// dismiss the form" — still holds for the press that closes the list.
+enum PickerEscape {
+
+    // MARK: - Functions
+
+    /// `listWasOpen` is what the host's `onEscape` reported: whether a list
+    /// was on screen (and has now been put away).
+    static func result(listWasOpen: Bool) -> KeyPress.Result {
+        if listWasOpen {
+            return .handled
+        }
+        return .ignored
+    }
+}
+
 // MARK: - Where the field is
 
 /// See the note at the top of this file: an anchor, not a rect.
@@ -85,10 +112,12 @@ struct SearchablePickerField: View {
 
     var fieldIdentifier: String = "searchable-picker-field"
 
-    /// Escape, pressed while this field has focus. It closes the list rather
-    /// than dismissing the window's sheet, and does NOT blur the field, so
-    /// somebody can carry on typing straight afterwards.
-    var onEscape: () -> Void = { }
+    /// Escape, pressed while this field has focus. When a list is drawn it
+    /// closes the list rather than dismissing the window's sheet, and does
+    /// NOT blur the field, so somebody can carry on typing straight
+    /// afterwards. Returns whether a list WAS open: `false` lets Escape reach
+    /// the sheet, which then closes as Cancel would (`PickerEscape`).
+    var onEscape: () -> Bool = { false }
 
     /// The trailing chevron. A toggle rather than an open, because a real
     /// combo box's arrow closes its popup as readily as it opens it.
@@ -124,11 +153,11 @@ struct SearchablePickerField: View {
             .anchorPreference(key: SearchablePickerAnchorKey.self, value: .bounds) { anchor in
                 return anchor
             }
-            // Consumed here so Escape closes the list rather than falling
-            // through to a sheet's dismiss.
+            // Consumed only while a list is drawn, so the first Escape
+            // closes the list and the next one reaches the sheet's Cancel
+            // (`PickerEscape`, #457).
             .onKeyPress(.escape) {
-                onEscape()
-                return .handled
+                return PickerEscape.result(listWasOpen: onEscape())
             }
             .onKeyPress(.upArrow) {
                 return onMoveHighlight(-1) ? .handled : .ignored
