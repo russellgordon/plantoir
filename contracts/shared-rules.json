@@ -105,6 +105,11 @@
         "why": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08: Help opens the support page). Help ▸ Plantoir Help used to be the system's item, which said 'Help isn't available for Plantoir'; it now opens https://plantoir.app/support/ in the browser. A teacher who looked for help just before something went wrong is a teacher whose report should say so, and the line is the only trace the app has that they did."
       },
       {
+        "carries": "whether the ID is now set, was cleared, or is not yet a valid ID - NEVER the ID itself. One line when the teacher leaves the field (Return, leaving the pane or closing the window) with a value different from the last one written, so typing an ID writes one line, not one per keystroke.",
+        "event": "Cloudflare account ID changed in Settings",
+        "why": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08). The Cloudflare Account ID moved from a course's settings to Plantoir ▸ Settings ▸ Deploying, because it belongs to the teacher and one account serves every course - edited inside one course it silently changed every other. A deploy to Cloudflare that suddenly fails for every course is answered by this line: the ID was changed or cleared, and when. No migration line is written: the value was always stored app-wide (the mac's cloudflareAccountID preference, Windows' AppSettings.CloudflareAccountId), so there was no per-course value to move."
+      },
+      {
         "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
