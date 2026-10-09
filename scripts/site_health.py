@@ -219,6 +219,54 @@ def print_pdf_problems_finding(facts: dict, course: str, section, table: dict) -
     )
 
 
+def figures_finding(facts: dict, course: str, section, table: dict) -> Finding:
+    """
+    ONE finding for every diagram or graph this build could not draw (#485
+    E1), never one per figure. Each is named through figureLine (its line in
+    the teacher's file), figureLineInBlock (only its line within the fence)
+    or figureLineNoLine, and the reason through figureFences.words.reasons;
+    every value is filled in one pass.
+    """
+    entry = table["figuresCouldNotBeDrawn"]
+    problems = facts.get("figure_problems") or []
+    reasons = contracts.section(CONTRACT_FILE, "figureFences", "words", "reasons")
+    seconds = contracts.section(CONTRACT_FILE, "figureFences", "timing", "perDiagramSeconds")
+    named = []
+    for problem in problems[:MOST_PAGES_NAMED]:
+        reason_text = reasons.get(problem.get("reason") or "", reasons["texSaid"])
+        reason = filled(reason_text, {"name": problem.get("name") or "",
+                                      "said": problem.get("said") or "",
+                                      "seconds": seconds})
+        fill = {
+            "page": problem.get("page", ""),
+            "kind": entry["kinds"].get(problem.get("engine"), problem.get("engine") or ""),
+            "block": problem.get("block", 1),
+            "reason": reason,
+        }
+        if problem.get("line") is not None:
+            fill["line"] = problem["line"]
+            piece = entry["figureLine"]
+        elif problem.get("blockLine") is not None:
+            fill["blockLine"] = problem["blockLine"]
+            piece = entry["figureLineInBlock"]
+        else:
+            piece = entry["figureLineNoLine"]
+        named.append(filled(piece, fill))
+    if len(problems) > MOST_PAGES_NAMED:
+        named.append(filled(entry["andMore"], {"count": len(problems) - MOST_PAGES_NAMED}))
+    extra = {
+        "page": problems[0].get("page", "") if problems else "",
+        "count": len(problems),
+        # "; " rather than ", ": a reason can hold a comma.
+        "figures": "; ".join(named),
+    }
+    return finding(
+        "figuresCouldNotBeDrawn", course, section, table,
+        extra_fill=extra,
+        sentence_key="sentence" if len(problems) == 1 else "sentenceForSeveral",
+    )
+
+
 def findings(facts: dict, course: str, section) -> list:
     """
     Every finding for one section's build.
@@ -249,6 +297,11 @@ def findings(facts: dict, course: str, section) -> list:
                                "problem": missing | notAPdf | hasAPath}],
                                each a page whose `printPdf:` could not be used
                                (#454)
+    * `figure_problems`      — [{"page": place, "engine": tikz | functionplot,
+                               "block": n, "line": n or None, "blockLine": n
+                               or None, "reason": figureFences.words.reasons
+                               key, "name", "said"}], each a diagram or graph
+                               that could not be drawn (#485 E1)
     """
     table = _checks_by_name()
     found = []
@@ -307,6 +360,10 @@ def findings(facts: dict, course: str, section) -> list:
     # After everything above, so the existing examples keep their order (#454).
     if facts.get("print_pdf_problems"):
         found.append(print_pdf_problems_finding(facts, course, section, table))
+
+    # After everything above, so the existing examples keep their order (#485).
+    if facts.get("figure_problems"):
+        found.append(figures_finding(facts, course, section, table))
 
     return found
 
