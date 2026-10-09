@@ -13,6 +13,10 @@ Run it from the top of the repository::
     python3 website/shots/capture.py --only reference     # one scene (or several, a,b)
     python3 website/shots/capture.py --dry-run            # prove every scene can be set up
 
+    # What printing does (v1.7.0): a printable maths page and its handout,
+    # from a preview in a folder of its own (~/Plantoir Print, made when absent):
+    python3 website/shots/capture.py --print-set
+
 See website/README.md, "Regenerating every image", and scenes.py.
 
 What it does, in order:
@@ -1818,6 +1822,194 @@ def promote_captured_shots(passed: list[str]) -> None:
             print(f"   shots.json — {line}")
 
 
+# ---------- What printing does (v1.7.0, DECISIONS 35) ----------
+
+# The print pictures are of a PREVIEW of a maths example course, built in a
+# working folder of their own: the published demo sites (ENG2D, MCV4U, SCH3U)
+# carry no printable page, and a preview is what a teacher presses Print on.
+# The folder is made from the example content by setup.sh itself, answered the
+# way the app's New Course panel answers it (NewCourseCreator presses Return at
+# every prompt and types the code where asked), so nothing in it is hand-made.
+PRINT_FOLDER = Path.home() / "Plantoir Print"
+PRINT_COURSE_CONFIG = {
+    "class_folder": "All Classes",
+    "color_schemes": {"section1": "quartz-standard"},
+    "course_code": "MPM2D",
+    "course_name": "Principles of Mathematics, Grade 10, Academic",
+    "custom_short_name": "",
+    "deploy_folder_path": "",
+    "deploy_target": "netlify",
+    "emojis": {"sections": {"section1": "📐"}},
+    "expandOnFolderClick": False,
+    "fonts": {
+        "default": {"body": "Helvetica, Arial", "code": "IBM Plex Mono", "header": "Helvetica, Arial"},
+        "sections": {"section1": {"body": "Helvetica, Arial", "code": "IBM Plex Mono", "header": "Helvetica, Arial"}},
+    },
+    "footer_html": "",
+    "include_coverage_notes": False,
+    "include_curriculum_coverage": True,
+    "include_curriculum_pages": True,
+    "locale": "en-CA",
+    "num_sections": 1,
+    "prepopulate_example_content": True,
+    "section_numbers": [1],
+    "show_grade_in_title": {"sections": {"section1": False}},
+    "show_reading_time": True,
+    "show_section_marker": {"sections": {"section1": True}},
+    "unit_word": "Unit",
+    "use_lcs_terminology": False,
+    "use_skeleton": False,
+}
+
+
+def provision_print_course(folder: Path) -> None:
+    """Make MPM2D in the print folder from its example content, unless it is
+    there. A payload page changed since then reaches the folder only when the
+    folder is made again: delete it and run --print-set."""
+    code = PRINT_COURSE_CONFIG["course_code"]
+    ensure_launchers(folder)
+    mirror_toolchain(folder)
+    if workspace_has_course(folder, code) and (folder / "courses" / code / "Exercises").is_dir():
+        print(f"   {code} is already there.")
+        return
+    course = folder / "courses" / code
+    course.mkdir(parents=True, exist_ok=True)
+    manifest = json.loads((REPO / "support" / "example_content" / code / "manifest.json").read_text(encoding="utf-8"))
+    config = dict(PRINT_COURSE_CONFIG)
+    for key in ("shared_folders", "shared_files", "per_section_folders", "per_section_files", "hidden", "expandable"):
+        config[key] = manifest[key]
+    (course / "course_config.json").write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"   Making {code} from its example content…")
+    import pty
+    import re
+    import select
+    child, terminal = pty.fork()
+    if child == 0:
+        os.chdir(folder)
+        os.execv("/bin/bash", ["/bin/bash", "./setup.sh"])
+    said = b""
+    quiet_since = time.time()
+    answered = 0
+    while answered < 300:
+        ready, _, _ = select.select([terminal], [], [], 0.4)
+        if ready:
+            try:
+                chunk = os.read(terminal, 65536)
+            except OSError:
+                break
+            if not chunk:
+                break
+            said += chunk
+            quiet_since = time.time()
+            continue
+        if said and time.time() - quiet_since > 0.8:
+            plain = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", said).decode("utf-8", "replace").rstrip(" ")
+            last = (plain.splitlines() or [""])[-1]
+            if last.rstrip().endswith((":", "?", "]", ")")):
+                os.write(terminal, ((code if "Enter the course code" in last else "") + "\n").encode())
+                answered += 1
+                said = b""
+    _, status = os.waitpid(child, 0)
+    if os.waitstatus_to_exitcode(status) != 0 or not (course / "Exercises").is_dir():
+        raise SystemExit(f"setup.sh did not make {code} in {folder}.")
+
+
+def chrome_for_testing() -> str:
+    """The Chrome for Testing verify.sh prints handouts with (PLANTOIR_CHROME
+    names another)."""
+    named = os.environ.get("PLANTOIR_CHROME", "")
+    if named:
+        return named
+    pattern = "Library/Caches/Plantoir-dev/browsers/chrome/*/chrome-mac-*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+    found = sorted(Path.home().glob(pattern))
+    if not found:
+        raise SystemExit("No Chrome for Testing to print the handout with; set PLANTOIR_CHROME.")
+    return str(found[-1])
+
+
+def must_show(picture: Path, shot: dict) -> None:
+    words = shot.get("expectText", [])
+    found = shows_any(picture, words)
+    missing = [word for word in words if word not in found]
+    if missing:
+        raise SystemExit(f"{picture.name} does not show {', '.join(missing)}. Nothing past this point was taken.")
+
+
+def capture_print_set(folder: Path) -> None:
+    """The print pictures: a printable maths page as students see it, with
+    its Print button, in both colour schemes; then the handout that button
+    prints, as paper (light only, `static` in shots.json).
+
+    The page is photographed in a plain window with no browser around it
+    (webwindow.swift), because a preview's address is localhost. The handout
+    is printed by the page itself in Chrome for Testing (handout_pdf.mjs), and
+    the PDF is shown in the same kind of window, so both pictures are whole
+    window captures with their own corners and shadow (#434).
+    """
+    page_shots = shots_of_kind("preview-page")
+    handout_shots = shots_of_kind("handout")
+    announce(f"Photographing what printing does, in {folder}")
+    provision_print_course(folder)
+    code = PRINT_COURSE_CONFIG["course_code"]
+    helper = Path(__file__).resolve().parent / "webwindow.swift"
+    server = subprocess.Popen(
+        ["./preview.sh", code, "1", "--non-interactive"], cwd=folder,
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    try:
+        address = None
+        for line in server.stdout:
+            if "Preview will be available at:" in line:
+                address = line.split("at:", 1)[1].strip().rstrip("/")
+            if "Started a Quartz server" in line:
+                break
+        if address is None:
+            raise SystemExit(f"The preview of {code} did not start.")
+        print(f"   The preview is at {address}")
+        for shot in page_shots:
+            url = address + shot["capture"]["path"]
+            for dark in (False, True):
+                suffix = "dark" if dark else "light"
+                with Appearance(dark=dark):
+                    time.sleep(2)
+                    destination = IMAGE_DIR / f"{shot['id']}-{suffix}.png"
+                    result = subprocess.run(["swift", str(helper), url, "1280", "860", str(destination), "4"],
+                                            capture_output=True, text=True)
+                    if result.returncode != 0 or not destination.exists():
+                        raise SystemExit(f"Could not photograph {url}: {result.stderr.strip()}")
+                    verify_appearance(destination, dark, shot["id"])
+                    must_show(destination, shot)
+                    serve_as_captured(destination)
+                    print(f"   saved {destination.name}")
+        for shot in handout_shots:
+            capture = shot["capture"]
+            pdf = SCRATCH / f"{shot['id']}.pdf"
+            SCRATCH.mkdir(parents=True, exist_ok=True)
+            printer = Path(__file__).resolve().parent / "handout_pdf.mjs"
+            result = subprocess.run(["node", str(printer), chrome_for_testing(), address + capture["path"], str(pdf),
+                                     capture.get("mode", "questionsOnly"), capture.get("paper", "portrait")],
+                                    capture_output=True, text=True)
+            print(f"   {result.stdout.strip()}")
+            if result.returncode != 0:
+                raise SystemExit(f"The handout of {capture['path']} was not printed.")
+            with Appearance(dark=False):
+                time.sleep(2)
+                destination = IMAGE_DIR / f"{shot['id']}.png"
+                # A letter page and the viewer's margin round it, at the size
+                # a reader holds it: 680 points wide shows the type at about
+                # the size it has on paper.
+                result = subprocess.run(["swift", str(helper), pdf.resolve().as_uri(), "680", "880", str(destination), "3"],
+                                        capture_output=True, text=True)
+                if result.returncode != 0 or not destination.exists():
+                    raise SystemExit(f"Could not photograph the handout: {result.stderr.strip()}")
+                must_show(destination, shot)
+                serve_as_captured(destination)
+                print(f"   saved {destination.name}")
+    finally:
+        subprocess.run(["./preview.sh", code, "1", "--stop"], cwd=folder, capture_output=True)
+        server.terminate()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture every screenshot plantoir.app uses.")
     parser.add_argument("--workspace", default=str(DEFAULT_WORKSPACE),
@@ -1849,6 +2041,12 @@ def main() -> int:
                         help="only re-take the three home pages and rebuild colour-schemes and light-and-dark")
     parser.add_argument("--browser-shots", default=None,
                         help="only re-take these class-site shots, comma-separated ids from shots.json")
+    parser.add_argument("--print-set", action="store_true",
+                        help="only photograph what printing does: a printable maths page with its Print "
+                             "button, both appearances, and the handout it prints (v1.7.0)")
+    parser.add_argument("--print-folder", default=str(PRINT_FOLDER),
+                        help="the working folder the print pictures are taken in (made when absent; "
+                             "must be inside your home folder)")
     parser.add_argument("--hero", action="store_true",
                         help="only reassemble the hero composite from parts already captured")
     arguments = parser.parse_args()
@@ -1895,6 +2093,20 @@ def main() -> int:
                 capture_browser_shots(arguments.browser_shots.split(","))
             if arguments.colour_figures:
                 capture_colour_figures()
+        finally:
+            keeping_awake.terminate()
+        rebuild_site()
+        announce("Checking every picture's corners")
+        return refuse_drawn_corners()
+
+    if arguments.print_set:
+        folder = Path(arguments.print_folder).expanduser()
+        if Path.home() not in folder.parents:
+            raise SystemExit("The print folder has to be inside your home folder, or the site builder sees it as empty.")
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        keeping_awake = stay_awake()
+        try:
+            capture_print_set(folder)
         finally:
             keeping_awake.terminate()
         rebuild_site()

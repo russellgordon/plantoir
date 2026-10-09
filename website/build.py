@@ -762,6 +762,61 @@ def redirect_problems(site: dict, slugs: list[str], rendered: dict[str, str]) ->
     return problems
 
 
+# ---------- Short addresses ----------
+
+# site.json's "shortcuts": an address like /math that lands on a section of a
+# page (/interactive/#math). Written as a page of its own that sends the
+# browser on, rather than a _redirects rule: Netlify's handling of a redirect
+# whose destination carries a #section was never measured here, and this
+# works the same on any server and under --serve.
+
+
+def shortcuts(site: dict) -> list[dict]:
+    return list(site.get("shortcuts", {}).get("to", []))
+
+
+def shortcut_page(site: dict, destination: str) -> str:
+    target = "../" + destination
+    absolute = f"{site['base_url']}/{destination}"
+    return (
+        "<!doctype html>\n"
+        "<html lang=\"en\">\n"
+        "<head>\n"
+        "<meta charset=\"utf-8\">\n"
+        f"<title>{site['name']}</title>\n"
+        f"<meta http-equiv=\"refresh\" content=\"0; url={target}\">\n"
+        f"<link rel=\"canonical\" href=\"{absolute}\">\n"
+        "<meta name=\"robots\" content=\"noindex\">\n"
+        "</head>\n"
+        "<body>\n"
+        f"<p><a href=\"{target}\">Continue to {absolute}</a></p>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
+def shortcut_problems(site: dict, slugs: list[str], rendered: dict[str, str]) -> list[str]:
+    problems: list[str] = []
+    for shortcut in shortcuts(site):
+        source = shortcut["from"]
+        page, _, section = shortcut["to"].partition("#")
+        slug = page.strip("/") or "index"
+        if source in slugs:
+            problems.append(f"site.json's shortcut /{source}/ is also a page")
+        if slug not in rendered:
+            problems.append(f"site.json's shortcut /{source}/ goes to /{page}, which is not a page")
+        elif section and f'id="{section}"' not in rendered[slug]:
+            problems.append(f"site.json's shortcut /{source}/ goes to #{section}, which is not on /{page}")
+    return problems
+
+
+def write_shortcuts(site: dict, output: Path) -> None:
+    for shortcut in shortcuts(site):
+        folder = output / shortcut["from"]
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "index.html").write_text(shortcut_page(site, shortcut["to"]), encoding="utf-8")
+
+
 def moved_location(site: dict, path: str) -> str | None:
     """Where --serve sends a request for a moved page's old address — the
     same place plantoir.app's _redirects sends it — or None if it did not move."""
@@ -978,10 +1033,12 @@ def build(check_only: bool) -> int:
 
     problems.extend(broken_fragment_problems(rendered))
     problems.extend(redirect_problems(site, site_slugs(pages), rendered))
+    problems.extend(shortcut_problems(site, site_slugs(pages), rendered))
 
     if not check_only:
         remove_moved_output(site, OUTPUT)
         (OUTPUT / REDIRECTS_FILE).write_text(redirects_text(site), encoding="utf-8")
+        write_shortcuts(site, OUTPUT)
         assets = OUTPUT / "assets"
         assets.mkdir(parents=True, exist_ok=True)
         for asset in sorted((WEBSITE / "assets").iterdir()):
