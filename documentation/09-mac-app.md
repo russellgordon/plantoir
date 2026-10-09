@@ -2692,8 +2692,12 @@ nothing. `PreviewBrowserHandoff` (the web view's `uiDelegate` and its
 sheet came up on "All 3 Pages"); a new-window link — a page's own PDF among
 them — opens in the browser too. Only the preview's own `localhost` pages and
 the contract's three modes are acted on. Each hand-over is a trail line,
-`preview page opened in the web browser`, with the section, why, and the
-page's place in the site. `PrintablePagesTests.testThePreviewsWebViewHandsBothToTheBrowser`
+`preview page opened in the web browser`, with the section, why, and the slug
+of the page the teacher was ON — for a new-window link only its KIND (the
+page's own PDF, another page of the site, another site), never where it led:
+the first version recorded any link's path, a shared Drive document's id
+included, and a link's destination is something the teacher wrote
+(implementation review S2, rule 5). `PrintablePagesTests.testThePreviewsWebViewHandsBothToTheBrowser`
 drives a real web view built the way the preview builds it, and fails with
 the delegate and the handler taken out. **Rejected:**
 `WKWebView.printOperation(with:)`, which prints the frame on screen rather
@@ -2701,18 +2705,42 @@ than the handout.
 
 ### Guidance for an assistant, written into the working folder
 
-The toolchain mirror (`WorkspaceModel.copyToolchainFiles`, once per folder per
-run of the app) also writes `support/agent_guidance` into the working folder's
-ROOT: the `plantoir-printing` skill into `.claude/skills/` (Claude Code) and
-`.agents/skills/` (Codex), and `AGENTS.md` and `CLAUDE.md` naming it. Each
-skill's folder is the app's whole; nothing else under `.claude` or `.agents`
-is touched (Russell's real folder has a `.claude/settings.local.json`). The
-two root files start `<!-- Managed by Plantoir:` and are rewritten on every
-pass — except a file of that name WITHOUT the marker, which is the teacher's
-own and is left exactly as it is (a deliberate narrowing of "overwritten on
-every mirror", so a teacher's own `CLAUDE.md` is never lost). Every course is
-its own vault, so the root is in none and neither file shows in Obsidian or
-on a site.
+After the toolchain copy (`ToolchainReadiness.ensure`, once per folder per run
+of the app) the app writes `support/agent_guidance` into the working folder's
+ROOT (`AgentGuidance.write`): the `plantoir-printing` skill into
+`.claude/skills/` (Claude Code) and `.agents/skills/` (Codex) — each skill's
+folder is the app's whole, and nothing else under `.claude` or `.agents` is
+touched (Russell's real folder has a `.claude/settings.local.json`) — and a
+**managed section** in `AGENTS.md` and `CLAUDE.md` naming the skill, between
+`<!-- BEGIN PLANTOIR: … -->` and `<!-- END PLANTOIR -->`. Russell's rulings
+of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
+(`printablePages.agentGuidance.rootFileCases`, nine):
+
+- **no file** → written, holding only the section;
+- **the markers present** → only what is between them is replaced;
+- **the teacher's own file, no markers** → the app ASKS: a sheet names the
+  file, says what Plantoir would add (the text behind "Show what would be
+  added"), and that their own text stays above it; **Add** (Return) appends
+  the section below their text with one blank line between, **Not Now**
+  (Escape) is remembered for that file (`AgentGuidanceDeclined` in the
+  preferences, the section's fingerprint) until the section's words change
+  or the file goes. Both answers are a trail line, `asked before adding
+  guidance to a file`. A file is never appended to without a yes; the skills
+  are written either way.
+
+**It never holds the folder back** (implementation review S1). The first
+version counted a guidance failure in the toolchain copy's outcome, so a
+`.claude` that was a file, or a read-only `.agents`, marked the whole folder
+"not ready" and refused Preview, Deploy and New Course. Now the guidance runs
+after the copy on an outcome of its own: a failure is logged, written on the
+trail (`guidance for assistants could not be written`) and shown as a
+dismissable notice above the path bar (`AgentGuidanceNoticeView`), and
+nothing waits on it. `PrintablePagesTests.testAGuidanceFailureNeverHoldsTheFolderBack`
+fails if a failure is put back into the readiness state. Every course is its
+own vault, so the root is in none and neither file shows in Obsidian or on a
+site. This repository is itself a working folder (it has `preview.sh` at its
+root), so `.gitignore` keeps the mirrored teachers' skill and `.agents` out of
+it (review N5); its own `CLAUDE.md` has no markers, so the app would ask.
 
 **Why the root, measured** (plan review S1, Claude Code 2.1.295 and Codex
 0.155.1): Codex never found a skill inside a course and found it at the root
