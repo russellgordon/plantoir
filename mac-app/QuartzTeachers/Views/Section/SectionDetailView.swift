@@ -375,7 +375,10 @@ struct SectionDetailView: View {
                 // moving it between containers is how that gets thrown away.
                 if let previewURL {
                     WebPreviewView(controller: previewController, url: previewURL)
-                        .onAppear {
+                        .task {
+                            // A task rather than an appearance block: the section's
+                            // registering appearance block is found by a source scan
+                            // (WorkingFolderSelectionTests) as the view's first one.
                             notePagesHandedToTheBrowser()
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
