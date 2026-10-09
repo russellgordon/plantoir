@@ -215,6 +215,18 @@ now checks it is absent.
 
 ### `/opt/vendor`: engines a site carries only when a page asks (#454)
 
+**Beside it since #499 (v1.6.0): `/opt/vendor/pagedjs/fonts/`**, six Latin
+Modern faces (Roman regular, bold, italic, bold italic; Sans bold; Mono —
+631,940 bytes, unmodified OTF) and `LICENSE-Latin-Modern.txt` (Debian's
+copyright file, which carries the GUST Font License). A printed handout is set
+in them (06 → F8), and the same gate carries them. They come from Debian's
+`fonts-lmodern` through apt — installed, copied, purged in one layer — not
+from GUST's download page, so a font host that is down can never fail a
+teacher's first build; the six SHA-256s are in `contracts/toolchain.json` →
+`pins` → `latinModern` → `files`, and verify.sh checks the baked files
+against them rather than the recipe, so a Debian point release that touched
+them would surface in a check instead of in a teacher's build.
+
 Since v2.0.0 the image fetches **Paged.js 0.4.3** from the npm registry by
 exact version, checks the tarball's SHA-256 (`a79baaa9…6c17c5`), and keeps
 only `dist/paged.min.js` (502,617 bytes, 96,934 gzipped, SHA-256
