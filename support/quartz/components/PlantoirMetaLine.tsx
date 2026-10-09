@@ -34,6 +34,7 @@ type PrintSettings = {
   words: Record<string, string>
   answerKinds: string[]
   answerTitleWords: string[]
+  curriculumHeadings: string[]
   defaultMode: string
 }
 

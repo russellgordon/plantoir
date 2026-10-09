@@ -103,7 +103,23 @@ never split across pages and are scaled to the page width; diagrams print in
 light colours even when the reader uses dark mode. Keep each figure a
 reasonable size - a figure taller than a page cannot avoid a break.
 
-## 6. Check it
+## 6. The Curriculum connection never prints
+
+Many pages end with a section headed `## Curriculum connection` that
+transcludes the curriculum expectations the page addresses (`![[A1.1]]`).
+It is for the teacher and the course's Curriculum Coverage map, not for
+students, so it is NEVER printed: not on the worksheet, not in the answer
+key, and not when the page is printed with the browser's own Print (⌘P or
+Control-P). It stays on the page on screen. Plantoir leaves off the heading
+and everything under it up to the next heading of the same or a higher level.
+
+- Keep that heading as it is ("Curriculum connection" or "Curriculum
+  connections", any capitals), so the expectations stay off paper and on the
+  coverage map.
+- Put nothing students need below it - no questions, answers or
+  instructions - unless a new heading of the same level (`##`) comes first.
+
+## 7. Check it
 
 Ask the teacher to preview the section in Plantoir and press Print on the
 page. In Plantoir's own preview, Print opens the page in their web browser

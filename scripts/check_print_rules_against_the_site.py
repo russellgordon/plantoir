@@ -16,7 +16,8 @@ Two halves:
 1. `support/quartz/components/scripts/printRules.ts` - the file the page's
    own print code imports - is bundled with the scaffold's esbuild and every
    case in `contracts/shared-rules.json` -> `printablePages` (answerCallouts,
-   labels, titleCleaning, pageLabels) is run through it in Node. The Python
+   labels, titleCleaning, pageLabels, curriculumConnection) is run through it
+   in Node. The Python
    tests cannot reach these: the rule lives in the browser.
 2. Every typed line in `contracts/file-formats.json` -> `pageOptIns` is put
    through the build's own reader (python-frontmatter, after
@@ -62,8 +63,23 @@ for (const c of pages.pageLabels.cases) {
   const got = rules.pageLabel(c.part, c.n, c.total, words)
   if (got !== c.label) failures.push(`pageLabels ${c.part} ${c.n}/${c.total}: ${got}`)
 }
+const curriculum = pages.curriculumConnection
+for (const c of curriculum.headings) {
+  const got = rules.isCurriculumHeading(c.heading, curriculum.headingWords)
+  if (got !== c.curriculum) failures.push(`curriculumConnection.headings ${JSON.stringify(c.heading)}: ${got} != ${c.curriculum}`)
+}
+for (const c of curriculum.sections) {
+  const blocks = c.blocks.map((text) => {
+    const heading = /^(#{1,6}) (.*)$/.exec(text)
+    return heading ? { heading: heading[2], level: heading[1].length } : { heading: null, level: 0 }
+  })
+  const leftOff = rules.leftOffPaper(blocks, curriculum.headingWords)
+  const printed = c.blocks.filter((text, index) => !leftOff[index])
+  if (JSON.stringify(printed) !== JSON.stringify(c.printed)) failures.push(`curriculumConnection.sections ${c.name}: prints ${JSON.stringify(printed)}`)
+}
 const count = pages.answerCallouts.cases.length + pages.labels.cases.length +
-  pages.titleCleaning.cases.length + pages.pageLabels.cases.length
+  pages.titleCleaning.cases.length + pages.pageLabels.cases.length +
+  curriculum.headings.length + curriculum.sections.length
 console.log(JSON.stringify({ count, failures }))
 """
 

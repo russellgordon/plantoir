@@ -103,6 +103,7 @@ def site_settings(settings: dict, displayed_code: str) -> dict:
         "words": words,
         "answerKinds": list(callouts["answerKinds"]),
         "answerTitleWords": list(callouts["answerTitleWords"]),
+        "curriculumHeadings": list(_section("curriculumConnection", "headingWords")),
         "defaultMode": _section("modes", "default"),
     }
 

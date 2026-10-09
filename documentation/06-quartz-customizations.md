@@ -523,7 +523,8 @@ answer toggles the same class; plan finding C). On Print:
    when a Chrome for Testing is on the Mac. Proven against the old code.
 2. Await every function in `window.plantoirPrint.prepare` (the hook #485 E1
    and #455 register in).
-3. Clone the title and article: answers lifted to an "Answers" section on a
+3. Clone the title and article; the page's Curriculum connection is taken
+   out of the copy first, in every mode (#498, below in F4); then answers lifted to an "Answers" section on a
    fresh page, labelled by their own title or by where they sit (numbered
    list item → "Question n", after the heading above the list when there is
    one — "Practice · Question 1", since the item's number alone repeated the
@@ -577,6 +578,36 @@ was tried and REJECTED (it clipped both edges). The Print button is the path
 that prints at full size in Safari. Also found, unchanged by #454: ⌘P of an
 ordinary page in DARK mode in Safari printed eight blank pages (white text,
 backgrounds dropped) — before and after.
+
+**The Curriculum connection is never printed (#498, v1.6.0, Russell
+2026-10-09)** — not in the handout in any mode, not under ⌘P on a printable
+page. It says which expectations a page addresses, for the teacher and the
+coverage map; on a worksheet it is noise. The rule and its cases are
+`printablePages.curriculumConnection`: a heading reading "Curriculum
+connection(s)" in any capitals (closing colon allowed; one that merely
+contains the words is the teacher's and prints), and everything after it to
+the next heading of the same or a higher level. **The build emits no hook,
+and none was added:** measured on the verify fixture, the skeleton
+templates' `%%curriculum-start%%` markers are comments Quartz strips, and the
+section arrives as a bare `<h2 id="curriculum-connection">` followed by its
+siblings (an empty `<p>`, the transcluded expectation's `blockquote.transclude`,
+a deeper heading) directly in the article. So `print.inline.ts` marks those
+siblings `data-plantoir-curriculum` on load — printable pages only, by
+`printRules.leftOffPaper` — ⌘P's stylesheet hides them and the handout
+removes them before lifting answers, so no heading of it ever labels one.
+REJECTED: a wrapper class added by `build_site.py` (it would change the HTML
+of every page with the block, opted in or not, against the compatibility
+promise above, for a section only printing needs to find); a pure-CSS sibling
+selector on `#curriculum-connection` (the id gains a suffix when a page has
+two, and CSS cannot stop at "the next heading of the same level" without
+enumerating levels). Measured, Chrome for Testing 155: the verify fixture's
+section is on screen, in none of the three handouts and not in the ⌘P PDF
+(`pdftotext`: 0 lines of it, "Practice" after it still printed); the same
+block on the page that did not opt in prints under ⌘P as before; the old code
+printed it in both handouts and under ⌘P (`browser-checks/print_handout.mjs`,
+verify.sh 6h, proven against the old build). Cost: `postscript.js` +1,068
+bytes and `index.css` +59 against the figures above; no page that does not
+opt in changes.
 
 ### F5. Plantoir's own preview
 

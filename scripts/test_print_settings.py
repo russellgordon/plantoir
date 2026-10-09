@@ -107,6 +107,11 @@ class WrittenSettingsTests(unittest.TestCase):
         rules = contracts.section("shared-rules", "printablePages", "answerCallouts")
         self.assertEqual(written["answerKinds"], rules["answerKinds"])
         self.assertEqual(written["answerTitleWords"], rules["answerTitleWords"])
+        # The page's Curriculum connection is never printed (#498): the page
+        # finds it by these words.
+        self.assertEqual(written["curriculumHeadings"],
+                         contracts.section("shared-rules", "printablePages",
+                                           "curriculumConnection", "headingWords"))
         self.assertEqual(written["defaultMode"],
                          contracts.section("shared-rules", "printablePages", "modes", "default"))
 
