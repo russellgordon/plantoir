@@ -27,9 +27,14 @@ struct PrintSettingsView: View {
         return sketch(for: "header_left")
     }
 
-    /// What the bottom left corner will say.
+    /// What the bottom left corner will say: the page's title, then what is
+    /// placed there (#499; printablePages.footer).
     private var bottomLeftSketch: String {
-        return sketch(for: "footer_left")
+        let placed: String = sketch(for: "footer_left")
+        if placed.isEmpty {
+            return CourseSettingsWording.printingSampleTitle
+        }
+        return CourseSettingsWording.printingSampleTitle + " · " + placed
     }
 
     /// What the top right corner will say: the chosen blanks.

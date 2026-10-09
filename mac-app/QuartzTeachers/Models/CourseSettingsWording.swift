@@ -46,6 +46,10 @@ enum CourseSettingsWording {
     nonisolated static let printedPageLabel: String = "Page {n} of {total}"
     nonisolated static let printingCaption: String =
         "Used on pages whose settings say printable: true, when a student or you press Print."
+    /// Stands for a page's own title in the sketch of the bottom-left corner,
+    /// which prints the title before the course code (#499;
+    /// printablePages.footer).
+    nonisolated static let printingSampleTitle: String = "Page title"
 
     // MARK: - Functions
 
