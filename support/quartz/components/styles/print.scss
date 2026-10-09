@@ -163,8 +163,10 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
     widows: 2;
   }
 
+  // Not tables: in the handout a table longer than the page must split, and
+  // Safari, which reads this rule itself, moved a 40-row table's first rows
+  // off the page instead (measured, Safari 26.6). ⌘P keeps them whole below.
   blockquote.callout,
-  table,
   figure:not(.plantoir-splittable),
   img,
   svg:not(.katex svg),
@@ -548,6 +550,10 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
 @media print {
   html.plantoir-printable {
     @include plantoir-paper;
+
+    table {
+      break-inside: avoid;
+    }
 
     body,
     .page {
