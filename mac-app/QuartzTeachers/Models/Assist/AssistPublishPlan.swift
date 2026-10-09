@@ -280,7 +280,11 @@ struct AssistPublishPlan {
     /// `noun` is what the course calls one of its class pages (#267). The
     /// model is always given the `.class` form; a club's CARD says
     /// "meeting" — see `AssistToolOutcome.planned(_:plan:card:)`.
-    func describe(mostListed: Int = 15, noun: ClassNoun = .class) -> String {
+    ///
+    /// `fromTheMenu` is the Section menu's card (#457 batch B): the one
+    /// first-person sentence here, about pages left alone, in its own voice.
+    /// Never set for what the model reads.
+    func describe(mostListed: Int = 15, noun: ClassNoun = .class, fromTheMenu: Bool = false) -> String {
         var lines: [String] = []
         lines.append("\(courseCode) Section \(sectionNumber): \(verb)ing.")
         lines.append("")
@@ -331,7 +335,7 @@ struct AssistPublishPlan {
         // teacher presses Go, because a refusal they only hear about
         // afterwards is one they have already been told did not happen.
         if !noRoomForAKey.isEmpty {
-            lines.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey))
+            lines.append(AssistPublishPlan.sayingPagesWithNoRoomForAKey(noRoomForAKey, fromTheMenu: fromTheMenu))
         }
 
         // The classes a link landed on, which this publish left where they
@@ -400,21 +404,30 @@ struct AssistPublishPlan {
 
     /// "a", "a and b", "a, b and c" — the way a sentence says a list.
     /// The sentence for pages the writer declined, naming a few of them.
-    static func sayingPagesWithNoRoomForAKey(_ pages: [AssistSectionPage]) -> String {
+    ///
+    /// `fromTheMenu` for the Section menu's own voice (#457 batch B): the
+    /// same fact, not said in the first person.
+    static func sayingPagesWithNoRoomForAKey(_ pages: [AssistSectionPage], fromTheMenu: Bool = false) -> String {
         var names: [String] = []
         for page in pages {
             names.append(page.displayTitle)
         }
-        return sayingPagesWithNoRoomForAKey(named: names)
+        return sayingPagesWithNoRoomForAKey(named: names, fromTheMenu: fromTheMenu)
     }
 
     /// The same, from titles already to hand.
-    static func sayingPagesWithNoRoomForAKey(named names: [String]) -> String {
+    static func sayingPagesWithNoRoomForAKey(named names: [String], fromTheMenu: Bool = false) -> String {
+        if fromTheMenu {
+            return AssistWording.pagesWhoseSettingsCannotBeAddedToFromTheMenu(listingAFew(names), count: names.count)
+        }
         return AssistWording.pagesWhoseSettingsCannotBeAddedTo(listingAFew(names), count: names.count)
     }
 
     /// The sentence for pages whose new date could not be set, naming a few.
-    static func sayingPagesWhoseNewDateCouldNotBeSet(named names: [String]) -> String {
+    static func sayingPagesWhoseNewDateCouldNotBeSet(named names: [String], fromTheMenu: Bool = false) -> String {
+        if fromTheMenu {
+            return AssistWording.pagesWhoseNewDateCouldNotBeSetFromTheMenu(listingAFew(names), count: names.count)
+        }
         return AssistWording.pagesWhoseNewDateCouldNotBeSet(listingAFew(names), count: names.count)
     }
 

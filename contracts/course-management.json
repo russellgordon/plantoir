@@ -34,6 +34,25 @@
         "why": "Seven assistant backups and three of the teacher's: the two OLDEST assistant backups go. The teacher's three are not counted among the five and are not deleted, however old."
       },
       {
+        "name": "the Section menu keeps its five most recent, counted apart from the assistant's",
+        "course": "ICS3U",
+        "existing": [
+          "ICS3U_backup_2026-09-01_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-02_120000_menu-section2.zip",
+          "ICS3U_backup_2026-09-03_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-04_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-05_120000_menu-section1.zip",
+          "ICS3U_backup_2026-09-06_120000_menu-section1.zip",
+          "ICS3U_backup_2026-08-01_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-08-02_120000_assistant-section1.zip",
+          "ICS3U_backup_2026-08-21_090000.zip"
+        ],
+        "expectDeleted": [
+          "ICS3U_backup_2026-09-01_120000_menu-section1.zip"
+        ],
+        "why": "#457 batch B. The Section menu saves a copy before EVERY change it makes (the director's ruling on the plan review: per action, so 'the copy made before it is in Backups' is always true), so it clears up after itself as the assistant does: its own five most recent of the course are kept, whatever section each was for. Counted APART from the assistant's: six menu copies and two of the assistant's delete one menu copy and none of the assistant's, so an afternoon of menu changes never pushes the copy an open conversation's Restore button needs off the disk. The teacher's own are never counted."
+      },
+      {
         "name": "a teacher's own backups are never pruned, however many there are",
         "course": "ICS3U",
         "existing": [
@@ -645,6 +664,14 @@
         "moment": "2026-08-11 22:15:30",
         "section": 3,
         "why": "The assistant's own backups say so in the name, so a teacher can see which copies Plantoir made and what each was for. A name WITHOUT that ending is one of the teacher's own — which is exactly what every backup made before this existed is, and why the suffix is added rather than the teacher's being marked."
+      },
+      {
+        "kind": "backup",
+        "maker": "menu",
+        "name": "ICS3U_backup_2026-08-11_221530_menu-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "why": "#457 batch B: the copy the Section menu saves before each change it makes (Publish Pages..., Hide Pages... and the rest of the assistant's functions, run from the menu bar). Its own ending, never `_assistant-section<N>`: a teacher who declined the assistant must not see a backup said to be from an assistant chat they never had, and the Backups list says which section the change was made to. Read by both apps; one written by either is listed and restored by the other."
       },
       {
         "kind": "archive",

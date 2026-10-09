@@ -1737,6 +1737,32 @@ enum ScheduledDeploy {
         )
     }
 
+    /// A scheduled deploy goes out with any class dated after the next
+    /// class as it is, and records their places (#475): the deploy is not
+    /// held up for a question nobody is awake to answer. Read on the main
+    /// thread, as the rest of this run's reading is.
+    nonisolated static func noteClassesDatedLaterGoingOut(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)
+    ) {
+        MainActor.assumeIsolated {
+            let configURL: URL = section.courseDirectory.appendingPathComponent("course_config.json")
+            guard let configuration = try? CourseConfiguration(contentsOf: configURL) else {
+                return
+            }
+            let course: Course = Course(
+                code: section.courseCode, directoryURL: section.courseDirectory, configuration: configuration
+            )
+            let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(
+                forSection: section.sectionNumber, in: course, today: CalendarDay.today()
+            )
+            if let line = ClassesDatedLater.wentOutLine(flagged) {
+                ActivityTrail.note(
+                    .laterClassesWentOut, line, course: section.courseCode, section: section.sectionNumber
+                )
+            }
+        }
+    }
+
     /// Run the one-shot script and leave, without ever becoming an app.
     ///
     /// Never returns. Same shape as `AssistMCPServer.serve` for the same
@@ -1882,6 +1908,10 @@ enum ScheduledDeploy {
             switch step {
             case .run:
                 clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
+                // Classes dated after the next class (#475) go out as they
+                // are — there is nobody at half six to ask — and the trail
+                // says which (`classesDatedLater.neverAskedFrom`).
+                noteClassesDatedLaterGoingOut(section: section)
             case .leaveQuietly:
                 for lease in leasesTaken {
                     WorkLeaseFiles.remove(at: lease)
