@@ -187,6 +187,13 @@ struct CourseSettingsView: View {
                     FormSectionHeader("Footer")
                 }
 
+                // What a printed handout carries in its corners (#454).
+                Section {
+                    PrintSettingsView(configuration: configuration, displayedCourseCode: course.displayCode)
+                } header: {
+                    FormSectionHeader(CourseSettingsWording.printingHeader)
+                }
+
                 Section {
                     StringListEditorView(
                         title: "Shared folders (all sections)",
@@ -755,12 +762,18 @@ struct CourseSettingsView: View {
                 )
             )
             saveNotice = notice
+            var printingBefore: SettingsSaveNotice.PrintingSnapshot? = nil
+            if let onDisk {
+                printingBefore = SettingsSaveNotice.PrintingSnapshot(onDisk)
+            }
             ActivityTrail.note(.settingsSaved, SettingsSaveNotice.trailLine(
                 courseCode: course.code,
                 hiddenBefore: hiddenBefore,
                 hiddenAfter: course.configuration.hiddenItems,
                 result: result,
-                notice: notice
+                notice: notice,
+                printingBefore: printingBefore,
+                printingAfter: SettingsSaveNotice.PrintingSnapshot(course.configuration)
             ))
             didJustSave = true
             Task {

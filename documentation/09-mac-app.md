@@ -2658,6 +2658,120 @@ to, did not change — and `scripts/test_colour_scheme_names.py` now holds every
 scheme name against the same `forbidden` list, whole-word. It is pure Python,
 so Windows' `PythonToolchainTests` runs it too (`userFacingLabelWords.data`).
 
+## Printing (#454, v2.0.0)
+
+Three pieces of the printable-pages feature are the app's; the rest is the
+build and the site ([06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200)).
+
+### Course Settings → Printing
+
+A section between Footer and Content Structure (`PrintSettingsView`): the
+school name, three switches for the blanks (Name, Date, Class #), where the
+school name and the course code print (top left, bottom left, not printed),
+and a sketch of a page's corners that follows the build's rule. Course-wide.
+The four accessors on `CourseConfiguration` NEVER write when read: an unknown
+blank or place reads as nothing or the default and stays in the file until
+the teacher changes that setting (`savingSettings.whatEnablesSave.freshOpenCases`
+→ "printing settings, with an unknown blank and an unknown place"). An empty
+school name removes the key. The words are `CourseSettingsWording.printing*`,
+pinned to `courseSettingsWording`. A Save that changed printing adds to the
+`settings saved` line: "printing: school name set; blanks Name, Date → Name,
+Date, Class #; course code bottom left → top left" — only what changed, and
+the school's name NEVER (it is something the teacher wrote).
+
+### The preview hands Print to the web browser
+
+The preview is a `WKWebView` with no print dialog and no new windows:
+measured on macOS 26.6 (plan review B1), `print()` returned at once with no
+dialog and no `afterprint`, and a `target="_blank"` link did nothing — so the
+teacher's FIRST press of Print, which is almost always in the preview, did
+nothing. `PreviewBrowserHandoff` (the web view's `uiDelegate` and its
+`plantoirPrint` message handler) fixes both: the page's print code posts
+`{mode, paper, url}` and the app opens the page in the default browser with
+`#plantoir-print=<mode>&paper=<portrait|landscape>`, which prints at once
+(measured in Safari 26.6: the sheet came up on "All 3 Pages"); a new-window
+link — a page's own PDF among them — opens in the browser too. Only the
+preview's own `localhost` pages, the contract's three modes (in the menu's
+order since #499: questions only, answers only, both) and its two papers are
+acted on; a page built before #499 sends no paper and is printed portrait.
+The paper travels because the page lays its handout out BEFORE any print
+dialog opens, so the menu, not the dialog, is where landscape is chosen
+(documentation/06 → F8). The trail line says `, on landscape paper` when it
+was. Each hand-over is a trail line,
+`preview page opened in the web browser`, with the section, why, and the slug
+of the page the teacher was ON — for a new-window link only its KIND (the
+page's own PDF, another page of the site, another site), never where it led:
+the first version recorded any link's path, a shared Drive document's id
+included, and a link's destination is something the teacher wrote
+(implementation review S2, rule 5). `PrintablePagesTests.testThePreviewsWebViewHandsBothToTheBrowser`
+drives a real web view built the way the preview builds it, and fails with
+the delegate and the handler taken out. **Rejected:**
+`WKWebView.printOperation(with:)`, which prints the frame on screen rather
+than the handout.
+
+### Guidance for an assistant, written into the working folder
+
+After the toolchain copy (`ToolchainReadiness.ensure`, once per folder per run
+of the app) the app writes `support/agent_guidance` into the working folder's
+ROOT (`AgentGuidance.write`): the `plantoir-printing` skill into
+`.claude/skills/` (Claude Code) and `.agents/skills/` (Codex) — each skill's
+folder is the app's whole, and nothing else under `.claude` or `.agents` is
+touched (Russell's real folder has a `.claude/settings.local.json`) — and a
+**managed section** in `AGENTS.md` and `CLAUDE.md` naming the skill, between
+`<!-- BEGIN PLANTOIR: … -->` and `<!-- END PLANTOIR -->`. Russell's rulings
+of 2026-10-09 (P1 REVISED AGAIN and ADDENDUM 2), as contract cases
+(`printablePages.agentGuidance.rootFileCases`, nine):
+
+- **no file** → written, holding only the section;
+- **the markers present** → only what is between them is replaced;
+- **the teacher's own file, no markers** → the app ASKS: a sheet names the
+  file, says what Plantoir would add (the text behind "Show what would be
+  added"), and that their own text stays above it; **Add** (Return) appends
+  the section below their text with one blank line between, **Not Now**
+  (Escape) is remembered for that file (`AgentGuidanceDeclined` in the
+  preferences, the section's fingerprint) until the section's words change
+  or the file goes. Both answers are a trail line, `asked before adding
+  guidance to a file`. A file is never appended to without a yes; the skills
+  are written either way.
+
+**It never holds the folder back** (implementation review S1). The first
+version counted a guidance failure in the toolchain copy's outcome, so a
+`.claude` that was a file, or a read-only `.agents`, marked the whole folder
+"not ready" and refused Preview, Deploy and New Course. Now the guidance runs
+after the copy on an outcome of its own: a failure is logged, written on the
+trail (`guidance for assistants could not be written`) and shown as a
+dismissable notice above the path bar (`AgentGuidanceNoticeView`) in the
+system's own words — the file's place stays on the trail line — and nothing
+waits on it. The notice comes back at each launch while its cause remains:
+the pass runs once per folder per launch. The section is found from its END
+line back to the last start line before it, so a stray start line in the
+teacher's text above is never taken as the section's (fix review: taken from
+the first start line, the second launch after an Add replaced the teacher's
+text). And Add reads the file again and REFUSES when it is there but can no
+longer be read, rather than writing the section over it (`addCases`). `PrintablePagesTests.testAGuidanceFailureNeverHoldsTheFolderBack`
+fails if a failure is put back into the readiness state. Every course is its
+own vault, so the root is in none and neither file shows in Obsidian or on a
+site. This repository is itself a working folder (it has `preview.sh` at its
+root), so `.gitignore` keeps the mirrored teachers' skill and `.agents` out of
+it (review N5); its own `CLAUDE.md` has no markers, so the app would ask.
+
+**Why the root, measured** (plan review S1, Claude Code 2.1.295 and Codex
+0.155.1): Codex never found a skill inside a course and found it at the root
+at once; Claude Code found a per-course one only after reading a file there.
+**Re-measured with the root files in place, 2026-10-09**, in a scratch working
+folder (`courses/ICS3U/Unit 1/Factoring Practice.md`: three questions with
+"Answer: …" written inline and a hint), one fresh copy per run:
+
+| Launcher | Started at | Prompt | `printable: true` | Answers in folded callouts, `>` line after the first | Result |
+|---|---|---|---|---|---|
+| `claude -p` (2.1.295, `--permission-mode acceptEdits`) | working folder root | `Make the page "courses/ICS3U/Unit 1/Factoring Practice.md" printable.` | yes | yes (`[!success]- Answer`), hint as folded `[!tip]-` | PASS |
+| `claude -p` | `courses/ICS3U` | `Make the page "Unit 1/Factoring Practice.md" printable.` | yes | yes, same shape | PASS |
+| `codex exec` (0.155.1, `-s workspace-write`) | working folder root | same as the first | yes | yes (`[!answer]- Answer n`) | PASS (read `.agents/skills/plantoir-printing/SKILL.md`) |
+| `codex exec` | `courses/ICS3U` | same as the second | yes | yes (`### Question n` headings, `[!success]- Answer n`, hint as `[!tip]-`) | PASS (found `AGENTS.md`, then the skill) |
+
+One run each, so "pass" means the guidance was found and followed, not that
+it always will be.
+
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
 Russell, 2026-10-07/08: Plantoir did things a teacher could reach only by

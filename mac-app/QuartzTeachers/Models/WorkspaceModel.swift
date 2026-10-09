@@ -1504,6 +1504,10 @@ class WorkspaceModel {
                 )
             }
         }
+        // The guidance for assistants (#454) is NOT written here: its failure
+        // must never hold the folder back from Preview and Deploy (review S1),
+        // so ToolchainReadiness writes it after this copy, on its own outcome
+        // (AgentGuidance.write).
         return changed
     }
 

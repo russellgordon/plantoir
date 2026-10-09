@@ -191,6 +191,30 @@
         "key": "reference_school_year",
         "type": "integer or null",
         "why": "Which school year a reference course was taught in, as the calendar year it STARTED in: 2025 means 2025–26. Only meaningful beside kept_for_reference. The LABEL is derived rather than stored — 'Other' for absent or null, otherwise SchoolYear's rule — so the en dash in '2025–26' never reaches this file and the two apps cannot render the same year two ways. Absent, null, or anything that is not a whole number within the offered range reads as 'Other', which is the safe direction: a course lands in a group the teacher can see and can change, rather than inventing a group labelled '0000–01' out of a value that coerced to zero. A year ABOVE the range today (a Mac with a wrong clock) joins its own group on the day that year arrives, because the range only ever grows at the top. Nil CLEARS the key rather than writing null, so a course nobody has filed under a year writes the same file it always did."
+      },
+      {
+        "default": "",
+        "key": "print_school_name",
+        "type": "string",
+        "why": "#454 (v1.6.0). The school's name, printed in a corner of every page of a handout made from a page whose settings say `printable: true`. COURSE-wide rather than per section: a handout is the same piece of paper for every section of a course. ABSENT or \"\" (or only spaces) means no school name is printed. Written by Course Settings ▸ Printing; read on every build by `scripts/print_settings.py`, which composes the four corners. shared-rules.json → printablePages.corners carries the cases."
+      },
+      {
+        "default": ["name", "date"],
+        "key": "print_blanks",
+        "type": "array of strings: name, date, class_number",
+        "why": "#454. The lines a student fills in, printed top right on EVERY page (decision 4), always in the order Name, Date, Class # whatever order the array holds. ABSENT means [\"name\", \"date\"]; an EMPTY array means none. An unknown value is ignored rather than refused, and a repeated one prints once, so a value a newer app adds cannot break an older build."
+      },
+      {
+        "default": "header_left",
+        "key": "print_school_name_at",
+        "type": "string: header_left, footer_left or none",
+        "why": "#454. Which corner the school name prints in. ABSENT or anything unknown means header_left. When it shares a corner with the course code the two read \"School · CODE\", school first."
+      },
+      {
+        "default": "footer_left",
+        "key": "print_course_code_at",
+        "type": "string: header_left, footer_left or none",
+        "why": "#454. Which corner the course code prints in: the code a teacher reads (a reference course kept in `ICS4U-2025` prints its `course_code`, ICS4U), in capitals. ABSENT or anything unknown means footer_left."
       }
     ],
     "note": "`courses/<CODE>/course_config.json`. Written by the wizard and the settings form, read by both apps AND by `scripts/*.py` — so a key spelled differently on one platform is not a disagreement between two apps, it is a setting the site build silently ignores. Nested keys are per-section maps: `{\"sections\": {\"section1\": <value>}}`. The keys fall into TWO groups, and a first draft of this contract only had the first: the settings form round-trips most of them, while a handful are written ONCE by the wizard and read back by `setup_course.py` as the defaults for its own questions. Missing the second group means a teacher on one platform is asked a question the other platform answers for them.",
@@ -505,6 +529,61 @@
     }
   },
   "note": "The two files both apps WRITE, and the Python then reads. Everything else in these contracts describes behaviour; this describes a format, and a format that drifts corrupts a teacher's course quietly. Both spellings below have already caused a real bug: `SectionAdder` was found writing the OLD frontmatter key on both platforms, so a section added through the app was born in a schema everything else had moved off, and the TEST agreed with the code.",
+  "pageOptIns": {
+    "note": "#454 (v1.6.0). Frontmatter keys a page uses to ask for something extra on the built site, as opposed to `publish:`, which decides whether it is there at all. Both apps leave these alone - only the build and the site read them - so the cases below are run by the shared Python (scripts/test_page_features.py) and, down the real chain inside the image, by scripts/check_print_rules_against_the_site.py from verify.sh. A key that pulls in a large engine is GATED PER SITE: the engine is copied into a section's site only when at least one page students can see opts in, so a course that never prints carries none of it (Paged.js, 502,617 bytes). #455 adds `codeRunner` here.",
+    "keys": [
+      {
+        "key": "printable",
+        "type": "boolean",
+        "why": "`printable: true` puts a Print button on the page's date line, trailing edge, and makes ⌘P print it as a worksheet (questions only). Read the way the build reads every page: python-frontmatter (PyYAML, YAML 1.1) loads the teacher's line, the build writes it back, and the site reads THAT - so `yes` and `on` opt in (YAML 1.1 booleans, written back as `true`), while `\"true\"` and `1` do not (a string and a number). Pages that do not opt in print exactly as they did before #454, byte for byte."
+      },
+      {
+        "key": "printPdf",
+        "type": "string: a file name in the course's Media folder",
+        "why": "Decisions 14 and 14a (Russell, 2026-10-09). A PDF the teacher already has, handed out instead of the generated handout: the Print button becomes a plain link that opens the PDF, with no menu and no script, so it works offline and without JavaScript. The value is a FILE NAME only - the PDF is assumed to be in the course's Media folder, where Obsidian puts attachments - written plainly (`printPdf: Worksheet 3.pdf`) or as the link Obsidian writes for a link property (`printPdf: \"[[Worksheet 3.pdf]]\"`, `|alias` dropped); the unquoted `[[Worksheet 3.pdf]]`, which YAML reads as a list inside a list, is accepted too, because Obsidian users type exactly that. A slash or backslash is a path and is refused. It WINS over `printable` when both are set. A value the build cannot use is taken off the build's own copy of the page (never the teacher's), so the page falls back to the generated handout when it says `printable: true` and to no button otherwise, and the teacher is told by the siteHealth check printPdfNotFound. The PDF reaches the site the way every Media file already does (Quartz copies every non-page file in content/ to the site), so the build only resolves and checks the name; it copies nothing."
+      }
+    ],
+    "readingCases": {
+      "rule": "`lines` is the page's frontmatter as typed; `printable` is what python-frontmatter makes of the key (null for absent or empty), which is what the build writes back and the site reads; `optsIn` is the answer; `carriesThePrintLayout` is whether this page makes its section's site carry the print engine - it opts in, students can see it, and it has no printPdf that resolved. The Python test runs `printable` -> `optsIn`; check_print_rules_against_the_site.py runs `lines` through the real reader in the image.",
+      "cases": [
+        { "lines": ["printable: true"], "printable": true, "optsIn": true, "carriesThePrintLayout": true, "why": "The plain case." },
+        { "lines": ["printable: True"], "printable": true, "optsIn": true, "carriesThePrintLayout": true },
+        { "lines": ["printable: TRUE"], "printable": true, "optsIn": true, "carriesThePrintLayout": true },
+        { "lines": ["printable: yes"], "printable": true, "optsIn": true, "carriesThePrintLayout": true, "why": "YAML 1.1: PyYAML reads yes as true and writes back `true`, which is what the site reads." },
+        { "lines": ["printable: on"], "printable": true, "optsIn": true, "carriesThePrintLayout": true },
+        { "lines": ["printable: \"true\""], "printable": "true", "optsIn": false, "carriesThePrintLayout": false, "why": "Quotes keep it a string, and the site asks for the boolean." },
+        { "lines": ["printable: 1"], "printable": 1, "optsIn": false, "carriesThePrintLayout": false },
+        { "lines": ["printable: false"], "printable": false, "optsIn": false, "carriesThePrintLayout": false },
+        { "lines": ["printable:"], "printable": null, "optsIn": false, "carriesThePrintLayout": false, "why": "A key with nothing after it is null." },
+        { "lines": ["title: A page with no printable key"], "printable": null, "optsIn": false, "carriesThePrintLayout": false, "why": "Absent." },
+        { "lines": ["printable: true", "publish: false"], "printable": true, "optsIn": true, "carriesThePrintLayout": false, "why": "Students cannot see the page, so it does not make the site carry the engine." },
+        { "lines": ["printable: true", "printPdf: Worksheet 3.pdf"], "printable": true, "optsIn": true, "carriesThePrintLayout": false, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "why": "Its own PDF wins, so the generated handout is never made from it." },
+        { "lines": ["printable: true", "printPdf: missing-7f3a.pdf"], "printable": true, "optsIn": true, "carriesThePrintLayout": true, "mediaFiles": [], "why": "A printPdf that does not resolve falls back to the generated handout, which needs the engine." }
+      ]
+    },
+    "printPdfCases": {
+      "rule": "`printPdf` is the value python-frontmatter makes of the line (a string, a list for the unquoted wikilink, a number, or null); `printable` whether the page opts in; `visible` whether students can see it; `mediaFiles` what is in the course's Media folder, each a real PDF (`isPdf`, starting %PDF-) or not. `expect.button` is pdf, handout or none; `expect.file` the PDF's name AS THE MEDIA FOLDER SPELLS IT (never the typed spelling, because Netlify and Cloudflare are case-sensitive and the site's copy carries the folder's spelling); `expect.problem` is missing, notAPdf, hasAPath or null. Where a PDF resolves, its web address is `Media/` plus Quartz's slug of the file name, relative to the site's root (printablePages.pdfLink) - checked against the REAL emitted file by verify.sh rather than here, because a Python copy of Quartz's slug rule would drift.",
+      "cases": [
+        { "name": "a file name", "printPdf": "Worksheet 3.pdf", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } },
+        { "name": "the link Obsidian writes for a link property", "typed": "printPdf: \"[[Worksheet 3.pdf]]\"", "printPdf": "[[Worksheet 3.pdf]]", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } },
+        { "name": "a link with an alias", "printPdf": "[[Worksheet 3.pdf|Key]]", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } },
+        { "name": "the unquoted link, which YAML reads as a list inside a list", "typed": "printPdf: [[Worksheet 3.pdf]]", "printPdf": [["Worksheet 3.pdf"]], "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } },
+        { "name": "not in Media, page printable", "printPdf": "Worksheet 3.pdf", "printable": true, "visible": true, "mediaFiles": [], "expect": { "button": "handout", "file": null, "problem": "missing" } },
+        { "name": "not in Media, page not printable", "printPdf": "Worksheet 3.pdf", "printable": false, "visible": true, "mediaFiles": [], "expect": { "button": "none", "file": null, "problem": "missing" } },
+        { "name": "not a PDF by name", "printPdf": "notes.docx", "printable": false, "visible": true, "mediaFiles": [{ "name": "notes.docx", "isPdf": false }], "expect": { "button": "none", "file": null, "problem": "notAPdf" } },
+        { "name": "named .pdf but not a PDF inside", "printPdf": "fake.pdf", "printable": true, "visible": true, "mediaFiles": [{ "name": "fake.pdf", "isPdf": false }], "expect": { "button": "handout", "file": null, "problem": "notAPdf" } },
+        { "name": "a number", "typed": "printPdf: 3", "printPdf": 3, "printable": false, "visible": true, "mediaFiles": [], "expect": { "button": "none", "file": null, "problem": "notAPdf" } },
+        { "name": "a path with a slash", "printPdf": "Media/Worksheet 3.pdf", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "none", "file": null, "problem": "hasAPath" } },
+        { "name": "a path with a backslash", "printPdf": "Unit 3\\key.pdf", "printable": true, "visible": true, "mediaFiles": [], "expect": { "button": "handout", "file": null, "problem": "hasAPath" } },
+        { "name": "both keys: the PDF wins", "printPdf": "Worksheet 3.pdf", "printable": true, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } },
+        { "name": "an empty value", "typed": "printPdf: \"\"", "printPdf": "", "printable": true, "visible": true, "mediaFiles": [], "expect": { "button": "handout", "file": null, "problem": null } },
+        { "name": "a key with nothing after it", "typed": "printPdf:", "printPdf": null, "printable": false, "visible": true, "mediaFiles": [], "expect": { "button": "none", "file": null, "problem": null } },
+        { "name": "a page students cannot see is not checked", "printPdf": "missing-7f3a.pdf", "printable": true, "visible": false, "mediaFiles": [], "expect": { "button": "none", "file": null, "problem": null } },
+        { "name": "spelled in other capitals: the Media folder's spelling is used", "printPdf": "WORKSHEET 3.PDF", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null }, "why": "Found the same way on every platform - by the Media folder's own listing, compared without regard to capitals - rather than by asking the file system, which finds it on macOS and Windows and not on Linux. The file named is the folder's spelling, which is the one the site carries." },
+        { "name": "spaces around the name", "printPdf": "  Worksheet 3.pdf  ", "printable": false, "visible": true, "mediaFiles": [{ "name": "Worksheet 3.pdf", "isPdf": true }], "expect": { "button": "pdf", "file": "Worksheet 3.pdf", "problem": null } }
+      ]
+    }
+  },
   "pageVisibility": {
     "keys": {
       "courseLevelPage": {

@@ -1640,6 +1640,44 @@ folders", and asks "Revise with Claude…" to draft one page per code from the
 framework they have; the next build draws its map.
 
 
+## Printable pages: what the build does (#454, v2.0.0)
+
+The site side is [06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200);
+the build's share is four steps, all in the ALWAYS section so every existing
+section picks them up on its next build:
+
+1. **`install_quartz_additions`** (beside `install_patched_backlinks`) copies
+   `support/quartz/**` into the section's Quartz copy where the bytes differ.
+   Read only from `SUPPORT_DIR`, so verify.sh's `check_baked` proves the image.
+2. **`_resolve_print_settings_of_pages`**, after the How I Teach sweep and
+   BEFORE the folder checks, reads every processed page's `printable` and
+   `printPdf` with python-frontmatter. A `printPdf` that resolves against the
+   course's Media folder (`page_features.resolve_print_pdf`, by the folder's
+   own listing, without regard to capitals) is rewritten to the folder's
+   spelling; one that does not is taken off the build's copy and becomes a
+   `printPdfNotFound` fact, so the folder check says it where every folder
+   problem is said (review S3 — a console line is where a teacher using the
+   app never looks). It never refuses a build: one attachment must not stop a
+   site, and refusing would break the preview the teacher is using to fix it.
+   It also counts the pages that need the print engine.
+3. **`page_features.install_gated_assets`** puts `/opt/vendor/pagedjs` into the
+   section's `quartz/static` when that count is above zero, and takes it out
+   when it is zero (one plain line: "This site carries the print layout for 2
+   pages.").
+4. **`print_settings.write`** writes `quartz/plantoir_print.json` (the corners
+   from the course's `print_*` settings, the words, the rules), then
+   **`wire_quartz_additions`** makes its two marker edits — after every other
+   edit to `quartz.layout.ts`, so nothing rewrites the wrapped line. A stale
+   contract makes step 4 print a warning, never stop the build.
+
+The PDF itself needs no copying: Quartz's Assets emitter already copies every
+non-page file in `content/` (Media included, through the build's link to it)
+to the site at Quartz's slug of its path. Measured on a real course: 179 PDFs
+under `Media/`, `&` and spaces included, at exactly that slug.
+
+**Compatibility:** none of this changes a page that does not opt in — verify.sh
+plants one and checks it (06 → F, "Compatibility").
+
 ## Stage 4: Configuration patching
 
 The remaining per-section settings from `course_config.json` are applied to

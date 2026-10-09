@@ -428,6 +428,407 @@ coverage map for it, linked from Key Links under that folder's entry.
 
 ---
 
+## F. Additions installed every build: printable pages (#454, v2.0.0)
+
+A page whose settings say `printable: true` prints as a worksheet that reads
+like the teacher's LaTeX handouts (#499, F8); a page that says
+`printPdf: <file in Media>` hands out a PDF the teacher already has. The
+rules are data in [`contracts/shared-rules.json`](../contracts/shared-rules.json)
+→ `printablePages` and [`file-formats.json`](../contracts/file-formats.json) →
+`pageOptIns`; this section says how the site does it and why.
+
+**Compatibility, stated first because it is the promise.** A page that does
+not opt in renders exactly as it did before #454: its HTML carries no print
+markup at all — no wrapper, no button, no style, no `@page` — and its date
+line is the plain `<p class="content-meta">` it always was. Measured on EXC2O
+(implementation review, `origin/dev` 8178eeaac against the branch): **all 300
+pages that do not opt in are byte-identical** once what Quartz already varies
+between ANY two builds is set aside (the explorer's random list id, build-time
+dates on curriculum pages, and the order of tag-list entries sharing one of
+those dates); the only pages that differ are the 7 that opt in. Every new CSS
+selector is scoped to a printable page or the handout frame, and nothing adds
+an `@page`. ⌘P of a page that does not opt in prints the same pages with the
+same text in Chrome for Testing 155 (13 and 3 pages, light and dark,
+`pdftotext` identical) and in Safari 26.6. **verify.sh gates it on every
+run**: section 5 plants "Printable Not Opted", the worksheet with only
+`printable: true` taken out, and the 6h printable-pages check fails if that
+page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
+`@page`, or if its date line is not the plain one straight after its title.
+What every site DOES change is its two shared bundles, measured on EXC2O
+against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
+`index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
++10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
+change), every rule in them scoped so it cannot touch an ordinary page.
+
+### F1. The files and how they reach a section
+
+New files, not patches, live in `support/quartz/` at the path they take in a
+section's Quartz copy, and `build_site.install_quartz_additions` copies them in
+on EVERY build (ALWAYS section), so a section built before them picks them up
+on its next preview:
+
+| File | What it does |
+|---|---|
+| `components/PlantoirMetaLine.tsx` | Wraps the CONTENT layout's `ContentMeta()` only (folder and tag pages never get a button). Not opted in → renders the inner date line and nothing else. `printPdf` → a plain `<a … target="_blank">` to `Media/<Quartz slug of the file>`, built with Quartz's own `slugifyFilePath` so the address is the one the Assets emitter writes (measured with `&` and a space: `Media/plantoir-print-fixture--and--key.pdf`). `printable` → Print, the summary of a `<details>` menu (#499, decision 29: Portrait / Landscape radios, then Questions only, Answers only, Both — nothing prints until a choice), at the TRAILING edge (`margin-inline-start: auto`, so right-to-left too), present even when the date line shows nothing (decision 6), and an inline `<style id="plantoir-print-page">` with the Latin Modern `@font-face` rules, the `@page` box (margins, NO size — F4) and its four corners for ⌘P, and the code box. The page's `title` and `description` travel in `data-settings` for the footer and the subtitle. Reads `quartz/plantoir_print.json` with `fs` rather than importing it, so a missing file costs the button, never the build. Forwards the inner component's `css`/`afterDOMLoaded` (review S7). Both the Print button and the PDF link open with a printer glyph (#497): an inline `<svg>` stroked in `currentColor`, 1em square, `aria-hidden` so the button is still read as its label alone, drawn the way Quartz draws its search and dark-mode icons — no image file, hidden on paper with the button, and nothing on a page that does not opt in. |
+| `components/scripts/printRules.ts` | The rules with no DOM and no imports — answer/question/unfold roles, labels and answer places, question numbering, part letters and columns, title cleaning, page labels, the paper box, the footer, which callouts keep a box, the code box, the completeness decision, and the `@page`/`@font-face` text both ⌘P and the handout write — so `scripts/check_print_rules_against_the_site.py` can bundle it with the scaffold's esbuild and run every contract case in Node (verify.sh). `PlantoirMetaLine.tsx` imports it too, so ⌘P's page box and the handout's cannot drift. |
+| `components/scripts/print.inline.ts` | The button, the handout, ⌘P and the preview handoff (F3–F5). Bundled into every site; inert unless the page carries a printable meta line. |
+| `components/styles/print.scss` | On-screen button styles, ⌘P rules under `@media print { html.plantoir-printable … }`, and handout rules under `html.plantoir-print-frame`. No bare `@page` anywhere (review B2: it cannot be scoped). |
+
+Two marker edits wire them in (`wire_quartz_additions`, idempotent, ALWAYS):
+`components/index.ts` exports `PlantoirMetaLine`, and `quartz.layout.ts`'s
+content layout becomes `Component.PlantoirMetaLine(Component.ContentMeta())`.
+**REJECTED: a third edit to `mermaid.inline.ts`** (an event saying diagrams are
+drawn), in the first implementation: that script is INLINED into every page,
+so it changed the HTML of every page on every site. The handout waits by
+watching the diagrams instead (F3). Also rejected: `patches/` rows (nothing of
+Quartz's is replaced), a meta tag in `Head.tsx`, appending to `base.scss`
+(marker appends freeze, see C2), and resolving `support/quartz` from the
+working directory as the Backlinks copier does (then `check_baked` would
+compare the tree with itself). A file later REMOVED from `support/quartz`
+stays in sections that have it; nothing imports it, so it is inert.
+
+Every build also writes `quartz/plantoir_print.json` (`scripts/print_settings.py`):
+the four corners composed from the course's `print_*` settings, the words, the
+answer kinds and title words, and the Curriculum connection's heading words.
+No default mode since #499: nothing prints until the teacher chooses. Corners are Python
+because they depend on the COURSE's settings, which the site cannot read.
+
+### F2. The engine, gated per site
+
+Paged.js 0.4.3 (`/opt/vendor/pagedjs`, see 02) — and, since #499, the six
+Latin Modern faces beside it in `fonts/` (631,940 bytes, F8) — is copied into
+a section's `quartz/static/pagedjs` only when at least one page students can see opts in
+and has no PDF of its own (`page_features.install_gated_assets`), and taken out
+when none does — verify.sh 6c checks it is gone once the planted pages are.
+So a course that never prints carries none of its 502,617 bytes. The gate runs
+on the build's processed copies, before Quartz. **The live-preview edge:** a
+page that gains `printable: true` while a preview is ALREADY running gets its
+button on the next build of that preview but the engine only on the next
+build that runs the gate — until then Print uses the fallback (F3).
+
+### F3. The handout (Print)
+
+On each page load the script stamps every callout in the article with its
+role, read from what was folded WHEN THE PAGE LOADED (a student who opened an
+answer toggles the same class; plan finding C). On Print:
+
+1. Dark page → `saved-theme="light"` and a `themechange` (the reader's saved
+   preference is never written). Then, on EVERY page, wait until every
+   Mermaid diagram's OWN child is an `svg`, 8 s cap — at once when they are
+   already drawn. Measured: Mermaid first draws into a temporary box, and
+   taking the first `svg` found printed a blank space; and a LIGHT page opened
+   from the preview (F5) starts printing before Quartz has drawn anything, so
+   the first version, which waited only on dark pages, printed every diagram
+   as its source text (implementation review B1: Safari's PDF read
+   "flowchart LR / A[Expand] --> …"; Chrome had 0 of 5 drawn).
+   `browser-checks/print_handout.mjs` prints the verify fixture that way in
+   headless Chrome for Testing and fails on source text; verify.sh 6h runs it
+   when a Chrome for Testing is on the Mac. Proven against the old code.
+2. Await every function in `window.plantoirPrint.prepare` (the hook #485 E1
+   and #455 register in).
+3. Clone the title and article; the page's Curriculum connection is taken
+   out of the copy first, in every mode (#498, below in F4). The questions
+   are numbered in page order (`printablePages.questionItems`, F8); answers
+   are lifted, with their place (`answerPlace`: "7.", "3. a)",
+   "Practice · 3.", the nearest heading, else "Answer n"), into an answer key
+   headed "Title — Answers" on a fresh page — their bodies only, never the
+   callout around them, the parts of one question gathered under its number
+   in columns; question headings and question callouts become numbered items,
+   and an ordered list inside one becomes lettered parts; every other folded
+   callout opened in place; "(click to expand)" dropped; code longer than 25
+   lines may split and flows rather than scrolls; an `svg` with a size and no
+   `viewBox` gets one; code line numbers written out (Paged.js does not carry
+   Quartz's line counter: every line printed "1") with each block's digit
+   count, so the number box is as wide as "110".
+3a. Every picture decoded and given `width`/`height` from its NATURAL size
+   (a `|300` width kept) — never from the screen, where Quartz's
+   `content-visibility: auto` measures every picture below the fold 0 × 0
+   (#499 review B1). Then every element that carries words or a picture is
+   stamped for the completeness check (step 6a).
+4. An iframe ON SCREEN but invisible (`opacity:0`): off screen, Safari
+   paginated about one page per 8 s (11 pages ≈ 90 s); on screen, 192 ms.
+5. Paged.js paginates with `index.css` plus a page box written by
+   `printRules.pageBoxRules` with the chosen paper's `size` and the corners,
+   the bottom two being per-page `--plantoir-footer-left` and
+   `--plantoir-page-label`, PLUS the break and overflow rules spelled out
+   unscoped, by classes the handout adds rather than `:has()` — Paged.js decides breaks by matching
+   selectors against the content BEFORE it sits under the frame's `<html>`,
+   so `html.plantoir-print-frame .plantoir-answers { break-before: page }`
+   matched nothing (measured: the answers began mid-page). Margin boxes use
+   no-break spaces: "Page 1 of 3" wrapped onto three lines in Safari — except
+   the top-left corner, which may take two lines: a long school name sharing
+   it with the course code printed ON TOP of three blanks (review S3,
+   measured with "St. Michael's Catholic Secondary School of the Arts ·
+   EXC2O"; two clean lines after, handout and ⌘P). The top corners sit on
+   their bottom edge, so the blanks line up with the name's last line.
+6. Pages labelled "Page n of m" then "Answers n of m" (decision 3), the
+   footer naming the page ("Title · CODE", "Title — Answers · CODE").
+6a. **Completeness (#499, review B2):** every stamped element must be on a
+   page and none may run more than 1.5 px past its page's content box (or be
+   a loaded picture laid out 0 px tall). Otherwise NOTHING prints, the button
+   says `printablePages.words.incomplete`, and the console names what ran
+   off (`149 span.katex-display 137px`). Measured: it refused the verify
+   fixture's 30-line displayed formula on LANDSCAPE paper (taller than the
+   6.85 in content box; a formula is one line box and cannot split) and
+   passed it on portrait; the fixture now carries 20 lines.
+6b. `print()`; restored again when `print()` returns, in case a browser never
+   sends `afterprint` (review N4). That is right where `print()` waits for the
+   dialog to close — Safari, Chrome and Edge, measured — and UNMEASURED in
+   Firefox, where a `print()` that returned at once would take the frame away
+   mid-print. `afterprint` restores the theme and removes the frame (measured
+   in Safari: Cancel fires it too; the page came back dark with no frame).
+
+**Fallback:** Paged.js missing or failing → the same frame printed by the
+browser, corners where it prints margin boxes (Chrome, Edge), one count for
+the whole document. Measured in Chrome: 3 pages, answers on a fresh page.
+Since #499 the frame's `<html>` says which path ran
+(`data-plantoir-print-path="paged"|"fallback"`, with the counts beside it)
+and the console warns once, and the browser check FAILS if the fixture takes
+the fallback. The fallback still prints everything, so it shows no sentence
+to the reader: one telling Safari users their page numbers are missing would
+be wrong in Chrome, which prints them (review S6 considered; REJECTED).
+
+### F4. ⌘P on a printable page
+
+Questions only, no pagination (decision 7): answers hidden, question bodies
+hidden, everything else open, sidebars hidden, titles cleaned for the print
+and restored after. Since #499 in the handout's look (Latin Modern, no
+callout boxes but the example's, code in its hairline box), and its page box
+writes margins and NO `size`, so the browser's own dialog chooses portrait or
+landscape in every browser — measured with Chrome's printer asked for
+landscape: 792 × 612 now, 612 × 792 before (the page's `size: letter` won).
+Not restructured: no numbered items or lettered parts, which the handout
+builds from a copy. A dark page prints light; Mermaid diagrams already drawn
+dark cannot be redrawn between `beforeprint` and the print, so they keep the
+dark colours they were drawn with and are inverted as a whole (review S5).
+Measured: flipping only the page's colours left light words on light shapes.
+**Safari limit, measured:** Safari lays a printed page out at the WINDOW's
+width (`innerWidth` 1512 while printing from a 1512 px window) and shrinks it
+onto the paper, so ⌘P in Safari prints the column at roughly half size — on
+EVERY Quartz page, before #454 too. Scaling the page up by the window's width
+was tried and REJECTED (it clipped both edges). The Print button is the path
+that prints at full size in Safari. Also found, unchanged by #454: ⌘P of an
+ordinary page in DARK mode in Safari printed eight blank pages (white text,
+backgrounds dropped) — before and after.
+
+**The Curriculum connection is never printed (#498, v1.6.0, Russell
+2026-10-09)** — not in the handout in any mode, not under ⌘P on a printable
+page. It says which expectations a page addresses, for the teacher and the
+coverage map; on a worksheet it is noise. The rule and its cases are
+`printablePages.curriculumConnection`: a heading reading "Curriculum
+connection(s)" in any capitals (closing colon allowed; one that merely
+contains the words is the teacher's and prints), and everything after it to
+the next heading of the same or a higher level — or to the page's footnotes,
+which Quartz puts after the LAST section as a sibling (`section[data-footnotes]`)
+and which must print: the first version left them off the PDF of a page
+ending in a Curriculum connection (review finding, measured; the fixture now
+carries a footnote and a second, final Curriculum connection). **The build emits no hook,
+and none was added:** measured on the verify fixture, the skeleton
+templates' `%%curriculum-start%%` markers are comments Quartz strips, and the
+section arrives as a bare `<h2 id="curriculum-connection">` followed by its
+siblings (an empty `<p>`, the transcluded expectation's `blockquote.transclude`,
+a deeper heading) directly in the article. So `print.inline.ts` marks those
+siblings `data-plantoir-curriculum` on load — printable pages only, by
+`printRules.leftOffPaper` — ⌘P's stylesheet hides them and the handout
+removes them before lifting answers, so no heading of it ever labels one.
+REJECTED: a wrapper class added by `build_site.py` (it would change the HTML
+of every page with the block, opted in or not, against the compatibility
+promise above, for a section only printing needs to find); a pure-CSS sibling
+selector on `#curriculum-connection` (the id gains a suffix when a page has
+two, and CSS cannot stop at "the next heading of the same level" without
+enumerating levels). Measured, Chrome for Testing 155: the verify fixture's
+section is on screen, in none of the three handouts and not in the ⌘P PDF
+(`pdftotext`: 0 lines of it, "Practice" after it still printed); the same
+block on the page that did not opt in prints under ⌘P as before; the old code
+printed it in both handouts and under ⌘P (`browser-checks/print_handout.mjs`,
+verify.sh 6h, proven against the old build). Cost: `postscript.js` +1,068
+bytes and `index.css` +59 against the figures above; no page that does not
+opt in changes.
+
+### F5. Plantoir's own preview
+
+A `WKWebView` inside the app shows no print dialog and opens no new windows
+(review B1, measured). So when the page finds the app's `plantoirPrint`
+message handler it says `printablePages.words.openingInBrowser` and posts
+`{mode, paper, url}`; the app opens the page in the default browser with
+`#plantoir-print=<mode>&paper=<paper>` (#499), and the page prints at once there. Measured in
+Safari 26.6, light, real print sheet then Save as PDF: "All 3 Pages", the
+diagram DRAWN (no source text — the first version printed it as text, B1),
+the hash removed afterwards.
+New-window links, the PDF link among them, open in the browser too. See 09.
+
+### F6. Figures (decision 13, for #485 E1)
+
+An engine's figure is `<figure class="pl-figure pl-<engine>">` with an SVG
+that has a `viewBox` (or an `<img>` with its own size) and a `<figcaption>`.
+On paper it never splits, is scaled to the width — and since #499 to the
+page's height too, `object-fit: contain`, the same cap as every picture and
+Mermaid diagram — keeps its own resolution, and any dark-mode filter is removed. A browser-drawn engine registers in
+`window.plantoirPrint.prepare`.
+
+### F7. Measured matrix (macOS 26.6, M4 Pro), the verify fixture
+
+| Browser | With answers | Questions only | Answers only | ⌘P | Press → print |
+|---|---|---|---|---|---|
+| Safari 26.6 | 3 (2 + 1) | 2 | 1 | 2, small (F4) | 760 ms |
+| Chrome for Testing 155.0.8059.39 | 3 (2 + 1) | 2 | 1 | 2, corners | 131–214 ms |
+| Edge 155.0.4283.45 | 3 (2 + 1) | 2 | 1 | 2, corners | 124–212 ms |
+
+Light and dark gave the same page counts in every cell. Chrome and Edge were
+driven by puppeteer-core 24.10.0 (handout: the frame's document as printed,
+re-rendered by `page.pdf`; ⌘P: `page.pdf` with the page's `@page`). **Trap:**
+Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
+the Internet" prompt, and until it is answered `requestAnimationFrame` never
+fires, which made Paged.js hang and looked exactly like an Edge bug.
+Not measured here: a site published to Netlify or Cloudflare (the files are
+identical to the preview's), Windows browsers (the `windows` issue asks).
+These counts are from before #499's look; F8 has the counts after it.
+
+### F8. On paper: the look of a handout, and nothing lost (#499, v1.6.0)
+
+Russell's print of a real page, MVVM Review, on 2026-10-09 (Safari,
+landscape chosen in its dialog): 18 pages of 792 × 612, every page clipped —
+no footers or page numbers, 18 lines of code, three questions and two steps
+of the instructions lost, every answer in a tinted box under a coloured icon,
+code line numbers reading "1, 6, 1, 7". Decisions 26, 28, 29 and 30 and the
+director's rulings 499-1 to 499-6 set the target: his LaTeX handouts
+(`Get Ready for Linear Systems`, 11pt article, lmodern).
+
+**What prints (contract: `questionItems`, `paper`, `footer`, `paperLook`,
+`completeness`, `labels`, `modes.menu`).** Letter paper, 0.75 in margins and
+0.9 in at the bottom; Latin Modern Roman 10.95 pt, the title in LM Sans bold
+17.28 pt, section headings 12 pt, the page's `description` as a grey
+subtitle; questions numbered "1." in a 2.2 em margin (from `### Question n`
+headings and `question` callouts), an ordered list inside a question
+lettered a), b), c) in 3, 2 or 1 columns by length (a formula's characters
+count 1.5 — counted plainly, question 4's parts were squeezed into three
+columns and wrapped); answers in a key headed "Title — Answers" with the
+same numbers, parts gathered in columns; no box behind any text except an
+`[!example]` (the peach tcolorbox) and fenced code (a 0.5 pt #999 hairline
+box, no fill, its numbers counting on across a page break, the box drawn on
+each piece — DECISIONS 30); header corners as decision 4; footer "Title ·
+CODE" left and the page label right, centred in the bottom margin.
+
+**Measured against the LaTeX** (Chrome for Testing 155, `pdftotext -bbox`,
+`pdffonts`; the side-by-side is `scratchpad/499-side-by-side-linear.png` of
+the session): left ink at 54.0 pt in both, right 556.8 against 558.0; word
+widths "Get" 28.48 against 28.38 pt, "Evaluate" 47.09 against 46.91 (the
+plan review's warning held: glyph HEIGHTS differ because Chrome embeds Type
+3 and LaTeX Type 1C, so widths are what to compare); footer baseline 765.5
+against 767.4 pt; faces LMRoman10-Regular/-Bold and LMSans10-Bold in both.
+The visible differences left: no strand headings in our key, and the Name /
+Date header (decision 4), which the LaTeX warm-up has not.
+
+**MVVM Review, Chrome for Testing 155 (the scratch site: the real page, and
+— since the review — its real RocketSim screenshot, 1368 × 2730, which
+prints at its full resolution; the first counts below used a placeholder):**
+
+| | Before (dev) | After |
+|---|---|---|
+| Questions only, portrait | 6 pages, 79 of 113 code lines missing, 2 pages 6,250 px over | 4 pages |
+| Answers only, portrait | 7 pages | 3 pages |
+| Both, portrait | 13 (6 + 7) | 7 (4 + 3) |
+| Questions only / Answers only / Both, landscape | — (not offered; Safari clipped 18 pages) | 7 / 3 / 10 |
+
+After, in all six, every one of the 14 question stems, 113 non-empty code
+lines and 23 answer paragraphs of the source page is in `pdftotext`'s text
+(a checker that ignores hyphenation, smart quotes and the page corners),
+and every page has 0 px of overflow.
+
+**After the implementation review (Opus):** the guard measured a displayed
+formula's box, which is always the column's width, so a 59-term formula
+(724 px box, 4,342 px of formula) printed to "+ a12" and was called complete.
+The guard now reads the formula's scroll width, and before the layout each
+over-wide formula is measured in the frame at the paper's width: set smaller
+when it keeps at least 70% of its size (`paperLook.formulas`), otherwise
+broken between its terms as KaTeX breaks one in a line of text — the
+fixture's 59 terms print whole on five lines, its 11 terms at 80%; a single
+unbreakable term 2,839 px too wide is refused (measured). Quartz's 75 px
+minimum cell width made a nine-column timetable refuse on portrait: cells
+now have none and break between words (`anywhere` printed "Scien / ce"),
+and tables of eight columns or more print in 9 pt (`paperLook.tables`) — a
+12-column timetable prints whole on both papers. Under ⌘P the code number
+box was still Quartz's, so "100" printed as "10" over "0": the digit rule is
+in the shared mixin now and the page writes the digits on load, and the
+browser check reads ⌘P's numbers 1–110. Formulas print black, not the site's
+grey-green, and Escape in the menu no longer hands focus to Search.
+
+**How each fault was fixed, measured by turning the fix off alone:**
+pictures had no height when Paged.js measured (natural sizes written, and
+`content-visibility: visible` — the screen's box is 0 × 0 below the fold,
+review B1); code scrolled, and Paged.js 0.4.3 will not split a scrolling box
+(`overflow: visible` on code, by class); a 3,134 px Mermaid diagram under
+the same rule printed three pages of arrows and stopped the layout (review
+B2 — diagrams keep their box and are capped with every picture at the
+content height less 0.45 in); Quartz's code `<figure>` kept whole stranded
+"Source Code" on its own page (exempted when the code splits, review S2);
+`<section>` is tinted in Quartz (no backgrounds on paper, S3);
+`.katex-display` clipped (S4); the number box `width: 1rem` broke "100" into
+three lines (sized by digits, `nowrap`); the corners sat at the paper's edge
+(S5: centred in the margins now, 0.37 in up).
+
+**REJECTED, so they are not proposed again:**
+- Orientation by `@media print and (orientation: …)` with both layouts made
+  — Chrome picked the right set, Safari evaluated the WINDOW's orientation
+  and printed the landscape set on portrait paper (measured in the plan).
+- Dropping Paged.js so the dialog's orientation is honoured — Safari then
+  prints no margin boxes: no page numbers, no blanks, no separate counts.
+- Stripping every box, the worked examples included — the LaTeX handouts
+  keep the peach example box (499-2); code keeps a box by DECISIONS 30.
+- Computer Modern from KaTeX's CDN — no bytes, but the network at the moment
+  of printing, and no sans or mono. Latin Modern comes from Debian's
+  `fonts-lmodern` (not GUST's site: a font host that is down must never
+  fail a teacher's first build), unmodified OTF; woff2 (283,148 against
+  631,940 bytes) would change the files, which the GUST Font License asks be
+  renamed when changed.
+- Numbering an untitled `question` callout after the HIGHEST number so far —
+  page order is what the reader sees; a page that mixes "Question 3"
+  headings after an untitled self-check can show two 3s, and the agent
+  guidance tells authors to label questions.
+
+**Safari, measured after the review (Safari 26.6, the scratch site, Safari driven
+on the Mac with `print()` intercepted, then once with the real
+print window):** the completeness check first REFUSED MVVM Review in Safari
+on both papers while Chrome printed it — three shapes, each a WebKit
+difference in how Paged.js's page-as-a-column measuring leaves things:
+(1) a line of code Paged.js split before its words leaves an empty piece
+whose box reaches into the column the layout throws away (the rest prints on
+the next page) — such an EMPTY split piece (no words, no picture) is not a loss
+and is not counted, while every other split piece is measured and what it
+loses is lost (the first version of this fix skipped EVERY split piece, and
+the fix review measured a 60-line formula and a 90-line table row printing
+half-missing while the check said nothing was lost; the verify fixture's
+"Printable Too Tall" page now has to be refused on both papers, proven
+against that version, which printed it "5/5"); (2) a blank code line holds only a space, which Paged.js does not
+break before, so it straddled the page's foot with its number cut off —
+blank lines now hold a zero-width space and break like any other; (3)
+WebKit honours `table { break-inside: avoid }` itself and moved a 40-row
+table's first rows into the thrown-away column, a real loss — in the
+handout tables may now split (⌘P keeps them whole). The check also counts an
+UNSPLIT element cut off only if no unsplit copy of it sits whole on a page,
+measures each piece rather than the union box, and allows a line 3 px of
+hanging leading. Over-wide formulas are measured only after KaTeX's own
+faces have loaded (`document.fonts.ready`): measured before, a 13-term
+formula read 799 px for 896, was not shrunk enough and was refused.
+After: all six prints of MVVM Review and of the verify fixture lay out every
+piece in Safari (`scratchpad/i499/safari-sweep.txt`). **Safari does NOT take
+its orientation from the page:** asked for landscape, its print window opened
+on Portrait and showed the 11 in pages shrunk onto portrait sheets; choosing
+Landscape there printed them right, footers included. A first version
+said `printablePages.words.landscapeInDialog` beside the button while the
+print window was open, but that window covers the page and the sentence was
+never seen (fix review S2), so it shows in the Print MENU, under the papers,
+while Landscape is chosen (review S6's fallback; Chrome and Edge follow the
+page, and the sentence is conditional, so it is true there too).
+
+**Not done / open:**
+the answer key has no strand headings; a displayed formula taller than the
+page, or one unbreakable term wider than it, cannot print (refused, with the
+sentence). Windows owes all of this:
+#496.
+
+---
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — with five asset exceptions, all in

@@ -213,6 +213,41 @@ the Explorer's hide filter. It was 468 MB of image disk per image version,
 and during an update two versions sit side by side for a day. `verify.sh`
 now checks it is absent.
 
+### `/opt/vendor`: engines a site carries only when a page asks (#454)
+
+**Beside it since #499 (v1.6.0): `/opt/vendor/pagedjs/fonts/`**, six Latin
+Modern faces (Roman regular, bold, italic, bold italic; Sans bold; Mono —
+631,940 bytes, unmodified OTF) and `LICENSE-Latin-Modern.txt` (Debian's
+copyright file, which carries the GUST Font License). A printed handout is set
+in them (06 → F8), and the same gate carries them. They come from Debian's
+`fonts-lmodern` through apt — installed, copied, purged in one layer — not
+from GUST's download page, so a font host that is down can never fail a
+teacher's first build; the six SHA-256s are in `contracts/toolchain.json` →
+`pins` → `latinModern` → `files`, and verify.sh checks the baked files
+against them rather than the recipe, so a Debian point release that touched
+them would surface in a check instead of in a teacher's build.
+
+Since v2.0.0 the image fetches **Paged.js 0.4.3** from the npm registry by
+exact version, checks the tarball's SHA-256 (`a79baaa9…6c17c5`), and keeps
+only `dist/paged.min.js` (502,617 bytes, 96,934 gzipped, SHA-256
+`c4af9ac4…397211`) and its MIT licence in `/opt/vendor/pagedjs/`. It is the
+print layout for pages whose settings say `printable: true` (see
+[06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200)).
+It is NOT in the scaffold's `static/`: `build_site.py` copies it into a
+section's site only when a page students can see opts in, so a course that
+never prints carries none of it. `toolchain_paths.VENDOR_DIR` is
+`QUARTZ_DIR.parent / "vendor"` — `/opt/vendor` here and `runtime\vendor` on
+Windows with no variable of its own (`PLANTOIR_VENDOR_DIR` overrides it).
+`contracts/toolchain.json` → `pins` → `pagedjs` carries both hashes; verify.sh
+checks the baked file against `fileSha256`. Two things to know: the UMD
+global is `PagedModule`, not `Paged`; and the project is QUIET — 0.4.3 has
+been npm's `latest` since 2023-07-06, with only `0.5.0-beta.2` (2024-10-04)
+since — so a browser change it does not keep up with is ours to work around.
+**Rejected:** loading it from a CDN (a printed worksheet must work offline and
+from a folder publish), carrying it in every site (half a megabyte per site
+for a feature most pages never use), and committing the file (the repository
+ships recipes, not binaries). #455 adds Pyodide to the same folder.
+
 ### What the first build downloads (measured for #334)
 
 Per container (`/sys/class/net/eth0/statistics/rx_bytes` inside each
