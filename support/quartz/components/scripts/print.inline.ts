@@ -13,7 +13,8 @@
 // 192 ms), then printed from there. The plan and every measurement are in
 // documentation/06-quartz-customizations.md, section F.
 
-import { cleanTitle, label, pageLabel, role } from "./printRules"
+import { cleanTitle, isCurriculumHeading, label, leftOffPaper, pageLabel, role } from "./printRules"
+import type { Block } from "./printRules"
 
 type Mode = "withAnswersAtTheEnd" | "questionsOnly" | "answersOnly"
 type Corners = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string }
@@ -22,11 +23,14 @@ type Settings = {
   words: Record<string, string>
   answerKinds: string[]
   answerTitleWords: string[]
+  curriculumHeadings: string[]
   defaultMode: Mode
 }
 type PrintHooks = { prepare: Array<() => Promise<void>> }
 
 const PRINTABLE = "plantoir-printable"
+// On every element of the page's Curriculum connection (#498): never printed.
+const CURRICULUM = "data-plantoir-curriculum"
 const FROM_DARK = "plantoir-printing-from-dark"
 const MODES: Mode[] = ["withAnswersAtTheEnd", "questionsOnly", "answersOnly"]
 // A code block longer than this many lines may break across pages; a shorter
@@ -87,6 +91,40 @@ function stampRoles(settings: Settings) {
       settings.answerKinds,
       settings.answerTitleWords,
     )
+  }
+}
+
+// The page's Curriculum connection, marked when the page loads so that ⌘P's
+// stylesheet and the handout both leave it off paper (#498). The rule - which
+// heading, and how far its section runs - is printRules.leftOffPaper's, run on
+// the siblings of each heading that names it.
+function stampCurriculum(settings: Settings) {
+  const words = settings.curriculumHeadings ?? []
+  const parents: Set<Element> = new Set()
+  for (const heading of document.querySelectorAll(
+    ".center article h1, .center article h2, .center article h3, .center article h4, .center article h5, .center article h6",
+  )) {
+    if (heading.parentElement && isCurriculumHeading(heading.textContent ?? "", words)) {
+      parents.add(heading.parentElement)
+    }
+  }
+  for (const parent of parents) {
+    const children = Array.from(parent.children)
+    const blocks: Block[] = []
+    for (const child of children) {
+      if (child.matches("section[data-footnotes]")) {
+        blocks.push({ heading: null, level: 1 })
+        continue
+      }
+      const level = /^H[1-6]$/.test(child.tagName) ? parseInt(child.tagName.slice(1), 10) : 0
+      blocks.push({ heading: level > 0 ? (child.textContent ?? "") : null, level })
+    }
+    const leftOff = leftOffPaper(blocks, words)
+    children.forEach((child, index) => {
+      if (leftOff[index]) {
+        child.setAttribute(CURRICULUM, "")
+      }
+    })
   }
 }
 
@@ -184,6 +222,11 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
     ".clipboard-button, .expand-button, #mermaid-container, .mermaid-controls",
   )) {
     control.remove()
+  }
+  // Before anything is lifted or labelled: nothing in it is printed, in any
+  // mode, and no heading of it names an answer (#498).
+  for (const element of article.querySelectorAll(`[${CURRICULUM}]`)) {
+    element.remove()
   }
 
   const entries: HTMLElement[] = []
@@ -550,6 +593,7 @@ document.addEventListener("nav", () => {
     return
   }
   stampRoles(settings)
+  stampCurriculum(settings)
   html.classList.add(PRINTABLE)
 
   if (box) {

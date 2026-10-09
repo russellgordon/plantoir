@@ -245,6 +245,12 @@ a.plantoir-print-pdf:hover,
     article blockquote.callout[data-plantoir-role="question"] > .callout-content {
       display: none !important;
     }
+
+    // The page's Curriculum connection is never printed (#498); the handout
+    // removes the same elements from its copy.
+    article [data-plantoir-curriculum] {
+      display: none !important;
+    }
   }
 
   // Diagrams drawn for a dark page cannot be re-drawn between ⌘P and the
