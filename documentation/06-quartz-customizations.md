@@ -927,8 +927,17 @@ Safari does not, and there a pinch zooms the page) — so a plain scroll
   from dark mode prints black on white with white label boxes (review B1 —
   #454's light flip covers printable pages only, and before this a figure
   printed near-white with black boxes); `break-inside: avoid`; and a cap of
-  **8 in** with `width: auto` (review B3 — a 1,400 px figure split over four
-  pages with the text after it printed twice). Measured: the handout of a
+  **8 in on portrait paper, 6 in on landscape**, with `width: auto` (review
+  B3 — a 1,400 px figure split over four pages with the text after it printed
+  twice). The cap sits inside `:where()`, with no specificity, because the
+  handout has its own per-paper cap that must win: the first version's 8 in
+  beat it and a landscape handout with a tall figure refused to print, and
+  ⌘P in landscape split it (E1 implementation review B1). Measured after the
+  fix, a 30 cm TikZ ladder in Chrome for Testing: the handout prints on both
+  papers (854 px and 614 px tall, whole, 5 of 5 pieces), and ⌘P keeps all 29
+  rungs on one page in portrait and landscape. **Safari not measured**: it
+  needs "Allow remote automation", which only `safaridriver --enable` (an
+  administrator's password) and a restart of the running Safari turn on. Measured: the handout of a
   printable fixture with 11 figures, from dark mode, in all three modes and
   both papers: every piece laid out (29 of 29), none split, lettering
   rgb(0, 0, 0), the 530 px tree whole.

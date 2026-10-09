@@ -11,7 +11,8 @@ website. A page can carry two kinds of drawn figure, each written as a
 fenced block of plain text in the page:
 
 - ` ```functionplot ` - an interactive **graph of y = f(x)**. Students can
-  drag it (and zoom with Ctrl/Cmd + scroll); it is drawn in their
+  drag it with a mouse or trackpad (and zoom with Ctrl/Cmd + scroll); it is
+  drawn in their
   browser from the site's own files.
 - ` ```tikz ` - a **precise static diagram** in LaTeX's TikZ: geometry,
   number lines, tree diagrams, circuits, labelled axes with pgfplots. Plantoir
@@ -112,13 +113,16 @@ y = -x + 4
   written in both themes; prefer `red`, `orange` or `teal` over pure `blue`,
   which is dim on a dark page.
 - Keep it modest: a diagram that takes longer than 20 seconds to draw is
-  stopped. A picture taller than a printed page is scaled down to fit one.
+  stopped. On paper a picture is scaled down to fit the page (at most about
+  8 in tall on portrait paper and 6 in on landscape), so a tall, narrow
+  diagram prints small - draw it wider rather than taller.
 
 ## 4. Where a fence can go
 
 Anywhere on a page: at the top level, inside a callout (folded or not, e.g.
-inside `> [!example]-`, every line starting `> `), or indented inside a
-numbered list item. Backticks or tildes (`~~~tikz`) both work. The language
+inside `> [!example]-`, every line starting `> `), or in a list item -
+indented under the item, or opened on the item's own line (`1. ```tikz`)
+with every line after it indented to match. Backticks or tildes (`~~~tikz`) both work. The language
 word must be exactly `tikz` or `functionplot`, lowercase.
 
 ## 5. Printing

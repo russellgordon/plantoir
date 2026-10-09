@@ -349,6 +349,10 @@ def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 
 # `%%` inside a fence eats what Quartz eats. What this adds is the block's
 # CONTENT, which the masks above never needed.
 
+# A list item's marker and the spaces after it, on the line a fence opens on.
+_LIST_MARKER = re.compile(r"^[ \t]*(?:[-*+]|[0-9]{1,9}[.)])[ \t]+")
+
+
 def _strip_quote_markers(line: str, depth: int) -> str:
     """`line` with its first `depth` blockquote markers (and the one space
     after each) taken off, the way CommonMark reads a line inside a fence
@@ -395,8 +399,11 @@ def fenced_blocks(text: str) -> list:
 
     The rule is the one `code_ranges` uses (readingALink.whatIsCode); an
     unclosed fence runs to the end of the page, and a line at a smaller quote
-    depth ends it. A fence opened on a list marker's own line (`- ```tikz`)
-    is not seen here, as it is not seen by `code_ranges`.
+    depth ends it. A fence opened on a list marker's own line (`- ```tikz`,
+    `1. ```functionplot`) IS a block here (#485 E1 review S1: the site's
+    parser draws one, so the build must draw it too); its content lines lose
+    up to the fence's own column of indent, as CommonMark's list item does.
+    `code_ranges` keeps its #313 rule unchanged.
     """
     stripped, origin = _without_comments(text)
     found = []
@@ -441,6 +448,12 @@ def fenced_blocks(text: str) -> list:
                 open_block["lines"].append(content[indent:])
         else:
             fence = _FENCE.match(body)
+            marker = 0
+            if not fence:
+                after_marker = _LIST_MARKER.match(body)
+                if after_marker:
+                    fence = _FENCE.match(body[after_marker.end():])
+                    marker = after_marker.end()
             if fence and not (fence.group(1)[0] == "`" and "`" in fence.group(2)):
                 info = fence.group(2).strip(_WHITESPACE)
                 words = info.split(None, 1)
@@ -449,7 +462,7 @@ def fenced_blocks(text: str) -> list:
                     "char": fence.group(1)[0],
                     "length": len(fence.group(1)),
                     "depth": depth,
-                    "indent": len(body) - len(body.lstrip(" \t")),
+                    "indent": marker + len(body[marker:]) - len(body[marker:].lstrip(" \t")),
                     "lang": words[0] if words else "",
                     "meta": words[1] if len(words) > 1 else "",
                     "line": text.count("\n", 0, where) + 1,

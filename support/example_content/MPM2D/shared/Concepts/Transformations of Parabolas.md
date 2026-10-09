@@ -46,8 +46,8 @@ To sketch $y = -2(x - 1)^2 + 3$ by hand:
       the equation — or the whole curve in [[Using Desmos]].
 
 Here is the parent and the finished sketch on the same axes. Check
-yours against it — then drag the graph to see the vertex sitting at
-$(1, 3)$ and the steeper descent on either side.
+yours against it: the vertex sits at $(1, 3)$, and the curve falls away
+twice as steeply as the parent does.
 
 ```functionplot
 ---

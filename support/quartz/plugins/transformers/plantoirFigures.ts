@@ -204,7 +204,11 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
           const caption = node.children
           if (engine === "tikz") {
             if (entry === undefined) {
-              node.children = [element("p", { className: ["pl-figure-message"] }, [text(words.diagramNeedsPreview)]), ...caption]
+              // The build saw no such fence (review S1: it once missed one
+              // opened on a list marker's line). Never a promise that a
+              // preview will fix it - that would stay on the page for ever.
+              node.properties.className = [...classesOf(node), "pl-figure-failed"]
+              node.children = [element("p", { className: ["pl-figure-message"] }, [text(words.diagramCouldNotBeDrawn)]), ...caption]
               return
             }
             const copy = (copies.get(key) ?? 0) + 1
@@ -233,11 +237,7 @@ export const PlantoirFigures: QuartzTransformerPlugin = () => ({
           }
           // A graph: the box it is drawn into, and its own text until then.
           const sourceBox = element("pre", { className: ["pl-plot-source"] }, [element("code", {}, [text(source)])])
-          if (entry === undefined) {
-            node.children = [element("p", { className: ["pl-figure-message"] }, [text(words.graphNeedsPreview)]), sourceBox, ...caption]
-            return
-          }
-          if (!entry.ok) {
+          if (entry === undefined || !entry.ok) {
             node.properties.className = [...classesOf(node), "pl-figure-failed"]
             node.children = [element("p", { className: ["pl-figure-message"] }, [text(words.graphCouldNotBeDrawn)]), sourceBox, ...caption]
             return

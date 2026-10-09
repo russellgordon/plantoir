@@ -140,9 +140,11 @@
 
   // Never split and never taller than a page (review B3: a tall figure was
   // split over four pages with the text after it printed twice).
-  // figureFences.darkMode.printMaxHeightIn.
-  .pl-figure svg:not(svg svg),
-  .pl-figure img {
+  // figureFences.darkMode.printMaxHeightIn / printMaxHeightLandscapeIn.
+  // Inside :where(), so it has NO specificity: the handout's own per-paper
+  // cap (print.inline.ts layoutRules) must win, and an 8 in cap here once
+  // beat it and made a landscape handout refuse to print (E1 review B1).
+  :where(.pl-figure svg:not(svg svg), .pl-figure img) {
     max-width: 100% !important;
     max-height: 8in !important;
     width: auto;
@@ -151,5 +153,12 @@
 
   .pl-figure.pl-functionplot .zoom-and-drag {
     display: none;
+  }
+}
+
+// ⌘P on landscape paper: letter's printable height is about 7 in there.
+@media print and (orientation: landscape) {
+  :where(.pl-figure svg:not(svg svg), .pl-figure img) {
+    max-height: 6in !important;
   }
 }
