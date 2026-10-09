@@ -36,6 +36,10 @@ if (!chromePath || !pageUrl) {
 // The fixture's Curriculum connection: its own words, and the start of the
 // expectation it transcludes (EXC2O's B1.1).
 const CURRICULUM = /plantoir-curriculum-sentinel-7f3a|assess impacts of climate change/
+// A footnote on the worksheet: Quartz puts the footnotes after the LAST
+// section, so they follow a Curriculum connection at the end and must still
+// print (review finding on #498).
+const FOOTNOTE = /plantoir-footnote-sentinel-7f3a/
 const MODES = ["withAnswersAtTheEnd", "questionsOnly", "answersOnly"]
 
 const PROBE = `
@@ -58,6 +62,7 @@ const PROBE = `
             theme: document.documentElement.getAttribute("saved-theme"),
             curriculum: ${CURRICULUM}.test(frame.body.textContent || ""),
             practice: headings.includes("Practice"),
+            footnote: ${FOOTNOTE}.test(frame.body.textContent || ""),
           }
         }
       }
@@ -156,7 +161,7 @@ async function connect(chunk) {
       // asked for it; answersOnly prints the title and the answers alone.
       if (mode !== "answersOnly") {
         good = good && printed.diagrams > 0 && printed.drawn === printed.diagrams && !printed.sourceText &&
-          printed.practice
+          printed.practice && printed.footnote
       }
       good = good && printed.pages > 0 && printed.theme === "light" && !printed.curriculum
     }
@@ -185,9 +190,10 @@ async function connect(chunk) {
       curriculumOnScreen: CURRICULUM.test(worksheet.onScreen),
       curriculumOnPaper: CURRICULUM.test(worksheet.onPaper),
       practiceOnPaper: /(^|\n)Practice(\n|$)/.test(worksheet.onPaper),
+      footnoteOnPaper: FOOTNOTE.test(worksheet.onPaper),
     }
     good = good && report.commandP.curriculumOnScreen && !report.commandP.curriculumOnPaper &&
-      report.commandP.practiceOnPaper
+      report.commandP.practiceOnPaper && report.commandP.footnoteOnPaper
     if (plainUrl) {
       const plain = await printedText(plainUrl)
       report.notOptedCommandP = { curriculumOnPaper: CURRICULUM.test(plain.onPaper) }

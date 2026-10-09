@@ -1470,7 +1470,7 @@ A worksheet planted by verify.sh (plantoir-print-sentinel-7f3a). Try each questi
 
 ## Question 1
 
-Simplify $(x + 3)(x - 2)$.
+Simplify $(x + 3)(x - 2)$.[^1]
 
 > [!success]- Answer 1
 > $x^2 + x - 6$
@@ -1535,6 +1535,14 @@ def area(width, height):
 ```
 
 <figure class="pl-figure pl-test"><svg viewBox="0 0 200 100" width="400" height="200" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="180" height="80" fill="none" stroke="black"/><text x="100" y="55" text-anchor="middle">plantoir figure</text></svg><figcaption>A figure an engine would draw.</figcaption></figure>
+
+## Curriculum connections
+
+![[B1.2]]
+
+Last on the page, as the templates put it (plantoir-curriculum-sentinel-7f3a).
+
+[^1]: Multiply each term (plantoir-footnote-sentinel-7f3a).
 PRINTFIXTURE
 sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable Not Opted/' \
     -e 's/plantoir-print-sentinel-7f3a/plantoir-notopted-sentinel-7f3a/' \

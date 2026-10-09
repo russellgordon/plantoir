@@ -158,8 +158,10 @@ export function isCurriculumHeading(heading: string, curriculumHeadings: string[
   return false
 }
 
-// One element of a run of siblings: a heading (its text and level, 1 to 6)
-// or anything else (heading null, level 0).
+// One element of a run of siblings: a heading (its text and level, 1 to 6),
+// the page's footnotes (heading null, level 1: Quartz puts them after the
+// LAST section, so they follow a Curriculum connection at the end of a page
+// and must still print), or anything else (heading null, level 0).
 export type Block = { heading: string | null; level: number }
 
 // Which of a run of siblings are left off paper: a Curriculum connection
@@ -171,11 +173,11 @@ export function leftOffPaper(blocks: Block[], curriculumHeadings: string[]): boo
   // The level of the Curriculum connection heading being left off, or 0.
   let openLevel = 0
   for (const block of blocks) {
-    if (block.heading !== null && block.level > 0) {
+    if (block.level > 0) {
       if (openLevel > 0 && block.level <= openLevel) {
         openLevel = 0
       }
-      if (openLevel === 0 && isCurriculumHeading(block.heading, curriculumHeadings)) {
+      if (openLevel === 0 && block.heading !== null && isCurriculumHeading(block.heading, curriculumHeadings)) {
         openLevel = block.level
       }
     }

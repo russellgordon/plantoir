@@ -70,6 +70,7 @@ for (const c of curriculum.headings) {
 }
 for (const c of curriculum.sections) {
   const blocks = c.blocks.map((text) => {
+    if (text === "the footnotes") return { heading: null, level: 1 }
     const heading = /^(#{1,6}) (.*)$/.exec(text)
     return heading ? { heading: heading[2], level: heading[1].length } : { heading: null, level: 0 }
   })

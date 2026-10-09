@@ -112,6 +112,10 @@ function stampCurriculum(settings: Settings) {
     const children = Array.from(parent.children)
     const blocks: Block[] = []
     for (const child of children) {
+      if (child.matches("section[data-footnotes]")) {
+        blocks.push({ heading: null, level: 1 })
+        continue
+      }
       const level = /^H[1-6]$/.test(child.tagName) ? parseInt(child.tagName.slice(1), 10) : 0
       blocks.push({ heading: level > 0 ? (child.textContent ?? "") : null, level })
     }
