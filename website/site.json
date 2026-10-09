@@ -50,32 +50,6 @@
       }
     }
   },
-  "new_in": {
-    "version": "1.6",
-    "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.6 release is reminded to rewrite it; a 1.6.x is not.",
-    "items": [
-      {
-        "text": "On the Mac: mark a worksheet printable and it gets a Print button — questions only, answers only, or both.",
-        "href": "features/#what-a-page-carries"
-      },
-      {
-        "text": "On the Mac: handouts set like a typeset worksheet, with numbered questions, lettered parts side by side, and an answer key.",
-        "href": "features/#what-a-page-carries"
-      },
-      {
-        "text": "On the Mac: a Printing section in Course Settings for your school’s name and the blanks students fill in.",
-        "href": "features/#what-a-page-carries"
-      },
-      {
-        "text": "On the Mac: a page can hand out a PDF you already have, from its own Print button.",
-        "href": "features/#what-a-page-carries"
-      },
-      {
-        "text": "On the Mac: Claude and Codex are told how to write a page that prints well.",
-        "href": "features/#bring-your-own"
-      }
-    ]
-  },
   "nav": [
     "index",
     "features",
