@@ -50,6 +50,13 @@ enum AssistActivity {
         /// conversation makes mid-way is covered the moment it exists. Nil
         /// while no assistant window is open. See `backupsAnOpenConversationHolds`.
         var heldBackups: (@MainActor () -> [URL])?
+
+        /// Whether the open conversation is working right now — thinking,
+        /// or running a tool. Asked of that window's own agent each time,
+        /// so the Section menu greys its functions on the same section while
+        /// the assistant is changing it (#457 batch B, the plan review's
+        /// note 14). Nil while no assistant window is open.
+        var isWorking: (@MainActor () -> Bool)?
     }
 
     // MARK: - Stored properties
@@ -93,6 +100,7 @@ enum AssistActivity {
         if store.active == ending {
             store.active = nil
             store.heldBackups = nil
+            store.isWorking = nil
         }
     }
 
@@ -116,6 +124,40 @@ enum AssistActivity {
         if store.active == holding {
             store.heldBackups = report
         }
+    }
+
+    /// Says how to tell whether the open conversation is working, for the
+    /// Section menu (#457 batch B). Only for the window holding the claim,
+    /// as `holdBackups` is — and it is a property of its own, so it never
+    /// replaces that window's held backups (#242).
+    static func reportWork(
+        folderPath: String,
+        courseCode: String,
+        sectionNumber: Int,
+        from report: @escaping @MainActor () -> Bool
+    ) {
+        let holding: Session = Session(
+            folderPath: folderPath,
+            courseCode: courseCode,
+            sectionNumber: sectionNumber
+        )
+        if store.active == holding {
+            store.isWorking = report
+        }
+    }
+
+    /// Whether the assistant's window open on this section is working now.
+    static func isWorking(folderPath: String, courseCode: String, sectionNumber: Int) -> Bool {
+        guard let active = store.active, let report = store.isWorking else {
+            return false
+        }
+        if active.courseCode.lowercased() != courseCode.lowercased() || active.sectionNumber != sectionNumber {
+            return false
+        }
+        if !FolderIdentity.isSameFolder(active.folderPath, folderPath) {
+            return false
+        }
+        return report()
     }
 
     /// The backups an open assistant conversation can restore from.

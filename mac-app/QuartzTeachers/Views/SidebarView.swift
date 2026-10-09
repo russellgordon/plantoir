@@ -1539,6 +1539,18 @@ struct SidebarView: View {
             row: row
         )
         Divider()
+        // The assistant's four everyday functions (#457 batch B; Russell's
+        // decision 10 on the plan), run by the section window through the
+        // tools' own code — the same items as the Section menu's. Not on a
+        // course kept for reference, which nothing writes to: hidden here,
+        // greyed in the menu bar, as every other row item.
+        if !course.isKeptForReference {
+            sectionVerbItem("Publish Pages…", .publishPages, course: course, sectionNumber: sectionNumber, row: row)
+            sectionVerbItem("Hide Pages…", .hidePages, course: course, sectionNumber: sectionNumber, row: row)
+            sectionVerbItem("Publish Class for a Date…", .publishClassForADate, course: course, sectionNumber: sectionNumber, row: row)
+            sectionVerbItem("Add Next Class", .addNextClass, course: course, sectionNumber: sectionNumber, row: row)
+            Divider()
+        }
         // One item or the other, never a
         // greyed-out line — a menu that
         // teaches teachers to stop reading it
@@ -1583,6 +1595,21 @@ struct SidebarView: View {
         }
         Divider()
         folderMenuItems(for: course.sectionDirectoryURL(forSection: sectionNumber), row: row)
+    }
+
+    /// One of the assistant's functions on a section row's context menu: the
+    /// row is selected FIRST (Finder's rule, #457 item 4), then the section
+    /// window — the one for this row — takes the request and runs it.
+    func sectionVerbItem(
+        _ title: String, _ item: SubjectMenuRules.Item, course: Course, sectionNumber: Int, row: SidebarSelection
+    ) -> some View {
+        return Button(title) {
+            select(row)
+            workspace.sectionVerbRequest = SectionVerbRequest(
+                item: item, courseCode: course.code, sectionNumber: sectionNumber
+            )
+        }
+        .accessibilityIdentifier("\(item.rawValue)-\(course.code)-section\(sectionNumber)")
     }
 
     /// A live course row's context menu.
@@ -1921,9 +1948,13 @@ struct SidebarView: View {
             }
         case .openWorkingFolder, .openRecent, .newCourse, .importCoursesForReference, .restoreFromArchive, .reloadCourses,
              .saveCourseSettings, .revertCourseSettings, .courseReviseWithLocalAssistant,
-             .preview, .deploy, .openInBrowser, .back, .forward, .reloadPage:
+             .preview, .deploy, .openInBrowser, .back, .forward, .reloadPage,
+             .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
+             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
             // Not the sidebar's: File, Course Settings and the section
-            // window own these. Local AI Assistant is never live on a course.
+            // window own these — the assistant's functions run in the
+            // section window, which shows their sheets (#457 batch B). Local
+            // AI Assistant is never live on a course.
             break
         }
     }

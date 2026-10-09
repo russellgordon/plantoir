@@ -41,7 +41,8 @@ final class FakePreview {
                   sectionNumber: Int,
                   running previewIsRunning: Bool = true,
                   showing: SectionWindowControllers.PreviewState? = nil,
-                  refusingToDeploy refusal: String? = nil) {
+                  refusingToDeploy refusal: String? = nil,
+                  answeringLaterClasses laterClassesAnswer: LaterClassesAnswer = .nothingToAsk) {
         events = []
         // `running` is kept for the callers that only care whether there is
         // something to stop; `showing` is for the tests that care WHICH of the
@@ -93,6 +94,16 @@ final class FakePreview {
                     return AssistSiteWorkResult(
                         succeeded: true, message: FakePreview.deployedMessage
                     )
+                },
+                // #475: the window's question about classes dated after the
+                // next class. Recorded only when it is put — a window with
+                // nothing to ask records nothing, so every older case's
+                // sequence is unchanged.
+                askAboutClassesDatedLater: { [weak self] in
+                    if laterClassesAnswer != .nothingToAsk {
+                        self?.events.append("askAboutClassesDatedLater")
+                    }
+                    return laterClassesAnswer
                 }
             )
         )

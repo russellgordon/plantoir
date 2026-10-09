@@ -58,9 +58,23 @@ final class AssistToolRunner {
     ///
     /// Defaults to `.local`, so the only caller that has to say anything is
     /// the MCP server.
+    ///
+    /// **`.menu` is the third client (#457 batch B):** Section ▸ Publish
+    /// Pages…, Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo
+    /// Last Change, Add Next Class, Re-date Classes… and Make Room for
+    /// Classes…. The menu builds its call in code (`SectionVerbs`) and runs
+    /// it through `run(call:)`, so the reference-course gate and every check
+    /// in the tool are the ones the assistant meets — and a teacher who
+    /// declined the assistant can use every one of them. It behaves as
+    /// `.local` everywhere but three: its sentences are not a conversation
+    /// (the `…FromTheMenu` twins in `AssistWording`), it saves a copy of the
+    /// course before EVERY change rather than once per conversation, named
+    /// for the menu (`BackupMaker.menu`), and it never leaves a request for
+    /// class dates in the assistant's window — the section window asks first.
     nonisolated enum Surface: Sendable {
         case local
         case mcp
+        case menu
     }
 
     private let surface: Surface
@@ -147,7 +161,32 @@ final class AssistToolRunner {
         return try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL, madeBy: maker)
     }
 
+    /// Whether a change is followed by bringing the section's preview up to
+    /// date — true everywhere but one call: the classes a teacher ticks to
+    /// hide at Deploy (#475), where the deploy builds the site anyway and a
+    /// preview started first would be stopped again a moment later. Not an
+    /// argument and not in any schema: the menu sets it in code, around that
+    /// one call.
+    @ObservationIgnored var previewFollowsAChange: Bool = true
+
     // MARK: - Computed properties
+
+    /// The section of the change `undo_last_change` would take back next, or
+    /// nil when there is none — for Section ▸ Undo Last Change, which is live
+    /// only on the section that change was made in.
+    var lastChange: (courseCode: String, sectionNumber: Int)? {
+        guard let pending = history.nextToUndo else {
+            return nil
+        }
+        return (pending.courseCode, pending.sectionNumber)
+    }
+
+    /// How many changes the undo list holds — so the Section menu can tell
+    /// a call that changed something from one that did not, for its line on
+    /// the trail.
+    var changeCount: Int {
+        return history.changes.count
+    }
 
     /// Whether this conversation has saved a copy to go back to yet.
     var hasConversationBackup: Bool {
@@ -480,6 +519,13 @@ final class AssistToolRunner {
         // being built elsewhere (#433) — refused here, before anything is
         // backed up or written, so a refusal never follows a change.
         if let heldBack = outsideChangeHeldBack(call) {
+            return heldBack
+        }
+
+        // The assistant's change while the Section menu is changing the same
+        // section (#457's ruling: the menu route has its own claim, and the
+        // two undo lists must not interleave). Before anything is written.
+        if let heldBack = menuChangeHeldBack(call) {
             return heldBack
         }
 
@@ -931,12 +977,14 @@ final class AssistToolRunner {
     private func planPublishClassOn(_ arguments: [String: Any]) -> AssistToolOutcome {
         switch classPlan(arguments) {
         case .failure(let refusal):
-            return AssistToolOutcome.couldNotRead(refusal.message)
+            return AssistToolOutcome.couldNotRead(sayingWhy(refusal))
         case .success(let planned):
             return AssistToolOutcome.planned(
                 "Worked out what publishing the class on \(planned.day.text) would do.",
                 plan: planned.plan.describe(),
-                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
+                card: planned.plan.describe(
+                    noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
+                )
             )
         }
     }
@@ -954,9 +1002,9 @@ final class AssistToolRunner {
                     because: AssistWording.datesToFindADaysPage(noun: course.configuration.classNoun)
                 )
             }
-            return AssistToolOutcome.refused(refusal.message)
+            return AssistToolOutcome.refused(sayingWhy(refusal))
         case .success(let planned):
-            return await carryOut(
+            let outcome: AssistToolOutcome = await carryOut(
                 planned.plan,
                 forSection: planned.located.sectionNumber,
                 in: planned.located.course,
@@ -966,7 +1014,32 @@ final class AssistToolRunner {
                     )
                 }
             )
+            keepTheClassNamedByItsDate(planned)
+            return outcome
         }
+    }
+
+    /// A class published by naming its DATE is not a mistake to catch (#475,
+    /// the plan review's finding 5): the teacher said which day. So a class
+    /// this published that the question at Deploy would ask about is
+    /// recorded as kept at that date (`file-formats.json` → `laterClassesKept`)
+    /// — whoever asked: Section ▸ Publish Class for a Date…, the in-app
+    /// assistant, or one working from another app. Re-dated later, it is
+    /// asked about again. Nothing is recorded for a class that would not be
+    /// asked about, so tomorrow's class leaves no record.
+    private func keepTheClassNamedByItsDate(_ planned: PlannedClass) {
+        let course: Course = planned.located.course
+        let section: Int = planned.located.sectionNumber
+        var namedPlaces: Set<String> = []
+        for page in planned.plan.namedPages {
+            namedPlaces.insert(ClassesDatedLater.place(of: page.fileURL, courseDirectory: course.directoryURL))
+        }
+        var kept: [ClassesDatedLater.Flagged] = []
+        for flagged in ClassesDatedLater.flagged(forSection: section, in: course, today: today)
+        where namedPlaces.contains(flagged.place) {
+            kept.append(flagged)
+        }
+        ClassesDatedLater.keep(kept, forSection: section, in: course)
     }
 
     /// A located class plan: everything the two halves of "publish tomorrow's
@@ -1022,7 +1095,7 @@ final class AssistToolRunner {
         }
         switch pagePlan(arguments, publishing: true) {
         case .failure(let refusal):
-            return AssistToolOutcome.couldNotRead(refusal.message)
+            return AssistToolOutcome.couldNotRead(sayingWhy(refusal))
         case .success(let planned):
             // Nothing to agree to. A plan card asking "Shall I go ahead?"
             // about a page that is already published makes a teacher approve
@@ -1033,7 +1106,9 @@ final class AssistToolRunner {
             return AssistToolOutcome.planned(
                 "Worked out what publishing those pages would do.",
                 plan: planned.plan.describe(),
-                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
+                card: planned.plan.describe(
+                    noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
+                )
             )
         }
     }
@@ -1044,7 +1119,7 @@ final class AssistToolRunner {
         }
         switch pagePlan(arguments, publishing: true) {
         case .failure(let refusal):
-            return AssistToolOutcome.refused(refusal.message)
+            return AssistToolOutcome.refused(sayingWhy(refusal))
         case .success(let planned):
             return await carryOut(
                 planned.plan,
@@ -1063,7 +1138,7 @@ final class AssistToolRunner {
         }
         switch pagePlan(arguments, publishing: false) {
         case .failure(let refusal):
-            return AssistToolOutcome.couldNotRead(refusal.message)
+            return AssistToolOutcome.couldNotRead(sayingWhy(refusal))
         case .success(let planned):
             if let already = planned.plan.nothingToDoSentence {
                 return AssistToolOutcome.wrote(already, detail: already)
@@ -1071,7 +1146,9 @@ final class AssistToolRunner {
             return AssistToolOutcome.planned(
                 "Worked out what unpublishing those pages would do.",
                 plan: planned.plan.describe(),
-                card: planned.plan.describe(noun: planned.located.course.configuration.classNoun)
+                card: planned.plan.describe(
+                    noun: planned.located.course.configuration.classNoun, fromTheMenu: surface == .menu
+                )
             )
         }
     }
@@ -1082,7 +1159,7 @@ final class AssistToolRunner {
         }
         switch pagePlan(arguments, publishing: false) {
         case .failure(let refusal):
-            return AssistToolOutcome.refused(refusal.message)
+            return AssistToolOutcome.refused(sayingWhy(refusal))
         case .success(let planned):
             return await carryOut(
                 planned.plan,
@@ -1687,7 +1764,12 @@ final class AssistToolRunner {
         forSection sectionNumber: Int
     ) async -> Bool {
         let code: String = course.code
-        if conversationBackups[code] != nil {
+        // The Section menu saves a copy before EVERY change (#457's ruling on
+        // the plan review, blocker 2): its runner lives as long as a window —
+        // weeks — so "once" would have been once a month, and the sentence
+        // that the copy made before a change is in Backups would have been
+        // false whenever the teacher had deleted it since.
+        if surface != .menu && conversationBackups[code] != nil {
             return true
         }
         if let underWay = backupsInFlight[code] {
@@ -1722,6 +1804,13 @@ final class AssistToolRunner {
     /// written: the window's own runner reports its backups in-process
     /// (`AssistActivity.holdBackups`).
     private func rememberConversationBackup(_ backupURL: URL, forCourse code: String) {
+        // The menu's newest copy is its way back (`publishStoppedPartWay`);
+        // there is no conversation for the first one to belong to.
+        if surface == .menu {
+            conversationBackups[code] = backupURL
+            conversationBackupURL = backupURL
+            return
+        }
         if conversationBackups[code] != nil {
             return
         }
@@ -1755,29 +1844,39 @@ final class AssistToolRunner {
             }
         }
         let started: Date = Date()
+        // Named for whoever is making the change: the Backups list says "before
+        // a change from the Section menu" about the menu's, never "before an
+        // assistant chat" about a copy a teacher who declined the assistant
+        // made by choosing a menu item (#457's plan review, blocker 2).
+        var maker: BackupMaker = .assistant(sectionNumber: sectionNumber)
+        var event: ActivityTrail.Event = .assistantBackedUpACourse
+        if surface == .menu {
+            maker = .menu(sectionNumber: sectionNumber)
+            event = .sectionMenuBackedUpACourse
+        }
         do {
-            let backupURL: URL = try await backUpACourse(
-                course, coursesDirectoryURL, .assistant(sectionNumber: sectionNumber)
-            )
+            let backupURL: URL = try await backUpACourse(course, coursesDirectoryURL, maker)
             let bytes: Int64 = AssistToolRunner.sizeOnDisk(of: backupURL)
-            ActivityTrail.note(
-                .assistantBackedUpACourse,
-                ActivityTrail.assistantBackedUpLine(
+            var line: String = ActivityTrail.assistantBackedUpLine(
+                fileName: backupURL.lastPathComponent,
+                bytes: bytes,
+                seconds: Date().timeIntervalSince(started)
+            )
+            if surface == .menu {
+                line = ActivityTrail.sectionMenuBackedUpLine(
                     fileName: backupURL.lastPathComponent,
                     bytes: bytes,
                     seconds: Date().timeIntervalSince(started)
-                ),
-                course: code,
-                section: sectionNumber
-            )
+                )
+            }
+            ActivityTrail.note(event, line, course: code, section: sectionNumber)
             return backupURL
         } catch {
-            ActivityTrail.note(
-                .assistantBackedUpACourse,
-                ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription),
-                course: code,
-                section: sectionNumber
-            )
+            var line: String = ActivityTrail.assistantCouldNotBackUpLine(reason: error.localizedDescription)
+            if surface == .menu {
+                line = ActivityTrail.sectionMenuCouldNotBackUpLine(reason: error.localizedDescription)
+            }
+            ActivityTrail.note(event, line, course: code, section: sectionNumber)
             throw error
         }
     }
@@ -1787,7 +1886,12 @@ final class AssistToolRunner {
     /// so the plan the write was about to carry out is worked out again after
     /// it, and a plan that no longer matches is refused rather than applied.
     /// The rule: documentation/10 → "The gap between a plan and its write".
-    private static func changedWhileSavingACopy(_ located: Located) -> AssistToolOutcome {
+    private func changedWhileSavingACopy(_ located: Located) -> AssistToolOutcome {
+        if surface == .menu {
+            return AssistToolOutcome.refused(AssistWording.changedWhileSavingACopyFromTheMenu(
+                course: located.course.code, section: String(located.sectionNumber)
+            ))
+        }
         let said: String = AssistWording.changedWhileSavingACopy(
             course: located.course.code, section: String(located.sectionNumber)
         )
@@ -1836,7 +1940,10 @@ final class AssistToolRunner {
             // Nothing could be written because every page that needed it was
             // declined: say THAT, not "nothing needed changing" (#186).
             if !plan.noRoomForAKey.isEmpty {
-                let declined: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.noRoomForAKey)
+                var declined: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.noRoomForAKey)
+                if surface == .menu {
+                    declined = AssistPublishPlan.sayingPagesWithNoRoomForAKey(plan.noRoomForAKey, fromTheMenu: true)
+                }
                 AssistToolRunner.notePagesLeftAsTheyWere(
                     plan.noRoomForAKey.count, act: plan.publishes ? "publishing pages" : "hiding pages",
                     course: course.code, section: sectionNumber
@@ -1906,10 +2013,13 @@ final class AssistToolRunner {
             detail += "\n\n" + AssistToolRunner.backedUpNote
         }
 
-        let previewNote: String = await bringThePreviewUpToDate(
-            for: course, sectionNumber: sectionNumber
-        )
-        detail += "\n\n" + previewNote
+        // Not when the change is the classes a teacher ticked to hide at
+        // Deploy (#475): the deploy builds the site itself, straight after.
+        var previewNote: String = ""
+        if previewFollowsAChange {
+            previewNote = await bringThePreviewUpToDate(for: course, sectionNumber: sectionNumber)
+            detail += "\n\n" + previewNote
+        }
         // Not "and their PREVIEW" when an outside assistant's change left the
         // open preview as it was (#433): that would be false.
         // Nor when the headless rebuild RAN and did not build (#471) —
@@ -1920,8 +2030,8 @@ final class AssistToolRunner {
         // the section, a copy of the course being zipped, no working folder
         // — still gets the old ending, a pre-existing gap this does not
         // close.)
-        let previewLeftAsItWas: Bool =
-            previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
+        let previewLeftAsItWas: Bool = !previewFollowsAChange
+            || previewNote == AssistWording.changesAreSavedPreviewShowsTheOldPages(
                 course: course.code, section: String(sectionNumber)
             )
             || previewNote == AssistWording.changesAreSavedWhileTheCourseIsBuilt(
@@ -1943,7 +2053,7 @@ final class AssistToolRunner {
 
         return AssistToolOutcome.wrote(
             AssistToolRunner.whatWasDone(
-                plan, declinedNow: declinedNow, summary: summary
+                plan, declinedNow: declinedNow, summary: summary, fromTheMenu: surface == .menu
             ),
             detail: detail
         )
@@ -1956,7 +2066,8 @@ final class AssistToolRunner {
     static func whatWasDone(
         _ plan: AssistPublishPlan,
         declinedNow: [String],
-        summary: (Int) -> String
+        summary: (Int) -> String,
+        fromTheMenu: Bool = false
     ) -> String {
         var declined: [String] = []
         for page in plan.noRoomForAKey {
@@ -1981,7 +2092,7 @@ final class AssistToolRunner {
                 + " \(written) \(written == 1 ? "page" : "pages")."
         }
         if !declined.isEmpty {
-            let sentence: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declined)
+            let sentence: String = AssistPublishPlan.sayingPagesWithNoRoomForAKey(named: declined, fromTheMenu: fromTheMenu)
             said = said.isEmpty ? sentence : said + " " + sentence
         }
         return said
@@ -1994,9 +2105,13 @@ final class AssistToolRunner {
         guard case .success(let located) = found else {
             return AssistToolOutcome.refused(refusal(from: found).message)
         }
-        let message: String = await bringThePreviewUpToDate(
+        var message: String = await bringThePreviewUpToDate(
             for: located.course, sectionNumber: located.sectionNumber, afterAChange: false
         )
+        // The one sentence on this path that asks to be asked again (#457).
+        if surface == .menu && message == AssistWording.courseIsBeingCopied(course: located.course.code) {
+            message = AssistWording.courseIsBeingCopiedFromTheMenu(course: located.course.code)
+        }
         return AssistToolOutcome.wrote(message, detail: message)
     }
 
@@ -2008,6 +2123,11 @@ final class AssistToolRunner {
         let said: String = AssistWording.publishStoppedPartWay(what: what, problem: problem)
         if surface == .local && hasConversationBackup {
             return said + " " + AssistWording.restoreSectionPutsItBack(section: String(sectionNumber))
+        }
+        // The menu has no Restore banner; its way back is the copy it made
+        // just before this change, in the course's Backups.
+        if surface == .menu && hasConversationBackup {
+            return said + " " + AssistWording.restoreFromBackupPutsItBack
         }
         return said
     }
@@ -2095,6 +2215,83 @@ final class AssistToolRunner {
         return AssistToolOutcome.refused(AssistWording.courseIsBeingBuilt(course: course.code))
     }
 
+    /// The assistant's change to a section the Section menu is changing
+    /// right now (#457's ruling: the menu route has its own claim,
+    /// `SectionMenuActivity`). Refused before anything is backed up or
+    /// written. Nil — go ahead — for the menu itself, for a read, and when
+    /// the menu is not changing that section.
+    private func menuChangeHeldBack(_ call: AssistToolCall) -> AssistToolOutcome? {
+        if surface == .menu {
+            return nil
+        }
+        guard let tool = definition(named: call.function.name), !tool.readOnly else {
+            return nil
+        }
+        guard let folder = workspace.workspaceURL else {
+            return nil
+        }
+        var code: String = AssistToolRunner.text("course", in: call.argumentValues)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var section: Int? = number("section", in: call.argumentValues)
+        if code.isEmpty, let pending = history.nextToUndo {
+            code = pending.courseCode
+            section = pending.sectionNumber
+        }
+        if code.isEmpty {
+            return nil
+        }
+        guard SectionMenuActivity.isChanging(folderPath: folder.path, courseCode: code, sectionNumber: section) else {
+            return nil
+        }
+        var sectionText: String = "?"
+        if let section {
+            sectionText = String(section)
+        }
+        return AssistToolOutcome.refused(AssistWording.sectionIsChangingFromTheMenu(
+            course: code, section: sectionText
+        ))
+    }
+
+    /// A refusal's sentence, in the voice of whoever asked (#457 batch B):
+    /// the two a code-built call from the Section menu can meet that speak
+    /// as a conversation — "ask me", "ask again" — have twins; every other
+    /// refusal reads the same either way.
+    private func sayingWhy(_ refusal: AssistToolRefusal) -> String {
+        if surface != .menu {
+            return refusal.message
+        }
+        switch refusal {
+        case .noClassOn(let day, let code, let number):
+            return AssistWording.noClassOnFromTheMenu(
+                day: AssistWording.laterClassesDay(weekday: day.weekdayName, date: day.text),
+                course: code, section: String(number), noun: noun(forCourse: code)
+            )
+        case .noPageByThatName(let names, let code, let number):
+            // The menu sends each page by its folder as well as its name;
+            // the teacher is told the name they ticked.
+            var titles: [String] = []
+            for name in names {
+                titles.append(AssistToolRunner.lastPartOfAName(name))
+            }
+            if titles.count == 1 {
+                return AssistWording.noPageCalledFromTheMenu(page: titles[0], course: code, section: String(number))
+            }
+            return AssistWording.noPagesCalledFromTheMenu(
+                pages: AssistPublishPlan.listing(titles), course: code, section: String(number)
+            )
+        default:
+            return refusal.message
+        }
+    }
+
+    /// "section1/All Classes/Unit 2, Day 5" → "Unit 2, Day 5".
+    static func lastPartOfAName(_ name: String) -> String {
+        if let lastSlash = name.lastIndex(of: "/") {
+            return String(name[name.index(after: lastSlash)...])
+        }
+        return name
+    }
+
     /// What is said when another program is in the way (#156).
     ///
     /// An assistant working from another app is told `courseIsBeingBuilt`
@@ -2108,7 +2305,7 @@ final class AssistToolRunner {
         switch surface {
         case .mcp:
             return AssistWording.courseIsBeingBuilt(course: course.code)
-        case .local:
+        case .local, .menu:
             return AssistWording.courseIsBeingBuiltElsewhere(course: course.displayCode)
         }
     }
@@ -2445,15 +2642,21 @@ final class AssistToolRunner {
     /// "undo that" behave differently for no reason a teacher could see, which
     /// is exactly the sort of difference that gets reported months later.
     private func undoLastChange() async -> AssistToolOutcome {
+        // The Section menu's undo is not a conversation (#457 batch B): its
+        // sentences are the `…FromTheMenu` twins, chosen here.
+        let fromTheMenu: Bool = surface == .menu
+        let nothingToUndo: String = fromTheMenu ? AssistWording.nothingToUndoFromTheMenu : AssistWording.nothingToUndo
+        let stillAvailable: String = fromTheMenu
+            ? AssistWording.undoIsStillAvailableFromTheMenu : AssistWording.undoIsStillAvailable
         if history.isEmpty {
-            return AssistToolOutcome.refused(AssistWording.nothingToUndo)
+            return AssistToolOutcome.refused(nothingToUndo)
         }
 
         // Looked at before it is taken back, because the preview that has to
         // come down belongs to the section the change was made in, and a
         // change used to know only its files.
         guard let pending = history.nextToUndo else {
-            return AssistToolOutcome.refused(AssistWording.nothingToUndo)
+            return AssistToolOutcome.refused(nothingToUndo)
         }
         let course: Course? = course(withCode: pending.courseCode)
 
@@ -2491,24 +2694,37 @@ final class AssistToolRunner {
             var refusal: String = AssistWording.couldNotUndo(
                 result.whatHappened, leftAlone: result.skipped.count
             )
+            if fromTheMenu {
+                refusal = AssistWording.couldNotUndoFromTheMenu(
+                    result.whatHappened, leftAlone: result.skipped.count
+                )
+            }
             refusal += "\n\n" + listing(result.skipped)
-            refusal += "\n\n" + AssistWording.undoIsStillAvailable
+            refusal += "\n\n" + stillAvailable
             return AssistToolOutcome.refused(refusal)
         }
 
-        let summary: String
+        var summary: String
         if result.skipped.isEmpty {
             summary = AssistWording.undid(result.whatHappened)
+            if fromTheMenu {
+                summary = AssistWording.undidFromTheMenu(result.whatHappened)
+            }
         } else {
             summary = AssistWording.undidPartly(
                 result.whatHappened, leftAlone: result.skipped.count
             )
+            if fromTheMenu {
+                summary = AssistWording.undidPartlyFromTheMenu(
+                    result.whatHappened, leftAlone: result.skipped.count
+                )
+            }
         }
 
         var detail: String = summary
         if !result.skipped.isEmpty {
             detail += "\n\nThe ones I left alone:\n" + listing(result.skipped)
-            detail += "\n\n" + AssistWording.undoIsStillAvailable
+            detail += "\n\n" + stillAvailable
         }
 
         // (c) Put the preview back up, built from what is on disk now.
@@ -2538,6 +2754,8 @@ final class AssistToolRunner {
             return "mcp"
         case .local:
             return "assistant"
+        case .menu:
+            return "menu"
         }
     }
 
@@ -2905,6 +3123,13 @@ final class AssistToolRunner {
             return AssistToolOutcome.refused(builtElsewhereSentence(for: located.course))
         }
 
+        // Classes dated after the next class (#475) — asked, or held back
+        // for, BEFORE the preview is stopped, so a Cancel or a refusal leaves
+        // the teacher's preview exactly as it was.
+        if let heldBack = await classesDatedLaterHoldTheDeploy(located) {
+            return heldBack
+        }
+
         _ = await stopThePreviewBeforeWriting(
             for: located.course, sectionNumber: located.sectionNumber
         )
@@ -2960,6 +3185,58 @@ final class AssistToolRunner {
             return AssistToolOutcome.wrote(said, detail: said)
         }
         return AssistToolOutcome.wrote(result.message, detail: result.message)
+    }
+
+    /// #475 at the assistants' deploy (`shared-rules.json` →
+    /// `classesDatedLater`). Nil — go ahead — when nothing is flagged.
+    ///
+    /// * **In the app**, with the section's window open: the window asks,
+    ///   exactly as its Deploy button does, and Cancel is `deployWasCancelled`.
+    ///   A window that already has a question or a sheet up is not waited on:
+    ///   `deployWaitsForAnOpenQuestion` (the director's ruling).
+    /// * **In the app, with no window showing the section**, and **from
+    ///   another app**: nobody can be asked here, so the deploy is refused
+    ///   with the classes named, before anything is stopped — the outside
+    ///   assistant's sentence is shaped like `deployNeedsAnAnswer`: deploy it
+    ///   once from the window, and the answer is remembered
+    ///   (`laterClassesKept`), after which it can be deployed from there.
+    private func classesDatedLaterHoldTheDeploy(_ located: Located) async -> AssistToolOutcome? {
+        let course: Course = located.course
+        let section: Int = located.sectionNumber
+        if surface == .local, let window = sectionWindow(for: course, sectionNumber: section) {
+            switch await window.askAboutClassesDatedLater() {
+            case .nothingToAsk, .goAhead:
+                return nil
+            case .cancelled:
+                return AssistToolOutcome.refused(AssistWording.deployWasCancelled)
+            case .cannotAsk:
+                return AssistToolOutcome.refused(AssistWording.deployWaitsForAnOpenQuestion(
+                    course: course.code, section: String(section)
+                ))
+            }
+        }
+        let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(forSection: section, in: course, today: today)
+        if flagged.isEmpty {
+            return nil
+        }
+        var titles: [String] = []
+        for page in flagged {
+            titles.append(page.title)
+        }
+        let pages: String = AssistPublishPlan.listingAFew(titles)
+        ActivityTrail.note(
+            .laterClassesHeldADeployBack,
+            ClassesDatedLater.heldBackLine(count: flagged.count, by: surface == .mcp ? "an outside assistant" : "the assistant"),
+            course: course.code, section: section
+        )
+        if surface == .mcp {
+            return AssistToolOutcome.refused(AssistWording.deployHasClassesDatedLater(
+                course: course.code, section: String(section), pages: pages, count: flagged.count
+            ))
+        }
+        return AssistToolOutcome.refused(AssistWording.deployHasClassesDatedLaterAndNoWindow(
+            course: course.code, section: String(section), pages: pages, count: flagged.count
+        ))
     }
 
     // MARK: - Deploying later
@@ -3433,7 +3710,7 @@ final class AssistToolRunner {
             // Held again to the plan after the copy (#351's plan/write gap).
             guard case .success(let again) = timetablePlan(arguments),
                   again.plan.description == asked.plan.description else {
-                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+                return changedWhileSavingACopy(asked.located)
             }
             do {
                 try SectionTimetableStore.applyRememberTimetable(asked.plan)
@@ -3545,6 +3822,13 @@ final class AssistToolRunner {
     }
 
     private func askForTheTimetable(courseCode: String, sectionNumber: Int, because: String) {
+        // Never from the Section menu (#457's plan review, blocker 1): only
+        // the assistant's window shows an offer, so one left here would ask
+        // into nothing and then appear, stale, the next time the assistant
+        // opened. The section window asks for dates itself, before the call.
+        if surface == .menu {
+            return
+        }
         guard let folder = workspace.workspaceURL else {
             return
         }
@@ -3630,7 +3914,7 @@ final class AssistToolRunner {
               again.plan.description == request.plan.description,
               again.sourceText == request.sourceText,
               again.newURL == request.newURL else {
-            return AssistToolRunner.changedWhileSavingACopy(request.located)
+            return changedWhileSavingACopy(request.located)
         }
 
         let outcome: ClassChangeOutcome
@@ -4201,7 +4485,9 @@ final class AssistToolRunner {
             // Pages the re-date could not date, named — and counted nowhere
             // above, since the counts are of dates written (#186, #343).
             if !leftAlone.isEmpty {
-                let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: leftAlone)
+                let declined: String = AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(
+                    named: leftAlone, fromTheMenu: surface == .menu
+                )
                 said += said.isEmpty ? declined : " " + declined
                 detail += "\n\n" + declined
                 AssistToolRunner.notePagesLeftAsTheyWere(
@@ -4568,19 +4854,23 @@ final class AssistToolRunner {
             return AssistToolOutcome.planned(
                 "Worked out what making room in that unit would do.",
                 plan: AssistToolRunner.makeRoomPlan(asked.plan, noun: .class),
-                card: AssistToolRunner.makeRoomPlan(asked.plan, noun: noun)
+                card: AssistToolRunner.makeRoomPlan(asked.plan, noun: noun, fromTheMenu: surface == .menu)
             )
         }
     }
 
     /// A make-room plan, in the words a teacher agrees to.
-    private static func makeRoomPlan(_ plan: ClassInsertionPlan, noun: ClassNoun) -> String {
+    private static func makeRoomPlan(_ plan: ClassInsertionPlan, noun: ClassNoun, fromTheMenu: Bool = false) -> String {
         var lines: [String] = [plan.describe(noun: noun)]
         lines.append("")
         lines.append("The new pages start hidden, so nothing changes on the site until you publish them.")
         if plan.movesAnythingElse {
             lines.append("")
-            lines.append(AssistWording.makingRoomCannotBeUndone(noun: noun))
+            if fromTheMenu {
+                lines.append(AssistWording.makingRoomCannotBeUndoneFromTheMenu(noun: noun))
+            } else {
+                lines.append(AssistWording.makingRoomCannotBeUndone(noun: noun))
+            }
         }
         return lines.joined(separator: "\n")
     }
@@ -4621,7 +4911,7 @@ final class AssistToolRunner {
             // Held again to the plan after the copy (#351's plan/write gap).
             guard case .planned(let again) = roomPlan(arguments),
                   again.plan.description == asked.plan.description else {
-                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+                return changedWhileSavingACopy(asked.located)
             }
             let outcome: ClassChangeOutcome
             do {
@@ -4648,13 +4938,17 @@ final class AssistToolRunner {
             if backedUp {
                 detail += "\n\n" + AssistToolRunner.backedUpNote
             }
-            return AssistToolOutcome.wrote(
-                AssistWording.madeRoom(
-                    count: asked.count, at: asked.plan.positionTitle,
-                    noun: asked.located.course.configuration.classNoun
-                ),
-                detail: detail
+            var said: String = AssistWording.madeRoom(
+                count: asked.count, at: asked.plan.positionTitle,
+                noun: asked.located.course.configuration.classNoun
             )
+            // The Section menu shows only this line, so the pages that could
+            // not be dated or finished are said in it, in its own voice
+            // (#457 batch B's review, note 6); the model reads them in `detail`.
+            if surface == .menu && !outcome.leftUndoneFromTheMenu.isEmpty {
+                said += " " + outcome.leftUndoneFromTheMenu
+            }
+            return AssistToolOutcome.wrote(said, detail: detail)
         }
     }
 
@@ -4761,7 +5055,7 @@ final class AssistToolRunner {
         // where that is true rather than nearly true.
         var courses: [Course] = []
         for course in coursesAsSavedNow {
-            if surface == .local && course.isKeptForReference {
+            if surface != .mcp && course.isKeptForReference {
                 continue
             }
             courses.append(course)
@@ -4942,7 +5236,7 @@ final class AssistToolRunner {
             // folder is never made again by the apply.
             guard case .success(let again) = nextClassPlan(arguments),
                   again.plan.description == asked.plan.description else {
-                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+                return changedWhileSavingACopy(asked.located)
             }
 
             let outcome: ClassChangeOutcome
@@ -5128,7 +5422,7 @@ final class AssistToolRunner {
             // Held again to the plan after the copy (#351's plan/write gap).
             guard case .success(let again) = mentionsPlan(arguments),
                   again.plan.describe() == asked.plan.describe() else {
-                return AssistToolRunner.changedWhileSavingACopy(asked.located)
+                return changedWhileSavingACopy(asked.located)
             }
 
             let change: AssistChange
