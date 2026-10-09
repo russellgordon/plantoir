@@ -2900,9 +2900,9 @@ review's finding 3; `SectionVerbsTests.testPagesAreNamedByTheirFolder`).
 
 **The sheet** wears the title band every sheet does since #457's HIG sweep —
 `.headline`, leading, 52 points, sentence case — and its default button takes
-Return and the accent only while it can be pressed (#364's shape). Both are
-written out in `SectionVerbSheet` until batch C's `.sheetTitle(_:)` and
-`.defaultButton(isEnabled:)` are on the same branch. A request from a row's
+Return and the accent only while it can be pressed (#364's shape), through
+batch C's `.sheetTitle(_:)` and `.defaultButton(isEnabled:)` since the two
+batches met on one branch (ddf2fb321). A request from a row's
 context menu is DROPPED once that row is no longer selected, never run the
 next time the section is shown (the review's note 7).
 
@@ -3084,7 +3084,7 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   the same; Schedule a Deploy's Schedule wore the accent while disabled AND
   ignored Return. #364 fixed this for Save by swapping the style on the
   enabling predicate; `.defaultButton(isEnabled:)` makes that one modifier
-  for every sheet (thirteen buttons) — while disabled the button has no key
+  for every sheet (fourteen sheet buttons, the wizard's Close, and B's verb sheet) — while disabled the button has no key
   equivalent and is a grey push button. `.prominentButton(isEnabled:)` does
   the same for an accent button that takes no Return (an empty state's
   Restore…). The scan: no button under `Views/` writes the default look beside
@@ -3136,7 +3136,7 @@ session's scratchpad, `C-impl/shots/`). What changed, and the reason for each:
   52-point band (Canopy §3a), or the two-line shape with matching top and
   bottom padding for the five sheets with an explanation under the title (Add
   Section, Keep a Copy for Reference, Class Dates, Special Folders, a
-  credential request). Fifteen sheets; five were `.title2` (three bold).
+  credential request). Sixteen sheets with B's verb sheet; five were `.title2` (three bold).
   `SheetTitleScanTests` lists them and censuses every `.sheet(` in the app
   against the list, so a new sheet arrives looked at. Titles stay in
   sentence case (Russell: no).

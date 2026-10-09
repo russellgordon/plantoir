@@ -107,9 +107,10 @@ struct CourseCodePickerView: View {
 
     /// Return pressed while the field has focus. Returns whether a
     /// highlighted suggestion was taken; `false` lets Return fall
-    /// through to the sheet's default button, so a teacher who has
-    /// typed a code and never touched the arrows can still hit Return
-    /// to create the course.
+    /// through to the sheet. Since #457's sweep the wizard's Create
+    /// Course button takes NO key equivalent — measured: Return here
+    /// created a club with its name empty and the rest of the form
+    /// unread — so a fall-through creates nothing.
     var onCommitHighlight: () -> Bool = { false }
 
     @FocusState var codeFieldHasFocus: Bool
