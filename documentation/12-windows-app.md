@@ -4483,3 +4483,23 @@ test now waits for `ready` in `DrivenApp`'s constructor (up to 90 s): on a
 fixture `InitializeWorkspace` has already brought up to date that is the
 ordinary half-second pass, and without the wait a test pressing Preview the
 moment the sidebar appears would meet the disabled button.
+
+## Diagrams and graphs (#485 E1, v1.7.0): what the runtime must carry
+
+The build's figure pass (`scripts/figures.py`), its helper
+(`support/figures/plantoir-figures.mjs`), the site's transformer and the
+contract (`figureFences`) are shared and reach Windows unchanged; the Python
+half is tested there by `scripts/test_figures.py`, which needs no Node. What
+the RUNTIME owes is two engines under `runtime\vendor`: `function-plot\`
+(function-plot 1.25.4's `function-plot.js` and `LICENSE`, by the tarball's
+SHA-256) and `tikz-engine\` (`npm ci --omit=dev` from
+`support\figures\package-lock.json` — node-tikzjax 1.0.5, 133 packages,
+5,445 files, 39.8 MB). Until `fetch-runtime.ps1` fetches them,
+`ToolchainContractTests.TheWindowsRuntimeRecipeCarriesTheSamePins` is red by
+design (`functionPlot`, `nodeTikzjax` → `windowsRuntimeContains`), and a
+Windows build reports every figure as `engineMissing` without failing. The
+why, the measurements and what was rejected are in
+[02](02-docker-image.md#optvendorfunction-plot-and-optvendortikz-engine-485-e1-v170),
+[05](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170)
+and [06 → G](06-quartz-customizations.md#g-diagrams-and-graphs-485-e1-v170);
+the work is the `windows` issue opened with E1.

@@ -507,6 +507,17 @@ covered under "Why determinism matters" above. Tested in
 `scripts/test_deploy_netlify_headers.py` (no Docker needed — `verify.sh`
 runs it before the image build).
 
+**Graphs rely on `'unsafe-eval'` (#485 E1).** function-plot, which draws a
+page's ` ```functionplot ` graphs, compiles each function with `new
+Function`, which is `eval` to a Content-Security-Policy. The policy above has
+always allowed it; a change that dropped `'unsafe-eval'` would leave every
+graph on a Netlify site showing its text instead (the figure's own fallback)
+with nothing failing at deploy time. The script is a file from the site
+itself (`static/function-plot/`), loaded by the bundled `postscript.js`, so
+no inline script is added and no new hash is needed. Cloudflare Pages sets no
+policy. Not yet measured on the live hosts; `verify-deploy.sh` is where that
+is done before the release.
+
 **The block is marked and REPLACED, never appended again (#462).** Lines
 somebody else put in `_headers` are kept, and until 2026-10-08 the function
 kept them by appending its own block below whatever was there — including
