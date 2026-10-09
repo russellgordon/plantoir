@@ -1456,8 +1456,8 @@ restore_hit_fixture() {
   rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
         "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
         "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" \
-        "$HIT_COURSE/Media/plantoir-print-tall.png" "$HIT_COURSE/Media/plantoir-print-wide.png" \
-        "$HIT_COURSE/Media/plantoir-print-viewbox.svg"
+        "$HIT_COURSE/Media/plantoir-hazard-tall.png" "$HIT_COURSE/Media/plantoir-hazard-wide.png" \
+        "$HIT_COURSE/Media/plantoir-hazard-viewbox.svg"
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -1705,17 +1705,17 @@ n = 110  # CODE-110
 >
 > It counts to 110 (plantoir-ans-5), and its output looks like this (plantoir-before-answer-picture):
 >
-> ![[plantoir-print-wide.png]]
+> ![[plantoir-hazard-wide.png]]
 >
 > The picture is above (plantoir-after-answer-picture).
 
 Before the picture (plantoir-before-tall).
 
-![[plantoir-print-tall.png]]
+![[plantoir-hazard-tall.png]]
 
 After the picture (plantoir-after-tall). Before the drawing (plantoir-before-viewbox).
 
-![[plantoir-print-viewbox.svg]]
+![[plantoir-hazard-viewbox.svg]]
 
 After the drawing (plantoir-after-viewbox). Before the diagram (plantoir-before-mermaid).
 
@@ -1850,9 +1850,9 @@ def png(path, width, height):
     with open(path, "wb") as out:
         out.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
                   + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b""))
-png(sys.argv[1] + "/plantoir-print-tall.png", 400, 1800)
-png(sys.argv[1] + "/plantoir-print-wide.png", 900, 300)
-open(sys.argv[1] + "/plantoir-print-viewbox.svg", "w").write(
+png(sys.argv[1] + "/plantoir-hazard-tall.png", 400, 1800)
+png(sys.argv[1] + "/plantoir-hazard-wide.png", 900, 300)
+open(sys.argv[1] + "/plantoir-hazard-viewbox.svg", "w").write(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 400"><rect x="5" y="5" width="90" height="390" fill="none" stroke="black"/></svg>\n')
 PY
 python3 - "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" <<'PY'
