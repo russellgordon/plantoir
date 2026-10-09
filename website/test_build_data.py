@@ -2,8 +2,8 @@
 """
 Unit tests for what build.py reads from data rather than from the pages.
 
-The counts a page quotes, the Mac-only notes, the download cards and the
-"New this year" list all come from `support/` and `site.json`, and two
+The counts a page quotes, the Mac-only notes and the download cards all
+come from `support/` and `site.json`, and two
 `--check` refusals keep them that way: a count typed into a page, and a word
 for the machinery. Pure stdlib, no network. Run with:
 
@@ -193,19 +193,6 @@ class DownloadTests(unittest.TestCase):
         self.assertIsNone(pins["Windows"])
 
 
-class NewInTests(unittest.TestCase):
-
-    def test_new_in_matches_on_major_minor(self):
-        self.assertTrue(build.new_in_is_current({"version": "1.4.1", "new_in": {"version": "1.4"}}))
-        self.assertFalse(build.new_in_is_current({"version": "1.5.0", "new_in": {"version": "1.4"}}))
-
-    def test_new_in_items_carry_counts_not_numbers(self):
-        site = build.read_json(build.WEBSITE / "site.json")
-        html = build.new_in_html(site, build.site_counts())
-        self.assertIn(build.site_counts()["ready_made_ontario"] + " Ontario courses", html)
-        self.assertNotIn("{{ready_made", html)
-
-
 class FragmentTests(unittest.TestCase):
 
     def test_a_link_to_a_missing_section_is_a_problem(self):
@@ -353,27 +340,23 @@ class DeployWordTests(unittest.TestCase):
 
 class ReleaseReadinessTests(unittest.TestCase):
 
-    def test_pages_ahead_of_the_release_are_not_deployed(self):
-        site = {"version": "1.3.1", "new_in": {"version": "1.4"}}
-        self.assertIn("Not deploying", build.release_readiness_refusal(site, {"shots": []}))
-
     def test_a_missing_awaited_picture_is_not_deployed(self):
-        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        site = {"version": "1.4.0"}
         shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True}]}
         self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
 
     def test_a_missing_picture_waiting_on_a_named_issue_is_deployed(self):
-        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        site = {"version": "1.4.0"}
         shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "#367"}]}
         self.assertIsNone(build.release_readiness_refusal(site, shots))
 
     def test_waiting_on_must_name_an_issue(self):
-        site = {"version": "1.4.0", "new_in": {"version": "1.4"}}
+        site = {"version": "1.4.0"}
         shots = {"shots": [{"id": "no-such-shot-anywhere", "awaiting_capture": True, "waiting_on": "later"}]}
         self.assertIn("no-such-shot-anywhere", build.release_readiness_refusal(site, shots))
 
     def test_a_ready_release_deploys(self):
-        site = {"version": "1.4.1", "new_in": {"version": "1.4"}}
+        site = {"version": "1.4.1"}
         self.assertIsNone(build.release_readiness_refusal(site, {"shots": []}))
 
 
