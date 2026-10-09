@@ -22838,6 +22838,7 @@
       "answersHeading": "Answers",
       "answerLabel": "Answer {n}",
       "questionLabel": "Question {n}",
+      "partLabel": "{question}, part {n}",
       "blankName": "Name",
       "blankDate": "Date",
       "blankClassNumber": "Class #",
@@ -22867,12 +22868,13 @@
       ]
     },
     "labels": {
-      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start), after the nearest heading above it and \" · \" when there is one (the item's number alone repeated across lists: the verify fixture's practice list gave \"Question 1\" beside a heading \"Question 1\", implementation review N2); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
+      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start), after the nearest heading above it and \" · \" when there is one - or, when that heading is itself a question label (questionLabel with any number, in any capitals), partLabel with the heading and the item's number (the item's number alone repeated across lists: the verify fixture's practice list gave \"Question 1\" beside a heading \"Question 1\", implementation review N2); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
       "cases": [
         { "title": "Answer 3", "kind": "success", "listItem": null, "heading": "Question 1", "answerNumber": 1, "label": "Answer 3" },
         { "title": "SOLUTION", "kind": "solution", "listItem": null, "heading": "Question 7", "answerNumber": 2, "label": "Question 7" },
         { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Practice · Question 3", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item - under its heading, since review N2." },
         { "title": "Check", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "Question 2", "why": "A list with no heading above it: the item alone." },
+        { "title": "SOLUTION", "kind": "solution", "listItem": 1, "heading": "Question 3", "answerNumber": 1, "label": "Question 3, part 1", "why": "A multi-part question: the heading already names the question, so the item is a part of it (partLabel). It read \"Question 3 · Question 1\" before the fix review." },
         { "title": "Success", "kind": "success", "listItem": null, "heading": null, "answerNumber": 4, "label": "Answer 4" },
         { "title": "Solution (click to expand)", "kind": "note", "listItem": null, "heading": "Question 2", "answerNumber": 1, "label": "Question 2" },
         { "title": "Answers", "kind": "success", "listItem": null, "heading": null, "answerNumber": 2, "label": "Answer 2" },
@@ -23022,7 +23024,23 @@
             "expect": "ask",
             "result": "My notes.\n{start}\nhalf\n\n{start}\nNEW\n{end}\n",
             "why": "Not a section: never replace from a start line to the end of a teacher's file."
+          },
+          {
+            "name": "the teacher's file after Add, with a stray start line above",
+            "existing": "My notes.\n{start}\nhalf\n\n{start}\nNEW\n{end}\n",
+            "declined": null,
+            "expect": "unchanged",
+            "result": "My notes.\n{start}\nhalf\n\n{start}\nNEW\n{end}\n",
+            "why": "The section is found from its END line back to the LAST start line before it. Taken from the first start line, the next launch replaced the teacher's own 'half' (fix review, measured). Every write, replace and ask result above must also come back unchanged on a second pass."
           }
+        ]
+      },
+      "addCases": {
+        "rule": "What Add does with the file it asked about, read again at the moment of the yes: a file that is there and can be read gets the section below the teacher's text; a file that is there and can NO LONGER be read (saved in another encoding, its permissions changed while the sheet was open) is REFUSED - left exactly as it is, recorded as `guidance for assistants could not be written` and shown as couldNotWrite - because writing would replace the teacher's text with the section alone; a file that has gone is written fresh.",
+        "cases": [
+          { "name": "read again", "file": "readable", "existing": "My notes.\n", "expect": "appended", "result": "My notes.\n\n{start}\nNEW\n{end}\n" },
+          { "name": "cannot be read again", "file": "unreadable", "expect": "refused", "result": null, "why": "The file is left byte for byte as it was." },
+          { "name": "gone", "file": "missing", "expect": "written", "result": "{start}\nNEW\n{end}\n" }
         ]
       },
       "words": {
@@ -23035,7 +23053,7 @@
         "notNow": "Not Now",
         "couldNotWrite": "Plantoir could not put its guidance for assistants into this folder ({reason}). Everything else works as usual.",
         "dismiss": "Dismiss",
-        "where": "askTitle heads the sheet, askFound under it; askWhat and askYoursStays are its body; showWhatIsAdded is a disclosure over the section's text; add (Return) and notNow (Escape) its buttons. couldNotWrite is a quiet notice above the window's path bar, with dismiss. {file} is AGENTS.md or CLAUDE.md; {reason} the first problem, a file and the system's words."
+        "where": "askTitle heads the sheet, askFound under it; askWhat and askYoursStays are its body; showWhatIsAdded is a disclosure over the section's text; add (Return) and notNow (Escape) its buttons. couldNotWrite is a quiet notice above the window's path bar, with dismiss. {file} is AGENTS.md or CLAUDE.md; {reason} the first problem in the system's own words without its final full stop (the file's place stays on the trail line, not in the notice). The notice comes back at each launch while its cause remains, because the pass runs once per folder per launch."
       },
       "why": "Measured (#454 plan review S1, Claude Code 2.1.295 and Codex 0.155.1, each started at the working folder as both apps start them): Codex never found a skill under courses/<CODE>/.agents/skills, and found the same skill at the root at once; Claude Code found a per-course skill only after it had read a file in that course - after the first worksheet was written. With the root files in place, all four runs (each launcher, from the root and from a course) found and followed the guidance (documentation/09-mac-app.md). REJECTED: a copy in every course (invisible to Codex, late for Claude Code); an AGENTS.md or CLAUDE.md in the course (a note in Obsidian's tree, needing publishing exclusions in four places like How I Teach); overwriting a teacher's own root file (the first implementation left it alone; Russell ruled for a managed section, appended only after a yes)."
     }

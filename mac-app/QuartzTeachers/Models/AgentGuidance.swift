@@ -73,8 +73,21 @@ nonisolated enum AgentGuidance {
         var changed: Int = 0
         /// One line per file that could not be written, with the reason.
         var failures: [String] = []
+        /// The first failure's reason alone, for the notice a teacher reads
+        /// (no path; the trail line keeps it).
+        var firstReason: String? = nil
         /// The teacher's own files, waiting for a yes.
         var pending: [PendingAppend] = []
+
+        // MARK: - Functions
+
+        /// One failure: where, and the system's words.
+        mutating func note(_ place: String, _ reason: String) {
+            failures.append(place + ": " + reason)
+            if firstReason == nil {
+                firstReason = AgentGuidance.withoutFinalStop(reason)
+            }
+        }
     }
 
     // MARK: - Stored properties
@@ -91,6 +104,15 @@ nonisolated enum AgentGuidance {
     static let declinedDefaultsKey: String = "AgentGuidanceDeclined"
 
     // MARK: - Functions: the rule
+
+    /// A sentence without its final full stop, to sit inside brackets.
+    static func withoutFinalStop(_ text: String) -> String {
+        var trimmed: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasSuffix(".") {
+            trimmed.removeLast()
+        }
+        return trimmed
+    }
 
     /// The section, markers included.
     static func block(body: String) -> String {
@@ -132,8 +154,14 @@ nonisolated enum AgentGuidance {
     /// The file with Plantoir's section replaced, or nil when the file has no
     /// complete section (a start line followed later by an end line).
     static func replacingSection(in existing: String, body: String) -> String? {
-        guard let start = existing.range(of: sectionStart),
-              let end = existing.range(of: sectionEnd, range: start.upperBound..<existing.endIndex) else {
+        // Anchored on the END line, taking the LAST start line before it: a
+        // stray start line above a real section (the shape "Add" leaves after
+        // a start line with no end) is the teacher's text, and taking the
+        // first start line replaced it on the next launch (fix review).
+        guard let firstStart = existing.range(of: sectionStart),
+              let end = existing.range(of: sectionEnd, range: firstStart.upperBound..<existing.endIndex),
+              let start = existing.range(of: sectionStart, options: .backwards,
+                                         range: existing.startIndex..<end.lowerBound) else {
             return nil
         }
         return String(existing[..<start.lowerBound]) + block(body: body) + String(existing[end.upperBound...])
@@ -182,8 +210,8 @@ nonisolated enum AgentGuidance {
                 let copied: WorkspaceModel.MirrorOutcome = WorkspaceModel.syncDirectory(from: skillURL, to: destination)
                 outcome.changed += copied.changed
                 if copied.failed > 0 {
-                    outcome.failures.append(home + "/skills/" + skillURL.lastPathComponent + ": "
-                                            + (copied.firstFailure ?? "could not be written"))
+                    outcome.note(home + "/skills/" + skillURL.lastPathComponent,
+                                 copied.firstFailure ?? "could not be written")
                 }
             }
         }
@@ -195,7 +223,7 @@ nonisolated enum AgentGuidance {
             var existing: String? = nil
             if fileManager.fileExists(atPath: fileURL.path) {
                 guard let read = try? String(contentsOf: fileURL, encoding: .utf8) else {
-                    outcome.failures.append(name + ": could not be read")
+                    outcome.note(name, "could not be read")
                     continue
                 }
                 existing = read
@@ -208,7 +236,7 @@ nonisolated enum AgentGuidance {
                     try Data(text.utf8).write(to: fileURL, options: [.atomic])
                     outcome.changed += 1
                 } catch {
-                    outcome.failures.append(name + ": " + error.localizedDescription)
+                    outcome.note(name, error.localizedDescription)
                 }
             case .ask:
                 outcome.pending.append(PendingAppend(fileName: name, fileURL: fileURL, body: body))
@@ -223,7 +251,17 @@ nonisolated enum AgentGuidance {
     /// (it may have changed while the sheet was open). Answers false when the
     /// file could not be written.
     static func appendAfterYes(_ pending: PendingAppend) -> Bool {
-        let existing: String = (try? String(contentsOf: pending.fileURL, encoding: .utf8)) ?? ""
+        // Only a MISSING file reads as empty. A file that is there and can no
+        // longer be read (saved in another encoding, its permissions changed
+        // while the sheet was open) is refused: writing would replace the
+        // teacher's text with the section alone (fix review).
+        var existing: String = ""
+        if FileManager.default.fileExists(atPath: pending.fileURL.path) {
+            guard let read = try? String(contentsOf: pending.fileURL, encoding: .utf8) else {
+                return false
+            }
+            existing = read
+        }
         var text: String = appended(to: existing, body: pending.body)
         if let replaced = replacingSection(in: existing, body: pending.body) {
             text = replaced
@@ -286,6 +324,11 @@ nonisolated enum AgentGuidanceWording {
     static let notNow: String = "Not Now"
     static let dismiss: String = "Dismiss"
 
+    static let askWhat: String =
+        "Plantoir would like to add a short section at the end of it that points them to its guidance for writing pages — for example, how to make a page printable."
+
+    static let askYoursStays: String = "Your own text stays exactly as it is, above the new section."
+
     // MARK: - Functions
 
     static func askTitle(file: String) -> String {
@@ -297,10 +340,6 @@ nonisolated enum AgentGuidanceWording {
             + ", a file that assistants such as Claude Code and Codex read before they start."
     }
 
-    static let askWhat: String =
-        "Plantoir would like to add a short section at the end of it that points them to its guidance for writing pages — for example, how to make a page printable."
-
-    static let askYoursStays: String = "Your own text stays exactly as it is, above the new section."
 
     static func couldNotWrite(reason: String) -> String {
         return "Plantoir could not put its guidance for assistants into this folder (" + reason

@@ -23,7 +23,7 @@ website/shots/windowshot/obj/
 # its root). Its source is support/agent_guidance; a copy here would load the
 # teachers' skill into this repository's own sessions (#454 review N5).
 .claude/skills/plantoir-printing/
-.agents/
+/.agents/
 
 # Release bundles (publish output)
 windows-app/dist/

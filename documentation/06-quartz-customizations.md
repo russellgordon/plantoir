@@ -527,7 +527,8 @@ answer toggles the same class; plan finding C). On Print:
    fresh page, labelled by their own title or by where they sit (numbered
    list item → "Question n", after the heading above the list when there is
    one — "Practice · Question 1", since the item's number alone repeated the
-   fixture's heading "Question 1" (review N2) — else nearest heading, else
+   fixture's heading "Question 1" (review N2), or "Question 3, part 1" when
+   that heading is itself a question (fix review) — else nearest heading, else
    "Answer n");
    question callouts keep their title and send their body; every other folded
    callout opened in place; "(click to expand)" dropped; code longer than 25
@@ -550,7 +551,10 @@ answer toggles the same class; plan finding C). On Print:
    their bottom edge, so the blanks line up with the name's last line.
 6. Pages labelled "Page n of m" then "Answers n of m" (decision 3), and
    `print()`; restored again when `print()` returns, in case a browser never
-   sends `afterprint` (review N4). `afterprint` restores the theme and removes the frame (measured
+   sends `afterprint` (review N4). That is right where `print()` waits for the
+   dialog to close — Safari, Chrome and Edge, measured — and UNMEASURED in
+   Firefox, where a `print()` that returned at once would take the frame away
+   mid-print. `afterprint` restores the theme and removes the frame (measured
    in Safari: Cancel fires it too; the page came back dark with no frame).
 
 **Fallback:** Paged.js missing or failing → the same frame printed by the

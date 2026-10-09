@@ -51,7 +51,9 @@ Factor $x^2 - 9$ completely.
   list (`1.`, `2.`, ...). An answer with no title of its own, or one titled
   just "Answer" or "Solution", is labelled in the answer key by where it
   sits: "Question 3" for the third item of a numbered list (after the
-  heading above the list, if there is one: "Practice · Question 3"),
+  heading above the list, if there is one: "Practice · Question 3"; under a
+  heading that is itself a question, the items are its parts: "Question 3,
+  part 1"),
   otherwise the nearest heading above it, otherwise "Answer 1", "Answer 2", ...
 - Anything after the title like "(click to expand)" is dropped on paper.
 - An answer left OPEN (no `-`) prints where it is, on the worksheet. Use that

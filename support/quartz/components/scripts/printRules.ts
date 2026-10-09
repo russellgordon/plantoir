@@ -97,6 +97,16 @@ function fill(template: string, values: Record<string, string | number>): string
   )
 }
 
+// Is this heading a question label - questionLabel with any number?
+function isQuestionLabel(heading: string, template: string): boolean {
+  const pieces: string[] = template.split("{n}")
+  const escaped: string[] = []
+  for (const piece of pieces) {
+    escaped.push(piece.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  }
+  return new RegExp("^" + escaped.join("\\d+") + "$", "i").test(heading)
+}
+
 // What an answer is called in the answers: its own title, or where it sits.
 export function label(
   title: string,
@@ -116,6 +126,12 @@ export function label(
     // beside the heading "Question 1" (implementation review N2).
     const item: string = fill(words.questionLabel, { n: listItem })
     if (heading !== null && heading !== undefined && heading.trim() !== "") {
+      // A heading that is itself a question ("### Question 3" over a list of
+      // parts) already names the question: the item is a part of it. It read
+      // "Question 3 · Question 1" until the fix review.
+      if (isQuestionLabel(heading.trim(), words.questionLabel)) {
+        return fill(words.partLabel, { question: heading.trim(), n: listItem })
+      }
       return heading.trim() + " · " + item
     }
     return item
