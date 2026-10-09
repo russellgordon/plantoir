@@ -3979,6 +3979,33 @@ Undo Last Change takes back the last change made from the menu there
 REJECTED: a runner per action (no undo), and sharing the assistant window's
 runner (a larger refactor, and no window for a teacher who has none).
 
+**Why the menu's answers are a sheet, not alerts.** The plan put the answer of
+Rebuild Preview, Undo Last Change and Add Next Class in an alert. The section
+window already carries three `.alert` modifiers, and its own code records that
+FOUR segfaulted SwiftUI's alert bridge in `updateExistingAlert` while a sheet
+was closing (`SectionDetailView`, on the health alert). That crash is written
+up, with its stack, how it was cornered and how to reproduce it, in
+[09-mac-app.md → "A test host that segfaults, and the six levers that look like
+they should fix it"](09-mac-app.md): SwiftUI ends a modal session from inside a
+layout pass while AppKit's sheet animation spins a nested runloop — one call
+stack, not a race. This piece did not reproduce it again; it simply does not
+add a fourth alert. So every answer is the Section menu's one sheet
+(`SectionVerbSheetModel`, kind `.result`): Undo Last Change and Add Next Class
+show it at once, working, while the copy is saved; and an answer that arrives
+while something else is on the window — the links checklist the change's own
+preview offered, a health alert — waits (`pendingVerbResult`) and is shown when
+that has gone. It is never dropped (the implementation review's note 4).
+
+**A copy per change, never two in one name.** Backups are stamped to the second,
+and the menu can make two in one (a tenth of a second each for a small course);
+`zip -r` would UPDATE the first in place. The second is `<stamp>-2`
+(`CourseArchiver.unusedBackupName`, `course-management.json` → `zipNames`).
+
+**Make Room for Classes…'s pages left undone** — not dated, or not finished —
+are said in the menu's line in its own voice (`pagesWhoseNewDateCouldNotBeSetFromTheMenu`,
+`pagesAChangeCouldNotFinishFromTheMenu`); the model reads the conversation's
+words for them in `detail`.
+
 **`previewFollowsAChange`** is the one non-schema switch added to the runner:
 false only around the call that hides classes at Deploy (#475), where the
 deploy builds straight after. Every other menu write rebuilds the preview, as

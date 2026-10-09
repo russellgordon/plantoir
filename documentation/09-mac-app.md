@@ -2898,6 +2898,14 @@ and OK alone. Pages are named by their folder AND name, as a JSON array
 holding a semicolon is split in two by the tool's list reading (the plan
 review's finding 3; `SectionVerbsTests.testPagesAreNamedByTheirFolder`).
 
+**The sheet** wears the title band every sheet does since #457's HIG sweep —
+`.headline`, leading, 52 points, sentence case — and its default button takes
+Return and the accent only while it can be pressed (#364's shape). Both are
+written out in `SectionVerbSheet` until batch C's `.sheetTitle(_:)` and
+`.defaultButton(isEnabled:)` are on the same branch. A request from a row's
+context menu is DROPPED once that row is no longer selected, never run the
+next time the section is shown (the review's note 7).
+
 **One runner per window**, made the first time an item is used
 (`WorkspaceModel.sectionVerbs()`), so Undo Last Change takes back the last
 change made from the menu in THIS window (Russell's decision 4); the
@@ -2963,10 +2971,25 @@ WHERE and in what order: `shared-rules.json` → `classesDatedLater`.
 - **Section ▸ Publish Pages…** asks about the classes ticked, before the
   plan; the ticked ones are left out. **Publish Class for a Date…** (and the
   assistants' `publish_class_on`) records the class it published as kept:
-  the teacher named the day.
+  the teacher named the day. So does **Publish in the links checklist**
+  (#379) for a later class it publishes — otherwise the two questions undid
+  each other: hidden at Deploy, its link dead, offered back, published,
+  flagged again (the review's finding 2). Both spell a page's place the same
+  way (links resolved, precomposed Unicode).
+- **A scheduled deploy** writes "deployed with classes dated after the next
+  class" only once it HAS deployed; the classes are read when it is set to
+  run, the line written on its exit status (the review's note 9).
 
-The sheet lists the flagged classes, every one ticked. Hide N and Deploy
-records the unticked as kept (`file-formats.json` → `laterClassesKept`,
+The sheet lists the flagged classes, every one ticked, and ALWAYS offers two
+buttons beside Cancel: **Hide Ticked and Deploy** (the default) and **Keep All
+and Deploy**, which keeps every listed class at its date and hides nothing —
+the director's ruling on the implementation review's finding 1 (Russell may
+overturn it). Every pre-populated course ships its whole term published and
+dated: the review measured 61 classes flagged in 33 of the 39 payloads on
+2026-10-08, every one ticked, with no way to keep them but unticking each.
+Measured on a really installed ICS3U payload the same evening: 61 flagged;
+Keep All and Deploy kept 61 and deployed; the second Deploy asked nothing and
+deployed. Hide Ticked and Deploy records the unticked as kept (`file-formats.json` → `laterClassesKept`,
 `section<N>.later-classes-kept.json` in `.publish_state`, removed on
 rollover) and hides the ticked through Hide Pages…'s own call — a copy of the
 course first, undoable, pages only they link to hidden with them — with no
