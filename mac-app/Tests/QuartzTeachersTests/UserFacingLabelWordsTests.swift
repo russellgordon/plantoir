@@ -29,6 +29,38 @@ final class UserFacingLabelWordsTests: XCTestCase {
         )
     }
 
+    /// Course Settings' Printing section (#454): every word is the contract's.
+    func testThePrintingWordsAreTheContracts() throws {
+        let block: [String: Any] = try SharedRulesContractTests.section("courseSettingsWording")
+        let pairs: [(String, String)] = [
+            ("printingHeader", CourseSettingsWording.printingHeader),
+            ("printingSchoolName", CourseSettingsWording.printingSchoolName),
+            ("printingBlanks", CourseSettingsWording.printingBlanks),
+            ("printingBlankName", CourseSettingsWording.printingBlankName),
+            ("printingBlankDate", CourseSettingsWording.printingBlankDate),
+            ("printingBlankClassNumber", CourseSettingsWording.printingBlankClassNumber),
+            ("printingSchoolNameGoes", CourseSettingsWording.printingSchoolNameGoes),
+            ("printingCourseCodeGoes", CourseSettingsWording.printingCourseCodeGoes),
+            ("printingTopLeft", CourseSettingsWording.printingTopLeft),
+            ("printingBottomLeft", CourseSettingsWording.printingBottomLeft),
+            ("printingNotPrinted", CourseSettingsWording.printingNotPrinted),
+            ("printingCaption", CourseSettingsWording.printingCaption),
+        ]
+        let forbidden: [String] = try UserFacingLabelWordsTests.forbiddenWords()
+        for (key, said) in pairs {
+            XCTAssertEqual(said, block[key] as? String, key)
+            XCTAssertEqual(UserFacingLabelWordsTests.forbiddenWords(in: said, from: forbidden), [], key)
+        }
+        // The blanks a student fills in are printed with the same words the
+        // settings use for them (printablePages.words).
+        let printed: [String: Any] = try SharedRulesContractTests.section("printablePages")
+        let words: [String: Any] = try XCTUnwrap(printed["words"] as? [String: Any])
+        XCTAssertEqual(CourseSettingsWording.printingBlankName, words["blankName"] as? String)
+        XCTAssertEqual(CourseSettingsWording.printingBlankDate, words["blankDate"] as? String)
+        XCTAssertEqual(CourseSettingsWording.printingBlankClassNumber, words["blankClassNumber"] as? String)
+        XCTAssertEqual(CourseSettingsWording.printedPageLabel, words["pageLabel"] as? String)
+    }
+
     /// And none of them names the machinery.
     func testNoCourseSettingsSentenceNamesTheMachinery() throws {
         let forbidden: [String] = try UserFacingLabelWordsTests.forbiddenWords()

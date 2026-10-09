@@ -375,6 +375,12 @@ struct SectionDetailView: View {
                 // moving it between containers is how that gets thrown away.
                 if let previewURL {
                     WebPreviewView(controller: previewController, url: previewURL)
+                        .task {
+                            // A task rather than an appearance block: the section's
+                            // registering appearance block is found by a source scan
+                            // (WorkingFolderSelectionTests) as the view's first one.
+                            notePagesHandedToTheBrowser()
+                        }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .accessibilityIdentifier("previewWebView")
                 }
@@ -1616,6 +1622,22 @@ struct SectionDetailView: View {
     }
 
     // MARK: - Functions
+
+    /// A page the preview handed to the web browser goes on the trail with
+    /// this section's name (#454; activityTrail → `preview page opened in the
+    /// web browser`).
+    func notePagesHandedToTheBrowser() {
+        let code: String = course.code
+        let section: Int = sectionNumber
+        previewController.browserHandoff.whenHandedOver = { page, target, reason in
+            ActivityTrail.note(
+                .previewPageOpenedInBrowser,
+                PreviewBrowserHandoff.trailWords(page: page, target: target, reason: reason),
+                course: code,
+                section: section
+            )
+        }
+    }
 
     /// Works out whether the title bar should say " — Edited", off the
     /// main thread: the check is a directory walk, and however brief, a

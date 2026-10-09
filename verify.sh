@@ -463,6 +463,24 @@ else
   cat /tmp/verify_launcher_words_test.log
 fi
 
+# Printable pages (#454): which pages opt in and which make a site carry the
+# print engine, a teacher's own PDF resolved against Media, the gate, and the
+# printPdfNotFound finding; then the corners, page labels and words a printed
+# page carries. Both read the contract; stdlib only.
+if (cd scripts && python3 test_page_features.py) >/tmp/verify_page_features_test.log 2>&1; then
+  pass "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+else
+  fail "printable pages: opting in, a page's own PDF, and the per-site print engine (scripts/test_page_features.py, #454)"
+  cat /tmp/verify_page_features_test.log
+fi
+
+if (cd scripts && python3 test_print_settings.py) >/tmp/verify_print_settings_test.log 2>&1; then
+  pass "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
+else
+  fail "printable pages: the corners, page labels and words a printed page carries (scripts/test_print_settings.py, #454)"
+  cat /tmp/verify_print_settings_test.log
+fi
+
 if (cd scripts && python3 test_port_blocks.py) >/tmp/verify_port_blocks_test.log 2>&1; then
   pass "the launchers walk forty blocks for a folder's preview addresses, skip any another folder holds, and say so truthfully when none is free (scripts/test_port_blocks.py)"
 else
@@ -973,6 +991,22 @@ else
   cat /tmp/verify_visibility_site.log
 fi
 
+# ---- Printable pages (#454): the rules, run where they really run ----
+# printRules.ts is the file the page's own print code imports; it is bundled
+# with the image's esbuild and every printablePages case is run through it in
+# Node. And every typed pageOptIns line goes through the build's own reader.
+echo ""
+echo "🔎 Checking the printing rules against what the site and the build run…"
+if docker run --rm \
+  --mount "$(bind_mount_argument "$(pwd)/scripts/check_print_rules_against_the_site.py" /opt/scripts/check_print_rules_against_the_site.py),readonly" \
+  "$DEV_TEST_IMAGE" python3 /opt/scripts/check_print_rules_against_the_site.py \
+  >/tmp/verify_print_rules_site.log 2>&1; then
+  pass "every printablePages rule case holds in the site's own code, and every pageOptIns line reads as the contract says (scripts/check_print_rules_against_the_site.py, #454)"
+else
+  fail "every printablePages rule case holds in the site's own code, and every pageOptIns line reads as the contract says (scripts/check_print_rules_against_the_site.py, #454)"
+  cat /tmp/verify_print_rules_site.log
+fi
+
 # ---- The date and title writers, against what the site reads ----
 # GitHub #199. `contracts/file-formats.json` -> `datesAndTitles.writingCases`
 # says what the built site reads from each page a writer produces; this runs
@@ -1261,6 +1295,21 @@ check_baked support/favicon/favicon.ico   /opt/support/favicon/favicon.ico
 check_baked support/favicon/icon.svg      /opt/support/favicon/icon.svg
 check_baked support/favicon/apple-touch-icon.png /opt/support/favicon/apple-touch-icon.png
 check_baked support/favicon/icon.png      /opt/support/favicon/icon.png
+# Printable pages (#454): the two modules, Plantoir's additions to Quartz, and
+# the guidance the app writes into each working folder.
+check_baked scripts/page_features.py      /opt/scripts/page_features.py
+check_baked scripts/print_settings.py     /opt/scripts/print_settings.py
+while IFS= read -r addition; do
+  check_baked "$addition" "/opt/$addition"
+done < <(find support/quartz support/agent_guidance -type f ! -name '.*' | sort)
+# The print engine itself, by the hash the pin carries (contracts/toolchain.json).
+PAGEDJS_PIN="$(python3 -c 'import json; print([p["fileSha256"] for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0])')"
+PAGEDJS_BAKED="$(docker run --rm "$DEV_TEST_IMAGE" sha256sum /opt/vendor/pagedjs/paged.min.js 2>/dev/null | cut -d' ' -f1)"
+if [[ "$PAGEDJS_BAKED" == "$PAGEDJS_PIN" ]]; then
+  pass "The image carries Paged.js at /opt/vendor/pagedjs, matching the pin (#454)"
+else
+  fail "The image's /opt/vendor/pagedjs/paged.min.js is '${PAGEDJS_BAKED:-missing}', not the pinned $PAGEDJS_PIN"
+fi
 [[ "$BAKED_OK" == "true" ]] && pass "Baked scripts, patches, and support files match the working tree"
 
 # -------------------- 4a. The live-reload client is still the one the rule names --------------------
@@ -1378,6 +1427,9 @@ fi
 restore_hit_fixture() {
   [[ -n "${HIT_CONFIG_BACKUP:-}" && -f "$HIT_CONFIG_BACKUP" ]] || return 0
   rm -f "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md" "$HIT_COURSE/How I Teach 1.md"
+  rm -f "$HIT_COURSE/Printable Fixture.md" "$HIT_COURSE/Printable Not Opted.md" \
+        "$HIT_COURSE/Printable PDF Fixture.md" "$HIT_COURSE/Printable Bad PDF.md" \
+        "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf"
   cp "$HIT_CONFIG_BACKUP" "$HIT_COURSE/course_config.json"
   if [[ "$HIT_HAD_CONFIG_BACKUP" == "yes" ]]; then
     cp "$HIT_CONFIG_BACKUP_BACKUP" "$HIT_COURSE/course_config.backup.json"
@@ -1399,12 +1451,102 @@ config.setdefault("per_section_files", []).append("HOW I TEACH.md")
 json.dump(config, open(path, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 PY
 
+# ---- #454: printable pages, planted for the same build ----
+# A worksheet with one callout per answerCallouts shape, a numbered list, a
+# hint, a self-check, an answer left open, maths, a diagram, code and a
+# figure; the SAME page without `printable:` (it must come out with no print
+# markup at all); a page with its own PDF (a name with `&` and a space, so the
+# web address is Quartz's slug and not a guess); and a page whose PDF is not
+# there. Removed by restore_hit_fixture with the pages above.
+cat > "$HIT_COURSE/Printable Fixture.md" <<'PRINTFIXTURE'
+---
+title: Printable Fixture
+printable: true
+tags:
+  - reference
+---
+A worksheet planted by verify.sh (plantoir-print-sentinel-7f3a). Try each question before you open its answer.
+
+## Question 1
+
+Simplify $(x + 3)(x - 2)$.
+
+> [!success]- Answer 1
+> $x^2 + x - 6$
+
+## Question 2
+
+Factor $x^2 - 9$ completely.
+
+> [!SOLUTION]-
+> $(x - 3)(x + 3)$, a difference of squares.
+
+## Practice
+
+1. Expand $(2x + 1)^2$.
+   > [!check]-
+   >
+   > $4x^2 + 4x + 1$
+2. Expand $(x - 5)^2$.
+3. Expand $(x + 4)(x - 4)$.
+   > [!success]-
+   >
+   > $x^2 - 16$
+
+> [!tip]- Need a hint? (click to expand)
+> A difference of squares $a^2 - b^2$ factors as $(a - b)(a + b)$.
+
+> [!question]- Self-check: which expansions gave a perfect square?
+> Questions 1 and 2 of the practice list.
+
+> [!success] Worked example (left open on purpose)
+> $(x + 1)^2 = x^2 + 2x + 1$
+
+> [!note]- Solution & Visual Check (click to expand)
+> The parabola $y = x^2 - 9$ crosses the axis at $x = \pm 3$.
+
+$$
+x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+$$
+
+```mermaid
+flowchart LR
+  A[Expand] --> B[Collect like terms] --> C[Factor]
+```
+
+```python
+def area(width, height):
+    return width * height
+```
+
+<figure class="pl-figure pl-test"><svg viewBox="0 0 200 100" width="400" height="200" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="180" height="80" fill="none" stroke="black"/><text x="100" y="55" text-anchor="middle">plantoir figure</text></svg><figcaption>A figure an engine would draw.</figcaption></figure>
+PRINTFIXTURE
+sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable Not Opted/' \
+    -e 's/plantoir-print-sentinel-7f3a/plantoir-notopted-sentinel-7f3a/' \
+    "$HIT_COURSE/Printable Fixture.md" > "$HIT_COURSE/Printable Not Opted.md"
+mkdir -p "$HIT_COURSE/Media"
+python3 - "$HIT_COURSE/Media/plantoir-print-fixture & key.pdf" <<'PY'
+import sys
+pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+       b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+       b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+       b"trailer<</Root 1 0 R>>\n%EOF\n")
+open(sys.argv[1], "wb").write(pdf)
+PY
+printf -- '---\nprintable: true\nprintPdf: "[[plantoir-print-fixture & key.pdf]]"\n---\nA page that hands out its own PDF (plantoir-printpdf-sentinel-7f3a).\n\n> [!success]- Answer 1\n>\n> Off the worksheet.\n' \
+  > "$HIT_COURSE/Printable PDF Fixture.md"
+printf -- '---\nprintable: true\nprintPdf: missing-7f3a.pdf\n---\nA page whose PDF is not there (plantoir-badpdf-sentinel-7f3a).\n' \
+  > "$HIT_COURSE/Printable Bad PDF.md"
+
 STAMP_FILE="$(mktemp -t cq4t-stamp)"
 echo ""
 echo "🚦 Running: ./preview.sh EXC2O 1 --image $DEV_TEST_IMAGE --full-rebuild --build-only"
 echo "   (full rebuild ensures the Quartz scaffold comes from the dev-test image)"
 echo ""
-if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --full-rebuild --build-only; then
+# Kept as a transcript too (`script` keeps the terminal the launcher needs and
+# passes its exit status through), so 6h can read what the build SAID - the
+# printPdfNotFound finding for the planted page whose PDF is missing (#454).
+if script -q /tmp/verify_main_build.log ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --full-rebuild --build-only; then
   pass "preview.sh completed against $DEV_TEST_IMAGE"
 else
   fail "preview.sh exited non-zero"
@@ -1510,6 +1652,127 @@ for planted in "$HIT_COURSE/How I Teach.md" "$HIT_COURSE/section1/HOW I TEACH.md
   fi
 done
 [[ "$HIT_OK" == "true" ]] && pass "No How I Teach page reaches the built site, the look-alike does, and the teacher's own pages are untouched (#209)"
+
+# ---- 6h, continued: printable pages (#454) ----
+# The pages planted with the How I Teach ones, read from the site the launcher
+# just built. Checked here, before the plants are taken away below.
+#
+# THE COMPATIBILITY CHECK is the second one: the planted "Printable Not
+# Opted" page is the worksheet with only `printable: true` taken out, and it
+# must carry none of the print markup - its date line exactly the plain one
+# every page had before #454, no meta-line wrapper, no print style, no button.
+if python3 - "$SITE_PUBLIC" "$HIT_COURSE" /tmp/verify_main_build.log <<'PY'
+import hashlib, html, json, re, sys
+from pathlib import Path
+public, course, log = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+sys.path.insert(0, "scripts")
+import contracts, print_settings, toolchain_paths
+toolchain_paths.CONTRACTS_DIR = Path("contracts")
+contracts.reset_cache()
+problems = []
+def page(name):
+    path = public / name
+    if not path.is_file():
+        problems.append(f"{name} was not built")
+        return ""
+    return path.read_text(encoding="utf-8")
+
+worksheet = page("Printable-Fixture.html")
+match = re.search(r'<div class="plantoir-meta-line" data-plantoir-printable="true" data-settings="([^"]*)"', worksheet)
+if not match:
+    problems.append("the printable page has no Print button line")
+else:
+    settings = json.loads(html.unescape(match.group(1)))
+    config = json.load(open(course / "course_config.json", encoding="utf-8"))
+    expected = print_settings.compose(config, "EXC2O")
+    if settings["corners"] != expected:
+        problems.append(f"the printable page's corners {settings['corners']} are not {expected}")
+for needle in ('class="plantoir-print-button"', 'data-mode="questionsOnly"', 'data-mode="answersOnly"',
+               'id="plantoir-print-page"', "@top-left"):
+    if needle not in worksheet:
+        problems.append(f"the printable page lacks {needle}")
+
+plain = page("Printable-Not-Opted.html")
+for needle in ("plantoir-meta-line", "plantoir-print", "data-plantoir", "@page"):
+    if needle in plain:
+        problems.append(f"the page that did not opt in carries {needle!r}: pages that do not ask to print must be unchanged")
+if plain and not re.search(r'</h1><p show-comma="[a-z]+" class="content-meta">', plain):
+    problems.append("the page that did not opt in does not have the plain date line straight after its title")
+
+pin = [p for p in json.load(open("contracts/toolchain.json"))["pins"] if p["pin"] == "pagedjs"][0]
+engine = public / "static" / "pagedjs" / "paged.min.js"
+if not engine.is_file() or hashlib.sha256(engine.read_bytes()).hexdigest() != pin["fileSha256"]:
+    problems.append("the site does not carry the pinned print engine at static/pagedjs/paged.min.js")
+for path in public.rglob("*"):
+    if "pagedjs" in path.parts:
+        continue  # the engine's own text names its home page; it is never fetched from there
+    if path.suffix in (".html", ".js", ".css") and re.search(r"https?://[^\"' ]*pagedjs", path.read_text(encoding="utf-8", errors="ignore")):
+        problems.append(f"{path.name} loads the print engine from the network")
+
+handout = page("Printable-PDF-Fixture.html")
+link = re.search(r'<a class="plantoir-print plantoir-print-pdf" href="([^"]+)" target="_blank"', handout)
+if not link:
+    problems.append("the page with its own PDF has no link to it")
+else:
+    served = (public / link.group(1)).resolve()
+    source = course / "Media" / "plantoir-print-fixture & key.pdf"
+    if not served.is_file() or served.read_bytes() != source.read_bytes():
+        problems.append(f"the PDF link {link.group(1)} does not lead to the teacher's PDF")
+if "plantoir-print-menu" in handout:
+    problems.append("the page with its own PDF still offers the generated handout's menu")
+
+missing = page("Printable-Bad-PDF.html")
+if 'class="plantoir-print-button"' not in missing:
+    problems.append("the page whose PDF is missing did not fall back to the generated handout")
+said = log.read_text(encoding="utf-8", errors="ignore") if log.is_file() else ""
+if not re.search(r'PLANTOIR_HEALTH: \{"name": "printPdfNotFound"[^\n]*Printable Bad PDF', said):
+    problems.append("the build did not report the missing PDF as a folder problem naming the page")
+
+for planted in (course / ".claude", course / ".agents"):
+    if planted.exists():
+        problems.append(f"the build wrote {planted} into the course; guidance belongs at the working folder's root")
+
+for problem in problems:
+    print("   " + problem)
+sys.exit(1 if problems else 0)
+PY
+then
+  pass "printable pages: the worksheet carries its corners and menu, a page that did not opt in carries no print markup at all, the engine is the pinned one served locally, a page's own PDF is linked byte for byte, and a missing PDF falls back and is reported (#454)"
+else
+  fail "printable pages: one of the checks above failed (#454)"
+fi
+
+# ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----
+# Opened from Plantoir's preview, Print starts at the first page load. In a
+# LIGHT page nothing used to wait for Quartz to draw the diagrams, so the
+# planted worksheet printed its Mermaid diagram as source text. This prints it
+# that way in headless Chrome for Testing and checks the diagram was drawn.
+# It needs a browser on this Mac, so it runs when one is found (PLANTOIR_CHROME,
+# or the copy documentation/06 F7 installs) and says SKIPPED otherwise.
+PRINT_CHROME="${PLANTOIR_CHROME:-}"
+if [[ -z "$PRINT_CHROME" ]]; then
+  for candidate in "$HOME"/Library/Caches/Plantoir-dev/browsers/chrome/*/chrome-mac-*/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"; do
+    [[ -x "$candidate" ]] && PRINT_CHROME="$candidate"
+  done
+fi
+# Node 22's own WebSocket is what the check speaks to Chrome with; an older
+# Node has none, so it is a SKIP there, not a failure.
+if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
+   && node -e 'process.exit(typeof WebSocket === "function" ? 0 : 1)' >/dev/null 2>&1; then
+  PRINT_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
+  PRINT_SERVER_PID=$!
+  if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" >/tmp/verify_print_handout.log 2>&1; then
+    pass "printable pages: opened as the preview opens it, in a light page, the handout prints its diagram DRAWN, not as source text (browser-checks/print_handout.mjs, #454)"
+  else
+    fail "printable pages: the handout printed from a light page did not carry its drawn diagram (browser-checks/print_handout.mjs, #454)"
+    cat /tmp/verify_print_handout.log
+  fi
+  kill "$PRINT_SERVER_PID" 2>/dev/null || true
+else
+  RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac"
+fi
 restore_hit_fixture
 trap release_verify_lock EXIT
 
@@ -1632,6 +1895,14 @@ for entry in os.listdir("/proc"):
     pass "and the site is still readable at the path every reader names"
   else
     fail "the site is gone from $SITE_INDEX after the recreate"
+  fi
+  # The printable pages planted for 6h are gone, so this build has none: the
+  # print engine must have been taken out of the site again (#454 - a course
+  # that does not print carries none of it).
+  if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/pagedjs" ]]; then
+    pass "and with no printable page left, the site no longer carries the print engine (#454)"
+  else
+    fail "the site still carries static/pagedjs with no printable page in it (#454)"
   fi
 else
   fail "could not put back a container without the builds mount"
