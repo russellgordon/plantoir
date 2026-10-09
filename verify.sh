@@ -1741,6 +1741,36 @@ then
 else
   fail "printable pages: one of the checks above failed (#454)"
 fi
+
+# ---- 6h, continued: the handout as a browser prints it (#454 review B1) ----
+# Opened from Plantoir's preview, Print starts at the first page load. In a
+# LIGHT page nothing used to wait for Quartz to draw the diagrams, so the
+# planted worksheet printed its Mermaid diagram as source text. This prints it
+# that way in headless Chrome for Testing and checks the diagram was drawn.
+# It needs a browser on this Mac, so it runs when one is found (PLANTOIR_CHROME,
+# or the copy documentation/06 F7 installs) and says SKIPPED otherwise.
+PRINT_CHROME="${PLANTOIR_CHROME:-}"
+if [[ -z "$PRINT_CHROME" ]]; then
+  for candidate in "$HOME"/Library/Caches/Plantoir-dev/browsers/chrome/*/chrome-mac-*/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"; do
+    [[ -x "$candidate" ]] && PRINT_CHROME="$candidate"
+  done
+fi
+if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] && command -v node >/dev/null 2>&1; then
+  PRINT_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
+  ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
+  PRINT_SERVER_PID=$!
+  sleep 1
+  if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" >/tmp/verify_print_handout.log 2>&1; then
+    pass "printable pages: opened as the preview opens it, in a light page, the handout prints its diagram DRAWN, not as source text (browser-checks/print_handout.mjs, #454)"
+  else
+    fail "printable pages: the handout printed from a light page did not carry its drawn diagram (browser-checks/print_handout.mjs, #454)"
+    cat /tmp/verify_print_handout.log
+  fi
+  kill "$PRINT_SERVER_PID" 2>/dev/null || true
+else
+  RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
+  echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing on this Mac"
+fi
 restore_hit_fixture
 trap release_verify_lock EXIT
 
