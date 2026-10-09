@@ -240,6 +240,15 @@ struct SectionDetailView: View {
     /// window says " — Edited" about a section that has just gone out.
     @State var refreshGeneration: Int = 0
 
+    /// The Section menu's sheet (#457 batch B) — one of the assistant's
+    /// functions, the class dates it needs first, or #475's question at
+    /// Deploy. One sheet at a time; see `SectionVerbSheetModel`.
+    @State var verbSheet: SectionVerbSheetModel?
+
+    /// What runs once the sheet in front has gone: the function the class
+    /// dates were asked for (#457's plan review, blocker 1).
+    @State var afterTheVerbSheet: (() -> Void)?
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
@@ -512,6 +521,8 @@ struct SectionDetailView: View {
             previewButtonEnabled: previewButtonIsEnabled,
             deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
             previewIsShowing: previewURL != nil,
+            lastChangeIsHere: lastMenuChangeIsHere,
+            verbIsRunning: verbIsRunningHere,
             perform: performSiteMenuItem
         ))
         // The assistant cannot drive a preview itself — it holds neither the
@@ -561,9 +572,15 @@ struct SectionDetailView: View {
                     },
                     startPreview: { startPreview() },
                     stopPreview: { await stopPreviewAndWait() },
-                    deploy: { await deployAndWait(pressedByTheAssistant: true) }
+                    deploy: { await deployAndWait(pressedByTheAssistant: true) },
+                    // #475: the in-app assistant's deploy asks HERE, before
+                    // it stops anything, as the Deploy button does.
+                    askAboutClassesDatedLater: { await askAboutClassesDatedLater(route: "the assistant's deploy") }
                 )
             )
+            // A function asked for from this row's context menu before this
+            // window was showing it (#457 batch B).
+            takeAVerbRequestIfItIsMine()
         }
         .task {
             // Anything the overnight publish found. It ran with the app
@@ -745,6 +762,20 @@ struct SectionDetailView: View {
                 refreshEditedMarker()
             })
         })
+        // The Section menu's functions (#457 batch B) and #475's question.
+        .sheet(item: $verbSheet, onDismiss: {
+            verbSheetWentAway()
+        }, content: { model in
+            SectionVerbSheet(
+                model: model,
+                pressDefault: { pressDefault(in: model) },
+                cancel: { cancelVerbSheet(model) },
+                verbs: workspace.sectionVerbsIfMade
+            )
+        })
+        .onChange(of: workspace.sectionVerbRequest) { _, _ in
+            takeAVerbRequestIfItIsMine()
+        }
     }
 
     /// The title of the folder-problem dialog.
@@ -820,6 +851,9 @@ struct SectionDetailView: View {
         // The links checklist follows the alert (#379), never over it — nor
         // over the preview alert, which carries the #397 question.
         if previewAlertIsUp {
+            return
+        }
+        if verbSheet != nil {
             return
         }
         if let waiting = pendingLinksChecklist {
@@ -1076,6 +1110,13 @@ struct SectionDetailView: View {
         if linksChecklist != nil {
             return
         }
+        // Behind the Section menu's sheet too (#457 batch B): a publish made
+        // from it starts a preview, whose build may offer the checklist while
+        // the answer is still on screen. Shown when that sheet goes.
+        if verbSheet != nil {
+            pendingLinksChecklist = model
+            return
+        }
         // Behind the preview alert too (#397): the question about today's
         // class invites a look at the front page in Obsidian, and coming back
         // makes this window key, which offers the checklist — a sheet asked
@@ -1285,6 +1326,9 @@ struct SectionDetailView: View {
             if previewURL != nil {
                 openInBrowser()
             }
+        case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
+             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+            performVerb(item)
         default:
             break
         }
@@ -2012,6 +2056,13 @@ struct SectionDetailView: View {
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
         Task {
+            // Classes dated after the next class (#475): asked AFTER the
+            // deploy's own refusals — a refusal never follows a change — and
+            // before anything is stopped or built (`askAboutClassesDatedLater`).
+            let answer: LaterClassesAnswer = await askAboutClassesDatedLater(route: "Deploy")
+            if answer == .cancelled || answer == .cannotAsk {
+                return
+            }
             let result: AssistSiteWorkResult = await deployAndWait(pressedByTheAssistant: false)
             // A refusal reaches the teacher as the alert this window has
             // always shown. The assistant's copy of the same sentence goes
