@@ -24,13 +24,21 @@ class WebPreviewController {
     /// KVO subscriptions watching the web view's navigation state.
     private var observations: [NSKeyValueObservation] = []
 
+    /// Print and new-window links, handed to the web browser (#454).
+    let browserHandoff: PreviewBrowserHandoff
+
     // MARK: - Initializer
 
     init() {
-        let webView: WKWebView = WKWebView()
+        let configuration: WKWebViewConfiguration = WKWebViewConfiguration()
+        let handoff: PreviewBrowserHandoff = PreviewBrowserHandoff()
+        configuration.userContentController.add(handoff, name: PreviewBrowserHandoff.messageName)
+        let webView: WKWebView = WKWebView(frame: .zero, configuration: configuration)
+        webView.uiDelegate = handoff
         webView.allowsBackForwardNavigationGestures = true
         webView.setAccessibilityIdentifier("previewWebViewNative")
         self.webView = webView
+        self.browserHandoff = handoff
 
         let backObservation = webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in
             Task { @MainActor in
