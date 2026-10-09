@@ -880,9 +880,15 @@ Black and white in a drawing follow the theme, as obsidian-tikzjax's own
 dark-mode setting does: CSS on the drawing's own attributes,
 `[stroke="#000"]`/`black` → `currentColor` with `color: var(--dark)`, and
 `#fff`/`white` → `var(--light)`, so a label box behind text takes the page's
-background. Measured on the fixture in Chrome for Testing: dark-mode
-lettering rgb(207, 224, 201) on the Forest Moss scheme. A teacher's own
-colours are kept; pure blue is dim on a dark page, exactly as in Obsidian.
+background. **Labels need one more step:** Quartz's own `base.scss` gives
+EVERY svg `<text>` `fill: var(--darkgray)`, which beats an SVG's `fill`
+attribute — found by verify.sh's first run: a label drawn red came out grey,
+and black lettering printed #4e4e4e. So the transformer writes each label's
+own colour (worked out from its ancestors, as SVG inherits) as an inline
+style, leaves black to `figures.scss` (`text { color: inherit; fill:
+currentColor }`), and turns white into the page's background. A teacher's
+own colours are kept; pure blue is dim on a dark page, exactly as in
+Obsidian.
 A graph's text, axes and grid take `--darkgray`, `--gray` and `--lightgray`.
 **Rejected:** `filter: invert()` (it inverts the teacher's colours too, and
 would have to be undone on paper).
@@ -908,7 +914,8 @@ would have to be undone on paper).
   `__on` list, so nothing re-adds them) when the teacher wrote
   `disableZoom: true` and on every touch screen (`(pointer: coarse)`); with a
   mouse or trackpad dragging still moves the graph, and the wheel zooms only
-  with ⌘ or Ctrl held — which a trackpad pinch sends — so a plain scroll
+  with ⌘ or Ctrl held (Chrome and Edge also send a trackpad pinch that way;
+Safari does not, and there a pinch zooms the page) — so a plain scroll
   always scrolls the page. That answers the review's open question about the
   desktop "map trap" by the safe default; Russell may prefer click-to-zoom.
   The Obsidian plugin keeps the trap; that is not Plantoir's to change.
