@@ -641,9 +641,15 @@ final class QuartzTeachersUITests: XCTestCase {
         XCTAssertTrue(courseRow.waitForExistence(timeout: 10))
         courseRow.rightClick()
 
-        let showInFinder: XCUIElement = application.menuItems["Show in Finder"]
+        // Inside the menu the right-click OPENED, never anywhere in the app:
+        // since #457 the menu bar's Course and Section menus carry items of
+        // the same titles, so `application.menuItems["Show in Finder"]`
+        // found one whether or not a context menu had appeared at all.
+        let contextMenu: XCUIElement = application.outlines.firstMatch.menus.firstMatch
+        XCTAssertTrue(contextMenu.waitForExistence(timeout: 5), "Right-clicking the row should open its context menu")
+        let showInFinder: XCUIElement = contextMenu.menuItems["Show in Finder"]
         XCTAssertTrue(showInFinder.waitForExistence(timeout: 5), "The context menu should offer Show in Finder")
-        let newTerminal: XCUIElement = application.menuItems["New Terminal at Folder"]
+        let newTerminal: XCUIElement = contextMenu.menuItems["New Terminal at Folder"]
         XCTAssertTrue(newTerminal.exists, "The context menu should offer New Terminal at Folder")
 
         saveScreenshot(named: "07-context-menu", of: application)

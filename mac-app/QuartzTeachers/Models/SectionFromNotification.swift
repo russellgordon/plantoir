@@ -514,7 +514,28 @@ enum SectionFromNotification {
         if WorkspaceModel.isRunningTests {
             return nil
         }
-        guard let mainMenu = NSApp.mainMenu else {
+        guard let found = newWindowMenuItem(in: NSApp.mainMenu) else {
+            return nil
+        }
+        return {
+            found.menu.performActionForItem(at: found.index)
+        }
+    }
+
+    /// Where ⌘N is in `mainMenu`: an item keyed exactly ⌘N, one level down
+    /// (an item of a top-level menu). Separate from the opener so a test can
+    /// ask it of the real menu bar, which the opener refuses to do under the
+    /// tests.
+    ///
+    /// **It found nothing until v1.5.0** (the plan review's finding 8,
+    /// measured): with two window groups SwiftUI put ⌘N in a nested File ▸
+    /// New ▸ submenu, two levels down, so a notification clicked with no
+    /// window open parked instead of opening one (#306). File ▸ New Window
+    /// is top-level since #457, which is what fixed it — the search was not
+    /// deepened, because "the item keyed ⌘N in a menu" is the contract and a
+    /// deeper search would have hidden the menu's shape going wrong again.
+    static func newWindowMenuItem(in mainMenu: NSMenu?) -> (menu: NSMenu, index: Int)? {
+        guard let mainMenu else {
             return nil
         }
         for topItem in mainMenu.items {
@@ -526,10 +547,7 @@ enum SectionFromNotification {
                 let item: NSMenuItem = menu.items[index]
                 let isCommandN: Bool = item.keyEquivalent == "n" && item.keyEquivalentModifierMask == [.command]
                 if isCommandN {
-                    let position: Int = index
-                    return {
-                        menu.performActionForItem(at: position)
-                    }
+                    return (menu, index)
                 }
                 index += 1
             }

@@ -64,13 +64,6 @@ struct AddSectionSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add a Section to \(course.displayCode)")
-                .font(.headline)
-
-            Text(existingSectionsSentence)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
             HStack(spacing: 4) {
                 Text("Section number:")
                 TextField("", text: $entry)
@@ -118,12 +111,16 @@ struct AddSectionSheet: View {
                 Button("Add Section") {
                     performAdd()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canAdd)
+                .defaultButton(isEnabled: canAdd)
                 .accessibilityIdentifier("addSectionConfirmButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle("Add a Section to \(course.displayCode)", explanation: {
+            Text(existingSectionsSentence)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        })
         .frame(width: 320)
         .onAppear {
             entry = "\(SectionAdder.suggestedNumber(existing: existingSections))"

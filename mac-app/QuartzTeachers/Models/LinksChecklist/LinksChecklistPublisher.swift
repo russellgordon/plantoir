@@ -501,6 +501,9 @@ enum LinksChecklistPublisher {
         }
         rememberTheAnswer(offer: offer, leftUnticked: Set(outcome.leftUntickedPlaces),
                           course: course, sectionNumber: sectionNumber)
+        keepTheLaterClassesItPublished(
+            outcome.publishedPlaces, course: course, sectionNumber: sectionNumber, today: CalendarDay.today()
+        )
         ActivityTrail.note(
             .pagesPublishedFromLinksChecklist, publishedLine(outcome),
             course: course.code, section: sectionNumber
@@ -520,6 +523,27 @@ enum LinksChecklistPublisher {
             )
         }
         return .published(outcome)
+    }
+
+    /// A class the teacher published from this checklist is a class they
+    /// CHOSE to put up, so one dated after the next class day is recorded as
+    /// kept at its date (#475, `file-formats.json` → `laterClassesKept`) —
+    /// otherwise the next Deploy would offer to hide it again, its link would
+    /// go dead, and the next build's checklist would offer it back: the two
+    /// questions undoing each other (#457 batch B's review, finding 2).
+    static func keepTheLaterClassesItPublished(
+        _ places: [String], course: Course, sectionNumber: Int, today: CalendarDay
+    ) {
+        var published: Set<String> = []
+        for place in places {
+            published.insert(place)
+        }
+        var kept: [ClassesDatedLater.Flagged] = []
+        for page in ClassesDatedLater.flagged(forSection: sectionNumber, in: course, today: today)
+        where published.contains(page.place) {
+            kept.append(page)
+        }
+        ClassesDatedLater.keep(kept, forSection: sectionNumber, in: course)
     }
 
     /// Press Not Now.

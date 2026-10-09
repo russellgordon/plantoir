@@ -314,8 +314,17 @@ struct FailureExplainer {
     }
 
     /// Netlify limits how often sites can be created and deployed.
+    ///
+    /// Matched on the launcher's own phrase, `Netlify API error 429`
+    /// (`scripts/deploy.py`), never on a bare "429" (#482): every build
+    /// prints the image's tag, an eight-digit hash, and about one tag in
+    /// seven hundred carries those digits — as does a timing like "429ms".
+    /// The NAME is part of the match because the sentence names Netlify: a
+    /// Cloudflare 429 says nothing here and shows its raw output, rather than
+    /// blaming the wrong service. Pinned by `app-rules.json` →
+    /// `failureExplanations.cases`.
     static func rateLimitExplanation(in output: String) -> String? {
-        let mentionsLimit: Bool = output.contains("429") || output.lowercased().contains("rate limit")
+        let mentionsLimit: Bool = output.contains("Netlify API error 429") || output.lowercased().contains("rate limit")
         if !mentionsLimit {
             return nil
         }

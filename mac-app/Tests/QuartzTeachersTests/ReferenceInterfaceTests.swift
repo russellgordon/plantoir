@@ -375,7 +375,7 @@ final class ReferenceInterfaceTests: XCTestCase {
         workspace.selection = SidebarSelection.course(reference.code)
         XCTAssertNil(
             workspace.courseThatCanBeRenamed,
-            "The Edit menu item and the Return key both go through this."
+            "Course ▸ Rename and the Return key both go through this."
         )
         workspace.selection = SidebarSelection.section(reference.code, 1)
         XCTAssertNil(workspace.courseThatCanBeRenamed)

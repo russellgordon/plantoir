@@ -48,6 +48,29 @@ class WorkspaceModel {
     /// the teacher never saw, and then be moved (#311 review M1).
     static var folderForNextNewWindow: String?
 
+    /// What File ▸ Open Working Folder… or File ▸ Open Recent asked for with
+    /// no Plantoir window in front (#457): the NEXT new window opens it, as
+    /// the teacher's own choice — the #290 refusal, the "working folder
+    /// opened" line and the last-folder memory all apply, exactly as they do
+    /// for a folder chosen in a window.
+    ///
+    /// Kept apart from `folderForNextNewWindow`, which is the app's own
+    /// request (the assistant, a notification) and is adopted as a RESTORED
+    /// folder, writing nothing. Dropped when the app goes to the background
+    /// (`AppDelegate.applicationDidResignActive`), the rule that value has
+    /// too: a window the teacher opens an hour later must not be captured by
+    /// a stale menu choice whose window never appeared. Only in memory, so
+    /// nothing of it survives a relaunch.
+    static var folderToOpenInNextNewWindow: PendingOpen?
+
+    /// A folder a new window has been asked to open by the File menu.
+    enum PendingOpen: Equatable {
+        /// Chosen in the app-level Open panel.
+        case chosen(URL)
+        /// Chosen from File ▸ Open Recent.
+        case recent(RememberedFolder)
+    }
+
     /// Decides the folder a window starts on, once, before its first frame
     /// renders — see `WindowStartRule` for the rule and why. A window that
     /// may yet claim a remembered window waits quietly instead, and settles
@@ -57,6 +80,22 @@ class WorkspaceModel {
     /// play a lone window, since the hosted suite's own window is always open.
     func adoptFolderForNewWindow(among models: [WorkspaceModel] = WorkspaceModel.windowModels) {
         guard workspaceURL == nil, !hasSettledItsFolder else {
+            return
+        }
+        // The File menu's own request comes first (#457). After the guard
+        // above, so a window being RESTORED — which may still claim a
+        // remembered folder — never consumes it: a restored window settles
+        // through its claim and never reaches here unsettled with a claim
+        // pending, while a brand-new window does.
+        if let pending = WorkspaceModel.folderToOpenInNextNewWindow {
+            WorkspaceModel.folderToOpenInNextNewWindow = nil
+            switch pending {
+            case .chosen(let url):
+                chooseWorkspace(at: url)
+            case .recent(let remembered):
+                openRecent(remembered)
+            }
+            settleItsFolder()
             return
         }
         var otherWindowCount: Int = 0
@@ -381,6 +420,14 @@ class WorkspaceModel {
     /// by the sidebar, which owns every sheet in this window.
     var schoolYearRequestCode: String?
 
+    /// The calm note about a reference course's locked pages, waiting to be
+    /// shown before Obsidian opens — asked for by ANY route (the section
+    /// window's toolbar, a row's menu, Course ▸ / Section ▸ Open in Obsidian)
+    /// through `openInObsidian(course:sectionNumber:)`, and presented by the
+    /// main window rather than the sidebar, so it shows with the sidebar
+    /// collapsed (#457, the HIG sweep).
+    var lockedPagesNoteRequest: LockedPagesNoteRequest?
+
     /// Whether the "Reference Courses" group is folded open. Remembered with
     /// the folder, exactly as Archived and Backups are.
     var isShowingReferenceCourses: Bool = false
@@ -398,12 +445,19 @@ class WorkspaceModel {
     /// Why a backup action could not go ahead, shown as an alert.
     var backupProblem: String?
 
+    /// That alert's title, naming the act that failed — "Could not back up
+    /// ICS3U", "Could not delete the backup" — set beside every
+    /// `backupProblem` (#457, the HIG sweep: it said "Could not do that",
+    /// a sentence met on a bad day that names nothing). `BackupProblemTitle`.
+    var backupProblemTitle: String = BackupProblemTitle.generic
+
     /// The course whose code is being edited IN PLACE in the sidebar, or
     /// nil when nothing is being renamed.
     ///
     /// It lives on the window's model rather than in the sidebar's own state
-    /// because two things start a rename — the Edit menu and the Return key
-    /// — and a menu command can only reach the focused window's model.
+    /// because two things start a rename — Course ▸ Rename (the Edit menu
+    /// until #457) and the Return key — and a menu command can only reach
+    /// the focused window's model.
     var renamingCourseCode: String?
 
     /// Why a rename could not go ahead, shown as an alert.
@@ -431,6 +485,11 @@ class WorkspaceModel {
     /// The current sidebar selection.
     var selection: SidebarSelection? {
         didSet {
+            // A function asked for from a section row's context menu belongs
+            // to that row: once the selection has left it, the request is
+            // DROPPED, never run the next time the section is shown (#457
+            // batch B's review, note 7).
+            dropAVerbRequestForAnotherRow()
             // The third of the rulings' re-assertion points: SELECTING a
             // reference course. The other two are the folder being read and
             // the teacher previewing it or opening it in Obsidian.
@@ -450,6 +509,29 @@ class WorkspaceModel {
 
     /// True while the folder-picker sheet should be shown.
     var isChoosingWorkspace: Bool = false
+
+    /// True while a sheet or alert is attached to this window (#457). Kept
+    /// here, set from AppKit's own sheet notifications in `WindowRootView`,
+    /// so the menu bar re-renders and greys every verb while one is up —
+    /// a menu key equivalent fires behind a sheet otherwise (measured: a
+    /// real ⇧⌘D ran Deploy behind one). `MenuRoute` asks the window again
+    /// at the click, which is the guard that counts.
+    var sheetIsUp: Bool = false
+
+    /// One of the assistant's functions asked for from a section row's
+    /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
+    /// Class for a Date…, Add Next Class. The row is selected first, so the
+    /// section window that answers it is the one for that section: it takes
+    /// the request only when it names its own course and section
+    /// (`SectionDetailView.takeAVerbRequestIfItIsMine`).
+    var sectionVerbRequest: SectionVerbRequest?
+
+    /// This window's runner for the Section menu's functions, made the first
+    /// time one is used (`sectionVerbs()`), so its undo list is the window's.
+    private(set) var sectionVerbsIfMade: SectionVerbs?
+
+    /// A test's own Open Recent list, made on first use.
+    @ObservationIgnored var ownRecentFolders: RecentWorkingFolders?
 
     /// True while the teacher is choosing the OLD folder to import courses
     /// for reference out of. Set by the File menu; the chooser and the sheet
@@ -800,16 +882,20 @@ class WorkspaceModel {
     /// the website builder cannot reach it (#290), in which case NOTHING is
     /// done to it: not adopted, not remembered, nothing written into it, and
     /// the folder this window had stays exactly as it was.
-    func chooseWorkspace(at url: URL) {
+    func chooseWorkspace(at url: URL, fromOpenRecent: Bool = false) {
         // A window newly pointed at the folder retries a copy that failed (#476).
         ToolchainReadiness.shared.forgetFailure(url)
         if let refusal = WorkingFolderReach.refusal(forFolder: url) {
-            refuseChosenFolder(refusal)
+            refuseChosenFolder(refusal, fromOpenRecent: fromOpenRecent)
             return
         }
         folderNotOpened = nil
         let previousPath: String? = workspaceURL?.path
-        ActivityTrail.note(.workingFolderOpened, "opened the working folder " + url.path)
+        var line: String = "opened the working folder " + url.path
+        if fromOpenRecent {
+            line += " from File ▸ Open Recent"
+        }
+        ActivityTrail.note(.workingFolderOpened, line)
         if canRememberChoice {
             // Remembered app-wide so a NEW window opens where the last one
             // left off; each window then keeps its own choice in its scene.
@@ -830,11 +916,79 @@ class WorkspaceModel {
             WorkspaceModel.releaseFolderIfUnused(previousPath)
         }
         rememberAsTheLastWorkingFolder()
+        noteOpenedInRecents()
+    }
+
+    /// File ▸ Open Recent (#457): open a folder from the list, in THIS window.
+    ///
+    /// Asked of the disk the way a remembered folder is (`RememberedFolder`),
+    /// so a folder moved since is found by its bookmark. One that can be
+    /// opened goes through `chooseWorkspace(at:)`, because it IS the
+    /// teacher's choice: the #290 refusal, the "working folder opened" line,
+    /// letting go of the folder being left, and the cloud-sync note treated
+    /// as a choice. One that cannot says why in Open Recent's own words —
+    /// on the picker, or in an alert when the window keeps its courses —
+    /// and the list keeps it, since a drive plugged back in makes it good
+    /// again. The plan routed this through `reopen`, which the review found
+    /// silent, wrongly worded and never releasing the folder left behind.
+    func openRecent(_ remembered: RememberedFolder, trashRoots: [String]? = nil) {
+        let facts: RememberedFolder.Facts = RememberedFolder.observe(remembered, trashRoots: trashRoots)
+        switch RememberedFolder.decide(facts) {
+        case .reopen(let path, _):
+            chooseWorkspace(at: URL(fileURLWithPath: path), fromOpenRecent: true)
+        case .cannotReopen(let reason, let folderName, let path):
+            if reason == .outsideHome || reason == .coursesOutsideHome {
+                // The picker's own refusal and words (#290).
+                chooseWorkspace(at: URL(fileURLWithPath: path), fromOpenRecent: true)
+                return
+            }
+            folderNotOpened = FolderNotOpened(
+                how: .recent,
+                reason: reason,
+                folderPath: path,
+                folderName: folderName,
+                isShownAsAlert: !isShowingPicker
+            )
+            ActivityTrail.note(
+                .workingFolderNotReopened,
+                "did not reopen the working folder " + LogRedactor.redacting(path)
+                    + " as " + ReopenOccasion.openRecent.rawValue + " — " + reason.rawValue
+            )
+        }
+    }
+
+    /// Puts this window's folder at the top of File ▸ Open Recent — on an
+    /// OPEN only (#457), never when the window merely comes to the front,
+    /// and only for a model a window shows, where remembering is allowed.
+    func noteOpenedInRecents() {
+        guard WorkspaceModel.isShownInAWindow(self), canRememberChoice, let url = workspaceURL else {
+            return
+        }
+        var bookmark: Data? = rememberedBookmark
+        if bookmark == nil {
+            bookmark = RememberedFolder.make(for: url).bookmark
+        }
+        recentFolders.noteOpened(RememberedFolder(path: url.path, bookmark: bookmark))
+    }
+
+    /// The Open Recent list this model writes: the app's own, or a test's.
+    var recentFolders: RecentWorkingFolders {
+        if defaults === PlantoirDefaults.shared {
+            return RecentWorkingFolders.shared
+        }
+        if let ownRecentFolders {
+            return ownRecentFolders
+        }
+        let made: RecentWorkingFolders = RecentWorkingFolders(defaults: defaults)
+        ownRecentFolders = made
+        return made
     }
 
     /// A chosen folder the builder cannot reach: say so, write it down, and
-    /// change nothing else.
-    private func refuseChosenFolder(_ refusal: WorkingFolderReach.Refusal) {
+    /// change nothing else. The trail says WHERE it was chosen — the Open
+    /// panel (the picker's own, or File's with no window open) or File ▸ Open
+    /// Recent (#457) — because "I never chose that folder" is answered by it.
+    private func refuseChosenFolder(_ refusal: WorkingFolderReach.Refusal, fromOpenRecent: Bool) {
         folderNotOpened = FolderNotOpened(
             how: .chosen,
             reason: refusal.whichPath == .workingFolder ? .outsideHome : .coursesOutsideHome,
@@ -847,7 +1001,8 @@ class WorkspaceModel {
             : "its courses lead outside the home folder"
         ActivityTrail.note(
             .workingFolderRefused,
-            "refused the working folder " + LogRedactor.redacting(refusal.folderPath) + " — " + why + " (chosen in the picker)"
+            "refused the working folder " + LogRedactor.redacting(refusal.folderPath) + " — " + why
+                + (fromOpenRecent ? " (chosen from File ▸ Open Recent)" : " (chosen in the picker)")
         )
     }
 
@@ -858,6 +1013,10 @@ class WorkspaceModel {
         /// A window choosing a folder took the one a clicked scheduled
         /// deploy notification named (#306).
         case scheduledPublishNotification = "the folder a clicked scheduled deploy notification named"
+        /// Chosen from File ▸ Open Recent (#457). Only ever written for a
+        /// folder that could NOT be opened: one that can goes through
+        /// `chooseWorkspace` and writes "working folder opened".
+        case openRecent = "a folder chosen from Open Recent"
     }
 
     /// Reopens a folder remembered from last time — THE route by which a
@@ -895,6 +1054,7 @@ class WorkspaceModel {
                 ActivityTrail.note(.workingFolderReopened, line)
             }
             rememberAsTheLastWorkingFolder()
+            noteOpenedInRecents()
             return true
         case .cannotReopen(let reason, let folderName, let path):
             folderNotOpened = FolderNotOpened(how: .remembered, reason: reason, folderPath: path, folderName: folderName)
@@ -1138,11 +1298,39 @@ class WorkspaceModel {
         ActivityTrail.note(.syncedFolderAccepted, howTheyWentOn + ", kept in sync with \(syncedFolder.serviceName)")
     }
 
+    /// Drops a context-menu request whose section is no longer selected.
+    func dropAVerbRequestForAnotherRow() {
+        guard let request = sectionVerbRequest else {
+            return
+        }
+        if case .section(let code, let number) = selection,
+           code.lowercased() == request.courseCode.lowercased(), number == request.sectionNumber {
+            return
+        }
+        sectionVerbRequest = nil
+    }
+
+    /// This window's runner for the Section menu (#457 batch B), made on
+    /// first use and made again when the window has moved to another
+    /// folder — which drops the old folder's undo list with it. Nil with no
+    /// folder open.
+    func sectionVerbs() -> SectionVerbs? {
+        guard let folder = workspaceURL else {
+            return nil
+        }
+        if let made = sectionVerbsIfMade, FolderIdentity.isSameFolder(made.folderPath, folder.path) {
+            return made
+        }
+        let made: SectionVerbs = SectionVerbs(folderPath: folder.path)
+        sectionVerbsIfMade = made
+        return made
+    }
+
     /// Adopts a folder that is ALREADY in use — silently, with no check, no
     /// trail line and nothing remembered.
     ///
     /// For a window opened beside one already on the folder, and for the
-    /// assistant's and the MCP server's own models. **A window getting a
+    /// assistant's, the MCP server's and the Section menu's own models. **A window getting a
     /// remembered folder back must NOT come here**: it goes through
     /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
     /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
@@ -1872,6 +2060,7 @@ class WorkspaceModel {
         do {
             try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
+            backupProblemTitle = BackupProblemTitle.backingUp(course.displayCode)
             backupProblem = error.localizedDescription
             return
         }
@@ -1886,7 +2075,8 @@ class WorkspaceModel {
     /// clicked into Section 2 and presses Return means the course it belongs
     /// to; there is nothing else in a section's row to rename.
     /// **Never a course kept for reference**, from any route. The context
-    /// menu already hid the item; the Edit menu and the Return key did not,
+    /// menu already hid the item; the Edit menu (Course ▸ Rename since #457)
+    /// and the Return key did not,
     /// and both set `renamingCourseCode` on a row that draws no editing
     /// field — so nothing appeared to happen AND the code was never cleared,
     /// which left Return-to-rename dead for every other course in the window
@@ -2217,6 +2407,7 @@ class WorkspaceModel {
             act: "restore",
             whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
         ) {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = refusal
             return
         }
@@ -2240,6 +2431,7 @@ class WorkspaceModel {
                 act: "restore",
                 whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
             ) {
+                backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
                 backupProblem = refusal
                 reloadCourses()
                 return
@@ -2261,6 +2453,7 @@ class WorkspaceModel {
             // (The records of renames under way are cleared by the restorer
             // itself, so a test can see it.)
         } catch {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = error.localizedDescription
             reloadCourses()
             return
@@ -2356,6 +2549,7 @@ class WorkspaceModel {
                 WorkspaceModel.trailLine(for: deletion, sizes: backupSizes)
             )
         }
+        backupProblemTitle = BackupProblemTitle.deletingBackups(count: items.count)
         backupProblem = WorkspaceModel.problem(with: deletion)
 
         for item in deleted {
@@ -2498,6 +2692,7 @@ class WorkspaceModel {
     /// confirmation.
     func requestDeleteBackup(_ item: BackupItem) {
         if WorkspaceModel.heldBackupPaths().contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblemTitle = BackupProblemTitle.deletingBackups(count: 1)
             backupProblem = WorkspaceModel.problem(with: BackupDeletion(
                 deleted: [], keptForTheAssistant: [item], failed: []
             ))
@@ -2505,6 +2700,7 @@ class WorkspaceModel {
         }
         let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
         if heldByASession.contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblemTitle = BackupProblemTitle.deletingBackups(count: 1)
             backupProblem = WorkspaceModel.problem(with: BackupDeletion(
                 deleted: [], keptForTheAssistant: [], failed: [], keptForAClaudeSession: [item]
             ))
@@ -2802,6 +2998,7 @@ class WorkspaceModel {
         do {
             try FileManager.default.removeItem(at: item.fileURL)
         } catch {
+            backupProblemTitle = BackupProblemTitle.deletingArchive
             backupProblem = error.localizedDescription
             return
         }

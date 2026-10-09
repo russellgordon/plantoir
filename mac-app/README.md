@@ -38,7 +38,11 @@ Mac until 2026-09-19 — the conditions, the measurements and what was
 rejected are in
 [`documentation/09-mac-app.md`](../documentation/09-mac-app.md) →
 "Quitting: what it frees, what it refuses to free, and why".
-Additional actions: Add Section (course context menu), Open in Obsidian
+Every action on a course or a section is in the menu bar's Course and
+Section menus (#457) as well as in the sidebar's context menus and the
+windows' buttons; File works with no window open (Open Working Folder…,
+Open Recent) — `documentation/09-mac-app.md` → "Mac conventions".
+Additional actions: Add Section (Course menu and context menu), Open in Obsidian
 (vault registration included), an Archived sidebar group with restore,
 per-section settings for grade-in-title (with a repetition warning) and a
 custom domain, and a custom About panel with the Icon Composer app icon.
@@ -136,9 +140,10 @@ so, rather than fail on a tree that holds only the menu bar. They skip only
 when the window is actually missing from the tree, so a lock never hides a
 test that could have run. A run made while the Mac is locked shows 8 more
 skipped, each naming #315. Being in the background is fine and is the normal
-case. **A normal full run has 3 skipped (a fourth,
+case. **A normal full run has 4 skipped — the four opt-in integration tests
+named in `CLAUDE.md`'s Testing table (a fifth,
 `QuitScriptRunsTests.testTheSharedMachineIsStoppedOnAClearAnswer`, skips while
-any launcher is running on the Mac); more than 3 skipped means read the skip
+any launcher is running on the Mac); more than 4 skipped means read the skip
 reasons.** Why, and what was rejected:
 `documentation/09-mac-app.md` → "Testing: the tests that read the real window,
 and a window on another Space or a locked screen (#249, #315)".

@@ -58,7 +58,13 @@ struct NewCourseWizardView: View {
     /// closes only when the field loses focus — a selection sets this to
     /// false itself (see `selectCourseCodeSuggestion`), and clicking
     /// elsewhere does the same the ordinary way SwiftUI focus works.
-    @State var courseCodeFieldIsFocused: Bool = false
+    ///
+    /// TRUE at open (#457, the HIG sweep — Russell: yes): the wizard opens
+    /// with the cursor in the code field, the field a teacher came to type
+    /// in, rather than on Add Example Course. The list does not open with
+    /// it — see `courseCodeSuggestionsManuallyDismissed` — so the form is
+    /// not covered before anything has been typed.
+    @State var courseCodeFieldIsFocused: Bool = true
 
     /// True once Escape has closed the popup without moving focus out of
     /// the field — reset the moment the code changes (typing should
@@ -69,7 +75,11 @@ struct NewCourseWizardView: View {
     /// Escape here NOT fall through to dismissing the whole wizard sheet
     /// — see the `.onKeyPress(.escape)` on `CourseCodePickerView`'s field
     /// (Russell, 2026-08-22).
-    @State var courseCodeSuggestionsManuallyDismissed: Bool = false
+    ///
+    /// TRUE at open, so the focus the wizard opens with does not also open
+    /// the list over the form: typing, ↓ or the chevron opens it, as in Copy
+    /// a Page (#457, the HIG sweep).
+    @State var courseCodeSuggestionsManuallyDismissed: Bool = true
 
     /// Which suggestion the arrow keys are sitting on, or `nil` when the
     /// teacher has not walked the list — the state behind Russell's
@@ -212,15 +222,6 @@ struct NewCourseWizardView: View {
         )
     }
 
-    /// The teacher's Cloudflare Account ID, which belongs to the person
-    /// rather than to this new course — so it is read from and written
-    /// straight back to app settings rather than kept as wizard state.
-    var cloudflareAccountIDBinding: Binding<String> {
-        return Binding(
-            get: { AppSettings.shared.cloudflareAccountID },
-            set: { newValue in AppSettings.shared.cloudflareAccountID = newValue }
-        )
-    }
 
     /// Why a club's class-pages folder cannot have this name, in the
     /// sentences a folder rename in Course Settings already uses
@@ -723,13 +724,9 @@ struct NewCourseWizardView: View {
 
     var wizardContent: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("New Course or Club")
-                    .font(.title2)
-                    .bold()
-                Spacer()
-            }
-            .padding()
+            // The one sheet title shape (#457, the HIG sweep): `.headline`
+            // in the 52-point band, where this was `.title2` bold.
+            SheetTitle("New Course or Club")
 
             if hasStarted {
                 TaskProgressView(runner: creator.runner, title: progressTitle, canCancel: false)
@@ -773,11 +770,17 @@ struct NewCourseWizardView: View {
                     Button(WizardWording.panelWords(isClub: isClubCourse).createButton) {
                         startCreation()
                     }
-                    .buttonStyle(.borderedProminent)
                     // Greyed while the folder is getting ready (#476), with
                     // the reason; `NewCourseCreator` refuses as well, before
                     // it writes, for a wizard opened before the copy began.
-                    .disabled(workspace.folderIsGettingReady)
+                    // The accent, but NOT Return (#457, the HIG sweep's
+                    // review, measured 2026-10-08): as the default button,
+                    // a Return typed in the Course code field — with no row
+                    // highlighted — created a club named by the code with
+                    // its name empty and the rest of the form unread. A long
+                    // form is finished with a click; the accent comes off
+                    // while the button cannot be pressed.
+                    .prominentButton(isEnabled: !workspace.folderIsGettingReady)
                     .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
@@ -792,9 +795,7 @@ struct NewCourseWizardView: View {
                         }
                         dismiss()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(creator.isCreating)
-                    .keyboardShortcut(.defaultAction)
+                    .defaultButton(isEnabled: !creator.isCreating)
                     .accessibilityIdentifier("wizardCloseActionButton")
                 }
             }
@@ -841,8 +842,10 @@ struct NewCourseWizardView: View {
                             courseCode: $courseCode,
                             isFocused: $courseCodeFieldIsFocused,
                             onEscape: {
+                                let listWasShown: Bool = courseCodeSuggestionsAreShown
                                 courseCodeSuggestionsManuallyDismissed = true
                                 highlightedCourseCode = nil
+                                return listWasShown
                             },
                             // A TOGGLE, not an open: pressing a real
                             // combo box's arrow a second time puts the
@@ -1238,7 +1241,10 @@ struct NewCourseWizardView: View {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
                     deployFolderPath: $deployFolderPath,
-                    cloudflareAccountID: cloudflareAccountIDBinding,
+                    // The teacher's, not this new course's: read from
+                    // Settings and shown read-only, with Open Settings…
+                    // beside it (#457, the HIG sweep).
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
                     additionalDeployTargets: $additionalDeployTargets
                 )
             } header: {
@@ -1428,8 +1434,9 @@ struct NewCourseWizardView: View {
 
     /// Return pressed in the field: takes the highlighted row if the
     /// teacher has walked to one. Returns false otherwise, so Return
-    /// still reaches the sheet's default button for someone who typed a
-    /// code and never touched the arrows.
+    /// goes on to the sheet — which has no default button, so it does
+    /// nothing there (#457, the HIG sweep's review: as the default,
+    /// Create Course was pressed with the form unread).
     func commitCourseCodeHighlight() -> Bool {
         guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
             return false

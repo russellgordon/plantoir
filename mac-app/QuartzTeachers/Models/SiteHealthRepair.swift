@@ -44,6 +44,20 @@ enum SiteHealthRepair {
         return result
     }
 
+    /// The button that dismisses the site-health alert. "OK" only when it
+    /// is the alert's only answer: beside a verb ("Repair…", "Preview
+    /// Again") an "OK" reads as "yes, do it" (#457, the HIG sweep). So it is
+    /// "Not Now" beside an offered repair, and "Close" after one.
+    static func dismissTitle(besideAnAction: Bool, afterARepair: Bool) -> String {
+        if !besideAnAction {
+            return "OK"
+        }
+        if afterARepair {
+            return "Close"
+        }
+        return "Not Now"
+    }
+
     static func buttonTitle(for findings: [SiteHealthFinding]) -> String? {
         let repairable: [SiteHealthFinding] = repairable(among: findings)
         if repairable.isEmpty {

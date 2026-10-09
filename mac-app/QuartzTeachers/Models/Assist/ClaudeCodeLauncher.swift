@@ -51,7 +51,12 @@ nonisolated enum ClaudeCodeLauncher {
     /// `contracts/app-rules.json` → `outsideAgents` carries them and a test
     /// compares the two. A sentence typed into the view and again into the
     /// contract is a sentence that will disagree with itself.
-    static let menuItemTitle: String = "Revise with Claude…"
+    ///
+    /// The item's title INSIDE Revise With ▸ — in the menu bar's Course and
+    /// Section menus and, since the HIG sweep (#457), in every row's context
+    /// menu too, so a command has one name everywhere. "Revise with Claude"
+    /// is still the command's name in a sentence (`WorkspaceWait`).
+    static let menuItemTitle: String = "Claude…"
 
     static let didNotOpenTitle: String = "Claude didn’t open"
 

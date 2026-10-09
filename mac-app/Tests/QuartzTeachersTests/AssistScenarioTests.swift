@@ -234,7 +234,13 @@ final class AssistScenarioTests: XCTestCase {
         let previewRunning: Bool = scenario.given["previewRunning"] as? Bool ?? false
         let sectionBusy: Bool = scenario.given["sectionBusy"] as? Bool ?? false
 
-        let made = try AssistFixture.makeRunner()
+        // #475: an assistant working from another app runs the call as the
+        // MCP server does.
+        var surface: AssistToolRunner.Surface = .local
+        if scenario.given["surface"] as? String == "mcp" {
+            surface = .mcp
+        }
+        let made = try AssistFixture.makeRunner(surface: surface)
         defer {
             FakePreview.shared.forget()
             try? FileManager.default.removeItem(at: made.root)
@@ -242,6 +248,17 @@ final class AssistScenarioTests: XCTestCase {
 
         // #378: the headless deploy refuses at a question.
         made.siteWork.deployMeetsAQuestion = scenario.given["theDeployMeetsAQuestion"] as? Bool ?? false
+
+        // #475: what the section window's question answers, when it asks.
+        var laterClassesAnswer: LaterClassesAnswer = .nothingToAsk
+        switch scenario.given["laterClassesAnswer"] as? String {
+        case "goAhead":
+            laterClassesAnswer = .goAhead
+        case "cancelled":
+            laterClassesAnswer = .cancelled
+        default:
+            break
+        }
 
         if windowOpen {
             FakePreview.shared.register(
@@ -251,8 +268,25 @@ final class AssistScenarioTests: XCTestCase {
                 running: previewRunning,
                 refusingToDeploy: sectionBusy
                     ? AssistWording.sectionIsBusy(course: "ICS3U", section: "1")
-                    : nil
+                    : nil,
+                answeringLaterClasses: laterClassesAnswer
             )
+        }
+
+        // #475: three published classes — today's, the next class day's, and
+        // one after it, which is the one flagged.
+        if scenario.given["classesDatedLater"] as? Bool == true {
+            try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
+            try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
+            try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
+            // Keep All and Deploy, answered earlier in the window (#475).
+            if scenario.given["laterClassesKeptAll"] as? Bool == true {
+                let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
+                ClassesDatedLater.keep(
+                    ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today),
+                    forSection: 1, in: made.course
+                )
+            }
         }
 
         // A page edit needs a page to edit, and the watched file is what makes

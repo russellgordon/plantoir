@@ -53,6 +53,10 @@ nonisolated enum ActivityTrail {
         /// whether it was the folder or its courses that lead outside the
         /// home folder. A refused folder leaves nothing else behind.
         case workingFolderRefused = "working folder refused"
+        /// File ▸ Open Recent ▸ Clear Menu (#457): carries how many folders
+        /// the list held. Without it, "Open Recent is empty and I never
+        /// cleared it" has no answer.
+        case recentWorkingFoldersCleared = "recent working folders cleared"
         case settingsSaved = "settings saved"
         case settingsCouldNotBeSaved = "settings could not be saved"
         /// Course Settings held changes that could not be saved because they
@@ -76,6 +80,14 @@ nonisolated enum ActivityTrail {
         case taskStarted = "task started"
         case taskFinished = "task finished"
         case askedForACredential = "asked for a publishing credential"
+        /// Help ▸ Plantoir Help opened plantoir.app's support page (#457,
+        /// the HIG sweep). Carries nothing else: the page is public.
+        case plantoirHelpOpened = "opened Plantoir Help"
+        /// The Cloudflare Account ID was changed in Plantoir ▸ Settings ▸
+        /// Deploying (#457, the HIG sweep: it moved there from a course's
+        /// settings). Whether it is now set, cleared or not yet valid —
+        /// NEVER the ID.
+        case cloudflareAccountIDChangedInSettings = "Cloudflare account ID changed in Settings"
         case assistantOpened = "assistant opened"
         /// A Claude or Codex session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
@@ -1149,6 +1161,39 @@ nonisolated enum ActivityTrail {
         /// course, the section and that date. Without it, a problem report
         /// shows class dates on disk and an app that asked for them anyway.
         case rememberedTimetableSetAside = "remembered timetable set aside"
+        /// One of the assistant's functions run from the Section menu or a
+        /// section's context menu (#457 batch B) — Publish Pages…, Hide
+        /// Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
+        /// Change, Add Next Class, Re-date Classes…, Make Room for Classes…,
+        /// Class Dates… — and Help ▸ Publishing and Deploying…. Carries where
+        /// it is in the menus, how it ended (carried out, changed nothing,
+        /// cancelled at the plan, rebuilt or not) and counts — never a page's
+        /// title. Not "section menu item": Help is not in the Section menu
+        /// (the plan review's note 11). Without it a change made from the
+        /// menu is a change nobody can say who made: the assistant's own line
+        /// is written by the conversation, which the menu does not have.
+        case ranFromAMenu = "ran from a menu"
+        /// The copy of a course the Section menu saves before each change it
+        /// makes (#457's ruling): the backup's FILE NAME, its size and how
+        /// long it took, or that it could not and why. The menu's own line,
+        /// not the assistant's: a teacher who declined the assistant never
+        /// had a chat for it to be "before".
+        case sectionMenuBackedUpACourse = "section menu backed up a course"
+        /// The teacher was asked about classes dated after the next class
+        /// (#475) — at Deploy, the in-app assistant's deploy, or Section ▸
+        /// Publish Pages… — and answered: how many were flagged, hidden (or
+        /// left hidden), kept published, or Cancel. Counts and places only.
+        /// "Why did my class disappear from the site?" is answered here.
+        case laterClassesAsked = "asked about classes dated after the next class"
+        /// A deploy went out with classes dated after the next class and
+        /// nobody to ask — a scheduled deploy (#475): their PLACES, at most
+        /// ten, then "and N more". The deploy is not held up; this is the
+        /// record that it went out with them.
+        case laterClassesWentOut = "deployed with classes dated after the next class"
+        /// An assistant working from another app was refused a deploy because
+        /// a class dated after the next class has no answer on file (#475):
+        /// the count. The other half of "why didn't Claude deploy it?".
+        case laterClassesHeldADeployBack = "a deploy was held back for classes dated after the next class"
     }
 
     // MARK: - Stored properties
@@ -1219,6 +1264,19 @@ nonisolated enum ActivityTrail {
     /// The words for an assistant backup that could not be made.
     static func assistantCouldNotBackUpLine(reason: String) -> String {
         return "assistant could not back up the course: \(reason)"
+    }
+
+    /// The words for `sectionMenuBackedUpACourse` (#457): the copy the
+    /// Section menu saves before each change it makes.
+    static func sectionMenuBackedUpLine(fileName: String, bytes: Int64, seconds: Double) -> String {
+        let megabytes: String = String(format: "%.1f", Double(bytes) / 1_000_000)
+        let took: String = String(format: "%.1f", seconds)
+        return "the Section menu backed up the course as \(fileName) (\(megabytes) MB, \(took) s)"
+    }
+
+    /// The words for a Section menu backup that could not be made.
+    static func sectionMenuCouldNotBackUpLine(reason: String) -> String {
+        return "the Section menu could not back up the course: \(reason)"
     }
 
     /// Where a start-of-the-year act was asked from, in the trail's words.

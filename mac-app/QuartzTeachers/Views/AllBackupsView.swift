@@ -29,6 +29,10 @@ struct AllBackupsView: View {
     /// The rows the teacher has selected, by `BackupItem.id`.
     @State var selectedIdentifiers: Set<BackupItem.ID> = []
 
+    /// How the table is sorted: newest first until a column header is
+    /// clicked (#457, the HIG sweep — Russell: yes, sort by column).
+    @State var sortOrder: [KeyPathComparator<BackupRow>] = BackupRow.newestFirst
+
     // MARK: - Computed properties
 
     var body: some View {
@@ -41,22 +45,29 @@ struct AllBackupsView: View {
         } else {
             VStack(alignment: .leading, spacing: 12) {
                 spaceSummary
-                Table(workspace.backupItems, selection: $selectedIdentifiers) {
-                    TableColumn("Course") { item in
-                        Text(item.courseCode)
+                Table(sortedRows, selection: $selectedIdentifiers, sortOrder: $sortOrder) {
+                    TableColumn("Course", value: \.courseCode) { row in
+                        Text(row.item.courseCode)
                     }
-                    TableColumn("Made") { item in
-                        Text(item.whenDescription)
+                    TableColumn("Made", value: \.backedUpAt) { row in
+                        Text(row.item.whenDescription)
                     }
-                    TableColumn("Made By") { item in
-                        Text(madeBy(item))
+                    TableColumn("Made By") { row in
+                        Text(madeBy(row.item))
                     }
-                    TableColumn("Size") { item in
-                        Text(workspace.shortSizeDescription(of: item) ?? "—")
+                    TableColumn("Size", value: \.bytesForSorting) { row in
+                        Text(workspace.shortSizeDescription(of: row.item) ?? "—")
                             .monospacedDigit()
-                            .help(workspace.sizeDescription(of: item) ?? "")
+                            .help(workspace.sizeDescription(of: row.item) ?? "")
                     }
                 }
+                // Right-click acts on the rows under the pointer and selects
+                // them first, as the sidebar's rows do (#457, the HIG sweep).
+                .contextMenu(forSelectionType: String.self) { identifiers in
+                    backupsMenu(for: identifiers)
+                }
+                // Delete asks the same "Delete N backups?" the button asks.
+                .onDeleteCommand(perform: requestDeletingTheSelection)
                 .accessibilityIdentifier("allBackupsTable")
                 HStack {
                     Text("Plantoir never deletes a backup you made. The assistant keeps only its five most recent for each course. Select the ones you no longer need — ⌘-click or ⇧-click for several — and delete them.")
@@ -72,10 +83,7 @@ struct AllBackupsView: View {
                     // Held includes a Claude or Codex session's backup elsewhere
                     // (#458), read when the pane draws: one listing of the
                     // activity folder, and the confirmation reads it again.
-                    .disabled(WorkspaceModel.deletableCount(
-                        of: selectedItems,
-                        heldPaths: WorkspaceModel.everyHeldBackupPath(inWorkingFolder: workspace.workspaceURL)
-                    ) == 0)
+                    .disabled(!canDelete(selectedItems))
                     .accessibilityIdentifier("deleteSelectedBackupsButton")
                 }
             }
@@ -129,6 +137,11 @@ struct AllBackupsView: View {
         }
     }
 
+    /// The table's rows, in the order the teacher sorted them.
+    var sortedRows: [BackupRow] {
+        return BackupRow.rows(of: workspace.backupItems, sizes: workspace.backupSizes, sortedBy: sortOrder)
+    }
+
     /// The backups selected, in the list's own order.
     var selectedItems: [BackupItem] {
         var items: [BackupItem] = []
@@ -174,6 +187,68 @@ struct AllBackupsView: View {
 
     // MARK: - Functions
 
+    /// Whether anything in `items` can be deleted: not a backup an open
+    /// assistant conversation or a Claude or Codex session holds.
+    func canDelete(_ items: [BackupItem]) -> Bool {
+        return WorkspaceModel.deletableCount(
+            of: items,
+            heldPaths: WorkspaceModel.everyHeldBackupPath(inWorkingFolder: workspace.workspaceURL)
+        ) > 0
+    }
+
+    /// The backups with these identifiers, in the list's own order.
+    func items(withIdentifiers identifiers: Set<BackupItem.ID>) -> [BackupItem] {
+        var items: [BackupItem] = []
+        for item in workspace.backupItems {
+            if identifiers.contains(item.id) {
+                items.append(item)
+            }
+        }
+        return items
+    }
+
+    /// The table's context menu: Restore… (one backup), Show in Finder, then
+    /// Delete… last, behind a divider — the sidebar's backup row's menu, for
+    /// one row or several.
+    @ViewBuilder
+    func backupsMenu(for identifiers: Set<BackupItem.ID>) -> some View {
+        let chosen: [BackupItem] = items(withIdentifiers: identifiers)
+        if !chosen.isEmpty {
+            Button("Restore…", systemImage: "arrow.uturn.backward") {
+                selectedIdentifiers = identifiers
+                if let item = chosen.first {
+                    workspace.backupRestoreRequest = item
+                }
+            }
+            .disabled(chosen.count != 1 || workspace.isBeingCopied(chosen[0].courseCode))
+            Button("Show in Finder", systemImage: "finder") {
+                selectedIdentifiers = identifiers
+                var urls: [URL] = []
+                for item in chosen {
+                    urls.append(item.fileURL)
+                }
+                NSWorkspace.shared.activateFileViewerSelecting(urls)
+            }
+            Divider()
+            Button(chosen.count == 1 ? "Delete Backup…" : "Delete \(chosen.count) Backups…", systemImage: "trash", role: .destructive) {
+                selectedIdentifiers = identifiers
+                workspace.backupsDeleteRequest = chosen
+            }
+            .disabled(!canDelete(chosen))
+        }
+    }
+
+    /// Delete, pressed in the table: the Delete button's question, for what
+    /// is selected — nothing when nothing selected can go.
+    func requestDeletingTheSelection() {
+        let chosen: [BackupItem] = selectedItems
+        if canDelete(chosen) {
+            workspace.backupsDeleteRequest = chosen
+        } else {
+            NSSound.beep()
+        }
+    }
+
     /// "ICS4U — 3 backups, 27.3 MB".
     func courseLine(for share: BackupSpace.CourseShare) -> String {
         let noun: String = share.count == 1 ? "backup" : "backups"
@@ -194,6 +269,8 @@ struct AllBackupsView: View {
             return "You"
         case .assistant(let sectionNumber):
             return "The assistant, Section \(sectionNumber)"
+        case .menu(let sectionNumber):
+            return "The Section menu, Section \(sectionNumber)"
         }
     }
 

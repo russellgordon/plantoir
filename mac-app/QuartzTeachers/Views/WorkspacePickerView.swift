@@ -116,13 +116,15 @@ struct WorkspacePickerView: View {
                         Text("Set Up This Folder")
                     }
                 }
-                .buttonStyle(.borderedProminent)
                 // Return sets the folder up — except while the note about
                 // a synced folder is showing, when going ahead is a
                 // decision and a Return pressed out of habit must not make
-                // it.
-                .keyboardShortcut(workspace.needsCloudSyncDecision ? nil : .defaultAction)
-                .disabled(workspace.isInitializingWorkspace)
+                // it. Grey, not dim blue, while it cannot be pressed
+                // (#457, the HIG sweep).
+                .defaultButton(
+                    isEnabled: !workspace.isInitializingWorkspace,
+                    isTheDefault: !workspace.needsCloudSyncDecision
+                )
                 .accessibilityIdentifier("initializeFolderButton")
 
                 Button(CloudSyncWording.chooseDifferentFolderButton) {

@@ -240,6 +240,21 @@ struct SectionDetailView: View {
     /// window says " — Edited" about a section that has just gone out.
     @State var refreshGeneration: Int = 0
 
+    /// The Section menu's sheet (#457 batch B) — one of the assistant's
+    /// functions, the class dates it needs first, or #475's question at
+    /// Deploy. One sheet at a time; see `SectionVerbSheetModel`.
+    @State var verbSheet: SectionVerbSheetModel?
+
+    /// What runs once the sheet in front has gone: the function the class
+    /// dates were asked for (#457's plan review, blocker 1).
+    @State var afterTheVerbSheet: (() -> Void)?
+
+    /// The answer of a function with no sheet of its own (Undo Last Change,
+    /// a refused Rebuild Preview, Add Next Class) that arrived while
+    /// something else was on the window — shown when that has gone, never
+    /// dropped (#457 batch B's review, note 4).
+    @State var pendingVerbResult: SectionVerbSheetModel?
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
@@ -274,6 +289,26 @@ struct SectionDetailView: View {
 
     var isBusy: Bool {
         return previewRunner.isRunning || deployRunner.isRunning
+    }
+
+    /// The Preview (or Stop Preview) button's enablement — read by the
+    /// button and by Section ▸ Preview alike (#457).
+    ///
+    /// Not while a copy of the course is being zipped (#351): a restore or
+    /// removal is waiting on that zip to replace the folder a preview would
+    /// be serving from. Nor while the folder's tools are still being copied,
+    /// or that copy failed (#476): the help says why, no dialog.
+    var previewButtonIsEnabled: Bool {
+        if previewRunner.isRunning {
+            return true
+        }
+        return !(isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+    }
+
+    /// The Deploy button's enablement — read by the button and by Section ▸
+    /// Deploy… alike (#457). See the button for each clause's reason.
+    var deployButtonIsEnabled: Bool {
+        return !(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
     }
 
     // MARK: - Body
@@ -415,10 +450,10 @@ struct SectionDetailView: View {
             }
             ToolbarItemGroup {
                 Button("Open in Obsidian", systemImage: "square.and.pencil") {
-                    FolderActions.openInObsidian(
-                        revealing: course.sectionDirectoryURL(forSection: sectionNumber),
-                        vaultURL: course.directoryURL
-                    )
+                    // The one route (#457, the HIG sweep): on a course kept
+                    // for reference it re-locks the pages and shows the note
+                    // the first time, as the row and the menu bar do.
+                    workspace.openInObsidian(course: course, sectionNumber: sectionNumber)
                 }
                 .disabled(!FolderActions.obsidianIsInstalled)
                 .help("Edit this section's pages in Obsidian")
@@ -430,14 +465,7 @@ struct SectionDetailView: View {
                     previewRunner.isRunning ? "Stop Preview" : "Preview",
                     systemImage: previewRunner.isRunning ? "stop.fill" : "play.fill"
                 ) {
-                    if previewRunner.isRunning {
-                        stopPreview()
-                    } else {
-                        // The BUTTON, and only the button, may ask about
-                        // today's class first (#397); every other way in calls
-                        // `startPreview()` and is never held up by a question.
-                        pressPreview()
-                    }
+                    previewButtonPressed()
                 }
                 // The icon alone doesn't say what these two buttons do, so
                 // they wear their titles; the neighbouring icons are the
@@ -448,7 +476,7 @@ struct SectionDetailView: View {
                 // folder a preview would be serving from.
                 // Nor while the folder's tools are still being copied, or
                 // that copy failed (#476): the help says why, no dialog.
-                .disabled(!previewRunner.isRunning && (isBusy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady))
+                .disabled(!previewButtonIsEnabled)
                 .help(previewRunner.isRunning ? "Stop previewing this section" : (workspace.folderReadinessReason ?? "Preview this section's website"))
                 .accessibilityIdentifier(previewRunner.isRunning ? "stopPreviewButton" : "previewButton")
 
@@ -476,7 +504,7 @@ struct SectionDetailView: View {
                 // sequence against the first's.
                 // Nor while a copy of the course is being zipped (#351): a
                 // removal waiting on that zip deletes what this would publish.
-                .disabled(deployRunner.isRunning || isPreparingDeploy || workspace.isBeingCopied(course.code) || workspace.folderIsGettingReady)
+                .disabled(!deployButtonIsEnabled)
                 .help(workspace.folderReadinessReason ?? "Deploy this section's website")
                 .accessibilityIdentifier("deployButton")
                 }
@@ -491,6 +519,18 @@ struct SectionDetailView: View {
             }
         }
         .focusedSceneValue(\.previewController, previewURL != nil ? previewController : nil)
+        // Section ▸ Preview, Deploy… and Open in Browser (#457): the
+        // toolbar's own actions and predicates, so the menu item and the
+        // button beside it cannot disagree.
+        .focusedSceneValue(\.sectionSiteMenu, SectionSiteCommands(
+            previewIsRunning: previewRunner.isRunning,
+            previewButtonEnabled: previewButtonIsEnabled,
+            deployButtonEnabled: deployButtonIsEnabled && !course.isKeptForReference,
+            previewIsShowing: previewURL != nil,
+            lastChangeIsHere: lastMenuChangeIsHere,
+            verbIsRunning: verbIsRunningHere,
+            perform: performSiteMenuItem
+        ))
         // The assistant cannot drive a preview itself — it holds neither the
         // port lease nor the web view — so this window hands it the things it
         // alone can do. Registered rather than observed: the assistant has to
@@ -538,9 +578,17 @@ struct SectionDetailView: View {
                     },
                     startPreview: { startPreview() },
                     stopPreview: { await stopPreviewAndWait() },
-                    deploy: { await deployAndWait(pressedByTheAssistant: true) }
+                    deploy: { await deployAndWait(pressedByTheAssistant: true) },
+                    // #475: the in-app assistant's deploy asks HERE, before
+                    // it stops anything, as the Deploy button does.
+                    askAboutClassesDatedLater: {
+                        await askAboutClassesDatedLater(route: "the assistant's deploy", askedByTheAssistant: true)
+                    }
                 )
             )
+            // A function asked for from this row's context menu before this
+            // window was showing it (#457 batch B).
+            takeAVerbRequestIfItIsMine()
         }
         .task {
             // Anything the overnight publish found. It ran with the app
@@ -667,14 +715,22 @@ struct SectionDetailView: View {
                         )
                     }
                 }
-                Button("OK") { }
+                // "OK" only when it is the only answer: beside a verb it
+                // reads as "yes, do it" (#457, the HIG sweep).
+                Button(SiteHealthRepair.dismissTitle(
+                    besideAnAction: !course.isKeptForReference && SiteHealthRepair.buttonTitle(for: healthFindings) != nil,
+                    afterARepair: false
+                ), role: .cancel) { }
             case .outcome:
                 if repairOutcome?.canRebuild == true {
                     Button("Preview Again") {
                         rebuildAfterRepair()
                     }
                 }
-                Button("OK") { }
+                Button(SiteHealthRepair.dismissTitle(
+                    besideAnAction: repairOutcome?.canRebuild == true,
+                    afterARepair: true
+                ), role: .cancel) { }
             case .none:
                 Button("OK") { }
             }
@@ -700,6 +756,7 @@ struct SectionDetailView: View {
                 healthFindings = []
                 repairOutcome = nil
                 showAnythingWaiting()
+                showAVerbResultIfWaiting()
             }
         }
         .onChange(of: previewAlertIsUp) { _, isUp in
@@ -717,11 +774,32 @@ struct SectionDetailView: View {
         }
         .sheet(item: $linksChecklist, onDismiss: {
             refreshEditedMarker()
+            showAVerbResultIfWaiting()
         }, content: { model in
             LinksChecklistSheet(model: model, onPublished: {
                 refreshEditedMarker()
             })
         })
+        // The Section menu's functions (#457 batch B) and #475's question.
+        .sheet(item: $verbSheet, onDismiss: {
+            verbSheetWentAway()
+        }, content: { model in
+            SectionVerbSheet(
+                model: model,
+                pressDefault: { pressDefault(in: model) },
+                cancel: { cancelVerbSheet(model) },
+                keepAll: { keepAllAtDeploy(model) },
+                verbs: workspace.sectionVerbsIfMade
+            )
+        })
+        .onChange(of: workspace.sectionVerbRequest) { _, _ in
+            takeAVerbRequestIfItIsMine()
+        }
+        .onChange(of: deployRefusal == nil) { _, isGone in
+            if isGone {
+                showAVerbResultIfWaiting()
+            }
+        }
     }
 
     /// The title of the folder-problem dialog.
@@ -797,6 +875,9 @@ struct SectionDetailView: View {
         // The links checklist follows the alert (#379), never over it — nor
         // over the preview alert, which carries the #397 question.
         if previewAlertIsUp {
+            return
+        }
+        if verbSheet != nil {
             return
         }
         if let waiting = pendingLinksChecklist {
@@ -1053,6 +1134,13 @@ struct SectionDetailView: View {
         if linksChecklist != nil {
             return
         }
+        // Behind the Section menu's sheet too (#457 batch B): a publish made
+        // from it starts a preview, whose build may offer the checklist while
+        // the answer is still on screen. Shown when that sheet goes.
+        if verbSheet != nil {
+            pendingLinksChecklist = model
+            return
+        }
         // Behind the preview alert too (#397): the question about today's
         // class invites a look at the front page in Obsidian, and coming back
         // makes this window key, which offers the checklist — a sheet asked
@@ -1224,10 +1312,52 @@ struct SectionDetailView: View {
         frontPageNotChanged = nil
         if !previewAlertIsUp && healthDialog == nil {
             showAnythingWaiting()
+            showAVerbResultIfWaiting()
         }
     }
 
     // MARK: - Today's class on the front page (#397)
+
+    /// The Preview button, pressed — by the teacher at the toolbar, or by
+    /// the teacher at Section ▸ Preview, which IS pressing it (#457). Stops
+    /// a running preview; otherwise `pressPreview`, the one way in that may
+    /// ask about today's class first.
+    func previewButtonPressed() {
+        if previewRunner.isRunning {
+            stopPreview()
+        } else {
+            // The BUTTON, and only the button (from the toolbar or the
+            // menu bar), may ask about today's class first (#397); every
+            // other way in calls `startPreview()` and is never held up by a
+            // question.
+            pressPreview()
+        }
+    }
+
+    /// Section ▸ Preview, Deploy… and Open in Browser. Each asks the
+    /// button's own predicate again: the menu may have been drawn before
+    /// something started.
+    func performSiteMenuItem(_ item: SubjectMenuRules.Item) {
+        switch item {
+        case .preview:
+            if previewButtonIsEnabled {
+                previewButtonPressed()
+            }
+        case .deploy:
+            if deployButtonIsEnabled && !course.isKeptForReference {
+                startDeploy()
+            }
+        case .openInBrowser:
+            if previewURL != nil {
+                openInBrowser()
+            }
+        case .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
+             .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
+            performVerb(item)
+        default:
+            break
+        }
+    }
 
     /// The Preview button's action. Asks about today's class when there is
     /// something to ask; otherwise, and after the answer, previews.
@@ -1951,6 +2081,13 @@ struct SectionDetailView: View {
     /// assistant can press the same button and be told how it went.
     func startDeploy() {
         Task {
+            // Classes dated after the next class (#475): asked AFTER the
+            // deploy's own refusals — a refusal never follows a change — and
+            // before anything is stopped or built (`askAboutClassesDatedLater`).
+            let answer: LaterClassesAnswer = await askAboutClassesDatedLater(route: "Deploy")
+            if answer == .cancelled || answer == .cannotAsk {
+                return
+            }
             let result: AssistSiteWorkResult = await deployAndWait(pressedByTheAssistant: false)
             // A refusal reaches the teacher as the alert this window has
             // always shown. The assistant's copy of the same sentence goes

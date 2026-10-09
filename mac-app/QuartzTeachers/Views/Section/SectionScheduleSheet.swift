@@ -114,7 +114,6 @@ struct SectionScheduleSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
             Divider()
 
             if let plan {
@@ -142,7 +141,12 @@ struct SectionScheduleSheet: View {
             Divider()
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(
+            "When does \(course.displayCode) section \(sectionNumber) meet?",
+            identifier: "sectionScheduleTitle",
+            explanation: { header }
+        )
         .frame(width: 560)
         .fileImporter(
             isPresented: $isPickingFile,
@@ -163,12 +167,10 @@ struct SectionScheduleSheet: View {
 
     // MARK: - Computed properties — the parts of the sheet
 
+    /// What sits under the title (`SheetTitle`'s two-line shape): why the
+    /// dates are asked for, and the reason this time when there is one.
     var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("When does \(course.displayCode) section \(sectionNumber) meet?")
-                .font(.title2)
-                .accessibilityIdentifier("sectionScheduleTitle")
-
             // The one sentence that has to be here: a teacher being asked
             // for a column of dates deserves to know what it buys them.
             Text("Give Plantoir the class dates once, so it can date new class pages for you. They are kept inside the course folder, so they travel with it through backup, archive and restore.")
@@ -222,7 +224,7 @@ struct SectionScheduleSheet: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 HStack {
-                    Button("Choose a file…") {
+                    Button("Choose a File…") {
                         isPickingFile = true
                     }
                     .accessibilityIdentifier("sectionScheduleChooseFileButton")
@@ -298,12 +300,12 @@ struct SectionScheduleSheet: View {
                 .accessibilityIdentifier("sectionScheduleOrderingQuestion")
 
             HStack(spacing: 12) {
-                Button("Day first (\(question.dayFirstShort))") {
+                Button("Day First (\(question.dayFirstShort))") {
                     answer(question, with: .dayThenMonth)
                 }
                 .accessibilityIdentifier("sectionScheduleDayFirstButton")
 
-                Button("Month first (\(question.monthFirstShort))") {
+                Button("Month First (\(question.monthFirstShort))") {
                     answer(question, with: .monthThenDay)
                 }
                 .accessibilityIdentifier("sectionScheduleMonthFirstButton")
@@ -356,17 +358,23 @@ struct SectionScheduleSheet: View {
             .accessibilityIdentifier("sectionScheduleCancelButton")
 
             if let plan {
-                Button("Remember these dates") {
+                Button("Remember These Dates") {
                     remember(plan)
                 }
-                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("sectionScheduleRememberButton")
             } else if question == nil {
-                Button("Read the dates") {
+                Button("Read the Dates") {
                     Task { await read() }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!canRead)
+                // Return reads the dates — except while the dates are being
+                // TYPED, when Return must be a new line in the box. A
+                // default button can take Return before a text box does
+                // (AppKit offers key equivalents first); a probe app could
+                // not put focus in its box to settle it, so the sheet does
+                // not risk dates that cannot be typed one per line. Grey
+                // then, as a button Return does not press is drawn (#457).
+                .defaultButton(isEnabled: canRead, isTheDefault: route != .typed)
                 .accessibilityIdentifier("sectionScheduleReadButton")
             }
         }
@@ -699,10 +707,11 @@ struct SectionScheduleCourseMissingView: View {
                 Button("OK") {
                     dismiss()
                 }
-                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle("Could not find \(courseCode)")
         .frame(width: 420)
     }
 }

@@ -795,4 +795,12 @@ final class RepairChangesTheEditedMarkerTests: XCTestCase {
         XCTAssertNotEqual(afterEmptyFolder, afterAFile,
                           "Media IS inside the walk — a picture in it is an edit")
     }
+
+    /// "OK" only when it is the alert's only answer (#457, the HIG sweep).
+    func testTheDismissButtonSaysOKOnlyWhenItIsTheOnlyAnswer() {
+        XCTAssertEqual(SiteHealthRepair.dismissTitle(besideAnAction: false, afterARepair: false), "OK")
+        XCTAssertEqual(SiteHealthRepair.dismissTitle(besideAnAction: false, afterARepair: true), "OK")
+        XCTAssertEqual(SiteHealthRepair.dismissTitle(besideAnAction: true, afterARepair: false), "Not Now")
+        XCTAssertEqual(SiteHealthRepair.dismissTitle(besideAnAction: true, afterARepair: true), "Close")
+    }
 }

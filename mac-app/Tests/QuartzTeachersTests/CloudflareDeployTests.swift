@@ -336,10 +336,7 @@ final class HeldPublishingChoice {
                 get: { self.deployFolderPath },
                 set: { newValue in self.deployFolderPath = newValue }
             ),
-            cloudflareAccountID: Binding(
-                get: { self.cloudflareAccountID },
-                set: { newValue in self.cloudflareAccountID = newValue }
-            ),
+            cloudflareAccountID: self.cloudflareAccountID,
             additionalDeployTargets: Binding(
                 get: { self.additionalDeployTargets },
                 set: { newValue in self.additionalDeployTargets = newValue }

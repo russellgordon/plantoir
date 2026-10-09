@@ -250,10 +250,18 @@ def app_identifiers() -> set[str]:
     # `isRunning ? "stopPreviewButton" : "previewButton"` — counts both ways.
     call = re.compile(r'accessibilityIdentifier\((.*)\)')
     literal = re.compile(r'"((?:[^"\\]|\\.)*)"')
+    # A sheet's title carries its identifier through `SheetTitle` since #457
+    # (`.sheetTitle("Schedule a deploy", identifier: "scheduleDeployTitle")`),
+    # which applies it with `accessibilityIdentifier(identifier)` — a
+    # variable this scan cannot read — so the literal is taken from the call.
+    titled = re.compile(r'[Ss]heetTitle\([^\n]*?identifier:\s*"((?:[^"\\]|\\.)*)"')
     for path in APP_SOURCE.rglob("*.swift"):
-        for match in call.finditer(path.read_text(encoding="utf-8", errors="replace")):
+        source = path.read_text(encoding="utf-8", errors="replace")
+        for match in call.finditer(source):
             for text in literal.findall(match.group(1)):
                 found.add(text.split("\\(")[0])
+        for match in titled.finditer(source):
+            found.add(match.group(1).split("\\(")[0])
     return found
 
 

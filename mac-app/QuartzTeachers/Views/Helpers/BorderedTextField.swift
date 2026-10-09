@@ -5,12 +5,11 @@ import SwiftUI
 /// "every text field … should use the clearly differentiated style used for
 /// Course name", never the borderless look).
 ///
-/// This is the only place `.roundedBorder` is written. A field that needs a
-/// different shape — the sidebar's rename card, the assistant's composer, a
-/// field inside an alert — draws its own border and is listed, with its
-/// reason, in `TextFieldStyleScanTests`, which fails on any field that has
-/// neither. (The wizard's fields and the searchable picker drew a 24pt
-/// imitation of this bezel until #456; they wear the real one now.)
+/// This is the only place `.roundedBorder` is written, and every field wears
+/// it — `TextFieldStyleScanTests` fails on any field that does not, and has
+/// no allow-list (#457). (The wizard's fields and the searchable picker drew
+/// a 24pt imitation of this bezel until #456; the sidebar's rename card, the
+/// assistant's composer and an alert's field were exempt until #457.)
 struct BorderedTextField: ViewModifier {
 
     // MARK: - Functions
