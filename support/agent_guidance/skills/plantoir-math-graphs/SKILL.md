@@ -11,7 +11,7 @@ website. A page can carry two kinds of drawn figure, each written as a
 fenced block of plain text in the page:
 
 - ` ```functionplot ` - an interactive **graph of y = f(x)**. Students can
-  drag it (and zoom with Ctrl/Cmd + scroll or a pinch); it is drawn in their
+  drag it (and zoom with Ctrl/Cmd + scroll); it is drawn in their
   browser from the site's own files.
 - ` ```tikz ` - a **precise static diagram** in LaTeX's TikZ: geometry,
   number lines, tree diagrams, circuits, labelled axes with pgfplots. Plantoir

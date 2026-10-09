@@ -16,8 +16,8 @@
 //   finger drag that starts over a graph moves the graph instead of the page.
 //   So its zoom listeners are taken off when the teacher turned zoom off and
 //   on every touch screen; with a mouse or trackpad dragging still moves the
-//   graph, and zooming needs Cmd or Ctrl held - which a trackpad pinch sends -
-//   so a plain scroll always scrolls the page.
+//   graph, and zooming needs Cmd or Ctrl held (Chrome and Edge send a
+//   trackpad pinch that way), so a plain scroll always scrolls the page.
 // * Printing (printablePages.figures, decision 13): the handout waits for
 //   window.plantoirPrint.prepare, and ⌘P's beforeprint draws every graph at
 //   the bounds the teacher wrote, whatever was zoomed on screen.
