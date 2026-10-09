@@ -18,6 +18,33 @@ struct ProblemReportCommands: View {
     }
 }
 
+/// Help ▸ Publishing and Deploying… (#457 batch B): the difference between
+/// the two words, which the assistant's `explain_publishing` was the only
+/// way to hear. An alert of its own, live with or without a window — it
+/// acts on nothing — and said to the teacher (`publishingAndDeployingExplained`,
+/// not the assistant's `whatPublishingMeans`, which says "the teacher").
+struct PublishingAndDeployingCommand: View {
+
+    // MARK: - Body
+
+    var body: some View {
+        Button("Publishing and Deploying…") {
+            PublishingAndDeployingCommand.explain()
+        }
+    }
+
+    // MARK: - Functions
+
+    static func explain() {
+        ActivityTrail.note(.ranFromAMenu, "Help ▸ Publishing and Deploying… — shown")
+        let alert: NSAlert = NSAlert()
+        alert.messageText = AssistWording.publishingAndDeployingTitle
+        alert.informativeText = AssistWording.publishingAndDeployingExplained
+        alert.addButton(withTitle: AssistWording.menuDoneButton)
+        alert.runModal()
+    }
+}
+
 /// Asks the teacher what to include, saves the report where they choose, and
 /// shows it to them in Finder.
 @MainActor

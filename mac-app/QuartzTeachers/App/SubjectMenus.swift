@@ -180,8 +180,34 @@ struct SectionMenu: Commands {
 
             Divider()
 
-            // Batch B (#457): the assistant's verbs go here, after Open in
-            // Browser, as a group of their own.
+            // The assistant's own functions (#457 batch B), run through the
+            // tools' own code by the section window (`SectionVerbs`) — never
+            // through a model, so a teacher who declined the assistant has
+            // every one of them. The ellipsis items show the plan before
+            // anything changes; Rebuild Preview, Undo Last Change and Add
+            // Next Class act at once (Russell's decision 11: a new class
+            // page arrives hidden and can be undone).
+            item("Publish Pages…", .publishPages, enabled)
+            item("Hide Pages…", .hidePages, enabled)
+            item("Publish Class for a Date…", .publishClassForADate, enabled)
+            // ⇧⌘B: free in batch A's census of every key the menu bar takes,
+            // not a macOS system-wide key, and Bold only under a Format menu,
+            // which Plantoir has none of (documentation/09 → "Mac conventions").
+            item("Rebuild Preview", .rebuildPreview, enabled)
+                .keyboardShortcut("b", modifiers: [.command, .shift])
+            // No key: ⌘Z belongs to text editing in Edit, and a key that took
+            // back a page change from inside a text field would be a surprise
+            // nobody could undo.
+            item("Undo Last Change", .undoLastChange, enabled)
+
+            Divider()
+
+            item("Add Next Class", .addNextClass, enabled)
+            item("Re-date Classes…", .reDateClasses, enabled)
+            item("Make Room for Classes…", .makeRoomForClasses, enabled)
+            item("Class Dates…", .classDates, enabled)
+
+            Divider()
 
             item("Schedule Deploy…", .scheduleDeploy, enabled)
             item(cancelTitle, .cancelScheduledDeploy, enabled)
@@ -232,7 +258,9 @@ struct SectionMenu: Commands {
     func run(_ item: SubjectMenuRules.Item) {
         MenuRoute.run(item, in: workspace?.window) {
             switch item {
-            case .preview, .deploy, .openInBrowser:
+            case .preview, .deploy, .openInBrowser,
+                 .publishPages, .hidePages, .publishClassForADate, .rebuildPreview, .undoLastChange,
+                 .addNextClass, .reDateClasses, .makeRoomForClasses, .classDates:
                 site?.perform(item)
             default:
                 sidebar?.perform(item)

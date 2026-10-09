@@ -137,6 +137,7 @@ struct QuartzTeachersApp: App {
             // need a person" is the same errand as looking for help — and it
             // is the menu somebody opens when they have run out of ideas.
             CommandGroup(after: .help) {
+                PublishingAndDeployingCommand()
                 ProblemReportCommands()
             }
         }
