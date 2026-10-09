@@ -33,7 +33,12 @@ final class CourseManagementContractTests: XCTestCase {
                 XCTAssertNotNil(backup, "\(name) should be read as a backup")
                 XCTAssertNil(archive, "\(name) must NOT also read as an archive")
                 CourseManagementContractTests.assertMoment(backup?.backedUpAt, is: testCase["moment"] as? String, in: name)
-                if let expectedSection = testCase["section"] as? Int {
+                if let expectedSection = testCase["section"] as? Int, testCase["maker"] as? String == "menu" {
+                    XCTAssertEqual(
+                        backup?.maker, .menu(sectionNumber: expectedSection),
+                        "\(name): the Section menu's own backups say so in the name (#457)"
+                    )
+                } else if let expectedSection = testCase["section"] as? Int {
                     XCTAssertEqual(
                         backup?.maker, .assistant(sectionNumber: expectedSection),
                         "\(name): the assistant's own backups say so in the name"

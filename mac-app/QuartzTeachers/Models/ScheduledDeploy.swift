@@ -1737,6 +1737,58 @@ enum ScheduledDeploy {
         )
     }
 
+    /// A scheduled deploy goes out with any class dated after the next
+    /// class as it is, and records their places (#475): the deploy is not
+    /// held up for a question nobody is awake to answer. Read on the main
+    /// thread, as the rest of this run's reading is.
+    nonisolated static func classesDatedLaterLine(
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)
+    ) -> String? {
+        return MainActor.assumeIsolated {
+            let configURL: URL = section.courseDirectory.appendingPathComponent("course_config.json")
+            guard let configuration = try? CourseConfiguration(contentsOf: configURL) else {
+                return nil
+            }
+            let course: Course = Course(
+                code: section.courseCode, directoryURL: section.courseDirectory, configuration: configuration
+            )
+            let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(
+                forSection: section.sectionNumber, in: course, today: CalendarDay.today()
+            )
+            return ClassesDatedLater.wentOutLine(flagged)
+        }
+    }
+
+    /// What a scheduled run records once its script has ended: the section
+    /// as published (when it was), then the classes dated after the next
+    /// class it sent (#475) — the one function the run calls, so a test runs
+    /// exactly what the run does.
+    nonisolated static func recordTheRun(
+        label: String?,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fingerprint: String?,
+        classesDatedLater line: String?,
+        inHomeFolder home: URL? = nil
+    ) {
+        let deployed: Bool = recordScheduledPublish(
+            label: label, section: section, fingerprint: fingerprint, inHomeFolder: home
+        )
+        noteClassesDatedLaterWentOut(line, deployed: deployed, section: section)
+    }
+
+    /// The line above, on the trail — only for a run that DEPLOYED (its
+    /// success sentinel was there): one that failed sent nothing out, and
+    /// "deployed with" would be false.
+    nonisolated static func noteClassesDatedLaterWentOut(
+        _ line: String?, deployed: Bool,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?
+    ) {
+        guard deployed, let line, let section else {
+            return
+        }
+        ActivityTrail.note(.laterClassesWentOut, line, course: section.courseCode, section: section.sectionNumber)
+    }
+
     /// Run the one-shot script and leave, without ever becoming an app.
     ///
     /// Never returns. Same shape as `AssistMCPServer.serve` for the same
@@ -1751,6 +1803,10 @@ enum ScheduledDeploy {
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil,
         now: Date = Date()
     ) -> Never {
+        // #475: the classes dated after the next class this run sends, read
+        // when it is set to run and written on the trail once it has deployed.
+        var classesDatedLaterGoingOut: String?
+
         // IS THIS STILL THE DAY IT WAS FOR? Asked before anything else
         // happens, because the answer can be no.
         //
@@ -1882,6 +1938,11 @@ enum ScheduledDeploy {
             switch step {
             case .run:
                 clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
+                // Classes dated after the next class (#475) go out as they
+                // are — there is nobody at half six to ask. Read NOW, as the
+                // pages that go out; written on the trail only once the run
+                // has deployed (#457 batch B's review, note 9).
+                classesDatedLaterGoingOut = classesDatedLaterLine(section: section)
             case .leaveQuietly:
                 for lease in leasesTaken {
                     WorkLeaseFiles.remove(at: lease)
@@ -1942,8 +2003,9 @@ enum ScheduledDeploy {
         do {
             try process.run()
             process.waitUntilExit()
-            recordScheduledPublish(
-                label: label, section: section, fingerprint: fingerprintBeforeRunning
+            recordTheRun(
+                label: label, section: section, fingerprint: fingerprintBeforeRunning,
+                classesDatedLater: classesDatedLaterGoingOut
             )
             // Publishes regardless; the findings are kept for somebody to read
             // when they are next at the machine.
@@ -2968,18 +3030,24 @@ enum ScheduledDeploy {
     ///
     /// Read under the job's own LABEL — the name its wrapper wrote — never a
     /// rebuilt one (#237; see `runScheduled`).
+    ///
+    /// Returns whether the run DEPLOYED — whether the wrapper left its success
+    /// sentinel. The wrapper's own exit status cannot say: it exits 0 either
+    /// way, because its status belongs to `launchctl bootout` (#457 batch B's
+    /// fixes review, A).
+    @discardableResult
     nonisolated static func recordScheduledPublish(
         label: String?,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fingerprint: String?,
         inHomeFolder home: URL? = nil
-    ) {
+    ) -> Bool {
         guard let label, let section, let fingerprint else {
-            return
+            return false
         }
         let sentinel: URL = successSentinelURL(label: label, inHomeFolder: home)
         guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
-            return
+            return false
         }
         try? FileManager.default.removeItem(at: sentinel)
         var destinations: [String] = []
@@ -2993,6 +3061,7 @@ enum ScheduledDeploy {
             destinations: destinations,
             rule: SectionPublishState.currentFingerprintRule
         )
+        return true
     }
 
     /// Takes the alarm off. Returns nil on success.

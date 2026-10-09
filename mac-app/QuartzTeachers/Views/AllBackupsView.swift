@@ -269,6 +269,8 @@ struct AllBackupsView: View {
             return "You"
         case .assistant(let sectionNumber):
             return "The assistant, Section \(sectionNumber)"
+        case .menu(let sectionNumber):
+            return "The Section menu, Section \(sectionNumber)"
         }
     }
 

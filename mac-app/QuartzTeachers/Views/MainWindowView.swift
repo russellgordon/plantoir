@@ -139,7 +139,12 @@ struct MainWindowView: View {
                 SectionDetailView(course: course, sectionNumber: sectionNumber)
                     .id("\(code)-\(sectionNumber)")
             } else {
+                // Nothing here can take a Section menu request, so one waiting
+                // for this row is dropped rather than left to run later.
                 missingSelectionView
+                    .onAppear {
+                        workspace.sectionVerbRequest = nil
+                    }
             }
         case .archived(let identifier):
             if let item = archivedItem(withIdentifier: identifier) {

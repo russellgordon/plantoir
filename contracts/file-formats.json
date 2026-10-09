@@ -442,6 +442,17 @@
     "writtenBy": "the app only, after Publish or Not Now - never the build (two writers never share a file). Removed on rollover.",
     "rule": "shared-rules.json -> linksChecklist.offeredWhen.onlyWhenSomethingNew: an offer whose every page is in `offered` is not shown again on its own; a new page brings it back, and a page in `leftUnticked` starts unticked."
   },
+  "laterClassesKept": {
+    "path": "courses/<CODE>/.publish_state/section<N>.later-classes-kept.json",
+    "keys": {
+      "version": "1",
+      "answeredAt": "UTC, yyyy-MM-ddTHH:mm:ssZ, when the last page was added",
+      "kept": "[{place, date}]: each class page the teacher left published when asked about classes dated after the next class day (#475), by its place in the course folder without .md (the links checklist's `place`), with the day its `created` named then, yyyy-MM-dd as written. One row per place: a later answer replaces that place's older date."
+    },
+    "writtenBy": "the app only, never the build: when the teacher UNTICKS a class in the question at Deploy or at Section > Publish Pages... (shared-rules.json -> classesDatedLater), when the teacher presses Keep All and Deploy (every listed class), when a class is published by naming its date (Section > Publish Class for a Date..., or publish_class_on from either assistant), and when a class dated later is published from the links checklist (#379) - a date the teacher named is not a mistake to catch. Removed on rollover, with linksChecklistAnswered.",
+    "rule": "class-planning.json -> futureDatedClasses: a flagged class whose place is here WITH THE SAME date is not asked about again; re-dated since, it is. A row for a page that is gone, or hidden, stops nothing and is harmless.",
+    "whyHidden": "Inside `.publish_state`, like frontPageNotToday and linksChecklistAnswered: hidden from the course's fingerprint and from the “— Edited” marker, and never published. Not the app's preferences: those are per Mac, and the outside assistant (a separate process) must read the same answer to know a deploy is no longer held back."
+  },
   "linksChecklistOffer": {
     "path": "courses/<CODE>/.publish_state/section<N>.links-checklist.json",
     "writtenBy": "the build (scripts/build_site.py -> _offer_the_links_checklist), on EVERY build of the section - preview, deploy, scheduled, terminal, MCP - after the two date passes; atomically (a hidden temporary beside it, then a rename). REMOVED when there is nothing to offer, so a dead link fixed in Obsidian stops being offered. Never written for a course kept for reference, and removed from one. Never written by an app.",

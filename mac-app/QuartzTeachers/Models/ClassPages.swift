@@ -140,11 +140,18 @@ struct ClassChangeOutcome {
     /// every page asked for had appeared while the teacher was deciding.
     let created: [URL]
 
+    /// The pages the change could not date or could not finish, said in the
+    /// Section menu's voice (#457 batch B) — empty when every page was done.
+    /// The menu puts it in the line a teacher reads; `message`, which carries
+    /// the conversation's words for the same pages, is the model's.
+    var leftUndoneFromTheMenu: String = ""
+
     // MARK: - Initializer
 
-    init(message: String, created: [URL] = []) {
+    init(message: String, created: [URL] = [], leftUndoneFromTheMenu: String = "") {
         self.message = message
         self.created = created
+        self.leftUndoneFromTheMenu = leftUndoneFromTheMenu
     }
 }
 

@@ -2712,7 +2712,9 @@ run of plans the teacher has accepted unchanged.
 
 The same tools are also served over **MCP** (the Model Context Protocol), so
 Claude Code can drive exactly what the built-in assistant drives and the
-safety rules cannot drift between the two clients. The app answers this
+safety rules cannot drift between the two clients. (Since #457 batch B there
+is a third, with no model at all: the Section menu — see "The Section menu, a
+third client".) The app answers this
 itself — `Plantoir.app/Contents/MacOS/Plantoir --mcp-stdio <working-folder>` —
 rather than shipping a second binary.
 
@@ -3904,6 +3906,128 @@ re-registering looser criteria after reading the result. **Known, not
 changed:** the held text still says linked pages come "optionally" — untrue
 since step (a), and a routing change to fix; kept by Russell's decision with
 the rest of the text (above).
+
+### The Section menu, a third client (#457 batch B, 2026-10-08)
+
+Eight of the local tools have a GUI route now: Section ▸ Publish Pages…, Hide
+Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last Change, Add Next
+Class, Re-date Classes… and Make Room for Classes… (the menu itself, and what
+each opens, is [09-mac-app.md](09-mac-app.md) → "The assistant's functions in
+the Section menu"). Until then a teacher who declined the assistant's download
+could do none of them.
+
+**What runs is the tool's own code.** `SectionVerbs` builds an `AssistToolCall`
+in code and hands it to `AssistToolRunner.run(call:)`, on a runner made with
+`surface: .menu`. No model, no engine, no download: nothing on the path asks
+whether one exists. The reference-course gate and the outside-change hold are
+in `run(call:)` before the tool is dispatched, so the menu meets them as every
+client does — which is the reason the alternative, lifting each tool's private
+function into a shared typed one, was REJECTED: the gate would have had to be
+copied into the menu, and a copy is what drifts.
+
+**`.menu` is `.local` everywhere except three places**, each decided at one
+of the runner's eleven surface sites:
+
+- **Its voice.** A teacher at the menu did not say "undo that", and there is no
+  "me" to ask again. Every sentence the eight tools can return on a path the
+  menu reaches that speaks in the first person, invites asking, or names the
+  conversation's way out has a `…FromTheMenu` twin in `AssistWording`, chosen
+  by surface: `undid`, `undidPartly`, `couldNotUndo`, `undoIsStillAvailable`,
+  `nothingToUndo`, `changedWhileSavingACopy`, `pagesWhoseSettingsCannotBeAddedTo`
+  (and `…NamingSeveral`), `pageWhoseNewDateCouldNotBeSet`,
+  `pagesWhoseNewDatesCouldNotBeSet`, `noPageCalled`, `noPagesCalled`, the
+  no-class-on-that-day refusal (`noClassOnFromTheMenu`), `courseIsBeingCopied`
+  (on Rebuild Preview), `makingRoomCannotBeUndone` (on Make Room's card) and,
+  after a publish that stopped part way, `restoreFromBackupPutsItBack` in place
+  of `restoreSectionPutsItBack`. Kept as they are, and why: everything the
+  model alone reads (`detail` — the menu shows `summary` and the plan's
+  `forTheCard`, never `detail`); `morePagesThanOneAreCalled` (unreachable: the
+  menu names pages by folder); `nextClassNeedsItsOwnPhrasing` and
+  `mayIAskForYourDates` (the conversation's settlers and offers, never reached
+  by a code-built call); the no-timetable refusals (the window asks for dates
+  before the call). `MenuVoiceTests` holds every twin, and every sheet
+  sentence, to a pattern (`\bI\b|I’|\bme\b|\bmy\b|say “|ask (me|again)|“Undo
+  that”|Restore Section`) and runs the main branches on both surfaces. The
+  conversation's sentences, and every byte the model reads, are unchanged:
+  the local digest is `46b965622213…96cb6` (13 tools) and the MCP digest
+  `a7c0823d75f5…e1733` (37) before and after, `toolSchemas` and
+  `toolDescriptions` untouched.
+- **Its backups.** A copy of the course before EVERY change, named
+  `<CODE>_backup_<stamp>_menu-section<N>.zip` (`BackupMaker.menu`;
+  `course-management.json` → `zipNames`), trail event "section menu backed up
+  a course", five of its own kept per course and counted apart from the
+  assistant's. The director's ruling on the plan review's blocker 2: a runner
+  that lives as long as a window would otherwise have made one copy a month,
+  and "the copy made before any of it is in Backups" would have been false
+  after a teacher deleted it; and the assistant's name on a copy made by a
+  teacher who never opened the assistant was a lie in the Backups list. The
+  menu does NOT call `AssistActivity.holdBackups` — that replaced the assistant
+  window's own hold and could have reopened #242 — and has its own claim
+  instead: `SectionMenuActivity`, held while a menu change runs, refuses the
+  in-app assistant's write to the same section (`sectionIsChangingFromTheMenu`),
+  and the menu greys while the assistant's window is working on that section
+  (`AssistActivity.reportWork`), so two undo lists never interleave.
+- **Class dates.** `askForTheTimetable` never leaves an offer from the menu:
+  only the assistant's window shows `SectionSchedulePrompt`'s offer, so one left
+  by the menu asked into nothing and then appeared, stale, in the next
+  conversation (the plan review's blocker 1). The section window asks for
+  dates before the call instead.
+
+**Undo is per window.** One runner per main window, made on first use, so
+Undo Last Change takes back the last change made from the menu there
+(`AssistToolRunner.lastChange`); the assistant's window keeps its own.
+REJECTED: a runner per action (no undo), and sharing the assistant window's
+runner (a larger refactor, and no window for a teacher who has none).
+
+**Why the menu's answers are a sheet, not alerts.** The plan put the answer of
+Rebuild Preview, Undo Last Change and Add Next Class in an alert. The section
+window already carries three `.alert` modifiers, and its own code records that
+FOUR segfaulted SwiftUI's alert bridge in `updateExistingAlert` while a sheet
+was closing (`SectionDetailView`, on the health alert). That crash is written
+up, with its stack, how it was cornered and how to reproduce it, in
+[09-mac-app.md → "A test host that segfaults, and the six levers that look like
+they should fix it"](09-mac-app.md): SwiftUI ends a modal session from inside a
+layout pass while AppKit's sheet animation spins a nested runloop — one call
+stack, not a race. This piece did not reproduce it again; it simply does not
+add a fourth alert. So every answer is the Section menu's one sheet
+(`SectionVerbSheetModel`, kind `.result`): Undo Last Change and Add Next Class
+show it at once, working, while the copy is saved; and an answer that arrives
+while something else is on the window — the links checklist the change's own
+preview offered, a health alert — waits (`pendingVerbResult`) and is shown when
+that has gone. It is never dropped (the implementation review's note 4).
+
+**A copy per change, never two in one name.** Backups are stamped to the second,
+and the menu can make two in one (a tenth of a second each for a small course);
+`zip -r` would UPDATE the first in place. The second is `<stamp>-2`
+(`CourseArchiver.unusedBackupName`, `course-management.json` → `zipNames`).
+
+**Make Room for Classes…'s pages left undone** — not dated, or not finished —
+are said in the menu's line in its own voice (`pagesWhoseNewDateCouldNotBeSetFromTheMenu`,
+`pagesAChangeCouldNotFinishFromTheMenu`); the model reads the conversation's
+words for them in `detail`.
+
+**`previewFollowsAChange`** is the one non-schema switch added to the runner:
+false only around the call that hides classes at Deploy (#475), where the
+deploy builds straight after. Every other menu write rebuilds the preview, as
+the tool does — the menu must not disagree with the tool.
+
+### #475 at the assistants' deploy
+
+`deploy_section` meets the question about classes dated after the next class
+(`shared-rules.json` → `classesDatedLater`) after its own refusals and BEFORE
+it stops the preview: the in-app assistant's runner asks the section window
+(`SectionWindowControllers.Controller.askAboutClassesDatedLater`) and a Cancel
+is `deployWasCancelled`; a window with something already up is not waited on
+(`deployWaitsForAnOpenQuestion`); with no window showing the section, the
+in-app assistant is told `deployHasClassesDatedLaterAndNoWindow`, and an
+assistant working from another app `deployHasClassesDatedLater` — shaped like
+`deployNeedsAnAnswer`, because the cure is the same: answer it once in the
+window, where the answer is remembered (`laterClassesKept`), and it deploys
+from here after that. `publish_class_on`, from any client, records the class
+it published as kept: the teacher named the date. Pinned by three scenarios in
+`assist-cases.json` (the order, the cancel, the outside refusal).
+REJECTED: refusing the outside assistant with nothing remembered (it could
+never deploy a section that posts ahead on purpose), and asking after the stop.
 
 ### The two MCP surfaces are not the same product
 
@@ -5122,6 +5246,9 @@ commands made six near-identical copies.
 
 It now backs up **lazily, once per conversation**: the first write makes the
 zip, later writes reuse it, and a conversation that only reads makes none.
+(The Section menu is the exception, deliberately: it has no conversation, so it
+saves a copy before EVERY change it makes, named `_menu-section<N>` — see "The
+Section menu, a third client".)
 That single zip is also what the assistant's **Restore** offers — putting the
 section back to how it was when the chat started, which is the safety net
 that makes "just do it" mode reasonable to offer at all.
