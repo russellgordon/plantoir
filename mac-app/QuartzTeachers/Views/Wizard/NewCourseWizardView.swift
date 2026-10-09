@@ -773,13 +773,14 @@ struct NewCourseWizardView: View {
                     // Greyed while the folder is getting ready (#476), with
                     // the reason; `NewCourseCreator` refuses as well, before
                     // it writes, for a wizard opened before the copy began.
-                    // The default button otherwise: Return in a field that
-                    // does not take it (the code field with no row
-                    // highlighted, the course name) creates the course, as
-                    // `CourseCodePickerView`'s Return comment has always
-                    // said — until the HIG sweep (#457) the button LOOKED
-                    // like the default and Return reached nothing.
-                    .defaultButton(isEnabled: !workspace.folderIsGettingReady)
+                    // The accent, but NOT Return (#457, the HIG sweep's
+                    // review, measured 2026-10-08): as the default button,
+                    // a Return typed in the Course code field — with no row
+                    // highlighted — created a club named by the code with
+                    // its name empty and the rest of the form unread. A long
+                    // form is finished with a click; the accent comes off
+                    // while the button cannot be pressed.
+                    .prominentButton(isEnabled: !workspace.folderIsGettingReady)
                     .help(workspace.folderReadinessReason ?? "")
                     .accessibilityIdentifier("createCourseButton")
                 } else {
@@ -1433,8 +1434,9 @@ struct NewCourseWizardView: View {
 
     /// Return pressed in the field: takes the highlighted row if the
     /// teacher has walked to one. Returns false otherwise, so Return
-    /// still reaches the sheet's default button for someone who typed a
-    /// code and never touched the arrows.
+    /// goes on to the sheet — which has no default button, so it does
+    /// nothing there (#457, the HIG sweep's review: as the default,
+    /// Create Course was pressed with the form unread).
     func commitCourseCodeHighlight() -> Bool {
         guard courseCodeSuggestionsAreShown, let entry = highlightedCourseCodeEntry else {
             return false

@@ -327,4 +327,30 @@ nonisolated enum SubjectMenuRules {
             return nil
         }
     }
+
+    /// The menu item the sidebar's − button runs for the selected row, or
+    /// nil where it does nothing (a backup or an archive is deleted only
+    /// through its own item). The button is enabled exactly when that item
+    /// is (`minusButtonIsEnabled`), so the − button, the Delete key and the
+    /// menu bar cannot disagree — until the HIG sweep's review the − button
+    /// still asked to remove a section of a course kept for reference, which
+    /// the menu and the key withhold (#457).
+    static func minusButtonItem(for row: Row) -> Item? {
+        switch row {
+        case .course:
+            return .removeCourse
+        case .section:
+            return .removeSection
+        case .backup, .archived, .allBackups, .none:
+            return nil
+        }
+    }
+
+    /// Whether the − button can be pressed in `situation`.
+    static func minusButtonIsEnabled(_ situation: Situation) -> Bool {
+        guard let item = minusButtonItem(for: situation.row) else {
+            return false
+        }
+        return enabledItems(situation).contains(item)
+    }
 }

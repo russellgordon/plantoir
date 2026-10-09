@@ -737,7 +737,12 @@ struct SidebarView: View {
             .accessibilityIdentifier("addCourseButton")
 
             Button {
-                prepareRemoval()
+                // Through the menu item's own rule and closure (#457, the
+                // HIG sweep's review): the − button, the Delete key and
+                // Course ▸ / Section ▸ Remove… are one command.
+                if let item = SubjectMenuRules.minusButtonItem(for: menuCommands.situation.row) {
+                    performMenuItem(item)
+                }
             } label: {
                 Label("Remove Selected", systemImage: "minus")
                     .labelStyle(.iconOnly)
@@ -746,12 +751,11 @@ struct SidebarView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
-            // An archived item is already put away, so there is nothing
-            // for this button to do while one is selected.
-            // Nor while the course is being copied (#351): a second archive of
-            // a folder already being put away.
-            .disabled(workspace.selectedCourse == nil
-                      || workspace.isBeingCopied(workspace.selectedCourse?.code ?? ""))
+            // Enabled exactly when the Remove item it runs is: not on an
+            // archived item (already put away), a backup, a section of a
+            // course kept for reference (`interface.whatIsWithheld`), under a
+            // sheet, or while the course is being copied (#351).
+            .disabled(!SubjectMenuRules.minusButtonIsEnabled(menuCommands.situation))
             .help("Remove the selected course or section")
             .accessibilityIdentifier("removeSelectedButton")
             .padding(.trailing, 5)

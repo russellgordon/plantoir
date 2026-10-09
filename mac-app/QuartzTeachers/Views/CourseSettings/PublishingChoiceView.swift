@@ -285,13 +285,20 @@ private struct CloudflareDetailFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Said FIRST, where the row is read from: the value below is
+            // shown, not edited, and this is where it is edited.
+            Text("Kept in Plantoir ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare Pages.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            // The value and its button together on the trailing side, the
+            // way the unit word's row draws "Unit" beside Rename… — so "Not
+            // set yet" sits where a value sits.
             LabeledContent("Cloudflare Account ID") {
                 HStack {
                     Text(shownID)
                         .foregroundStyle(cloudflareAccountID.isEmpty ? .secondary : .primary)
                         .textSelection(.enabled)
                         .accessibilityIdentifier("cloudflareAccountValue")
-                    Spacer()
                     Button("Open Settings…") {
                         SettingsPane.select(.deploying)
                         openSettings()
@@ -299,9 +306,6 @@ private struct CloudflareDetailFields: View {
                     .accessibilityIdentifier("cloudflareAccountOpenSettings")
                 }
             }
-            Text("Kept in Plantoir ▸ Settings ▸ Deploying, for every course that deploys to Cloudflare Pages.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
             // What is wrong with the ID this Mac has. Not commentary: this
             // is why the course will not save, or the wizard will not create.
