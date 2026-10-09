@@ -719,20 +719,39 @@ against 767.4 pt; faces LMRoman10-Regular/-Bold and LMSans10-Bold in both.
 The visible differences left: no strand headings in our key, and the Name /
 Date header (decision 4), which the LaTeX warm-up has not.
 
-**MVVM Review, Chrome for Testing 155 (the scratch site, the real page with
-a placeholder screenshot):**
+**MVVM Review, Chrome for Testing 155 (the scratch site: the real page, and
+— since the review — its real RocketSim screenshot, 1368 × 2730, which
+prints at its full resolution; the first counts below used a placeholder):**
 
 | | Before (dev) | After |
 |---|---|---|
-| Questions only, portrait | 6 pages, 79 of 113 code lines missing, 2 pages 6,250 px over | 5 pages |
+| Questions only, portrait | 6 pages, 79 of 113 code lines missing, 2 pages 6,250 px over | 4 pages |
 | Answers only, portrait | 7 pages | 3 pages |
-| Both, portrait | 13 (6 + 7) | 8 (5 + 3) |
+| Both, portrait | 13 (6 + 7) | 7 (4 + 3) |
 | Questions only / Answers only / Both, landscape | — (not offered; Safari clipped 18 pages) | 7 / 3 / 10 |
 
 After, in all six, every one of the 14 question stems, 113 non-empty code
 lines and 23 answer paragraphs of the source page is in `pdftotext`'s text
 (a checker that ignores hyphenation, smart quotes and the page corners),
 and every page has 0 px of overflow.
+
+**After the implementation review (Opus):** the guard measured a displayed
+formula's box, which is always the column's width, so a 59-term formula
+(724 px box, 4,342 px of formula) printed to "+ a12" and was called complete.
+The guard now reads the formula's scroll width, and before the layout each
+over-wide formula is measured in the frame at the paper's width: set smaller
+when it keeps at least 70% of its size (`paperLook.formulas`), otherwise
+broken between its terms as KaTeX breaks one in a line of text — the
+fixture's 59 terms print whole on five lines, its 11 terms at 80%; a single
+unbreakable term 2,839 px too wide is refused (measured). Quartz's 75 px
+minimum cell width made a nine-column timetable refuse on portrait: cells
+now have none and break between words (`anywhere` printed "Scien / ce"),
+and tables of eight columns or more print in 9 pt (`paperLook.tables`) — a
+12-column timetable prints whole on both papers. Under ⌘P the code number
+box was still Quartz's, so "100" printed as "10" over "0": the digit rule is
+in the shared mixin now and the page writes the digits on load, and the
+browser check reads ⌘P's numbers 1–110. Formulas print black, not the site's
+grey-green, and Escape in the menu no longer hands focus to Search.
 
 **How each fault was fixed, measured by turning the fix off alone:**
 pictures had no height when Paged.js measured (natural sizes written, and
@@ -770,7 +789,8 @@ three lines (sized by digits, `nowrap`); the corners sat at the paper's edge
 **Not done / open:** Safari presetting its dialog from `size` is unmeasured
 (Russell drives Safari in the smoke test — choose Landscape in the MENU);
 the answer key has no strand headings; a displayed formula taller than the
-page cannot print (refused, with the sentence). Windows owes all of this:
+page, or one unbreakable term wider than it, cannot print (refused, with the
+sentence). Windows owes all of this:
 #496.
 
 ---

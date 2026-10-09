@@ -1824,7 +1824,26 @@ After the formulas (plantoir-after-katex). Before the table (plantoir-before-tab
 | TROW-39 | 1521 |
 | TROW-40 | 1600 |
 
-After the table (plantoir-after-table).
+After the table (plantoir-after-table). Before the wide formula (plantoir-before-wide).
+
+$$
+y = a_{1} + a_{2} + a_{3} + a_{4} + a_{5} + a_{6} + a_{7} + a_{8} + a_{9} + a_{10} + a_{11} + a_{12} + a_{13} + a_{14} + a_{15} + a_{16} + a_{17} + a_{18} + a_{19} + a_{20} + a_{21} + a_{22} + a_{23} + a_{24} + a_{25} + a_{26} + a_{27} + a_{28} + a_{29} + a_{30} + a_{31} + a_{32} + a_{33} + a_{34} + a_{35} + a_{36} + a_{37} + a_{38} + a_{39} + a_{40} + a_{41} + a_{42} + a_{43} + a_{44} + a_{45} + a_{46} + a_{47} + a_{48} + a_{49} + a_{50} + a_{51} + a_{52} + a_{53} + a_{54} + a_{55} + a_{56} + a_{57} + a_{58} + a_{59} + \text{plantoirwideend}
+$$
+
+After the wide formula (plantoir-after-wide). Before the scaled formula (plantoir-before-scaled).
+
+$$
+y = a_{1}x^{1} + a_{2}x^{2} + a_{3}x^{3} + a_{4}x^{4} + a_{5}x^{5} + a_{6}x^{6} + a_{7}x^{7} + a_{8}x^{8} + a_{9}x^{9} + a_{10}x^{10} + a_{11}x^{11} + \text{plantoirscaledend}
+$$
+
+After the scaled formula (plantoir-after-scaled). Before the timetable (plantoir-before-timetable).
+
+| Period | Day 1 | Day 2 | Day 3 | Day 4 | Day 5 | Day 6 | Day 7 | Day 8 | Day 9 | Day 10 | Day 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Math | Math | Math | Math | Math | Math | Math | Math | Math | Math | CELLEND1 |
+| 2 | Science | Science | Science | Science | Science | Science | Science | Science | Science | Science | CELLEND2 |
+
+After the timetable (plantoir-after-timetable).
 
 ## Curriculum connections
 

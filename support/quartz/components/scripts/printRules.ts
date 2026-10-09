@@ -321,6 +321,31 @@ export function boxedOnPaper(kind: string): boolean {
   return kind.trim().toLowerCase() === "example"
 }
 
+// A displayed formula wider than the page (#499 review S1): set smaller when
+// it would still be at least MIN_FORMULA_SCALE of its size, as LaTeX's
+// \resizebox; otherwise broken between its terms. `room` and `wide` are in
+// the same unit. Contract: paperLook.formulas.
+export const MIN_FORMULA_SCALE = 0.7
+
+export function fitFormula(room: number, wide: number): { scale: number | null; wraps: boolean } {
+  if (room <= 0 || wide <= room + 1) {
+    return { scale: null, wraps: false }
+  }
+  const scale = Math.floor((room / wide) * 1000) / 1000
+  if (scale >= MIN_FORMULA_SCALE) {
+    return { scale, wraps: false }
+  }
+  return { scale: null, wraps: true }
+}
+
+// A table this wide prints in 9 pt type, so a timetable fits without
+// breaking its words (#499 review S3). Contract: paperLook.tables.
+export const WIDE_TABLE_COLUMNS = 8
+
+export function isWideTable(columns: number): boolean {
+  return columns >= WIDE_TABLE_COLUMNS
+}
+
 // Fenced code on paper (DECISIONS 30, paperLook.code): a monospaced face,
 // its line numbers, and a hairline box with no fill - the second box a
 // handout keeps, beside a worked example's. One rule for the handout and ⌘P.

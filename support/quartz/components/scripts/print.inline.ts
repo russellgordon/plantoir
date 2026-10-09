@@ -23,9 +23,11 @@ import {
   cleanTitle,
   cssPlainString,
   cssString,
+  fitFormula,
   fontFaceRules,
   footerLeft,
   isCurriculumHeading,
+  isWideTable,
   leftOffPaper,
   mayPrint,
   numberQuestions,
@@ -680,6 +682,7 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
       }
     }
   }
+  markWideTables(center)
   // An SVG with a size and no viewBox cannot be scaled to the page.
   for (const svg of center.querySelectorAll("svg")) {
     if (!svg.getAttribute("viewBox")) {
@@ -691,6 +694,15 @@ function buildHandout(mode: Mode, settings: Settings): HTMLElement {
     }
   }
   return page
+}
+
+function markWideTables(within: Element) {
+  for (const table of within.querySelectorAll("table")) {
+    const row = table.querySelector("tr")
+    if (row && isWideTable(row.children.length)) {
+      table.classList.add("plantoir-wide-table")
+    }
+  }
 }
 
 // Every picture loaded, then given its own size: the print layout measures
@@ -844,6 +856,49 @@ function labelPages(doc: Document, mode: Mode, settings: Settings, pageTitle: st
   })
 }
 
+// A displayed formula wider than the page is set smaller until it fits, as
+// LaTeX's \resizebox would - a formula of 59 terms printed to "+ a12" and
+// stopped at the paper's edge (#499 review S1). One that would have to
+// shrink below printRules.MIN_FORMULA_SCALE is broken between its terms instead, where
+// KaTeX breaks a formula in a line of text, so it prints whole and
+// readable. Measured in the frame at the paper's width before the layout,
+// then the measuring copy is thrown away. A single term wider than the page
+// (a huge matrix) still runs off, and the completeness check refuses it.
+async function fitWideFormulas(doc: Document, handout: HTMLElement, paper: Paper, indexCss: string | null) {
+  if (!handout.querySelector(".katex-display") || !indexCss) {
+    return
+  }
+  const link = doc.createElement("link")
+  link.rel = "stylesheet"
+  link.href = indexCss
+  doc.head.appendChild(link)
+  await stylesheetsLoaded(doc)
+  const measure = doc.createElement("div")
+  measure.style.cssText = `position:absolute;left:0;top:0;width:${paperBox(paper).contentWidthIn}in;visibility:hidden;`
+  measure.appendChild(doc.importNode(handout, true))
+  doc.body.appendChild(measure)
+  for (const display of measure.querySelectorAll(".katex-display")) {
+    const formula = display.querySelector(":scope > .katex") as HTMLElement | null
+    const stamp = display.getAttribute("data-plantoir-c")
+    if (!formula || stamp === null) {
+      continue
+    }
+    const room = display.getBoundingClientRect().width
+    const wide = formula.scrollWidth
+    {
+      const fit = fitFormula(room, wide)
+      const original = handout.querySelector(`.katex-display[data-plantoir-c="${stamp}"]`) as HTMLElement | null
+      if (fit.scale !== null) {
+        original?.style.setProperty("font-size", fit.scale + "em")
+      } else if (fit.wraps) {
+        original?.classList.add("plantoir-formula-wraps")
+      }
+    }
+  }
+  measure.remove()
+  link.remove()
+}
+
 // What the print layout must see in the text it is handed, not only in the
 // site's stylesheet: it decides where pages break by matching these against
 // the handout BEFORE it is placed in the frame, where a rule scoped to the
@@ -916,6 +971,15 @@ function checkComplete(doc: Document, expected: number): { found: number; overfl
         }
       }
       if (rect.width <= 0 && rect.height <= 0) {
+        continue
+      }
+      // A displayed formula's box is always the column's width; the formula
+      // inside it is what runs off the page (review S1).
+      // Its own box never grows, so it is the formula's scroll width that
+      // says (measured: a 59-term formula's box 724 px, its width 4,342).
+      const inner = element.classList.contains("katex-display") ? element.querySelector(":scope > .katex") : null
+      if (inner && inner.scrollWidth > inner.clientWidth + OVERFLOW_TOLERANCE) {
+        overflowing.push(`${id} a formula ${inner.scrollWidth - inner.clientWidth}px too wide`)
         continue
       }
       if (
@@ -1017,6 +1081,8 @@ async function printHandout(mode: Mode, paper: Paper, box: HTMLElement, settings
     const doc = frame.contentDocument!
     const indexCss = indexStylesheet()
     copyPageStylesheets(doc, indexCss, root)
+    await fontsReady(doc)
+    await fitWideFormulas(doc, handout, paper, indexCss)
 
     let paginated = false
     try {
@@ -1112,10 +1178,21 @@ document.addEventListener("nav", () => {
   }
   stampRoles(settings)
   stampCurriculum(settings)
+  const article = document.querySelector(".center article")
+  if (article) {
+    markWideTables(article)
+  }
   // Code keeps its box under ⌘P too (paperLook.code); a diagram is no code.
+  // And its numbers a box as wide as its longest: under ⌘P "100" printed as
+  // "10" over "0" until the digits went with it (#499 review S2).
   for (const pre of document.querySelectorAll(".center article pre")) {
     if (!pre.querySelector(":scope > code.mermaid")) {
       pre.classList.add("plantoir-code")
+      const code = pre.querySelector(":scope > code") as HTMLElement | null
+      if (code) {
+        const lines = code.querySelectorAll(":scope > [data-line]").length
+        code.style.setProperty("--plantoir-digits", String(Math.max(2, String(lines).length)))
+      }
     }
   }
   html.classList.add(PRINTABLE)
@@ -1166,13 +1243,22 @@ document.addEventListener("nav", () => {
       window.addCleanup(() => button.removeEventListener("click", press))
     }
     if (menu) {
-      // Escape, or a click anywhere else, closes the menu.
-      const onKey = (event: KeyboardEvent) => {
+      // Escape, or a click anywhere else, closes the menu. Inside the menu,
+      // Escape is kept from the site's own Escape handler, which hides the
+      // search and moved focus to the search button (#499 review N2).
+      const onMenuKey = (event: KeyboardEvent) => {
         if (event.key === "Escape" && menu.open) {
+          event.stopPropagation()
           menu.open = false
           ;(menu.querySelector("summary") as HTMLElement | null)?.focus()
         }
       }
+      const onKey = (event: KeyboardEvent) => {
+        if (event.key === "Escape" && menu.open) {
+          menu.open = false
+        }
+      }
+      menu.addEventListener("keydown", onMenuKey)
       const onClick = (event: MouseEvent) => {
         if (menu.open && !menu.contains(event.target as Node)) {
           menu.open = false
@@ -1181,6 +1267,7 @@ document.addEventListener("nav", () => {
       document.addEventListener("keydown", onKey)
       document.addEventListener("click", onClick)
       window.addCleanup(() => {
+        menu.removeEventListener("keydown", onMenuKey)
         document.removeEventListener("keydown", onKey)
         document.removeEventListener("click", onClick)
       })

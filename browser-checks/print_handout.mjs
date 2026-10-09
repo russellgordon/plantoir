@@ -63,6 +63,12 @@ const QUESTIONS = [
   "plantoir-before-tall", "plantoir-after-tall", "plantoir-before-viewbox", "plantoir-after-viewbox",
   "plantoir-before-mermaid", "plantoir-after-mermaid", "MM-01", "MM-30",
   "plantoir-before-katex", "plantoir-after-katex", "plantoir-before-table", "plantoir-after-table",
+  // A 59-term formula broken between its terms, an 11-term one set smaller
+  // to fit, and a 12-column timetable
+  // (#499 review S1, S3): their last terms and cells on paper.
+  "plantoir-before-wide", "plantoirwideend", "plantoir-after-wide",
+  "plantoir-before-scaled", "plantoirscaledend", "plantoir-after-scaled",
+  "plantoir-before-timetable", "CELLEND1", "CELLEND2", "plantoir-after-timetable",
   "plantoir-footnote-sentinel-7f3a", "Need a hint?",
 ]
 const ANSWERS = [
@@ -279,6 +285,9 @@ async function connect(chunk) {
     for (let tries = 0; tries < 240 && printed === null; tries += 1) {
       await pause(500)
       printed = JSON.parse((await evaluate("JSON.stringify(window.__plantoirPrinted || null)")) ?? "null")
+      // A refusal (printablePages.completeness) is said at once: stop waiting.
+      const said = (await evaluate("document.querySelector('.plantoir-print-status')?.textContent || ''")) ?? ""
+      if (printed === null && said !== "" && !/…$/.test(said)) break
     }
     return printed
   }
@@ -413,11 +422,21 @@ async function connect(chunk) {
     // landscape, Chrome's printer must give landscape, which it does only
     // when the page's own box names no size.
     const sizes = {}
+    let commandPNumbers = []
     for (const landscape of [false, true]) {
       const pdf = await send("Page.printToPDF", { landscape, preferCSSPageSize: true, printBackground: false })
       const file = join(work, `commandP-${landscape ? "landscape" : "portrait"}.pdf`)
       writeFileSync(file, Buffer.from(pdf.data, "base64"))
       sizes[landscape ? "landscape" : "portrait"] = (/Page size:\s+([\d.]+ x [\d.]+)/.exec(poppler("pdfinfo", [file])) || [])[1]
+      if (!landscape) {
+        // ⌘P's code numbers come from the site's own counter; past 99 they
+        // broke onto two lines until the digits rule reached ⌘P (review S2).
+        const layout = poppler("pdftotext", ["-layout", file, "-"])
+        for (let line = 1; line <= CODE_LINES; line += 1) {
+          const found = new RegExp(`(\\d+)\\s+n = ${line}\\s+# CODE-`).exec(layout)
+          if (!found || Number(found[1]) !== line) commandPNumbers.push(`${line}:${found ? found[1] : "missing"}`)
+        }
+      }
     }
     await send("Emulation.setEmulatedMedia", { media: "", ...light })
     report.commandP = {
@@ -429,6 +448,8 @@ async function connect(chunk) {
     }
     if (!(report.commandP.curriculumOnScreen && !report.commandP.curriculumOnPaper &&
       report.commandP.practiceOnPaper && report.commandP.footnoteOnPaper)) problems.push("⌘P printed the Curriculum connection or left out what should print")
+    if (commandPNumbers.length > 0) problems.push(`⌘P code lines without their own number: ${commandPNumbers.slice(0, 8).join(" ")}`)
+    report.commandP.codeNumbersWrong = commandPNumbers.length
     if (sizes.portrait !== "612 x 792" || sizes.landscape !== "792 x 612") problems.push(`⌘P paper ${JSON.stringify(sizes)}: the page decided the orientation, not the dialog`)
     if (plainUrl) {
       const plain = await printedText(plainUrl)

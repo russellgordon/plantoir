@@ -139,10 +139,14 @@ the page falls back to the generated handout (or to no button).
 Images, Mermaid diagrams, maths and code all print. Images and figures are
 never split across pages, are scaled to the page's width, and a picture
 taller than a page is scaled down to fit one; diagrams print in light colours
-even when the reader uses dark mode. A displayed formula cannot be split, so
-keep one shorter than half a page. If anything would still be cut off, the
-page refuses to print and says so plainly rather than printing a handout with
-something missing - the teacher can then try the other orientation.
+even when the reader uses dark mode. A displayed formula a little too wide is
+set smaller to fit, and a much wider one is broken between its terms; it
+cannot be split across pages, so keep one shorter than half a page, and never
+put one very long `\text{...}` or matrix on a line of its own. A table of
+eight columns or more prints in smaller type; keep tables to about ten
+columns of short words. If anything would still be cut off, the page refuses
+to print and says so plainly rather than printing a handout with something
+missing - the teacher can then try the other orientation.
 
 ## 6. The Curriculum connection never prints
 
