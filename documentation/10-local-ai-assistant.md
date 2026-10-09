@@ -6213,7 +6213,7 @@ own, bound to one section. These are different. A teacher who already has
 course to it — a real terminal session, with Plantoir's tools already
 connected and an opening message already sent. Nothing is typed by them.
 
-| | Revise with Claude… | Revise with Codex… |
+| | Revise With ▸ Claude… | Revise With ▸ Codex… |
 |---|---|---|
 | Tool looked for | `claude` | `codex` |
 | Server handed over as | a configuration file, `--mcp-config` | inline configuration, `-c` overrides (five on the mac since #458; four on Windows) |
