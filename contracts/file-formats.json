@@ -196,7 +196,7 @@
         "default": "",
         "key": "print_school_name",
         "type": "string",
-        "why": "#454 (v2.0.0). The school's name, printed in a corner of every page of a handout made from a page whose settings say `printable: true`. COURSE-wide rather than per section: a handout is the same piece of paper for every section of a course. ABSENT or \"\" (or only spaces) means no school name is printed. Written by Course Settings ▸ Printing; read on every build by `scripts/print_settings.py`, which composes the four corners. shared-rules.json → printablePages.corners carries the cases."
+        "why": "#454 (v1.6.0). The school's name, printed in a corner of every page of a handout made from a page whose settings say `printable: true`. COURSE-wide rather than per section: a handout is the same piece of paper for every section of a course. ABSENT or \"\" (or only spaces) means no school name is printed. Written by Course Settings ▸ Printing; read on every build by `scripts/print_settings.py`, which composes the four corners. shared-rules.json → printablePages.corners carries the cases."
       },
       {
         "default": ["name", "date"],
@@ -530,7 +530,7 @@
   },
   "note": "The two files both apps WRITE, and the Python then reads. Everything else in these contracts describes behaviour; this describes a format, and a format that drifts corrupts a teacher's course quietly. Both spellings below have already caused a real bug: `SectionAdder` was found writing the OLD frontmatter key on both platforms, so a section added through the app was born in a schema everything else had moved off, and the TEST agreed with the code.",
   "pageOptIns": {
-    "note": "#454 (v2.0.0). Frontmatter keys a page uses to ask for something extra on the built site, as opposed to `publish:`, which decides whether it is there at all. Both apps leave these alone - only the build and the site read them - so the cases below are run by the shared Python (scripts/test_page_features.py) and, down the real chain inside the image, by scripts/check_print_rules_against_the_site.py from verify.sh. A key that pulls in a large engine is GATED PER SITE: the engine is copied into a section's site only when at least one page students can see opts in, so a course that never prints carries none of it (Paged.js, 502,617 bytes). #455 adds `codeRunner` here.",
+    "note": "#454 (v1.6.0). Frontmatter keys a page uses to ask for something extra on the built site, as opposed to `publish:`, which decides whether it is there at all. Both apps leave these alone - only the build and the site read them - so the cases below are run by the shared Python (scripts/test_page_features.py) and, down the real chain inside the image, by scripts/check_print_rules_against_the_site.py from verify.sh. A key that pulls in a large engine is GATED PER SITE: the engine is copied into a section's site only when at least one page students can see opts in, so a course that never prints carries none of it (Paged.js, 502,617 bytes). #455 adds `codeRunner` here.",
     "keys": [
       {
         "key": "printable",

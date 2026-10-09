@@ -13,8 +13,11 @@ import WebKit
 /// Print had to do something there. Two doors, both to the default browser:
 ///
 /// - the page's own print code finds the `plantoirPrint` message handler and
-///   posts `{mode, url}`; the page is opened in the browser with
-///   `#plantoir-print=<mode>`, which makes the handout and prints it at once;
+///   posts `{mode, paper, url}`; the page is opened in the browser with
+///   `#plantoir-print=<mode>&paper=<paper>`, which makes the handout on that
+///   paper and prints it at once (#499: the paper is chosen in the page's
+///   Print menu, because the page lays out its handout before any print
+///   dialog opens);
 /// - any link that asks for a new window - a page's own PDF among them - is
 ///   opened in the browser instead of being dropped.
 ///
@@ -31,9 +34,12 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
     /// The name the page's print code looks for (print.inline.ts).
     nonisolated static let messageName: String = "plantoirPrint"
 
-    /// The ways of printing a page can ask for
-    /// (contracts/shared-rules.json → printablePages.modes).
-    nonisolated static let modes: [String] = ["withAnswersAtTheEnd", "questionsOnly", "answersOnly"]
+    /// The ways of printing a page can ask for, in the menu's order
+    /// (contracts/shared-rules.json → printablePages.modes; #499 decision 29).
+    nonisolated static let modes: [String] = ["questionsOnly", "answersOnly", "withAnswersAtTheEnd"]
+
+    /// The papers a page can ask for (printablePages.paper).
+    nonisolated static let papers: [String] = ["portrait", "landscape"]
 
     /// Told after a page has been handed over, for the trail.
     /// The page the teacher was on (nil when the web view has none), then
@@ -49,22 +55,23 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
 
     /// Why a page went to the browser.
     enum Reason: Equatable {
-        case printHandout(mode: String)
+        case printHandout(mode: String, paper: String)
         case newWindow
     }
 
     /// The address to open for a print request, or nil when the request is
     /// not one this app should act on: only the preview's own pages, served
-    /// from this Mac, and only a way of printing the contract names.
-    nonisolated static func printAddress(pageAddress: String, mode: String) -> URL? {
+    /// from this Mac, and only a way of printing and a paper the contract names.
+    nonisolated static func printAddress(pageAddress: String, mode: String, paper: String) -> URL? {
         guard modes.contains(mode),
+              papers.contains(paper),
               var parts = URLComponents(string: pageAddress),
               parts.scheme == "http" || parts.scheme == "https",
               let host = parts.host,
               host == "localhost" || host == "127.0.0.1" else {
             return nil
         }
-        parts.fragment = "plantoir-print=" + mode
+        parts.fragment = "plantoir-print=" + mode + "&paper=" + paper
         return parts.url
     }
 
@@ -87,8 +94,11 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
             }
         }
         var why: String = "a link to another site"
-        if case .printHandout(let mode) = reason {
+        if case .printHandout(let mode, let paper) = reason {
             why = "to print it " + modeWords(mode)
+            if paper == "landscape" {
+                why += ", on landscape paper"
+            }
         } else if isThePreviews(target) {
             if target.pathExtension.lowercased() == "pdf" {
                 why = "the page's own PDF"
@@ -122,12 +132,16 @@ final class PreviewBrowserHandoff: NSObject, WKUIDelegate, WKScriptMessageHandle
         guard message.name == PreviewBrowserHandoff.messageName,
               let body = message.body as? [String: Any],
               let page = body["url"] as? String,
-              let mode = body["mode"] as? String,
-              let address = PreviewBrowserHandoff.printAddress(pageAddress: page, mode: mode) else {
+              let mode = body["mode"] as? String else {
+            return
+        }
+        // A page built before #499 sends no paper: portrait, as it printed.
+        let paper: String = (body["paper"] as? String) ?? "portrait"
+        guard let address = PreviewBrowserHandoff.printAddress(pageAddress: page, mode: mode, paper: paper) else {
             return
         }
         open(address)
-        whenHandedOver?(address, address, .printHandout(mode: mode))
+        whenHandedOver?(address, address, .printHandout(mode: mode, paper: paper))
     }
 
     func webView(

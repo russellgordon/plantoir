@@ -77,6 +77,28 @@ RUN curl -fsSL -o /tmp/pagedjs.tgz https://registry.npmjs.org/pagedjs/-/pagedjs-
  && cp /tmp/pagedjs/package/dist/paged.min.js /tmp/pagedjs/package/LICENSE.md /opt/vendor/pagedjs/ \
  && rm -rf /tmp/pagedjs /tmp/pagedjs.tgz
 
+# Latin Modern, the faces a printed handout is set in (#499: the look of the
+# teacher's LaTeX handouts, 11pt article with lmodern). Six faces, 631,940
+# bytes, beside Paged.js so the same gate carries them: a site holds them only
+# when a page asks to print, and a browser fetches them only when it prints.
+# From Debian's own fonts-lmodern (2.005), through the same apt as every other
+# package here, rather than a download from the font's home page: a font host
+# that is down must never stop a teacher's first build. The package is taken
+# out again once the six files are copied; its copyright file, which carries
+# the GUST Font License, travels with them. The files are UNMODIFIED - the
+# licence asks that a changed font be renamed, and woff2 (283,148 bytes for
+# the six, measured) would be a change. Their SHA-256s are pinned in
+# contracts/toolchain.json and checked by verify.sh, not here, so a Debian
+# point release that touched them shows up in a check rather than failing a
+# teacher's build.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-lmodern \
+ && mkdir -p /opt/vendor/pagedjs/fonts \
+ && cd /usr/share/texmf/fonts/opentype/public/lm \
+ && cp lmroman10-regular.otf lmroman10-bold.otf lmroman10-italic.otf lmroman10-bolditalic.otf \
+       lmsans10-bold.otf lmmono10-regular.otf /opt/vendor/pagedjs/fonts/ \
+ && cp /usr/share/doc/fonts-lmodern/copyright /opt/vendor/pagedjs/fonts/LICENSE-Latin-Modern.txt \
+ && apt-get purge -y fonts-lmodern && apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Copy patched Quartz components into place
 COPY patches/Explorer.tsx /opt/quartz/quartz/components/Explorer.tsx
 COPY patches/FolderContent.tsx /opt/quartz/quartz/components/pages/FolderContent.tsx

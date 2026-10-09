@@ -45,6 +45,7 @@ final class UserFacingLabelWordsTests: XCTestCase {
             ("printingBottomLeft", CourseSettingsWording.printingBottomLeft),
             ("printingNotPrinted", CourseSettingsWording.printingNotPrinted),
             ("printingCaption", CourseSettingsWording.printingCaption),
+            ("printingSampleTitle", CourseSettingsWording.printingSampleTitle),
         ]
         let forbidden: [String] = try UserFacingLabelWordsTests.forbiddenWords()
         for (key, said) in pairs {
