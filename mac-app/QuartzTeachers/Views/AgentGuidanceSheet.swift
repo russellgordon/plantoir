@@ -51,12 +51,16 @@ struct AgentGuidanceSheet: View {
             }
         }
         .padding([.horizontal, .bottom], 20)
-        .sheetTitle(AgentGuidanceWording.askTitle(file: pending.fileName), identifier: "agentGuidanceTitle") {
-            Text(AgentGuidanceWording.askFound(file: pending.fileName))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        .sheetTitle(
+            AgentGuidanceWording.askTitle(file: pending.fileName),
+            identifier: "agentGuidanceTitle",
+            explanation: {
+                Text(AgentGuidanceWording.askFound(file: pending.fileName))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        )
         .frame(width: 480)
     }
 }
