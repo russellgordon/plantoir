@@ -28,7 +28,52 @@ enum CourseSettingsWording {
     /// found by the label scan).
     nonisolated static let colourSchemeNoneChosen: String = "Standard colours (none chosen)"
 
+    // MARK: Printing (#454) - Course Settings' Printing section
+
+    nonisolated static let printingHeader: String = "Printing"
+    nonisolated static let printingSchoolName: String = "School name"
+    nonisolated static let printingBlanks: String = "Blanks to fill in"
+    nonisolated static let printingBlankName: String = "Name"
+    nonisolated static let printingBlankDate: String = "Date"
+    nonisolated static let printingBlankClassNumber: String = "Class #"
+    nonisolated static let printingSchoolNameGoes: String = "School name prints"
+    nonisolated static let printingCourseCodeGoes: String = "Course code prints"
+    nonisolated static let printingTopLeft: String = "Top left"
+    nonisolated static let printingBottomLeft: String = "Bottom left"
+    nonisolated static let printingNotPrinted: String = "Not printed"
+    /// How a handout labels its question pages, for the corner sketch -
+    /// `printablePages.words.pageLabel`, the words the page itself prints.
+    nonisolated static let printedPageLabel: String = "Page {n} of {total}"
+    nonisolated static let printingCaption: String =
+        "Used on pages whose settings say printable: true, when a student or you press Print."
+    /// Stands for a page's own title in the sketch of the bottom-left corner,
+    /// which prints the title before the course code (#499;
+    /// printablePages.footer).
+    nonisolated static let printingSampleTitle: String = "Page title"
+
     // MARK: - Functions
+
+    /// The words for one print place (`CourseConfiguration.printPlaces`).
+    nonisolated static func printingPlace(_ place: String) -> String {
+        if place == "header_left" {
+            return printingTopLeft
+        }
+        if place == "footer_left" {
+            return printingBottomLeft
+        }
+        return printingNotPrinted
+    }
+
+    /// The words for one blank (`CourseConfiguration.printBlankOrder`).
+    nonisolated static func printingBlank(_ blank: String) -> String {
+        if blank == "name" {
+            return printingBlankName
+        }
+        if blank == "date" {
+            return printingBlankDate
+        }
+        return printingBlankClassNumber
+    }
 
     /// Beside Save, when this window's changes cannot be saved because they
     /// changed where the course publishes and that destination has a

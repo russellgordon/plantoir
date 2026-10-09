@@ -5,10 +5,10 @@
   "base_url": "https://plantoir.app",
   "repo_url": "https://github.com/russellgordon/plantoir",
   "support_email": "support@plantoir.app",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "released": "October 2026",
   "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
-  "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows was pinned to 1.1.0 from v1.2.0, which carried the macOS DMG only, until its installer joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3 cut until PlantoirSetup.exe joined v1.4.3 (2026-10-07), and to 1.4.3 for the mac-first v1.4.4 cut until PlantoirSetup.exe joined v1.4.4 (2026-10-08): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut until Plantoir-macOS.dmg joined v1.4.5 (2026-10-08). Windows is pinned to 1.4.5 for the mac-only v1.5.0 cut (2026-10-09): unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
+  "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows was pinned to 1.1.0 from v1.2.0, which carried the macOS DMG only, until its installer joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3 cut until PlantoirSetup.exe joined v1.4.3 (2026-10-07), and to 1.4.3 for the mac-first v1.4.4 cut until PlantoirSetup.exe joined v1.4.4 (2026-10-08): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut until Plantoir-macOS.dmg joined v1.4.5 (2026-10-08). Windows is pinned to 1.4.5 for the mac-only v1.5.0 cut (2026-10-09), and stays pinned there for the mac-only v1.6.0 cut (2026-10-09): unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
   "downloads": [
     {
       "platform": "macOS",
@@ -44,32 +44,35 @@
       },
       "scheduled-notification": {
         "windows": true
+      },
+      "printing": {
+        "windows": false
       }
     }
   },
   "new_in": {
-    "version": "1.5",
-    "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.5 release is reminded to rewrite it; a 1.4.x is not.",
+    "version": "1.6",
+    "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.6 release is reminded to rewrite it; a 1.6.x is not.",
     "items": [
       {
-        "text": "On the Mac: a Course menu and a Section menu that hold everything you can do, the assistant’s everyday jobs included.",
-        "href": "day-to-day/"
+        "text": "On the Mac: mark a worksheet printable and it gets a Print button — questions only, answers only, or both.",
+        "href": "features/#what-a-page-carries"
       },
       {
-        "text": "On the Mac: Deploy asks about classes students can already see that are dated after your next class.",
-        "href": "deploying/"
+        "text": "On the Mac: handouts set like a typeset worksheet, with numbered questions, lettered parts side by side, and an answer key.",
+        "href": "features/#what-a-page-carries"
       },
       {
-        "text": "On the Mac: Open Recent, and your Cloudflare Account ID kept once, in Settings.",
-        "href": "deploying/"
+        "text": "On the Mac: a Printing section in Course Settings for your school’s name and the blanks students fill in.",
+        "href": "features/#what-a-page-carries"
       },
       {
-        "text": "On the Mac: Revise With ▸ Claude, Codex or the local assistant, from any course or section.",
+        "text": "On the Mac: a page can hand out a PDF you already have, from its own Print button.",
+        "href": "features/#what-a-page-carries"
+      },
+      {
+        "text": "On the Mac: Claude and Codex are told how to write a page that prints well.",
         "href": "features/#bring-your-own"
-      },
-      {
-        "text": "On the Mac: Escape, Return and the Delete key do what a Mac app should, in every sheet and list.",
-        "href": "support/"
       }
     ]
   },

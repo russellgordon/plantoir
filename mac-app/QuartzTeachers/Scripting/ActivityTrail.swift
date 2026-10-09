@@ -1194,6 +1194,19 @@ nonisolated enum ActivityTrail {
         /// a class dated after the next class has no answer on file (#475):
         /// the count. The other half of "why didn't Claude deploy it?".
         case laterClassesHeldADeployBack = "a deploy was held back for classes dated after the next class"
+        /// Plantoir's preview handed a page to the teacher's web browser
+        /// (#454): Print on a printable page (with the way of printing
+        /// chosen), or a link that opens in a new window - a page's own PDF
+        /// among them. The page's place in the site, never its words.
+        case previewPageOpenedInBrowser = "preview page opened in the web browser"
+        /// The teacher was asked before Plantoir added its section to their
+        /// own AGENTS.md or CLAUDE.md (#454, P1 addendum 2): the file's name
+        /// and the answer, added or not now. Never the file's words.
+        case guidanceFileAskedAbout = "asked before adding guidance to a file"
+        /// The guidance for assistants could not be written into the working
+        /// folder (#454 review S1): how many problems, and the first (a file
+        /// and the system's reason). It never holds the folder back.
+        case guidanceCouldNotBeWritten = "guidance for assistants could not be written"
     }
 
     // MARK: - Stored properties
