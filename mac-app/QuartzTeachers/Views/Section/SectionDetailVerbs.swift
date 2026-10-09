@@ -78,8 +78,20 @@ extension SectionDetailView {
     /// Whether `item` may run now — asked again at the click, because the
     /// menu may have been drawn before something started (`MenuRoute`'s
     /// rule), and the context menu does not ask the rule at all.
-    func verbMayRunNow(_ item: SubjectMenuRules.Item) -> Bool {
-        if somethingIsUpOnThisWindow || verbIsRunningHere || workspace.isBeingCopied(course.code) {
+    ///
+    /// `afterTheDates` is the one call made as a sheet closes — the class
+    /// dates, written down, running the function they were asked for — when
+    /// the window may not yet have heard that its sheet has ended
+    /// (`sheetIsUp` follows AppKit's own notification), so that one flag is
+    /// not asked; everything else is.
+    func verbMayRunNow(_ item: SubjectMenuRules.Item, afterTheDates: Bool = false) -> Bool {
+        if verbIsRunningHere || workspace.isBeingCopied(course.code) {
+            return false
+        }
+        if verbSheet != nil || linksChecklist != nil || previewAlertIsUp || healthDialog != nil || deployRefusal != nil {
+            return false
+        }
+        if workspace.sheetIsUp && !afterTheDates {
             return false
         }
         if item == .rebuildPreview {
@@ -99,8 +111,8 @@ extension SectionDetailView {
     }
 
     /// Section ▸ Publish Pages… and the rest: what each one opens or does.
-    func performVerb(_ item: SubjectMenuRules.Item) {
-        if !verbMayRunNow(item) {
+    func performVerb(_ item: SubjectMenuRules.Item, afterTheDates: Bool = false) {
+        if !verbMayRunNow(item, afterTheDates: afterTheDates) {
             NSSound.beep()
             return
         }
@@ -198,7 +210,7 @@ extension SectionDetailView {
         }
         model.afterTheDates = {
             afterTheVerbSheet = {
-                performVerb(item)
+                performVerb(item, afterTheDates: true)
             }
         }
         verbSheet = model
