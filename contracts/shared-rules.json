@@ -23016,6 +23016,25 @@
         { "kind": "warning", "boxed": false },
         { "kind": "quote", "boxed": false }
       ],
+      "formulas": {
+        "rule": "#499 review S1: a displayed formula wider than the column (measured in the handout's own frame, at the paper's width, before the layout) is set smaller to fit when it would keep at least minScale of its size - LaTeX's \\resizebox; one that would need to be smaller is broken between its terms, where KaTeX breaks a formula in a line of text, so it prints whole and readable. A single term wider than the page (one huge matrix, one long \\text) cannot be either, and the completeness check refuses it - measured by the formula's own scroll width, because its box is always the column's (a 59-term formula: box 724 px, formula 4,342 px; the first version printed it to `+ a12` and called it complete). `room` and `wide` in any one unit; `scale` null when the formula is not set smaller.",
+        "minScale": 0.7,
+        "cases": [
+          { "room": 672, "wide": 600, "scale": null, "wraps": false },
+          { "room": 672, "wide": 880, "scale": 0.763, "wraps": false, "why": "An 11-term formula on portrait paper: smaller, whole." },
+          { "room": 672, "wide": 4342, "scale": null, "wraps": true, "why": "The review's 59 terms: broken between terms, never a 15% formula." },
+          { "room": 672, "wide": 960, "scale": 0.7, "wraps": false }
+        ]
+      },
+      "tables": {
+        "rule": "#499 review S3: on paper a table cell has no minimum width (Quartz gives each 75 px, so nine columns could not fit a 7 in page and the handout was refused) and breaks between words, inside a word only when it cannot fit (`anywhere` printed `Scien / ce`); a table of wideColumns columns or more prints in 9 pt type. Too wide even then, it is refused by completeness. Measured: a 12-column timetable prints whole on portrait and landscape.",
+        "wideColumns": 8,
+        "cases": [
+          { "columns": 7, "wide": false },
+          { "columns": 8, "wide": true },
+          { "columns": 12, "wide": true }
+        ]
+      },
       "code": {
         "rule": "DECISIONS 30 (Russell 2026-10-09): fenced code on paper keeps a monospaced face (Latin Modern Mono), its line numbers, and a BOX - a thin neutral border with no fill, the second exception to \"no boxes\" beside a worked example. Russell's LaTeX handouts carry no code, so the box is a plain hairline: `border` all round, `paddingPt` inside it, no fill, square corners. The numbers count on across a page break (1 to 110 in the verify fixture, wherever the page falls) and the box is drawn round each piece of a block that splits. A Mermaid diagram is a picture, not code, and has no box. Written by printRules.CODE_BOX into the handout's rules and ⌘P's page rules alike, so the two cannot differ.",
         "border": "0.5pt solid #999999",

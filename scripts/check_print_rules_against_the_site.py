@@ -112,6 +112,15 @@ for (const c of pages.paperLook.cases) {
   const got = rules.boxedOnPaper(c.kind)
   if (got !== c.boxed) failures.push(`paperLook ${c.kind}: ${got}`)
 }
+if (rules.MIN_FORMULA_SCALE !== pages.paperLook.formulas.minScale) failures.push(`paperLook.formulas.minScale: the site uses ${rules.MIN_FORMULA_SCALE}`)
+for (const c of pages.paperLook.formulas.cases) {
+  const got = rules.fitFormula(c.room, c.wide)
+  if (got.scale !== c.scale || got.wraps !== c.wraps) failures.push(`paperLook.formulas ${c.room}/${c.wide}: ${JSON.stringify(got)}`)
+}
+if (rules.WIDE_TABLE_COLUMNS !== pages.paperLook.tables.wideColumns) failures.push(`paperLook.tables.wideColumns: the site uses ${rules.WIDE_TABLE_COLUMNS}`)
+for (const c of pages.paperLook.tables.cases) {
+  if (rules.isWideTable(c.columns) !== c.wide) failures.push(`paperLook.tables ${c.columns}`)
+}
 const code = pages.paperLook.code
 if (rules.CODE_BOX.border !== code.border || rules.CODE_BOX.paddingPt !== code.paddingPt) {
   failures.push(`paperLook.code: the site draws ${JSON.stringify(rules.CODE_BOX)}`)
@@ -125,7 +134,7 @@ const count = pages.answerCallouts.cases.length + pages.labels.cases.length +
   curriculum.headings.length + curriculum.sections.length +
   items.numbering.length + items.partLetters.length + items.columns.length +
   1 + pages.paper.cases.length + pages.footer.cases.length + pages.paperLook.cases.length +
-  pages.completeness.cases.length
+  pages.completeness.cases.length + pages.paperLook.formulas.cases.length + pages.paperLook.tables.cases.length
 console.log(JSON.stringify({ count, failures }))
 """
 

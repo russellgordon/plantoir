@@ -193,6 +193,16 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
     overflow-wrap: anywhere;
   }
 
+  // A line's number never wraps, in a box as wide as the block's longest
+  // (--plantoir-digits, written on load for ⌘P and by the handout): Quartz's
+  // 1rem box broke "100" into "10" over "0" (#499 fault 2, review S2 for ⌘P).
+  pre > code > [data-line]::before {
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    width: calc(var(--plantoir-digits, 2) * 1ch) !important;
+    text-align: right !important;
+  }
+
   pre:not(.plantoir-splittable) {
     break-inside: avoid;
   }
@@ -352,16 +362,39 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
     overflow: visible !important;
   }
 
+  // Quartz gives every cell a 75 px minimum, so a nine-column timetable could
+  // not fit a portrait page and was refused (#499 review S3).
+  th,
+  td,
+  .table-container > table th,
+  .table-container > table td {
+    min-width: 0 !important;
+  }
+
   th,
   td {
     border: 0.4pt solid #999 !important;
     padding: 2pt 5pt !important;
     background: none !important;
-    overflow-wrap: anywhere;
+    // Between words, and inside a word only when it cannot fit: `anywhere`
+    // let a twelve-column timetable print "Scien / ce" (#499 review S3).
+    overflow-wrap: break-word;
   }
 
   tr {
     background: none !important;
+  }
+
+  table.plantoir-wide-table th,
+  table.plantoir-wide-table td {
+    font-size: 9pt !important;
+    padding: 1.5pt 3pt !important;
+  }
+
+  // A formula too wide to shrink readably, broken between its terms
+  // (print.inline.ts fitWideFormulas).
+  .plantoir-formula-wraps .katex-html {
+    white-space: normal !important;
   }
 
   hr {
@@ -430,6 +463,12 @@ $plantoir-mono: "Plantoir LM Mono", "Latin Modern Mono", "CMU Typewriter Text", 
 
   .katex-display {
     overflow: visible !important;
+  }
+
+  // Maths in black, as the LaTeX handouts set it; the site draws it in its
+  // grey-green (review N1).
+  .katex {
+    color: #000 !important;
   }
 }
 
