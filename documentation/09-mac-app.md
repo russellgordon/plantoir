@@ -2772,6 +2772,27 @@ folder (`courses/ICS3U/Unit 1/Factoring Practice.md`: three questions with
 One run each, so "pass" means the guidance was found and followed, not that
 it always will be.
 
+**The graphs skill (#485 E1), measured the same way, 2026-10-09.** Russell
+asked that `plantoir-math-graphs` teach an assistant to build a page with a
+figure productively, not only the fence syntax, so it carries when to use
+which fence, four complete patterns (a parabola beside its parent, two lines
+meeting — interactive and with the point marked, labelled similar triangles,
+a number line), the measured package list, the limits on paper and time,
+how a failure shows up, what to avoid, and what cannot be done (sliders).
+Every pattern in it is drawn by the real engines (the same check as verify's
+payload figures). Scratch working folder with the guidance as the app
+mirrors it and `courses/MPM2D/Unit 2/Parabolas.md` (vertex form, the example
+`y = 3(x - 2)^2 - 4` in prose, no figure), one fresh copy per run:
+
+| Launcher | Started at | Prompt | Result |
+|---|---|---|---|
+| `claude -p` (2.1.296, `--permission-mode acceptEdits`) | working folder root | `Add a graph of y = 3(x - 2)^2 - 4 beside its parent function y = x^2 to the page "courses/MPM2D/Unit 2/Parabolas.md", under the example.` | PASS — a `functionplot` fence, settings first, `alt` naming the vertex, both functions in the grapher's syntax, bounds [-4, 6, -6, 10] around the vertex (2, -4); drawn by the real engines with no problem or note |
+| `claude -p` | `courses/MPM2D` | the same, with `"Unit 2/Parabolas.md"` | PASS — the same fence plus `xLabel`/`yLabel` |
+| `claude -p` | working folder root | `Add a graph of y = a(x - 2)^2 with a slider for a to the page "courses/MPM2D/Unit 2/Parabolas.md".` | PASS — no slider promised: one graph with the parent and a = 0.5, 3, −1, a paragraph saying which curve is which (they are coloured, not labelled), a quoted `alt`; it said separate graphs are the only other option |
+| `codex exec` (0.155.1, `-s workspace-write`) | root and `courses/MPM2D` | the first two | NOT RUN — Codex's sign-in on this Mac has expired (HTTP 401 `token_expired`; every model then answers "not supported when using Codex with a ChatGPT account"). Signing in is Russell's; re-run both when it is renewed |
+
+One run each, as for printing.
+
 ## Mac conventions: the menu bar, keys and text fields (#457)
 
 Russell, 2026-10-07/08: Plantoir did things a teacher could reach only by
