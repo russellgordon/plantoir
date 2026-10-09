@@ -171,7 +171,7 @@ struct CourseSettingsView: View {
                     PublishingChoiceView(
                         deployTarget: $configuration.deployTarget,
                         deployFolderPath: $configuration.deployFolderPath,
-                        cloudflareAccountID: $settings.cloudflareAccountID,
+                        cloudflareAccountID: settings.cloudflareAccountID,
                         additionalDeployTargets: $configuration.additionalDeployTargets
                     )
                     ScheduledDeployLatenessPicker(

@@ -226,7 +226,14 @@ pages came to read as never asked (`gradedFolders.newCourse`, #292).
 The Cloudflare **account ID** is deliberately *not* here: it identifies the
 teacher rather than the course, so it lives in the app's own settings (and,
 for direct launcher use, the OS credential store) and is entered once for
-every course. The API tokens for Netlify and Cloudflare never touch this
+every course. On the mac it is EDITED in Plantoir ▸ Settings ▸ Deploying since
+v1.5.0 (#457, the HIG sweep); a course's Deploying section and the new-course
+wizard show it read-only with Open Settings… beside it. Before that it was
+edited inside a course's settings — the same app-wide value, so changing it in
+one course changed it for every course, which is why it moved. The stored key
+did not change (`cloudflareAccountID` in the app's preferences), so nothing was
+migrated. Windows stores it app-wide too (`AppSettings.CloudflareAccountId`)
+and has no Settings window; where Windows edits it is its own decision. The API tokens for Netlify and Cloudflare never touch this
 file — or any file in the working folder.
 
 ## Files that travel alongside it

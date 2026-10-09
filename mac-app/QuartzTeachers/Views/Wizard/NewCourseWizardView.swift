@@ -222,15 +222,6 @@ struct NewCourseWizardView: View {
         )
     }
 
-    /// The teacher's Cloudflare Account ID, which belongs to the person
-    /// rather than to this new course — so it is read from and written
-    /// straight back to app settings rather than kept as wizard state.
-    var cloudflareAccountIDBinding: Binding<String> {
-        return Binding(
-            get: { AppSettings.shared.cloudflareAccountID },
-            set: { newValue in AppSettings.shared.cloudflareAccountID = newValue }
-        )
-    }
 
     /// Why a club's class-pages folder cannot have this name, in the
     /// sentences a folder rename in Course Settings already uses
@@ -1249,7 +1240,10 @@ struct NewCourseWizardView: View {
                 PublishingChoiceView(
                     deployTarget: $deployTarget,
                     deployFolderPath: $deployFolderPath,
-                    cloudflareAccountID: cloudflareAccountIDBinding,
+                    // The teacher's, not this new course's: read from
+                    // Settings and shown read-only, with Open Settings…
+                    // beside it (#457, the HIG sweep).
+                    cloudflareAccountID: AppSettings.shared.cloudflareAccountID,
                     additionalDeployTargets: $additionalDeployTargets
                 )
             } header: {

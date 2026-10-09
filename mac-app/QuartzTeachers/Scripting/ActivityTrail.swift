@@ -83,6 +83,11 @@ nonisolated enum ActivityTrail {
         /// Help ▸ Plantoir Help opened plantoir.app's support page (#457,
         /// the HIG sweep). Carries nothing else: the page is public.
         case plantoirHelpOpened = "opened Plantoir Help"
+        /// The Cloudflare Account ID was changed in Plantoir ▸ Settings ▸
+        /// Deploying (#457, the HIG sweep: it moved there from a course's
+        /// settings). Whether it is now set, cleared or not yet valid —
+        /// NEVER the ID.
+        case cloudflareAccountIDChangedInSettings = "Cloudflare account ID changed in Settings"
         case assistantOpened = "assistant opened"
         /// A Claude or Codex session opened from Plantoir's door is holding the course
         /// it was opened from (#458): written by `Plantoir --mcp-stdio` when
