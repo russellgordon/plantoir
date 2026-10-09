@@ -55,9 +55,6 @@ struct SetSchoolYearSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Which school year was \(course.displayCode) taught in?")
-                .font(.headline)
-
             Picker("School year", selection: $schoolYear) {
                 ForEach(offeredYears, id: \.self) { year in
                     Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
@@ -87,7 +84,8 @@ struct SetSchoolYearSheet: View {
                 .accessibilityIdentifier("setSchoolYearButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle("Which school year was \(course.displayCode) taught in?")
         .frame(width: 420)
     }
 

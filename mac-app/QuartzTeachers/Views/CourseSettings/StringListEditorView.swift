@@ -439,8 +439,6 @@ struct StringListEditorView: View {
         ) == .orderedSame
         let problem: String? = renameProblem?(item, proposedName, finishing)
         VStack(alignment: .leading, spacing: 12) {
-            Text(SpecialNames.renameFolderTitle(for: item))
-                .font(.headline)
             TextField("New name", text: $proposedName)
                 .borderedTextField()
                 .accessibilityIdentifier("renameField")
@@ -475,7 +473,8 @@ struct StringListEditorView: View {
                 .defaultButton(isEnabled: problem == nil && !isRenaming)
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(SpecialNames.renameFolderTitle(for: item))
         .frame(width: 420)
     }
 

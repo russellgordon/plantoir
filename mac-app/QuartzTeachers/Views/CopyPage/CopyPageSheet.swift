@@ -168,9 +168,6 @@ struct CopyPageSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(CopyPageWording.sheetTitle(course: sourceFacts?.displayName ?? source.displayCode))
-                .font(.headline)
-
             if stage == .finished, let outcome {
                 result(outcome)
             } else if stage == .checking, let shownPlan {
@@ -188,7 +185,8 @@ struct CopyPageSheet: View {
 
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(CopyPageWording.sheetTitle(course: sourceFacts?.displayName ?? source.displayCode))
         .frame(width: 480)
         // The work is started as a Task that outlives this view, so a sheet
         // dismissed mid-backup would go on writing files, reloading the

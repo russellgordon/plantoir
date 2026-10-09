@@ -114,7 +114,6 @@ struct SectionScheduleSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header
             Divider()
 
             if let plan {
@@ -142,7 +141,12 @@ struct SectionScheduleSheet: View {
             Divider()
             buttons
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(
+            "When does \(course.displayCode) section \(sectionNumber) meet?",
+            identifier: "sectionScheduleTitle",
+            explanation: { header }
+        )
         .frame(width: 560)
         .fileImporter(
             isPresented: $isPickingFile,
@@ -163,12 +167,10 @@ struct SectionScheduleSheet: View {
 
     // MARK: - Computed properties — the parts of the sheet
 
+    /// What sits under the title (`SheetTitle`'s two-line shape): why the
+    /// dates are asked for, and the reason this time when there is one.
     var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("When does \(course.displayCode) section \(sectionNumber) meet?")
-                .font(.title2)
-                .accessibilityIdentifier("sectionScheduleTitle")
-
             // The one sentence that has to be here: a teacher being asked
             // for a column of dates deserves to know what it buys them.
             Text("Give Plantoir the class dates once, so it can date new class pages for you. They are kept inside the course folder, so they travel with it through backup, archive and restore.")
@@ -701,7 +703,8 @@ struct SectionScheduleCourseMissingView: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle("Could not find \(courseCode)")
         .frame(width: 420)
     }
 }

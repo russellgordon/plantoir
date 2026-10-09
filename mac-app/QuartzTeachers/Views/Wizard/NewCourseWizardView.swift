@@ -733,13 +733,9 @@ struct NewCourseWizardView: View {
 
     var wizardContent: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("New Course or Club")
-                    .font(.title2)
-                    .bold()
-                Spacer()
-            }
-            .padding()
+            // The one sheet title shape (#457, the HIG sweep): `.headline`
+            // in the 52-point band, where this was `.title2` bold.
+            SheetTitle("New Course or Club")
 
             if hasStarted {
                 TaskProgressView(runner: creator.runner, title: progressTitle, canCancel: false)
