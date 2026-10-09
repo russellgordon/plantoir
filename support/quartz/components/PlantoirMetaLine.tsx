@@ -149,6 +149,10 @@ export default ((inner: QuartzComponent) => {
                   {words.landscape}
                 </label>
               </div>
+              {/* Safari's print window opens on Portrait whatever the page asks,
+                  and covers the page while it is open, so this is said in the
+                  menu, before it opens (#499 fix review S2). */}
+              <p class="plantoir-print-paper-note">{words.landscapeInDialog}</p>
               <button type="button" data-mode="questionsOnly">
                 {words.questionsOnly}
               </button>
