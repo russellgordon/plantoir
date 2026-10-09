@@ -446,14 +446,30 @@ pages that do not opt in are byte-identical** once what Quartz already varies
 between ANY two builds is set aside (the explorer's random list id, build-time
 dates on curriculum pages, and the order of tag-list entries sharing one of
 those dates); the only pages that differ are the 7 that opt in. Every new CSS
-selector is scoped to a printable page or the handout frame, and nothing adds
-an `@page`. ⌘P of a page that does not opt in prints the same pages with the
-same text in Chrome for Testing 155 (13 and 3 pages, light and dark,
-`pdftotext` identical) and in Safari 26.6. **verify.sh gates it on every
-run**: section 5 plants "Printable Not Opted", the worksheet with only
-`printable: true` taken out, and the 6h printable-pages check fails if that
-page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
+selector is scoped to a printable page or the handout frame — with ONE
+exception since #501, below — and nothing adds an `@page`. **verify.sh gates
+it on every run**: section 5 plants "Printable Not Opted", the worksheet with
+only `printable: true` taken out, and the 6h printable-pages check fails if
+that page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
 `@page`, or if its date line is not the plain one straight after its title.
+
+**Its HTML is unchanged; its PRINT is not, since #501 (v1.7.0, F9).** The
+shared `index.css` carries one `@media print` block scoped
+`html:not(.plantoir-printable):not(.plantoir-print-frame)` that hides the
+sidebars and caps the column under ⌘P (`printablePages.everyOtherPage`). So
+every page's stylesheet changed (`index.css` +316 bytes, measured on EXC2O in
+the dev-test image) while its HTML stayed byte-identical (237 of 304 pages
+once Quartz's random list ids are set aside — the explorer's AND a table of
+contents' `<ul class="overflow">`; the other 67 differ only in the build-time
+`<time datetime>` on Curriculum and tag pages and the order of list entries
+sharing one, the variances named above), and
+`postscript.js` identical but for the explorer id. The 6h check also looks
+for the block's text in `index.css`, and `browser-checks/print_plain_page.mjs`
+prints a page that does not opt in and reads its ink back. **WITHDRAWN:** this
+paragraph used to say "⌘P of a page that does not opt in prints the same pages
+with the same text" (Chrome for Testing 155, `pdftotext` identical, and Safari
+26.6). True, and blind: the words Quartz's folder list covered on paper stayed
+in the PDF's text layer, so a text comparison found them all (F9).
 What every site DOES change is its two shared bundles, measured on EXC2O
 against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
 `index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
@@ -677,7 +693,7 @@ of its own that hold on EVERY page, not only printable ones — see G4.
 | Chrome for Testing 155.0.8059.39 | 3 (2 + 1) | 2 | 1 | 2, corners | 131–214 ms |
 | Edge 155.0.4283.45 | 3 (2 + 1) | 2 | 1 | 2, corners | 124–212 ms |
 
-Light and dark gave the same page counts in every cell. Chrome and Edge were
+Light and dark gave about the same page counts in every cell. Chrome and Edge were
 driven by puppeteer-core 24.10.0 (handout: the frame's document as printed,
 re-rendered by `page.pdf`; ⌘P: `page.pdf` with the page's `@page`). **Trap:**
 Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
@@ -830,6 +846,109 @@ page, or one unbreakable term wider than it, cannot print (refused, with the
 sentence). Windows owes all of this:
 #496.
 
+### F9. ⌘P on every other page (#501, v1.7.0)
+
+Found in passing by #485 E1's implementer: ⌘P on a page that is NOT
+printable lost words under the folder list. It predates #454 and E1 —
+**Quartz ships no print rules**, so ⌘P laid out the screen's page:
+
+- **Chrome and Edge** print letter paper with their default margins at 739 px
+  wide, under Quartz's 800 px breakpoint, so the page printed in the PHONE
+  layout. On a page loaded at desktop width the explorer is not `collapsed`,
+  and its mobile rule makes `.explorer-content` an opaque panel (`absolute`,
+  `z-index: 100`, `var(--light)`, `100dvh`) drawn OVER the article. On a long
+  test page it covered paragraphs 03–13 across pages 1–2.
+- **The covered words stayed in the PDF's text layer.** `pdftotext` found
+  every one, which is why #454's "pdftotext identical" check could not see
+  this. Two things do: the INK under a word, and the folder list read INTO
+  the paragraphs (5 of 68 no longer matched whole).
+- **Safari 26** lays out at the window's width (1512 px): the three-column
+  desktop grid, so the left sidebar printed on page 1 and the column's RIGHT
+  edge ran off the paper, visibly cut ("the class ta"). Not in the issue.
+
+**The fix** is one block in `support/quartz/components/styles/print.scss`,
+"⌘P on every other page", data in `contracts/shared-rules.json` →
+`printablePages.everyOtherPage`:
+
+```scss
+@media print {
+  html:not(.plantoir-printable):not(.plantoir-print-frame) {
+    .page > #quartz-body > .sidebar { display: none !important; }
+    .page > #quartz-body { display: block !important; }
+    .page { max-width: 8.5in !important; margin: 0 !important; }
+  }
+}
+```
+
+- `:not(.plantoir-printable)`: a printable page's ⌘P (F4) is untouched by
+  construction — 0 pixels differ, measured, though specificity alone gave
+  that too.
+- **`:not(.plantoir-print-frame)` is LOAD-BEARING.** The handout's frame has
+  a `.page` and Paged.js applies `@media print`; without this, both landscape
+  handouts were refused as `printablePages.words.incomplete`
+  (`print_handout.mjs` FAILED). Proven again by the implementer: drop only
+  that `:not()` and the check fails on landscape.
+- 8.5 in never narrows Chrome's portrait page, and keeps Safari's column on
+  the paper.
+
+**Before → after** (planner's measurement, Chrome for Testing 155 headless at
+a 1512 × 900 window, and Safari 26 by script — ⌘P, Save as PDF — macOS 26):
+
+| | Chrome, light and dark | Safari, light and dark |
+|---|---|---|
+| A 62-paragraph plain page | 6 → 6 pages; words with no ink 346 → 0; sidebar text on paper → none | 4 → 4 pages; words past the edge 98 → 0; 62/62 sentinels |
+| What This Site Can Do | 13 → 13; no ink 195 → 0 (dark 224 → 28, all labels of Mermaid drawn dark — out of scope) | 8 → 8; past the edge 29 → 0 |
+| Printable Not Opted | 21 → 21; no ink 86 → 0; "Search" gone | 10 → 10; past the edge 14 → 0 |
+| The plain page, landscape | 8 → 8; the tablet layout's sidebar gone | — |
+| Printable pages, portrait and landscape | **0 pixels differ** at 72 dpi; text identical | **0 pixels differ** |
+| Handout, 3 modes × 2 papers | `print_handout.mjs` OK; **0 pixels differ** | — |
+
+The Safari column was re-taken by the implementer from the planner's saved
+PDFs (`pdftotext -bbox` against the paper's width less 18 pt; `pdfinfo`; a
+72-dpi pixel comparison) and holds, and measured again by script on the
+implementer's run (Safari 26, a 1512 × 948 window opened for the purpose,
+⌘P → PDF → Save as PDF): the 62-paragraph page, light and dark, 4 → 4 pages,
+words past the edge 100 → 0, the sidebar's "Search" and "EXC2O S1" on paper →
+gone, sentinels inked 61/62 → 62/62; Printable Fixture 12 → 12 pages, 0
+pixels differ.
+
+**Gated on every run** where Chrome for Testing is present (verify.sh 6h,
+SKIPPED otherwise, with the handout check): section 5 plants "Plain Long
+Page", 40 paragraphs each starting `plantoir-plain-para-NN`, under headings
+and with list items, and `browser-checks/print_plain_page.mjs` loads it in a
+1512 px window and prints it portrait and landscape with ⌘P's defaults (no
+backgrounds). It asserts no line of any element `everyOtherPage.hidden` names
+is on paper, every paragraph is whole in the text, the darkest pixel under
+every sentinel (`pdftoppm -gray -r 100`, read as PGM by hand) is at most 200,
+and no word is within 18 pt of the paper's edge. The 6h static check also
+requires the block's minified text in `index.css`, built from
+`everyOtherPage.scope` and `.hidden`. **Must-fail, proven by copy-and-restore
+of `print.scss` through full verify.sh runs:** with the block taken out, both
+6h checks FAILED — portrait, the sidebar's words on paper ("🔬 EXC2O S1",
+"Search", "All Classes", …), 6 of 44 paragraphs not whole, 7 paragraphs with
+no ink (page 2, 11–17); landscape, the sidebar's words — and with only
+`:not(.plantoir-print-frame)` taken out, `print_handout.mjs` FAILED: Questions
+only and Both on landscape were refused with `printablePages.words.incomplete`.
+
+**REJECTED, all measured:** sidebars only (Safari kept the grid's tracks and
+printed 7 pages in a quarter-width column); the block with no cap (Safari
+clipped 50 words); a 7 in cap as on printable pages (Chrome clipped more of
+the wide table and formulas); hiding only the folder panel (Safari still
+clipped, and printed the folder list).
+
+**Found, not fixed:** in Chrome, ⌘P on a page that is not printable clips
+Quartz's horizontal scroll boxes — the wrapped code comment, the wide
+formulas and the 12-column timetable of the verify fixture are missing from
+the text both before and after the fix; a printable page's ⌘P and the
+handout handle them (F8). Mermaid drawn dark prints near-white labels (28
+words on What This Site Can Do).
+
+**Windows inherits it free** — the block is in `support/quartz`, installed by
+`build_site.py` on every build. It owes one measurement: ⌘P → Save as PDF in
+Edge and Chrome on a long page that is not printable, portrait and landscape,
+light and dark, because Windows' DPI and default margins can put the paper
+width on the other side of 800 px.
+
 ---
 
 ## G. Diagrams and graphs (#485 E1, v1.7.0)
@@ -942,10 +1061,12 @@ Safari does not, and there a pinch zooms the page) — so a plain scroll
   both papers: every piece laid out (29 of 29), none split, lettering
   rgb(0, 0, 0), the 530 px tree whole.
 
-**Found in passing, not E1's:** Quartz's own ⌘P on a page that is NOT
-printable overlays the sidebar's folder list on page 2 of the paper and
-loses what is under it — measured on `Style/What This Site Can Do` with no
-figure at all, so it predates E1 (decision 7 keeps those pages as they were).
+**Found in passing, not E1's, and fixed in the same release:** Quartz's own ⌘P on a page that is NOT
+printable used to overlay the sidebar's folder list on page 2 of the paper and
+lose what was under it — measured on `Style/What This Site Can Do` with no
+figure at all, so it predated E1. #501 (v1.7.0) fixes it with one print-only
+block in the shared stylesheet; see the #501 section of F for what it does and
+what it leaves pixel-identical.
 
 ### G5. What every site carries, figures or not
 

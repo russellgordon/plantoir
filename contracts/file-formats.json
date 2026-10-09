@@ -535,7 +535,7 @@
       {
         "key": "printable",
         "type": "boolean",
-        "why": "`printable: true` puts a Print button on the page's date line, trailing edge, and makes ⌘P print it as a worksheet (questions only). Read the way the build reads every page: python-frontmatter (PyYAML, YAML 1.1) loads the teacher's line, the build writes it back, and the site reads THAT - so `yes` and `on` opt in (YAML 1.1 booleans, written back as `true`), while `\"true\"` and `1` do not (a string and a number). Pages that do not opt in print exactly as they did before #454, byte for byte."
+        "why": "`printable: true` puts a Print button on the page's date line, trailing edge, and makes ⌘P print it as a worksheet (questions only). Read the way the build reads every page: python-frontmatter (PyYAML, YAML 1.1) loads the teacher's line, the build writes it back, and the site reads THAT - so `yes` and `on` opt in (YAML 1.1 booleans, written back as `true`), while `\"true\"` and `1` do not (a string and a number). Pages that do not opt in carry exactly the HTML they did before #454, byte for byte; since #501 their ⌘P changes only through the shared stylesheet (shared-rules.json → printablePages.everyOtherPage)."
       },
       {
         "key": "printPdf",
