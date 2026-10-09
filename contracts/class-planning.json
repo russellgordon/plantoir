@@ -5333,6 +5333,509 @@
       }
     ]
   },
+  "futureDatedClasses": {
+    "note": "#475 (Russell, 2026-10-07): catch class pages published with a date in the future, and offer to unpublish them with a checklist at Deploy. This key is the DETECTION rule; where and how the teacher is asked is shared-rules.json -> classesDatedLater, and what is remembered is file-formats.json -> laterClassesKept.",
+    "rule": "Among the section's class pages (classFolder - folder MEMBERSHIP, never the title's shape; an index.md is never a class), the NEXT CLASS DAY is the earliest `created` date strictly after today, counted over every class page whether students can see it or not. Flagged: a class page students can see (file-formats.json -> pageVisibility, as the built site reads it; a flag the app cannot read counts as visible) whose date is AFTER the next class day. Pages dated on or before it are never flagged. If no class page is dated after today, nothing is flagged. A flagged page whose place is in laterClassesKept with the SAME date is not flagged. The date is the first ten characters of `created` as WRITTEN, never converted (sectionIndexPointer.dateCases.why). Flagged pages are listed by date, then by title. A course kept for reference is never asked about: it is never deployed.",
+    "today": "The teacher's calendar day on this computer's clock - CalendarDay.today() on the mac - never UTC's, and decided once when the question is asked: an answer given after midnight acts on the day it was asked about.",
+    "howTheCasesRun": "`today` fixes the clock. Each of `pages` is written into section `section` (default 1) at `section<N>/<path>`, as `---\\ntitle: <file name>\\n<flag>\\ncreated: <created>\\n---\\n`, where `flag` is the whole visibility line as written (publish: or draft:) and `created: null` writes no created line. `unitWord`, `classPageScheme` and `noun` are the course's, as in todaysClassOnTheFrontPage; the course's per-section folders are `All Classes` and `Concepts`, and its class folder is `All Classes`. `kept` is the laterClassesKept record on disk. `expectFlagged` is the places (file-formats.json -> laterClassesKept: the place in the course folder, without .md), in order. Each case runs through the platform's REAL readers on real files.",
+    "rejected": [
+      "Flagging every class dated after TODAY (the plan's first rule): tomorrow's class, published the evening before on purpose, would be ticked to hide at every evening's Deploy (Russell's decision 1).",
+      "Counting only PUBLISHED classes for the next class day: a wrongly published 14th behind a hidden 9th would become the 'next' class and slip through (the plan review).",
+      "The timetable's next class day: most sections have no timetable, and the pages the teacher has made are what the question is about.",
+      "Matching the 'Unit x, Day y' shape the issue names: a club's 'Week 5' and a teacher's own folder of lessons are classes too, and a 'Unit 2, Day 3' outside the class folders is not one (Russell's decision 8).",
+      "Detecting it in build_site.py and reporting a marker (the #379 shape): the answer would arrive after the build, so hiding a page would need a second build; the container's clock is not the teacher's; and the question has to come before the deploy starts, when the app has already read these pages.",
+      "Converting `created` to this computer's zone: the class on the 9th as written is the 9th's class wherever the computer is."
+    ],
+    "cases": [
+      {
+        "name": "tomorrow's class, published the evening before, is not asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 3.md",
+            "flag": "publish: true",
+            "created": "2026-10-08T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Russell's decision 1 on #475's plan: \"publish tomorrow's class\" and then Deploy is the commonest flow in Plantoir. The next class day after today is never asked about, or the question would undo that every evening."
+      },
+      {
+        "name": "a class published a week early is asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 3.md",
+            "flag": "publish: true",
+            "created": "2026-10-08T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: false",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "The issue's own case. The next class day is the 9th, counted over EVERY class page, hidden ones included - so the 14th's class is after it even though the 9th's is still hidden."
+      },
+      {
+        "name": "a lone published class on the next class day is that day's class",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "The next class day is the earliest class date after today, not tomorrow's date: a section that next meets on the 14th has its next class on the 14th."
+      },
+      {
+        "name": "two classes on the next class day are both left alone",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 6.md",
+            "flag": "publish: false",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "A double period, or a page split in two: both are the next class."
+      },
+      {
+        "name": "today's class is never asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 3.md",
+            "flag": "publish: true",
+            "created": "2026-10-08T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Nothing is dated after today, so nothing is flagged."
+      },
+      {
+        "name": "a past class is not asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 1.md",
+            "flag": "publish: true",
+            "created": "2026-10-01T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Only dates after the next class day are flagged."
+      },
+      {
+        "name": "a hidden later class is not asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: false",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Students cannot see it, which is the state the question would offer to put it in."
+      },
+      {
+        "name": "a hidden next class does not shelter a published later one",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: false",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "The plan review's case: counting only published pages for the next class day would make the 14th's class the 'next' one and let it through."
+      },
+      {
+        "name": "publish: \"False\" in quotes is visible on the built site, so it is asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: \"False\"",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "file-formats.json -> pageVisibility: the site drops only the boolean false or the exact string \"false\"."
+      },
+      {
+        "name": "publish: FALSE hides the page",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: FALSE",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "YAML 1.1 reads FALSE as the boolean, so the site hides it."
+      },
+      {
+        "name": "a legacy draft: false is visible",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "draft: false",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "draft is the old spelling and means the OPPOSITE: draft: false publishes the page."
+      },
+      {
+        "name": "a legacy draft: true is hidden",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "draft: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "The old spelling, hiding the page."
+      },
+      {
+        "name": "a flag the app cannot read is counted as visible, so it is asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: \"true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "Each app reports a flag it cannot read as visible - the mild direction (file-formats.json -> pageVisibility) - so the teacher is asked rather than a page waved through. Hiding it is the safe answer either way."
+      },
+      {
+        "name": "an undated published class is not asked about",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 9.md",
+            "flag": "publish: true",
+            "created": null
+          }
+        ],
+        "expectFlagged": [],
+        "why": "With no date there is nothing to be early for."
+      },
+      {
+        "name": "a page outside the class folders is not a class",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "Concepts/Quiz.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "classFolder: a class page is decided by the folder it lives in, never by its title."
+      },
+      {
+        "name": "a folder's index page is never a class",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/index.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "classFolder: an index.md is the way into a folder, not a lesson."
+      },
+      {
+        "name": "a class in a folder inside the class folder counts",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2/Unit 2, Day 5"
+        ],
+        "why": "Membership is any folder on the way down, as classFolder says."
+      },
+      {
+        "name": "the day is the day as written, never converted to this Mac's zone",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T00:30:00.000+1300"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-10T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "sectionIndexPointer.dateCases.why. Converted to UTC the first page would be the 8th - today - and the 10th's class would become the next class and slip through."
+      },
+      {
+        "name": "late on today's date in another zone is still today",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 3.md",
+            "flag": "publish: true",
+            "created": "2026-10-08T23:30:00.000-0700"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-12T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "The 8th as written is today's class, however late in the day; the next class is the 9th."
+      },
+      {
+        "name": "a class kept at that date is not asked about again",
+        "today": "2026-10-08",
+        "kept": [
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "date": "2026-10-14"
+          }
+        ],
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Russell's decision 2: a teacher who posts a week ahead on purpose says so once (file-formats.json -> laterClassesKept)."
+      },
+      {
+        "name": "a class kept at another date is asked about again",
+        "today": "2026-10-08",
+        "kept": [
+          {
+            "place": "section1/All Classes/Unit 2, Day 5",
+            "date": "2026-10-10"
+          }
+        ],
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5"
+        ],
+        "why": "Re-dated since the answer, it is a different question."
+      },
+      {
+        "name": "a club's numbered meeting counts by where it lives",
+        "today": "2026-10-08",
+        "unitWord": "Week",
+        "classPageScheme": "numbered",
+        "noun": "meeting",
+        "pages": [
+          {
+            "path": "All Classes/Week 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Week 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Week 5"
+        ],
+        "why": "Russell's decision 8: folder membership, not the 'Unit x, Day y' shape the issue's title names."
+      },
+      {
+        "name": "another section's class is not this section's",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400",
+            "section": 2
+          }
+        ],
+        "expectFlagged": [],
+        "why": "Asked per section: section 2's early class is asked about when section 2 deploys."
+      },
+      {
+        "name": "several are listed by date, then by title",
+        "today": "2026-10-08",
+        "pages": [
+          {
+            "path": "All Classes/Unit 2, Day 4.md",
+            "flag": "publish: true",
+            "created": "2026-10-09T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 3, Day 1.md",
+            "flag": "publish: true",
+            "created": "2026-10-16T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 6.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          },
+          {
+            "path": "All Classes/Unit 2, Day 5.md",
+            "flag": "publish: true",
+            "created": "2026-10-14T07:00:00.000-0400"
+          }
+        ],
+        "expectFlagged": [
+          "section1/All Classes/Unit 2, Day 5",
+          "section1/All Classes/Unit 2, Day 6",
+          "section1/All Classes/Unit 3, Day 1"
+        ],
+        "why": "The order the question lists them in."
+      }
+    ]
+  },
   "reDatingASection": {
     "note": "Re-dating a whole section onto a new timetable (re_date_classes), and what the reply says it did.",
     "reportedCounts": {
