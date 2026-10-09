@@ -80,13 +80,6 @@ struct KeepACopyForReferenceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(ReferenceWording.keepACopyTitle(course: course.displayCode))
-                .font(.headline)
-
-            Text(ReferenceWording.copyIsASnapshot(course: course.displayCode))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
             Picker("School year", selection: $schoolYear) {
                 ForEach(offeredYears, id: \.self) { year in
                     Text(SchoolYear.label(forStartingYear: year)).tag(Int?.some(year))
@@ -141,12 +134,16 @@ struct KeepACopyForReferenceSheet: View {
                 Button("Keep a Copy") {
                     keepACopy()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canCopy)
+                .defaultButton(isEnabled: canCopy)
                 .accessibilityIdentifier("keepACopyButton")
             }
         }
-        .padding(20)
+        .padding([.horizontal, .bottom], 20)
+        .sheetTitle(ReferenceWording.keepACopyTitle(course: course.displayCode), explanation: {
+            Text(ReferenceWording.copyIsASnapshot(course: course.displayCode))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        })
         .frame(width: 460)
         .onAppear {
             if folderName.isEmpty {

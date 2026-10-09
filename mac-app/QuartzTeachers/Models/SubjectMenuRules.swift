@@ -1,0 +1,401 @@
+import Foundation
+
+/// Which items in the menu bar's File, Course and Section menus can be used
+/// right now — decided in ONE pure place, from facts the window publishes
+/// (#457).
+///
+/// **Presence follows the Mac, enablement follows the selection.** Whether
+/// "Revise With ▸ Claude…" is DRAWN depends on whether Claude is installed
+/// (`OutsideAssistantPresence`); whether it can be USED depends on what is
+/// selected, and that is this type's whole job. The menu bar GREYS an item
+/// that does not apply rather than hiding it, because a menu whose items come
+/// and go with the selection is a menu a teacher cannot learn; the sidebar's
+/// context menus keep HIDING what does not apply, because they are about one
+/// row.
+///
+/// **A sheet or an alert greys everything** (`sheetIsUp`). A menu item's key
+/// equivalent fires even while a sheet is attached to its window — measured
+/// by the plan review: a real ⇧⌘D sent through `NSApp.sendEvent` with a sheet
+/// up ran Deploy — so without this a teacher half-way through Add Section…
+/// could start a deploy behind it. Greying is the first guard; `MenuRoute`
+/// asks the window again at the click, which is the one that counts.
+///
+/// The cases live in `contracts/shared-rules.json` → `subjectMenus`, and
+/// `SubjectMenuRulesTests` runs them; the raw values below are that
+/// contract's item names.
+nonisolated enum SubjectMenuRules {
+
+    // MARK: - Types
+
+    /// What kind of sidebar row is selected.
+    enum Row: String, CaseIterable, Sendable {
+        case none
+        case course
+        case section
+        case backup
+        case archived
+        case allBackups
+    }
+
+    /// The outside assistants and the local one, for the Revise With items.
+    enum ReviseTarget: String, CaseIterable, Sendable {
+        case claude
+        case codex
+        case localAssistant
+    }
+
+    /// Every item whose enablement is decided here.
+    enum Item: String, CaseIterable, Sendable {
+        // File
+        case openWorkingFolder
+        case openRecent
+        case newCourse
+        case importCoursesForReference
+        case restoreFromArchive
+        case reloadCourses
+        // Course
+        case addSection
+        case copyAPage
+        case saveCourseSettings
+        case revertCourseSettings
+        case rename
+        case setSchoolYear
+        case keepACopyForReference
+        case backUpNow
+        case restoreFromBackup
+        case courseReviseWithClaude
+        case courseReviseWithCodex
+        case courseReviseWithLocalAssistant
+        case courseOpenInObsidian
+        case courseShowInFinder
+        case courseNewTerminalAtFolder
+        case deleteBackup
+        case deleteArchive
+        case removeCourse
+        // Section
+        case preview
+        case deploy
+        case openInBrowser
+        case scheduleDeploy
+        case cancelScheduledDeploy
+        case getReadyForTheStartOfTheYear
+        case undoGettingReady
+        case publishPagesLinksLeadTo
+        case sectionReviseWithClaude
+        case sectionReviseWithCodex
+        case sectionReviseWithLocalAssistant
+        case sectionOpenInObsidian
+        case sectionShowInFinder
+        case sectionNewTerminalAtFolder
+        case removeSection
+        // Section: the assistant's own functions (#457 batch B), run from
+        // the menu through the tools' own code (`SectionVerbs`).
+        case publishPages
+        case hidePages
+        case publishClassForADate
+        case rebuildPreview
+        case undoLastChange
+        case addNextClass
+        case reDateClasses
+        case makeRoomForClasses
+        case classDates
+        // View
+        case back
+        case forward
+        case reloadPage
+    }
+
+    /// Everything the rule needs to know, gathered from the window's
+    /// publishers. Equatable so a republish that changes nothing the menu
+    /// shows does not rebuild the menu bar.
+    struct Situation: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        /// A Plantoir window is in front with a working folder open.
+        var hasFolder: Bool = false
+        /// That folder's tools are still being copied, or the copy failed (#476).
+        var folderGettingReady: Bool = false
+        /// A sheet or alert is attached to the window, or the app is modal.
+        var sheetIsUp: Bool = false
+
+        var row: Row = .none
+        /// The selected course (or the selected section's course) is kept
+        /// for reference.
+        var keptForReference: Bool = false
+        /// Rename and Add Section must wait: previewing, deploying, or a
+        /// Claude or Codex session open on the course (#458).
+        var structuralHold: Bool = false
+        /// The course is previewing or deploying (Keep a Copy waits).
+        var busy: Bool = false
+        /// A copy of the course is being zipped (#351).
+        var copying: Bool = false
+        /// A deploy of the course is running from this app.
+        var deploying: Bool = false
+        /// The selected section has a deploy scheduled.
+        var hasSchedule: Bool = false
+        /// The selected section holds a start-of-the-year undo (#96).
+        var hasStartOfYearUndo: Bool = false
+        /// The selected section's last build left a links checklist (#379).
+        var hasLinksOffer: Bool = false
+        /// Revise items greyed for a reason (#458).
+        var reviseBlocked: Set<ReviseTarget> = []
+        var obsidianInstalled: Bool = false
+
+        /// Course Settings is showing and Save / Revert would do something.
+        var settingsMaySave: Bool = false
+        var settingsMayRevert: Bool = false
+
+        /// The section window's own buttons, read off the same predicates
+        /// the toolbar uses so the menu and the button cannot disagree.
+        var previewButtonEnabled: Bool = false
+        var deployButtonEnabled: Bool = false
+        var previewIsShowing: Bool = false
+        /// A preview of the selected section is running — building or
+        /// showing. Rebuild Preview is live only then (Russell's decision 5
+        /// on batch B's plan: otherwise it is Preview under a second name).
+        var previewIsRunning: Bool = false
+        /// The last change the Section menu made in this window was made in
+        /// the selected section, so Undo Last Change would act on it.
+        var lastChangeIsHere: Bool = false
+        /// One of the assistant's functions is running on the selected
+        /// section — from this window's menu, from another window's, or in
+        /// the assistant's own window (#457's plan review, note 14).
+        var verbIsRunning: Bool = false
+        var canGoBack: Bool = false
+        var canGoForward: Bool = false
+    }
+
+    // MARK: - Functions
+
+    /// The items that can be used in `situation`.
+    static func enabledItems(_ situation: Situation) -> Set<Item> {
+        var enabled: Set<Item> = []
+        if situation.sheetIsUp {
+            return enabled
+        }
+        let isLive: Bool = !situation.keptForReference
+        let isCourse: Bool = situation.row == .course
+        let isSection: Bool = situation.row == .section
+        let isCourseOrSection: Bool = isCourse || isSection
+
+        // File. Open Working Folder… and Open Recent are live with NO
+        // window (they open one) and in any window without a sheet; they grey
+        // under a sheet like every other verb, because the folder they choose
+        // would otherwise open a SECOND window behind it (the director's
+        // ruling on the implementation review, #457).
+        enabled.insert(.openWorkingFolder)
+        enabled.insert(.openRecent)
+        if situation.hasFolder && !situation.folderGettingReady {
+            enabled.insert(.newCourse)
+        }
+        if situation.hasFolder {
+            enabled.insert(.importCoursesForReference)
+            enabled.insert(.reloadCourses)
+        }
+        if situation.row == .archived {
+            enabled.insert(.restoreFromArchive)
+        }
+
+        // Course: with a section selected these act on its course.
+        if isCourseOrSection {
+            enabled.insert(.copyAPage)
+            if isLive && !situation.structuralHold {
+                enabled.insert(.addSection)
+                enabled.insert(.rename)
+            }
+            if !isLive {
+                enabled.insert(.setSchoolYear)
+            }
+            if isLive && !situation.busy {
+                enabled.insert(.keepACopyForReference)
+            }
+            if !situation.copying {
+                enabled.insert(.backUpNow)
+            }
+        }
+        if situation.settingsMaySave {
+            enabled.insert(.saveCourseSettings)
+        }
+        if situation.settingsMayRevert {
+            enabled.insert(.revertCourseSettings)
+        }
+        if situation.row == .backup && !situation.copying {
+            enabled.insert(.restoreFromBackup)
+        }
+        // The Revise and folder group acts on the course ROW only: with a
+        // section selected, the Section menu's copy of it is the live one,
+        // so ⇧⌘O and its neighbours are never enabled in both menus at once.
+        if isCourse && isLive {
+            if !situation.reviseBlocked.contains(.claude) {
+                enabled.insert(.courseReviseWithClaude)
+            }
+            if !situation.reviseBlocked.contains(.codex) {
+                enabled.insert(.courseReviseWithCodex)
+            }
+            // The local assistant works per SECTION, so it is never live
+            // on a course row (Russell, 2026-10-08: greyed, not hidden).
+        }
+        if isCourse && situation.obsidianInstalled {
+            enabled.insert(.courseOpenInObsidian)
+        }
+        if isCourse || situation.row == .backup || situation.row == .archived {
+            enabled.insert(.courseShowInFinder)
+        }
+        if isCourse {
+            enabled.insert(.courseNewTerminalAtFolder)
+        }
+        if situation.row == .backup {
+            enabled.insert(.deleteBackup)
+        }
+        if situation.row == .archived {
+            enabled.insert(.deleteArchive)
+        }
+        if isCourse && !situation.copying {
+            enabled.insert(.removeCourse)
+        }
+
+        // Section
+        if isSection {
+            if situation.previewButtonEnabled {
+                enabled.insert(.preview)
+            }
+            if situation.deployButtonEnabled && isLive {
+                enabled.insert(.deploy)
+            }
+            if situation.previewIsShowing {
+                enabled.insert(.openInBrowser)
+            }
+            // Neither on a course kept for reference: nothing deploys from
+            // one, and its section row's context menu offers neither — the
+            // menu bar and the context menu may not disagree (the director's
+            // ruling on the implementation review, #457). Plantoir turns off a
+            // schedule a kept course still has on its own
+            // (`ScheduledDeployCleanup.Reason.theCourseIsKeptForReference`).
+            if isLive && !situation.hasSchedule {
+                enabled.insert(.scheduleDeploy)
+            }
+            if isLive && situation.hasSchedule {
+                enabled.insert(.cancelScheduledDeploy)
+            }
+            if isLive && !situation.deploying {
+                enabled.insert(.getReadyForTheStartOfTheYear)
+                if situation.hasStartOfYearUndo {
+                    enabled.insert(.undoGettingReady)
+                }
+                if situation.hasLinksOffer {
+                    enabled.insert(.publishPagesLinksLeadTo)
+                }
+            }
+            if isLive {
+                if !situation.reviseBlocked.contains(.claude) {
+                    enabled.insert(.sectionReviseWithClaude)
+                }
+                if !situation.reviseBlocked.contains(.codex) {
+                    enabled.insert(.sectionReviseWithCodex)
+                }
+                if !situation.reviseBlocked.contains(.localAssistant) {
+                    enabled.insert(.sectionReviseWithLocalAssistant)
+                }
+            }
+            // The assistant's functions (#457 batch B). Each writes to the
+            // section, so none on a course kept for reference (the runner
+            // refuses anyway — greyed is the courtesy, the gate is the
+            // guard), none while it deploys or a copy is being zipped, and
+            // one at a time. Rebuild Preview writes only the built site, so it
+            // is live on a reference course, as the tool is
+            // (`toolsAllowedOnAReferenceCourse`).
+            let verbsMayRun: Bool = isLive && !situation.deploying && !situation.copying && !situation.verbIsRunning
+            if verbsMayRun {
+                enabled.insert(.publishPages)
+                enabled.insert(.hidePages)
+                enabled.insert(.publishClassForADate)
+                enabled.insert(.addNextClass)
+                enabled.insert(.reDateClasses)
+                enabled.insert(.makeRoomForClasses)
+                enabled.insert(.classDates)
+                if situation.lastChangeIsHere {
+                    enabled.insert(.undoLastChange)
+                }
+            }
+            if situation.previewIsRunning && situation.previewButtonEnabled && !situation.verbIsRunning {
+                enabled.insert(.rebuildPreview)
+            }
+            if situation.obsidianInstalled {
+                enabled.insert(.sectionOpenInObsidian)
+            }
+            enabled.insert(.sectionShowInFinder)
+            enabled.insert(.sectionNewTerminalAtFolder)
+            // Not on a course kept for reference: `interface.whatIsWithheld`
+            // withholds "Remove Section N (removing the whole course
+            // stays)". Until the HIG sweep (#457) this item was live there,
+            // against that contract; Remove Course stays live on one.
+            if isLive && !situation.copying {
+                enabled.insert(.removeSection)
+            }
+        }
+
+        // View: the embedded preview's own navigation.
+        if situation.previewIsShowing {
+            enabled.insert(.reloadPage)
+            if situation.canGoBack {
+                enabled.insert(.back)
+            }
+            if situation.canGoForward {
+                enabled.insert(.forward)
+            }
+        }
+        return enabled
+    }
+
+    /// The menu item the Delete key asks for on the selected sidebar row,
+    /// or nil for a row it means nothing on (#457, the HIG sweep: Delete
+    /// removes the selected item, as in Finder and Mail).
+    ///
+    /// The key runs the MENU ITEM — its own enablement and its own closure —
+    /// so it asks the same "Remove…?" or "Delete…?" question the menu does,
+    /// and can never do what the greyed item would not (`sidebarDeleteKey`
+    /// in `contracts/shared-rules.json`). It is not a key equivalent on the
+    /// item: a menu key equivalent is matched before the field editor, so ⌫
+    /// or ⌘⌫ there would be taken from every text field in the window.
+    static func deleteKeyItem(for row: Row) -> Item? {
+        switch row {
+        case .course:
+            return .removeCourse
+        case .section:
+            return .removeSection
+        case .backup:
+            return .deleteBackup
+        case .archived:
+            return .deleteArchive
+        case .allBackups, .none:
+            return nil
+        }
+    }
+
+    /// The menu item the sidebar's − button runs for the selected row, or
+    /// nil where it does nothing (a backup or an archive is deleted only
+    /// through its own item). The button is enabled exactly when that item
+    /// is (`minusButtonIsEnabled`), so the − button, the Delete key and the
+    /// menu bar cannot disagree — until the HIG sweep's review the − button
+    /// still asked to remove a section of a course kept for reference, which
+    /// the menu and the key withhold (#457).
+    static func minusButtonItem(for row: Row) -> Item? {
+        switch row {
+        case .course:
+            return .removeCourse
+        case .section:
+            return .removeSection
+        case .backup, .archived, .allBackups, .none:
+            return nil
+        }
+    }
+
+    /// Whether the − button can be pressed in `situation`.
+    static func minusButtonIsEnabled(_ situation: Situation) -> Bool {
+        guard let item = minusButtonItem(for: situation.row) else {
+            return false
+        }
+        return enabledItems(situation).contains(item)
+    }
+}

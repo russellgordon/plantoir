@@ -93,9 +93,20 @@ enum CourseArchiver {
         // A consequence worth knowing: the five kept are five ASSISTANT
         // backups. A teacher with twenty of their own keeps all twenty, and
         // they do not crowd out the assistant's five.
+        // The Section menu's own copies (#457) are pruned the same way and
+        // counted APART: five of the menu's are kept beside five of the
+        // assistant's, so a busy afternoon of menu changes never pushes the
+        // copy an open conversation's Restore button needs off the disk.
         var backups: [BackupItem] = []
+        var menuBackups: [BackupItem] = []
         for fileURL in contents {
             guard let backup = BackupItem.from(fileURL: fileURL, courseCode: courseCode) else {
+                continue
+            }
+            if case .menu = backup.maker {
+                if ArchiveStamp.couldHaveBeenStamped(backup.backedUpAt) {
+                    menuBackups.append(backup)
+                }
                 continue
             }
             guard case .assistant = backup.maker else {
@@ -115,13 +126,20 @@ enum CourseArchiver {
             }
             backups.append(backup)
         }
+        removeAllButTheNewest(backups)
+        removeAllButTheNewest(menuBackups)
+    }
+
+    /// Deletes all but the `mostBackupsKept` newest of `backups`.
+    private static func removeAllButTheNewest(_ backups: [BackupItem]) {
         if backups.count <= mostBackupsKept {
             return
         }
 
         // Newest first. Two backups made in the same second are ordered by
         // name, so the answer is the same every time it is asked.
-        backups.sort { first, second in
+        var newestFirst: [BackupItem] = backups
+        newestFirst.sort { first, second in
             if first.backedUpAt == second.backedUpAt {
                 return first.fileURL.lastPathComponent > second.fileURL.lastPathComponent
             }
@@ -129,7 +147,7 @@ enum CourseArchiver {
         }
 
         var keptSoFar: Int = 0
-        for backup in backups {
+        for backup in newestFirst {
             keptSoFar += 1
             if keptSoFar > mostBackupsKept {
                 try? FileManager.default.removeItem(at: backup.fileURL)
@@ -286,12 +304,34 @@ enum CourseArchiver {
         coursesDirectoryPath: String,
         nameSuffix: String = ""
     ) async throws -> URL {
+        let backupsPath: String = URL(fileURLWithPath: coursesDirectoryPath)
+            .appendingPathComponent("_backups").appendingPathComponent(code).path
         return try await zipping(
             folderPath: courseDirectoryPath,
-            archiveName: timestampedName(prefix: "\(code)_backup", suffix: nameSuffix),
+            archiveName: unusedBackupName(
+                code: code, stamp: ArchiveStamp.text(for: Date()), suffix: nameSuffix, inFolder: backupsPath
+            ),
             courseCode: code,
             coursesDirectoryPath: coursesDirectoryPath
         )
+    }
+
+    /// A backup's name no other backup of the course already has.
+    ///
+    /// Stamped to the second, so two copies saved within one second — the
+    /// Section menu saves one before EVERY change (#457 batch B), 0.1 s each
+    /// for a small course — would share a name, and `zip -r` UPDATES an
+    /// existing archive in place: "the copy made before any of it" would
+    /// become a mix of two states. The second is `<stamp>-2`, then `-3`
+    /// (`course-management.json` → `zipNames`), before any maker's ending.
+    nonisolated static func unusedBackupName(code: String, stamp: String, suffix: String, inFolder folderPath: String) -> String {
+        var name: String = "\(code)_backup_\(stamp)\(suffix).zip"
+        var attempt: Int = 2
+        while FileManager.default.fileExists(atPath: (folderPath as NSString).appendingPathComponent(name)) {
+            name = "\(code)_backup_\(stamp)-\(attempt)\(suffix).zip"
+            attempt += 1
+        }
+        return name
     }
 
     /// Whether the most recent zip ran on the main thread. Written by

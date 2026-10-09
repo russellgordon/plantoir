@@ -65,6 +65,11 @@ struct MainWindowView: View {
         // this window goes on showing its own folder (#290): said over the
         // folder the teacher is still in, which stays exactly as it was.
         .modifier(RefusedFolderAlert())
+        // The calm note about a reference course's locked pages, asked for
+        // by whichever route opened Obsidian. On the WINDOW, not the
+        // sidebar: the section window's toolbar button is reachable with the
+        // sidebar collapsed (#457, the HIG sweep).
+        .modifier(LockedPagesNoteAlert())
         .fileImporter(
             isPresented: $workspace.isChoosingWorkspace,
             allowedContentTypes: [.folder]
@@ -134,7 +139,12 @@ struct MainWindowView: View {
                 SectionDetailView(course: course, sectionNumber: sectionNumber)
                     .id("\(code)-\(sectionNumber)")
             } else {
+                // Nothing here can take a Section menu request, so one waiting
+                // for this row is dropped rather than left to run later.
                 missingSelectionView
+                    .onAppear {
+                        workspace.sectionVerbRequest = nil
+                    }
             }
         case .archived(let identifier):
             if let item = archivedItem(withIdentifier: identifier) {
@@ -166,8 +176,8 @@ struct MainWindowView: View {
                     Button("Restore…") {
                         workspace.backupRestoreRequest = item
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(workspace.isBeingCopied(item.courseCode))
+                    // The accent only while it can be pressed (#457).
+                    .prominentButton(isEnabled: !workspace.isBeingCopied(item.courseCode))
                     .accessibilityIdentifier("restoreBackupButton")
                     Button("Delete Backup…") {
                         workspace.requestDeleteBackup(item)
@@ -187,7 +197,9 @@ struct MainWindowView: View {
                 } description: {
                     Text("Add your first course, or start from the example course to see how everything fits together.")
                 } actions: {
-                    Button("Add a Course…") {
+                    // File ▸ New Course…'s own name (#457, the HIG sweep):
+                    // one command, one name everywhere.
+                    Button("New Course…") {
                         workspace.isShowingNewCourseWizard = true
                     }
                     .buttonStyle(.borderedProminent)
@@ -291,5 +303,58 @@ struct RefusedFolderAlert: ViewModifier {
             } message: {
                 Text(workspace.folderNotOpened?.detail ?? "")
             }
+    }
+}
+
+/// The calm note about a reference course's pages, shown once per course
+/// BEFORE the teacher goes into Obsidian.
+///
+/// **In front of it, not after it**, which is the placement decision the
+/// Obsidian measurement forced: what Obsidian SHOWS a teacher who types into
+/// a locked page could not be measured, so silent loss is not ruled out — and
+/// a note that arrives only after they have typed would be the worst of both.
+/// Once per course is enough; after that Open in Obsidian opens it directly,
+/// like any other course's.
+///
+/// A modifier rather than lines on a body, because the sidebar's body
+/// reached the point where the Swift compiler gave up type-checking it; it
+/// moved here from the sidebar in the HIG sweep (#457), with the request on
+/// `WorkspaceModel` so every route — the toolbar's included — asks it.
+private struct LockedPagesNoteAlert: ViewModifier {
+
+    // MARK: - Stored properties
+
+    @Environment(WorkspaceModel.self) var workspace
+
+    // MARK: - Functions
+
+    func body(content: Content) -> some View {
+        content.alert(
+            ReferenceWording.pagesAreLockedTitle,
+            isPresented: isPresented,
+            presenting: workspace.lockedPagesNoteRequest
+        ) { shown in
+            Button("Open in Obsidian") {
+                workspace.openInObsidianAfterTheNote(shown)
+            }
+            Button("Not Now", role: .cancel) {
+                workspace.lockedPagesNoteRequest = nil
+            }
+        } message: { _ in
+            // No warning icon and no "cannot": a teacher who kept this course
+            // for reference asked for it, so it reads as a fact.
+            Text(ReferenceWording.pagesAreLocked + "\n\n" + ReferenceWording.obsidianOpensThemForReading)
+        }
+    }
+
+    private var isPresented: Binding<Bool> {
+        return Binding(
+            get: { return workspace.lockedPagesNoteRequest != nil },
+            set: { showing in
+                if !showing {
+                    workspace.lockedPagesNoteRequest = nil
+                }
+            }
+        )
     }
 }

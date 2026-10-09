@@ -226,7 +226,14 @@ pages came to read as never asked (`gradedFolders.newCourse`, #292).
 The Cloudflare **account ID** is deliberately *not* here: it identifies the
 teacher rather than the course, so it lives in the app's own settings (and,
 for direct launcher use, the OS credential store) and is entered once for
-every course. The API tokens for Netlify and Cloudflare never touch this
+every course. On the mac it is EDITED in Plantoir ▸ Settings ▸ Deploying since
+v1.5.0 (#457, the HIG sweep); a course's Deploying section and the new-course
+wizard show it read-only with Open Settings… beside it. Before that it was
+edited inside a course's settings — the same app-wide value, so changing it in
+one course changed it for every course, which is why it moved. The stored key
+did not change (`cloudflareAccountID` in the app's preferences), so nothing was
+migrated. Windows stores it app-wide too (`AppSettings.CloudflareAccountId`)
+and has no Settings window; where Windows edits it is its own decision. The API tokens for Netlify and Cloudflare never touch this
 file — or any file in the working folder.
 
 ## Files that travel alongside it
@@ -241,6 +248,7 @@ file — or any file in the working folder.
 | `<CODE>/.cloudflare_sites/section<N>.json` | Cloudflare Pages marker (project name/id, subdomain, account) so re-publishing reuses the same project instead of creating a second one. |
 | `<CODE>/.publish_state/section<N>.links-checklist.json` | The links checklist offer (#379): the hidden pages publishing would bring back to life, their groups, ticks and dates, and which row each comes under when only other offered pages link it (`dependsOn`, #385). Written by EVERY build of the section, removed when there is nothing to offer, never written — and removed — for a course kept for reference. Read by the mac app's section window; Windows owes the reader (the `windows` issue #392; `contracts/README.md` → `linksChecklist.publishCases`, "owed by Windows"). `contracts/file-formats.json` → `linksChecklistOffer`. |
 | `<CODE>/.publish_state/section<N>.links-checklist-answered.json` | What the teacher last answered in that checklist (Publish or Not Now): the app's own file, never the build's. `linksChecklistAnswered`. |
+| `<CODE>/.publish_state/section<N>.later-classes-kept.json` | The classes the teacher left published when asked about classes dated after the next class (#475), each by its place and the date it had then, so it is not asked about again unless its date changes; also written for a class published by naming its date. The app's own file; removed on rollover. `laterClassesKept`. |
 | `<CODE>/.publish_state/section<N>.front-page-not-today.json` | Not Today, answered to Preview's question about today's class on the front page (#397): the calendar day and the class offered, so that class is not asked about again that day. The app's own file; never removed, since a record for another day or class stops nothing. `frontPageNotToday`. |
 | `<CODE>/.publish_state/section<N>.published-pages/` | A folder of fragments, one per destination a deploy reached, each naming the pages that site showed — what "published before" means when a page hidden again is published once more (#379). On every rollover its fragments are moved into `section<N>.published-pages.previous-<stamp>/` beside it (the folder itself stays, so the rollover's undo can put them back). `publishedPagesRecord`. |
 | the built output's `section<N>/.visible-pages.json` and `.build-id` | Beside `public/`, never inside it: the pages a build for publishing showed, and the id of the build that last started there; what a deploy records from (`visiblePagesList`). |
