@@ -14,6 +14,12 @@ struct PrintSettingsView: View {
     /// The code a teacher reads, for the sketch.
     let displayedCourseCode: String
 
+    /// The page label as a handout prints it on the first page of three -
+    /// the contract's own words (printablePages.words.pageLabel), filled.
+    private static let pageLabelSketch: String = CourseSettingsWording.printedPageLabel
+        .replacingOccurrences(of: "{n}", with: "1")
+        .replacingOccurrences(of: "{total}", with: "3")
+
     // MARK: - Computed properties
 
     /// What the top left corner will say, by the build's rule.
@@ -89,9 +95,6 @@ struct PrintSettingsView: View {
     }
 
     // MARK: - Functions
-
-    /// The page label as the build prints it on a first page of three.
-    private static let pageLabelSketch: String = "Page 1 of 3"
 
     /// The school name and the course code that print at `place`, school
     /// first, joined the way the build joins them.

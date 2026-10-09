@@ -1504,73 +1504,11 @@ class WorkspaceModel {
                 )
             }
         }
-        // Guidance for an assistant started at this folder (#454): the skills
-        // and the two root files that point at them.
-        if let supportURL = Bundle.main.url(forResource: "support", withExtension: nil) {
-            changed += WorkspaceModel.writeAgentGuidance(
-                from: supportURL.appendingPathComponent("agent_guidance"), into: workspaceURL
-            )
-            noteProgress()
-        }
+        // The guidance for assistants (#454) is NOT written here: its failure
+        // must never hold the folder back from Preview and Deploy (review S1),
+        // so ToolchainReadiness writes it after this copy, on its own outcome
+        // (AgentGuidance.write).
         return changed
-    }
-
-    /// The first line of a root guidance file Plantoir wrote, and so may
-    /// rewrite (contracts/shared-rules.json → printablePages.agentGuidance).
-    nonisolated static let agentGuidanceMarker: String = "<!-- Managed by Plantoir:"
-
-    /// Writes the assistant guidance into a working folder's root (#454,
-    /// decision 12 and its P1 addendum): each skill under `skills/` into
-    /// `.claude/skills/<name>` (Claude Code) and `.agents/skills/<name>`
-    /// (Codex), and `AGENTS.md` and `CLAUDE.md` beside them, naming the
-    /// skills, so an assistant started here meets them from its first prompt.
-    ///
-    /// Why the ROOT and not each course: measured (plan review S1, Claude Code
-    /// 2.1.295 and Codex 0.155.1, both started at the working folder as the
-    /// app starts them), Codex never found a skill inside a course and found
-    /// the same skill at the root at once; Claude Code found a per-course one
-    /// only after reading a file in that course.
-    ///
-    /// Each skill's folder is the app's, whole - extra files in it go - and
-    /// nothing else under `.claude` or `.agents` is touched (a teacher's own
-    /// settings and skills live there). A root file is rewritten only when it
-    /// is missing or carries `agentGuidanceMarker`: a file of that name the
-    /// teacher wrote is theirs and is left exactly as it is.
-    nonisolated static func writeAgentGuidance(from guidanceURL: URL, into workspaceURL: URL) -> MirrorOutcome {
-        let fileManager: FileManager = FileManager.default
-        var outcome: MirrorOutcome = MirrorOutcome()
-        let skillsURL: URL = guidanceURL.appendingPathComponent("skills")
-        let skills: [URL] = (try? fileManager.contentsOfDirectory(
-            at: skillsURL, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
-        )) ?? []
-        for skillURL in skills {
-            let isFolder: Bool = (try? skillURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            if !isFolder {
-                continue
-            }
-            for home in [".claude", ".agents"] {
-                let destination: URL = workspaceURL
-                    .appendingPathComponent(home)
-                    .appendingPathComponent("skills")
-                    .appendingPathComponent(skillURL.lastPathComponent)
-                outcome += WorkspaceModel.syncDirectory(from: skillURL, to: destination)
-            }
-        }
-        for name in ["AGENTS.md", "CLAUDE.md"] {
-            let sourceURL: URL = guidanceURL.appendingPathComponent(name)
-            if !fileManager.fileExists(atPath: sourceURL.path) {
-                continue
-            }
-            let destinationURL: URL = workspaceURL.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                let existing: String = (try? String(contentsOf: destinationURL, encoding: .utf8)) ?? ""
-                if !existing.hasPrefix(WorkspaceModel.agentGuidanceMarker) {
-                    continue
-                }
-            }
-            outcome += WorkspaceModel.syncFile(from: sourceURL, to: destinationURL)
-        }
-        return outcome
     }
 
     /// Copies one file when the destination differs or is missing.

@@ -1629,10 +1629,10 @@ struct SectionDetailView: View {
     func notePagesHandedToTheBrowser() {
         let code: String = course.code
         let section: Int = sectionNumber
-        previewController.browserHandoff.whenHandedOver = { url, reason in
+        previewController.browserHandoff.whenHandedOver = { page, target, reason in
             ActivityTrail.note(
                 .previewPageOpenedInBrowser,
-                PreviewBrowserHandoff.trailWords(for: url, reason: reason),
+                PreviewBrowserHandoff.trailWords(page: page, target: target, reason: reason),
                 course: code,
                 section: section
             )

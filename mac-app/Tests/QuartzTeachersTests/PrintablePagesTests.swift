@@ -148,13 +148,13 @@ final class PrintablePagesTests: XCTestCase {
         var opened: [URL] = []
         var told: [String] = []
         handoff.open = { url in opened.append(url) }
-        handoff.whenHandedOver = { url, reason in
-            told.append(PreviewBrowserHandoff.trailWords(for: url, reason: reason))
+        handoff.whenHandedOver = { page, target, reason in
+            told.append(PreviewBrowserHandoff.trailWords(page: page, target: target, reason: reason))
         }
         let address: URL = PreviewBrowserHandoff.printAddress(
             pageAddress: "http://localhost:8461/Unit-1/Worksheet-3", mode: "withAnswersAtTheEnd")!
         handoff.open(address)
-        handoff.whenHandedOver?(address, .printHandout(mode: "withAnswersAtTheEnd"))
+        handoff.whenHandedOver?(address, address, .printHandout(mode: "withAnswersAtTheEnd"))
         XCTAssertEqual(opened, [address])
         XCTAssertEqual(told, [
             "preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
@@ -168,14 +168,36 @@ final class PrintablePagesTests: XCTestCase {
         for event in events where event["event"] as? String == ActivityTrail.Event.previewPageOpenedInBrowser.rawValue {
             example = (event["line"] as? String) ?? ""
         }
+        let printed: URL = URL(string: "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd")!
         let words: String = PreviewBrowserHandoff.trailWords(
-            for: URL(string: "http://localhost:8461/Unit-1/Worksheet-3#plantoir-print=withAnswersAtTheEnd")!,
-            reason: .printHandout(mode: "withAnswersAtTheEnd")
+            page: printed, target: printed, reason: .printHandout(mode: "withAnswersAtTheEnd")
         )
         XCTAssertEqual(example, "{course}/{section} · " + words)
+        let page: URL = URL(string: "http://localhost:8461/Unit-1/Worksheet-3")!
         let pdf: String = PreviewBrowserHandoff.trailWords(
-            for: URL(string: "http://localhost:8461/Media/Key.pdf")!, reason: .newWindow)
-        XCTAssertEqual(pdf, "preview page opened in the web browser — a page's own PDF (Media/Key.pdf)")
+            page: page, target: URL(string: "http://localhost:8461/Media/Key.pdf")!, reason: .newWindow)
+        XCTAssertEqual(pdf, "preview page opened in the web browser — the page's own PDF (Unit-1/Worksheet-3)")
+    }
+
+    /// Rule 5 (implementation review S2): a link's destination is something
+    /// the teacher wrote, and a shared-document address is a key to it. The
+    /// line names the page the teacher was on, and only the KIND of link.
+    func testALinksDestinationNeverReachesTheTrail() {
+        let page: URL = URL(string: "http://localhost:8461/Unit-1/Worksheet-3")!
+        for secret in [
+            "https://docs.google.com/document/d/1AbcSecretDocId/edit?usp=sharing",
+            "https://zoom.us/j/81234567890",
+            "mailto:teacher@school.ca",
+        ] {
+            let line: String = PreviewBrowserHandoff.trailWords(
+                page: page, target: URL(string: secret)!, reason: .newWindow)
+            XCTAssertEqual(line, "preview page opened in the web browser — a link to another site (Unit-1/Worksheet-3)")
+            XCTAssertFalse(line.contains("Secret") || line.contains("8123") || line.contains("@"), line)
+        }
+        let external: String = PreviewBrowserHandoff.trailWords(
+            page: URL(string: "https://example.com/x")!,
+            target: URL(string: "https://example.com/y")!, reason: .newWindow)
+        XCTAssertEqual(external, "preview page opened in the web browser — a link to another site (an unknown page)")
     }
 
     /// The real web view, as the preview builds it: the page's own print
@@ -214,35 +236,106 @@ final class PrintablePagesTests: XCTestCase {
         return PrintablePagesTests.repositoryRoot().appendingPathComponent("support/agent_guidance")
     }
 
-    func testTheSkillAndBothPointersAreWrittenAtTheRoot() throws {
-        let outcome: WorkspaceModel.MirrorOutcome = WorkspaceModel.writeAgentGuidance(from: guidanceSource, into: folder)
-        XCTAssertEqual(outcome.failed, 0)
+    private func agentGuidanceContract() throws -> [String: Any] {
+        return try XCTUnwrap(try SharedRulesContractTests.section("printablePages")["agentGuidance"] as? [String: Any])
+    }
+
+    private func filled(_ text: String) -> String {
+        return text
+            .replacingOccurrences(of: "{start}", with: AgentGuidance.sectionStart)
+            .replacingOccurrences(of: "{end}", with: AgentGuidance.sectionEnd)
+    }
+
+    /// Russell's P1 rulings: a managed SECTION - written, replaced, or added
+    /// to a teacher's own file only after a yes - every case in the contract.
+    func testEveryRootFileCaseHoldsAsTheContractSays() throws {
+        let guidance: [String: Any] = try agentGuidanceContract()
+        XCTAssertEqual(guidance["sectionStart"] as? String, AgentGuidance.sectionStart)
+        XCTAssertEqual(guidance["sectionEnd"] as? String, AgentGuidance.sectionEnd)
+        XCTAssertEqual(guidance["rootFiles"] as? [String], AgentGuidance.rootFiles)
+        let block: [String: Any] = try XCTUnwrap(guidance["rootFileCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 9, "the contract lost root-file cases")
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            var existing: String? = nil
+            if let text = testCase["existing"] as? String {
+                existing = filled(text)
+            }
+            var declined: String? = nil
+            if let said = testCase["declined"] as? String {
+                declined = said == "thisSection"
+                    ? AgentGuidance.signature(of: "NEW")
+                    : AgentGuidance.signature(of: "EARLIER")
+            }
+            let action: AgentGuidance.RootFileAction = AgentGuidance.action(
+                existing: existing, body: "NEW", declinedSignature: declined)
+            let expected: String = filled(try XCTUnwrap(testCase["result"] as? String))
+            switch try XCTUnwrap(testCase["expect"] as? String) {
+            case "write":
+                XCTAssertEqual(action, .write(expected), name)
+            case "replace":
+                XCTAssertEqual(action, .replace(expected), name)
+            case "unchanged":
+                XCTAssertEqual(action, .unchanged, name)
+                XCTAssertEqual(existing, expected, name)
+            case "leave":
+                XCTAssertEqual(action, .leave, name)
+                XCTAssertEqual(existing, expected, name)
+            case "ask":
+                XCTAssertEqual(action, .ask, name)
+                XCTAssertEqual(AgentGuidance.appended(to: existing ?? "", body: "NEW"), expected, name)
+            default:
+                XCTFail("\(name): an expectation this test does not know")
+            }
+        }
+    }
+
+    func testTheSheetsWordsAreTheContractsAndNameNoMachinery() throws {
+        let words: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["words"] as? [String: Any])
+        let pairs: [(String, String)] = [
+            ("askTitle", AgentGuidanceWording.askTitle(file: "{file}")),
+            ("askFound", AgentGuidanceWording.askFound(file: "{file}")),
+            ("askWhat", AgentGuidanceWording.askWhat),
+            ("askYoursStays", AgentGuidanceWording.askYoursStays),
+            ("showWhatIsAdded", AgentGuidanceWording.showWhatIsAdded),
+            ("add", AgentGuidanceWording.add),
+            ("notNow", AgentGuidanceWording.notNow),
+            ("couldNotWrite", AgentGuidanceWording.couldNotWrite(reason: "{reason}")),
+            ("dismiss", AgentGuidanceWording.dismiss),
+        ]
+        let forbidden: [String] = try UserFacingLabelWordsTests.forbiddenWords()
+        for (key, said) in pairs {
+            XCTAssertEqual(said, words[key] as? String, key)
+            XCTAssertEqual(UserFacingLabelWordsTests.forbiddenWords(in: said, from: forbidden), [], key)
+        }
+    }
+
+    func testAFreshFolderGetsTheSkillsAndBothFilesHoldingOnlyTheSection() throws {
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(outcome.failures, [])
+        XCTAssertEqual(outcome.pending, [])
         for home in [".claude", ".agents"] {
-            let skill: URL = folder.appendingPathComponent("\(home)/skills/plantoir-printing/SKILL.md")
-            let text: String = try String(contentsOf: skill, encoding: .utf8)
-            XCTAssertTrue(text.contains("name: plantoir-printing"))
-            XCTAssertTrue(text.contains("printable: true"))
-            XCTAssertTrue(text.contains("printPdf"))
+            let skill: String = try String(
+                contentsOf: folder.appendingPathComponent("\(home)/skills/plantoir-printing/SKILL.md"), encoding: .utf8)
+            XCTAssertTrue(skill.contains("name: plantoir-printing"))
+            XCTAssertTrue(skill.contains("printable: true"))
         }
-        for name in ["AGENTS.md", "CLAUDE.md"] {
+        for name in AgentGuidance.rootFiles {
             let text: String = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
-            XCTAssertTrue(text.hasPrefix(WorkspaceModel.agentGuidanceMarker), "\(name) must say Plantoir manages it")
+            XCTAssertTrue(text.hasPrefix(AgentGuidance.sectionStart), name)
             XCTAssertTrue(text.contains("plantoir-printing"), "\(name) must name the skill")
+            XCTAssertTrue(text.hasSuffix(AgentGuidance.sectionEnd + "\n"), name)
         }
-        let second: WorkspaceModel.MirrorOutcome = WorkspaceModel.writeAgentGuidance(from: guidanceSource, into: folder)
+        let second: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
         XCTAssertEqual(second.changed, 0, "a second pass changes nothing")
     }
 
-    func testTheContractNamesTheMarkerTheAppChecks() throws {
-        let guidance: [String: Any] = try XCTUnwrap(
-            try SharedRulesContractTests.section("printablePages")["agentGuidance"] as? [String: Any])
-        XCTAssertEqual(guidance["managedMarker"] as? String, WorkspaceModel.agentGuidanceMarker)
-        XCTAssertEqual(guidance["rootFiles"] as? [String], ["AGENTS.md", "CLAUDE.md"])
-    }
-
-    func testATeachersOwnFilesAndSkillsAreLeftAlone() throws {
+    func testATeachersOwnFileIsAskedAboutNotWrittenAndTheirSkillsAreLeftAlone() throws {
         let fileManager: FileManager = FileManager.default
-        let own: String = "# My own notes for Claude\n"
+        let own: String = "# My own notes for Claude\n\nAlways use British spelling.\n"
         try own.write(to: folder.appendingPathComponent("CLAUDE.md"), atomically: true, encoding: .utf8)
         let sibling: URL = folder.appendingPathComponent(".claude/skills/my-own-skill/SKILL.md")
         try fileManager.createDirectory(at: sibling.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -250,26 +343,63 @@ final class PrintablePagesTests: XCTestCase {
         let settings: URL = folder.appendingPathComponent(".claude/settings.local.json")
         try "{}\n".write(to: settings, atomically: true, encoding: .utf8)
 
-        _ = WorkspaceModel.writeAgentGuidance(from: guidanceSource, into: folder)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
 
+        XCTAssertEqual(outcome.pending.count, 1)
+        XCTAssertEqual(outcome.pending.first?.fileName, "CLAUDE.md")
         XCTAssertEqual(try String(contentsOf: folder.appendingPathComponent("CLAUDE.md"), encoding: .utf8), own,
-                       "a CLAUDE.md without Plantoir's marker is the teacher's")
+                       "never appended without a yes")
         XCTAssertEqual(try String(contentsOf: sibling, encoding: .utf8), "mine\n")
         XCTAssertEqual(try String(contentsOf: settings, encoding: .utf8), "{}\n")
-        XCTAssertTrue(fileManager.fileExists(atPath: folder.appendingPathComponent("AGENTS.md").path))
+        XCTAssertTrue(fileManager.fileExists(atPath: folder.appendingPathComponent(".claude/skills/plantoir-printing/SKILL.md").path),
+                      "the skills are written whatever the answer")
+
+        // Add: below their text, which is left exactly as it was.
+        XCTAssertTrue(AgentGuidance.appendAfterYes(try XCTUnwrap(outcome.pending.first)))
+        let after: String = try String(contentsOf: folder.appendingPathComponent("CLAUDE.md"), encoding: .utf8)
+        XCTAssertTrue(after.hasPrefix(own + "\n" + AgentGuidance.sectionStart), after)
+        let again: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertEqual(again.pending, [], "once it has the section, it is kept up to date without asking")
     }
 
-    func testAManagedFileIsRewrittenAndAnExtraFileInTheSkillGoes() throws {
-        let managed: URL = folder.appendingPathComponent("AGENTS.md")
-        try (WorkspaceModel.agentGuidanceMarker + " old -->\nold words\n").write(to: managed, atomically: true, encoding: .utf8)
-        let extra: URL = folder.appendingPathComponent(".agents/skills/plantoir-printing/old.md")
-        try FileManager.default.createDirectory(at: extra.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "old\n".write(to: extra, atomically: true, encoding: .utf8)
+    func testNotNowIsRememberedUntilTheWordsChangeOrTheFileGoes() throws {
+        let defaults: UserDefaults = try XCTUnwrap(UserDefaults(suiteName: "plantoir-tests-\(UUID().uuidString)"))
+        let pending: AgentGuidance.PendingAppend = AgentGuidance.PendingAppend(
+            fileName: "CLAUDE.md", fileURL: folder.appendingPathComponent("CLAUDE.md"), body: "NEW")
+        AgentGuidance.rememberDeclined(pending, in: defaults)
+        let stored: String? = AgentGuidance.declinedSignature(forPath: pending.fileURL.path, in: defaults)
+        XCTAssertEqual(AgentGuidance.action(existing: "Mine.\n", body: "NEW", declinedSignature: stored), .leave)
+        XCTAssertEqual(AgentGuidance.action(existing: "Mine.\n", body: "NEWER", declinedSignature: stored), .ask)
+        AgentGuidance.forgetDeclined(forPath: pending.fileURL.path, in: defaults)
+        XCTAssertNil(AgentGuidance.declinedSignature(forPath: pending.fileURL.path, in: defaults))
+    }
 
-        _ = WorkspaceModel.writeAgentGuidance(from: guidanceSource, into: folder)
+    /// Implementation review S1: a guidance write that fails is a notice and a
+    /// trail line, and NEVER makes the folder "not ready".
+    func testAGuidanceFailureNeverHoldsTheFolderBack() throws {
+        try "not a folder".write(to: folder.appendingPathComponent(".claude"), atomically: true, encoding: .utf8)
+        let outcome: AgentGuidance.Outcome = AgentGuidance.write(
+            from: guidanceSource, into: folder, declined: { _ in nil }, forgetDeclined: { _ in })
+        XCTAssertFalse(outcome.failures.isEmpty, "a file where a folder belongs cannot hold the skill")
 
-        let rewritten: String = try String(contentsOf: managed, encoding: .utf8)
-        XCTAssertFalse(rewritten.contains("old words"))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: extra.path), "the skill's folder is the app's, whole")
+        let readiness: ToolchainReadiness = ToolchainReadiness.shared
+        readiness.noteReadyForTests(folder)
+        readiness.applyGuidance(outcome, to: folder)
+        XCTAssertEqual(readiness.state(of: folder), .ready)
+        XCTAssertNil(readiness.reasonToWait(folder), "Preview, Deploy and New Course must not wait on guidance")
+        XCTAssertNotNil(readiness.guidanceNotices[FolderIdentity.canonicalPath(folder.path)])
+        readiness.dismissGuidanceNotice(for: folder)
+        readiness.forgetEverything(about: folder)
+    }
+
+    /// And the toolchain copy no longer writes the guidance at all, so its
+    /// own outcome cannot be failed by it.
+    func testTheToolchainCopyDoesNotWriteTheGuidance() throws {
+        let source: String = try String(
+            contentsOf: UserFacingLabelWordsTests.macAppRoot().appendingPathComponent("QuartzTeachers/Models/WorkspaceModel.swift"),
+            encoding: .utf8)
+        XCTAssertFalse(source.contains("AgentGuidance.write("), "the copy's outcome decides readiness; guidance must stay out of it")
     }
 }
