@@ -1677,6 +1677,16 @@ alt: The parabola y = x^2
 y = x^2
 ```
 
+```tikz
+% alt: A ladder 24 cm tall, taller than either paper (E1 review B1)
+\begin{document}
+\begin{tikzpicture}
+\draw[thick] (0,0) -- (0,24) (1,0) -- (1,24);
+\foreach \y in {1,...,23} \draw (0,\y) -- (1,\y) node[right]{\y};
+\end{tikzpicture}
+\end{document}
+```
+
 After the drawn figures (plantoir-after-figures).
 
 ## Question 3
@@ -2146,6 +2156,13 @@ y = 1/(x - 2) + 1
 ```functionplot
 y = ln(x)
 ```
+
+- ```functionplot
+  ---
+  alt: A line opened on a bullet's own line (E1 review S1)
+  ---
+  y = x/2
+  ```
 FIGURESFIXTURE
 printf -- '---\ntitle: Figures Hidden\npublish: false\n---\nA hidden graph (plantoir-figures-hidden-7f3a).\n\n```functionplot\ny = x^2\n```\n' \
   > "$HIT_COURSE/Figures Hidden.md"
@@ -2382,7 +2399,7 @@ page = page_path.read_text(encoding="utf-8") if page_path.is_file() else ""
 if not page:
     problems.append("Figures-Fixture.html was not built")
 figures = re.findall(r'<figure class="pl-figure pl-(tikz|functionplot)( pl-figure-failed)?"[^>]*>(.*?)</figure>', page, re.S)
-fences = sum(1 for line in planted.read_text(encoding="utf-8").splitlines() if re.match(r"^[ >]*```(tikz|functionplot)\s*$", line))
+fences = sum(1 for line in planted.read_text(encoding="utf-8").splitlines() if re.match(r"^[ >]*(?:(?:[-*+]|[0-9]+[.)])[ \t]+)?```(tikz|functionplot)\s*$", line))
 if len(figures) != fences:
     problems.append(f"{len(figures)} figures on the page for {fences} fences")
 drawn = [body for engine, failed, body in figures if engine == "tikz" and not failed]
@@ -2393,6 +2410,8 @@ if len(failed) != 2 or "This diagram couldn" not in failed[0] or "This graph cou
     problems.append("the two figures that cannot be drawn do not say so in the contract's words")
 if not re.search(r'style="fill:\s*red;?"', page):
     problems.append("the red label kept no colour of its own (Quartz greys every svg text)")
+if not any(engine == "functionplot" and not failed and "a bullet" in body and "pl-plot" in body for engine, failed, body in figures):
+    problems.append("the graph opened on a bullet's own line was not placed to be drawn (E1 review S1)")
 if page.count("static/tikz/fonts.css") != 1:
     problems.append(f"the faces are linked {page.count('static/tikz/fonts.css')} times, not once")
 ids = re.findall(r'\bid="(pgf[^"]+)"', page)
@@ -2476,10 +2495,12 @@ else
   RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
-# Two builds of the same page differ in ONE place that is Quartz's own: the
-# sidebar's list gets a random id on every build (measured: `id="ubcjug"` in
-# `<ul class="explorer-ul overflow">`), so "byte-identical" is checked with
-# that one id set aside and every other byte compared.
+# Two builds of one page are not byte-identical even in Quartz alone: the
+# sidebar's list gets a random id every build (`id="ubcjug"` in `<ul
+# class="explorer-ul overflow">`), so does a table of contents (`<ul id="…"
+# class="overflow">`), and generated Curriculum and tag pages carry the build
+# time (E1 review N3). This sets the sidebar's id aside and compares pages
+# that have NEITHER of the other two - Figures Fixture and Help Sessions.
 same_page_but_for_quartz_ids() {
   python3 - "$1" "$2" <<'SAMEPY'
 import re, sys

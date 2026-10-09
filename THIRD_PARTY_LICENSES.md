@@ -19,6 +19,7 @@ teacher's site. Fonts a site carries for its own look are described in
 | **Paged.js** — the print layout for printable pages (#454) | 0.4.3 | MIT | `static/pagedjs/LICENSE.md` beside the file |
 | **Latin Modern** — the faces a printed handout is set in (#499) | Debian fonts-lmodern 2.005 | GUST Font License (an instance of the LPPL 1.3c) | `static/pagedjs/fonts/LICENSE-Latin-Modern.txt` |
 | **function-plot** — draws a page's ` ```functionplot ` graphs (#485 E1) | 1.25.4 | MIT, © 2015 Mauricio Poppe | `static/function-plot/LICENSE` beside the file |
+| **Inside function-plot.js** — it is one bundled file built from d3-axis, d3-color, d3-format, d3-interpolate, d3-scale, d3-selection, d3-shape and d3-zoom (ISC, © Mike Bostock), built-in-math-eval and interval-arithmetic-eval (MIT, © Mauricio Poppe) and events (MIT, © Joyent) | as bundled in function-plot 1.25.4 | ISC and MIT: each asks that its copyright and permission notice travel with copies | function-plot.js carries no notices of its own; this row is where they are named, and the ISC and MIT texts are the standard ones (the MIT text is the `LICENSE` beside the file) |
 | **BaKoMa Computer Modern TrueType fonts** — the lettering of a page's ` ```tikz ` diagrams; only the faces the site's diagrams name (#485 E1) | as shipped in node-tikzjax 1.0.5 | BaKoMa Fonts Licence, © 1994, 1995 Basil K. Malyshev: copying and distribution permitted with the notice; embedding in SVG and printing needs no notice | `static/tikz/LICENCE` beside the faces |
 
 ## Carried inside the website builder only

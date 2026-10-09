@@ -1770,8 +1770,11 @@ circuitikz 664 ms, pgfplots 842 ms.
 **The live-preview edge.** The preview's live reload re-reads `content/`,
 not the teacher's vault, so a fence edited in Obsidian reaches the site on
 the next Preview, which runs this pass again. A fence Quartz sees with no
-manifest entry (a hand edit inside the build folder) says
-`words.site.diagramNeedsPreview` / `graphNeedsPreview`.
+manifest entry says it could not be drawn — never "appears once previewed",
+which would stay on the page for ever if the build simply could not see the
+fence (review S1 found exactly that for a fence opened on a list marker's
+line, which the build now reads). `words.site.graphNeedsPreview` is only for
+a site whose graph engine is missing in the reader's browser.
 
 **Rejected:** rendering inside Quartz (no way to stop a build-long wait or
 reach the folder checks); raw `<svg>` in the processed Markdown (`ofm.ts`
