@@ -338,3 +338,126 @@ def matches_outside_code(pattern, text: str, ranges: list = None, offset: int = 
         found.append(match)
         position = match.end() if match.end() > match.start() else match.start() + 1
     return found
+
+
+# ---- Fenced blocks, read whole (#485 E1) -----------------------------------
+#
+# The figure fences (```tikz, ```functionplot) are found with the SAME fence
+# rule as above - in callouts at any depth, in list items, with backticks or
+# tildes - over the page with its `%%` comments removed first, as Quartz
+# removes them (#455 plan, finding F): a fence inside a comment is gone, and a
+# `%%` inside a fence eats what Quartz eats. What this adds is the block's
+# CONTENT, which the masks above never needed.
+
+def _strip_quote_markers(line: str, depth: int) -> str:
+    """`line` with its first `depth` blockquote markers (and the one space
+    after each) taken off, the way CommonMark reads a line inside a fence
+    that sits in a quote: a deeper `>` is the code's own text."""
+    position = 0
+    for _ in range(depth):
+        scan = position
+        while scan < len(line) and line[scan] in " \t":
+            scan += 1
+        if scan >= len(line) or line[scan] != ">":
+            break
+        position = scan + 1
+        if position < len(line) and line[position] == " ":
+            position += 1
+    return line[position:]
+
+
+def _without_comments(text: str):
+    """The page with every `%%` comment removed, and for each character of
+    the result its offset in `text` (plus one past the end)."""
+    comments = comment_ranges(text)
+    if not comments:
+        return text, None
+    kept_pieces = []
+    origin = []
+    last = 0
+    for start, end in comments:
+        kept_pieces.append(text[last:start])
+        origin.extend(range(last, start))
+        last = end
+    kept_pieces.append(text[last:])
+    origin.extend(range(last, len(text)))
+    origin.append(len(text))
+    return "".join(kept_pieces), origin
+
+
+def fenced_blocks(text: str) -> list:
+    """
+    Every fenced code block on the page, in order, as dicts:
+    {"lang": the info string's first word as written, "meta": the rest of it,
+     "body": the content with the quote markers of the fence's depth and up
+     to the opener's own indent taken off each line, joined with "\\n",
+     "line": the 1-based line of the OPENING fence in `text` as given}.
+
+    The rule is the one `code_ranges` uses (readingALink.whatIsCode); an
+    unclosed fence runs to the end of the page, and a line at a smaller quote
+    depth ends it. A fence opened on a list marker's own line (`- ```tikz`)
+    is not seen here, as it is not seen by `code_ranges`.
+    """
+    stripped, origin = _without_comments(text)
+    found = []
+    open_block = None
+
+    def close():
+        nonlocal open_block
+        if open_block is not None:
+            found.append({
+                "lang": open_block["lang"],
+                "meta": open_block["meta"],
+                "body": "\n".join(open_block["lines"]),
+                "line": open_block["line"],
+            })
+        open_block = None
+
+    line_start = 0
+    length = len(stripped)
+    while line_start <= length:
+        newline = stripped.find("\n", line_start)
+        line_end = length if newline < 0 else newline
+        line = stripped[line_start:line_end]
+        if line.endswith("\r"):
+            line = line[:-1]
+        depth, body = _quote_depth_and_body(line)
+
+        if open_block is not None and depth < open_block["depth"]:
+            close()
+
+        if open_block is not None:
+            content = _strip_quote_markers(line, open_block["depth"])
+            fence = _FENCE.match(content)
+            if depth == open_block["depth"] and fence \
+                    and fence.group(1)[0] == open_block["char"] \
+                    and len(fence.group(1)) >= open_block["length"] \
+                    and _is_blank(fence.group(2)):
+                close()
+            else:
+                indent = 0
+                while indent < open_block["indent"] and indent < len(content) and content[indent] == " ":
+                    indent += 1
+                open_block["lines"].append(content[indent:])
+        else:
+            fence = _FENCE.match(body)
+            if fence and not (fence.group(1)[0] == "`" and "`" in fence.group(2)):
+                info = fence.group(2).strip(_WHITESPACE)
+                words = info.split(None, 1)
+                where = line_start if origin is None else origin[line_start]
+                open_block = {
+                    "char": fence.group(1)[0],
+                    "length": len(fence.group(1)),
+                    "depth": depth,
+                    "indent": len(body) - len(body.lstrip(" \t")),
+                    "lang": words[0] if words else "",
+                    "meta": words[1] if len(words) > 1 else "",
+                    "line": text.count("\n", 0, where) + 1,
+                    "lines": [],
+                }
+
+        if newline < 0:
+            break
+        line_start = line_end + 1
+    close()
+    return found

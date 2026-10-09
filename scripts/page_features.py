@@ -21,7 +21,10 @@ frontmatter, so its test runs on a machine without it (Windows'
 PythonToolchainTests). What PyYAML makes of each TYPED line is checked down the
 real chain, inside the image, by `check_print_rules_against_the_site.py`.
 
-#455 adds `codeRunner` to GATED_ASSETS beside `printable`.
+#455 adds `codeRunner` to GATED_ASSETS beside `printable`. #485 E1 added
+`function-plot`, which no frontmatter key asks for: a ```functionplot fence on
+a page students can see does (scripts/figures.py counts them), and the build
+hands the count in beside the printable pages'.
 """
 
 import os
@@ -33,7 +36,25 @@ import toolchain_paths
 
 # Which engine each opt-in key pulls into a site. The engine's folder under
 # VENDOR_DIR, and under the site's quartz/static, has the same name.
-GATED_ASSETS = {"pagedjs": "printable"}
+GATED_ASSETS = {"pagedjs": "printable", "function-plot": "functionplot"}
+
+# What the build says about each engine, in the words of what it is FOR - a
+# graph is not a print layout (#485 review S9: the first draft would have
+# told a teacher their graphs were missing "the print layout").
+ENGINE_WORDS = {
+    "pagedjs": {
+        "missing": "⚠️ {pages} page(s) ask to be printable, but this copy of Plantoir "
+                   "is missing its print layout, so they will print without it.",
+        "carried": "🖨️  This site carries the print layout for {pages} {noun}.",
+        "failed": "⚠️ Could not set up the print layout: {error}",
+    },
+    "function-plot": {
+        "missing": "⚠️ {pages} page(s) have a graph, but this copy of Plantoir is missing "
+                   "what draws graphs, so students will see each graph's text instead.",
+        "carried": "📈 This site carries what draws the graphs on {pages} {noun}.",
+        "failed": "⚠️ Could not set up the graphs: {error}",
+    },
+}
 
 # A PDF's first five bytes. A file named .pdf that does not start with them
 # opens in a browser as an error page, which is worse than the handout.
@@ -197,15 +218,15 @@ def install_gated_assets(output_dir, counts: dict, vendor_dir=None, printer=prin
                 if target.exists():
                     shutil.rmtree(target, ignore_errors=True)
                 continue
+            said = ENGINE_WORDS[engine]
             source = vendor / engine
             if not source.is_dir():
-                printer(f"⚠️ {pages} page(s) ask to be printable, but this copy of Plantoir "
-                        f"is missing its print layout, so they will print without it.")
+                printer(said["missing"].format(pages=pages))
                 continue
             outcome[engine]["copied"] = _sync_folder(source, target)
             outcome[engine]["installed"] = True
             noun = "page" if pages == 1 else "pages"
-            printer(f"🖨️  This site carries the print layout for {pages} {noun}.")
+            printer(said["carried"].format(pages=pages, noun=noun))
         except OSError as error:
-            printer(f"⚠️ Could not set up the print layout: {error}")
+            printer(ENGINE_WORDS[engine]["failed"].format(error=error))
     return outcome

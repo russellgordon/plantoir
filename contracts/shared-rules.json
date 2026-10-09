@@ -4453,7 +4453,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound", "figuresCouldNotBeDrawn"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -4602,6 +4602,20 @@
         "fixable": false,
         "fill": "{page} is the page's place in the course folder without .md, {file} the name as the page gives it (brackets and an |alias taken off), {count} how many pages. `sentence` when there is one page and `sentenceForSeveral` otherwise; `detail` names at most ten pages, each through pageMissing, pageNotAPdf or pageHasAPath (file-formats.json → pageOptIns.printPdfCases' problem missing, notAPdf, hasAPath), joined with \", \", then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build, never one per page (#246).",
         "why": "#454 plan review S3: a PDF named by a page and then renamed, moved or never added made the page quietly fall back to the generated handout - or lose its Print button - with the reason only in the build's console, where a teacher using the app never looks. A finding is surfaced by both apps and recorded on the trail as 'found a problem with this course's folders' with no new code. It never stops a build: one attachment must not keep a whole site from being built or deployed, and refusing would also break the preview the teacher is using to fix it. Not repairable: only the teacher knows which PDF was meant."
+      },
+      {
+        "name": "figuresCouldNotBeDrawn",
+        "sentence": "A diagram or graph on “{page}” in {course} Section {section} could not be drawn.",
+        "sentenceForSeveral": "{count} diagrams and graphs in {course} Section {section} could not be drawn.",
+        "detail": "Students see a short note where it should be until it is fixed in your notes: {figures}.",
+        "figureLine": "“{page}”, {kind} {block}, line {line}: {reason}",
+        "figureLineInBlock": "“{page}”, {kind} {block}, line {blockLine} of the {kind}: {reason}",
+        "figureLineNoLine": "“{page}”, {kind} {block}: {reason}",
+        "kinds": { "tikz": "diagram", "functionplot": "graph" },
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md; {kind} is kinds[engine]; {block} counts that engine's fences on the page from 1; {line} is the line in the teacher's own file, and when it cannot be found {blockLine} is the line within the fence (figureLineInBlock), or neither is known (figureLineNoLine); {reason} is figureFences.words.reasons[reason] filled with the figure's {name}, {said} and {seconds}. `sentence` when ONE figure could not be drawn and `sentenceForSeveral` otherwise ({count} figures). `detail` names at most ten figures, joined with \"; \" (a reason can hold a comma), then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build (#246).",
+        "why": "#485 E1 (plan, Python prepares and Quartz places): a diagram or graph that cannot be drawn shows students a short sentence in its place (ruling E1-7), and the teacher, who previews in the app and never reads the build's console, has to be told where - page, fence and line - or the sentence stays on the site. An assistant reads the same facts on `plantoir: error:` lines. It never stops a build: one figure must not keep a whole site from being built or deployed. Not repairable: only the teacher knows what the figure was meant to say. A figure with no description (`% alt:`) is NOT a finding (ruling E1-3): it is drawn, and only a `plantoir: note:` line says so."
       }
     ],
     "linksIntoHiddenPages": {
@@ -23182,5 +23196,646 @@
       },
       "why": "Measured (#454 plan review S1, Claude Code 2.1.295 and Codex 0.155.1, each started at the working folder as both apps start them): Codex never found a skill under courses/<CODE>/.agents/skills, and found the same skill at the root at once; Claude Code found a per-course skill only after it had read a file in that course - after the first worksheet was written. With the root files in place, all four runs (each launcher, from the root and from a course) found and followed the guidance (documentation/09-mac-app.md). REJECTED: a copy in every course (invisible to Codex, late for Claude Code); an AGENTS.md or CLAUDE.md in the course (a note in Obsidian's tree, needing publishing exclusions in four places like How I Teach); overwriting a teacher's own root file (the first implementation left it alone; Russell ruled for a managed section, appended only after a yes)."
     }
+  },
+  "figureFences": {
+    "rule": "#485 E1. A ```tikz fence (a LaTeX TikZ picture, written as the Obsidian TikZJax plugin reads it) is DRAWN when the site is built, by the same TeX engine that plugin carries (node-tikzjax 1.0.5: its tex.wasm, core.dump and all 212 TeX files are byte-identical to obsidian-tikzjax 0.5.2's, measured by SHA-256), and placed in the page as an SVG: students download no engine. A ```functionplot fence (a graph of y = f(x), in obsidian-functionplot 1.2.1's syntax) is CHECKED when the site is built, with the evaluator the site draws it with (function-plot 1.25.4), and drawn in the student's browser from function-plot served by the site itself - never from another address. Both are emitted as printablePages.figures says (`<figure class=\"pl-figure pl-tikz\">` / `pl-functionplot`) with a figcaption holding the description a screen reader reads. A figure that cannot be drawn shows words.site.diagramCouldNotBeDrawn or graphCouldNotBeDrawn to students and is reported to the teacher (siteHealth.checks -> figuresCouldNotBeDrawn, one finding per section build) and to an assistant (a `plantoir: error:` line per figure, issue #485 section 7.5). Only pages students can see count; the fence IS the opt-in, so there is no page setting and no course switch.",
+    "fences": {
+      "rule": "The fence's language is the info string's FIRST WORD, exactly `tikz` or `functionplot` - the names the two plugins register; the rest of the info string is ignored. Found with readingALink.whatIsCode's fence rule, after every `%%` comment is removed as Quartz removes it: at any quote depth (a callout, folded or not), in a list item's indented content, with backticks or tildes. `block` counts each engine's fences on the page from 1; `line` is the opening fence's line. Whether Obsidian also reads another capitalisation was not measured (review N6); the guidance always writes lowercase.",
+      "cases": [
+        {
+          "name": "a tikz fence",
+          "page": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+          "found": [
+            {
+              "engine": "tikz",
+              "block": 1,
+              "line": 1
+            }
+          ]
+        },
+        {
+          "name": "TikZ in capitals is not a figure",
+          "page": "```TikZ\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+          "found": []
+        },
+        {
+          "name": "the first word of the info string",
+          "page": "```tikz title=\"x\"\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+          "found": [
+            {
+              "engine": "tikz",
+              "block": 1,
+              "line": 1
+            }
+          ]
+        },
+        {
+          "name": "a functionplot fence",
+          "page": "Intro.\n\n```functionplot\ny = x^2\n```\n",
+          "found": [
+            {
+              "engine": "functionplot",
+              "block": 1,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "name": "function-plot with a hyphen is not a figure",
+          "page": "```function-plot\ny = x^2\n```\n",
+          "found": []
+        },
+        {
+          "name": "inside a folded callout",
+          "page": "> [!example]- A tree\n> ```tikz\n> \\begin{document}\n> \\end{document}\n> ```\n",
+          "found": [
+            {
+              "engine": "tikz",
+              "block": 1,
+              "line": 2
+            }
+          ]
+        },
+        {
+          "name": "inside a list item",
+          "page": "1. Draw the line.\n\n   ```functionplot\n   y = 2x + 1\n   ```\n",
+          "found": [
+            {
+              "engine": "functionplot",
+              "block": 1,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "name": "with tildes",
+          "page": "~~~tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n~~~\n",
+          "found": [
+            {
+              "engine": "tikz",
+              "block": 1,
+              "line": 1
+            }
+          ]
+        },
+        {
+          "name": "inside a %% comment",
+          "page": "%%\n```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n%%\n",
+          "found": []
+        },
+        {
+          "name": "each engine counted on its own",
+          "page": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n\n```functionplot\ny = x\n```\n\n```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+          "found": [
+            {
+              "engine": "tikz",
+              "block": 1,
+              "line": 1
+            },
+            {
+              "engine": "functionplot",
+              "block": 1,
+              "line": 9
+            },
+            {
+              "engine": "tikz",
+              "block": 2,
+              "line": 13
+            }
+          ]
+        }
+      ]
+    },
+    "tidy": {
+      "rule": "obsidian-tikzjax 0.5.2's tidyTikzSource, which every engine runs before anything else: remove every `&nbsp;`, split on \"\\n\" ONLY, trim each line with JavaScript's String.prototype.trim(), drop the lines left empty, join with \"\\n\". JavaScript's trim set is NOT Python's str.strip() set (review S4: Python also strips U+001C-U+001F and U+0085 and keeps U+FEFF), so the build spells JavaScript's out; a mismatch would draw a diagram the page then cannot find.",
+      "cases": [
+        {
+          "body": "  \\draw (0,0);\n\n\t\\end{tikzpicture}  ",
+          "tidy": "\\draw (0,0);\n\\end{tikzpicture}"
+        },
+        {
+          "body": "a&nbsp;b",
+          "tidy": "ab"
+        },
+        {
+          "body": " x y ",
+          "tidy": "x y",
+          "why": "No-break spaces are trimmed at the ends and kept inside."
+        },
+        {
+          "body": "﻿x",
+          "tidy": "x"
+        },
+        {
+          "body": "x",
+          "tidy": "x"
+        },
+        {
+          "body": "\u001fx",
+          "tidy": "\u001fx"
+        },
+        {
+          "body": "x\r\ny\r\n",
+          "tidy": "x\ny"
+        },
+        {
+          "body": "x y",
+          "tidy": "x y",
+          "why": "Split on \"\\n\" only, never on every line break Python knows."
+        }
+      ]
+    },
+    "cacheKey": {
+      "rule": "A figure is cached and looked up by SHA-256 of its tidied fence, as lowercase hex - the build, the site's transformer and the helper all compute it (figureRules.keyOf). WHICH ENGINE drew it is not in the key: the cache folder is named after the engine (cache.engineIdFrom), so a changed engine empties the cache without anyone remembering to change a string (review S3).",
+      "cases": [
+        {
+          "body": "% alt: Two similar triangles; triangle DEF is a 1.5× enlargement of triangle ABC.\n\\begin{document}\n\\begin{tikzpicture}\n  \\draw[thick] (0,0) node[below left]{$A$} -- (3,0) node[below right]{$B$} -- (1,2) node[above]{$C$} -- cycle;\n  \\draw[thick] (5,0) node[below left]{$D$} -- (9.5,0) node[below right]{$E$} -- (6.5,3) node[above]{$F$} -- cycle;\n  \\node at (1.5,-0.5) {$3$};\n  \\node at (7.25,-0.5) {$4.5$};\n\\end{tikzpicture}\n\\end{document}\n",
+          "key": "2fb12f167d4724ee74c7aa269b3b443cac66e6ccfbc09f2cd71d1f4f88fd812b"
+        }
+      ]
+    },
+    "alt": {
+      "rule": "What a screen reader reads for a figure (the figcaption, hidden on screen and on paper). TikZ: `% alt: ...` as the FIRST non-empty line of the fence - a TeX comment, so Obsidian draws the same picture; otherwise words.site.untitledDiagram, and the build prints a `plantoir: note:` line (words.reasons.missingAlt) - never a folder problem (ruling E1-3). functionplot: an `alt:` setting in its settings block (Plantoir's addition: the plugin reads only the keys it knows, so it ignores `alt:` rather than failing - measured on its released main.js); otherwise words.site.describePlot, made from the functions as written and the x bounds.",
+      "cases": [
+        {
+          "engine": "tikz",
+          "body": "% alt: A tree of two coin tosses\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "alt": "A tree of two coin tosses"
+        },
+        {
+          "engine": "tikz",
+          "body": "\\begin{document}\n% alt: too late\n\\end{document}",
+          "alt": null
+        },
+        {
+          "engine": "tikz",
+          "body": "%alt:x\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "alt": "x"
+        },
+        {
+          "engine": "tikz",
+          "body": "\n   % alt:   Spaced out  \n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "alt": "Spaced out"
+        },
+        {
+          "engine": "tikz",
+          "body": "% alt:\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "alt": null
+        },
+        {
+          "engine": "functionplot",
+          "body": "---\nalt: Two lines that cross at (1, 3)\n---\ny = 2x + 1\ny = -x + 4",
+          "alt": "Two lines that cross at (1, 3)"
+        },
+        {
+          "engine": "functionplot",
+          "body": "---\nbounds: [-5, 5, -5, 5]\n---\ny = 2x + 1\ny = -x + 4",
+          "alt": "Graph of y = 2x + 1 and y = -x + 4, for x from -5 to 5."
+        }
+      ]
+    },
+    "functionplot": {
+      "rule": "obsidian-functionplot 1.2.1, read from its released main.js and reproduced exactly: the settings are the text between the first `---` and the LAST `---` (a greedy, unanchored match), read as YAML; the plugin then cuts that many characters off the START of the fence, so settings written below a function are read wrongly - Plantoir refuses them (settingsMustComeFirst). Every other non-empty, trimmed line is one function, and what is drawn is the text after its first `=` and before any second one (`line.split(\"=\")[1]`), as a polyline. Settings and defaults: title \"\", xLabel \"\", yLabel \"\", bounds [-10, 10, -10, 10] ([xMin, xMax, yMin, yMax]), disableZoom false, grid true; a key left empty (the plugin's own \"Plot a function\" command writes `title:` with nothing after it) keeps its default; any other key is ignored and noted (unknownSetting), never a failure. `alt` is Plantoir's. A graph is drawn only when nothing in problems is found; the first problem (by line) is the one reported.",
+      "parseCases": [
+        {
+          "name": "settings, two functions, a misspelt key",
+          "body": "---\ntitle: Two lines\nbounds: [-5, 5, -5, 5]\nalt: Two lines crossing\ndisbaleZoom: true\n---\ny = 2x + 1\ny = -x + 4",
+          "functions": [
+            "2x + 1",
+            "-x + 4"
+          ],
+          "bounds": [
+            -5,
+            5,
+            -5,
+            5
+          ],
+          "title": "Two lines",
+          "alt": "Two lines crossing",
+          "unknown": [
+            "disbaleZoom"
+          ],
+          "problem": null
+        },
+        {
+          "name": "no settings",
+          "body": "y = x^2",
+          "functions": [
+            "x^2"
+          ],
+          "bounds": [
+            -10,
+            10,
+            -10,
+            10
+          ],
+          "title": "",
+          "alt": null,
+          "unknown": [],
+          "problem": null
+        },
+        {
+          "name": "f(x) = also works",
+          "body": "f(x) = x^2",
+          "functions": [
+            "x^2"
+          ],
+          "problem": null
+        },
+        {
+          "name": "the plugin's own Plot a function command",
+          "body": "---\ntitle: \nxLabel: \nyLabel: \nbounds: [-10,10,-10,10]\ndisableZoom: false\ngrid: true\n---\nf(x)=x^2",
+          "functions": [
+            "x^2"
+          ],
+          "bounds": [
+            -10,
+            10,
+            -10,
+            10
+          ],
+          "title": "",
+          "unknown": [],
+          "problem": null
+        },
+        {
+          "name": "zoom turned off",
+          "body": "---\ndisableZoom: true\n---\ny = x",
+          "functions": [
+            "x"
+          ],
+          "disableZoom": true,
+          "problem": null
+        },
+        {
+          "name": "a line with no =",
+          "body": "x^2",
+          "problem": {
+            "reason": "noEquals",
+            "blockLine": 1
+          }
+        },
+        {
+          "name": "two bounds",
+          "body": "---\nbounds: [0, 10]\n---\ny = x",
+          "problem": {
+            "reason": "boundsNeedFour",
+            "blockLine": 1
+          }
+        },
+        {
+          "name": "bounds the wrong way round",
+          "body": "---\nbounds: [10, 0, -5, 5]\n---\ny = x",
+          "problem": {
+            "reason": "boundsNeedFour",
+            "blockLine": 1
+          }
+        },
+        {
+          "name": "a function above the settings",
+          "body": "y = x\n---\ntitle: Late\n---",
+          "problem": {
+            "reason": "settingsMustComeFirst",
+            "blockLine": 2
+          }
+        },
+        {
+          "name": "settings YAML cannot read",
+          "body": "---\nalt: Graph: two lines\n---\ny = x",
+          "problem": {
+            "reason": "settingsDoNotParse",
+            "blockLine": 1
+          }
+        },
+        {
+          "name": "settings and nothing to draw",
+          "body": "---\ntitle: Empty\n---\n",
+          "problem": {
+            "reason": "noFunctions",
+            "blockLine": 1
+          }
+        },
+        {
+          "name": "the plugin's per-function settings are not read",
+          "body": "y = x^2 @ color=red",
+          "problem": {
+            "reason": "expressionNotUnderstood",
+            "blockLine": 1
+          },
+          "why": "1.2.1 draws `x^2 @ color` (split on =), which its evaluator refuses; the newer @-syntax in the plugin's source was never released."
+        }
+      ],
+      "expressionCases": {
+        "rule": "Each function is tried at x = 0.5, 1.5 and -2.5 with function-plot's own evaluator ($eval.builtIn) - a name it does not know is only found by evaluating - and then sampled at 51 points across the x bounds: if none of them is a finite number, it would draw nothing (drawsNothing). `log` with two arguments is refused from the text (logTakesOneArgument), because function-plot silently ignores the base and draws the natural log (review S2: log(x,2) at 8 is 2.079). Bounds are the default [-10, 10] here. `problem` null means it is drawn.",
+        "cases": [
+          {
+            "fn": "log(x)",
+            "problem": null
+          },
+          {
+            "fn": "log10(x)",
+            "problem": null
+          },
+          {
+            "fn": "log(x)/log(2)",
+            "problem": null
+          },
+          {
+            "fn": "2x",
+            "problem": null
+          },
+          {
+            "fn": "2sin(x)",
+            "problem": null
+          },
+          {
+            "fn": "(x+1)(x-1)",
+            "problem": null
+          },
+          {
+            "fn": "E^x",
+            "problem": null
+          },
+          {
+            "fn": "x^PI",
+            "problem": null
+          },
+          {
+            "fn": "cbrt(x)",
+            "problem": null
+          },
+          {
+            "fn": "abs(x)",
+            "problem": null
+          },
+          {
+            "fn": "sqrt(x)",
+            "problem": null,
+            "why": "Drawn where it is defined, x >= 0."
+          },
+          {
+            "fn": "x^(1/3)",
+            "problem": null,
+            "why": "Drawn for x >= 0 only, as a power of a negative number is not a real number to the evaluator: the guidance says cbrt(x). A half graph, never refused."
+          },
+          {
+            "fn": "ln(x)",
+            "problem": "unknownName",
+            "name": "ln"
+          },
+          {
+            "fn": "pi*x",
+            "problem": "unknownName",
+            "name": "pi"
+          },
+          {
+            "fn": "e^x",
+            "problem": "unknownName",
+            "name": "e"
+          },
+          {
+            "fn": "sec(x)",
+            "problem": "unknownName",
+            "name": "sec"
+          },
+          {
+            "fn": "arcsin(x)",
+            "problem": "unknownName",
+            "name": "arcsin"
+          },
+          {
+            "fn": "x(x-1)",
+            "problem": "needsTimesSign",
+            "name": "x"
+          },
+          {
+            "fn": "x**2",
+            "problem": "expressionNotUnderstood"
+          },
+          {
+            "fn": "|x|",
+            "problem": "expressionNotUnderstood"
+          },
+          {
+            "fn": "sin x",
+            "problem": "drawsNothing"
+          },
+          {
+            "fn": "log(x,2)",
+            "problem": "logTakesOneArgument"
+          },
+          {
+            "fn": "log(x, 10) + 1",
+            "problem": "logTakesOneArgument"
+          }
+        ]
+      }
+    },
+    "texErrors": {
+      "rule": "Why a TikZ diagram was not drawn, read from TeX's own console (node-tikzjax with showConsole): the first line starting `! ` is what TeX said, and the `l.N` line after it says where - N is the TIDIED fence's line N - 1, because node-tikzjax puts a one-line preamble in front of it (measured). The build maps the tidied line back to the fence's own line (tidy drops blank lines) and then to the line in the teacher's file. A diagram still drawing after timing.perDiagramSeconds is ended (`\\def\\x{\\x}\\x` never finishes and says nothing - measured) and is tookTooLong; that one is NOT cached, so the next build tries again (review S5). Every other answer is the same every time, and is cached. `blockLine` is the line within the fence.",
+      "cases": [
+        {
+          "name": "\\foo",
+          "body": "\\begin{document}\n\n\\begin{tikzpicture}\n\\foo\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "reason": "undefinedCommand",
+          "blockLine": 4
+        },
+        {
+          "name": "siunitx",
+          "body": "\\usepackage{siunitx}\n\\begin{document}\n\\begin{tikzpicture}\\draw (0,0) -- (1,1);\\end{tikzpicture}\n\\end{document}",
+          "reason": "missingPackage",
+          "blockLine": 2
+        },
+        {
+          "name": "no \\begin{document}",
+          "body": "\\begin{tikzpicture}\\draw (0,0) -- (1,1);\\end{tikzpicture}",
+          "reason": "missingDocument",
+          "blockLine": 1
+        },
+        {
+          "name": "a \\documentclass line, as Overleaf writes",
+          "body": "\\documentclass{article}\n\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\\draw (0,0) -- (1,1);\\end{tikzpicture}\n\\end{document}",
+          "reason": "documentClassNotNeeded",
+          "blockLine": 1,
+          "why": "Review S6: an assistant or an Overleaf paste writes it by habit; the line is not removed for the teacher, so Obsidian and the site still agree."
+        },
+        {
+          "name": "a missing semicolon",
+          "body": "\\begin{document}\n\\begin{tikzpicture}\\draw (0,0) -- (1,1)\\end{tikzpicture}\n\\end{document}",
+          "reason": "texSaid",
+          "blockLine": 2
+        },
+        {
+          "name": "a definition that never ends",
+          "body": "\\begin{document}\n\\def\\x{\\x}\\x\n\\end{document}",
+          "reason": "tookTooLong",
+          "blockLine": null
+        },
+        {
+          "name": "\\usepackage{tikz} is harmless",
+          "body": "\\usepackage{tikz}\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}",
+          "reason": null
+        }
+      ]
+    },
+    "timing": {
+      "perDiagramSeconds": 20,
+      "startSeconds": 120,
+      "why": "20 s is 25 times the slowest diagram measured (pgfplots, 842 ms, M4 Pro, Colima at 6 CPUs). The clock for a diagram starts once the engine is loaded (0.5 to 0.8 s here), which has its own limit, because Windows' first load against 5,445 files and its antivirus is unmeasured (review S5)."
+    },
+    "cache": {
+      "rule": "`<the course's builds folder>/.figure-cache/<engineId>/<engine>-<key>.json`, shared by the course's sections, outside the teacher's folder, and kept when the website builder is remade. engineId is the first 16 hex of SHA-256 over engineIdFrom (each file's name and bytes), computed by the build only; a folder for any other engineId is removed. An entry is touched when used and removed after pruneDays unused; --full-rebuild clears this engine's entries. Every write goes to a temporary file and is then moved into place; a missing or half-written entry is simply not cached (review S7). A build whose figures are all cached never starts the drawing engine.",
+      "engineIdFrom": [
+        "support/figures/package-lock.json",
+        "support/figures/plantoir-figures.mjs",
+        "support/quartz/plugins/transformers/figureRules.js",
+        "function-plot/function-plot.js (the vendored copy)"
+      ],
+      "pruneDays": 90,
+      "notCached": [
+        "tookTooLong",
+        "engineMissing"
+      ]
+    },
+    "siteCarriesEngine": {
+      "rule": "The #454 gate, per site. `static/function-plot/` (function-plot.js and its LICENSE) only when a page students can see has a graph that can be drawn (page_features.GATED_ASSETS -> \"function-plot\"); `static/tikz/` only when a diagram is drawn, holding exactly the Computer Modern faces the site's diagrams name (each 20 to 33 KB as TrueType; 140 exist), fonts.css and the BaKoMa LICENCE. The TikZ engine itself (39 MB, 5,445 files) is never copied into a site: its folder is `tikz-engine`, a different name from the site's `tikz` (review S8). A site with no figure carries neither folder, and no page of it changes.",
+      "cases": [
+        {
+          "name": "no figures",
+          "pages": [
+            {
+              "text": "Just words.",
+              "visible": true
+            }
+          ],
+          "drawnFonts": [],
+          "functionPlot": false,
+          "fonts": []
+        },
+        {
+          "name": "a graph students can see",
+          "pages": [
+            {
+              "text": "```functionplot\ny = x\n```\n",
+              "visible": true
+            }
+          ],
+          "drawnFonts": [],
+          "functionPlot": true,
+          "fonts": []
+        },
+        {
+          "name": "a graph only on a page students cannot see",
+          "pages": [
+            {
+              "text": "---\npublish: false\n---\n```functionplot\ny = x\n```\n",
+              "visible": false
+            }
+          ],
+          "drawnFonts": [],
+          "functionPlot": false,
+          "fonts": []
+        },
+        {
+          "name": "a graph that cannot be drawn",
+          "pages": [
+            {
+              "text": "```functionplot\ny = ln(x)\n```\n",
+              "visible": true
+            }
+          ],
+          "drawnFonts": [],
+          "functionPlot": false,
+          "fonts": []
+        },
+        {
+          "name": "a diagram naming two faces",
+          "pages": [
+            {
+              "text": "```tikz\n\\begin{document}\n\\begin{tikzpicture}\n\\draw (0,0) -- (1,1);\n\\end{tikzpicture}\n\\end{document}\n```\n",
+              "visible": true
+            }
+          ],
+          "drawnFonts": [
+            "cmr10",
+            "cmmi10"
+          ],
+          "functionPlot": false,
+          "fonts": [
+            "cmmi10",
+            "cmr10"
+          ],
+          "files": [
+            "LICENCE",
+            "cmmi10.ttf",
+            "cmr10.ttf",
+            "fonts.css"
+          ]
+        }
+      ]
+    },
+    "darkMode": {
+      "rule": "Colours follow the site's theme through CSS on the drawing's own attributes, as obsidian-tikzjax's own dark-mode setting does: in a TikZ drawing black (`#000`, `black`) becomes the theme's text colour (--dark) and white (`#fff`, `white`) its background (--light); a graph's text, axes and grid take the theme's grey and text colours. Every rule is scoped under `.pl-figure`, so a page with no figure is untouched. NO invert() filter. On paper (`@media print`, every page, printable or not) `.pl-figure` sets --light #fff, --lightgray #e5e5e5, --gray #b8b8b8, --darkgray #4e4e4e and --dark #000, so ⌘P from dark mode prints black on white with white label boxes (review B1: before it, a figure on a page that is not printable printed near-white on white with solid black label boxes, because #454's light flip is scoped to printable pages). A figure on paper is never split, is scaled to the page's width, and is no taller than printMaxHeightIn, so it can never be split or duplicated by a print layout (review B3: a 1,400 px figure printed over 4 pages with the text after it twice).",
+      "selectors": [
+        ".pl-tikz svg [stroke=\"#000\"]",
+        ".pl-tikz svg [fill=\"#000\"]",
+        ".pl-tikz svg [stroke=\"#fff\"]",
+        ".pl-tikz svg [fill=\"#fff\"]",
+        ".pl-tikz svg [stroke=\"black\"]",
+        ".pl-tikz svg [fill=\"black\"]",
+        ".pl-tikz svg [stroke=\"white\"]",
+        ".pl-tikz svg [fill=\"white\"]"
+      ],
+      "printMaxHeightIn": 8,
+      "knownLimit": "A pure colour the teacher chose (red, blue) is drawn as written in both themes; pure blue is dim on a dark page, exactly as in Obsidian."
+    },
+    "zoom": {
+      "rule": "function-plot attaches its zoom to the graph's own surface whether or not zoom is on (`disableZoom` only ignores the result), and while it is attached a scroll or a finger drag that starts over a graph moves the graph instead of the page - measured: page scroll 0 px for a 400 px wheel and a 300 px touch drag (review B2). So the site DETACHES those listeners when the teacher wrote `disableZoom: true` and on every touch screen (`(pointer: coarse)`), and with a mouse or trackpad keeps drag-to-move but zooms only with ⌘ or Ctrl held - which a trackpad pinch sends - so a plain scroll always moves the page. Not Obsidian's behaviour (the plugin keeps the trap); that is not Plantoir's to change."
+    },
+    "words": {
+      "note": "English, as data: the site's words appear on a page students read, the reasons in the teacher's folder problem and on the `plantoir:` lines an assistant reads. No word names the machinery (CLAUDE.md rule 1). {name} is a command, package, setting or function name as written; {said} is the engine's own words; {seconds} is timing.perDiagramSeconds.",
+      "site": {
+        "diagramCouldNotBeDrawn": "This diagram couldn't be drawn.",
+        "graphCouldNotBeDrawn": "This graph couldn't be drawn.",
+        "diagramNeedsPreview": "This diagram appears once the site is previewed again.",
+        "graphNeedsPreview": "This graph appears once the site is previewed again.",
+        "untitledDiagram": "A diagram.",
+        "describePlot": "Graph of {functions}, for x from {xMin} to {xMax}.",
+        "describePlotAnd": " and "
+      },
+      "reasons": {
+        "undefinedCommand": "{name} isn't a command LaTeX knows here",
+        "missingPackage": "the {name} package isn't available for diagrams",
+        "missingDocument": "a diagram needs \\begin{document} and \\end{document} around it",
+        "documentClassNotNeeded": "remove the \\documentclass line - a diagram doesn't need one",
+        "texSaid": "LaTeX stopped here: {said}",
+        "tookTooLong": "it took longer than {seconds} seconds to draw, so it was stopped (it will be tried again next time)",
+        "engineMissing": "this copy of Plantoir can't draw diagrams and graphs",
+        "settingsMustComeFirst": "the settings between --- lines must come before the functions",
+        "settingsDoNotParse": "the settings between the --- lines can't be read (put quotes around a value that has a colon in it)",
+        "boundsNeedFour": "bounds needs four numbers, [xMin, xMax, yMin, yMax], each pair smallest first",
+        "noEquals": "each line under the settings must be a function, such as y = x^2",
+        "noFunctions": "there is no function to draw - add a line such as y = x^2",
+        "unknownName": "“{name}” isn't something a graph understands - use log for the natural log, log10 for base 10, PI and E",
+        "needsTimesSign": "put * between {name} and the bracket after it, as in x*(x - 1)",
+        "logTakesOneArgument": "log takes one value - for a base-2 logarithm write log(x)/log(2)",
+        "drawsNothing": "nothing can be drawn between the bounds - check the brackets, as in sin(x)",
+        "expressionNotUnderstood": "the graph can't read this function ({said})",
+        "graphEngineMissing": "this copy of Plantoir can't check graphs",
+        "unknownSetting": "{name} isn't a graph setting, so it was left out",
+        "missingAlt": "it has no “% alt:” first line, so a screen reader only says “A diagram.”"
+      }
+    },
+    "agentGuidance": {
+      "rule": "The skill `plantoir-math-graphs` sits beside `plantoir-printing` in support/agent_guidance/skills and reaches a working folder the same way (printablePages.agentGuidance): which fence to use, the syntax, the measured list of packages, the gotchas, and how to read a `plantoir: error:` line. The root AGENTS.md and CLAUDE.md sections name it in one line each.",
+      "skill": "plantoir-math-graphs"
+    },
+    "knownLimits": [
+      "Quartz removes every `%%` pair from a page before it reads anything, inside fences too, so a TeX comment written `%% like this` is altered on the site and not in Obsidian. Write single `%` comments.",
+      "One picture per fence: TikZJax draws only the first tikzpicture in a fence (measured).",
+      "The functionplot plugin is no longer in Obsidian's community plugin directory (review S1, 2026-10-09: absent from community-plugins.json and from the removed list), so a teacher's Obsidian shows a functionplot fence as plain text; the site draws it. TikZJax is still listed and draws the same picture in Obsidian as on the site, once the teacher installs it there.",
+      "A site opened as files on a computer, rather than served, shows a diagram's lettering in the browser's own font: browsers do not load fonts beside a page opened that way.",
+      "Two copies of the same pgfplots diagram on one page share element ids (the engine names them after the drawing); the site renames the second copy's ids so the first, if folded away, does not take the second's clipping with it (review N5)."
+    ]
   }
 }
