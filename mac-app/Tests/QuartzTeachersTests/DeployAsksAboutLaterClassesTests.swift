@@ -45,13 +45,13 @@ final class DeployAsksAboutLaterClassesTests: XCTestCase {
         let asks: Range<String.Index> = try XCTUnwrap(start.range(of: "askAboutClassesDatedLater(route: \"Deploy\")"))
         let deploys: Range<String.Index> = try XCTUnwrap(start.range(of: "deployAndWait(pressedByTheAssistant: false)"))
         XCTAssertLessThan(asks.lowerBound, deploys.lowerBound, "the Deploy button asks before it deploys")
-        XCTAssertTrue(view.contains("askAboutClassesDatedLater: { await askAboutClassesDatedLater(route: \"the assistant's deploy\") }"),
-                      "the window hands the question to the in-app assistant")
+        XCTAssertTrue(view.contains("await askAboutClassesDatedLater(route: \"the assistant's deploy\", askedByTheAssistant: true)"),
+                      "the window hands the question to the in-app assistant, saying it is the assistant's")
 
         let verbs: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
             "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
         ))
-        let ask: String = try DeployAsksAboutLaterClassesTests.body(of: "    func askAboutClassesDatedLater(route: String)", in: verbs)
+        let ask: String = try DeployAsksAboutLaterClassesTests.body(of: "    func askAboutClassesDatedLater(route: String", in: verbs)
         XCTAssertTrue(ask.contains("willBeRefused: deployWillBeRefused()"), "the deploy's own refusals come first")
 
         let runner: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
@@ -88,16 +88,11 @@ final class DeployAsksAboutLaterClassesTests: XCTestCase {
         let firstLines: String = String(run.prefix(500))
         XCTAssertTrue(firstLines.contains("classesDatedLaterGoingOut = classesDatedLaterLine(section: section)"),
                       "a scheduled run reads the classes it sends, and is not held up for them")
-        // …and writes "deployed with" only once it HAS deployed (#457 batch
-        // B's review, note 9): after the process has ended, on its status.
-        let afterTheRun: String = try XCTUnwrap(scheduled.components(separatedBy: "let status: Int32 = process.terminationStatus").dropFirst().first)
-        XCTAssertTrue(String(afterTheRun.prefix(200)).contains(
-            "noteClassesDatedLaterWentOut(classesDatedLaterGoingOut, exitStatus: status, section: section)"
-        ))
-        let note: String = try DeployAsksAboutLaterClassesTests.body(
-            of: "    nonisolated static func noteClassesDatedLaterWentOut(", in: scheduled
-        )
-        XCTAssertTrue(note.contains("guard exitStatus == 0"), "a run that failed sent nothing out")
+        // …and writes "deployed with" only once it HAS deployed: tested by
+        // running the real wrapper, `ScheduledPublishOutcomeTests.
+        // testTheClassesDatedLaterLineFollowsADeployThatWentOut`. Here, only
+        // that the run records through that one function.
+        XCTAssertTrue(scheduled.contains("recordTheRun(\n                label: label, section: section, fingerprint: fingerprintBeforeRunning"))
     }
 
     // MARK: - Helpers
@@ -132,5 +127,30 @@ final class DeployAsksAboutLaterClassesTests: XCTestCase {
             kept.append(line)
         }
         return kept.joined(separator: "\n")
+    }
+}
+
+/// Note 8b of batch B's review: the in-app assistant's question about classes
+/// dated later is put on the section's window, which is brought to the front
+/// first — the assistant's own window is usually in front of it.
+@MainActor
+final class LaterClassesQuestionComesForwardTests: XCTestCase {
+
+    // MARK: - Tests
+
+    func testTheAssistantsQuestionBringsItsWindowForward() throws {
+        XCTAssertTrue(SectionDetailView.bringsItsWindowForward(askedByTheAssistant: true))
+        XCTAssertFalse(SectionDetailView.bringsItsWindowForward(askedByTheAssistant: false),
+                       "a teacher who pressed Deploy is already looking at this window")
+        let verbs: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
+        ))
+        let ask: String = try DeployAsksAboutLaterClassesTests.body(of: "    func askAboutClassesDatedLater(route: String", in: verbs)
+        let forward: Range<String.Index> = try XCTUnwrap(ask.range(of: "bringThisWindowForward()"))
+        let question: Range<String.Index> = try XCTUnwrap(ask.range(of: "verbSheet = model"))
+        XCTAssertLessThan(forward.lowerBound, question.lowerBound, "brought forward BEFORE the question goes up")
+        XCTAssertTrue(ask.contains("if SectionDetailView.bringsItsWindowForward(askedByTheAssistant: askedByTheAssistant)"))
+        let bring: String = try DeployAsksAboutLaterClassesTests.body(of: "    func bringThisWindowForward()", in: verbs)
+        XCTAssertTrue(bring.contains("makeKeyAndOrderFront"))
     }
 }

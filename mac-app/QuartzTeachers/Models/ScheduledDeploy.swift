@@ -1759,13 +1759,31 @@ enum ScheduledDeploy {
         }
     }
 
-    /// The line above, on the trail — only for a run that DEPLOYED: one that
-    /// failed sent nothing out, and "deployed with" would be false.
+    /// What a scheduled run records once its script has ended: the section
+    /// as published (when it was), then the classes dated after the next
+    /// class it sent (#475) — the one function the run calls, so a test runs
+    /// exactly what the run does.
+    nonisolated static func recordTheRun(
+        label: String?,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
+        fingerprint: String?,
+        classesDatedLater line: String?,
+        inHomeFolder home: URL? = nil
+    ) {
+        let deployed: Bool = recordScheduledPublish(
+            label: label, section: section, fingerprint: fingerprint, inHomeFolder: home
+        )
+        noteClassesDatedLaterWentOut(line, deployed: deployed, section: section)
+    }
+
+    /// The line above, on the trail — only for a run that DEPLOYED (its
+    /// success sentinel was there): one that failed sent nothing out, and
+    /// "deployed with" would be false.
     nonisolated static func noteClassesDatedLaterWentOut(
-        _ line: String?, exitStatus: Int32,
+        _ line: String?, deployed: Bool,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?
     ) {
-        guard exitStatus == 0, let line, let section else {
+        guard deployed, let line, let section else {
             return
         }
         ActivityTrail.note(.laterClassesWentOut, line, course: section.courseCode, section: section.sectionNumber)
@@ -1985,8 +2003,9 @@ enum ScheduledDeploy {
         do {
             try process.run()
             process.waitUntilExit()
-            recordScheduledPublish(
-                label: label, section: section, fingerprint: fingerprintBeforeRunning
+            recordTheRun(
+                label: label, section: section, fingerprint: fingerprintBeforeRunning,
+                classesDatedLater: classesDatedLaterGoingOut
             )
             // Publishes regardless; the findings are kept for somebody to read
             // when they are next at the machine.
@@ -2031,7 +2050,6 @@ enum ScheduledDeploy {
             // The notification (#212) goes out first, for the same reason.
             // The job is booted out by the LABEL it was started with (#237).
             let status: Int32 = process.terminationStatus
-            noteClassesDatedLaterWentOut(classesDatedLaterGoingOut, exitStatus: status, section: section)
             let courseCode: String? = section?.courseCode
             let sectionNumber: Int? = section?.sectionNumber
             var noticeFolderID: String?
@@ -3012,18 +3030,24 @@ enum ScheduledDeploy {
     ///
     /// Read under the job's own LABEL — the name its wrapper wrote — never a
     /// rebuilt one (#237; see `runScheduled`).
+    ///
+    /// Returns whether the run DEPLOYED — whether the wrapper left its success
+    /// sentinel. The wrapper's own exit status cannot say: it exits 0 either
+    /// way, because its status belongs to `launchctl bootout` (#457 batch B's
+    /// fixes review, A).
+    @discardableResult
     nonisolated static func recordScheduledPublish(
         label: String?,
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?,
         fingerprint: String?,
         inHomeFolder home: URL? = nil
-    ) {
+    ) -> Bool {
         guard let label, let section, let fingerprint else {
-            return
+            return false
         }
         let sentinel: URL = successSentinelURL(label: label, inHomeFolder: home)
         guard let written = try? String(contentsOf: sentinel, encoding: .utf8) else {
-            return
+            return false
         }
         try? FileManager.default.removeItem(at: sentinel)
         var destinations: [String] = []
@@ -3037,6 +3061,7 @@ enum ScheduledDeploy {
             destinations: destinations,
             rule: SectionPublishState.currentFingerprintRule
         )
+        return true
     }
 
     /// Takes the alarm off. Returns nil on success.

@@ -103,6 +103,35 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         }
     }
 
+    /// Run the real generated wrapper, and say how it ended.
+    private func runWrapperReturningItsStatus(
+        course: String, section: Int, destinations: [String], descriptions: [String]
+    ) throws -> Int32 {
+        var argumentsList: [[String]] = []
+        for description in descriptions {
+            argumentsList.append([course, String(section), "--to", description])
+        }
+        let script: String = ScheduledDeploy.oneShotCommand(
+            courseCode: course,
+            sectionNumber: section,
+            workspaceURL: workspace,
+            deployArgumentsList: argumentsList,
+            destinationTypes: destinations,
+            destinationDescriptions: descriptions,
+            homeFolder: home
+        )
+        let scriptURL: URL = workspace.appendingPathComponent("wrapper.sh")
+        try script.write(to: scriptURL, atomically: true, encoding: .utf8)
+        let process: Process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = [scriptURL.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        return process.terminationStatus
+    }
+
     /// Run the real generated wrapper.
     private func runWrapper(
         course: String,
@@ -143,6 +172,43 @@ final class ScheduledPublishOutcomeTests: XCTestCase {
         process.standardError = FileHandle.nullDevice
         try process.run()
         process.waitUntilExit()
+    }
+
+    // MARK: - Classes dated after the next class (#475)
+
+    /// "Deployed with classes dated after the next class" is written for a
+    /// run that DEPLOYED, and never for one that did not — run through the
+    /// REAL generated wrapper with stub launchers, and recorded by the one
+    /// function the scheduled run calls (`recordTheRun`). The wrapper exits
+    /// 0 whether or not the deploy got through (its exit status belongs to
+    /// `launchctl bootout`), so only its success sentinel can tell (#457
+    /// batch B's fixes review, A).
+    func testTheClassesDatedLaterLineFollowsADeployThatWentOut() throws {
+        let scratch: URL = home.appendingPathComponent("trail-later-classes", isDirectory: true)
+        let previousStore: ProblemReportStore = ActivityTrail.store
+        ActivityTrail.store = ProblemReportStore(folderURL: scratch)
+        defer { ActivityTrail.store = previousStore }
+        let line: String = "deployed with classes dated after the next class: section1/All Classes/Unit 2, Day 5"
+
+        for (course, deployExit) in [("ZZQLF", Int32(1)), ("ZZQLS", Int32(0))] {
+            try writeStubLaunchers(deployExit: deployExit)
+            let courseDirectory: URL = workspace.appendingPathComponent("courses").appendingPathComponent(course)
+            try FileManager.default.createDirectory(at: courseDirectory, withIntermediateDirectories: true)
+            let label: String = ScheduledDeploy.agentLabel(
+                courseCode: course, sectionNumber: 1, workingFolder: workspace
+            )
+            let status: Int32 = try runWrapperReturningItsStatus(
+                course: course, section: 1, destinations: ["netlify"], descriptions: ["Netlify"]
+            )
+            XCTAssertEqual(status, 0, "the wrapper exits 0 whether or not it deployed, which is why its status cannot be the gate")
+            ScheduledDeploy.recordTheRun(
+                label: label, section: (courseDirectory, course, 1), fingerprint: "fingerprint",
+                classesDatedLater: line, inHomeFolder: home
+            )
+        }
+        let trail: String = ActivityTrail.store.activityText(includingPrompts: true)
+        XCTAssertFalse(trail.contains("ZZQLF/1 · " + line), "a deploy that failed sent nothing out: \(trail)")
+        XCTAssertTrue(trail.contains("ZZQLS/1 · " + line), "a deploy that went out says what went with it: \(trail)")
     }
 
     // MARK: - A run that stopped
