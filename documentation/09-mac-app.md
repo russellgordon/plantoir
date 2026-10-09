@@ -2734,8 +2734,15 @@ version counted a guidance failure in the toolchain copy's outcome, so a
 "not ready" and refused Preview, Deploy and New Course. Now the guidance runs
 after the copy on an outcome of its own: a failure is logged, written on the
 trail (`guidance for assistants could not be written`) and shown as a
-dismissable notice above the path bar (`AgentGuidanceNoticeView`), and
-nothing waits on it. `PrintablePagesTests.testAGuidanceFailureNeverHoldsTheFolderBack`
+dismissable notice above the path bar (`AgentGuidanceNoticeView`) in the
+system's own words — the file's place stays on the trail line — and nothing
+waits on it. The notice comes back at each launch while its cause remains:
+the pass runs once per folder per launch. The section is found from its END
+line back to the last start line before it, so a stray start line in the
+teacher's text above is never taken as the section's (fix review: taken from
+the first start line, the second launch after an Add replaced the teacher's
+text). And Add reads the file again and REFUSES when it is there but can no
+longer be read, rather than writing the section over it (`addCases`). `PrintablePagesTests.testAGuidanceFailureNeverHoldsTheFolderBack`
 fails if a failure is put back into the readiness state. Every course is its
 own vault, so the root is in none and neither file shows in Obsidian or on a
 site. This repository is itself a working folder (it has `preview.sh` at its

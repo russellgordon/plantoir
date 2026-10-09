@@ -105,6 +105,14 @@ async function connect(chunk) {
     await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "light" }] })
     await send("Page.enable")
     await send("Page.addScriptToEvaluateOnNewDocument", { source: PROBE })
+    // The page's server may still be starting: ask until it answers (15 s),
+    // rather than guessing how long to wait.
+    for (let tries = 0; tries < 60; tries += 1) {
+      try {
+        if ((await fetch(pageUrl)).ok) break
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 250))
+    }
     await send("Page.navigate", { url: pageUrl + "#plantoir-print=withAnswersAtTheEnd" })
     for (let tries = 0; tries < 110; tries += 1) {
       await new Promise((resolve) => setTimeout(resolve, 500))

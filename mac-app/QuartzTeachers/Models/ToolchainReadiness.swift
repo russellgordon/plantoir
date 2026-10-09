@@ -249,7 +249,7 @@ final class ToolchainReadiness {
         } else {
             AppLog.interface.error("could not write the guidance for assistants in \(LogRedactor.redacting(workspaceURL.path), privacy: .public): \(outcome.failures.count) problem(s)")
             ActivityTrail.note(.guidanceCouldNotBeWritten, AgentGuidance.couldNotWriteLine(outcome.failures))
-            guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(reason: outcome.failures[0])
+            guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(reason: outcome.firstReason ?? outcome.failures[0])
         }
         if outcome.pending.isEmpty {
             pendingAppends.removeValue(forKey: key)
@@ -280,9 +280,10 @@ final class ToolchainReadiness {
                 AgentGuidance.forgetDeclined(forPath: pending.fileURL.path)
                 ActivityTrail.note(.guidanceFileAskedAbout, AgentGuidance.askedLine(fileName: pending.fileName, added: true))
             } else {
-                let failure: String = pending.fileName + ": could not be written"
+                let failure: String = pending.fileName + ": could not be read again or written"
                 ActivityTrail.note(.guidanceCouldNotBeWritten, AgentGuidance.couldNotWriteLine([failure]))
-                guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(reason: failure)
+                guidanceNotices[key] = AgentGuidanceWording.couldNotWrite(
+                    reason: pending.fileName + " could not be read again or written")
             }
         } else {
             AgentGuidance.rememberDeclined(pending)

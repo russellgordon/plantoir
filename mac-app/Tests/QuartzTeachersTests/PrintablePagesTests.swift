@@ -288,7 +288,68 @@ final class PrintablePagesTests: XCTestCase {
             default:
                 XCTFail("\(name): an expectation this test does not know")
             }
+            // The property the first version lacked: whatever a pass (or an
+            // Add) leaves, the next pass leaves alone.
+            if let after = (testCase["expect"] as? String), after != "leave" {
+                XCTAssertEqual(
+                    AgentGuidance.action(existing: expected, body: "NEW", declinedSignature: nil), .unchanged,
+                    "\(name): a second pass must change nothing"
+                )
+            }
         }
+    }
+
+    /// `addCases`: Add reads the file again, and refuses one it can no longer
+    /// read rather than writing the section over the teacher's text.
+    func testAddReadsTheFileAgainAndRefusesOneItCannotRead() throws {
+        let block: [String: Any] = try XCTUnwrap(try agentGuidanceContract()["addCases"] as? [String: Any])
+        let cases: [[String: Any]] = try XCTUnwrap(block["cases"] as? [[String: Any]])
+        XCTAssertEqual(cases.count, 3)
+        for testCase in cases {
+            let name: String = try XCTUnwrap(testCase["name"] as? String)
+            let fileURL: URL = folder.appendingPathComponent(name.replacingOccurrences(of: " ", with: "-") + ".md")
+            var before: Data? = nil
+            switch try XCTUnwrap(testCase["file"] as? String) {
+            case "readable":
+                try (try XCTUnwrap(testCase["existing"] as? String)).write(to: fileURL, atomically: true, encoding: .utf8)
+            case "unreadable":
+                // Saved in another encoding: these bytes are not UTF-8.
+                before = Data([0x4D, 0x79, 0x20, 0xE9, 0xE8, 0x0A, 0xFF, 0xFE])
+                try before!.write(to: fileURL)
+            default:
+                break
+            }
+            let added: Bool = AgentGuidance.appendAfterYes(
+                AgentGuidance.PendingAppend(fileName: "CLAUDE.md", fileURL: fileURL, body: "NEW"))
+            switch try XCTUnwrap(testCase["expect"] as? String) {
+            case "refused":
+                XCTAssertFalse(added, name)
+                XCTAssertEqual(try Data(contentsOf: fileURL), before, "\(name): the teacher's file must be untouched")
+            default:
+                XCTAssertTrue(added, name)
+                let expected: String = filled(try XCTUnwrap(testCase["result"] as? String))
+                XCTAssertEqual(try String(contentsOf: fileURL, encoding: .utf8), expected, name)
+            }
+        }
+    }
+
+    /// The trail line and the notice: the contract's example line is the
+    /// app's own words, and the notice carries the system's sentence without
+    /// a path or a doubled full stop.
+    func testTheFailureLineIsTheContractsAndTheNoticeHasNoPath() throws {
+        let events: [[String: Any]] = try XCTUnwrap(
+            try SharedRulesContractTests.section("activityTrail")["mustRecord"] as? [[String: Any]])
+        var example: String = ""
+        for event in events where event["event"] as? String == ActivityTrail.Event.guidanceCouldNotBeWritten.rawValue {
+            example = (event["line"] as? String) ?? ""
+        }
+        var outcome: AgentGuidance.Outcome = AgentGuidance.Outcome()
+        outcome.note(".agents/skills/plantoir-printing", "You don’t have permission to save the file.")
+        XCTAssertEqual(AgentGuidance.couldNotWriteLine(outcome.failures), example)
+        XCTAssertEqual(
+            AgentGuidanceWording.couldNotWrite(reason: try XCTUnwrap(outcome.firstReason)),
+            "Plantoir could not put its guidance for assistants into this folder (You don’t have permission to save the file). Everything else works as usual."
+        )
     }
 
     func testTheSheetsWordsAreTheContractsAndNameNoMachinery() throws {
