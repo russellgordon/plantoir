@@ -5,10 +5,10 @@
   "base_url": "https://plantoir.app",
   "repo_url": "https://github.com/russellgordon/plantoir",
   "support_email": "support@plantoir.app",
-  "version": "1.4.5",
+  "version": "1.5.0",
   "released": "October 2026",
   "netlify_site_id": "67a69720-5e21-49ed-a354-adce4a75b279",
-  "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows was pinned to 1.1.0 from v1.2.0, which carried the macOS DMG only, until its installer joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3 cut until PlantoirSetup.exe joined v1.4.3 (2026-10-07), and to 1.4.3 for the mac-first v1.4.4 cut until PlantoirSetup.exe joined v1.4.4 (2026-10-08): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. The Mac card is pinned to 1.4.4 from the Windows-only v1.4.5 cut (2026-10-08) until Plantoir-macOS.dmg joins a later release: unpin it then. Asset names are frozen (RELEASING.md).",
+  "downloads_note": "The download cards on the home page. A card with no 'pinned' version links GitHub's evergreen releases/latest/download/<asset>, which 404s for a platform whose installer is missing from the newest release; such a card is pinned to the last release that has it, and says so. Windows was pinned to 1.1.0 from v1.2.0, which carried the macOS DMG only, until its installer joined v1.4.2 (2026-10-03), and to 1.4.2 for the mac-first v1.4.3 cut until PlantoirSetup.exe joined v1.4.3 (2026-10-07), and to 1.4.3 for the mac-first v1.4.4 cut until PlantoirSetup.exe joined v1.4.4 (2026-10-08): pin it again in any release that lacks PlantoirSetup.exe, and unpin it in the release that ships the Windows installer again. The Mac card was pinned to 1.4.4 from the Windows-only v1.4.5 cut until Plantoir-macOS.dmg joined v1.4.5 (2026-10-08). Windows is pinned to 1.4.5 for the mac-only v1.5.0 cut (2026-10-09): unpin it in the release that ships the Windows installer again. Asset names are frozen (RELEASING.md).",
   "downloads": [
     {
       "platform": "macOS",
@@ -20,7 +20,7 @@
       "platform": "Windows",
       "asset": "PlantoirSetup.exe",
       "meta": "Windows 10 or 11, 64-bit",
-      "pinned": null
+      "pinned": "1.4.5"
     }
   ],
   "availability": {
@@ -48,40 +48,28 @@
     }
   },
   "new_in": {
-    "version": "1.4",
+    "version": "1.5",
     "why": "The home page's 'New this year' list. --deploy warns when this version is not the major.minor of 'version', so a 1.5 release is reminded to rewrite it; a 1.4.x is not.",
     "items": [
       {
-        "text": "Ready-made courses for {{ready_made_ontario}} Ontario courses now, and a starting outline for about {{skeleton_codes}} more.",
-        "href": "features/#ready-made"
+        "text": "On the Mac: a Course menu and a Section menu that hold everything you can do, the assistant’s everyday jobs included.",
+        "href": "day-to-day/"
       },
       {
-        "text": "Deploy on a schedule, and hear how it went.",
-        "href": "day-to-day/#sunday-evening"
+        "text": "On the Mac: Deploy asks about classes students can already see that are dated after your next class.",
+        "href": "deploying/"
       },
       {
-        "text": "Last year's courses beside this year's, to read and borrow from.",
-        "href": "features/#last-year"
+        "text": "On the Mac: Open Recent, and your Cloudflare Account ID kept once, in Settings.",
+        "href": "deploying/"
       },
       {
-        "text": "One step to get a section ready for the first day.",
-        "href": "day-to-day/#before-school"
-      },
-      {
-        "text": "A second curriculum — AP, say — with its own coverage map.",
-        "href": "features/#two-curricula"
-      },
-      {
-        "text": "Work on a course with Claude or Codex, after telling them how you teach.",
+        "text": "On the Mac: Revise With ▸ Claude, Codex or the local assistant, from any course or section.",
         "href": "features/#bring-your-own"
       },
       {
-        "text": "Plantoir keeps itself up to date.",
-        "href": "support/#updates"
-      },
-      {
-        "text": "Clubs, not only courses.",
-        "href": "features/#clubs"
+        "text": "On the Mac: Escape, Return and the Delete key do what a Mac app should, in every sheet and list.",
+        "href": "support/"
       }
     ]
   },
