@@ -445,11 +445,17 @@ class WorkspaceModel {
     /// Why a backup action could not go ahead, shown as an alert.
     var backupProblem: String?
 
+    /// That alert's title, naming the act that failed — "Could not back up
+    /// ICS3U", "Could not delete the backup" — set beside every
+    /// `backupProblem` (#457, the HIG sweep: it said "Could not do that",
+    /// a sentence met on a bad day that names nothing). `BackupProblemTitle`.
+    var backupProblemTitle: String = BackupProblemTitle.generic
+
     /// The course whose code is being edited IN PLACE in the sidebar, or
     /// nil when nothing is being renamed.
     ///
     /// It lives on the window's model rather than in the sidebar's own state
-    /// because two things start a rename — Course ▸ Rename… (the Edit menu
+    /// because two things start a rename — Course ▸ Rename (the Edit menu
     /// until #457) and the Return key — and a menu command can only reach
     /// the focused window's model.
     var renamingCourseCode: String?
@@ -2009,6 +2015,7 @@ class WorkspaceModel {
         do {
             try await CourseArchiver.backUpCourse(course, coursesDirectoryURL: coursesDirectoryURL)
         } catch {
+            backupProblemTitle = BackupProblemTitle.backingUp(course.displayCode)
             backupProblem = error.localizedDescription
             return
         }
@@ -2023,7 +2030,7 @@ class WorkspaceModel {
     /// clicked into Section 2 and presses Return means the course it belongs
     /// to; there is nothing else in a section's row to rename.
     /// **Never a course kept for reference**, from any route. The context
-    /// menu already hid the item; the Edit menu (Course ▸ Rename… since #457)
+    /// menu already hid the item; the Edit menu (Course ▸ Rename since #457)
     /// and the Return key did not,
     /// and both set `renamingCourseCode` on a row that draws no editing
     /// field — so nothing appeared to happen AND the code was never cleared,
@@ -2355,6 +2362,7 @@ class WorkspaceModel {
             act: "restore",
             whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
         ) {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = refusal
             return
         }
@@ -2378,6 +2386,7 @@ class WorkspaceModel {
                 act: "restore",
                 whenBusy: "\(item.courseCode) is previewing or deploying right now. Stop that first, then restore."
             ) {
+                backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
                 backupProblem = refusal
                 reloadCourses()
                 return
@@ -2399,6 +2408,7 @@ class WorkspaceModel {
             // (The records of renames under way are cleared by the restorer
             // itself, so a test can see it.)
         } catch {
+            backupProblemTitle = BackupProblemTitle.restoring(item.courseCode)
             backupProblem = error.localizedDescription
             reloadCourses()
             return
@@ -2494,6 +2504,7 @@ class WorkspaceModel {
                 WorkspaceModel.trailLine(for: deletion, sizes: backupSizes)
             )
         }
+        backupProblemTitle = BackupProblemTitle.deletingBackups(count: items.count)
         backupProblem = WorkspaceModel.problem(with: deletion)
 
         for item in deleted {
@@ -2636,6 +2647,7 @@ class WorkspaceModel {
     /// confirmation.
     func requestDeleteBackup(_ item: BackupItem) {
         if WorkspaceModel.heldBackupPaths().contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblemTitle = BackupProblemTitle.deletingBackups(count: 1)
             backupProblem = WorkspaceModel.problem(with: BackupDeletion(
                 deleted: [], keptForTheAssistant: [item], failed: []
             ))
@@ -2643,6 +2655,7 @@ class WorkspaceModel {
         }
         let heldByASession: Set<String> = WorkspaceModel.backupPathsHeldByOtherSessions(inWorkingFolder: workspaceURL)
         if heldByASession.contains(WorkspaceModel.comparablePath(of: item)) {
+            backupProblemTitle = BackupProblemTitle.deletingBackups(count: 1)
             backupProblem = WorkspaceModel.problem(with: BackupDeletion(
                 deleted: [], keptForTheAssistant: [], failed: [], keptForAClaudeSession: [item]
             ))
@@ -2940,6 +2953,7 @@ class WorkspaceModel {
         do {
             try FileManager.default.removeItem(at: item.fileURL)
         } catch {
+            backupProblemTitle = BackupProblemTitle.deletingArchive
             backupProblem = error.localizedDescription
             return
         }

@@ -455,7 +455,7 @@ struct ExampleContentBadge: View {
 
     var body: some View {
         Text("Example content")
-            .font(.system(size: 9, weight: .bold))
+            .font(.caption2.bold())
             .textCase(.uppercase)
             .kerning(0.4)
             .foregroundStyle(isOnHighlightedRow ? Color.accentColor : Color.white)

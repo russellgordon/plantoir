@@ -357,3 +357,44 @@ extension SheetConventionScanTests {
         return ""
     }
 }
+
+// MARK: - Text size (C28)
+
+extension SheetConventionScanTests {
+
+    /// Nothing is drawn below 10 points (HIG: the smallest legible size on
+    /// macOS). The "Example content" badge was 9 until the HIG sweep (#457);
+    /// it is `.caption2.bold()` (10) now. Larger fixed sizes — the 56 and 34
+    /// point symbols, the assistant setting's 15 — are icons and stay.
+    func testNoFixedFontIsSmallerThanTenPoints() throws {
+        var problems: [String] = []
+        var fixedSizes: Int = 0
+        for file in UserFacingLabelWordsTests.swiftFiles(under: TextFieldStyleScanTests.viewsURL()) {
+            let code: String = TextFieldStyleScanTests.codeWithoutComments(try String(contentsOf: file, encoding: .utf8))
+            var lineNumber: Int = 0
+            for line in code.components(separatedBy: "\n") {
+                lineNumber += 1
+                guard let range = line.range(of: ".system(size:") else {
+                    continue
+                }
+                fixedSizes += 1
+                var digits: String = ""
+                for character in line[range.upperBound...] {
+                    if character == " " && digits.isEmpty {
+                        continue
+                    }
+                    if character.isNumber || character == "." {
+                        digits.append(character)
+                    } else {
+                        break
+                    }
+                }
+                if let size = Double(digits), size < 10 {
+                    problems.append(file.lastPathComponent + ":" + String(lineNumber) + " is " + digits + " pt")
+                }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(fixedSizes, 3, "the scan found only \(fixedSizes) fixed sizes")
+        XCTAssertEqual(problems, [], "Nothing smaller than 10 pt (#457, C28)")
+    }
+}

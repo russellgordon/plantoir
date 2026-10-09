@@ -313,7 +313,7 @@ private struct CloudflareDetailFields: View {
             CredentialRequestSheet(
                 request: CredentialRequest.cloudflareAccountIDHelp,
                 initialAnswer: cloudflareAccountID,
-                confirmTitle: "Use this ID",
+                confirmTitle: "Use This ID",
                 onSend: { typed in
                     cloudflareAccountID = typed
                     isShowingAccountHelp = false

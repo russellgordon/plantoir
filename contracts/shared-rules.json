@@ -100,7 +100,12 @@
         "why": "The first publish of a section stops behind a dialog asking for a Netlify or Cloudflare token, and a teacher who does not notice it reports a publish that 'never finished'. This line is the difference between reading that as a hang and reading it as a question waiting. The answer is a live credential and is never written down - only the name of the thing asked for."
       },
       {
-        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: 'Revise with Claude…', 'Revise with Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report.",
+        "carries": "nothing but the fact - the page is plantoir.app's public support page",
+        "event": "opened Plantoir Help",
+        "why": "GitHub #457 item 4 (the HIG sweep; Russell, 2026-10-08: Help opens the support page). Help ▸ Plantoir Help used to be the system's item, which said 'Help isn't available for Plantoir'; it now opens https://plantoir.app/support/ in the browser. A teacher who looked for help just before something went wrong is a teacher whose report should say so, and the line is the only trace the app has that they did."
+      },
+      {
+        "carries": "course, section, and which assistant - except that an OUTSIDE door (app-rules.json -> outsideAgents: Revise With ▸ 'Claude…', 'Codex…') is course-wide and so carries the course and the assistant's name with no section. Naming the assistant is the load-bearing half once there is more than one door: 'assistant opened' on its own cannot answer the first question anybody asks about a report.",
         "event": "assistant opened",
         "why": "Which tier is running decides what routing accuracy to expect, and it is the first thing to establish about any report of the assistant misunderstanding something."
       },
@@ -12041,16 +12046,16 @@
       "whatIsWithheld": [
         "the section window's Deploy button",
         "Schedule Deploy... (Cancel Deploy at... is always offered - gate by direction)",
-        "Rename Course (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
+        "Rename (Course ▸ Rename and the row's menu; \"Rename Course\" before the HIG sweep, #457) (the folder carries the year and course_code carries the real code; the two are allowed to disagree only here, and a rename would collapse them)",
         "Add Section...",
         "Remove Section N (removing the whole course stays)",
         "the Course Settings FORM itself - a reference course's row opens a short read-only summary instead (the real code and name, its school year with the Set School Year... action beside it, its sections, and the two sentences). The form asked a never-deployed course to choose a deploy folder, greyed Save for ever with no explanation, and let every OTHER setting be saved - including the deploying settings whose emptiness is what makes an older Plantoir refuse the course",
         "Course Settings' writes: the folder and unit-word renames, and Restore Section N...",
         "the Site Health REPAIR button. The findings may still be reported; the button may not be drawn, because a repair returns no attempts on a frozen course and the zero-attempt branch reads as 'That is already put right. Nothing needed changing.' - about a folder that is really missing",
-        "Rename from EVERY route, not just the context menu: the Edit menu item (Course ▸ Rename… since v1.5.0, #457) and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
+        "Rename from EVERY route, not just the context menu: the Edit menu item (Course ▸ Rename since v1.5.0, #457) and the Return key both went through courseThatCanBeRenamed, which said yes, set a rename in motion on a row that draws no editing field, and left Return-to-rename dead for every other course in the window",
         "Site Health repairs, which CREATE files inside the course - and would succeed, because the folders are deliberately left unlocked so the preview can work",
-        "Revise with Claude... and Revise with Codex...",
-        "Revise with Local AI Assistant...",
+        "Revise With ▸ Claude... and Revise With ▸ Codex... (the row's menu said Revise with Claude... before the HIG sweep, #457)",
+        "Revise With ▸ Local AI Assistant...",
         "Keep a Copy for Reference... (a copy of a frozen copy has no purpose a teacher would recognise)"
       ],
       "theReadOnlySummary": "What a reference course's row opens instead of the settings form: the code a teacher reads and the course name; the school year, with the one action a frozen course still offers; the sections; the FOLDER name, which is the one place a folder name is the fact; and wording.neverDeployed, wording.pagesAreLocked and wording.obsidianOpensThemForReading. No fields, no Save, and no control that can never become available.",
@@ -21758,7 +21763,7 @@
       "backups": "Each backup the session's conversation made is recorded beside its lease (file-formats.json -> heldBackupRecord); a delete keeps it while that process holds a live assist lease on any course in the folder. Said with assist-wording.json -> backupKeptForAClaudeSession / backupsKeptForAClaudeSession before a delete-several, and finishTheClaudeSessionToDeleteItsBackup(s) after one, or at once for the single Delete Backup. A backup the in-app assistant window holds keeps its own sentences - the two are told apart, never merged.",
       "reviseItems": "All three Revise items on the course - Revise with Claude, Revise with Codex, Revise with Local AI Assistant - are greyed, with assist-wording.json -> availableOnceYouFinishRevisingWithClaude once under them; and a click that gets past the menu is refused with courseIsAlreadyBeingRevised and finishTheClaudeSessionFirst. See reviseCases.",
       "structuralWork": [
-        "Rename Course",
+        "Rename",
         "Add Section",
         "restoring a backup of the course"
       ],
