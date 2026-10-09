@@ -50,7 +50,7 @@
         "why": "GitHub #457. File ▸ Open Recent lists the working folders a teacher has opened (openRecent), so the folder they want is one choice away even with no window open. 'Open Recent is empty and I never cleared it' — or 'it forgot my folders' — has no answer without this line; the list is otherwise only ever added to."
       },
       {
-        "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a deploy of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause)",
+        "carries": "the course code; which sidebar items this save hid or showed (names only, compared with the file as it was before the save); which settings it kept or replaced because another window or a build had changed the file since this window read it, and — when the sidebar list was one it replaced — that the teacher was told so (specialNames.settingsSaveReplacedSidebarChange); and whether a preview or a deploy of the course was running, so it could not see the save; and, since #323, for each section with a deploy set to happen on its own in this working folder, whether it now goes somewhere else or could not go ahead as set now (with the reason clause); and, since #454, when the save changed them, the printing settings: whether the school name was set, changed or cleared (NEVER the name itself), the blanks before → after, and where the school name and the course code print, before → after - only the parts that changed",
         "event": "settings saved",
         "why": "'It broke after I changed something' is the commonest report there is, and this is the line that dates the change. Issue #265 (2026-09-24) widened it: two windows on one working folder each held their own copy of a course's settings, a Save in the stale one put back its older sidebar list, and a Save made while a preview was open never reached that preview. Every one of those looks, from the teacher's chair, like switches with 'no correlation' to the site; the line naming what the save hid, what it kept from elsewhere and what was running settles it in one read."
       },
@@ -895,6 +895,12 @@
         "carries": "the course and section, and how many classes had no answer on file.",
         "line": "{course}/{section} · a deploy was held back for classes dated after the next class — {N} with no answer",
         "why": "#475. An assistant working from another app is refused a deploy until the question has been answered once in the section's window (wording.deployHasClassesDatedLater). Without this line 'why didn't Claude deploy it?' has no answer on the trail."
+      },
+      {
+        "event": "preview page opened in the web browser",
+        "carries": "the course and section, the page's place in the site (its web address below the preview's root, never anything written on it), and why: to print the handout - with the way of printing chosen (with the answers at the end, questions only, answers only) - or a link that opens in a new window, which is how a page's own PDF opens (printablePages.previewPane).",
+        "line": "{course}/{section} · preview page opened in the web browser — to print it with the answers at the end (Unit-1/Worksheet-3)",
+        "why": "#454 review B1. Plantoir's preview cannot print and opened nothing in a new window, so Print and a page's PDF link now hand the page to the teacher's web browser. That is the app acting on a teacher's press in a window the app does not own: 'I pressed Print and nothing happened' or 'a browser window opened by itself' is answered here."
       }
     ],
     "note": "The breadcrumb trail: what the teacher was doing, in the order they did it, in ONE file. Task records answer 'what did that publish print'; they do not answer the question support opens with, which is 'what were you doing when it went wrong'. Two files each holding half a story force whoever reads them to interleave by timestamp in their head, and they will get it wrong - so the assistant's turns go in here too. The list below is the MINIMUM: an app may record more, but a missing event is a gap in both apps at once. Deliberately coarse - every line is something a teacher would recognise as an action they took, never a view redraw or a state change, because the failure mode of logging everything is that the one line that mattered is on page forty. LINES WRITTEN BEFORE v1.4.4 say PUBLISH where they now say DEPLOY (#443, Russell's words rule of 2026-10-03): 'scheduled publish' is now 'scheduled deploy' (the lines about a run, its notification and clicking it), 'the publishing folder' is 'the deploy folder', 'a publish or preview' is 'a deploy or preview', 'published by process' is 'deployed by process', and 'marked this section's pages as published to' is 'recorded this section's pages as deployed to'. So a search of a trail that spans the upgrade looks for both words. The event KEYS below did NOT change (several still say 'scheduled publish'): they are never written into a line, and both apps' tests pin them to this list.",
@@ -4435,7 +4441,7 @@
     "repair": {
       "note": "What Plantoir offers to put right, and what it says afterwards. Only two of the checks are repairable, and the line is the point: a fix must restore the FEATURE, not merely satisfy the check.",
       "neverOffered": {
-        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages"],
+        "checks": ["curriculumCoverageFoundNothing", "courseTeachesNothing", "handWrittenCoveragePage", "noGradedFolders", "pageSettingsUnreadable", "linksIntoHiddenPages", "printPdfNotFound"],
         "why": "Recreating an empty curriculum folder would silence \"the curriculum map could not be built\" and leave the map missing, because the folder only counts once it holds a page named for an expectation code. A button that makes a warning go away without fixing anything is worse than no button: the teacher then believes it is dealt with. Decide from the check's NAME, not from the `fixable` flag alone — the flag means \"this kind of thing is repairable\", while what has to be true is that THIS app has a repair for it. linksIntoHiddenPages stays in this list because the list is about the ALERT's repair button, and that button is still never offered for it; what #379 reversed is the REASON #333 gave here - see reversed.",
         "reversed": {
           "check": "linksIntoHiddenPages",
@@ -4571,6 +4577,19 @@
         "fill": "{page} is the hidden page's place in the course folder without .md, {count} how many links, {from} and {to} the two ends of one link. `sentence` when there is one link and `sentenceForSeveral` otherwise; `detail` names at most ten links, each through `linkLine`, joined with \", \", then `andMore` with the number left over. Every value is filled in ONE pass, so a page a teacher named \"{course} notes\" is named as it is. ONE finding per section build, never one per link: both apps key a finding on name, course and section, so two per-link findings would collide (#246).",
         "rule": "After the merge and after the How I Teach sweep, every page students can see (not held back by its settings) has its links read - wikilinks and embeds, and Markdown-style links in either shape (followingLinks.markdownStyleLinks), all through the code and comment mask (readingALink.whatIsCode, whatIsAComment). A link is resolved by its path first, then by its name; it is listed when it resolves to a page (.md) that is hidden, and, when a name belongs to several pages, only when EVERY one of them is hidden. Not listed: links from hidden pages, links to pages that do not exist, pictures and files, and the How I Teach page (removed rather than hidden, so a link to it resolves to nothing). Each (from, to) pair once, in page order.",
         "why": "#333, the director's ruling: a class published by its own flag - in Obsidian, by the assistant, or by #96's Get Ready - can link to pages that are still hidden, and students who follow the link find nothing. The build is the one place that sees every publish (the flag flipped by hand, scheduled deploys, the MCP), so it warns there. Since #379 the warning is also an OFFER: the build writes which hidden pages publishing would bring back to life, and the section window shows them as a checklist (linksChecklist) instead of listing the finding in the alert - the alert remains the fallback for a course kept for reference or a folder whose builder has not yet written an offer. Measured 2026-09-26 on every payload as installed: 0 links from a visible page into a hidden one across all 39, so a new course is not nagged. An emulation of #96's rule (not its code) flipping SNC1W's second class visible lists Unit 1, Day 2 -> What Counts as Evidence, and a section front page that embeds the newest class lists it once that class is hidden by hand. Not repairable: see repair.neverOffered. The trail line is the family's existing 'found a problem with this course's folders' - a stretch of the word for links, as it already is for pageSettingsUnreadable."
+      },
+      {
+        "name": "printPdfNotFound",
+        "sentence": "The handout named on “{page}” in {course} Section {section} could not be used.",
+        "sentenceForSeveral": "The handouts named on {count} pages in {course} Section {section} could not be used.",
+        "detail": "A page can name a PDF in your course’s Media folder for its Print button to open, by its file name alone. Until it can be found, Print makes a handout from the page when the page is printable, and the page has no Print button otherwise: {pages}.",
+        "pageMissing": "“{page}” names {file}, which is not in the Media folder",
+        "pageNotAPdf": "“{page}” names {file}, which is not a PDF",
+        "pageHasAPath": "“{page}” names {file}, which is a place in a folder rather than a file name",
+        "andMore": "and {count} more",
+        "fixable": false,
+        "fill": "{page} is the page's place in the course folder without .md, {file} the name as the page gives it (brackets and an |alias taken off), {count} how many pages. `sentence` when there is one page and `sentenceForSeveral` otherwise; `detail` names at most ten pages, each through pageMissing, pageNotAPdf or pageHasAPath (file-formats.json → pageOptIns.printPdfCases' problem missing, notAPdf, hasAPath), joined with \", \", then `andMore` with the number left over. Every value is filled in ONE pass. ONE finding per section build, never one per page (#246).",
+        "why": "#454 plan review S3: a PDF named by a page and then renamed, moved or never added made the page quietly fall back to the generated handout - or lose its Print button - with the reason only in the build's console, where a teacher using the app never looks. A finding is surfaced by both apps and recorded on the trail as 'found a problem with this course's folders' with no new code. It never stops a build: one attachment must not keep a whole site from being built or deployed, and refusing would also break the preview the teacher is using to fix it. Not repairable: only the teacher knows which PDF was meant."
       }
     ],
     "linksIntoHiddenPages": {
@@ -17250,7 +17269,19 @@
     "colourSchemeNoneChosen": "Standard colours (none chosen)",
     "saveHeldBack": "Save is held back until Deploying is fixed: {reason}",
     "saveHeldBackReason": "{reason} is the destination's own sentence, unchanged: app-rules.json → configurationRules (the deploy-folder and Cloudflare Account ID problems).",
-    "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave).",
+    "printingHeader": "Printing",
+    "printingSchoolName": "School name",
+    "printingBlanks": "Blanks to fill in",
+    "printingBlankName": "Name",
+    "printingBlankDate": "Date",
+    "printingBlankClassNumber": "Class #",
+    "printingSchoolNameGoes": "School name prints",
+    "printingCourseCodeGoes": "Course code prints",
+    "printingTopLeft": "Top left",
+    "printingBottomLeft": "Bottom left",
+    "printingNotPrinted": "Not printed",
+    "printingCaption": "Used on pages whose settings say printable: true, when a student or you press Print.",
+    "where": "localeLabel names the locale picker in Course Settings AND in the new-course wizard, so the setting has one name wherever it is chosen; localeCaption sits under it in Course Settings. colourSchemeNoneChosen is the colour-scheme picker's entry for a section with no scheme chosen. saveHeldBack is said beside Save (savingSettings.whatEnablesSave). The printing* keys are Course Settings' Printing section (#454), between Footer and Content Structure: printingHeader heads it; printingSchoolName labels the school name field (file-formats.json → print_school_name); printingBlanks heads three switches labelled printingBlankName, printingBlankDate and printingBlankClassNumber (print_blanks); printingSchoolNameGoes and printingCourseCodeGoes label two pickers offering printingTopLeft, printingBottomLeft and printingNotPrinted (print_school_name_at, print_course_code_at: header_left, footer_left, none); printingCaption sits under the section, beside a sketch of a page's corners.",
     "why": "#369 (2026-09-27): Course Settings' first settings row read “Language / region (Quartz locale)” from v1.1.0 to v1.4.0, naming the site builder in a label a teacher reads (CLAUDE.md rule 1), and it was the first row in plantoir.app's headline picture. The label scan that found it (userFacingLabelWords) found one more: “Quartz default (none chosen)” in the colour-scheme picker. The wizard said “Language / region”; both now say the same thing. REJECTED: keeping “locale” in brackets (a word only a developer uses); putting these in AssistWording (they are not the assistant's words)."
   },
   "userFacingLabelWords": {
@@ -17651,6 +17682,17 @@
           },
           "remove": [],
           "why": "The emoji field always settles on one emoji and used to write the one it kept the moment the form appeared, so this course read as changed on open (plan review, finding 11). The stored value is now read as one emoji; the file keeps what it has until the teacher chooses."
+        },
+        {
+          "name": "printing settings, with an unknown blank and an unknown place (#454)",
+          "set": {
+            "print_school_name": "Lakefield College School",
+            "print_blanks": ["class_number", "seat"],
+            "print_school_name_at": "top",
+            "print_course_code_at": "none"
+          },
+          "remove": [],
+          "why": "The Printing section reads an unknown blank as nothing and an unknown place as the default place (printablePages.corners), and must do so WITHOUT writing its reading back: a course a newer app or a hand edit gave a value this app does not know opens clean, and keeps that value until the teacher changes the setting."
         }
       ],
       "freshOpenExpect": {
@@ -22770,5 +22812,128 @@
       "⌘⌫ (or ⌫) as the menu items' key equivalent: matched before the field editor, it would delete a course from inside a text field where the teacher meant to delete a word.",
       "Removing without the question, Finder-style straight to an undoable place: removal archives and a backup's deletion is real, and neither has an undo in the window — the question IS the safety net."
     ]
+  },
+  "printablePages": {
+    "note": "#454 (v1.6.0): a page whose settings say `printable: true` prints as a worksheet - its answers lifted out and gathered at the end on a fresh page, its folded hints opened in place, the school name, the blanks a student fills in and the course code in the page's corners on EVERY page, the questions and the answers numbered separately. The page itself (pageOptIns in file-formats.json) opts in; the course's settings (print_* in courseConfigKeys) decide the corners. Everything here is run by more than one reader: the rules about callouts, labels and titles by support/quartz/components/scripts/printRules.ts in the site (scripts/check_print_rules_against_the_site.py, in the image, from verify.sh), the corners and page labels by scripts/print_settings.py (scripts/test_print_settings.py), and the words both apps show by their own tests. The deep dive - what was measured, in which browsers, and what was rejected - is documentation/06-quartz-customizations.md, section F.",
+    "words": {
+      "print": "Print",
+      "moreWaysToPrint": "More ways to print",
+      "questionsOnly": "Questions only",
+      "answersOnly": "Answers only",
+      "preparing": "Preparing to print…",
+      "openingInBrowser": "Opening this page in your web browser to print it…",
+      "couldNotPrepare": "This page could not be prepared for printing. Use your browser’s own Print command instead.",
+      "answersHeading": "Answers",
+      "answerLabel": "Answer {n}",
+      "questionLabel": "Question {n}",
+      "blankName": "Name",
+      "blankDate": "Date",
+      "blankClassNumber": "Class #",
+      "pageLabel": "Page {n} of {total}",
+      "answersPageLabel": "Answers {n} of {total}",
+      "where": "print is the button on a printable page's date line, at its trailing edge; moreWaysToPrint names the small menu beside it (for a screen reader), which holds questionsOnly and answersOnly - the button itself prints with the answers at the end. preparing is said beside the button while the handout is made; openingInBrowser instead, in Plantoir's own preview, which hands the page to the teacher's web browser to print (previewPane); couldNotPrepare when nothing could be printed. answersHeading heads the answers; answerLabel and questionLabel label an answer that has no title of its own (labels). The blanks and the two page labels print in the corners (corners, pageLabels).",
+      "why": "English whatever the course's locale (P5, the director's ruling 2026-10-09): the site's own words come from Quartz's locale files, which have no words for any of this, and a translation can be added here as data later. REJECTED: borrowing the course's locale for some words and not others, which would print a half-translated worksheet."
+    },
+    "answerCallouts": {
+      "rule": "Read when the page LOADS (finding C of the plan): a student who opened an answer on screen must not print it on the worksheet, and Quartz toggles the same class a reader opens it with. `kind` is the callout's kind as the site writes it (data-callout: Quartz turns check and done into success, hint into tip, help and faq into question, and leaves a kind it does not know, such as solution or answer, as typed in lower case); `title` its title as shown. An UNFOLDED callout prints where it is, as it is (none). A FOLDED callout is an ANSWER when its kind is one of answerKinds, or its title - with titleCleaning applied - begins with one of answerTitleWords as a whole word (Answer, Answers, Solution, Solutions; `Answering tips` is not one); the title rule wins over every kind. Otherwise a folded `question` is a QUESTION: its title stays on the worksheet and its body goes to the answers (decision 1). Every other folded callout is UNFOLDED in place - hints included (decision 2). Nothing is left behind where an answer was lifted. A callout inside an answer travels with it.",
+      "answerKinds": ["success", "solution", "answer"],
+      "answerTitleWords": ["answer", "solution"],
+      "cases": [
+        { "kind": "success", "folded": true, "title": "Answer 3", "role": "answer" },
+        { "kind": "solution", "folded": true, "title": "SOLUTION", "role": "answer", "why": "[!SOLUTION]- with no title: the site gives it the kind as its title." },
+        { "kind": "answer", "folded": true, "title": "Answer", "role": "answer" },
+        { "kind": "note", "folded": true, "title": "Solution & Visual Check (click to expand)", "role": "answer", "why": "Found in a real course: a note callout used for the answer, and the title says so." },
+        { "kind": "success", "folded": true, "title": "Check", "role": "answer", "why": "[!check]- : the site turns check into success and titles it Check." },
+        { "kind": "success", "folded": false, "title": "Answer 3", "role": "none", "why": "An answer left open is meant to be read with the question, so it prints where it is." },
+        { "kind": "tip", "folded": true, "title": "Need a hint?", "role": "unfold" },
+        { "kind": "tip", "folded": true, "title": "Answering tips", "role": "unfold", "why": "Answering is not the word Answer." },
+        { "kind": "question", "folded": true, "title": "Self-Check: what does len() return?", "role": "question" },
+        { "kind": "question", "folded": false, "title": "Think about it", "role": "none" },
+        { "kind": "warning", "folded": true, "title": "Answer key notes", "role": "answer", "why": "Pinned: the title rule wins over the kind." },
+        { "kind": "example", "folded": true, "title": "Worked example", "role": "unfold" },
+        { "kind": "question", "folded": true, "title": "Solutions", "role": "answer", "why": "The title rule wins over question too." }
+      ]
+    },
+    "labels": {
+      "rule": "What an answer is called in the answers. A title of its OWN is kept, cleaned (titleCleaning). A title that says nothing - the site's default title for the kind (its kind, or one of the kind's other spellings: success is also check and done), or one of answerTitleWords on its own, plural or not - is replaced by where the answer sits: inside the n-th item of a numbered list, questionLabel with that item's number (counting from the list's own start); otherwise the nearest heading above it, as written; otherwise answerLabel with the answer's own number, counting every answer on the page from 1.",
+      "cases": [
+        { "title": "Answer 3", "kind": "success", "listItem": null, "heading": "Question 1", "answerNumber": 1, "label": "Answer 3" },
+        { "title": "SOLUTION", "kind": "solution", "listItem": null, "heading": "Question 7", "answerNumber": 2, "label": "Question 7" },
+        { "title": "Check", "kind": "success", "listItem": 3, "heading": "Practice", "answerNumber": 1, "label": "Question 3", "why": "P3, the director's ruling: an answer inside a numbered list item is labelled by the item." },
+        { "title": "Success", "kind": "success", "listItem": null, "heading": null, "answerNumber": 4, "label": "Answer 4" },
+        { "title": "Solution (click to expand)", "kind": "note", "listItem": null, "heading": "Question 2", "answerNumber": 1, "label": "Question 2" },
+        { "title": "Answers", "kind": "success", "listItem": null, "heading": null, "answerNumber": 2, "label": "Answer 2" },
+        { "title": "Done", "kind": "success", "listItem": null, "heading": "Part B", "answerNumber": 1, "label": "Part B" },
+        { "title": "Why the loop stops (click to reveal)", "kind": "success", "listItem": 2, "heading": null, "answerNumber": 1, "label": "Why the loop stops" }
+      ]
+    },
+    "titleCleaning": {
+      "rule": "A title's trailing instruction to a reader on screen is taken off (decision 5): a bracketed phrase at the END that begins with click or tap, in any capitals. A bracketed phrase anywhere else is the teacher's own words and stays.",
+      "cases": [
+        { "title": "Solution (click to expand)", "cleaned": "Solution" },
+        { "title": "Answer 2 (Click to reveal)", "cleaned": "Answer 2" },
+        { "title": "Hint (tap to reveal)", "cleaned": "Hint" },
+        { "title": "Answer (see p. 2)", "cleaned": "Answer (see p. 2)" },
+        { "title": "Check (see p. 2) (click to expand)", "cleaned": "Check (see p. 2)" },
+        { "title": "Need a hint?", "cleaned": "Need a hint?" }
+      ]
+    },
+    "modes": {
+      "default": "withAnswersAtTheEnd",
+      "list": [
+        { "mode": "withAnswersAtTheEnd", "keeps": "The page with its answers lifted out, then the answers, headed answersHeading, starting on a fresh page.", "pageLabels": "pageLabel on the questions, answersPageLabel on the answers, each counted on its own (decision 3)." },
+        { "mode": "questionsOnly", "keeps": "The page with its answers lifted out, and no answers.", "pageLabels": "pageLabel." },
+        { "mode": "answersOnly", "keeps": "The page's title and the answers only.", "pageLabels": "answersPageLabel." }
+      ],
+      "commandP": "⌘P (the browser's own Print) on a printable page prints questionsOnly, laid out by the browser rather than paginated by the page: no answers, question bodies left out, everything else unfolded, the site's sidebars hidden, in light colours (decision 7). Its corners are printed where the browser supports them (Chrome and Edge do; Safari and Firefox print none), and its page label counts the whole document. A page that is not printable prints exactly as it did before #454: every print rule is scoped to printable pages, and the class that marks one is set on each page load and taken off on the next (review B2)."
+    },
+    "corners": {
+      "rule": "One piece of text per corner, identical on every page (decision 4). topLeft holds what is placed at header_left and bottomLeft what is placed at footer_left (print_school_name_at, print_course_code_at); two in one corner read \"School · CODE\", school first, joined by \" · \". topRight is the blanks, in the order Name, Date, Class #, each its word and a line of underscores (blankLines gives each line's length), joined by blankJoin. bottomRight is always the page label (pageLabels). The course code is the one a teacher reads (`course_code` for a course kept for reference, the folder otherwise), in capitals. An empty school name is no school name.",
+      "blankLines": { "name": 24, "date": 12, "class_number": 6 },
+      "blankJoin": "     ",
+      "cases": [
+        { "name": "nothing set", "folder": "ICS3U", "settings": { "course_code": "ICS3U" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
+        { "name": "a school name", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School" }, "expect": { "topLeft": "Lakefield College School", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
+        { "name": "both at the bottom", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_school_name_at": "footer_left" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "Lakefield College School · ICS3U" } },
+        { "name": "both at the top", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_course_code_at": "header_left" }, "expect": { "topLeft": "Lakefield College School · ICS3U", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
+        { "name": "neither printed", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield College School", "print_school_name_at": "none", "print_course_code_at": "none" }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "" } },
+        { "name": "no blanks", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": [] }, "expect": { "topLeft": "", "topRight": "", "bottomLeft": "ICS3U" } },
+        { "name": "blanks in any order, an unknown one and a repeat", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": ["class_number", "name", "seat", "name"] }, "expect": { "topLeft": "", "topRight": "Name ________________________     Class # ______", "bottomLeft": "ICS3U" } },
+        { "name": "all three blanks", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_blanks": ["name", "date", "class_number"] }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________     Class # ______", "bottomLeft": "ICS3U" } },
+        { "name": "a course kept for reference prints the code a teacher reads", "folder": "ICS4U-2025", "settings": { "course_code": "ICS4U", "kept_for_reference": true }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS4U" } },
+        { "name": "a course code in small letters prints in capitals", "folder": "ics3u", "settings": {}, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
+        { "name": "a school name of only spaces is none", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "   " }, "expect": { "topLeft": "", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } },
+        { "name": "an unknown place is the default place", "folder": "ICS3U", "settings": { "course_code": "ICS3U", "print_school_name": "Lakefield", "print_school_name_at": "top", "print_course_code_at": 7 }, "expect": { "topLeft": "Lakefield", "topRight": "Name ________________________     Date ____________", "bottomLeft": "ICS3U" } }
+      ]
+    },
+    "pageLabels": {
+      "rule": "Questions and answers are numbered separately (decision 3): pageLabel over the pages before the answers, answersPageLabel over the answers, each counting from 1 to its own total.",
+      "cases": [
+        { "part": "questions", "n": 1, "total": 3, "label": "Page 1 of 3" },
+        { "part": "questions", "n": 3, "total": 3, "label": "Page 3 of 3" },
+        { "part": "answers", "n": 1, "total": 2, "label": "Answers 1 of 2" }
+      ]
+    },
+    "pdfLink": {
+      "rule": "When a page names its own PDF (pageOptIns → printPdf) and it resolves, the Print button is a plain link to `Media/` plus the site's own slug of the file name as the Media folder spells it, relative to the site's root, opening in a new window: no menu, no script, no print engine. ⌘P on that page is unchanged: it prints questions only when the page is also printable, and as before #454 otherwise.",
+      "why": "Quartz already copies every Media file to the site at that address, so the build copies nothing; the link is made with Quartz's own path functions so the two cannot disagree (measured: a real course's Media PDFs, `&` and spaces included, reach the site at exactly that slug)."
+    },
+    "previewPane": {
+      "rule": "Plantoir's own preview cannot print (a web view inside an app shows no print dialog) and opened nothing in a new window. So in the preview, Print says words.openingInBrowser and asks the app to open the page in the teacher's web browser, with the chosen way of printing, where the handout is made and printed at once; and a link that opens in a new window - the PDF link among them - opens in the web browser. Each is recorded on the trail (activityTrail → `preview page opened in the web browser`).",
+      "why": "#454 plan review B1: measured on macOS 26.6 with a bare WKWebView set up as the preview's is - `print()` returned at once with no dialog and no afterprint, and a target=_blank link did nothing. The teacher's first press of Print is almost always in the preview, right after adding printable: true, so Print had to work there. REJECTED: WKWebView's own printOperation, which prints the frame on screen rather than the handout."
+    },
+    "figures": {
+      "rule": "A figure an engine draws (#485 E1's TikZ and functionplot, and any later one) is emitted as `<figure class=\"pl-figure pl-<engine>\">` holding an SVG with a viewBox, or an <img> with its own size, and a <figcaption>. Printing keys on that wrapper: a figure is never split across a page, is scaled to the printable width, prints at its own resolution (never re-drawn as a picture), and prints in LIGHT colours - any filter the site applies to it in dark mode is removed while printing, so a dark-mode figure never prints white on white (decision 13). An engine that draws only in the browser registers a function in window.plantoirPrint.prepare, awaited before the handout is made, that draws every figure on the page.",
+      "wrapperClass": "pl-figure",
+      "engineClassPrefix": "pl-"
+    },
+    "agentGuidance": {
+      "rule": "Guidance for an assistant writing a page meant to print (decision 12): one skill, written ONCE per working folder at its root - `.claude/skills/plantoir-printing/` for Claude Code and `.agents/skills/plantoir-printing/` for Codex - by the app's own copy of the toolchain into the working folder, from support/agent_guidance/. The app owns those two folders whole and leaves every other skill alone. Hidden names, so neither Obsidian nor the website ever shows them.",
+      "skill": "plantoir-printing",
+      "folders": [".claude/skills", ".agents/skills"],
+      "source": "support/agent_guidance",
+      "why": "Measured (#454 plan review S1, Claude Code 2.1.295 and Codex 0.155.1, each started at the working folder as both apps start them): Codex never found a skill under courses/<CODE>/.agents/skills, and found the same skill at once at the working folder's root; Claude Code found a per-course skill only after it had read a file in that course - after the first worksheet was written. REJECTED: a copy in every course (invisible to Codex, late for Claude Code), and an AGENTS.md or CLAUDE.md in the course (a note in Obsidian's tree, needing publishing exclusions in four places like How I Teach)."
+    }
+
   }
 }
