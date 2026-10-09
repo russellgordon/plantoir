@@ -22517,7 +22517,7 @@
         ]
       },
       {
-        "why": "#457 batch B: a section of a course kept for reference with its preview running. Rebuild Preview is live - it writes only the built site, and reading last year's pages with their images and links is what a kept course is for; nothing that writes to the course is, whatever lastChangeIsHere says.",
+        "why": "#457 batch B: a section of a course kept for reference with its preview running. Rebuild Preview is live - it writes only the built site, and reading last year's pages with their images and links is what a kept course is for; nothing that writes to the course is, whatever lastChangeIsHere says. Nor Remove Section… (interface.whatIsWithheld; batch C's HIG sweep found the rule enabling it, and corrected this case when the two batches met).",
         "situation": {
           "hasFolder": true,
           "obsidianInstalled": true,
@@ -22538,7 +22538,6 @@
           "preview",
           "rebuildPreview",
           "reloadCourses",
-          "removeSection",
           "sectionNewTerminalAtFolder",
           "sectionOpenInObsidian",
           "sectionShowInFinder",

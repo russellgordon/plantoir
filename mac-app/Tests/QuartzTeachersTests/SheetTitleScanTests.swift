@@ -33,14 +33,17 @@ final class SheetTitleScanTests: XCTestCase {
         ("UnitWordRenameSheet", "CourseSettings/UnitWordRenameSheet.swift", false),
         ("CredentialRequestSheet", "Console/CredentialRequestSheet.swift", true),
         ("renameSheet", "CourseSettings/StringListEditorView.swift", false),
+        // Batch B's sheet for the Section menu's functions (#457 item 3);
+        // its Class Dates kind presents `SectionScheduleSheet` itself.
+        ("SectionVerbSheet", "Section/SectionVerbSheet.swift", false),
     ]
 
     // MARK: - Tests
 
-    /// Fifteen sheets, each titled through `SheetTitle`, in the shape it is
+    /// Sixteen sheets (fifteen, and batch B's), each titled through `SheetTitle`, in the shape it is
     /// listed with — and no title in those files at `.title2` or larger.
     func testEverySheetIsTitledByTheOneShape() throws {
-        XCTAssertEqual(SheetTitleScanTests.sheets.count, 15)
+        XCTAssertEqual(SheetTitleScanTests.sheets.count, 16)
         var problems: [String] = []
         for sheet in SheetTitleScanTests.sheets {
             let source: String = try SheetTitleScanTests.source(of: sheet.file)
