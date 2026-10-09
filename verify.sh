@@ -2079,6 +2079,7 @@ Diagrams and graphs planted by verify.sh (plantoir-figures-sentinel-7f3a).
 \begin{document}
 \begin{tikzpicture}
 \draw (0,0) circle (1);
+\node[text=red] at (0,0) {$O$};
 \end{tikzpicture}
 \end{document}
 ```
@@ -2390,6 +2391,8 @@ if len(drawn) != 7 or any(not re.search(r'<svg[^>]*viewBox="', body) for body in
 failed = [body for engine, failed, body in figures if failed]
 if len(failed) != 2 or "This diagram couldn" not in failed[0] or "This graph couldn" not in failed[1]:
     problems.append("the two figures that cannot be drawn do not say so in the contract's words")
+if not re.search(r'style="fill:\s*red;?"', page):
+    problems.append("the red label kept no colour of its own (Quartz greys every svg text)")
 if page.count("static/tikz/fonts.css") != 1:
     problems.append(f"the faces are linked {page.count('static/tikz/fonts.css')} times, not once")
 ids = re.findall(r'\bid="(pgf[^"]+)"', page)
@@ -2473,6 +2476,23 @@ else
   RESULTS+=("⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac (set PLANTOIR_CHROME; documentation/06-quartz-customizations.md F7)")
   echo "⏭️  SKIPPED  the handout as a browser prints it: no Chrome for Testing, or no Node 22 or later, on this Mac"
 fi
+# Two builds of the same page differ in ONE place that is Quartz's own: the
+# sidebar's list gets a random id on every build (measured: `id="ubcjug"` in
+# `<ul class="explorer-ul overflow">`), so "byte-identical" is checked with
+# that one id set aside and every other byte compared.
+same_page_but_for_quartz_ids() {
+  python3 - "$1" "$2" <<'SAMEPY'
+import re, sys
+def read(path):
+    try:
+        return re.sub(r'(class="explorer-ul overflow" id=")[^"]*"', r'\1"', open(path, encoding="utf-8").read())
+    except OSError:
+        return None
+one, other = read(sys.argv[1]), read(sys.argv[2])
+sys.exit(0 if one is not None and one == other else 1)
+SAMEPY
+}
+
 # ---- 6i, continued: a second build draws nothing (#485 E1) ----
 # The cache: the same figures, built again without --full-rebuild, are all
 # found from before, the drawing engine is never started, and the page comes
@@ -2480,7 +2500,7 @@ fi
 cp "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html 2>/dev/null || true
 if ./preview.sh EXC2O 1 --image "$DEV_TEST_IMAGE" --build-only >/tmp/verify_figures_second.log 2>&1 \
    && grep -Eq "Drew 0 diagrams \([1-9][0-9]* from before\)" /tmp/verify_figures_second.log \
-   && cmp -s "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html; then
+   && same_page_but_for_quartz_ids "$SITE_PUBLIC/Figures-Fixture.html" /tmp/verify_figures_first.html; then
   pass "diagrams and graphs: a second build finds every figure from before, draws none, and the page is byte-identical (#485)"
 else
   fail "diagrams and graphs: a second build drew again or changed the page (#485)"
@@ -2623,7 +2643,7 @@ for entry in os.listdir("/proc"):
   if [[ -f "$SITE_INDEX" && ! -e "$SITE_PUBLIC/static/function-plot" && ! -e "$SITE_PUBLIC/static/tikz" ]] \
      && ! grep -q "Drew [0-9]* diagram" /tmp/verify_old_container.log \
      && ! grep -q "pl-figure" "$SITE_PUBLIC/Help-Sessions.html" \
-     && cmp -s "$SITE_PUBLIC/Help-Sessions.html" /tmp/verify_untouched_page.html; then
+     && same_page_but_for_quartz_ids "$SITE_PUBLIC/Help-Sessions.html" /tmp/verify_untouched_page.html; then
     pass "and with no figure left, the site carries neither figure engine, nothing is drawn, and a page without figures is byte-identical (#485)"
   else
     fail "a site with no figures still carries static/function-plot or static/tikz, drew something, or changed a page without figures (#485)"
