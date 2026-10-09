@@ -428,7 +428,7 @@ coverage map for it, linked from Key Links under that folder's entry.
 
 ---
 
-## F. Additions installed every build: printable pages (#454, v2.0.0)
+## F. Additions installed every build: printable pages (#454, v1.6.0)
 
 A page whose settings say `printable: true` prints as a worksheet that reads
 like the teacher's LaTeX handouts (#499, F8); a page that says
@@ -666,6 +666,9 @@ page's height too, `object-fit: contain`, the same cap as every picture and
 Mermaid diagram — keeps its own resolution, and any dark-mode filter is removed. A browser-drawn engine registers in
 `window.plantoirPrint.prepare`.
 
+E1 conforms (v1.7.0): `pl-tikz` and `pl-functionplot`, with three additions
+of its own that hold on EVERY page, not only printable ones — see G4.
+
 ### F7. Measured matrix (macOS 26.6, M4 Pro), the verify fixture
 
 | Browser | With answers | Questions only | Answers only | ⌘P | Press → print |
@@ -828,6 +831,149 @@ sentence). Windows owes all of this:
 #496.
 
 ---
+
+## G. Diagrams and graphs (#485 E1, v1.7.0)
+
+A ` ```tikz ` fence is drawn when the site is built and placed in the page as
+an inline SVG; a ` ```functionplot ` fence is drawn in the reader's browser
+from function-plot served by the site itself. The build half is
+[05 → Diagrams and graphs](05-build-pipeline.md#diagrams-and-graphs-what-the-build-does-485-e1-v170);
+the rules are `contracts/shared-rules.json` → `figureFences`.
+
+### G1. The files (all in `support/quartz/`, installed every build)
+
+- `plugins/transformers/figureRules.js` — plain JavaScript shared with the
+  build's helper: `tidy`, `keyOf`, `altOf`, `parseFunctionPlot`,
+  `texProblem`. An ES module, as Quartz is; esbuild bundles the `.js` import
+  from TypeScript without complaint.
+- `plugins/transformers/plantoirFigures.ts` — the transformer, wired by
+  `build_site.wire_quartz_additions` straight AFTER `Plugin.Description()` in
+  `quartz.config.ts` and exported from `plugins/transformers/index.ts`
+  (both idempotent).
+- `components/scripts/figures.inline.ts` and `components/styles/figures.scss`
+  — carried by `PlantoirMetaLine` (the component every content page already
+  has), so no layout edit was needed.
+
+### G2. Two stages, and why the second comes after Description
+
+The **markdown stage** turns the fence into
+`<figure class="pl-figure pl-<engine>">` holding only a hidden figcaption
+(the description a screen reader reads). The **html stage**, which runs after
+Quartz's `Description`, then puts the drawing in. In that order the page's
+summary — its search card and its social card — is made from the words and
+the description, never from the drawing's lettering, which is hundreds of
+single glyphs (`A B C 3 4 . 5`; seen in the spike, and checked in verify.sh).
+No manifest means the stage does nothing at all, so a site without figures
+is untouched. A failed figure is `pl-figure-failed` with the contract's
+sentence (ruling E1-7: students see "This diagram couldn't be drawn." rather
+than a gap); a graph keeps its own text, shown until it is drawn and kept if
+it cannot be. A second copy of the same drawing on a page has its element ids
+renamed (`-pl2`): node-tikzjax names ids after the drawing, and a first copy
+folded away in a callout would otherwise take the second's clip paths with
+it (review N5). The first drawing on a page links `static/tikz/fonts.css`
+once; Paged.js keeps that link, and the faces are loaded in the handout's
+frame when it prints (measured: cmmi10, cmr10, cmsy10 all `loaded`).
+
+### G3. Colour, on screen (no filter)
+
+Black and white in a drawing follow the theme, as obsidian-tikzjax's own
+dark-mode setting does: CSS on the drawing's own attributes,
+`[stroke="#000"]`/`black` → `currentColor` with `color: var(--dark)`, and
+`#fff`/`white` → `var(--light)`, so a label box behind text takes the page's
+background. **Labels need one more step:** Quartz's own `base.scss` gives
+EVERY svg `<text>` `fill: var(--darkgray)`, which beats an SVG's `fill`
+attribute — found by verify.sh's first run: a label drawn red came out grey,
+and black lettering printed #4e4e4e. So the transformer writes each label's
+own colour (worked out from its ancestors, as SVG inherits) as an inline
+style, leaves black to `figures.scss` (`text { color: inherit; fill:
+currentColor }`), and turns white into the page's background. A teacher's
+own colours are kept; pure blue is dim on a dark page, exactly as in
+Obsidian.
+A graph's text, axes and grid take `--darkgray`, `--gray` and `--lightgray`.
+**Rejected:** `filter: invert()` (it inverts the teacher's colours too, and
+would have to be undone on paper).
+
+### G4. Graphs, zoom, and print
+
+- **Loaded only where needed.** On a page with a graph, the script loads
+  `static/function-plot/function-plot.js` at once (`spa-preserve`, so a page
+  change does not drop it) — eagerly, because ⌘P's `beforeprint` gives no
+  time to wait — and draws each graph when a tenth of it is visible, at the
+  figure's width and 0.62 of it in height, again after a resize. function-
+  plot gives its drawing a size and no viewBox, so one is added after every
+  draw. A page without a graph fetches nothing and adds no listener.
+- **Zoom (review B2, measured in Chrome for Testing).** function-plot
+  attaches d3-zoom to the graph's surface even with `disableZoom: true`
+  (that option only ignores the result), and while it is attached a scroll
+  or a finger drag starting over a graph moves the graph instead of the
+  page. Measured on the fixture: a 400 px wheel over a graph scrolled the
+  page **0 px** without the fix and **400 px** with it; a 300 px touch drag
+  (touch emulation, 820 × 1180) **0 px** without and **286 px** with — both
+  proved by putting the old behaviour back in the built script and measuring
+  again. So the script detaches the `.zoom` listeners (through d3's own
+  `__on` list, so nothing re-adds them) when the teacher wrote
+  `disableZoom: true` and on every touch screen (`(pointer: coarse)`); with a
+  mouse or trackpad dragging still moves the graph, and the wheel zooms only
+  with ⌘ or Ctrl held (Chrome and Edge also send a trackpad pinch that way;
+Safari does not, and there a pinch zooms the page) — so a plain scroll
+  always scrolls the page. That answers the review's open question about the
+  desktop "map trap" by the safe default; Russell may prefer click-to-zoom.
+  The Obsidian plugin keeps the trap; that is not Plantoir's to change.
+- **Print (decision 13).** The handout awaits a function in
+  `window.plantoirPrint.prepare` that draws every graph; ⌘P's
+  `beforeprint` draws every graph at the teacher's bounds whatever was
+  zoomed. `figures.scss` holds, on EVERY page: a `@media print` block that
+  sets the figure's own colours light (`--light #fff … --dark #000`), so ⌘P
+  from dark mode prints black on white with white label boxes (review B1 —
+  #454's light flip covers printable pages only, and before this a figure
+  printed near-white with black boxes); `break-inside: avoid`; and a cap of
+  **8 in on portrait paper, 6 in on landscape**, with `width: auto` (review
+  B3 — a 1,400 px figure split over four pages with the text after it printed
+  twice). The cap sits inside `:where()`, with no specificity, because the
+  handout has its own per-paper cap that must win: the first version's 8 in
+  beat it and a landscape handout with a tall figure refused to print, and
+  ⌘P in landscape split it (E1 implementation review B1). Measured after the
+  fix, a 30 cm TikZ ladder in Chrome for Testing: the handout prints on both
+  papers (854 px and 614 px tall, whole, 5 of 5 pieces), and ⌘P keeps all 29
+  rungs on one page in portrait and landscape. **Safari not measured**: it
+  needs "Allow remote automation", which only `safaridriver --enable` (an
+  administrator's password) and a restart of the running Safari turn on. Measured: the handout of a
+  printable fixture with 11 figures, from dark mode, in all three modes and
+  both papers: every piece laid out (29 of 29), none split, lettering
+  rgb(0, 0, 0), the 530 px tree whole.
+
+**Found in passing, not E1's:** Quartz's own ⌘P on a page that is NOT
+printable overlays the sidebar's folder list on page 2 of the paper and
+loses what is under it — measured on `Style/What This Site Can Do` with no
+figure at all, so it predates E1 (decision 7 keeps those pages as they were).
+
+### G5. What every site carries, figures or not
+
+The figures' styles and script are bundled into every site's `index.css`
+and `postscript.js`, like #454's print code: every rule is under
+`.pl-figure` and the script returns at once on a page without a graph, so
+no page that has no figure changes — its HTML is byte-identical, which
+verify.sh checks (a page built with figures elsewhere in the site against
+the same page once they are gone). The site-wide bundle grows by the
+script's and the styles' size; a site without figures carries neither
+`static/function-plot` nor `static/tikz`.
+
+### G6. Teacher note: "Graphs and diagrams"
+
+Write ` ```functionplot ` for a graph students can explore and ` ```tikz `
+for a precise diagram; preview, and anything that cannot be drawn is named
+with its page and line. In Obsidian, a TikZ fence shows as a picture only
+with the community plugin **TikZJax** installed (Plantoir does not install
+it yet — #495); the functionplot plugin is no longer in Obsidian's plugin
+directory (review S1, checked 2026-10-09 against `community-plugins.json`
+and the removed list), so there a graph shows as its text — the site draws
+it. The skill `plantoir-math-graphs` (support/agent_guidance) carries the
+whole syntax for an assistant.
+
+**Rejected** (with the reasons in 05 and 02): TikZJax in the browser;
+`<img>` SVGs; every Computer Modern face on every site (140 faces, 20–33 KB
+each — a site carries only the ones its drawings name, ~30 KB a face);
+carrying function-plot in every site; a CDN.
 
 ## E. Summary: what is *not* customized
 

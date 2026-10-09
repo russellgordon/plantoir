@@ -328,6 +328,20 @@ def lint(course_code: str) -> int:
             for link in markdown_code.matches_outside_code(link_pattern, text, code)
         }
 
+        # Diagrams and graphs (#485 E1): every figure carries the sentence a
+        # screen reader reads, and a TikZ fence is a whole document - the
+        # two things a figure needs that the site cannot supply.
+        for block in markdown_code.fenced_blocks(text):
+            body_lines = [line.strip() for line in block["body"].split("\n") if line.strip()]
+            if block["lang"] == "tikz":
+                if not body_lines or not re.match(r"^%\s*alt\s*:\s*\S", body_lines[0]):
+                    problems.append(f"{rel}: the tikz fence at line {block['line']} does not open with a “% alt:” line")
+                if "\\begin{document}" not in block["body"]:
+                    problems.append(f"{rel}: the tikz fence at line {block['line']} has no \\begin{{document}}")
+            elif block["lang"] == "functionplot":
+                if not re.search(r"^\s*alt\s*:\s*\S", block["body"], re.M):
+                    problems.append(f"{rel}: the functionplot fence at line {block['line']} has no alt: setting")
+
         fallen = fence_lines_that_fall_out(text)
         if fallen:
             problems.append(

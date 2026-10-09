@@ -1,0 +1,10 @@
+{
+  "name": "plantoir-figures",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The TikZ engine Plantoir draws diagrams with at build time (#485). Installed with `npm ci --omit=dev` from the lockfile beside this file, which pins every package under node-tikzjax.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "node-tikzjax": "1.0.5"
+  }
+}
