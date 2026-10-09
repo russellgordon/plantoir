@@ -6372,12 +6372,13 @@ Three properties matter more than the mechanism:
   here, because there is no such file for either agent to read and the whole
   instruction set is the one-paragraph greeting passed as an argument. **Changed
   by #454 (v2.0.0), and the doors still write nothing:** the app's toolchain
-  mirror now writes a Plantoir-managed `AGENTS.md` and `CLAUDE.md` at the
+  app now keeps a managed SECTION in `AGENTS.md` and `CLAUDE.md` at the
   working folder's ROOT — which is in no vault, each course being its own —
   naming the `plantoir-printing` skill it writes under `.claude/skills` and
   `.agents/skills`, because measured, Codex found a skill only there and
   Claude Code found a per-course one only after the first page was written.
-  A teacher's own file of either name (no Plantoir marker) is left alone. See
+  A teacher's own file of either name is added to only after they say yes in
+  a sheet. See
   [09 → Printing](09-mac-app.md#guidance-for-an-assistant-written-into-the-working-folder).
 - **The item is hidden when the tool is not installed**, and hidden
   independently per door. Not greyed out: a menu that teaches teachers to stop

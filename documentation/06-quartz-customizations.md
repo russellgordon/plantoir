@@ -439,21 +439,25 @@ rules are data in [`contracts/shared-rules.json`](../contracts/shared-rules.json
 **Compatibility, stated first because it is the promise.** A page that does
 not opt in renders exactly as it did before #454: its HTML carries no print
 markup at all — no wrapper, no button, no style, no `@page` — and its date
-line is the plain `<p class="content-meta">` it always was. Measured on EXC2O,
-`origin/dev` 8178eeaac against this branch: 299 of 300 pages that do not opt
-in are byte-identical once what Quartz already varies between ANY two builds
-is set aside (the explorer's random list id, build-time dates on curriculum
-pages, and the order of tag-list entries sharing one of those dates); the
-300th is the planted printable page. ⌘P of a page that does not opt in prints
-the same pages with the same text in Chrome for Testing 155 (13 and 3 pages,
-light and dark, `pdftotext` identical) and in Safari 26.6. **verify.sh gates it
-on every run**: section 5 plants "Printable Not Opted", the worksheet with only
+line is the plain `<p class="content-meta">` it always was. Measured on EXC2O
+(implementation review, `origin/dev` 8178eeaac against the branch): **all 300
+pages that do not opt in are byte-identical** once what Quartz already varies
+between ANY two builds is set aside (the explorer's random list id, build-time
+dates on curriculum pages, and the order of tag-list entries sharing one of
+those dates); the only pages that differ are the 7 that opt in. Every new CSS
+selector is scoped to a printable page or the handout frame, and nothing adds
+an `@page`. ⌘P of a page that does not opt in prints the same pages with the
+same text in Chrome for Testing 155 (13 and 3 pages, light and dark,
+`pdftotext` identical) and in Safari 26.6. **verify.sh gates it on every
+run**: section 5 plants "Printable Not Opted", the worksheet with only
 `printable: true` taken out, and the 6h printable-pages check fails if that
 page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
 `@page`, or if its date line is not the plain one straight after its title.
-What every site DOES change is its two shared bundles: `postscript.js`
-74,590 → 84,374 bytes and `index.css` 35,386 → 40,952 on EXC2O (+9,784 and
-+5,566), every rule in them scoped so it cannot touch an ordinary page (below).
+What every site DOES change is its two shared bundles, measured on EXC2O
+against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
+`index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
++10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
+change), every rule in them scoped so it cannot touch an ordinary page.
 
 ### F1. The files and how they reach a section
 
@@ -506,14 +510,25 @@ role, read from what was folded WHEN THE PAGE LOADED (a student who opened an
 answer toggles the same class; plan finding C). On Print:
 
 1. Dark page → `saved-theme="light"` and a `themechange` (the reader's saved
-   preference is never written), then wait until every Mermaid diagram's OWN
-   child is an `svg` again, 5 s cap. Measured: Mermaid first draws into a
-   temporary box; taking the first `svg` found printed a blank space.
+   preference is never written). Then, on EVERY page, wait until every
+   Mermaid diagram's OWN child is an `svg`, 8 s cap — at once when they are
+   already drawn. Measured: Mermaid first draws into a temporary box, and
+   taking the first `svg` found printed a blank space; and a LIGHT page opened
+   from the preview (F5) starts printing before Quartz has drawn anything, so
+   the first version, which waited only on dark pages, printed every diagram
+   as its source text (implementation review B1: Safari's PDF read
+   "flowchart LR / A[Expand] --> …"; Chrome had 0 of 5 drawn).
+   `browser-checks/print_handout.mjs` prints the verify fixture that way in
+   headless Chrome for Testing and fails on source text; verify.sh 6h runs it
+   when a Chrome for Testing is on the Mac. Proven against the old code.
 2. Await every function in `window.plantoirPrint.prepare` (the hook #485 E1
    and #455 register in).
 3. Clone the title and article: answers lifted to an "Answers" section on a
    fresh page, labelled by their own title or by where they sit (numbered
-   list item → "Question n", else nearest heading, else "Answer n");
+   list item → "Question n", after the heading above the list when there is
+   one — "Practice · Question 1", since the item's number alone repeated the
+   fixture's heading "Question 1" (review N2) — else nearest heading, else
+   "Answer n");
    question callouts keep their title and send their body; every other folded
    callout opened in place; "(click to expand)" dropped; code longer than 25
    lines may split; an `svg` with a size and no `viewBox` gets one; code line
@@ -527,9 +542,15 @@ answer toggles the same class; plan finding C). On Print:
    selectors against the content BEFORE it sits under the frame's `<html>`,
    so `html.plantoir-print-frame .plantoir-answers { break-before: page }`
    matched nothing (measured: the answers began mid-page). Margin boxes use
-   no-break spaces: "Page 1 of 3" wrapped onto three lines in Safari.
+   no-break spaces: "Page 1 of 3" wrapped onto three lines in Safari — except
+   the top-left corner, which may take two lines: a long school name sharing
+   it with the course code printed ON TOP of three blanks (review S3,
+   measured with "St. Michael's Catholic Secondary School of the Arts ·
+   EXC2O"; two clean lines after, handout and ⌘P). The top corners sit on
+   their bottom edge, so the blanks line up with the name's last line.
 6. Pages labelled "Page n of m" then "Answers n of m" (decision 3), and
-   `print()`. `afterprint` restores the theme and removes the frame (measured
+   `print()`; restored again when `print()` returns, in case a browser never
+   sends `afterprint` (review N4). `afterprint` restores the theme and removes the frame (measured
    in Safari: Cancel fires it too; the page came back dark with no frame).
 
 **Fallback:** Paged.js missing or failing → the same frame printed by the
@@ -559,8 +580,10 @@ A `WKWebView` inside the app shows no print dialog and opens no new windows
 (review B1, measured). So when the page finds the app's `plantoirPrint`
 message handler it says `printablePages.words.openingInBrowser` and posts
 `{mode, url}`; the app opens the page in the default browser with
-`#plantoir-print=<mode>`, and the page prints at once there (measured in
-Safari 26.6: the print sheet came up with "All 3 Pages", the hash was removed).
+`#plantoir-print=<mode>`, and the page prints at once there. Measured in
+Safari 26.6, light, real print sheet then Save as PDF: "All 3 Pages", the
+diagram DRAWN (no source text — the first version printed it as text, B1),
+the hash removed afterwards.
 New-window links, the PDF link among them, open in the browser too. See 09.
 
 ### F6. Figures (decision 13, for #485 E1)
