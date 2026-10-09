@@ -123,8 +123,8 @@ final class SectionVerbsTests: XCTestCase {
         _ = await made.runner.run(call: SectionVerbs.publishPages(
             course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 1"], planning: false
         ))
-        // A second apart, so the two copies cannot share a stamp.
-        try await Task.sleep(for: .seconds(1.1))
+        // No wait between them: two copies in one second take distinct names
+        // (`CourseArchiver.unusedBackupName`), never one zip updated twice.
         _ = await made.runner.run(call: SectionVerbs.publishPages(
             course: "ICS3U", section: 1, names: ["section1/All Classes/Unit 1, Day 2"], planning: false
         ))
@@ -304,5 +304,150 @@ final class SectionVerbsTests: XCTestCase {
     /// Unit 1, Days 1 to 3, and class dates from 2026-09-08.
     static func layOutClassesWithDates(in course: Course) throws {
         try MenuVoiceTests.layOutAUnitWithDates(in: course)
+    }
+}
+
+/// The fixes round of batch B (#457, #475): the director's rulings on the
+/// implementation review.
+@MainActor
+final class SectionVerbsFixesTests: XCTestCase {
+
+    // MARK: - Tests
+
+    /// Finding 1: Keep All records every listed class as kept, so the next
+    /// question about the same section asks nothing.
+    func testKeepAllAsksOnce() async throws {
+        let made = try AssistFixture.makeRunner(surface: .menu)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try AssistFixture.write(page: "Unit 2, Day 3", publish: "true", date: "2026-09-08", body: "Today.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 6", publish: "true", date: "2026-09-14", body: "Later still.", in: made.course)
+        let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
+        let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today)
+        XCTAssertEqual(flagged.count, 2)
+        let model: SectionVerbSheetModel = SectionVerbSheetModel(
+            kind: .laterClassesAtDeploy, course: made.course, sectionNumber: 1, title: "", item: nil
+        )
+        model.ask(about: flagged, nextDay: CalendarDay(year: 2026, month: 9, day: 9))
+        XCTAssertEqual(model.laterHidden.count, 2, "every class starts ticked to hide")
+        XCTAssertEqual(model.defaultButtonTitle, AssistWording.hideTickedAndDeployButton)
+        // What Keep All and Deploy does to the model, then records.
+        model.laterTicked = []
+        ClassesDatedLater.keep(model.laterKept, forSection: 1, in: made.course)
+        XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today), [], "asked again after Keep All")
+
+        // The window's Keep All runs the same answer with nothing ticked.
+        let verbs: String = try DeployAsksAboutLaterClassesTests.body(
+            of: "    func keepAllAtDeploy(", in: try DeployAsksAboutLaterClassesTests.source(
+                "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
+            )
+        )
+        XCTAssertTrue(verbs.contains("model.laterTicked = []"))
+        XCTAssertTrue(verbs.contains("answerAtDeploy(model)"))
+        let sheet: String = try DeployAsksAboutLaterClassesTests.source("mac-app/QuartzTeachers/Views/Section/SectionVerbSheet.swift")
+        XCTAssertTrue(sheet.contains("Button(AssistWording.keepAllAndDeployButton)"), "Keep All is always beside the default")
+    }
+
+    /// Finding 2: a class published from the links checklist is kept at its
+    /// date, so the next Deploy does not offer to hide it again.
+    func testAClassPublishedFromTheLinksChecklistIsKept() async throws {
+        let made = try AssistFixture.makeRunner(surface: .local)
+        defer {
+            try? FileManager.default.removeItem(at: made.root)
+        }
+        try AssistFixture.write(page: "Unit 2, Day 4", publish: "true", date: "2026-09-09", body: "Next.", in: made.course)
+        try AssistFixture.write(page: "Unit 2, Day 5", publish: "true", date: "2026-09-11", body: "Later.", in: made.course)
+        let today: CalendarDay = CalendarDay(year: 2026, month: 9, day: 8)!
+        XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today).count, 1)
+        LinksChecklistPublisher.keepTheLaterClassesItPublished(
+            [LinksChecklistPublisher.place(of: AssistFixture.pageURL(of: "Unit 2, Day 5", in: made.course), in: made.course)],
+            course: made.course, sectionNumber: 1, today: today
+        )
+        XCTAssertEqual(ClassesDatedLater.flagged(forSection: 1, in: made.course, today: today), [])
+        let publisher: String = try DeployAsksAboutLaterClassesTests.body(
+            of: "    static func publish(", in: try DeployAsksAboutLaterClassesTests.source(
+                "mac-app/QuartzTeachers/Models/LinksChecklist/LinksChecklistPublisher.swift"
+            )
+        )
+        XCTAssertTrue(
+            publisher.contains("keepTheLaterClassesItPublished(\n            outcome.publishedPlaces"),
+            "Publish in the links checklist keeps what it published"
+        )
+    }
+
+    /// Note 4: an answer that arrives while something else is up waits for
+    /// it, and is shown when it goes — never dropped.
+    func testAnAnswerIsNeverDropped() throws {
+        XCTAssertEqual(SectionDetailView.whereAnAnswerGoes(ownSheetIsUp: true, somethingIsUp: true), .intoItsOwnSheet)
+        XCTAssertEqual(SectionDetailView.whereAnAnswerGoes(ownSheetIsUp: false, somethingIsUp: true), .whenTheWindowIsFree)
+        XCTAssertEqual(SectionDetailView.whereAnAnswerGoes(ownSheetIsUp: false, somethingIsUp: false), .now)
+        let verbs: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailVerbs.swift"
+        ))
+        let run: String = try DeployAsksAboutLaterClassesTests.body(of: "    func runAtOnce(", in: verbs)
+        XCTAssertFalse(run.contains("NSSound.beep()"), "an answer is never dropped with a beep")
+        XCTAssertTrue(run.contains("pendingVerbResult = model"))
+        let view: String = DeployAsksAboutLaterClassesTests.codeOnly(try DeployAsksAboutLaterClassesTests.source(
+            "mac-app/QuartzTeachers/Views/Section/SectionDetailView.swift"
+        ))
+        // Shown when each thing that can be up has gone: the health alert,
+        // the preview alert, the links checklist, the deploy refusal, and the
+        // Section menu's own sheet.
+        XCTAssertGreaterThanOrEqual(view.components(separatedBy: "showAVerbResultIfWaiting()").count - 1, 4)
+        XCTAssertTrue(verbs.contains("showAnythingWaiting()\n        showAVerbResultIfWaiting()"))
+    }
+
+    /// Note 7: a context-menu request whose row is no longer selected is
+    /// dropped, never run the next time the section is shown.
+    func testARequestNotTakenIsDropped() throws {
+        let workspace: WorkspaceModel = WorkspaceModel(defaults: TestDefaults.make())
+        workspace.selection = SidebarSelection.section("ICS3U", 1)
+        workspace.sectionVerbRequest = SectionVerbRequest(item: .addNextClass, courseCode: "ICS3U", sectionNumber: 1)
+        workspace.selection = SidebarSelection.section("ICS3U", 1)
+        XCTAssertNotNil(workspace.sectionVerbRequest, "the same row: still waiting for its window")
+        workspace.selection = SidebarSelection.section("ICS3U", 2)
+        XCTAssertNil(workspace.sectionVerbRequest, "the row was left: the request is dropped")
+        workspace.sectionVerbRequest = SectionVerbRequest(item: .publishPages, courseCode: "ICS3U", sectionNumber: 2)
+        workspace.selection = nil
+        XCTAssertNil(workspace.sectionVerbRequest)
+    }
+
+    /// Note 5: two copies in one second take distinct names, and the second
+    /// is read as the same moment and the same maker.
+    func testTwoCopiesInOneSecondDoNotShareAName() throws {
+        let folder: URL = FileManager.default.temporaryDirectory.appendingPathComponent("names-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let first: String = CourseArchiver.unusedBackupName(
+            code: "ICS3U", stamp: "2026-08-11_221530", suffix: "_menu-section1", inFolder: folder.path
+        )
+        XCTAssertEqual(first, "ICS3U_backup_2026-08-11_221530_menu-section1.zip")
+        try Data().write(to: folder.appendingPathComponent(first))
+        let second: String = CourseArchiver.unusedBackupName(
+            code: "ICS3U", stamp: "2026-08-11_221530", suffix: "_menu-section1", inFolder: folder.path
+        )
+        XCTAssertEqual(second, "ICS3U_backup_2026-08-11_221530-2_menu-section1.zip")
+        let read: BackupItem? = BackupItem.from(fileURL: folder.appendingPathComponent(second), courseCode: "ICS3U")
+        XCTAssertEqual(read?.maker, .menu(sectionNumber: 1))
+        XCTAssertEqual(
+            read?.backedUpAt,
+            BackupItem.from(fileURL: folder.appendingPathComponent(first), courseCode: "ICS3U")?.backedUpAt
+        )
+    }
+
+    /// Note 6: Make Room's pages left undone are said in the menu's voice.
+    func testMakeRoomsLeftUndoneHasTheMenusVoice() {
+        let outcome: ClassChangeOutcome = ClassChangeOutcome(
+            message: "x", leftUndoneFromTheMenu: AssistWording.pagesAChangeCouldNotFinishFromTheMenu("“Unit 1, Day 3”", count: 1)
+        )
+        XCTAssertFalse(MenuVoiceTests.speaksAsAConversation(outcome.leftUndoneFromTheMenu))
+        XCTAssertTrue(MenuVoiceTests.speaksAsAConversation(
+            AssistWording.pagesAChangeCouldNotFinish("“Unit 1, Day 3”", count: 1)
+        ))
     }
 }

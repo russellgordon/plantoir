@@ -27,6 +27,16 @@ import Foundation
 /// - **Kept:** a page the teacher already said to leave published, at the
 ///   date it had then, is not asked about again. Re-dated since, it is.
 ///
+/// **A course that publishes its whole term ahead is asked ONCE.** Every
+/// pre-populated course ships every class published and dated across the
+/// semester, so the rule flags most of them — 61 classes in 33 of the 39
+/// payloads on 2026-10-08, measured by batch B's implementation review. The
+/// question therefore always offers Keep All and Deploy beside Hide Ticked
+/// and Deploy (the director's ruling, Russell may overturn): every listed
+/// class is kept at its date and never asked about again until that date
+/// changes. Without it, the teacher who took example content met a 61-row
+/// sheet whose Return hid half the term.
+///
 /// The date is the day as WRITTEN in `created` (`sectionIndexPointer.
 /// dateCases.why`), never converted to this Mac's zone: the class on
 /// `2026-10-09T00:30+1300` is the 9th's class wherever the Mac is.
@@ -234,10 +244,14 @@ nonisolated enum ClassesDatedLater {
         return found
     }
 
-    /// Where a page is in the course folder, without `.md`.
+    /// Where a page is in the course folder, without `.md` — spelled
+    /// exactly as the links checklist spells a place
+    /// (`LinksChecklistPublisher.place(of:in:)`: links resolved, the
+    /// precomposed Unicode form), so a place one writes is a place the other
+    /// finds.
     static func place(of fileURL: URL, courseDirectory: URL) -> String {
-        let full: String = fileURL.standardizedFileURL.path
-        let root: String = courseDirectory.standardizedFileURL.path + "/"
+        let full: String = fileURL.standardizedFileURL.resolvingSymlinksInPath().path
+        let root: String = courseDirectory.standardizedFileURL.resolvingSymlinksInPath().path + "/"
         var within: String = fileURL.lastPathComponent
         if full.hasPrefix(root) {
             within = String(full.dropFirst(root.count))
@@ -245,7 +259,7 @@ nonisolated enum ClassesDatedLater {
         if within.lowercased().hasSuffix(".md") {
             within = String(within.dropLast(3))
         }
-        return within
+        return within.precomposedStringWithCanonicalMapping
     }
 
     /// The section's class pages, read from disk the way the rule needs them.

@@ -674,6 +674,24 @@
         "why": "#457 batch B: the copy the Section menu saves before each change it makes (Publish Pages..., Hide Pages... and the rest of the assistant's functions, run from the menu bar). Its own ending, never `_assistant-section<N>`: a teacher who declined the assistant must not see a backup said to be from an assistant chat they never had, and the Backups list says which section the change was made to. Read by both apps; one written by either is listed and restored by the other."
       },
       {
+        "kind": "backup",
+        "maker": "menu",
+        "name": "ICS3U_backup_2026-08-11_221530-2_menu-section2.zip",
+        "moment": "2026-08-11 22:15:30",
+        "section": 2,
+        "why": "#457 batch B's implementation review, note 5: a second copy saved within the same second as another - the Section menu saves one before EVERY change, a tenth of a second each for a small course - takes `-2` after its time (then `-3`), before any maker's ending, so it never overwrites the first: `zip -r` UPDATES an existing archive in place, and 'the copy made before any of it' would become a mix of two states. Read as the same moment."
+      },
+      {
+        "kind": "neither",
+        "name": "ICS3U_backup_2026-08-11_221530-1.zip",
+        "why": "The counter starts at 2: the first copy of a second has none."
+      },
+      {
+        "kind": "neither",
+        "name": "ICS3U_backup_2026-08-11_221530-x_menu-section2.zip",
+        "why": "Anything else after the time makes the whole name unrecognised, as an unknown maker does."
+      },
+      {
         "kind": "archive",
         "name": "ICS3U_2026-08-10_143005.zip",
         "moment": "2026-08-10 14:30:05"

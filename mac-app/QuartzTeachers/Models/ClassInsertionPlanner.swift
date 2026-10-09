@@ -478,8 +478,10 @@ enum ClassInsertionPlanner {
         }
 
         var message: String = "Made room for \(created.count) class\(created.count == 1 ? "" : "es") at \(plan.positionTitle). Renamed \(renamed.count), moved \(moved) onto later class days, and updated \(linksRewritten) link\(linksRewritten == 1 ? "" : "s"). The new pages are unpublished until you write them — look the section over before you deploy it."
+        var leftUndone: [String] = []
         if !notDated.isEmpty {
             message += " " + AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated)
+            leftUndone.append(AssistPublishPlan.sayingPagesWhoseNewDateCouldNotBeSet(named: notDated, fromTheMenu: true))
         }
         let unfinished: [String] = notFinished.pages
         if !unfinished.isEmpty {
@@ -492,8 +494,13 @@ enum ClassInsertionPlanner {
             message += " " + AssistWording.pagesAChangeCouldNotFinish(
                 AssistPublishPlan.listingAFew(unfinished), count: unfinished.count
             )
+            leftUndone.append(AssistWording.pagesAChangeCouldNotFinishFromTheMenu(
+                AssistPublishPlan.listingAFew(unfinished), count: unfinished.count
+            ))
         }
-        return ClassChangeOutcome(message: message, created: created)
+        return ClassChangeOutcome(
+            message: message, created: created, leftUndoneFromTheMenu: leftUndone.joined(separator: " ")
+        )
     }
 
     /// Making room in a numbered course (#267) — a club's "Week 1", "Week 2".

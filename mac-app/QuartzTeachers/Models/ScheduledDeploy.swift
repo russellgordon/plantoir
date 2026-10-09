@@ -1741,13 +1741,13 @@ enum ScheduledDeploy {
     /// class as it is, and records their places (#475): the deploy is not
     /// held up for a question nobody is awake to answer. Read on the main
     /// thread, as the rest of this run's reading is.
-    nonisolated static func noteClassesDatedLaterGoingOut(
+    nonisolated static func classesDatedLaterLine(
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)
-    ) {
-        MainActor.assumeIsolated {
+    ) -> String? {
+        return MainActor.assumeIsolated {
             let configURL: URL = section.courseDirectory.appendingPathComponent("course_config.json")
             guard let configuration = try? CourseConfiguration(contentsOf: configURL) else {
-                return
+                return nil
             }
             let course: Course = Course(
                 code: section.courseCode, directoryURL: section.courseDirectory, configuration: configuration
@@ -1755,12 +1755,20 @@ enum ScheduledDeploy {
             let flagged: [ClassesDatedLater.Flagged] = ClassesDatedLater.flagged(
                 forSection: section.sectionNumber, in: course, today: CalendarDay.today()
             )
-            if let line = ClassesDatedLater.wentOutLine(flagged) {
-                ActivityTrail.note(
-                    .laterClassesWentOut, line, course: section.courseCode, section: section.sectionNumber
-                )
-            }
+            return ClassesDatedLater.wentOutLine(flagged)
         }
+    }
+
+    /// The line above, on the trail — only for a run that DEPLOYED: one that
+    /// failed sent nothing out, and "deployed with" would be false.
+    nonisolated static func noteClassesDatedLaterWentOut(
+        _ line: String?, exitStatus: Int32,
+        section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)?
+    ) {
+        guard exitStatus == 0, let line, let section else {
+            return
+        }
+        ActivityTrail.note(.laterClassesWentOut, line, course: section.courseCode, section: section.sectionNumber)
     }
 
     /// Run the one-shot script and leave, without ever becoming an app.
@@ -1777,6 +1785,10 @@ enum ScheduledDeploy {
         section: (courseDirectory: URL, courseCode: String, sectionNumber: Int)? = nil,
         now: Date = Date()
     ) -> Never {
+        // #475: the classes dated after the next class this run sends, read
+        // when it is set to run and written on the trail once it has deployed.
+        var classesDatedLaterGoingOut: String?
+
         // IS THIS STILL THE DAY IT WAS FOR? Asked before anything else
         // happens, because the answer can be no.
         //
@@ -1909,9 +1921,10 @@ enum ScheduledDeploy {
             case .run:
                 clearTheOldNamedRecord(label: jobLabel, section: section, homeFolder: RealHome.forFiles)
                 // Classes dated after the next class (#475) go out as they
-                // are — there is nobody at half six to ask — and the trail
-                // says which (`classesDatedLater.neverAskedFrom`).
-                noteClassesDatedLaterGoingOut(section: section)
+                // are — there is nobody at half six to ask. Read NOW, as the
+                // pages that go out; written on the trail only once the run
+                // has deployed (#457 batch B's review, note 9).
+                classesDatedLaterGoingOut = classesDatedLaterLine(section: section)
             case .leaveQuietly:
                 for lease in leasesTaken {
                     WorkLeaseFiles.remove(at: lease)
@@ -2018,6 +2031,7 @@ enum ScheduledDeploy {
             // The notification (#212) goes out first, for the same reason.
             // The job is booted out by the LABEL it was started with (#237).
             let status: Int32 = process.terminationStatus
+            noteClassesDatedLaterWentOut(classesDatedLaterGoingOut, exitStatus: status, section: section)
             let courseCode: String? = section?.courseCode
             let sectionNumber: Int? = section?.sectionNumber
             var noticeFolderID: String?

@@ -249,6 +249,12 @@ struct SectionDetailView: View {
     /// dates were asked for (#457's plan review, blocker 1).
     @State var afterTheVerbSheet: (() -> Void)?
 
+    /// The answer of a function with no sheet of its own (Undo Last Change,
+    /// a refused Rebuild Preview, Add Next Class) that arrived while
+    /// something else was on the window — shown when that has gone, never
+    /// dropped (#457 batch B's review, note 4).
+    @State var pendingVerbResult: SectionVerbSheetModel?
+
     @Environment(WorkspaceModel.self) var workspace
 
     // MARK: - Computed properties
@@ -740,6 +746,7 @@ struct SectionDetailView: View {
                 healthFindings = []
                 repairOutcome = nil
                 showAnythingWaiting()
+                showAVerbResultIfWaiting()
             }
         }
         .onChange(of: previewAlertIsUp) { _, isUp in
@@ -757,6 +764,7 @@ struct SectionDetailView: View {
         }
         .sheet(item: $linksChecklist, onDismiss: {
             refreshEditedMarker()
+            showAVerbResultIfWaiting()
         }, content: { model in
             LinksChecklistSheet(model: model, onPublished: {
                 refreshEditedMarker()
@@ -770,11 +778,17 @@ struct SectionDetailView: View {
                 model: model,
                 pressDefault: { pressDefault(in: model) },
                 cancel: { cancelVerbSheet(model) },
+                keepAll: { keepAllAtDeploy(model) },
                 verbs: workspace.sectionVerbsIfMade
             )
         })
         .onChange(of: workspace.sectionVerbRequest) { _, _ in
             takeAVerbRequestIfItIsMine()
+        }
+        .onChange(of: deployRefusal == nil) { _, isGone in
+            if isGone {
+                showAVerbResultIfWaiting()
+            }
         }
     }
 
@@ -1288,6 +1302,7 @@ struct SectionDetailView: View {
         frontPageNotChanged = nil
         if !previewAlertIsUp && healthDialog == nil {
             showAnythingWaiting()
+            showAVerbResultIfWaiting()
         }
     }
 
