@@ -1,0 +1,277 @@
+// Printable pages (#454).
+//
+// Compiled into EVERY site's index.css, so every rule here is scoped to a
+// class only a printable page or the handout carries (review B2):
+// * .plantoir-meta-line and .plantoir-print - the button, on screen;
+// * html.plantoir-printable - ⌘P on a printable page (set on each page load,
+//   taken off on the next);
+// * html.plantoir-print-frame - the handout, inside its own iframe, which
+//   never carries plantoir-printable.
+// No bare @page: it cannot be scoped by a selector, so the page box lives in
+// the printable page's own inline style and nowhere else. A page that has not
+// opted in prints exactly as before.
+
+// ---- The button, on screen ---------------------------------------------------
+
+.plantoir-meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  & > .content-meta {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+.plantoir-print {
+  // The TRAILING edge (decision 6), right-to-left included, and still there
+  // when the date line itself shows nothing.
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+  font-family: var(--bodyFont);
+  font-size: 0.9rem;
+}
+
+a.plantoir-print-pdf,
+.plantoir-print-button,
+.plantoir-print-more > summary {
+  border: 1px solid var(--lightgray);
+  border-radius: 5px;
+  background: var(--light);
+  color: var(--dark);
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+a.plantoir-print-pdf:hover,
+.plantoir-print-button:hover,
+.plantoir-print-more > summary:hover {
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+.plantoir-print-more {
+  position: relative;
+
+  & > summary {
+    list-style: none;
+    padding: 0.2rem 0.45rem;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: "▾";
+    }
+  }
+
+  & > .plantoir-print-menu {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.25rem);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    min-width: max-content;
+    background: var(--light);
+    border: 1px solid var(--lightgray);
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    padding: 0.25rem;
+
+    & > button {
+      border: 0;
+      background: transparent;
+      color: var(--dark);
+      font: inherit;
+      text-align: start;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--highlight);
+      }
+    }
+  }
+}
+
+.plantoir-print-status:not(:empty) {
+  color: var(--gray);
+  font-size: 0.85rem;
+}
+
+// ---- On paper: shared by ⌘P and the handout ----------------------------------
+
+@mixin plantoir-paper {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+  }
+
+  p,
+  li {
+    orphans: 2;
+    widows: 2;
+  }
+
+  blockquote.callout,
+  table,
+  figure,
+  img,
+  svg:not(.katex svg),
+  .katex-display,
+  pre:has(> code.mermaid),
+  .pl-figure {
+    break-inside: avoid;
+  }
+
+  blockquote.callout {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .fold-callout-icon,
+  .clipboard-button,
+  .expand-button,
+  .mermaid-controls,
+  #mermaid-container {
+    display: none !important;
+  }
+
+  pre code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  pre:not(.plantoir-splittable) {
+    break-inside: avoid;
+  }
+
+  // Printed at their own resolution, scaled to the page, never re-drawn.
+  // Not KaTeX's own drawings (a square root's sign is an SVG sized by KaTeX):
+  // `height: auto` collapses them, measured - the radical vanished.
+  img,
+  svg:not(.katex svg),
+  .pl-figure > * {
+    max-width: 100%;
+    height: auto;
+  }
+
+  // A figure an engine draws (#485 E1) prints in light colours: any filter the
+  // site applies to it in dark mode is taken off (decision 13).
+  .pl-figure svg,
+  .pl-figure img {
+    filter: none !important;
+  }
+}
+
+// ---- ⌘P on a printable page: questions only (decision 7) --------------------
+
+@media print {
+  html.plantoir-printable {
+    @include plantoir-paper;
+
+    body,
+    .page {
+      background: white !important;
+    }
+
+    .left,
+    .right,
+    .page-header .breadcrumb-container,
+    .page-header .tags,
+    .plantoir-print,
+    footer,
+    .popover {
+      display: none !important;
+    }
+
+    .page > #quartz-body {
+      display: block !important;
+    }
+
+    // The printable width of a letter page. Safari lays a printed page out at
+    // the WINDOW's width (measured: innerWidth 1512 while printing from a
+    // 1512 px window) and shrinks the result onto the paper, so in Safari ⌘P
+    // still prints this column small; the Print button is the path that
+    // prints at full size there. Scaling the page up by the window's width
+    // was tried and REJECTED: it clipped both edges.
+    .page {
+      max-width: 7in !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .center {
+      margin: 0 !important;
+      padding: 0 !important;
+      max-width: none !important;
+      width: auto !important;
+    }
+
+    article blockquote.callout[data-plantoir-role="answer"] {
+      display: none !important;
+    }
+
+    article blockquote.callout[data-plantoir-role="question"] > .callout-content {
+      display: none !important;
+    }
+  }
+
+  // Diagrams drawn for a dark page cannot be re-drawn between ⌘P and the
+  // print, so they are inverted while printing: never light text on white
+  // paper (review S5).
+  html.plantoir-printable.plantoir-printing-from-dark pre:has(> code.mermaid) svg {
+    filter: invert(1) hue-rotate(180deg);
+  }
+}
+
+// ---- The handout, in its own frame -------------------------------------------
+
+html.plantoir-print-frame {
+  @include plantoir-paper;
+
+  background: white;
+
+  body {
+    background: white;
+    margin: 0;
+  }
+
+  .page,
+  .center {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .center > article {
+    overflow: visible;
+  }
+
+  .plantoir-answers {
+    break-before: page;
+  }
+
+  pre > code > [data-plantoir-line]::before {
+    content: attr(data-plantoir-line) !important;
+  }
+
+  .plantoir-answers-only {
+    break-before: auto;
+  }
+}
