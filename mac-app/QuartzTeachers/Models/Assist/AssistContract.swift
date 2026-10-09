@@ -589,6 +589,125 @@ enum AssistContract {
             "reDatedOnlyPagesTheyUseForAMeeting": AssistWording.reDatedOnlyPagesTheyUse(
                 pagesTheyUse: 3, noun: .meeting
             ),
+            // The Section menu (#457 batch B): the assistant's functions run
+            // from the menu bar, and the `…FromTheMenu` twins of what they
+            // say in the first person. Rendered with the same literals as
+            // their conversational originals, so the two can be read side by
+            // side.
+            "undidFromTheMenu": AssistWording.undidFromTheMenu(changePlaceholder),
+            "undidPartlyFromTheMenu": AssistWording.undidPartlyFromTheMenu(changePlaceholder, leftAlone: 2),
+            "couldNotUndoFromTheMenu": AssistWording.couldNotUndoFromTheMenu(changePlaceholder, leftAlone: 2),
+            "undoIsStillAvailableFromTheMenu": AssistWording.undoIsStillAvailableFromTheMenu,
+            "nothingToUndoFromTheMenu": AssistWording.nothingToUndoFromTheMenu,
+            "changedWhileSavingACopyFromTheMenu": AssistWording.changedWhileSavingACopyFromTheMenu(
+                course: course, section: section
+            ),
+            "pagesWhoseSettingsCannotBeAddedToFromTheMenu": AssistWording.pagesWhoseSettingsCannotBeAddedToFromTheMenu(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseSettingsCannotBeAddedToFromTheMenuNamingSeveral":
+                AssistWording.pagesWhoseSettingsCannotBeAddedToFromTheMenu(
+                    AssistPublishPlan.listingAFew(
+                        ["Unit 2, Day 4", "Unit 2, Day 5", "Unit 2, Day 6", "Unit 2, Day 7", "Unit 2, Day 8"]
+                    ),
+                    count: 5
+                ),
+            "pageWhoseNewDateCouldNotBeSetFromTheMenu": AssistWording.pagesWhoseNewDateCouldNotBeSetFromTheMenu(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4"]), count: 1
+            ),
+            "pagesWhoseNewDatesCouldNotBeSetFromTheMenu": AssistWording.pagesWhoseNewDateCouldNotBeSetFromTheMenu(
+                AssistPublishPlan.listingAFew(["Unit 2, Day 4", "Unit 2, Day 5"]), count: 2
+            ),
+            "noPageCalledFromTheMenu": AssistWording.noPageCalledFromTheMenu(
+                page: pagePlaceholder, course: course, section: section
+            ),
+            "noPagesCalledFromTheMenu": AssistWording.noPagesCalledFromTheMenu(
+                pages: pagesPlaceholder, course: course, section: section
+            ),
+            "noClassOnFromTheMenu": AssistWording.noClassOnFromTheMenu(
+                day: "Monday, 2026-09-14", course: course, section: section
+            ),
+            "noClassOnFromTheMenuForAMeeting": AssistWording.noClassOnFromTheMenu(
+                day: "Monday, 2026-09-14", course: course, section: section, noun: .meeting
+            ),
+            "courseIsBeingCopiedFromTheMenu": AssistWording.courseIsBeingCopiedFromTheMenu(course: course),
+            "restoreFromBackupPutsItBack": AssistWording.restoreFromBackupPutsItBack,
+            "makingRoomCannotBeUndoneFromTheMenu": AssistWording.makingRoomCannotBeUndoneFromTheMenu(),
+            "makingRoomCannotBeUndoneFromTheMenuForAMeeting": AssistWording.makingRoomCannotBeUndoneFromTheMenu(
+                noun: .meeting
+            ),
+            "datesToMakeRoom": AssistWording.datesToMakeRoom(),
+            "datesToMakeRoomForAMeeting": AssistWording.datesToMakeRoom(noun: .meeting),
+            "menuPublishPagesTitle": AssistWording.menuPublishPagesTitle(course: course, section: section),
+            "menuHidePagesTitle": AssistWording.menuHidePagesTitle(course: course, section: section),
+            "menuPublishClassTitle": AssistWording.menuPublishClassTitle(course: course, section: section),
+            "menuPublishClassTitleForAMeeting": AssistWording.menuPublishClassTitle(
+                course: course, section: section, noun: .meeting
+            ),
+            "menuReDateTitle": AssistWording.menuReDateTitle(course: course, section: section),
+            "menuReDateTitleForAMeeting": AssistWording.menuReDateTitle(course: course, section: section, noun: .meeting),
+            "menuMakeRoomTitle": AssistWording.menuMakeRoomTitle(course: course, section: section),
+            "menuMakeRoomTitleForAMeeting": AssistWording.menuMakeRoomTitle(
+                course: course, section: section, noun: .meeting
+            ),
+            "menuPickPagesToPublish": AssistWording.menuPickPagesToPublish,
+            "menuPickPagesToHide": AssistWording.menuPickPagesToHide,
+            "menuNoHiddenPages": AssistWording.menuNoHiddenPages(course: course, section: section),
+            "menuNoVisiblePages": AssistWording.menuNoVisiblePages(course: course, section: section),
+            "menuPickClassDay": AssistWording.menuPickClassDay(),
+            "menuPickClassDayForAMeeting": AssistWording.menuPickClassDay(noun: .meeting),
+            "menuMakeRoomAt": AssistWording.menuMakeRoomAt(),
+            "menuMakeRoomAtForAMeeting": AssistWording.menuMakeRoomAt(noun: .meeting),
+            "menuFindAPage": AssistWording.menuFindAPage,
+            "menuContinueButton": AssistWording.menuContinueButton,
+            "menuPublishButton": AssistWording.menuPublishButton,
+            "menuHideButton": AssistWording.menuHideButton,
+            "menuReDateButton": AssistWording.menuReDateButton,
+            "menuMakeRoomButton": AssistWording.menuMakeRoomButton,
+            "menuCancelButton": AssistWording.menuCancelButton,
+            "menuDoneButton": AssistWording.menuDoneButton,
+            "menuSavingACopy": AssistWording.menuSavingACopy(course: course),
+            "menuWorking": AssistWording.menuWorking,
+            "menuRebuildPreviewTitle": AssistWording.menuRebuildPreviewTitle,
+            "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
+            "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
+            "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
+            "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
+            "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
+            "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
+            // Classes dated after the next class (#475): the question asked
+            // at Deploy and at Section ▸ Publish Pages…, and what an
+            // assistant is told when it cannot be asked.
+            "laterClassesTitle": AssistWording.laterClassesTitle(),
+            "laterClassesTitleForAMeeting": AssistWording.laterClassesTitle(noun: .meeting),
+            "laterClassesAtDeploy": AssistWording.laterClassesAtDeploy(nextDay: "Friday, 2026-10-09"),
+            "laterClassesAtDeployForAMeeting": AssistWording.laterClassesAtDeploy(
+                nextDay: "Friday, 2026-10-09", noun: .meeting
+            ),
+            "laterClassesAtPublish": AssistWording.laterClassesAtPublish(nextDay: "Friday, 2026-10-09"),
+            "laterClassesAtPublishForAMeeting": AssistWording.laterClassesAtPublish(
+                nextDay: "Friday, 2026-10-09", noun: .meeting
+            ),
+            "laterClassesKeptNote": AssistWording.laterClassesKeptNote(),
+            "laterClassesKeptNoteForAMeeting": AssistWording.laterClassesKeptNote(noun: .meeting),
+            "laterClassesDay": AssistWording.laterClassesDay(weekday: "Wednesday", date: "2026-10-14"),
+            "hideAndDeployButton": AssistWording.hideAndDeployButton(count: 2),
+            "deployAsItIsButton": AssistWording.deployAsItIsButton,
+            "leaveOutAndContinueButton": AssistWording.leaveOutAndContinueButton(count: 2),
+            "publishThemAllButton": AssistWording.publishThemAllButton,
+            "deployHasClassesDatedLater": AssistWording.deployHasClassesDatedLater(
+                course: course, section: section, pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5"]), count: 1
+            ),
+            "deployHasClassesDatedLaterNamingSeveral": AssistWording.deployHasClassesDatedLater(
+                course: course, section: section,
+                pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5", "Unit 2, Day 6"]), count: 2
+            ),
+            "deployHasClassesDatedLaterAndNoWindow": AssistWording.deployHasClassesDatedLaterAndNoWindow(
+                course: course, section: section, pages: AssistPublishPlan.listingAFew(["Unit 2, Day 5"]), count: 1
+            ),
+            "deployWaitsForAnOpenQuestion": AssistWording.deployWaitsForAnOpenQuestion(
+                course: course, section: section
+            ),
         ]
         return [
             "note": "Generated from mac-app AssistWording by `Plantoir --write-contracts`. "

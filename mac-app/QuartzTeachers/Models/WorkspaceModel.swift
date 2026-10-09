@@ -499,6 +499,18 @@ class WorkspaceModel {
     /// at the click, which is the guard that counts.
     var sheetIsUp: Bool = false
 
+    /// One of the assistant's functions asked for from a section row's
+    /// context menu (#457 batch B) — Publish Pages…, Hide Pages…, Publish
+    /// Class for a Date…, Add Next Class. The row is selected first, so the
+    /// section window that answers it is the one for that section: it takes
+    /// the request only when it names its own course and section
+    /// (`SectionDetailView.takeAVerbRequestIfItIsMine`).
+    var sectionVerbRequest: SectionVerbRequest?
+
+    /// This window's runner for the Section menu's functions, made the first
+    /// time one is used (`sectionVerbs()`), so its undo list is the window's.
+    private(set) var sectionVerbsIfMade: SectionVerbs?
+
     /// A test's own Open Recent list, made on first use.
     @ObservationIgnored var ownRecentFolders: RecentWorkingFolders?
 
@@ -1276,6 +1288,22 @@ class WorkspaceModel {
     /// `reopen(_:occasion:)`, which catches the Trash, a missing drive and a
     /// folder the builder cannot reach. `AdoptRestoredPathCallersTests`
     /// holds the callers to a named list, so a new one is a decision.
+    /// This window's runner for the Section menu (#457 batch B), made on
+    /// first use and made again when the window has moved to another
+    /// folder — which drops the old folder's undo list with it. Nil with no
+    /// folder open.
+    func sectionVerbs() -> SectionVerbs? {
+        guard let folder = workspaceURL else {
+            return nil
+        }
+        if let made = sectionVerbsIfMade, FolderIdentity.isSameFolder(made.folderPath, folder.path) {
+            return made
+        }
+        let made: SectionVerbs = SectionVerbs(folderPath: folder.path)
+        sectionVerbsIfMade = made
+        return made
+    }
+
     func adoptRestoredPath(_ path: String) {
         if path.isEmpty || isUnderUITest {
             return

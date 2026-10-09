@@ -1917,4 +1917,282 @@ nonisolated enum AssistWording {
         }
         return "Finish the Claude or Codex session working on \(course) first. It made these backups, so they were kept."
     }
+
+    // MARK: - The Section menu (#457 batch B)
+    //
+    // The assistant's own functions, reached from Section ▸ Publish Pages…,
+    // Hide Pages…, Publish Class for a Date…, Rebuild Preview, Undo Last
+    // Change, Add Next Class, Re-date Classes… and Make Room for Classes… —
+    // the same tool code, called with a call built in code and never through
+    // a model (`AssistToolRunner.Surface.menu`). What a teacher reads there is
+    // not a conversation: nobody said "undo that", there is no "me" to ask
+    // again, and the way out of a change is a menu item. So each sentence the
+    // eight tools can say in the first person, or about asking, has a twin
+    // here, ending `FromTheMenu`, chosen by the runner's surface. The
+    // conversation's own sentences are unchanged, and so is every byte the
+    // model is shown. The list of which sentences were twinned, and which
+    // were kept as they are and why, is in documentation/10 → "The Section
+    // menu, a third client".
+
+    /// Undo Last Change worked.
+    static func undidFromTheMenu(_ whatHappened: String) -> String {
+        return "Undone. Earlier, you \(whatHappened); that is put back now."
+    }
+
+    /// Undo Last Change worked for some files and left the rest alone,
+    /// because they have been edited since.
+    static func undidPartlyFromTheMenu(_ whatHappened: String, leftAlone: Int) -> String {
+        let pages: String = leftAlone == 1 ? "one page was" : "\(leftAlone) pages were"
+        return "Earlier, you \(whatHappened). Everything that could be put back is put back — but "
+             + "\(pages) left alone, because they have been edited since."
+    }
+
+    /// Undo Last Change put nothing back: every file has been edited since.
+    static func couldNotUndoFromTheMenu(_ whatHappened: String, leftAlone: Int) -> String {
+        let pages: String = leftAlone == 1 ? "that page has" : "those \(leftAlone) pages have"
+        return "Earlier, you \(whatHappened) — but nothing was undone, because \(pages) been edited "
+             + "since. Putting the old copy back would throw away that newer work."
+    }
+
+    /// After a partial or refused undo: the change is still the last one.
+    static let undoIsStillAvailableFromTheMenu: String =
+        "That change is still the last one, so Section ▸ Undo Last Change can take it back once "
+        + "you have dealt with the pages left alone."
+
+    /// Undo Last Change with nothing to undo — greyed in the menu, so this is
+    /// said only when the change went away between drawing the menu and the click.
+    static let nothingToUndoFromTheMenu: String =
+        "Nothing has been changed from the Section menu in this window yet, so there is nothing to "
+        + "undo. Anything older is in Plantoir's Backups list."
+
+    /// The section changed while its copy was being saved (#351), so the
+    /// plan no longer fits and nothing was written.
+    static func changedWhileSavingACopyFromTheMenu(course: String, section: String) -> String {
+        return "Nothing was changed: \(course) Section \(section) changed while a copy of it was being "
+             + "saved, so the plan no longer fits. Choose the menu item again to see it as things are now."
+    }
+
+    /// Pages whose settings could not be added to, so they were left as they are.
+    static func pagesWhoseSettingsCannotBeAddedToFromTheMenu(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "The settings at the top of \(listing) are written in a way Plantoir cannot add to, "
+                 + "so that page stays exactly as it is. Open it in Obsidian to set it there."
+        }
+        return "The settings at the top of \(listing) are written in a way Plantoir cannot add to, "
+             + "so those pages stay exactly as they are. Open them in Obsidian to set them there."
+    }
+
+    /// Pages a re-date could not give their new date.
+    static func pagesWhoseNewDateCouldNotBeSetFromTheMenu(_ listing: String, count: Int) -> String {
+        if count == 1 {
+            return "The new date could not be set on \(listing): the settings at the top of it are "
+                 + "written in a way Plantoir cannot add to. Open it in Obsidian to set the date there."
+        }
+        return "The new dates could not be set on \(listing): the settings at the top of them are "
+             + "written in a way Plantoir cannot add to. Open them in Obsidian to set the dates there."
+    }
+
+    /// A page the list offered is not there any more — renamed, moved or
+    /// removed in Obsidian between the list and the press.
+    static func noPageCalledFromTheMenu(page: String, course: String, section: String) -> String {
+        return "“\(page)” is no longer in \(course) Section \(section) — it may have been renamed or "
+             + "moved since the list was shown. Choose the menu item again to see the pages as they are now."
+    }
+
+    /// The same, for two or more pages.
+    static func noPagesCalledFromTheMenu(pages: String, course: String, section: String) -> String {
+        return "\(pages) are no longer in \(course) Section \(section) — they may have been renamed or "
+             + "moved since the list was shown. Choose the menu item again to see the pages as they are now."
+    }
+
+    /// Publish Class for a Date… on a day no class is dated.
+    static func noClassOnFromTheMenu(day: String, course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "No \(noun.singular) in \(course) Section \(section) is dated \(day). Choose another day, "
+             + "or publish the page by its name with Section ▸ Publish Pages…."
+    }
+
+    /// Rebuild Preview while a copy of the course is being saved.
+    static func courseIsBeingCopiedFromTheMenu(course: String) -> String {
+        return "A copy of \(course) is being saved in Plantoir. Wait for that to finish, then try again."
+    }
+
+    /// A publish or hide that stopped part way, from the menu: the copy made
+    /// just before it is the way back (one per menu change, #457's ruling).
+    static let restoreFromBackupPutsItBack: String =
+        "A copy of the course from just before this change is in its Backups — Course ▸ Restore "
+        + "from Backup… puts it back."
+
+    /// Make Room for Classes…'s plan, when other classes move.
+    static func makingRoomCannotBeUndoneFromTheMenu(noun: ClassNoun = .class) -> String {
+        return "Because other \(noun.plural) move, Section ▸ Undo Last Change will not take this back "
+             + "afterwards — the copy made just before it is in Plantoir's Backups list."
+    }
+
+    /// Why Make Room for Classes… opens the class dates first.
+    static func datesToMakeRoom(noun: ClassNoun = .class) -> String {
+        return "Making room for a \(noun.singular) moves later \(noun.plural) onto the days this "
+             + "section meets, so it needs those days first."
+    }
+
+    // The sheets' own words.
+
+    static func menuPublishPagesTitle(course: String, section: String) -> String {
+        return "Publish Pages in \(course) Section \(section)"
+    }
+
+    static func menuHidePagesTitle(course: String, section: String) -> String {
+        return "Hide Pages in \(course) Section \(section)"
+    }
+
+    static func menuPublishClassTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Publish a \(noun.singular.capitalized) in \(course) Section \(section)"
+    }
+
+    static func menuReDateTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Re-date the \(noun.plural.capitalized) in \(course) Section \(section)"
+    }
+
+    static func menuMakeRoomTitle(course: String, section: String, noun: ClassNoun = .class) -> String {
+        return "Make Room for \(noun.plural.capitalized) in \(course) Section \(section)"
+    }
+
+    static let menuPickPagesToPublish: String =
+        "Tick the pages to publish. The pages they link to are published with them, as far as the next class."
+
+    static let menuPickPagesToHide: String =
+        "Tick the pages to hide. Pages only they link to are hidden with them."
+
+    static func menuNoHiddenPages(course: String, section: String) -> String {
+        return "Every page in \(course) Section \(section) is already published."
+    }
+
+    static func menuNoVisiblePages(course: String, section: String) -> String {
+        return "No page in \(course) Section \(section) is published."
+    }
+
+    static func menuPickClassDay(noun: ClassNoun = .class) -> String {
+        return "Choose the day of the \(noun.singular) to publish. It is published with the pages it links to."
+    }
+
+    static func menuMakeRoomAt(noun: ClassNoun = .class) -> String {
+        return "Choose the \(noun.singular) a new one goes in front of, and how many to make room for. "
+             + "That \(noun.singular) and every later one move along to make room."
+    }
+
+    static let menuFindAPage: String = "Find a page"
+
+    static let menuContinueButton: String = "Continue"
+    static let menuPublishButton: String = "Publish"
+    static let menuHideButton: String = "Hide"
+    static let menuReDateButton: String = "Re-date"
+    static let menuMakeRoomButton: String = "Make Room"
+    static let menuCancelButton: String = "Cancel"
+    static let menuDoneButton: String = "OK"
+
+    /// While the sheet waits on the change: a copy of the course comes first.
+    static func menuSavingACopy(course: String) -> String {
+        return "Saving a copy of \(course) first…"
+    }
+
+    static let menuWorking: String = "Working…"
+
+    /// Titles for the answer to Rebuild Preview, Undo Last Change and Add
+    /// Next Class, which have no sheet of their own.
+    static let menuRebuildPreviewTitle: String = "Rebuild Preview"
+    static let menuUndoLastChangeTitle: String = "Undo Last Change"
+    static func menuAddNextClassTitle(noun: ClassNoun = .class) -> String {
+        return "Add Next \(noun.singular.capitalized)"
+    }
+
+    /// Help ▸ Publishing and Deploying…: the difference, said to the teacher
+    /// — `whatPublishingMeans` is the assistant's, and says "the teacher".
+    static let publishingAndDeployingTitle: String = "Publishing and Deploying"
+
+    static let publishingAndDeployingExplained: String =
+        "Publishing a page decides whether students can see it in this section's website. Deploying "
+        + "sends the whole website out to the web. They are different acts: a page can be published for "
+        + "days and still not be online, and deploying puts everything already published in front of "
+        + "students straight away. Preview after a change to look it over first, which is the safer order."
+
+    // MARK: - Classes dated after the next class (#475)
+    //
+    // Asked at Deploy, and at Section ▸ Publish Pages…, when a class students
+    // can see — or are about to — is dated after the next class day
+    // (`class-planning.json` → `futureDatedClasses`; where it is asked and
+    // where it never is: `shared-rules.json` → `classesDatedLater`).
+
+    static func laterClassesTitle(noun: ClassNoun = .class) -> String {
+        return "Hide \(noun.plural.capitalized) Dated Later?"
+    }
+
+    /// At Deploy. `nextDay` is the next class day, as the row writes a day.
+    static func laterClassesAtDeploy(nextDay: String, noun: ClassNoun = .class) -> String {
+        return "These \(noun.plural) are published but dated after \(nextDay), the next \(noun.singular). "
+             + "Students will see them once this section is deployed. Ticked ones are hidden first, "
+             + "with any page only they link to."
+    }
+
+    /// At Section ▸ Publish Pages…, before the plan.
+    static func laterClassesAtPublish(nextDay: String, noun: ClassNoun = .class) -> String {
+        return "These \(noun.plural) are dated after \(nextDay), the next \(noun.singular). Ticked ones "
+             + "are left hidden; the rest are published with the other pages."
+    }
+
+    /// Under the list, both times.
+    static func laterClassesKeptNote(noun: ClassNoun = .class) -> String {
+        return "A \(noun.singular) you untick stays published, and is not asked about again unless its date changes."
+    }
+
+    /// One row's day: "Wednesday, 2026-10-14".
+    static func laterClassesDay(weekday: String, date: String) -> String {
+        return "\(weekday), \(date)"
+    }
+
+    static func hideAndDeployButton(count: Int) -> String {
+        return "Hide \(count) and Deploy"
+    }
+
+    static let deployAsItIsButton: String = "Deploy As It Is"
+
+    static func leaveOutAndContinueButton(count: Int) -> String {
+        return "Leave \(count) Hidden and Continue"
+    }
+
+    static let publishThemAllButton: String = "Publish Them All"
+
+    /// An assistant working from another app asked to deploy a section with
+    /// a class dated later and no answer on file. Refused before anything is
+    /// stopped, shaped like `deployNeedsAnAnswer`: the question is answered
+    /// once in the section's window, and the answer is remembered.
+    /// `pages` is the classes, named a few at a time.
+    static func deployHasClassesDatedLater(course: String, section: String, pages: String, count: Int) -> String {
+        let are: String = count == 1 ? "is" : "are"
+        return "\(course) Section \(section) was not deployed, so nothing was sent to students: \(pages) "
+             + "\(are) published and dated after the next class, and the teacher is asked about that before "
+             + "the section goes out. Deploy it once from its window in Plantoir, where the question can be "
+             + "answered; after that it can be deployed from here."
+    }
+
+    /// The in-app assistant asked to deploy while the section's window
+    /// already has a question or a sheet up — the question about classes
+    /// dated later cannot be shown, so nothing is deployed.
+    static func deployWaitsForAnOpenQuestion(course: String, section: String) -> String {
+        return "\(course) Section \(section) was not deployed: its window is waiting on another question. "
+             + "Answer that first, then deploy."
+    }
+
+    /// The in-app assistant asked to deploy, and no window shows the section
+    /// to ask in.
+    static func deployHasClassesDatedLaterAndNoWindow(course: String, section: String, pages: String, count: Int) -> String {
+        let are: String = count == 1 ? "is" : "are"
+        return "\(course) Section \(section) was not deployed: \(pages) \(are) published and dated after "
+             + "the next class. Deploy it from its window in Plantoir, where you are asked about that first."
+    }
+
+    /// An assistant's write refused while the Section menu is changing the
+    /// same section (#457's ruling: the menu has its own claim).
+    static func sectionIsChangingFromTheMenu(course: String, section: String) -> String {
+        return "\(course) Section \(section) is being changed from the Section menu right now, so nothing "
+             + "was changed. Try again once that has finished."
+    }
 }

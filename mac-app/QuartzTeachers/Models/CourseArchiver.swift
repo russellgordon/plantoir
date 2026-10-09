@@ -93,9 +93,20 @@ enum CourseArchiver {
         // A consequence worth knowing: the five kept are five ASSISTANT
         // backups. A teacher with twenty of their own keeps all twenty, and
         // they do not crowd out the assistant's five.
+        // The Section menu's own copies (#457) are pruned the same way and
+        // counted APART: five of the menu's are kept beside five of the
+        // assistant's, so a busy afternoon of menu changes never pushes the
+        // copy an open conversation's Restore button needs off the disk.
         var backups: [BackupItem] = []
+        var menuBackups: [BackupItem] = []
         for fileURL in contents {
             guard let backup = BackupItem.from(fileURL: fileURL, courseCode: courseCode) else {
+                continue
+            }
+            if case .menu = backup.maker {
+                if ArchiveStamp.couldHaveBeenStamped(backup.backedUpAt) {
+                    menuBackups.append(backup)
+                }
                 continue
             }
             guard case .assistant = backup.maker else {
@@ -115,13 +126,20 @@ enum CourseArchiver {
             }
             backups.append(backup)
         }
+        removeAllButTheNewest(backups)
+        removeAllButTheNewest(menuBackups)
+    }
+
+    /// Deletes all but the `mostBackupsKept` newest of `backups`.
+    private static func removeAllButTheNewest(_ backups: [BackupItem]) {
         if backups.count <= mostBackupsKept {
             return
         }
 
         // Newest first. Two backups made in the same second are ordered by
         // name, so the answer is the same every time it is asked.
-        backups.sort { first, second in
+        var newestFirst: [BackupItem] = backups
+        newestFirst.sort { first, second in
             if first.backedUpAt == second.backedUpAt {
                 return first.fileURL.lastPathComponent > second.fileURL.lastPathComponent
             }
@@ -129,7 +147,7 @@ enum CourseArchiver {
         }
 
         var keptSoFar: Int = 0
-        for backup in backups {
+        for backup in newestFirst {
             keptSoFar += 1
             if keptSoFar > mostBackupsKept {
                 try? FileManager.default.removeItem(at: backup.fileURL)

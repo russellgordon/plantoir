@@ -320,6 +320,34 @@ nonisolated enum ClassesDatedLater {
         try? record.write(courseDirectory: course.directoryURL, section: sectionNumber)
     }
 
+    /// The trail's words for a deploy held back for them (#475):
+    /// `laterClassesHeldADeployBack`.
+    static func heldBackLine(count: Int, by who: String) -> String {
+        let classes: String = count == 1 ? "1 class" : "\(count) classes"
+        return "a deploy was held back for classes dated after the next class — \(classes) with no answer, "
+             + "asked for by \(who)"
+    }
+
+    /// The trail's words for the question, answered (#475):
+    /// `laterClassesAsked`. Counts only.
+    static func askedLine(route: String, flagged: Int, hidden: Int, kept: Int, cancelled: Bool) -> String {
+        let start: String = "asked about classes dated after the next class at \(route) — \(flagged) flagged"
+        if cancelled {
+            return start + ", cancelled"
+        }
+        return start + ", \(hidden) hidden, \(kept) kept published"
+    }
+
+    /// The trail's words for a deploy that went out with them and nobody to
+    /// ask — a scheduled deploy: `laterClassesWentOut`. Nil when nothing was
+    /// flagged.
+    static func wentOutLine(_ pages: [Flagged]) -> String? {
+        if pages.isEmpty {
+            return nil
+        }
+        return "deployed with classes dated after the next class: " + placesLine(pages)
+    }
+
     /// The trail's words for pages that went out unasked — a scheduled
     /// deploy, which has nobody to ask: places, at most ten, the rest
     /// counted (`LinksChecklistPublisher.publishedLine`'s shape). Places are
@@ -338,4 +366,25 @@ nonisolated enum ClassesDatedLater {
         }
         return line
     }
+}
+
+/// What the teacher answered when asked about classes dated after the next
+/// class (#475) — at Deploy, or at the in-app assistant's deploy.
+enum LaterClassesAnswer: Equatable {
+
+    /// Nothing to ask about: no class is dated after the next class day, or
+    /// every one was kept already. The deploy goes ahead.
+    case nothingToAsk
+
+    /// Answered: the ticked classes are hidden (or none was ticked), and the
+    /// deploy goes ahead.
+    case goAhead
+
+    /// Cancel: nothing was hidden, nothing deployed.
+    case cancelled
+
+    /// Something else is already on the window — a sheet, an alert, another
+    /// question — so this one could not be put (the director's ruling: do
+    /// not wait; the assistant is told `deployWaitsForAnOpenQuestion`).
+    case cannotAsk
 }

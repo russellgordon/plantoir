@@ -88,6 +88,17 @@ nonisolated enum SubjectMenuRules {
         case sectionShowInFinder
         case sectionNewTerminalAtFolder
         case removeSection
+        // Section: the assistant's own functions (#457 batch B), run from
+        // the menu through the tools' own code (`SectionVerbs`).
+        case publishPages
+        case hidePages
+        case publishClassForADate
+        case rebuildPreview
+        case undoLastChange
+        case addNextClass
+        case reDateClasses
+        case makeRoomForClasses
+        case classDates
         // View
         case back
         case forward
@@ -140,6 +151,17 @@ nonisolated enum SubjectMenuRules {
         var previewButtonEnabled: Bool = false
         var deployButtonEnabled: Bool = false
         var previewIsShowing: Bool = false
+        /// A preview of the selected section is running — building or
+        /// showing. Rebuild Preview is live only then (Russell's decision 5
+        /// on batch B's plan: otherwise it is Preview under a second name).
+        var previewIsRunning: Bool = false
+        /// The last change the Section menu made in this window was made in
+        /// the selected section, so Undo Last Change would act on it.
+        var lastChangeIsHere: Bool = false
+        /// One of the assistant's functions is running on the selected
+        /// section — from this window's menu, from another window's, or in
+        /// the assistant's own window (#457's plan review, note 14).
+        var verbIsRunning: Bool = false
         var canGoBack: Bool = false
         var canGoForward: Bool = false
     }
@@ -275,6 +297,29 @@ nonisolated enum SubjectMenuRules {
                 if !situation.reviseBlocked.contains(.localAssistant) {
                     enabled.insert(.sectionReviseWithLocalAssistant)
                 }
+            }
+            // The assistant's functions (#457 batch B). Each writes to the
+            // section, so none on a course kept for reference (the runner
+            // refuses anyway — greyed is the courtesy, the gate is the
+            // guard), none while it deploys or a copy is being zipped, and
+            // one at a time. Rebuild Preview writes only the built site, so it
+            // is live on a reference course, as the tool is
+            // (`toolsAllowedOnAReferenceCourse`).
+            let verbsMayRun: Bool = isLive && !situation.deploying && !situation.copying && !situation.verbIsRunning
+            if verbsMayRun {
+                enabled.insert(.publishPages)
+                enabled.insert(.hidePages)
+                enabled.insert(.publishClassForADate)
+                enabled.insert(.addNextClass)
+                enabled.insert(.reDateClasses)
+                enabled.insert(.makeRoomForClasses)
+                enabled.insert(.classDates)
+                if situation.lastChangeIsHere {
+                    enabled.insert(.undoLastChange)
+                }
+            }
+            if situation.previewIsRunning && situation.previewButtonEnabled && !situation.verbIsRunning {
+                enabled.insert(.rebuildPreview)
             }
             if situation.obsidianInstalled {
                 enabled.insert(.sectionOpenInObsidian)
