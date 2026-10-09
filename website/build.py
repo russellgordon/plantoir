@@ -624,8 +624,6 @@ def shot_texts(shot: dict) -> list[tuple[str, str]]:
 def site_json_texts(site: dict) -> list[tuple[str, str]]:
     """The words site.json puts on a page."""
     texts: list[tuple[str, str]] = [("headline", site.get("headline", "")), ("tagline", site.get("tagline", ""))]
-    for index, item in enumerate(site.get("new_in", {}).get("items", [])):
-        texts.append((f"new_in item {index + 1}", item["text"]))
     for entry in site.get("downloads", []):
         texts.append((f"downloads {entry.get('platform', '')}", entry.get("meta", "")))
     texts.append(("availability note", site.get("availability", {}).get("note", "")))
@@ -692,22 +690,10 @@ def download_cards_html(site: dict) -> str:
     return "\n".join(cards)
 
 
-def new_in_html(site: dict, counts: dict) -> str:
-    """The home page's "New this year" list, from `site.json -> new_in`."""
-    items: list[str] = []
-    for item in site.get("new_in", {}).get("items", []):
-        text = substitute(item["text"], counts)
-        items.append(f'    <li><a href="{{{{up}}}}{item["href"]}">{text}</a></li>')
-    if not items:
-        return ""
-    joined = "\n".join(items)
-    return f'<ul class="plain new-in">\n{joined}\n  </ul>'
-
-
 def broken_fragment_problems(rendered: dict[str, str]) -> list[str]:
     """A link to `page/#section` whose page has no `id="section"`.
 
-    A new-in item or a cross-reference pointing at a section that was renamed
+    A cross-reference pointing at a section that was renamed
     or never landed goes to the top of the page with nothing said.
     """
     ids: dict[str, set] = {}
@@ -825,13 +811,6 @@ def remove_moved_output(site: dict, output: Path) -> None:
             shutil.rmtree(stale)
 
 
-def version_tuple(text: str) -> tuple:
-    parts: list[int] = []
-    for piece in str(text).split("."):
-        parts.append(int(piece) if piece.isdigit() else 0)
-    return tuple(parts)
-
-
 def waiting_on_issue(shot: dict) -> str | None:
     """The GitHub issue a still-missing shot waits on (`waiting_on: "#367"`),
     or None. Only an issue reference counts: a bare word is not a promise
@@ -843,18 +822,10 @@ def waiting_on_issue(shot: dict) -> str | None:
 def release_readiness_refusal(site: dict, shots: dict) -> str | None:
     """Why the site must not go live yet, or None.
 
-    Two ways a deploy can advertise what nobody can have: the "New this year"
-    list is written for a release AHEAD of `version` (the pages describe
-    features whose download does not exist yet — deploy after the cut), or a
-    shot the pages name is still `awaiting_capture` with no image (the section
-    would go out without its picture). `--check` lets both through, so the
-    site can be built and reviewed before the release; deploying does not.
+    A shot the pages name that is still `awaiting_capture` with no image
+    would go out without its picture. `--check` lets it through, so the site
+    can be built and reviewed before the release; deploying does not.
     """
-    listed = str(site.get("new_in", {}).get("version", ""))
-    current = ".".join(str(site.get("version", "")).split(".")[:2])
-    if listed and version_tuple(listed) > version_tuple(current):
-        return (f"Not deploying: the pages describe {listed} (site.json -> new_in) but the release is "
-                f"{site.get('version')}. Deploy after the {listed} cut sets `version`.")
     waiting: list[str] = []
     for shot in shots.get("shots", []):
         if not shot.get("awaiting_capture"):
@@ -872,17 +843,6 @@ def release_readiness_refusal(site: dict, shots: dict) -> str | None:
         return ("Not deploying: these pictures have not been taken yet, so their sections would go out "
                 f"without them: {', '.join(waiting)} (capture.py --scenes).")
     return None
-
-
-def new_in_is_current(site: dict) -> bool:
-    """Does the "New this year" list belong to the version being released?
-
-    Compared on major.minor, so a 1.4.1 does not trip it and a 1.5.0 does.
-    """
-    version = site.get("version", "")
-    listed = str(site.get("new_in", {}).get("version", ""))
-    major_minor = ".".join(version.split(".")[:2])
-    return listed == major_minor
 
 
 def site_slugs(pages: list[dict]) -> list[str]:
@@ -928,7 +888,6 @@ def build(check_only: bool) -> int:
         "released": site["released"],
         "demo_links": demo_links_html(site),
         "download_cards": download_cards_html(site),
-        "new_in": new_in_html(site, counts),
     }
     site_values.update(counts)
 
@@ -940,9 +899,6 @@ def build(check_only: bool) -> int:
                 if text:
                     problems.extend(typed_count_problems(f"shots.json {shot['id']} {key}", text))
                     problems.extend(machinery_problems(f"shots.json {shot['id']} {key}", text))
-    for index, item in enumerate(site.get("new_in", {}).get("items", [])):
-        problems.extend(typed_count_problems(f"site.json new_in item {index + 1}", item["text"]))
-        problems.extend(machinery_problems(f"site.json new_in item {index + 1}", item["text"]))
     for shot in shot_list:
         for key, text in shot_texts(shot):
             problems.extend(deploy_word_problems(f"shots.json {shot['id']} {key}", text, readable=False))
@@ -965,8 +921,8 @@ def build(check_only: bool) -> int:
         problems.extend(machinery_problems(page_name, page["body"], page["body_line"]))
         body = expand_shots(page["body"], shots, problems, page_name, up)
         body = expand_availability(body, site, problems, page_name)
-        # Twice: the first pass puts in blocks (download cards, the new-in
-        # list) that carry placeholders of their own, like {{repo_url}}.
+        # Twice: the first pass puts in blocks (the download cards) that
+        # carry placeholders of their own, like {{repo_url}}.
         body = substitute(body, dict(site_values, up=up))
         body = substitute(body, dict(site_values, up=up))
 
@@ -1305,13 +1261,6 @@ def main() -> int:
         if refusal:
             print(refusal, file=sys.stderr)
             return 1
-        site = read_json(WEBSITE / "site.json")
-        if not new_in_is_current(site):
-            # A reminder, not a refusal: the list is still true, only no
-            # longer new. A 1.4.x deploys without it; a 1.5.0 is told.
-            print(f"⚠️  The home page's \"New this year\" list is for {site.get('new_in', {}).get('version')}, "
-                  f"and this is {site.get('version')}. Rewrite site.json -> new_in when you can.",
-                  file=sys.stderr)
         import netlify_deploy
         return netlify_deploy.deploy()
     return result

@@ -117,7 +117,7 @@ Inside the body you can use:
 - `{{demo_links}}` — the list of live example class sites.
 - `{{ready_made_ontario}}`, `{{ready_made_other_sentence}}`, `{{skeleton_codes}}`
   — counted from `support/` at every build; `{{availability:<key>}}`,
-  `{{download_cards}}`, `{{new_in}}` — drawn from `site.json`. See "What the
+  `{{download_cards}}` — drawn from `site.json`. See "What the
   pages read from data" below. A count typed into a page is refused.
 
 A page that leaves a `{{placeholder}}` unfilled, or names a screenshot that
@@ -515,10 +515,8 @@ product change for a marketing script), and the kept folder.
 **Until the release it photographs exists**, a new shot is marked
 `awaiting_capture` in `shots.json`: `build.py` renders nothing where it goes
 and lists it on every build, so `--check` passes and the pages can be
-reviewed. **`--deploy` refuses** while any such shot has no image, and while
-`site.json → new_in.version` is ahead of `version` (pages describing a release
-nobody can download yet). Retaken shots carry their new alt text and caption
-under `retake`. Pictures are checked in a staging folder and only those that
+reviewed. **`--deploy` refuses** while any such shot has no image. Retaken
+shots carry their new alt text and caption under `retake`. Pictures are checked in a staging folder and only those that
 pass are promoted; a shot taken in both appearances then loses
 `awaiting_capture`, and a retake's words are promoted with its picture
 (`capture.py → promote_captured_shots`), so the words never describe a
@@ -577,10 +575,6 @@ whose section does not exist.
   last release that has it and says "version <pinned>". Windows is pinned to
   1.1.0 (v1.2.0 onward carried the DMG only); unpin it in the release that ships
   the Windows installer again. The asset names are frozen (RELEASING.md).
-- **New this year.** `{{new_in}}` is `site.json → new_in`, each item a sentence
-  and a link to the section that explains it. `new_in.version` names the
-  release it was written for; `--deploy` warns when that is not the major.minor
-  of `version`.
 
 ## plantoir.app is generated, and its screenshots are taken by a robot
 
