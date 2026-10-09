@@ -428,6 +428,195 @@ coverage map for it, linked from Key Links under that folder's entry.
 
 ---
 
+## F. Additions installed every build: printable pages (#454, v2.0.0)
+
+A page whose settings say `printable: true` prints as a worksheet; a page that
+says `printPdf: <file in Media>` hands out a PDF the teacher already has. The
+rules are data in [`contracts/shared-rules.json`](../contracts/shared-rules.json)
+→ `printablePages` and [`file-formats.json`](../contracts/file-formats.json) →
+`pageOptIns`; this section says how the site does it and why.
+
+**Compatibility, stated first because it is the promise.** A page that does
+not opt in renders exactly as it did before #454: its HTML carries no print
+markup at all — no wrapper, no button, no style, no `@page` — and its date
+line is the plain `<p class="content-meta">` it always was. Measured on EXC2O
+(implementation review, `origin/dev` 8178eeaac against the branch): **all 300
+pages that do not opt in are byte-identical** once what Quartz already varies
+between ANY two builds is set aside (the explorer's random list id, build-time
+dates on curriculum pages, and the order of tag-list entries sharing one of
+those dates); the only pages that differ are the 7 that opt in. Every new CSS
+selector is scoped to a printable page or the handout frame, and nothing adds
+an `@page`. ⌘P of a page that does not opt in prints the same pages with the
+same text in Chrome for Testing 155 (13 and 3 pages, light and dark,
+`pdftotext` identical) and in Safari 26.6. **verify.sh gates it on every
+run**: section 5 plants "Printable Not Opted", the worksheet with only
+`printable: true` taken out, and the 6h printable-pages check fails if that
+page carries `plantoir-meta-line`, `plantoir-print`, `data-plantoir` or
+`@page`, or if its date line is not the plain one straight after its title.
+What every site DOES change is its two shared bundles, measured on EXC2O
+against `origin/dev`: `postscript.js` 74,590 → 85,344 bytes (+10,754) and
+`index.css` 35,386 → 41,045 (+5,659) on the final branch (the review measured
++10,525 and +5,659 at 4c587f670, before the light-page wait and the corner
+change), every rule in them scoped so it cannot touch an ordinary page.
+
+### F1. The files and how they reach a section
+
+New files, not patches, live in `support/quartz/` at the path they take in a
+section's Quartz copy, and `build_site.install_quartz_additions` copies them in
+on EVERY build (ALWAYS section), so a section built before them picks them up
+on its next preview:
+
+| File | What it does |
+|---|---|
+| `components/PlantoirMetaLine.tsx` | Wraps the CONTENT layout's `ContentMeta()` only (folder and tag pages never get a button). Not opted in → renders the inner date line and nothing else. `printPdf` → a plain `<a … target="_blank">` to `Media/<Quartz slug of the file>`, built with Quartz's own `slugifyFilePath` so the address is the one the Assets emitter writes (measured with `&` and a space: `Media/plantoir-print-fixture--and--key.pdf`). `printable` → Print plus a `<details>` menu (Questions only, Answers only) at the TRAILING edge (`margin-inline-start: auto`, so right-to-left too), present even when the date line shows nothing (decision 6), and an inline `<style id="plantoir-print-page">` with the `@page` box and its four corners for ⌘P. Reads `quartz/plantoir_print.json` with `fs` rather than importing it, so a missing file costs the button, never the build. Forwards the inner component's `css`/`afterDOMLoaded` (review S7). |
+| `components/scripts/printRules.ts` | The rules with no DOM and no imports — answer/question/unfold roles, labels, title cleaning, page labels — so `scripts/check_print_rules_against_the_site.py` can bundle it with the scaffold's esbuild and run every contract case in Node (verify.sh). |
+| `components/scripts/print.inline.ts` | The button, the handout, ⌘P and the preview handoff (F3–F5). Bundled into every site; inert unless the page carries a printable meta line. |
+| `components/styles/print.scss` | On-screen button styles, ⌘P rules under `@media print { html.plantoir-printable … }`, and handout rules under `html.plantoir-print-frame`. No bare `@page` anywhere (review B2: it cannot be scoped). |
+
+Two marker edits wire them in (`wire_quartz_additions`, idempotent, ALWAYS):
+`components/index.ts` exports `PlantoirMetaLine`, and `quartz.layout.ts`'s
+content layout becomes `Component.PlantoirMetaLine(Component.ContentMeta())`.
+**REJECTED: a third edit to `mermaid.inline.ts`** (an event saying diagrams are
+drawn), in the first implementation: that script is INLINED into every page,
+so it changed the HTML of every page on every site. The handout waits by
+watching the diagrams instead (F3). Also rejected: `patches/` rows (nothing of
+Quartz's is replaced), a meta tag in `Head.tsx`, appending to `base.scss`
+(marker appends freeze, see C2), and resolving `support/quartz` from the
+working directory as the Backlinks copier does (then `check_baked` would
+compare the tree with itself). A file later REMOVED from `support/quartz`
+stays in sections that have it; nothing imports it, so it is inert.
+
+Every build also writes `quartz/plantoir_print.json` (`scripts/print_settings.py`):
+the four corners composed from the course's `print_*` settings, the words, the
+answer kinds and title words, and the default mode. Corners are Python
+because they depend on the COURSE's settings, which the site cannot read.
+
+### F2. The engine, gated per site
+
+Paged.js 0.4.3 (`/opt/vendor/pagedjs`, see 02) is copied into a section's
+`quartz/static/pagedjs` only when at least one page students can see opts in
+and has no PDF of its own (`page_features.install_gated_assets`), and taken out
+when none does — verify.sh 6c checks it is gone once the planted pages are.
+So a course that never prints carries none of its 502,617 bytes. The gate runs
+on the build's processed copies, before Quartz. **The live-preview edge:** a
+page that gains `printable: true` while a preview is ALREADY running gets its
+button on the next build of that preview but the engine only on the next
+build that runs the gate — until then Print uses the fallback (F3).
+
+### F3. The handout (Print)
+
+On each page load the script stamps every callout in the article with its
+role, read from what was folded WHEN THE PAGE LOADED (a student who opened an
+answer toggles the same class; plan finding C). On Print:
+
+1. Dark page → `saved-theme="light"` and a `themechange` (the reader's saved
+   preference is never written). Then, on EVERY page, wait until every
+   Mermaid diagram's OWN child is an `svg`, 8 s cap — at once when they are
+   already drawn. Measured: Mermaid first draws into a temporary box, and
+   taking the first `svg` found printed a blank space; and a LIGHT page opened
+   from the preview (F5) starts printing before Quartz has drawn anything, so
+   the first version, which waited only on dark pages, printed every diagram
+   as its source text (implementation review B1: Safari's PDF read
+   "flowchart LR / A[Expand] --> …"; Chrome had 0 of 5 drawn).
+   `browser-checks/print_handout.mjs` prints the verify fixture that way in
+   headless Chrome for Testing and fails on source text; verify.sh 6h runs it
+   when a Chrome for Testing is on the Mac. Proven against the old code.
+2. Await every function in `window.plantoirPrint.prepare` (the hook #485 E1
+   and #455 register in).
+3. Clone the title and article: answers lifted to an "Answers" section on a
+   fresh page, labelled by their own title or by where they sit (numbered
+   list item → "Question n", after the heading above the list when there is
+   one — "Practice · Question 1", since the item's number alone repeated the
+   fixture's heading "Question 1" (review N2), or "Question 3, part 1" when
+   that heading is itself a question (fix review) — else nearest heading, else
+   "Answer n");
+   question callouts keep their title and send their body; every other folded
+   callout opened in place; "(click to expand)" dropped; code longer than 25
+   lines may split; an `svg` with a size and no `viewBox` gets one; code line
+   numbers written out (Paged.js does not carry Quartz's line counter: every
+   line printed "1").
+4. An iframe ON SCREEN but invisible (`opacity:0`): off screen, Safari
+   paginated about one page per 8 s (11 pages ≈ 90 s); on screen, 192 ms.
+5. Paged.js paginates with `index.css` plus the page's `@page` text, its
+   bottom-right corner replaced by a per-page `--plantoir-page-label`, PLUS
+   the break rules spelled out unscoped — Paged.js decides breaks by matching
+   selectors against the content BEFORE it sits under the frame's `<html>`,
+   so `html.plantoir-print-frame .plantoir-answers { break-before: page }`
+   matched nothing (measured: the answers began mid-page). Margin boxes use
+   no-break spaces: "Page 1 of 3" wrapped onto three lines in Safari — except
+   the top-left corner, which may take two lines: a long school name sharing
+   it with the course code printed ON TOP of three blanks (review S3,
+   measured with "St. Michael's Catholic Secondary School of the Arts ·
+   EXC2O"; two clean lines after, handout and ⌘P). The top corners sit on
+   their bottom edge, so the blanks line up with the name's last line.
+6. Pages labelled "Page n of m" then "Answers n of m" (decision 3), and
+   `print()`; restored again when `print()` returns, in case a browser never
+   sends `afterprint` (review N4). That is right where `print()` waits for the
+   dialog to close — Safari, Chrome and Edge, measured — and UNMEASURED in
+   Firefox, where a `print()` that returned at once would take the frame away
+   mid-print. `afterprint` restores the theme and removes the frame (measured
+   in Safari: Cancel fires it too; the page came back dark with no frame).
+
+**Fallback:** Paged.js missing or failing → the same frame printed by the
+browser, corners where it prints margin boxes (Chrome, Edge), one count for
+the whole document. Measured in Chrome: 3 pages, answers on a fresh page.
+
+### F4. ⌘P on a printable page
+
+Questions only, no pagination (decision 7): answers hidden, question bodies
+hidden, everything else open, sidebars hidden, titles cleaned for the print
+and restored after. A dark page prints light; Mermaid diagrams already drawn
+dark cannot be redrawn between `beforeprint` and the print, so they keep the
+dark colours they were drawn with and are inverted as a whole (review S5).
+Measured: flipping only the page's colours left light words on light shapes.
+**Safari limit, measured:** Safari lays a printed page out at the WINDOW's
+width (`innerWidth` 1512 while printing from a 1512 px window) and shrinks it
+onto the paper, so ⌘P in Safari prints the column at roughly half size — on
+EVERY Quartz page, before #454 too. Scaling the page up by the window's width
+was tried and REJECTED (it clipped both edges). The Print button is the path
+that prints at full size in Safari. Also found, unchanged by #454: ⌘P of an
+ordinary page in DARK mode in Safari printed eight blank pages (white text,
+backgrounds dropped) — before and after.
+
+### F5. Plantoir's own preview
+
+A `WKWebView` inside the app shows no print dialog and opens no new windows
+(review B1, measured). So when the page finds the app's `plantoirPrint`
+message handler it says `printablePages.words.openingInBrowser` and posts
+`{mode, url}`; the app opens the page in the default browser with
+`#plantoir-print=<mode>`, and the page prints at once there. Measured in
+Safari 26.6, light, real print sheet then Save as PDF: "All 3 Pages", the
+diagram DRAWN (no source text — the first version printed it as text, B1),
+the hash removed afterwards.
+New-window links, the PDF link among them, open in the browser too. See 09.
+
+### F6. Figures (decision 13, for #485 E1)
+
+An engine's figure is `<figure class="pl-figure pl-<engine>">` with an SVG
+that has a `viewBox` (or an `<img>` with its own size) and a `<figcaption>`.
+On paper it never splits, is scaled to the width, keeps its own resolution,
+and any dark-mode filter is removed. A browser-drawn engine registers in
+`window.plantoirPrint.prepare`.
+
+### F7. Measured matrix (macOS 26.6, M4 Pro), the verify fixture
+
+| Browser | With answers | Questions only | Answers only | ⌘P | Press → print |
+|---|---|---|---|---|---|
+| Safari 26.6 | 3 (2 + 1) | 2 | 1 | 2, small (F4) | 760 ms |
+| Chrome for Testing 155.0.8059.39 | 3 (2 + 1) | 2 | 1 | 2, corners | 131–214 ms |
+| Edge 155.0.4283.45 | 3 (2 + 1) | 2 | 1 | 2, corners | 124–212 ms |
+
+Light and dark gave the same page counts in every cell. Chrome and Edge were
+driven by puppeteer-core 24.10.0 (handout: the frame's document as printed,
+re-rendered by `page.pdf`; ⌘P: `page.pdf` with the page's `@page`). **Trap:**
+Edge's first launch from a Homebrew cask waits on macOS's "downloaded from
+the Internet" prompt, and until it is answered `requestAnimationFrame` never
+fires, which made Paged.js hang and looked exactly like an Edge bug.
+Not measured here: a site published to Netlify or Cloudflare (the files are
+identical to the preview's), Windows browsers (the `windows` issue asks).
+
+---
+
 ## E. Summary: what is *not* customized
 
 Everything else is stock Quartz v4.5.0 — with five asset exceptions, all in

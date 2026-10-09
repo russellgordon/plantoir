@@ -804,6 +804,75 @@ class CourseConfiguration {
         set { values["footer_html"] = newValue }
     }
 
+    // MARK: Printing (#454)
+    //
+    // Course-wide, read by the build on every build (scripts/print_settings.py)
+    // for the corners of a printed page: contracts/file-formats.json →
+    // courseConfigKeys (print_*) and shared-rules.json → printablePages.corners.
+    // The getters NEVER write: an unknown blank or place reads as nothing or
+    // the default, and stays in the file until the teacher changes the setting
+    // (savingSettings.whatEnablesSave.freshOpenCases).
+
+    /// The places a school name or course code can print.
+    nonisolated static let printPlaces: [String] = ["header_left", "footer_left", "none"]
+
+    /// The blanks a student can be asked to fill in, in the order they print.
+    nonisolated static let printBlankOrder: [String] = ["name", "date", "class_number"]
+
+    /// The school's name; "" when none. An empty name removes the key, so a
+    /// course that never set one writes the file it always did.
+    var printSchoolName: String {
+        get { return stringValue(forKey: "print_school_name") }
+        set {
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                values.removeValue(forKey: "print_school_name")
+            } else {
+                values["print_school_name"] = newValue
+            }
+        }
+    }
+
+    /// The blanks, in print order. Absent means Name and Date; unknown values
+    /// are ignored; an empty list means none.
+    var printBlanks: [String] {
+        get {
+            guard values["print_blanks"] != nil else {
+                return ["name", "date"]
+            }
+            let stored: [String] = stringListValue(forKey: "print_blanks")
+            var ordered: [String] = []
+            for blank in CourseConfiguration.printBlankOrder {
+                if stored.contains(blank) {
+                    ordered.append(blank)
+                }
+            }
+            return ordered
+        }
+        set {
+            var ordered: [String] = []
+            for blank in CourseConfiguration.printBlankOrder {
+                if newValue.contains(blank) {
+                    ordered.append(blank)
+                }
+            }
+            values["print_blanks"] = ordered
+        }
+    }
+
+    /// Where the school name prints: header_left (the default), footer_left
+    /// or none.
+    var printSchoolNameAt: String {
+        get { return printPlace(forKey: "print_school_name_at", fallback: "header_left") }
+        set { values["print_school_name_at"] = newValue }
+    }
+
+    /// Where the course code prints: footer_left (the default), header_left
+    /// or none.
+    var printCourseCodeAt: String {
+        get { return printPlace(forKey: "print_course_code_at", fallback: "footer_left") }
+        set { values["print_course_code_at"] = newValue }
+    }
+
     /// Whether a section's site title leads with the grade ("Grade 12
     /// Computer Science…") — per section, like the section marker. On by
     /// default; the build recomputes the landing title on every build.
@@ -1571,6 +1640,15 @@ class CourseConfiguration {
         }
         let firstWrapped: NSArray = [first]
         return firstWrapped.isEqual(to: [second])
+    }
+
+    /// One of `printPlaces`, or the fallback for anything else.
+    private func printPlace(forKey key: String, fallback: String) -> String {
+        let stored: String = stringValue(forKey: key)
+        if CourseConfiguration.printPlaces.contains(stored) {
+            return stored
+        }
+        return fallback
     }
 
     private func stringValue(forKey key: String) -> String {

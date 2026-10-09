@@ -385,7 +385,9 @@ struct SettingsSaveNotice: Equatable {
         hiddenBefore: [String],
         hiddenAfter: [String],
         result: CourseConfiguration.WriteResult,
-        notice: SettingsSaveNotice?
+        notice: SettingsSaveNotice?,
+        printingBefore: PrintingSnapshot? = nil,
+        printingAfter: PrintingSnapshot? = nil
     ) -> String {
         var line: String = "saved the settings for " + courseCode
 
@@ -410,6 +412,12 @@ struct SettingsSaveNotice: Equatable {
         }
         if !sidebarParts.isEmpty {
             line += " — sidebar: " + sidebarParts.joined(separator: "; ")
+        }
+
+        if let printingAfter {
+            if let clause = SettingsSaveNotice.printingClause(before: printingBefore, after: printingAfter) {
+                line += "; printing: " + clause
+            }
         }
 
         if !result.keptFromElsewhere.isEmpty {
@@ -448,6 +456,87 @@ struct SettingsSaveNotice: Equatable {
             }
         }
         return line
+    }
+
+    /// The printing settings as one Save found and left them (#454), for the
+    /// trail. The school's NAME is held only to compare: the line says set,
+    /// changed or cleared, and never the name (rule 5: nothing a teacher
+    /// wrote reaches the trail).
+    nonisolated struct PrintingSnapshot: Equatable, Sendable {
+
+        // MARK: - Stored properties
+
+        let schoolName: String
+        let blanks: [String]
+        let schoolNameAt: String
+        let courseCodeAt: String
+
+        // MARK: - Initializer
+
+        init(schoolName: String, blanks: [String], schoolNameAt: String, courseCodeAt: String) {
+            self.schoolName = schoolName.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.blanks = blanks
+            self.schoolNameAt = schoolNameAt
+            self.courseCodeAt = courseCodeAt
+        }
+
+        @MainActor
+        init(_ configuration: CourseConfiguration) {
+            self.init(
+                schoolName: configuration.printSchoolName,
+                blanks: configuration.printBlanks,
+                schoolNameAt: configuration.printSchoolNameAt,
+                courseCodeAt: configuration.printCourseCodeAt
+            )
+        }
+    }
+
+    /// What a Save changed about printing, or nil when it changed nothing.
+    /// Only the parts that changed: "school name set; blanks Name, Date →
+    /// Name, Date, Class #; course code bottom left → top left". A course
+    /// whose file had no settings yet compares with the defaults.
+    nonisolated static func printingClause(before: PrintingSnapshot?, after: PrintingSnapshot) -> String? {
+        let earlier: PrintingSnapshot = before ?? PrintingSnapshot(
+            schoolName: "", blanks: ["name", "date"], schoolNameAt: "header_left", courseCodeAt: "footer_left"
+        )
+        var parts: [String] = []
+        if earlier.schoolName != after.schoolName {
+            if earlier.schoolName.isEmpty {
+                parts.append("school name set")
+            } else if after.schoolName.isEmpty {
+                parts.append("school name cleared")
+            } else {
+                parts.append("school name changed")
+            }
+        }
+        if earlier.blanks != after.blanks {
+            parts.append("blanks " + blankWords(earlier.blanks) + " → " + blankWords(after.blanks))
+        }
+        if earlier.schoolNameAt != after.schoolNameAt {
+            parts.append("school name " + placeWords(earlier.schoolNameAt) + " → " + placeWords(after.schoolNameAt))
+        }
+        if earlier.courseCodeAt != after.courseCodeAt {
+            parts.append("course code " + placeWords(earlier.courseCodeAt) + " → " + placeWords(after.courseCodeAt))
+        }
+        if parts.isEmpty {
+            return nil
+        }
+        return parts.joined(separator: "; ")
+    }
+
+    nonisolated private static func blankWords(_ blanks: [String]) -> String {
+        if blanks.isEmpty {
+            return "none"
+        }
+        var words: [String] = []
+        for blank in blanks {
+            words.append(CourseSettingsWording.printingBlank(blank))
+        }
+        return words.joined(separator: ", ")
+    }
+
+    nonisolated private static func placeWords(_ place: String) -> String {
+        return CourseSettingsWording.printingPlace(place).lowercased()
     }
 
     // MARK: - Private helpers
