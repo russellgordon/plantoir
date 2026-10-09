@@ -1453,8 +1453,9 @@ PY
 
 # ---- #454: printable pages, planted for the same build ----
 # A worksheet with one callout per answerCallouts shape, a numbered list, a
-# hint, a self-check, an answer left open, maths, a diagram, code and a
-# figure; the SAME page without `printable:` (it must come out with no print
+# hint, a self-check, an answer left open, maths, a diagram, code, a figure
+# and a Curriculum connection between two questions, as the skeleton templates
+# write one (#498: never printed); the SAME page without `printable:` (it must come out with no print
 # markup at all); a page with its own PDF (a name with `&` and a space, so the
 # web address is Quartz's slug and not a guess); and a page whose PDF is not
 # there. Removed by restore_hit_fixture with the pages above.
@@ -1469,7 +1470,7 @@ A worksheet planted by verify.sh (plantoir-print-sentinel-7f3a). Try each questi
 
 ## Question 1
 
-Simplify $(x + 3)(x - 2)$.
+Simplify $(x + 3)(x - 2)$.[^1]
 
 > [!success]- Answer 1
 > $x^2 + x - 6$
@@ -1480,6 +1481,20 @@ Factor $x^2 - 9$ completely.
 
 > [!SOLUTION]-
 > $(x - 3)(x + 3)$, a difference of squares.
+
+%%curriculum-start%%
+## Curriculum connection
+
+%%
+The skeleton templates' note to the teacher.
+%%
+
+![[B1.1]]
+
+### Where it leads
+
+Linked on purpose (plantoir-curriculum-sentinel-7f3a).
+%%curriculum-end%%
 
 ## Practice
 
@@ -1520,6 +1535,14 @@ def area(width, height):
 ```
 
 <figure class="pl-figure pl-test"><svg viewBox="0 0 200 100" width="400" height="200" xmlns="http://www.w3.org/2000/svg"><rect x="10" y="10" width="180" height="80" fill="none" stroke="black"/><text x="100" y="55" text-anchor="middle">plantoir figure</text></svg><figcaption>A figure an engine would draw.</figcaption></figure>
+
+## Curriculum connections
+
+![[B1.2]]
+
+Last on the page, as the templates put it (plantoir-curriculum-sentinel-7f3a).
+
+[^1]: Multiply each term (plantoir-footnote-sentinel-7f3a).
 PRINTFIXTURE
 sed -e '/^printable: true$/d' -e 's/^title: Printable Fixture$/title: Printable Not Opted/' \
     -e 's/plantoir-print-sentinel-7f3a/plantoir-notopted-sentinel-7f3a/' \
@@ -1692,6 +1715,14 @@ for needle in ('class="plantoir-print-button"', 'data-mode="questionsOnly"', 'da
     if needle not in worksheet:
         problems.append(f"the printable page lacks {needle}")
 
+# #498: the Curriculum connection stays on the page on SCREEN - it is left off
+# paper by the page's print code when the page loads, and the build adds no
+# mark of its own (print_handout.mjs below checks the printing itself).
+if worksheet and ('id="curriculum-connection"' not in worksheet or "plantoir-curriculum-sentinel-7f3a" not in worksheet):
+    problems.append("the worksheet's Curriculum connection is not on the page on screen (#498)")
+if "data-plantoir-curriculum" in worksheet:
+    problems.append("the build marked the Curriculum connection itself; the page's print code does that, on printable pages only (#498)")
+
 plain = page("Printable-Not-Opted.html")
 for needle in ("plantoir-meta-line", "plantoir-print", "data-plantoir", "@page"):
     if needle in plain:
@@ -1746,7 +1777,10 @@ fi
 # Opened from Plantoir's preview, Print starts at the first page load. In a
 # LIGHT page nothing used to wait for Quartz to draw the diagrams, so the
 # planted worksheet printed its Mermaid diagram as source text. This prints it
-# that way in headless Chrome for Testing and checks the diagram was drawn.
+# that way in headless Chrome for Testing and checks the diagram was drawn -
+# in each of the three modes - and that the worksheet's Curriculum connection
+# is printed in none of them nor under ⌘P (print media), while the page that
+# did not opt in still prints its own under ⌘P (#498).
 # It needs a browser on this Mac, so it runs when one is found (PLANTOIR_CHROME,
 # or the copy documentation/06 F7 installs) and says SKIPPED otherwise.
 PRINT_CHROME="${PLANTOIR_CHROME:-}"
@@ -1762,10 +1796,11 @@ if [[ -n "$PRINT_CHROME" && -x "$PRINT_CHROME" ]] \
   PRINT_PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
   ( cd "$SITE_PUBLIC" && exec python3 -m http.server "$PRINT_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
   PRINT_SERVER_PID=$!
-  if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" >/tmp/verify_print_handout.log 2>&1; then
-    pass "printable pages: opened as the preview opens it, in a light page, the handout prints its diagram DRAWN, not as source text (browser-checks/print_handout.mjs, #454)"
+  if node browser-checks/print_handout.mjs "$PRINT_CHROME" "http://127.0.0.1:$PRINT_PORT/Printable-Fixture.html" \
+       "http://127.0.0.1:$PRINT_PORT/Printable-Not-Opted.html" >/tmp/verify_print_handout.log 2>&1; then
+    pass "printable pages: opened as the preview opens it, in a light page, the handout prints its diagram DRAWN, not as source text (#454); the page's Curriculum connection is on screen but in none of the three handouts and not under ⌘P, the heading after it still printed, and the page that did not opt in still prints its own (#498) (browser-checks/print_handout.mjs)"
   else
-    fail "printable pages: the handout printed from a light page did not carry its drawn diagram (browser-checks/print_handout.mjs, #454)"
+    fail "printable pages: a handout or ⌘P printed a diagram as source text, printed the Curriculum connection, or left out what should print (browser-checks/print_handout.mjs, #454, #498)"
     cat /tmp/verify_print_handout.log
   fi
   kill "$PRINT_SERVER_PID" 2>/dev/null || true

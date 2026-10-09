@@ -3,9 +3,9 @@
 // No imports and no DOM, so the same file runs in the browser (print.inline.ts
 // imports it) and in Node, where scripts/check_print_rules_against_the_site.py
 // bundles it and runs every case in contracts/shared-rules.json ->
-// printablePages (answerCallouts, labels, titleCleaning, pageLabels) through
-// it. A rule changed here without the contract, or there without here, fails
-// verify.sh.
+// printablePages (answerCallouts, labels, titleCleaning, pageLabels,
+// curriculumConnection) through it. A rule changed here without the contract,
+// or there without here, fails verify.sh.
 
 export type Role = "answer" | "question" | "unfold" | "none"
 export type Part = "questions" | "answers"
@@ -140,6 +140,50 @@ export function label(
     return heading.trim()
   }
   return fill(words.answerLabel, { n: answerNumber })
+}
+
+// A page's Curriculum connection (#498) is never printed: it says which
+// expectations the page addresses, which is for the teacher and the coverage
+// map, not for a student's worksheet. Is this heading one? Its words in any
+// capitals, singular or plural, with a closing colon or full stop allowed:
+// "Curriculum Connections:" is one, "Making a curriculum connection" is not.
+export function isCurriculumHeading(heading: string, curriculumHeadings: string[]): boolean {
+  const text = normalised(heading).replace(/[:.]+$/, "").trim()
+  for (const words of curriculumHeadings) {
+    const wanted = normalised(words)
+    if (text === wanted || text === wanted + "s") {
+      return true
+    }
+  }
+  return false
+}
+
+// One element of a run of siblings: a heading (its text and level, 1 to 6),
+// the page's footnotes (heading null, level 1: Quartz puts them after the
+// LAST section, so they follow a Curriculum connection at the end of a page
+// and must still print), or anything else (heading null, level 0).
+export type Block = { heading: string | null; level: number }
+
+// Which of a run of siblings are left off paper: a Curriculum connection
+// heading, and everything after it up to the next heading of the same or a
+// higher level - the section as the page's table of contents draws it. A
+// deeper heading inside it goes with it.
+export function leftOffPaper(blocks: Block[], curriculumHeadings: string[]): boolean[] {
+  const result: boolean[] = []
+  // The level of the Curriculum connection heading being left off, or 0.
+  let openLevel = 0
+  for (const block of blocks) {
+    if (block.level > 0) {
+      if (openLevel > 0 && block.level <= openLevel) {
+        openLevel = 0
+      }
+      if (openLevel === 0 && block.heading !== null && isCurriculumHeading(block.heading, curriculumHeadings)) {
+        openLevel = block.level
+      }
+    }
+    result.push(openLevel > 0)
+  }
+  return result
 }
 
 // "Page 1 of 3" over the questions, "Answers 1 of 2" over the answers.
