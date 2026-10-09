@@ -593,7 +593,9 @@ enum AssistContract {
             // from the menu bar, and the `…FromTheMenu` twins of what they
             // say in the first person. Rendered with the same literals as
             // their conversational originals, so the two can be read side by
-            // side.
+            // side. A sheet's TITLE is in title case, so a club's title twin
+            // is `…ForAClub`, never `…ForAMeeting`: that suffix promises the
+            // lower-case word (ClubNounTests).
             "undidFromTheMenu": AssistWording.undidFromTheMenu(changePlaceholder),
             "undidPartlyFromTheMenu": AssistWording.undidPartlyFromTheMenu(changePlaceholder, leftAlone: 2),
             "couldNotUndoFromTheMenu": AssistWording.couldNotUndoFromTheMenu(changePlaceholder, leftAlone: 2),
@@ -641,13 +643,13 @@ enum AssistContract {
             "menuPublishPagesTitle": AssistWording.menuPublishPagesTitle(course: course, section: section),
             "menuHidePagesTitle": AssistWording.menuHidePagesTitle(course: course, section: section),
             "menuPublishClassTitle": AssistWording.menuPublishClassTitle(course: course, section: section),
-            "menuPublishClassTitleForAMeeting": AssistWording.menuPublishClassTitle(
+            "menuPublishClassTitleForAClub": AssistWording.menuPublishClassTitle(
                 course: course, section: section, noun: .meeting
             ),
             "menuReDateTitle": AssistWording.menuReDateTitle(course: course, section: section),
-            "menuReDateTitleForAMeeting": AssistWording.menuReDateTitle(course: course, section: section, noun: .meeting),
+            "menuReDateTitleForAClub": AssistWording.menuReDateTitle(course: course, section: section, noun: .meeting),
             "menuMakeRoomTitle": AssistWording.menuMakeRoomTitle(course: course, section: section),
-            "menuMakeRoomTitleForAMeeting": AssistWording.menuMakeRoomTitle(
+            "menuMakeRoomTitleForAClub": AssistWording.menuMakeRoomTitle(
                 course: course, section: section, noun: .meeting
             ),
             "menuPickPagesToPublish": AssistWording.menuPickPagesToPublish,
@@ -671,7 +673,7 @@ enum AssistContract {
             "menuRebuildPreviewTitle": AssistWording.menuRebuildPreviewTitle,
             "menuUndoLastChangeTitle": AssistWording.menuUndoLastChangeTitle,
             "menuAddNextClassTitle": AssistWording.menuAddNextClassTitle(),
-            "menuAddNextClassTitleForAMeeting": AssistWording.menuAddNextClassTitle(noun: .meeting),
+            "menuAddNextClassTitleForAClub": AssistWording.menuAddNextClassTitle(noun: .meeting),
             "publishingAndDeployingTitle": AssistWording.publishingAndDeployingTitle,
             "publishingAndDeployingExplained": AssistWording.publishingAndDeployingExplained,
             "sectionIsChangingFromTheMenu": AssistWording.sectionIsChangingFromTheMenu(course: course, section: section),
@@ -679,7 +681,7 @@ enum AssistContract {
             // at Deploy and at Section ▸ Publish Pages…, and what an
             // assistant is told when it cannot be asked.
             "laterClassesTitle": AssistWording.laterClassesTitle(),
-            "laterClassesTitleForAMeeting": AssistWording.laterClassesTitle(noun: .meeting),
+            "laterClassesTitleForAClub": AssistWording.laterClassesTitle(noun: .meeting),
             "laterClassesAtDeploy": AssistWording.laterClassesAtDeploy(nextDay: "Friday, 2026-10-09"),
             "laterClassesAtDeployForAMeeting": AssistWording.laterClassesAtDeploy(
                 nextDay: "Friday, 2026-10-09", noun: .meeting
