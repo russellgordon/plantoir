@@ -1285,6 +1285,19 @@ Reference: `Plantoir/Views/SidebarPane.xaml.cs` (`SidebarRow`,
 `ReconcileSections`), `Plantoir/Views/SidebarPane.xaml` (the three `Mode=OneWay`
 bindings), `Plantoir/MainWindow.xaml.cs`.
 
+## Printable pages (#454, v2.0.0) — a pointer
+
+The build, the site and the shared Python do everything for a printed page,
+and Windows inherits them unchanged (`support/quartz`, `scripts/page_features.py`,
+`scripts/print_settings.py`, the skill under `support/agent_guidance`). What the
+Windows app owes — fetching Paged.js into `runtime\vendor\pagedjs`, Course
+Settings' Printing section, the widened `settings saved` line, writing the
+guidance into the working folder's root, and measuring WebView2's preview pane
+and Edge — is the `windows` issue for #454. The design and every measurement:
+[06 → F](06-quartz-customizations.md#f-additions-installed-every-build-printable-pages-454-v200),
+[05 → Printable pages](05-build-pipeline.md#printable-pages-what-the-build-does-454-v200),
+[09 → Printing](09-mac-app.md#printing-454-v200).
+
 ## What this page does not cover
 
 Deliberately, so there is one home for each and not two that drift. The macOS

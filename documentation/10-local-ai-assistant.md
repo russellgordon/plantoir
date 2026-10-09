@@ -6370,7 +6370,15 @@ Three properties matter more than the mechanism:
   is watching. Neither door writes a `CLAUDE.md`, an `AGENTS.md` or a
   `.mcp.json` — Codex's `AGENTS.md` convention costs nothing and gains nothing
   here, because there is no such file for either agent to read and the whole
-  instruction set is the one-paragraph greeting passed as an argument.
+  instruction set is the one-paragraph greeting passed as an argument. **Changed
+  by #454 (v2.0.0), and the doors still write nothing:** the app's toolchain
+  mirror now writes a Plantoir-managed `AGENTS.md` and `CLAUDE.md` at the
+  working folder's ROOT — which is in no vault, each course being its own —
+  naming the `plantoir-printing` skill it writes under `.claude/skills` and
+  `.agents/skills`, because measured, Codex found a skill only there and
+  Claude Code found a per-course one only after the first page was written.
+  A teacher's own file of either name (no Plantoir marker) is left alone. See
+  [09 → Printing](09-mac-app.md#guidance-for-an-assistant-written-into-the-working-folder).
 - **The item is hidden when the tool is not installed**, and hidden
   independently per door. Not greyed out: a menu that teaches teachers to stop
   reading it is worse than a shorter menu.
@@ -7192,7 +7200,10 @@ will eventually ask why the two are not the same.
   given the folder as an argument.
 - **Auto-installing Codex, or offering to.** See above.
 - **Writing an `AGENTS.md` into the teacher's vault.** A developer-looking file
-  in the folder Obsidian watches, to say what the greeting already says.
+  in the folder Obsidian watches, to say what the greeting already says. (Still
+  rejected for the VAULT; #454 writes one at the working folder's root, which
+  Obsidian never shows, because the guidance there says what the greeting
+  does not.)
 - **The `OutsideAgent` / `OutsideAgentLauncher` extraction**, on the day of a
   release. The helpers were lifted (one directory search parameterised by name,
   one support directory, one terminal launch, one greeting) and nothing is
