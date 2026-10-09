@@ -32,6 +32,13 @@ SUPPORT_DIR = _env_path("PLANTOIR_SUPPORT_DIR", "/opt/support")
 # node_modules beside it.
 QUARTZ_DIR = _env_path("PLANTOIR_QUARTZ_DIR", "/opt/quartz")
 
+# Engines a site carries only when one of its pages asks for them (#454:
+# Paged.js for printable pages; #455 adds Pyodide), each in its own folder.
+# Beside the Quartz scaffold, so the container's /opt/vendor and Windows'
+# <runtime>\vendor (PLANTOIR_QUARTZ_DIR is <runtime>\quartz there) both follow
+# without a variable of their own; set PLANTOIR_VENDOR_DIR to put it elsewhere.
+VENDOR_DIR = _env_path("PLANTOIR_VENDOR_DIR", str(QUARTZ_DIR.parent / "vendor"))
+
 # Where these scripts themselves live (deploy.py re-invokes build_site.py).
 SCRIPTS_DIR = _env_path("PLANTOIR_SCRIPTS_DIR", "/opt/scripts")
 
